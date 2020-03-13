@@ -1,0 +1,16 @@
+bazel
+bazel-bazel-test
+bazel-bin
+bazel-genfiles
+bazel-out
+bazel-testlogs
+bazel-TRTorch
+third_party/pytorch
+*.jit
+*.jit.pt
+.\#*
+experiments/
+py/build/
+py/tmp/
+py/.eggs
+ 
