@@ -38,7 +38,13 @@ namespace trtorch {
  *
  */
 struct TRTORCH_API ExtraInfo {
-    //struct TRTORCH_API InputRangesArray {
+    /**
+     * @brief A struct to hold an input range (used by TensorRT Optimization profile)
+     *
+     * This struct can either hold a single vector representing an input shape, signifying a 
+     * static input shape or a set of three input shapes representing the min, optiminal and max
+     * input shapes allowed for the engine.
+     */
     struct TRTORCH_API InputRange {
         std::vector<int64_t> min;
         std::vector<int64_t> opt;
