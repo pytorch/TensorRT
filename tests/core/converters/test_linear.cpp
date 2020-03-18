@@ -8,7 +8,7 @@
 TEST(Converters, ATenLinearNoBiasConvertsCorrectly) {
     const auto graph = R"IR(
       graph(%0 : Tensor,
-            %1 : Float(2, 2)):
+            %1 : Float(3, 2)):
         %2 : None = prim::Constant()
         %3 : Tensor = aten::linear(%0, %1, %2)
         return (%3))IR";
@@ -19,7 +19,7 @@ TEST(Converters, ATenLinearNoBiasConvertsCorrectly) {
     //Input Tensor needs to be 4D for TensorRT linear
     auto in = at::randint(1, 10, {1, 2}, {at::kCUDA});
     auto w = at::randint(1, 10, {3, 2}, {at::kCUDA});
-    
+
     auto params = trtorch::core::conversion::get_named_params(g->inputs(), {w});
     auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
 
@@ -32,8 +32,6 @@ TEST(Converters, ATenLinearNoBiasConvertsCorrectly) {
 }
 
 
-//TODO: Track down the cause of why the JIT linear function fails
-//TODO: Sort out what the exepected output dim should be? 
 TEST(Converters, ATenLinearBiasConvertsCorrectly) {
     const auto graph = R"IR(
       graph(%0 : Tensor,
@@ -53,7 +51,7 @@ TEST(Converters, ATenLinearBiasConvertsCorrectly) {
     auto jit_in = at::clone(in);
     auto jit_w = at::clone(w);
     auto jit_b = at::clone(b);
-    
+
     auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w, jit_b});
     auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
 
