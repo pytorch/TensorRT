@@ -8,6 +8,7 @@ test_suite(
     tests = [
         ":test_modules_as_engines",
         ":test_compiled_modules",
+	":test_multiple_registered_engines"
     ]
 )
 

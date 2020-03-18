@@ -19,9 +19,9 @@ TEST_P(ModuleTests, ModuleAsEngineIsClose) {
 INSTANTIATE_TEST_SUITE_P(ModuleAsEngineForwardIsCloseSuite,
                          ModuleTests,
                          testing::Values(
-                             PathAndInSize({"tests/models/lenet.jit.pt",
+                             PathAndInSize({"tests/modules/lenet.jit.pt",
                                             {{1,1,28,28}}}),
-                             PathAndInSize({"tests/models/resnet18.jit.pt",
+                             PathAndInSize({"tests/modules/resnet18.jit.pt",
                                             {{1,3,224,224}}}),
-                             PathAndInSize({"tests/models/resnet50.jit.pt",
+                             PathAndInSize({"tests/modules/resnet50.jit.pt",
                                             {{1,3,224,224}}})));
