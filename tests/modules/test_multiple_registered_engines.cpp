@@ -8,8 +8,8 @@ TEST(ModuleTests, CanRunMultipleEngines) {
     torch::jit::script::Module mod1;
     torch::jit::script::Module mod2;
     try {
-        mod1 = torch::jit::load("tests/models/resnet50.jit.pt");
-        mod2 = torch::jit::load("tests/models/resnet18.jit.pt");
+        mod1 = torch::jit::load("tests/modules/resnet50.jit.pt");
+        mod2 = torch::jit::load("tests/modules/resnet18.jit.pt");
     }
     catch (const c10::Error& e) {
         std::cerr << "error loading the model\n";
