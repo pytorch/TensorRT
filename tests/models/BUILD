@@ -15,10 +15,7 @@ cc_test(
     name = "test_multiple_registered_engines",
     srcs = ["test_multiple_registered_engines.cpp"],
     deps = [
-        "//cpp/api:trtorch",
-        "//tests/util",
-        "@libtorch//:libtorch",
-        "@googletest//:gtest_main",
+        ":module_test",
     ],
     data = [
         ":jit_models"

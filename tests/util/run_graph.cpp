@@ -21,8 +21,11 @@ std::vector<at::Tensor> RunGraph(std::shared_ptr<torch::jit::Graph>& g,
         inputs_.push_back(in.clone());
     }
 
-    for (auto p : params) {
-        inputs_.push_back(p.second.clone());
+    for (auto* in : g->inputs()) {
+        const auto iter = params.find(in);
+        if (iter != params.end()) {
+            inputs_.push_back(iter->second.clone());
+        }
     }
 
     torch::jit::GraphExecutor executor(g);

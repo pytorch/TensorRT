@@ -1,8 +1,8 @@
 #include <string>
 #include "gtest/gtest.h"
-#include "torch/csrc/jit/irparser.h"
+#include "torch/script.h"
 #include "tests/util/util.h"
-#include "cpp/trtorch.h"
+#include "trtorch/trtorch.h"
 
 TEST(ModuleTests, CanRunMultipleEngines) {
     torch::jit::script::Module mod1;
@@ -16,7 +16,7 @@ TEST(ModuleTests, CanRunMultipleEngines) {
         return;
     }
 
-    const std::vector<int64_t> input_shape = {1,3,224,224};
+    const std::vector<std::vector<int64_t>> input_shapes = {{1,3,224,224}};
     
     std::vector<torch::jit::IValue> jit1_inputs_ivalues;
     std::vector<torch::jit::IValue> trt1_inputs_ivalues;
@@ -38,18 +38,18 @@ TEST(ModuleTests, CanRunMultipleEngines) {
     std::vector<at::Tensor> jit1_results;
     jit1_results.push_back(jit1_results_ivalues.toTensor());
 
-        torch::jit::IValue jit2_results_ivalues = trtorch::tests::util::RunModuleForward(mod2, jit2_inputs_ivalues);
+    torch::jit::IValue jit2_results_ivalues = trtorch::tests::util::RunModuleForward(mod2, jit2_inputs_ivalues);
     std::vector<at::Tensor> jit2_results;
     jit2_results.push_back(jit2_results_ivalues.toTensor());
 
     
     auto trt_mod1 = trtorch::CompileGraph(mod1, input_shapes);
-    torch::jit::IValue trt1_results_ivalues = trtorch::tests::util::RunModuleForward(trt1_mod, trt1_inputs_ivalues);
+    torch::jit::IValue trt1_results_ivalues = trtorch::tests::util::RunModuleForward(trt_mod1, trt1_inputs_ivalues);
     std::vector<at::Tensor> trt1_results;
     trt1_results.push_back(trt1_results_ivalues.toTensor());
 
      auto trt_mod2 = trtorch::CompileGraph(mod2, input_shapes);
-    torch::jit::IValue trt2_results_ivalues = trtorch::tests::util::RunModuleForward(trt2_mod, trt2_inputs_ivalues);
+    torch::jit::IValue trt2_results_ivalues = trtorch::tests::util::RunModuleForward(trt_mod2, trt2_inputs_ivalues);
     std::vector<at::Tensor> trt2_results;
     trt2_results.push_back(trt2_results_ivalues.toTensor());
 
