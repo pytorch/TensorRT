@@ -138,16 +138,3 @@ RegisterNodeConversionPatterns& RegisterNodeConversionPatterns::RegisterNodeConv
 } // namespace conversion
 } // namespace core
 } // namespace trtorch
-
-// Hack to keep the symbols live, need to get rid of this
-#include "core/conversion/converters/impl/activation.cpp"
-#include "core/conversion/converters/impl/batch_norm.cpp"
-#include "core/conversion/converters/impl/constant.cpp"
-#include "core/conversion/converters/impl/conv_deconv.cpp"
-#include "core/conversion/converters/impl/element_wise.cpp"
-#include "core/conversion/converters/impl/linear.cpp"
-#include "core/conversion/converters/impl/pooling.cpp"
-#include "core/conversion/converters/impl/scale.cpp"
-#include "core/conversion/converters/impl/softmax.cpp"
-#include "core/conversion/converters/impl/unary.cpp"
-

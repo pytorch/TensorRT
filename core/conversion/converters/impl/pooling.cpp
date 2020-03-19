@@ -1,4 +1,3 @@
-#pragma once
 #include "core/util/prelude.h"
 #include "core/conversion/converters/converters.h"
 
