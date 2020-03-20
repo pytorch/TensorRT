@@ -1,4 +1,3 @@
-#pragma once
 #include "torch/csrc/jit/ir.h"
 #include "torch/csrc/jit/constants.h"
 #include "ATen/core/functional.h"

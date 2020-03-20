@@ -4,15 +4,16 @@ cc_library(
     name = "evaluators",
     hdrs = [
         "evaluators.h",
-        "prim.cpp"
     ],
     srcs = [
         "NodeEvaluatorRegistry.cpp",
+        "prim.cpp",
     ],
     deps = [
         "@libtorch//:libtorch",
         "//core/util:prelude",
-    ]
+    ],
+    alwayslink = True,
 )
 
 load("@rules_pkg//:pkg.bzl", "pkg_tar")

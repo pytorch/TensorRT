@@ -85,6 +85,3 @@ RegisterNodeEvaluators& RegisterNodeEvaluators::RegisterNodeEvaluators::operator
 } // namespace conversion
 } // namespace core
 } // namespace trtorch
-
-// Hack, remove when symbols don't get left out
-#include "core/conversion/evaluators/prim.cpp"
