@@ -53,3 +53,11 @@
       TRTORCH_THROW_ERROR("Expected " << #cond                              \
                           << " to be true but got false\n" << __VA_ARGS__); \
   }
+
+
+// suppress an unused variable.
+#if defined(_MSC_VER) && !defined(__clang__)
+#define TRTORCH_UNUSED __pragma(warning(suppress: 4100 4101))
+#else
+#define TRTORCH_UNUSED __attribute__((__unused__))
+#endif //_MSC_VER

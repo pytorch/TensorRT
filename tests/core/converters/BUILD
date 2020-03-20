@@ -5,7 +5,7 @@ converter_test(
 )
 
 converter_test(
-    name = "test_relu"
+    name = "test_activation"
 )
 
 converter_test(
@@ -36,7 +36,7 @@ test_suite(
     name = "test_converters",
     tests = [
         ":test_softmax",
-        ":test_relu",
+        ":test_activation",
         ":test_pooling",
         ":test_unary",
         ":test_linear",
