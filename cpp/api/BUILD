@@ -17,7 +17,8 @@ cc_library(
         "//core/util:prelude"
     ],
     strip_include_prefix = "include/",
-    linkstatic = True 
+    linkstatic = True,
+    alwayslink = True
 )
     
     
