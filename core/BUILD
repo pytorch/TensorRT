@@ -15,7 +15,8 @@ cc_library(
         "//core/util/logging",
         "@libtorch//:libtorch",
         "@tensorrt//:nvinfer"
-    ]
+    ],
+    alwayslink=True, 
 )
 
 
