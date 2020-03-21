@@ -24,7 +24,7 @@
 namespace trtorch {
 namespace core {
 
-c10::FunctionSchema GenerateGraphSchema(torch::jit::script::Module mod, std::string method_name, std::shared_ptr<torch::jit::Graph>& g) {    
+c10::FunctionSchema GenerateGraphSchema(torch::jit::script::Module mod, const std::string& method_name, std::shared_ptr<torch::jit::Graph>& g) {    
 
     std::vector<c10::Argument> args;
     for (auto in : g->inputs()) {
@@ -65,7 +65,7 @@ void AddEngineToGraph(torch::jit::script::Module mod, std::shared_ptr<torch::jit
 }
 
 std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod,
-                                    std::string method_name,
+                                    const std::string& method_name,
                                     conversion::ExtraInfo cfg) {
     auto g = mod.get_method(method_name).graph();
     // Go through PyTorch Lowering to simplify graph and extract weight parameters
