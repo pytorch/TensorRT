@@ -24,13 +24,16 @@ std::vector<at::Tensor> RunEngine(std::string& eng, std::vector<at::Tensor> inpu
     auto ctx = engine->createExecutionContext();
 
     std::vector<void*> gpu_handles;
+
+    std::vector<at::Tensor> contig_inputs{};
+    contig_inputs.reserve(inputs.size());
     for (size_t i = 0; i < inputs.size(); i++) {
-        auto in_gpu = inputs[i].to(at::kCUDA);
-        auto shape = core::util::toDimsPad(in_gpu.sizes(), 1);
-        in_gpu = inputs[i].reshape(core::util::toVec(shape));
-        LOG_DEBUG("In shape:" << in_gpu.sizes() );
-        ctx->setBindingDimensions(i, shape);
-        gpu_handles.push_back(in_gpu.data_ptr());
+        auto dims = core::util::toDimsPad(inputs[i].sizes(), 1);
+        auto shape = core::util::toVec(dims);
+        contig_inputs.push_back(inputs[i].to(at::kCUDA).view(shape).contiguous());
+        LOG_DEBUG("In shape:" << shape);
+        ctx->setBindingDimensions(i, dims);
+        gpu_handles.push_back(contig_inputs.back().data_ptr());
     }
 
     if (!ctx->allInputDimensionsSpecified()) {
