@@ -4,22 +4,51 @@
 #include "tests/util/util.h"
 #include "core/compiler.h"
 
-TEST(Converters, ATenLogConvertsCorrectly) {
-    const auto graph = R"IR(
+namespace {
+std::string gen_test_graph(const std::string &unary) {
+  return R"IR(
       graph(%0 : Tensor):
-        %3 : Tensor = aten::log(%0)
+        %3 : Tensor = aten::)IR" +
+         unary + R"IR((%0)
         return (%3))IR";
-
-    auto g = std::make_shared<torch::jit::Graph>();
-    torch::jit::script::parseIR(graph, &*g);
-    
-    auto in = at::randint(1, 5, {5}, {at::kCUDA});
-    auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-    auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
-
-    in = at::clone(in);
-    params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-    auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
-
-    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0]));
 }
+} // namespace
+
+#define test_unary(unary, name)                                                \
+  TEST(Converters, ATen##name##ConvertsCorrectly) {                            \
+    const auto graph = gen_test_graph(#unary);                                 \
+                                                                               \
+    auto g = std::make_shared<torch::jit::Graph>();                            \
+    torch::jit::script::parseIR(graph, &*g);                                   \
+                                                                               \
+    auto in = at::empty({10}, {at::kCUDA}).uniform_(0, 0.5);                   \
+    auto params =                                                              \
+        trtorch::core::conversion::get_named_params(g->inputs(), {});          \
+    auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});        \
+                                                                               \
+    in = at::clone(in);                                                        \
+    params = trtorch::core::conversion::get_named_params(g->inputs(), {});     \
+    auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});  \
+                                                                               \
+    ASSERT_TRUE(                                                               \
+        trtorch::tests::util::almostEqual(jit_results[0], trt_results[0]));    \
+  }
+
+test_unary(cos, Cos);
+test_unary(acos, Acos);
+test_unary(cosh, Cosh);
+test_unary(sin, Sin);
+test_unary(asin, Asin);
+test_unary(sinh, Sinh);
+test_unary(tan, Tan);
+test_unary(atan, Atan);
+test_unary(abs, Abs);
+test_unary(floor, Floor);
+test_unary(reciprocal, Reciprocal);
+test_unary(log, Log);
+test_unary(ceil, Ceil);
+test_unary(sqrt, Sqrt);
+test_unary(exp, Exp);
+test_unary(neg, Neg);
+
+#undef test_unary
