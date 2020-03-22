@@ -16,7 +16,6 @@ cc_library(
         "impl/element_wise.cpp",
         "impl/linear.cpp",
         "impl/pooling.cpp",
-        "impl/scale.cpp",
         "impl/softmax.cpp",
         "impl/unary.cpp",
     ],
