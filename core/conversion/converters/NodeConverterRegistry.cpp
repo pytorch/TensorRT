@@ -125,15 +125,6 @@ RegisterNodeConversionPatterns&& RegisterNodeConversionPatterns::pattern(Convers
 RegisterNodeConversionPatterns::RegisterNodeConversionPatterns(RegisterNodeConversionPatterns&&) noexcept = default;
 RegisterNodeConversionPatterns& RegisterNodeConversionPatterns::RegisterNodeConversionPatterns::operator=(RegisterNodeConversionPatterns&&) noexcept = default;
 
-// RegisterNodeConversionPatterns::RegisterNodeConversionPatterns(std::vector<ConversionPattern> patterns) {
-//     for (auto p : patterns) {
-//         std::cout << "HELLO" << std::endl;
-//         util::logging::get_logger().log(util::logging::LogLevel::kDEBUG,
-//                                         "Registering Converter for " + p.signature);
-//         RegisterNodeConverter(p.signature, p.converter);
-//     }
-// }
-
 } // namespace converters
 } // namespace conversion
 } // namespace core

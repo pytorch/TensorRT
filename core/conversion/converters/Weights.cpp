@@ -26,8 +26,6 @@ Weights::Weights(ConversionCtx* ctx, float val) {
     ctx->builder_resources.push_back(buf);
     this->kernel_shape.nbDims = 1;
     this->kernel_shape.d[0] = 1;
-
-    std::cout << ((float*)this->data.values)[0] << std::endl;
 }
 
 Weights::Weights(ConversionCtx* ctx, at::Tensor t) {
