@@ -15,7 +15,7 @@ std::vector<at::Tensor> RunCudaEngine(nvinfer1::IExecutionContext* ctx, std::pai
     std::vector<at::Tensor> contig_inputs{};
     contig_inputs.reserve(inputs.size());
     for (size_t i = 0; i < inputs.size(); i++) {
-        auto dims = core::util::toDimsPad(inputs[i].sizes(), 4);
+        auto dims = core::util::toDimsPad(inputs[i].sizes(), 1);
         auto shape = core::util::toVec(dims);
         contig_inputs.push_back(inputs[i].to(at::kCUDA).view(shape).contiguous());
         LOG_DEBUG("In shape:" << shape);
