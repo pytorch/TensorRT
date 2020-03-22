@@ -22,7 +22,6 @@ c10::FunctionSchema GenerateEngineFunctionSchema(EngineID id, nvinfer1::ICudaEng
     std::stringstream in_ss;
     std::stringstream out_ss;
 
-    std::cout << num_inputs << num_outputs << std::endl;
     uint64_t inputs_parsed = 0;
     uint64_t outputs_parsed = 0;
     for (int i = 0; i < engine->getNbBindings(); i++) {
