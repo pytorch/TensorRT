@@ -28,10 +28,6 @@ converter_test(
     name = "test_conv"
 )
 
-converter_test(
-    name = "test_scale"
-)
-
 test_suite(
     name = "test_converters",
     tests = [
@@ -42,7 +38,6 @@ test_suite(
         ":test_linear",
         ":test_element_wise",
         ":test_conv",
-        ":test_scale"
     ]
 )
 
