@@ -64,6 +64,28 @@ void AddEngineToGraph(torch::jit::script::Module mod, std::shared_ptr<torch::jit
     return;
 }
 
+bool CheckMethodOperatorSupport(const torch::jit::script::Module& mod,
+                                std::string method_name) {
+    auto g = mod.get_method(method_name).graph();
+    // Go through PyTorch Lowering to simplify graph and extract weight parameters
+    auto graph_and_parameters = torch::jit::LowerGraph(*g, mod._ivalue());
+    
+    g = graph_and_parameters.first;
+    
+    // Go through TRTorch Lowering to reformat graph to be conversion friendly
+    // and also segment for accelerators and executors (TRT-DLA, TRT-GPU, PYT)
+    lowering::LowerGraph(g);
+    
+    auto params = graph_and_parameters.second;
+    auto named_params = conversion::get_named_params(g->inputs(), params);
+    LOG_DEBUG(*g << "(CheckMethodOperatorSupport)\n");
+    
+    // Is this necessary?
+    lowering::LowerBlock(g->block());
+    
+    return conversion::VerifyConverterSupportForBlock(g->block());
+}
+
 std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod,
                                     std::string method_name,
                                     conversion::ExtraInfo cfg) {
@@ -87,7 +109,6 @@ std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod,
     return std::move(engine);
 }
 
-// TODO: Consider if there is a better way to deal with input size
 torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod,
                                         conversion::ExtraInfo cfg) {
     // TODO: Should be doing a functional transform but need PR #31978

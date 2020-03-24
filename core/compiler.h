@@ -6,9 +6,11 @@
 
 namespace trtorch {
 namespace core {
+bool CheckMethodOperatorSupport(const torch::jit::script::Module& mod, std::string method_name);
 
 std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod,
                                     std::string method_name, conversion::ExtraInfo cfg);
+
 torch::jit::script::Module CompileGraph(const torch::jit::script::Module& module, conversion::ExtraInfo cfg);
 
 } // namespace core

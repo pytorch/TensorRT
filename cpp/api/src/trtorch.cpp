@@ -10,12 +10,17 @@ namespace trtorch {
 // Defined in extra_info.cpp
 core::conversion::ExtraInfo to_internal_extra_info(ExtraInfo external);
 
-std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod,
+bool CheckMethodOperatorSupport(const torch::jit::script::Module& module,
+                                std::string method_name) {
+    return core::CheckMethodOperatorSupport(module, method_name);
+}
+
+std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& module,
                                     std::string method_name, ExtraInfo info) {
     LOG_DEBUG(get_build_info());
     // Want to export a much simpler (non TRT header dependent) API so doing the
     // type conversion here
-    return std::move(core::ConvertGraphToTRTEngine(mod, method_name, to_internal_extra_info(info)));
+    return std::move(core::ConvertGraphToTRTEngine(module, method_name, to_internal_extra_info(info)));
 }
 
 torch::jit::script::Module CompileGraph(const torch::jit::script::Module& module, ExtraInfo info) {

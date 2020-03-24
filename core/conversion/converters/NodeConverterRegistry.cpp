@@ -46,10 +46,6 @@ using ConverterLUT = std::unordered_map<torch::jit::Symbol, OpConverter>;
 class NodeConverterRegistry {
 public:
     bool RegisterConverter(torch::jit::FunctionSchema* signature, OpConverter& converter) {
-        // NOTE: This is useful for people developing extentions to the conversion registry as is
-        // If you are working on the core conversion library and the conversion registry
-        // itself, it might helpful to set -DDEBUG_MSGS when you compile so you can watch the
-        // registration of core converters during init, otherwise the messages will be masked
         LOG_DEBUG("Registering Converter for " << canonical_schema_string(*signature));
         auto sym = torch::jit::Symbol::fromQualString(signature->name());
         converter_lut_[sym] = std::move(converter);
@@ -70,13 +66,12 @@ public:
     bool Convertable(const torch::jit::Node* n) {
         auto schema = n->maybeSchema();
         if (schema) {
-            auto converter = GetConverter(schema);
-            if (converter) {
-                return true;
+            auto sym = torch::jit::Symbol::fromQualString(schema->name());
+            auto iter = converter_lut_.find(sym);
+            if (iter == converter_lut_.end()) {
+               return false;
             } else {
-                LOG_DEBUG("Node has no registered converter: " << util::node_info(n) \
-                          << " (NodeConverterRegistry.Convertable)\nSchema: " << *schema);
-                return false;
+                return true;
             }
         } else {
             LOG_DEBUG("Unable to get schema for Node " << util::node_info(n) \

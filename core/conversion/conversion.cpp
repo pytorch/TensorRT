@@ -11,7 +11,7 @@ namespace core {
 namespace conversion {
 
 // Defined in core/conversion/conversion_blacklist.cpp 
-bool isNodeConversionBlacklisted(torch::jit::Node* n);
+bool isNodeConversionBlacklisted(const torch::jit::Node* n);
 
 bool OpSupported(const torch::jit::Node* n) {
     bool evalable = evaluators::shouldEvalAtConversionTime(n);
@@ -19,7 +19,7 @@ bool OpSupported(const torch::jit::Node* n) {
     return evalable || convertable;
 }
 
-c10::optional<torch::jit::IValue> EvaluateNode(ConversionCtx* ctx, torch::jit::Node* n, int level=0, int limit=10) {
+c10::optional<torch::jit::IValue> EvaluateNode(ConversionCtx* ctx, const torch::jit::Node* n, int level=0, int limit=10) {
     // Check to see if you can just go through and eval all of these AOT (saves the recursion)
     // Also probably a better way to deal with the two error cases;
     TRTORCH_CHECK(level < limit, "Failed to evaluate node: " << *n              \
@@ -55,7 +55,7 @@ c10::optional<torch::jit::IValue> EvaluateNode(ConversionCtx* ctx, torch::jit::N
     return eval;
 }
 
-bool AddLayer(ConversionCtx* ctx, torch::jit::Node* n) {
+bool AddLayer(ConversionCtx* ctx, const torch::jit::Node* n) {
     LOG_INFO(ctx->logger,
              "Adding Layer " << util::node_info(n) << " (ctx.AddLayer)");
     converters::args node_args;
@@ -114,11 +114,11 @@ bool AddLayer(ConversionCtx* ctx, torch::jit::Node* n) {
 }
 
 bool AddInputs(ConversionCtx* ctx,
-                at::ArrayRef<torch::jit::Value*> inputs,
+                at::ArrayRef<const torch::jit::Value*> inputs,
                 std::vector<InputRange>& input_dims) {
     
     auto type_lut = torch::jit::script::string_to_type_lut();
-    std::vector<torch::jit::Value*> input_tensors;
+    std::vector<const torch::jit::Value*> input_tensors;
     for (auto in : inputs) {
         // Disregarding inputs that are not tensors
         //
@@ -163,7 +163,7 @@ bool AddInputs(ConversionCtx* ctx,
     return true;
 }
 
-bool MarkOutputs(ConversionCtx* ctx, at::ArrayRef<torch::jit::Value*> outputs) {
+bool MarkOutputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> outputs) {
     for (auto out : outputs) {
         ctx->net->markOutput(*(ctx->value_tensor_map[out]));
         LOG_INFO(ctx->logger,
@@ -178,7 +178,7 @@ void AddParamsToCtxValueMap(ConversionCtx* ctx, GraphParams& params) {
     }
 }
 
-void ConvertBlockToNetDef(ConversionCtx* ctx, torch::jit::Block* b, ExtraInfo build_info, GraphParams& static_params) {
+void ConvertBlockToNetDef(ConversionCtx* ctx, const torch::jit::Block* b, ExtraInfo build_info, GraphParams& static_params) {
      LOG_INFO(ctx->logger, "Converting Block");
 
     auto inputs = b->inputs();
@@ -188,7 +188,6 @@ void ConvertBlockToNetDef(ConversionCtx* ctx, torch::jit::Block* b, ExtraInfo bu
     auto nodes = b->nodes();
 
     for (const auto n : nodes) {
-        
         bool to_eval = evaluators::shouldEvalAtConversionTime(n);
         bool blacklisted = isNodeConversionBlacklisted(n);
         if (!to_eval && !blacklisted) {
@@ -220,11 +219,39 @@ void ConvertBlockToNetDef(ConversionCtx* ctx, torch::jit::Block* b, ExtraInfo bu
 // a serialized TensorRT engine that can be deserialized and run
 
 // Probably should consolidate these two functions 
-std::string ConvertBlockToEngine(torch::jit::Block* b, ExtraInfo build_info, GraphParams& static_params) {
+std::string ConvertBlockToEngine(const torch::jit::Block* b, ExtraInfo build_info, GraphParams& static_params) {
     ConversionCtx ctx(build_info.engine_settings);
     ConvertBlockToNetDef(&ctx, b, build_info, static_params);
     std::string engine = ctx.SerializeEngine();
     return engine;
+}
+
+bool VerifyConverterSupportForBlock(const torch::jit::Block* b) {
+    bool supported = true;
+    std::set<std::string> unsupported_ops;
+    for (const auto n : b->nodes()) {
+        if (!OpSupported(n)) {
+            auto schema = n->maybeSchema();
+            TRTORCH_CHECK(schema, "Unable to get schema for Node " << util::node_info(n) \
+                                    << " (conversion.AddLayer)");
+            std::stringstream ss;
+            ss << *schema;
+            unsupported_ops.insert(ss.str());
+            supported = false;
+        }
+    }
+
+    if (!supported) {
+        std::stringstream unsupported_msg;
+         unsupported_msg << "Method requested cannot be compiled by TRTorch.\nUnsupported operators listed below:" << std::endl;
+        for (auto s : unsupported_ops) {
+            unsupported_msg << "  -  " << s << std::endl;
+        }
+        unsupported_msg << "You can either implement converters for these ops in your application or file a bug" << std::endl;
+        unsupported_msg <<  "https://www.github.com/nvidia/TRTorch/issues" << std::endl;
+        LOG_ERROR(unsupported_msg.str());
+    }
+    return supported;
 }
 
 } // namespace conversion

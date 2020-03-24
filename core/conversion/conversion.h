@@ -43,9 +43,11 @@ GraphParams get_named_params(c10::ArrayRef<torch::jit::Value*> inputs, std::vect
 
 // Converts a already lowered block (blocks with no sub blocks) to
 // a serialized TensorRT engine that can be deserialized and run
-std::string ConvertBlockToEngine(torch::jit::Block* b, ExtraInfo build_info, GraphParams& static_params);
+std::string ConvertBlockToEngine(const torch::jit::Block* b, ExtraInfo build_info, GraphParams& static_params);
 
 bool OpSupported(const torch::jit::Node* n);
+
+bool VerifyConverterSupportForBlock(const torch::jit::Block* b);
 
 } // namespace conversion
 } // namespace core

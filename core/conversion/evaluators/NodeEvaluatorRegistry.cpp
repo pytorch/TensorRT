@@ -20,10 +20,6 @@ using EvaluatorLUT = std::unordered_map<torch::jit::NodeKind, NodeEvaluator>;
 class NodeEvaluatorRegistry {
 public:
     void RegisterEvaluator(torch::jit::NodeKind node_kind, NodeEvaluator& evaluator) {
-        // NOTE: This is useful for people developing extentions to the conversion registry as is
-        // If you are working on the core conversion library and the conversion registry
-        // itself, it might helpful to set -DDEBUG_MSGS when you compile so you can watch the
-        // registration of core converters during init, otherwise the messages will be masked
         LOG_DEBUG("Registering evaluator for " << node_kind.toQualString());
         evaluator_lut_[node_kind] = std::move(evaluator);
     }
