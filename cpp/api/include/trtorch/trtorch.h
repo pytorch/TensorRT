@@ -216,6 +216,19 @@ TRTORCH_API std::string get_build_info();
 TRTORCH_API void dump_build_info();
 
 /**
+ * @brief Check to see if a module is fully supported by the compiler
+ *
+ * @param module: torch::jit::script::Module - Existing TorchScript module 
+ * @param method_name: std::string - Name of method to compile
+ *
+ * Takes a module and a method name and checks if the method graph contains purely
+ * convertable operators 
+ * 
+ * Will print out a list of unsupported operators if the graph is unsupported
+ */ 
+TRTORCH_API bool CheckMethodOperatorSupport(const torch::jit::script::Module& module, std::string method_name);
+
+/**
  * @brief Compile a TorchScript module for NVIDIA GPUs using TensorRT
  *
  * @param module: torch::jit::script::Module - Existing TorchScript module 
@@ -239,5 +252,5 @@ TRTORCH_API torch::jit::script::Module CompileGraph(const torch::jit::script::Mo
  * and will convert selected method to a serialized TensorRT engine which can be run with
  * TensorRT
  */
-TRTORCH_API std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::string method_name, ExtraInfo info);
+TRTORCH_API std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& module, std::string method_name, ExtraInfo info);
 } // namespace trtorch
