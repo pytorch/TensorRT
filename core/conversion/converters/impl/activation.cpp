@@ -18,11 +18,9 @@ namespace {
                   "Unable to create " #act " layer from node: " << *n);        \
                                                                                \
     new_layer->setName(util::node_info(n).c_str());                            \
-    auto out_value = n->outputs()[0];                                          \
-    auto out_tensor = new_layer->getOutput(0);                                 \
-    out_tensor->setName(out_value->debugName().c_str());                       \
-    ctx->value_tensor_map[out_value] = out_tensor;                             \
-    LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());         \
+    associate_value_and_tensor(ctx, n->outputs()[0], new_layer->getOutput(0)); \
+    LOG_DEBUG("Output tensor shape: "                                          \
+               << new_layer->getOutput(0)->getDimensions());                   \
                                                                                \
     return true;                                                               \
   }                                                                            \
@@ -35,6 +33,8 @@ namespace {
           .pattern({"aten::" #act "_(Tensor(a!) self) -> (Tensor(a!))",        \
                     [](ConversionCtx *ctx, const torch::jit::Node *n,          \
                        args &args) -> bool { return act(ctx, n, args); }});
+
+//TODO: remove support for conversion of implace operators and move to the functionalization pass
 
 convert(relu, kRELU);
 convert(sigmoid, kSIGMOID);

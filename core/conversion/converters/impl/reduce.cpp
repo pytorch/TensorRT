@@ -19,13 +19,11 @@ auto reduced_registrations = RegisterNodeConversionPatterns()
 
             LOG_WARNING("Mean converter disregards dtype");
             auto mean_layer = ctx->net->addReduce(*in_tensor, nvinfer1::ReduceOperation::kAVG, axis_mask, keepdim);
-            mean_layer->setName(util::node_info(n).c_str());
 
-            auto out_value = n->outputs()[0];
-            auto out_tensor = mean_layer->getOutput(0);
-            out_tensor->setName(out_value->debugName().c_str());
-            ctx->value_tensor_map[out_value] = out_tensor;
-            
+            TRTORCH_CHECK(mean_layer, "Unable to create mean layer from node: " << *n);
+
+            mean_layer->setName(util::node_info(n).c_str());
+            associate_value_and_tensor(ctx, n->outputs()[0], mean_layer->getOutput(0));
             return true;
         }
     });

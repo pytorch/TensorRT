@@ -115,6 +115,12 @@ inline nvinfer1::ITensor* tensor_to_const(ConversionCtx* ctx, at::Tensor t) {
     return ctx->net->addConstant(t_weights.shape, t_weights.data)->getOutput(0);
 }
 
+inline nvinfer1::ITensor* associate_value_and_tensor(ConversionCtx* ctx, const torch::jit::Value* value, nvinfer1::ITensor* tensor) {
+    tensor->setName(value->debugName().c_str());
+    ctx->value_tensor_map[value] = tensor;
+    return tensor;
+}
+
 } // namespace converters
 } // namespace conversion
 } // namespace core

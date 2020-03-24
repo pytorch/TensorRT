@@ -65,13 +65,11 @@ auto conv_registrations = RegisterNodeConversionPatterns()
                 conv->setNbGroups(groups);
                 new_layer = conv;
             }
-
             new_layer->setName(util::node_info(n).c_str());
-            auto out_value = n->outputs()[0];
-            auto out_tensor = new_layer->getOutput(0);
-            out_tensor->setName(out_value->debugName().c_str());
-            ctx->value_tensor_map[out_value] = out_tensor;
-            LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+
+            auto out = associate_value_and_tensor(ctx, n->outputs()[0], new_layer->getOutput(0));
+
+            LOG_DEBUG("Output tensor shape: " << out->getDimensions());
 
             return true;
         }

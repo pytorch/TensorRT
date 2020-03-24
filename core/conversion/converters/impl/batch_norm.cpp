@@ -31,13 +31,12 @@ bool ConvertConvBatchNorm(ConversionCtx* ctx, const torch::jit::Node* n, args& a
     auto bias = Weights(ctx, b);
 
     auto bn_as_conv = ctx->net->addConvolutionNd(*input, weights.num_output_maps, weights.kernel_shape, weights.data, bias.data);
+    TRTORCH_CHECK(bn_as_conv, "Unable to create fused batch norm from node: " << *n);
     
     bn_as_conv->setName(util::node_info(n).c_str());
-    auto out_value = n->outputs()[0];
-    auto out_tensor = bn_as_conv->getOutput(0);
-    out_tensor->setName(out_value->debugName().c_str());
-    ctx->value_tensor_map[out_value] = out_tensor;
-    LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+
+    auto bn_out = associate_value_and_tensor(ctx, n->outputs()[0], bn_as_conv->getOutput(0));
+    LOG_DEBUG("Output tensor shape: " << bn_out->getDimensions());
     return true;
 }
 
@@ -68,9 +67,8 @@ bool ConvertLinearBatchNorm(ConversionCtx* ctx, const torch::jit::Node* n, args&
     auto bn_biased_out = bn_biased->getOutput(0);
 
     bn_biased->setName(util::node_info(n).c_str());
-    auto out_value = n->outputs()[0];
-    bn_biased_out->setName(out_value->debugName().c_str());
-    ctx->value_tensor_map[out_value] = bn_biased_out;
+    associate_value_and_tensor(ctx, n->outputs()[0], bn_biased_out);
+
     return true;
 }
 
