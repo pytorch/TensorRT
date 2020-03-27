@@ -10,7 +10,7 @@ namespace trtorch {
 namespace core {
 namespace conversion {
 
-// Defined in core/conversion/conversion_blacklist.cpp 
+// Defined in core/conversion/conversion_blacklist.cpp
 bool isNodeConversionBlacklisted(const torch::jit::Node* n);
 
 bool OpSupported(const torch::jit::Node* n) {
@@ -24,8 +24,8 @@ c10::optional<torch::jit::IValue> EvaluateNode(ConversionCtx* ctx, const torch::
     // Also probably a better way to deal with the two error cases;
     TRTORCH_CHECK(level < limit, "Failed to evaluate node: " << *n              \
                            << "Reason: Exceeded evaluation stack limit (limit=" \
-                           << limit << ")"); 
-    
+                           << limit << ")");
+
     LOG_DEBUG(ctx->logger, "Evaluating " << util::node_info(n));
     evaluators::kwargs eval_args;
     for (auto eval_in : n->inputs()) {
@@ -55,7 +55,7 @@ c10::optional<torch::jit::IValue> EvaluateNode(ConversionCtx* ctx, const torch::
     return eval;
 }
 
-bool AddLayer(ConversionCtx* ctx, const torch::jit::Node* n) {
+void AddLayer(ConversionCtx* ctx, const torch::jit::Node* n) {
     LOG_INFO(ctx->logger,
              "Adding Layer " << util::node_info(n) << " (ctx.AddLayer)");
     converters::args node_args;
@@ -87,36 +87,34 @@ bool AddLayer(ConversionCtx* ctx, const torch::jit::Node* n) {
             TRTORCH_THROW_ERROR("Unable to retrieve all node inputs for node: " \
                                 << util::node_info(n) << " (ctx.AddLayer)\nSpecifically failed to retrieve value for input: " \
                                 << *input_node);
-            return false;
         }
-
     }
 
     if (n->inputs().size() != node_args.size()) {
         TRTORCH_THROW_ERROR("Unable to retrieve all node inputs for node: " << *n);
-        return false;
     }
 
-    
+
     auto schema = n->maybeSchema();
     TRTORCH_CHECK(schema, "Unable to get schema for Node " << util::node_info(n) \
                   << " (conversion.AddLayer)");
-    
+
     auto converter = converters::get_node_converter_for(schema);
     TRTORCH_CHECK(converter, "Unable to convert node: " << util::node_info(n) \
                   << " (conversion.AddLayer)\nSchema: " << *schema
                   << "\nConverter for " << schema->name()
                   << " requested, but no such converter was found.\nIf you need a converter for this operator, you can try implementing one yourself\n"
-                  << "or request a converter: https://www.github.com/NVIDIA/TRTorch/issues"); 
-    converter(ctx, n, node_args);
+                  << "or request a converter: https://www.github.com/NVIDIA/TRTorch/issues");
 
-    return true;
+    TRTORCH_CHECK(converter(ctx, n, node_args),
+                  "Converter for " << *schema << " failed to convert node: "
+                  << util::node_info(n) << "please report this error to https://www.github.com/NVIDIA/TRTorch/issues");
 }
 
-bool AddInputs(ConversionCtx* ctx,
+void AddInputs(ConversionCtx* ctx,
                 at::ArrayRef<const torch::jit::Value*> inputs,
                 std::vector<InputRange>& input_dims) {
-    
+
     auto type_lut = torch::jit::script::string_to_type_lut();
     std::vector<const torch::jit::Value*> input_tensors;
     for (auto in : inputs) {
@@ -130,7 +128,7 @@ bool AddInputs(ConversionCtx* ctx,
             input_tensors.push_back(in);
         }
     }
-    
+
     TRTORCH_CHECK(input_tensors.size() == input_dims.size(),
                   "Expected dimension specifications for all input tensors" \
                   << ", but found " << input_tensors.size()                 \
@@ -138,7 +136,7 @@ bool AddInputs(ConversionCtx* ctx,
                   << input_dims.size() << "dimension specs (conversion.AddInputs)");
 
     auto profile = ctx->builder->createOptimizationProfile();
-    
+
     for (size_t i = 0; i < input_tensors.size(); i++) {
         auto in = input_tensors[i];
         auto dims = input_dims[i];
@@ -158,20 +156,23 @@ bool AddInputs(ConversionCtx* ctx,
     }
 
     TRTORCH_CHECK(profile->isValid(), "Optimization profile is invalid, please check the input range provided (conversion.AddInputs)");
-    
+
     ctx->cfg->addOptimizationProfile(profile);
-    return true;
 }
 
-bool MarkOutputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> outputs) {
+void MarkOutputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> outputs) {
     for (auto out : outputs) {
-        ctx->net->markOutput(*(ctx->value_tensor_map[out]));
+        auto it = ctx->value_tensor_map.find(out);
+        // Leaves the potential for unused outputs to be populated with nullptr "safely"
+        TRTORCH_CHECK(it != ctx->value_tensor_map.end() && it->second,
+                      "No corresponding output TRT Tensor found for TorchScript output: " << out->debugName());
+        auto out_tensor = it->second;
+        ctx->net->markOutput(*out_tensor);
         LOG_INFO(ctx->logger,
                  "Marking Output " << out->debugName() << " (ctx.MarkOutput)");
     }
-    return true;
 }
-    
+
 void AddParamsToCtxValueMap(ConversionCtx* ctx, GraphParams& params) {
     for (auto p : params) {
         ctx->evaluated_value_map[p.first] = torch::jit::IValue(p.second.clone());
@@ -191,13 +192,8 @@ void ConvertBlockToNetDef(ConversionCtx* ctx, const torch::jit::Block* b, ExtraI
         bool to_eval = evaluators::shouldEvalAtConversionTime(n);
         bool blacklisted = isNodeConversionBlacklisted(n);
         if (!to_eval && !blacklisted) {
-            if (!AddLayer(ctx, n)) {
-                //TODO: Exception things 
-                LOG_ERROR(ctx->logger,
-                          "Failed to add layer: " << *n \
-                          << " (ctx.AddLayer)");
-                return;
-            }
+            // Should error out if something fails
+            AddLayer(ctx, n);
         } else {
             std::string reason = "";
             if (to_eval) {
@@ -207,7 +203,13 @@ void ConvertBlockToNetDef(ConversionCtx* ctx, const torch::jit::Block* b, ExtraI
                 reason += " (explicitly blacklisted)";
             }
             LOG_DEBUG(ctx->logger,
-                      "Skipping Node: " << (n->kind().toQualString()) << reason);
+                      "Skipping Node: " << util::node_info(n) << reason);
+        }
+    }
+
+    for (const auto n : nodes) {
+        if (converters::node_is_convertable(n)) {
+            ctx->CheckLayerAddition(n);
         }
     }
 
@@ -218,7 +220,7 @@ void ConvertBlockToNetDef(ConversionCtx* ctx, const torch::jit::Block* b, ExtraI
 // Converts a already lowered block (blocks with no sub blocks) to
 // a serialized TensorRT engine that can be deserialized and run
 
-// Probably should consolidate these two functions 
+// Probably should consolidate these two functions
 std::string ConvertBlockToEngine(const torch::jit::Block* b, ExtraInfo build_info, GraphParams& static_params) {
     ConversionCtx ctx(build_info.engine_settings);
     ConvertBlockToNetDef(&ctx, b, build_info, static_params);
@@ -247,7 +249,7 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b) {
         for (auto s : unsupported_ops) {
             unsupported_msg << "  -  " << s << std::endl;
         }
-        unsupported_msg << "You can either implement converters for these ops in your application or file a bug" << std::endl;
+        unsupported_msg << "You can either implement converters for these ops in your application or request implementation" << std::endl;
         unsupported_msg <<  "https://www.github.com/nvidia/TRTorch/issues" << std::endl;
         LOG_ERROR(unsupported_msg.str());
     }
