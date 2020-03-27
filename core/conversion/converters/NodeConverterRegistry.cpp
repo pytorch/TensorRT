@@ -41,20 +41,20 @@ std::string canonical_schema_string(const torch::jit::FunctionSchema& schema) {
 }
 
 namespace {
-using ConverterLUT = std::unordered_map<torch::jit::Symbol, OpConverter>;
+using ConverterLUT = std::unordered_map<c10::OperatorName, OpConverter>;
 
 class NodeConverterRegistry {
 public:
     bool RegisterConverter(torch::jit::FunctionSchema* signature, OpConverter& converter) {
         LOG_DEBUG("Registering Converter for " << canonical_schema_string(*signature));
-        auto sym = torch::jit::Symbol::fromQualString(signature->name());
-        converter_lut_[sym] = std::move(converter);
+        auto name = signature->operator_name();
+        converter_lut_[name] = std::move(converter);
         return true;
     }
 
     OpConverter GetConverter(const torch::jit::FunctionSchema* signature) {
-        auto sym = torch::jit::Symbol::fromQualString(signature->name());
-        auto iter = converter_lut_.find(sym);
+        auto name = signature->operator_name();
+        auto iter = converter_lut_.find(name);
         if (iter == converter_lut_.end()) {
             LOG_ERROR("Requested converter for " << signature->name() << ", but no such converter was found");
             // ASK: Is there a better way than returning a nullptr?
@@ -66,8 +66,8 @@ public:
     bool Convertable(const torch::jit::Node* n) {
         auto schema = n->maybeSchema();
         if (schema) {
-            auto sym = torch::jit::Symbol::fromQualString(schema->name());
-            auto iter = converter_lut_.find(sym);
+            auto name = schema->operator_name();
+            auto iter = converter_lut_.find(name);
             if (iter == converter_lut_.end()) {
                return false;
             } else {
@@ -79,7 +79,7 @@ public:
             return false;
         }
     }
-    
+
 private:
     ConverterLUT converter_lut_;
 };
@@ -111,7 +111,7 @@ OpConverter get_node_converter_for(const torch::jit::FunctionSchema* signature) 
 bool node_is_convertable(const torch::jit::Node* n) {
     return get_converter_registry().Convertable(n);
 }
-    
+
 RegisterNodeConversionPatterns&& RegisterNodeConversionPatterns::pattern(ConversionPattern p) && {
     register_node_converter(std::move(p));
     return std::move(*this);

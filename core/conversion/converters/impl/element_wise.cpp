@@ -68,7 +68,7 @@ auto element_wise_registrations = RegisterNodeConversionPatterns()
                 TRTORCH_CHECK(add, "Unable to create add layer from node: " << *n);
 
                 add->setName(util::node_info(n).c_str());
-                auto out = associate_value_and_tensor(ctx, n->outputs()[0], add->getOutput(0));
+                auto out = ctx->AssociateValueAndTensor(n->outputs()[0], add->getOutput(0));
 
                 LOG_DEBUG("Output tensor shape: " << out->getDimensions());
                 return true;
@@ -85,7 +85,7 @@ auto element_wise_registrations = RegisterNodeConversionPatterns()
                 TRTORCH_CHECK(add, "Unable to create add layer from node: " << *n);
 
                 add->setName(util::node_info(n).c_str());
-                auto out = associate_value_and_tensor(ctx, n->outputs()[0], add->getOutput(0));
+                auto out = ctx->AssociateValueAndTensor(n->outputs()[0], add->getOutput(0));
 
                 LOG_DEBUG("Output tensor shape: " << out->getDimensions());
                 return true;
@@ -102,13 +102,13 @@ auto element_wise_registrations = RegisterNodeConversionPatterns()
                 TRTORCH_CHECK(sub, "Unable to create sub layer from node: " << *n);
 
                 sub->setName(util::node_info(n).c_str());
-                auto out = associate_value_and_tensor(ctx, n->outputs()[0], sub->getOutput(0));
+                auto out = ctx->AssociateValueAndTensor(n->outputs()[0], sub->getOutput(0));
 
                 LOG_DEBUG("Output tensor shape: " << out->getDimensions());
                 return true;
             }
       }).pattern({
-            "aten::div(Tensor self, Tensor other) -> Tensor",
+            "aten::div.Tensor(Tensor self, Tensor other) -> Tensor",
             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                 // Should implement self / other
                 auto self = args[0].ITensor();
@@ -118,13 +118,29 @@ auto element_wise_registrations = RegisterNodeConversionPatterns()
                 TRTORCH_CHECK(div, "Unable to create div layer from node: " << *n);
 
                 div->setName(util::node_info(n).c_str());
-                auto out = associate_value_and_tensor(ctx, n->outputs()[0], div->getOutput(0));
+                auto out = ctx->AssociateValueAndTensor(n->outputs()[0], div->getOutput(0));
 
                 LOG_DEBUG("Output tensor shape: " << out->getDimensions());
                 return true;
              }
       }).pattern({
-            "aten::mul(Tensor self, Tensor other) -> Tensor",
+            "aten::div_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)",
+            [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                // TODO: Remove with functionalization
+                auto self = args[0].ITensor();
+                auto other = args[1].ITensor();
+                auto div = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other);
+
+                TRTORCH_CHECK(div, "Unable to create div layer from node: " << *n);
+
+                div->setName(util::node_info(n).c_str());
+                auto out = ctx->AssociateValueAndTensor(n->outputs()[0], div->getOutput(0));
+
+                LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+                return true;
+             }
+      }).pattern({
+            "aten::mul.Tensor(Tensor self, Tensor other) -> Tensor",
             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                 // Should implement self * other
                 auto self = args[0].ITensor();
@@ -134,13 +150,65 @@ auto element_wise_registrations = RegisterNodeConversionPatterns()
                 TRTORCH_CHECK(mul, "Unable to create mul layer from node: " << *n);
 
                 mul->setName(util::node_info(n).c_str());
-                auto out = associate_value_and_tensor(ctx, n->outputs()[0], mul->getOutput(0));
+                auto out = ctx->AssociateValueAndTensor(n->outputs()[0], mul->getOutput(0));
+
+                LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+                return true;
+             }
+         }).pattern({
+            "aten::mul_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)",
+            [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                // TODO: Remove with functionalization
+                auto self = args[0].ITensor();
+                auto other = args[1].ITensor();
+                auto mul = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPROD, self, other);
+
+                TRTORCH_CHECK(mul, "Unable to create mul layer from node: " << *n);
+
+                mul->setName(util::node_info(n).c_str());
+                auto out = ctx->AssociateValueAndTensor(n->outputs()[0], mul->getOutput(0));
 
                 LOG_DEBUG("Output tensor shape: " << out->getDimensions());
                 return true;
              }
          });
 
+// - func: div.Tensor(Tensor self, Tensor other) -> Tensor
+//   use_c10_dispatcher: full
+//   variants: function, method
+//   dispatch:
+//     CPU: div
+//     CUDA: div
+//     SparseCPU: div_sparse
+//     SparseCUDA: div_sparse
+//   supports_named_tensor: True
+
+// - func: div_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
+//   variants: method
+//   dispatch:
+//     CPU: div_
+//     CUDA: div_
+//     SparseCPU: div_sparse_
+//     SparseCUDA: div_sparse_
+//   supports_named_tensor: True
+
+// - func: div.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
+//   dispatch:
+//     CPU: div_out
+//     CUDA: div_out
+//     SparseCPU: div_out_sparse_zerodim
+//     SparseCUDA: div_out_sparse_zerodim
+//   supports_named_tensor: True
+
+// # For C++ only, until we have conversion from C++ numbers to Tensor
+// - func: div.Scalar(Tensor self, Scalar other) -> Tensor
+//   use_c10_dispatcher: full
+//   variants: function, method
+//   supports_named_tensor: True
+
+// - func: div_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
+//   variants: method
+//   supports_named_tensor: True
 
 } // namespace
 } // namespace impl
