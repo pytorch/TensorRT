@@ -23,7 +23,7 @@ namespace {
                  "Unable to create " #unary " layer from node: " << *n);        \
                                                                                 \
              unary->setName(util::node_info(n).c_str());                        \
-             auto out_tensor = associate_value_and_tensor(ctx,                  \
+             auto out_tensor = ctx->AssociateValueAndTensor(                    \
                                                           n->outputs()[0],      \
                                                           unary->getOutput(0)); \
              LOG_DEBUG(                                                         \

@@ -52,7 +52,7 @@ auto linear_registrations = RegisterNodeConversionPatterns()
             TRTORCH_CHECK(new_layer,"Unable to create linear layer from node: " << *n);
 
             new_layer->setName(util::node_info(n).c_str());
-            auto out_tensor = associate_value_and_tensor(ctx, n->outputs()[0], new_layer->getOutput(0));
+            auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
 
             LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
 

@@ -69,12 +69,12 @@ private:
     ArgContainer ptr_;
     Type type_;
 };
-        
-    
+
+
 
 typedef std::vector<Arg> args;
 typedef std::function<bool(ConversionCtx*, const torch::jit::Node*, args&)> OpConverter;
-struct ConversionPattern {    
+struct ConversionPattern {
     std::string signature;
     OpConverter converter;
 };
@@ -107,18 +107,12 @@ struct Weights {
     Weights();
     Weights(ConversionCtx* ctx, at::Tensor t);
     Weights(ConversionCtx* ctx, float val);
-    friend std::ostream& operator<<(std::ostream& os, const Weights& w); 
+    friend std::ostream& operator<<(std::ostream& os, const Weights& w);
 };
 
 inline nvinfer1::ITensor* tensor_to_const(ConversionCtx* ctx, at::Tensor t) {
     auto t_weights = Weights(ctx, t);
     return ctx->net->addConstant(t_weights.shape, t_weights.data)->getOutput(0);
-}
-
-inline nvinfer1::ITensor* associate_value_and_tensor(ConversionCtx* ctx, const torch::jit::Value* value, nvinfer1::ITensor* tensor) {
-    tensor->setName(value->debugName().c_str());
-    ctx->value_tensor_map[value] = tensor;
-    return tensor;
 }
 
 } // namespace converters

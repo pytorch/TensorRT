@@ -30,12 +30,15 @@ struct BuilderSettings {
 
     BuilderSettings() = default;
     BuilderSettings(const BuilderSettings& other) = default;
-    friend std::ostream& operator<<(std::ostream& os, const BuilderSettings& s); 
+    friend std::ostream& operator<<(std::ostream& os, const BuilderSettings& s);
 };
-    
+
 struct ConversionCtx {
     ConversionCtx(BuilderSettings settings);
     std::string SerializeEngine();
+    nvinfer1::ITensor* AssociateValueAndTensor(const torch::jit::Value* value, nvinfer1::ITensor* tensor);
+    bool CheckLayerAddition(const torch::jit::Node* n);
+
     ~ConversionCtx();
 
     nvinfer1::IBuilder* builder;
@@ -50,12 +53,12 @@ struct ConversionCtx {
     // is constructed from a PyTorch Tensor it allocates the data here to store a
     // copy of the values
     std::vector<void*> builder_resources;
-    
+
     std::unordered_map<const torch::jit::Value*, nvinfer1::ITensor*> value_tensor_map;
     std::unordered_map<const torch::jit::Value*, torch::jit::IValue> evaluated_value_map;
 };
 
-} // namespace conversion    
+} // namespace conversion
 } // namespace core
 } // namespace trtorch
-    
+
