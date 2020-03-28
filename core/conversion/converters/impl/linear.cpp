@@ -27,7 +27,7 @@ auto linear_registrations = RegisterNodeConversionPatterns()
                 new_shape.push_back(shape[0]);
                 new_shape.push_back(1);
                 new_shape.push_back(1);
-                new_shape.push_back(util::volume(util::toDims(shape)));
+                new_shape.push_back(util::volume(util::toDims(shape)) / shape[0]);
 
                 auto new_dims = util::toDims(new_shape);
                 LOG_DEBUG("Input shape is less than 4D got: " << util::toDims(shape) << ", inserting shuffle layer to reshape to 4D tensor shape: " << new_dims);
