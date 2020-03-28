@@ -1,3 +1,4 @@
+#include <bitset>
 #include "core/util/prelude.h"
 #include "core/conversion/converters/converters.h"
 
@@ -22,17 +23,26 @@ auto reduced_registrations = RegisterNodeConversionPatterns()
             TRTORCH_CHECK(mean_layer, "Unable to create mean layer from node: " << *n);
 
             mean_layer->setName(util::node_info(n).c_str());
-            ctx->AssociateValueAndTensor(n->outputs()[0], mean_layer->getOutput(0));
+            auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], mean_layer->getOutput(0));
+
+            LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
             return true;
         }
     }).pattern({
-        "aten::mean.dim(Tensor self, int[1] dim, bool keepdim=False, *, int? dtype=None) -> (Tensor)",
+        "aten::mean.dim(Tensor self, int[] dim, bool keepdim=False, *, int? dtype=None) -> (Tensor)",
         [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
             auto in_tensor = args[0].ITensor();
-            auto dim = args[1].unwrapToIntList();
-            auto keepdim = args[2].unwrapToBool();
+            auto dims = args[1].unwrapToIntList();
+            LOG_DEBUG("Dim to reduce:" << util::toDims(dims)); // Some abuse of toDim but just for debug info
 
-            uint32_t axis_mask = 1 << dim[0];
+            uint32_t axis_mask = 0;
+            for (int d = 0; d < dims.size(); d++) {
+                axis_mask |= 1 << dims[d];
+            }
+            LOG_DEBUG("Axis Mask" << std::bitset<32>(axis_mask));
+
+            auto keepdim = args[2].unwrapToBool();
+            LOG_DEBUG("Keep dims :" << keepdim);
 
             LOG_WARNING("Mean converter disregards dtype");
             auto mean_layer = ctx->net->addReduce(*in_tensor, nvinfer1::ReduceOperation::kAVG, axis_mask, keepdim);
@@ -40,7 +50,9 @@ auto reduced_registrations = RegisterNodeConversionPatterns()
             TRTORCH_CHECK(mean_layer, "Unable to create mean layer from node: " << *n);
 
             mean_layer->setName(util::node_info(n).c_str());
-            ctx->AssociateValueAndTensor(n->outputs()[0], mean_layer->getOutput(0));
+            auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], mean_layer->getOutput(0));
+
+            LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
             return true;
         }
     });
