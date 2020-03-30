@@ -4,6 +4,8 @@
 #include "tests/util/util.h"
 #include "core/compiler.h"
 
+#define LAYER_TEST //used to set threshold for diff
+
 TEST(Converters, ATenSoftmax1DConvertsCorrectly) {
     const auto graph = R"IR(
       graph(%0 : Tensor):
@@ -14,7 +16,7 @@ TEST(Converters, ATenSoftmax1DConvertsCorrectly) {
 
     auto g = std::make_shared<torch::jit::Graph>();
     torch::jit::script::parseIR(graph, &*g);
-    
+
     auto in = at::randint(0, 5, {5}, {at::kCUDA});
     auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
     auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
@@ -22,9 +24,9 @@ TEST(Converters, ATenSoftmax1DConvertsCorrectly) {
     in = at::clone(in);
     params = trtorch::core::conversion::get_named_params(g->inputs(), {});
     auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
-    auto trt = trt_results[0].reshape_as(jit_results[0]); 
+    auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt));
+    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
 TEST(Converters, ATenSoftmaxNDConvertsCorrectlySub3DIndex) {
@@ -37,7 +39,7 @@ TEST(Converters, ATenSoftmaxNDConvertsCorrectlySub3DIndex) {
 
     auto g = std::make_shared<torch::jit::Graph>();
     torch::jit::script::parseIR(graph, &*g);
-    
+
     auto in = at::randint(0, 5, {1,2,2,2,2}, {at::kCUDA});
 
     auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
@@ -46,9 +48,9 @@ TEST(Converters, ATenSoftmaxNDConvertsCorrectlySub3DIndex) {
     in = at::clone(in);
     params = trtorch::core::conversion::get_named_params(g->inputs(), {});
     auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
-    auto trt = trt_results[0].reshape_as(jit_results[0]); 
+    auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt));
+    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
 TEST(Converters, ATenSoftmaxNDConvertsCorrectlyAbove3DIndex) {
@@ -61,7 +63,7 @@ TEST(Converters, ATenSoftmaxNDConvertsCorrectlyAbove3DIndex) {
 
     auto g = std::make_shared<torch::jit::Graph>();
     torch::jit::script::parseIR(graph, &*g);
-    
+
     auto in = at::randint(0, 5, {1,2,2,2,2}, {at::kCUDA});
 
     auto jit_in = at::clone(in);
@@ -71,8 +73,8 @@ TEST(Converters, ATenSoftmaxNDConvertsCorrectlyAbove3DIndex) {
     auto trt_in = at::clone(in);
     params = trtorch::core::conversion::get_named_params(g->inputs(), {});
     auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
-    
-    auto trt = trt_results[0].reshape_as(jit_results[0]); 
 
-    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt));
+    auto trt = trt_results[0].reshape_as(jit_results[0]);
+
+    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }

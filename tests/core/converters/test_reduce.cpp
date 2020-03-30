@@ -4,6 +4,8 @@
 #include "tests/util/util.h"
 #include "core/compiler.h"
 
+#define LAYER_TEST //used to set threshold for diff
+
 TEST(Converters, ATenMeanConvertsCorrectly) {
     const auto graph = R"IR(
       graph(%0 : Tensor):
@@ -22,7 +24,7 @@ TEST(Converters, ATenMeanConvertsCorrectly) {
     params = trtorch::core::conversion::get_named_params(g->inputs(), {});
     auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
 
-    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0]));
+    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
 TEST(Converters, ATenMeanHigherDimensionConvertsCorrectly) {
@@ -43,7 +45,7 @@ TEST(Converters, ATenMeanHigherDimensionConvertsCorrectly) {
     params = trtorch::core::conversion::get_named_params(g->inputs(), {});
     auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
 
-    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0]));
+    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
 TEST(Converters, ATenMeanRowConvertsCorrectly) {
@@ -67,7 +69,7 @@ TEST(Converters, ATenMeanRowConvertsCorrectly) {
     params = trtorch::core::conversion::get_named_params(g->inputs(), {});
     auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
 
-    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0]));
+    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
 TEST(Converters, ATenMeanMultiDimsConvertsCorrectly) {
@@ -92,7 +94,7 @@ TEST(Converters, ATenMeanMultiDimsConvertsCorrectly) {
     params = trtorch::core::conversion::get_named_params(g->inputs(), {});
     auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
 
-    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0]));
+    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
 TEST(Converters, ATenMeanKeepDimsConvertsCorrectly) {
@@ -116,5 +118,5 @@ TEST(Converters, ATenMeanKeepDimsConvertsCorrectly) {
     params = trtorch::core::conversion::get_named_params(g->inputs(), {});
     auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
 
-    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0]));
+    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }

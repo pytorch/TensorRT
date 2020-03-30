@@ -11,13 +11,13 @@ namespace trtorch {
 namespace tests {
 namespace util {
 
-bool almostEqual(const at::Tensor& a, const at::Tensor& b);
+bool almostEqual(const at::Tensor& a, const at::Tensor& b, float threshold);
 
 bool exactlyEqual(const at::Tensor& a, const at::Tensor& b);
 
 std::vector<at::Tensor> RunEngine(std::string& eng, std::vector<at::Tensor> inputs);
 
-// Runs an arbitrary JIT graph and returns results  
+// Runs an arbitrary JIT graph and returns results
 std::vector<at::Tensor> RunGraph(std::shared_ptr<torch::jit::Graph>& g,
                                  core::conversion::GraphParams& named_params,
                                  std::vector<at::Tensor> inputs);

@@ -4,6 +4,7 @@
 #include "tests/util/util.h"
 #include "core/compiler.h"
 
+#define LAYER_TEST //used to set threshold for diff
 
 TEST(Converters, ATenLinearNoBiasConvertsCorrectly) {
     const auto graph = R"IR(
@@ -28,7 +29,7 @@ TEST(Converters, ATenLinearNoBiasConvertsCorrectly) {
     params = trtorch::core::conversion::get_named_params(g->inputs(), {w});
     auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
 
-    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0])));
+    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
 }
 
 
@@ -62,5 +63,5 @@ TEST(Converters, ATenLinearBiasConvertsCorrectly) {
     auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
 
-    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0])));
+    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
 }
