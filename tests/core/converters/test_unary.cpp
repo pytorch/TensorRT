@@ -4,8 +4,6 @@
 #include "tests/util/util.h"
 #include "core/compiler.h"
 
-#define LAYER_TEST //used to set threshold for diff
-
 namespace {
 std::string gen_test_graph(const std::string &unary) {
   return R"IR(

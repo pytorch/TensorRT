@@ -4,8 +4,6 @@
 #include "tests/util/util.h"
 #include "core/compiler.h"
 
-#define LAYER_TEST //used to set threshold for diff
-
 TEST(Converters, ATenSoftmax1DConvertsCorrectly) {
     const auto graph = R"IR(
       graph(%0 : Tensor):
