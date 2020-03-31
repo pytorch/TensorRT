@@ -19,12 +19,10 @@ auto constant_registrations = RegisterNodeConversionPatterns()
             auto t_weights = Weights(ctx, t);
             auto const_layer = ctx->net->addConstant(t_weights.shape, t_weights.data);
             const_layer->setName(util::node_info(n).c_str());
-            auto out_value = n->outputs()[0];
-            auto out_tensor = const_layer->getOutput(0);
-            out_tensor->setName(out_value->debugName().c_str());
-            ctx->value_tensor_map[out_value] = out_tensor;
-            LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
-            
+            auto const_out = ctx->AssociateValueAndTensor(n->outputs()[0], const_layer->getOutput(0));
+
+            LOG_DEBUG("Output tensor shape: " << const_out->getDimensions());
+
             return true;
         }
     });
@@ -33,5 +31,5 @@ auto constant_registrations = RegisterNodeConversionPatterns()
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // namespace trtorch 
+} // namespace trtorch
 

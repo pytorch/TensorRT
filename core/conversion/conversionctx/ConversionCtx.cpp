@@ -37,11 +37,11 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
     switch(settings.op_precision) {
     case nvinfer1::DataType::kHALF:
         cfg->setFlag(nvinfer1::BuilderFlag::kFP16);
-        input_type = nvinfer1::DataType::kHALF; 
+        input_type = nvinfer1::DataType::kHALF;
         break;
     // case nvinfer1::DataType::kINT8:
     //     cfg->setFlag(nvinfer1::BuilderFlag::kINT8);
-    //         input_type = nvinfer1::DataType::kFLOAT;    
+    //         input_type = nvinfer1::DataType::kFLOAT;
     //     break;
     case nvinfer1::DataType::kFLOAT:
     default:
@@ -80,11 +80,28 @@ ConversionCtx::~ConversionCtx() {
         free(ptr);
     }
 }
-    
+
+nvinfer1::ITensor* ConversionCtx::AssociateValueAndTensor(const torch::jit::Value* value, nvinfer1::ITensor* tensor) {
+    tensor->setName(value->debugName().c_str());
+    this->value_tensor_map[value] = tensor;
+    return tensor;
+}
+
 std::string ConversionCtx::SerializeEngine() {
     auto engine = builder->buildEngineWithConfig(*net, *cfg);
     auto serialized_engine = engine->serialize();
     return std::string((const char*)serialized_engine->data(), serialized_engine->size());
+}
+
+bool ConversionCtx::CheckLayerAddition(const torch::jit::Node* n) {
+    for (auto out : n->outputs()) {
+        auto iter = this->value_tensor_map.find(out);
+        if (iter == this->value_tensor_map.end()) {
+            LOG_WARNING("Node " << util::node_info(n) << " output: " << out->debugName() << " does not have a coresponding output, may potentially indicate a defective converter");
+            return false;
+        }
+    }
+    return true;
 }
 
 } // namespace conversion

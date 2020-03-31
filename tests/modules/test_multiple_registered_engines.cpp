@@ -17,7 +17,7 @@ TEST(ModuleTests, CanRunMultipleEngines) {
     }
 
     const std::vector<std::vector<int64_t>> input_shapes = {{1,3,224,224}};
-    
+
     std::vector<torch::jit::IValue> jit1_inputs_ivalues;
     std::vector<torch::jit::IValue> trt1_inputs_ivalues;
     for (auto in_shape : input_shapes) {
@@ -42,7 +42,7 @@ TEST(ModuleTests, CanRunMultipleEngines) {
     std::vector<at::Tensor> jit2_results;
     jit2_results.push_back(jit2_results_ivalues.toTensor());
 
-    
+
     auto trt_mod1 = trtorch::CompileGraph(mod1, input_shapes);
     torch::jit::IValue trt1_results_ivalues = trtorch::tests::util::RunModuleForward(trt_mod1, trt1_inputs_ivalues);
     std::vector<at::Tensor> trt1_results;
@@ -55,10 +55,10 @@ TEST(ModuleTests, CanRunMultipleEngines) {
 
 
     for (size_t i = 0; i < trt1_results.size(); i++) {
-        ASSERT_TRUE(trtorch::tests::util::almostEqual(jit1_results[i], trt1_results[i].reshape_as(jit1_results[i])));
+        ASSERT_TRUE(trtorch::tests::util::almostEqual(jit1_results[i], trt1_results[i].reshape_as(jit1_results[i]), 2e-5));
     }
 
     for (size_t i = 0; i < trt2_results.size(); i++) {
-        ASSERT_TRUE(trtorch::tests::util::almostEqual(jit2_results[i], trt2_results[i].reshape_as(jit2_results[i])));
+        ASSERT_TRUE(trtorch::tests::util::almostEqual(jit2_results[i], trt2_results[i].reshape_as(jit2_results[i]), 2e-5));
     }
 }

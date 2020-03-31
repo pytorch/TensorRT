@@ -31,13 +31,12 @@ bool ConvertConvBatchNorm(ConversionCtx* ctx, const torch::jit::Node* n, args& a
     auto bias = Weights(ctx, b);
 
     auto bn_as_conv = ctx->net->addConvolutionNd(*input, weights.num_output_maps, weights.kernel_shape, weights.data, bias.data);
-    
+    TRTORCH_CHECK(bn_as_conv, "Unable to create fused batch norm from node: " << *n);
+
     bn_as_conv->setName(util::node_info(n).c_str());
-    auto out_value = n->outputs()[0];
-    auto out_tensor = bn_as_conv->getOutput(0);
-    out_tensor->setName(out_value->debugName().c_str());
-    ctx->value_tensor_map[out_value] = out_tensor;
-    LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+
+    auto bn_out = ctx->AssociateValueAndTensor(n->outputs()[0], bn_as_conv->getOutput(0));
+    LOG_DEBUG("Output tensor shape: " << bn_out->getDimensions());
     return true;
 }
 
@@ -68,26 +67,25 @@ bool ConvertLinearBatchNorm(ConversionCtx* ctx, const torch::jit::Node* n, args&
     auto bn_biased_out = bn_biased->getOutput(0);
 
     bn_biased->setName(util::node_info(n).c_str());
-    auto out_value = n->outputs()[0];
-    bn_biased_out->setName(out_value->debugName().c_str());
-    ctx->value_tensor_map[out_value] = bn_biased_out;
+    ctx->AssociateValueAndTensor(n->outputs()[0], bn_biased_out);
+
     return true;
 }
 
 volatile auto batch_norm_registrations = RegisterNodeConversionPatterns()
     .pattern({
-            R"SIG(aten::batch_norm(Tensor input, Tensor? gamma, Tensor? beta, 
-                               Tensor? mean, Tensor? var, 
+            R"SIG(aten::batch_norm(Tensor input, Tensor? gamma, Tensor? beta,
+                               Tensor? mean, Tensor? var,
                                bool training, float momentum, float eps, bool cudnn_enabled) -> (Tensor))SIG",
             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                 auto input = args[0].ITensor();
                 auto shape = input->getDimensions();
                 auto gamma = args[1].unwrapToTensor();
-                
+
                 if (/*training*/ args[5].unwrapToBool()) {
                     LOG_WARNING("TensorRT only converts forward pass of graphs, but saw training = True, may see undefined behavior, consider placing module in eval mode");
                 }
-                
+
                 // If gamma is None this fails
                 if (util::volume(shape) == gamma.numel()) {
                     return ConvertLinearBatchNorm(ctx, n, args);
@@ -103,4 +101,4 @@ volatile auto batch_norm_registrations = RegisterNodeConversionPatterns()
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // namespace trtorch 
+} // namespace trtorch

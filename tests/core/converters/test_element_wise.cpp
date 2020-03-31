@@ -7,7 +7,7 @@
 void pointwise_test_helper(std::string graph_ir) {
     auto g = std::make_shared<torch::jit::Graph>();
     torch::jit::script::parseIR(graph_ir, &*g);
-    
+
     auto in0 = at::randint(1, 5, {5}, {at::kCUDA});
     auto in1 = at::randint(1, 5, {5}, {at::kCUDA});
     auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
@@ -18,7 +18,7 @@ void pointwise_test_helper(std::string graph_ir) {
     params = trtorch::core::conversion::get_named_params(g->inputs(), {});
     auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in0, in1});
 
-    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0]));
+    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
 

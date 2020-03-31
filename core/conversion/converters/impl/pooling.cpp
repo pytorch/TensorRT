@@ -15,7 +15,7 @@ auto pooling_registrations = RegisterNodeConversionPatterns()
             auto in = args[0].ITensor();
             auto shape = util::toVec(in->getDimensions());
 
-            // Max Pool needs at least 4D input 
+            // Max Pool needs at least 4D input
             if (shape.size() < 4) {
                 auto new_shape = util::toDimsPad(shape, 4);
                 LOG_DEBUG("Input shape is less than 4D got: " << util::toDims(shape) << ", inserting shuffle layer to reshape to 4D tensor shape: " << new_shape);
@@ -24,16 +24,16 @@ auto pooling_registrations = RegisterNodeConversionPatterns()
                 shuffle->setName((util::node_info(n) + " [Reshape to " + util::toStr(new_shape) + ']').c_str());
                 in = shuffle->getOutput(0);
             }
-            
-            
+
+
             auto kernel_size = util::toDimsHW(args[1].unwrapToIntList());
             LOG_DEBUG("kernel_size: " << kernel_size);
             auto padding = util::toDimsHW(args[3].unwrapToIntList());
             LOG_DEBUG("padding: " << padding);
             auto dilation = util::toDims(args[4].unwrapToIntList());
-            
+
             TRTORCH_ASSERT(dilation == util::toDims(std::vector<int64_t>({1,1})), "Pooling dilation is not supported in TensorRT");
-            
+
             LOG_DEBUG("dilation: " << dilation);
             LOG_WARNING("Dilation not used in max pooling converter");
             bool ceil_mode = args[5].IValue()->to<bool>();
@@ -47,17 +47,14 @@ auto pooling_registrations = RegisterNodeConversionPatterns()
                 auto stride = util::toDims(args[2].unwrapToIntList());
                 new_layer->setStrideNd(stride);
             }
-            
+
             auto padding_mode = ceil_mode ? nvinfer1::PaddingMode::kEXPLICIT_ROUND_UP :  nvinfer1::PaddingMode::kEXPLICIT_ROUND_DOWN;
             new_layer->setPaddingMode(padding_mode);
-            
-            new_layer->setName(util::node_info(n).c_str());
-            auto out_value = n->outputs()[0];
-            auto out_tensor = new_layer->getOutput(0);
-            out_tensor->setName(out_value->debugName().c_str());
-            ctx->value_tensor_map[out_value] = out_tensor;
-            LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
 
+            new_layer->setName(util::node_info(n).c_str());
+            auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
+
+            LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
             return true;
         }
     }).pattern({
@@ -75,7 +72,7 @@ auto pooling_registrations = RegisterNodeConversionPatterns()
                 in = shuffle->getOutput(0);
                 in_shape = util::toVec(in->getDimensions());
             }
-            
+
             auto out_shape = args[1].IValue()->toIntList();
 
             std::vector<int64_t> stride(out_shape.size());
@@ -90,7 +87,7 @@ auto pooling_registrations = RegisterNodeConversionPatterns()
             }
 
             LOG_DEBUG("Window" << util::toDims(window));
-            
+
             auto new_layer = ctx->net->addPoolingNd(*in, nvinfer1::PoolingType::kAVERAGE, util::toDims(window));
             if (!new_layer) {
                 LOG_ERROR("Unable to create average pooling layer from node: " << *n);
@@ -98,14 +95,11 @@ auto pooling_registrations = RegisterNodeConversionPatterns()
             }
 
             new_layer->setStrideNd(util::toDims(stride));
-            new_layer->setName(util::node_info(n).c_str());
-            auto out_value = n->outputs()[0];
-            auto out_tensor = new_layer->getOutput(0);
-            out_tensor->setName(out_value->debugName().c_str());
-            ctx->value_tensor_map[out_value] = out_tensor;
-            LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
-                        
 
+            new_layer->setName(util::node_info(n).c_str());
+            auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
+
+            LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
             return true;
         }
     });
@@ -114,4 +108,4 @@ auto pooling_registrations = RegisterNodeConversionPatterns()
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // trtorch 
+} // trtorch

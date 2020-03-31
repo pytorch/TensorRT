@@ -15,7 +15,7 @@ static auto softmax_registrations = RegisterNodeConversionPatterns()
             auto in = args[0].ITensor();
             auto shape = util::toVec(in->getDimensions());
 
-            // SoftMax needs at least 4D input 
+            // SoftMax needs at least 4D input
             if (shape.size() < 2) {
                 auto new_shape = util::toDimsPad(shape, 2);
                 LOG_DEBUG("Input shape is less than 2D got: " << util::toDims(shape) << ", inserting shuffle layer to reshape to 2D tensor shape: " << new_shape);
@@ -24,9 +24,12 @@ static auto softmax_registrations = RegisterNodeConversionPatterns()
                 shuffle->setName((util::node_info(n) + " [Reshape to " + util::toStr(new_shape) + ']').c_str());
                 in = shuffle->getOutput(0);
             }
-            
+
             int64_t dim = args[1].IValue()->toInt();
             auto softmax = ctx->net->addSoftMax(*in);
+
+            TRTORCH_CHECK(softmax, "Unable to create softmax layer from node: " << *n);
+
             if (!softmax) {
                 LOG_ERROR("Unable to create softmax layer from node: " << *n);
                 return false;
@@ -39,7 +42,7 @@ static auto softmax_registrations = RegisterNodeConversionPatterns()
                 // When there is no batch dimension
                 softmax->setAxes(1 << (dim + 1));
             }
-               
+
             softmax->setName(util::node_info(n).c_str());
             auto out_value = n->outputs()[0];
             auto out_tensor = softmax->getOutput(0);
@@ -57,7 +60,7 @@ static auto softmax_registrations = RegisterNodeConversionPatterns()
             out_tensor->setName(out_value->debugName().c_str());
             ctx->value_tensor_map[out_value] = out_tensor;
             LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
-            
+
             return true;
         }
     });
@@ -66,4 +69,4 @@ static auto softmax_registrations = RegisterNodeConversionPatterns()
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // trtorch 
+} // trtorch
