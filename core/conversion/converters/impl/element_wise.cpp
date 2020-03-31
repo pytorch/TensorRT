@@ -173,43 +173,6 @@ auto element_wise_registrations = RegisterNodeConversionPatterns()
              }
          });
 
-// - func: div.Tensor(Tensor self, Tensor other) -> Tensor
-//   use_c10_dispatcher: full
-//   variants: function, method
-//   dispatch:
-//     CPU: div
-//     CUDA: div
-//     SparseCPU: div_sparse
-//     SparseCUDA: div_sparse
-//   supports_named_tensor: True
-
-// - func: div_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)
-//   variants: method
-//   dispatch:
-//     CPU: div_
-//     CUDA: div_
-//     SparseCPU: div_sparse_
-//     SparseCUDA: div_sparse_
-//   supports_named_tensor: True
-
-// - func: div.out(Tensor self, Tensor other, *, Tensor(a!) out) -> Tensor(a!)
-//   dispatch:
-//     CPU: div_out
-//     CUDA: div_out
-//     SparseCPU: div_out_sparse_zerodim
-//     SparseCUDA: div_out_sparse_zerodim
-//   supports_named_tensor: True
-
-// # For C++ only, until we have conversion from C++ numbers to Tensor
-// - func: div.Scalar(Tensor self, Scalar other) -> Tensor
-//   use_c10_dispatcher: full
-//   variants: function, method
-//   supports_named_tensor: True
-
-// - func: div_.Scalar(Tensor(a!) self, Scalar other) -> Tensor(a!)
-//   variants: method
-//   supports_named_tensor: True
-
 } // namespace
 } // namespace impl
 } // namespace converters
