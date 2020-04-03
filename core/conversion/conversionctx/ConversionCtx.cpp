@@ -19,7 +19,8 @@ std::ostream& operator<<(std::ostream& os, const BuilderSettings& s) {
        << "\n    Avg Timing Iterations: " << s.num_avg_timing_iters                \
        << "\n    Max Workspace Size: " << s.workspace_size                         \
        << "\n    Device Type: " << s.device                                        \
-       << "\n    Engine Capability: " << s.capability;
+       << "\n    Engine Capability: " << s.capability                              \
+       << "\n    Calibrator Created: " << s.calibrator ? true : false;
     return os;
 }
 
@@ -36,13 +37,17 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
 
     switch(settings.op_precision) {
     case nvinfer1::DataType::kHALF:
+        TRTORCH_CHECK(builder->platformHasFastFp16(), "Requested inference in FP16 but platform does support FP16");
         cfg->setFlag(nvinfer1::BuilderFlag::kFP16);
         input_type = nvinfer1::DataType::kHALF;
         break;
-    // case nvinfer1::DataType::kINT8:
-    //     cfg->setFlag(nvinfer1::BuilderFlag::kINT8);
-    //         input_type = nvinfer1::DataType::kFLOAT;
-    //     break;
+    case nvinfer1::DataType::kINT8:
+        TRTORCH_CHECK(builder->platformHasFastInt8(), "Requested inference in INT8 but platform does support INT8");
+        cfg->setFlag(nvinfer1::BuilderFlag::kINT8);
+        input_type = nvinfer1::DataType::kINT8;
+        // If the calibrator is nullptr then TRT will use default quantization
+        cfg->setInt8Calibrator(settings.calibrator);
+        break;
     case nvinfer1::DataType::kFLOAT:
     default:
         input_type = nvinfer1::DataType::kFLOAT;

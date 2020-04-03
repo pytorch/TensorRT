@@ -14,3 +14,5 @@ py/build/
 py/tmp/
 py/.eggs
 .vscode/
+.DS_Store
+._DS_Store
