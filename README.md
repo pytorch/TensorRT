@@ -8,6 +8,23 @@ More Information / System Architecture:
 
 - [GTC 2020 Talk](https://developer.nvidia.com/gtc/2020/video/s21671)
 
+## Example Usage
+
+```c++
+#include "torch/script.h"
+#include "trtorch/trtorch.h"
+
+...
+auto compile_settings = trtorch::ExtraInfo(dims);
+// FP16 execution
+compile_settings.op_precision = torch::kHalf;
+// Compile module
+auto trt_mod = trtorch::CompileGraph(ts_mod, compile_settings);
+// Run like normal
+auto results = trt_mod.forward({in_tensor});
+...
+```
+
 ## Platform Support
 
 | Platform | Support |
