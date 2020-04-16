@@ -16,3 +16,6 @@ py/.eggs
 .vscode/
 .DS_Store
 ._DS_Store
+*.pth
+*.pyc
+cpp/ptq/training/vgg16/data/
