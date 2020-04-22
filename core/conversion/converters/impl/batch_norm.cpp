@@ -83,7 +83,8 @@ volatile auto batch_norm_registrations = RegisterNodeConversionPatterns()
                 auto gamma = args[1].unwrapToTensor();
 
                 if (/*training*/ args[5].unwrapToBool()) {
-                    LOG_WARNING("TensorRT only converts forward pass of graphs, but saw training = True, may see undefined behavior, consider placing module in eval mode");
+                    LOG_WARNING(R"WARN(TRTorch only converts forward pass of graphs, but saw training = True, may see
+                    unexpected behavior, consider placing module in eval mode before exporting the TorchScript module)WARN");
                 }
 
                 // If gamma is None this fails

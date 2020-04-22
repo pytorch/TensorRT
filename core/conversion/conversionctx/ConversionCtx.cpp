@@ -20,7 +20,7 @@ std::ostream& operator<<(std::ostream& os, const BuilderSettings& s) {
        << "\n    Max Workspace Size: " << s.workspace_size                         \
        << "\n    Device Type: " << s.device                                        \
        << "\n    Engine Capability: " << s.capability                              \
-       << "\n    Calibrator Created: " << s.calibrator ? true : false;
+       << "\n    Calibrator Created: " << (s.calibrator != nullptr);
     return os;
 }
 

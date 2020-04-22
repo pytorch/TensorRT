@@ -179,7 +179,7 @@ void AddParamsToCtxValueMap(ConversionCtx* ctx, GraphParams& params) {
     }
 }
 
-void ConvertBlockToNetDef(ConversionCtx* ctx, const torch::jit::Block* b, ExtraInfo build_info, GraphParams& static_params) {
+void ConvertBlockToNetDef(ConversionCtx* ctx, const torch::jit::Block* b, ConversionInfo build_info, GraphParams& static_params) {
      LOG_INFO(ctx->logger, "Converting Block");
 
     auto inputs = b->inputs();
@@ -221,7 +221,7 @@ void ConvertBlockToNetDef(ConversionCtx* ctx, const torch::jit::Block* b, ExtraI
 // a serialized TensorRT engine that can be deserialized and run
 
 // Probably should consolidate these two functions
-std::string ConvertBlockToEngine(const torch::jit::Block* b, ExtraInfo build_info, GraphParams& static_params) {
+std::string ConvertBlockToEngine(const torch::jit::Block* b, ConversionInfo build_info, GraphParams& static_params) {
     ConversionCtx ctx(build_info.engine_settings);
     ConvertBlockToNetDef(&ctx, b, build_info, static_params);
     std::string engine = ctx.SerializeEngine();

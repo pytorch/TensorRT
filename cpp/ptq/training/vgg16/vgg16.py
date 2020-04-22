@@ -1,3 +1,8 @@
+'''
+# Reference
+- [Very Deep Convolutional Networks for Large-Scale Image Recognition](
+    https://arxiv.org/abs/1409.1556) (ICLR 2015)
+'''
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -21,9 +26,9 @@ class VGG(nn.Module):
                 in_channels = l
 
         self.features = nn.Sequential(*layers)
-        self.avgpool = nn.AdaptiveAvgPool2d((7, 7))
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.classifier = nn.Sequential(
-            nn.Linear(512 * 7 * 7, 4096),
+            nn.Linear(512 * 1 * 1, 4096),
             nn.ReLU(),
             nn.Dropout(),
             nn.Linear(4096, 4096),
@@ -55,5 +60,5 @@ class VGG(nn.Module):
         return x
 
 def vgg16(num_classes=1000, init_weights=False):
-    vgg16_cfg = [64, 64, 'pool', 128, 128, 'pool', 256, 256, 256, 256, 'pool', 512, 512, 512, 512, 'pool', 512, 512, 512, 512, 'pool']
+    vgg16_cfg = [64, 64, 'pool', 128, 128, 'pool', 256, 256, 256, 'pool', 512, 512, 512, 'pool', 512, 512, 512, 'pool']
     return VGG(vgg16_cfg, num_classes, init_weights)

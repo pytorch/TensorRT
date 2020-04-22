@@ -8,7 +8,7 @@
 namespace trtorch {
 
 // Defined in extra_info.cpp
-core::conversion::ExtraInfo to_internal_extra_info(ExtraInfo external);
+core::ExtraInfo to_internal_extra_info(ExtraInfo external);
 
 bool CheckMethodOperatorSupport(const torch::jit::script::Module& module,
                                 std::string method_name) {

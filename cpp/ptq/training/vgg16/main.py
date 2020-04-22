@@ -16,7 +16,7 @@ from torch.utils.tensorboard import SummaryWriter
 from vgg16 import vgg16
 
 PARSER = argparse.ArgumentParser(description="VGG16 example to use with TRTorch PTQ")
-PARSER.add_argument('--epochs', default=300, type=int, help="Number of total epochs to train")
+PARSER.add_argument('--epochs', default=100, type=int, help="Number of total epochs to train")
 PARSER.add_argument('--batch-size', default=128, type=int, help="Batch size to use when training")
 PARSER.add_argument('--lr', default=0.1, type=float, help="Initial learning rate")
 PARSER.add_argument('--drop-ratio', default=0., type=float, help="Dropout ratio")
@@ -89,6 +89,9 @@ def main():
     crit = nn.CrossEntropyLoss()
     opt = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
 
+    if torch.cuda.device_count() > 1:
+        model = nn.DataParallel(model)
+
     if args.start_from != 0:
         ckpt_file = args.ckpt_dir + '/ckpt_epoch' + str(args.start_from) + '.pth'
         print('Loading from checkpoint {}'.format(ckpt_file))
@@ -97,9 +100,6 @@ def main():
         model.load_state_dict(ckpt["model_state_dict"])
         opt.load_state_dict(ckpt["opt_state_dict"])
         state = ckpt["state"]
-
-    if torch.cuda.device_count() > 1:
-        model = nn.DataParallel(model)
 
     for epoch in range(args.start_from, args.epochs):
         adjust_lr(opt, epoch)
@@ -170,6 +170,7 @@ def test(model, dataloader, crit, epoch):
     test_preds = torch.cat(class_preds)
     for i in range(len(classes)):
         add_pr_curve_tensorboard(i, test_probs, test_preds, epoch)
+    #print(loss, total, correct, total)
     return loss / total, correct / total
 
 
@@ -181,7 +182,7 @@ def save_checkpoint(state, ckpt_dir='checkpoint'):
 
 def adjust_lr(optimizer, epoch):
     global state
-    new_lr = state["lr"] * (0.5 ** (epoch // 50)) if state["lr"] > 1e-7 else state["lr"]
+    new_lr = state["lr"] * (0.5 ** (epoch // 40)) if state["lr"] > 1e-7 else state["lr"]
     if new_lr != state["lr"]:
         state["lr"] = new_lr
         print("Updating learning rate: {}".format(state["lr"]))

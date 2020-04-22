@@ -16,7 +16,7 @@ cc_library(
         "@libtorch//:libtorch",
         "@tensorrt//:nvinfer"
     ],
-    alwayslink=True, 
+    alwayslink=True,
 )
 
 
