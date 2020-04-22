@@ -11,6 +11,13 @@ class IInt8Calibrator;
 class IInt8EntropyCalibrator2;
 }
 
+namespace torch {
+namespace data {
+template<typename Example>
+class Iterator;
+}
+}
+
 namespace trtorch {
 namespace ptq {
 

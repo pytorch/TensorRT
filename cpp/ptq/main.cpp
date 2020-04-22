@@ -41,8 +41,8 @@ int main(int argc, const char* argv[]) {
 
     std::string calibration_cache_file = "/tmp/vgg16_TRT_ptq_calibration.cache";
 
-    //auto calibrator = trtorch::ptq::make_int8_calibrator(std::move(calibration_dataloader), calibration_cache_file, true);
-    auto calibrator = trtorch::ptq::make_int8_cache_calibrator(calibration_cache_file);
+    auto calibrator = trtorch::ptq::make_int8_calibrator(std::move(calibration_dataloader), calibration_cache_file, true);
+    //auto calibrator = trtorch::ptq::make_int8_cache_calibrator(calibration_cache_file);
 
 
     std::vector<std::vector<int64_t>> input_shape = {{32, 3, 32, 32}};

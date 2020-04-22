@@ -12,9 +12,6 @@
 #include <vector>
 #include <memory>
 
-#include "torch/torch.h"
-#include "NvInfer.h"
-
 // Just include the .h?
 namespace torch {
 namespace jit {
