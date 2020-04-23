@@ -32,6 +32,7 @@ int main(int argc, const char* argv[]) {
     // Create the calibration dataset
     const std::string data_dir = std::string(argv[2]);
     auto calibration_dataset = datasets::CIFAR10(data_dir, datasets::CIFAR10::Mode::kTest)
+                                    .use_subset(320)
                                     .map(torch::data::transforms::Normalize<>({0.4914, 0.4822, 0.4465},
                                                                               {0.2023, 0.1994, 0.2010}))
                                     .map(torch::data::transforms::Stack<>());
@@ -41,7 +42,7 @@ int main(int argc, const char* argv[]) {
 
     std::string calibration_cache_file = "/tmp/vgg16_TRT_ptq_calibration.cache";
 
-    auto calibrator = trtorch::ptq::make_int8_calibrator(std::move(calibration_dataloader), calibration_cache_file, true);
+    auto calibrator = trtorch::ptq::make_int8_calibrator(std::move(calibration_dataloader), calibration_cache_file, false);
     //auto calibrator = trtorch::ptq::make_int8_cache_calibrator(calibration_cache_file);
 
 
@@ -49,11 +50,11 @@ int main(int argc, const char* argv[]) {
     // Configure settings for compilation
     auto extra_info = trtorch::ExtraInfo({input_shape});
     // Set operating precision to INT8
-    extra_info.op_precision = torch::kChar;
+    extra_info.op_precision = torch::kFI8;
     // Use the TensorRT Entropy Calibrator
     extra_info.ptq_calibrator = calibrator;
-    // Increase the default workspace size;
-    extra_info.workspace_size = 1 << 30;
+    // Set max batch size for the engine
+    extra_info.max_batch_size = 32;
 
     mod.eval();
 
@@ -92,6 +93,14 @@ int main(int argc, const char* argv[]) {
 
         auto outputs = trt_mod.forward({images});
         auto predictions = std::get<1>(torch::max(outputs.toTensor(), 1, false));
+        predictions = predictions.reshape(predictions.sizes()[0]);
+
+        if (predictions.sizes()[0] != targets.sizes()[0]) {
+            // To handle smaller batches util Optimization profiles work
+            predictions = predictions.slice(0, 0, targets.sizes()[0]);
+        }
+
+        std:: cout << predictions << targets << std::endl;
 
         total += targets.sizes()[0];
         correct += torch::sum(torch::eq(predictions, targets)).item().toFloat();

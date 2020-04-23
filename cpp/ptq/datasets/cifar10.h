@@ -34,6 +34,10 @@ public:
     // Returns all targets stacked into a single tensor
     const torch::Tensor& targets() const;
 
+    // Trims the dataset to the first n pairs
+    CIFAR10&& use_subset(int64_t new_size);
+
+
 private:
     Mode mode_;
     torch::Tensor images_, targets_;

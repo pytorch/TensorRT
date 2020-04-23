@@ -1,5 +1,6 @@
 #include "cpp/ptq/datasets/cifar10.h"
 
+#include "torch/torch.h"
 #include "torch/data/example.h"
 #include "torch/types.h"
 
@@ -63,15 +64,19 @@ std::pair<torch::Tensor, torch::Tensor> read_batch(const std::string& path) {
 }
 
 std::pair<torch::Tensor, torch::Tensor> read_train_data(const std::string& root) {
-    torch::Tensor images, targets;
+    std::vector<torch::Tensor> images, targets;
     for(uint32_t i = 1; i <= 5; i++) {
         std::stringstream ss;
         ss << root << '/' << kTrainFilenamePrefix << i << ".bin";
         auto batch = read_batch(ss.str());
-        images = torch::stack({images, batch.first});
-        targets = torch::stack({targets, batch.second});
+        images.push_back(batch.first);
+        targets.push_back(batch.second);
     }
-    return std::make_pair(images, targets);
+
+    torch::Tensor image_tensor = std::accumulate(++images.begin(), images.end(), *images.begin(), [&](torch::Tensor a, torch::Tensor b) {return torch::cat({a, b}, 0);});
+    torch::Tensor target_tensor = std::accumulate(++targets.begin(), targets.end(), *targets.begin(), [&](torch::Tensor a, torch::Tensor b) {return torch::cat({a, b}, 0);});
+
+    return std::make_pair(image_tensor, target_tensor);
 }
 
 std::pair<torch::Tensor, torch::Tensor> read_test_data(const std::string& root) {
@@ -93,6 +98,7 @@ CIFAR10::CIFAR10(const std::string& root, Mode mode)
 
     images_ = std::move(data.first);
     targets_ = std::move(data.second);
+    assert(images_.sizes()[0] == images_.sizes()[0]);
 }
 
 torch::data::Example<> CIFAR10::get(size_t index) {
@@ -113,6 +119,13 @@ const torch::Tensor& CIFAR10::images() const {
 
 const torch::Tensor& CIFAR10::targets() const {
     return targets_;
+}
+
+CIFAR10&& CIFAR10::use_subset(int64_t new_size) {
+    assert(new_size <= images_.sizes()[0]);
+    images_ = images_.slice(0, 0, new_size);
+    targets_ = targets_.slice(0, 0, new_size);
+    return std::move(*this);
 }
 
 } // namespace datasets
