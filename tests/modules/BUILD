@@ -8,6 +8,7 @@ test_suite(
     tests = [
         ":test_modules_as_engines",
         ":test_compiled_modules",
+        ":test_fp16_compiled_modules",
         ":test_multiple_registered_engines"
     ]
 )
@@ -27,6 +28,17 @@ cc_test(
 cc_test(
     name = "test_modules_as_engines",
     srcs = ["test_modules_as_engines.cpp"],
+    deps = [
+        ":module_test"
+    ],
+    data = [
+        ":jit_models"
+    ]
+)
+
+cc_test(
+    name = "test_fp16_compiled_modules",
+    srcs = ["test_fp16_compiled_modules.cpp"],
     deps = [
         ":module_test"
     ],
