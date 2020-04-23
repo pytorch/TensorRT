@@ -175,7 +175,7 @@ struct TRTORCH_API ExtraInfo {
     /**
      * Restrict operating type to only set default operation precision (op_precision)
      */
-    bool strict_type = false;
+    bool strict_types = false;
 
     /**
      * (Only used when targeting DLA (device))
@@ -205,7 +205,12 @@ struct TRTORCH_API ExtraInfo {
     /**
      * Maximum size of workspace given to TensorRT
      */
-    uint64_t workspace_size = 1 << 20;
+    uint64_t workspace_size = 0;
+
+    /**
+     * Maximum batch size (must be =< 1 to be set, 0 means not set)
+     */
+    uint64_t max_batch_size = 0;
 
     /**
      * Calibration dataloaders for each input for post training quantizatiom

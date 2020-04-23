@@ -9,17 +9,24 @@ namespace core {
 namespace conversion {
 
 std::ostream& operator<<(std::ostream& os, const BuilderSettings& s) {
-    os << "Settings requested for TensorRT engine:"                                \
-       << "\n    Operating Precision: " << s.op_precision                          \
-       << "\n    Make Refittable Engine: " << s.refit                              \
-       << "\n    Debuggable Engine: " << s.debug                                   \
-       << "\n    Strict Type: " << s.strict_type                                   \
-       << "\n    Allow GPU Fallback (if running on DLA): " << s.allow_gpu_fallback \
-       << "\n    Min Timing Iterations: " << s.num_min_timing_iters                \
-       << "\n    Avg Timing Iterations: " << s.num_avg_timing_iters                \
-       << "\n    Max Workspace Size: " << s.workspace_size                         \
-       << "\n    Device Type: " << s.device                                        \
-       << "\n    Engine Capability: " << s.capability                              \
+    os << "Settings requested for TensorRT engine:"                                        \
+       << "\n    Operating Precision: " << s.op_precision                                  \
+       << "\n    Make Refittable Engine: " << s.refit                                      \
+       << "\n    Debuggable Engine: " << s.debug                                           \
+       << "\n    Strict Type: " << s.strict_types                                          \
+       << "\n    Allow GPU Fallback (if running on DLA): " << s.allow_gpu_fallback         \
+       << "\n    Min Timing Iterations: " << s.num_min_timing_iters                        \
+       << "\n    Avg Timing Iterations: " << s.num_avg_timing_iters                        \
+       << "\n    Max Workspace Size: " << s.workspace_size;
+
+    if (s.max_batch_size != 0) {
+        os << "\n    Max Batch Size: " << s.max_batch_size;
+    } else {
+        os << "\n    Max Batch Size: Not set";
+    }
+
+    os << "\n    Device Type: " << s.device                                                \
+       << "\n    Engine Capability: " << s.capability                                      \
        << "\n    Calibrator Created: " << (s.calibrator != nullptr);
     return os;
 }
@@ -62,12 +69,16 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
         cfg->setFlag(nvinfer1::BuilderFlag::kDEBUG);
     }
 
-    if (settings.strict_type) {
+    if (settings.strict_types) {
         cfg->setFlag(nvinfer1::BuilderFlag::kSTRICT_TYPES);
     }
 
     if (settings.allow_gpu_fallback) {
         cfg->setFlag(nvinfer1::BuilderFlag::kGPU_FALLBACK);
+    }
+
+    if (settings.max_batch_size != 0) {
+        builder->setMaxBatchSize(settings.max_batch_size);
     }
 
     cfg->setMinTimingIterations(settings.num_min_timing_iters);

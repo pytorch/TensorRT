@@ -91,8 +91,9 @@ core::ExtraInfo to_internal_extra_info(ExtraInfo external) {
 
     internal.convert_info.engine_settings.refit = external.refit;
     internal.convert_info.engine_settings.debug = external.debug;
-    internal.convert_info.engine_settings.strict_type = external.strict_type;
+    internal.convert_info.engine_settings.strict_types = external.strict_types;
     internal.convert_info.engine_settings.allow_gpu_fallback = external.allow_gpu_fallback;
+    internal.convert_info.engine_settings.max_batch_size = external.max_batch_size;
 
     switch(external.device) {
     case ExtraInfo::DeviceType::kDLA:
