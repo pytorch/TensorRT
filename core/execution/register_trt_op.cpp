@@ -1,5 +1,6 @@
 #include "c10/cuda/CUDAStream.h"
 
+#include "torch/torch.h"
 #include "torch/csrc/jit/custom_operator.h"
 
 #include "core/util/prelude.h"
@@ -15,6 +16,18 @@ std::vector<at::Tensor> RunCudaEngine(nvinfer1::IExecutionContext* ctx, std::pai
     std::vector<at::Tensor> contig_inputs{};
     contig_inputs.reserve(inputs.size());
     for (size_t i = 0; i < inputs.size(); i++) {
+        TRTORCH_CHECK(inputs[i].is_cuda(), "Expected input tensors to have device cuda, found device " << inputs[i].device());
+        auto expected_type = torch::kF32;
+        switch (ctx->getEngine().getBindingDataType(i)) {
+        case nvinfer1::DataType::kHALF:
+            expected_type = torch::kF16;
+            break;
+        case nvinfer1::DataType::kFLOAT:
+        case nvinfer1::DataType::kINT8:
+        default:
+            expected_type = torch::kF32;
+        }
+        TRTORCH_CHECK(inputs[i].dtype() == expected_type, "Expected input tensors to have type " << expected_type << ", found type " << inputs[i].dtype());
         auto dims = core::util::toDimsPad(inputs[i].sizes(), 1);
         auto shape = core::util::toVec(dims);
         contig_inputs.push_back(inputs[i].to(at::kCUDA).view(shape).contiguous());

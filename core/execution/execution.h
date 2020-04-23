@@ -1,5 +1,5 @@
 #pragma once
-#include <utility> 
+#include <utility>
 #include "NvInfer.h"
 #include "ATen/core/function_schema.h"
 
