@@ -93,10 +93,6 @@ public:
         return reinterpret_cast<nvinfer1::IInt8Calibrator*>(this);
     }
 
-    ~Int8Calibrator() {
-        delete dataloader_;
-    }
-
 private:
     DataLoader* dataloader_;
     torch::data::Iterator<Batch> it_;
