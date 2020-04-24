@@ -133,7 +133,7 @@ void AddInputs(ConversionCtx* ctx,
                   "Expected dimension specifications for all input tensors" \
                   << ", but found " << input_tensors.size()                 \
                   << " input tensors and "                                  \
-                  << input_dims.size() << "dimension specs (conversion.AddInputs)");
+                  << input_dims.size() << " dimension specs (conversion.AddInputs)");
 
     auto profile = ctx->builder->createOptimizationProfile();
 
@@ -235,7 +235,7 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b) {
         if (!OpSupported(n)) {
             auto schema = n->maybeSchema();
             TRTORCH_CHECK(schema, "Unable to get schema for Node " << util::node_info(n) \
-                                    << " (conversion.AddLayer)");
+                                    << " (conversion.VerifyCoverterSupportForBloxk");
             std::stringstream ss;
             ss << *schema;
             unsupported_ops.insert(ss.str());

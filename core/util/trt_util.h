@@ -21,7 +21,7 @@ inline bool operator==(const nvinfer1::Dims& in1, const nvinfer1::Dims& in2) {
     }
 
     // TODO maybe look to support broadcasting comparisons
-    
+
     for (int64_t i = 0; i < in1.nbDims; i++) {
         if (in1.d[i] != in2.d[i]) {
             return false;
@@ -85,11 +85,12 @@ nvinfer1::DimsHW toDimsHW(c10::IntArrayRef l);
 std::vector<int64_t> toVec(nvinfer1::Dims d);
 std::string toStr(nvinfer1::Dims d);
 
+at::ScalarType toATenDType(nvinfer1::DataType t);
 nvinfer1::DataType toTRTDataType(at::ScalarType t);
 c10::optional<nvinfer1::DataType>toTRTDataType(caffe2::TypeMeta dtype);
 
 const std::unordered_map<at::ScalarType, nvinfer1::DataType>& get_aten_trt_type_map();
-  
+
 } // namespace util
 } // namespace core
 } // namespace trtorch

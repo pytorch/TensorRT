@@ -15,18 +15,18 @@ nvinfer1::Dims toDimsPad(c10::IntArrayRef l, uint64_t pad_to) {
         LOG_DEBUG("Requested padding of dimensions to " << pad_to << " but found " << l.size() << " dimensions, not going to pad");
         return toDims(l);
     }
-    
+
     if (pad_to > nvinfer1::Dims::MAX_DIMS) {
         //TODO: Handle this with exceptions or whatever
         LOG_INTERNAL_ERROR("The list requested to be converted to nvinfer1::Dims exceeds the max number of dimensions for TensorRT");
     }
-    
+
     nvinfer1::Dims dims;
     dims.nbDims = pad_to;
     for (size_t i = 0; i < pad_to - l.size(); i++) {
         dims.d[i] = 1;
     }
-    
+
     for (size_t i = pad_to - l.size(); i < pad_to; i++) {
         dims.d[i] = l[i - (pad_to - l.size())];
     }
@@ -58,7 +58,7 @@ nvinfer1::Dims toDims(c10::List<int64_t> l) {
     }
     return dims;
 }
-    
+
 std::vector<int64_t> toVec(nvinfer1::Dims d) {
     std::vector<int64_t> dims;
     for (int i = 0; i < d.nbDims; i++) {
@@ -110,7 +110,25 @@ const std::unordered_map<at::ScalarType, nvinfer1::DataType>& get_at_trt_type_ma
     };
     return at_trt_type_map;
 }
+
+const std::unordered_map<nvinfer1::DataType, at::ScalarType>& get_trt_at_type_map() {
+    static const std::unordered_map<nvinfer1::DataType, at::ScalarType> trt_at_type_map = {
+        {nvinfer1::DataType::kFLOAT, at::kFloat},
+        {nvinfer1::DataType::kHALF, at::kHalf},
+        {nvinfer1::DataType::kINT32, at::kInt},
+        {nvinfer1::DataType::kINT8, at::kChar},
+    };
+    return trt_at_type_map;
+}
 } // namespace
+
+const std::unordered_map<nvinfer1::DataType, at::ScalarType>& get_trt_aten_type_map() {
+    return get_trt_at_type_map();
+}
+
+at::ScalarType toATenDType(nvinfer1::DataType t) {
+    return get_trt_aten_type_map().at(t);
+}
 
 const std::unordered_map<at::ScalarType, nvinfer1::DataType>& get_aten_trt_type_map() {
     return get_at_trt_type_map();

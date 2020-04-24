@@ -13,7 +13,7 @@
 #include <sys/stat.h>
 
 int main(int argc, const char* argv[]) {
-    trtorch::logging::set_reportable_log_level(trtorch::logging::kINFO);
+    trtorch::logging::set_reportable_log_level(trtorch::logging::Level::kERROR);
     if (argc < 3) {
         std::cerr << "usage: ptq <path-to-module> <path-to-cifar10>\n";
         return -1;
@@ -50,11 +50,13 @@ int main(int argc, const char* argv[]) {
     // Configure settings for compilation
     auto extra_info = trtorch::ExtraInfo({input_shape});
     // Set operating precision to INT8
-    extra_info.op_precision = torch::kFI8;
+    extra_info.op_precision = torch::kI8;
     // Use the TensorRT Entropy Calibrator
     extra_info.ptq_calibrator = calibrator;
     // Set max batch size for the engine
     extra_info.max_batch_size = 32;
+    // Set a larger workspace
+    extra_info.workspace_size = 1 << 28;
 
     mod.eval();
 
@@ -82,6 +84,7 @@ int main(int argc, const char* argv[]) {
     std::cout << "Accuracy of JIT model on test set: " << 100 * (correct / total) << "%" << std::endl;
 
     // Compile Graph
+    std::cout << "Compiling and quantizing module" << std::endl;
     auto trt_mod = trtorch::CompileGraph(mod, extra_info);
 
     // Check the INT8 accuracy in TRT
@@ -91,22 +94,27 @@ int main(int argc, const char* argv[]) {
         auto images = batch.data.to(torch::kCUDA);
         auto targets = batch.target.to(torch::kCUDA);
 
+        if (images.sizes()[0] < 32) {
+            // To handle smaller batches util Optimization profiles work with Int8
+            auto diff = 32 - images.sizes()[0];
+            auto img_padding = torch::zeros({diff, 3, 32, 32}, {torch::kCUDA});
+            auto target_padding = torch::zeros({diff}, {torch::kCUDA});
+            images = torch::cat({images, img_padding}, 0);
+            targets = torch::cat({targets, target_padding}, 0);
+        }
+
         auto outputs = trt_mod.forward({images});
         auto predictions = std::get<1>(torch::max(outputs.toTensor(), 1, false));
         predictions = predictions.reshape(predictions.sizes()[0]);
 
         if (predictions.sizes()[0] != targets.sizes()[0]) {
-            // To handle smaller batches util Optimization profiles work
+            // To handle smaller batches util Optimization profiles work with Int8
             predictions = predictions.slice(0, 0, targets.sizes()[0]);
         }
 
-        std:: cout << predictions << targets << std::endl;
-
         total += targets.sizes()[0];
         correct += torch::sum(torch::eq(predictions, targets)).item().toFloat();
-        std::cout << total << " " << correct << std::endl;
     }
-    std::cout << total << " " << correct << std::endl;
     std::cout << "Accuracy of quantized model on test set: " << 100 * (correct / total) << "%" << std::endl;
 
     // Time execution in INT8

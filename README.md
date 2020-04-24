@@ -27,7 +27,7 @@ auto results = trt_mod.forward({in_tensor});
 
 > Notes on running in lower precisions:
 > - Set precision with extra_info.op_precision
-> - The module should be left in FP32 before compilation
+> - The module should be left in FP32 before compilation (FP16 can support half tensor models)
 > - In FP16 only input tensors should be converted to FP16, other precisions use FP32
 
 ## Platform Support
