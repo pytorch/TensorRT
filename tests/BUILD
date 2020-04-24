@@ -5,4 +5,11 @@ test_suite(
         "//tests/modules:test_modules"
     ],
 )
-    
+
+test_suite(
+    name = "required_and_optional_tests",
+    tests = [
+        ":tests",
+        "//tests/accuracy:test_accuracy"
+    ]
+)

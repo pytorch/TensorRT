@@ -18,7 +18,7 @@ std::vector<at::Tensor> RunModuleForwardAsEngine(torch::jit::script::Module& mod
     for (auto in : inputs) {
         input_ranges.push_back(in.sizes());
     }
-    
+
     auto engine = trtorch::ConvertGraphToTRTEngine(mod, "forward", input_ranges);
     return RunEngine(engine, inputs);
 }

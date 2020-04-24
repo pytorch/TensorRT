@@ -21,5 +21,6 @@ py/.eggs
 cpp/ptq/training/vgg16/data/*
 *.bin
 cpp/ptq/datasets/data/
+tests/accuracy/datasets/data/*
 ._.DS_Store
 *.tar.gz
