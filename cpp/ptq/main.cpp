@@ -13,7 +13,6 @@
 #include <sys/stat.h>
 
 int main(int argc, const char* argv[]) {
-    trtorch::logging::set_reportable_log_level(trtorch::logging::Level::kERROR);
     if (argc < 3) {
         std::cerr << "usage: ptq <path-to-module> <path-to-cifar10>\n";
         return -1;
@@ -42,7 +41,7 @@ int main(int argc, const char* argv[]) {
 
     std::string calibration_cache_file = "/tmp/vgg16_TRT_ptq_calibration.cache";
 
-    auto calibrator = trtorch::ptq::make_int8_calibrator(std::move(calibration_dataloader), calibration_cache_file, false);
+    auto calibrator = trtorch::ptq::make_int8_calibrator(std::move(calibration_dataloader), calibration_cache_file, true);
     //auto calibrator = trtorch::ptq::make_int8_cache_calibrator(calibration_cache_file);
 
 
