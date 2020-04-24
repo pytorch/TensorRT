@@ -122,6 +122,13 @@ int main(int argc, const char* argv[]) {
     auto images = (*(*eval_dataloader).begin()).data.to(torch::kCUDA);
 
     execution_timer.start();
+    mod.forward({images});
+    execution_timer.stop();
+    std::cout << "Latency of JIT model FP32 (Batch Size 32): " << execution_timer.milliseconds() << "ms" << std::endl;
+
+    execution_timer.reset();
+
+    execution_timer.start();
     trt_mod.forward({images});
     execution_timer.stop();
 

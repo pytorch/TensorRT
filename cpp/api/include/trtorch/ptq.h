@@ -27,7 +27,7 @@ class Int8Calibrator : Algorithm {
     using Batch = typename DataLoader::super::BatchType;
 public:
     Int8Calibrator(DataLoaderUniquePtr dataloader, const std::string& cache_file_path, bool use_cache)
-      : dataloader_(dataloader.get()), it_(dataloader_->begin()), cache_file_path_(cache_file_path), use_cache_(use_cache) {}
+      : dataloader_(dataloader.get()), it_(dataloader_->end()), cache_file_path_(cache_file_path), use_cache_(use_cache) {}
 
     int getBatchSize() const override {
         // HACK: TRTorch only uses explict batch sizing, INT8 Calibrator does not
