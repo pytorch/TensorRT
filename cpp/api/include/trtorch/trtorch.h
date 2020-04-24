@@ -215,7 +215,7 @@ struct TRTORCH_API ExtraInfo {
     /**
      * Calibration dataloaders for each input for post training quantizatiom
      */
-    nvinfer1::IInt8Calibrator* ptq_calibrator;
+    nvinfer1::IInt8Calibrator* ptq_calibrator = nullptr;
 };
 
 /**
