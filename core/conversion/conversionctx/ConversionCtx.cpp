@@ -52,7 +52,7 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
         TRTORCH_CHECK(builder->platformHasFastInt8(), "Requested inference in INT8 but platform does support INT8");
         cfg->setFlag(nvinfer1::BuilderFlag::kINT8);
         input_type = nvinfer1::DataType::kFLOAT;
-        // If the calibrator is nullptr then TRT will use default quantization
+        TRTORCH_CHECK(settings.calibrator != nullptr, "Requested inference in INT8 but no calibrator provided, set the ptq_calibrator field in the ExtraInfo struct with your calibrator");
         cfg->setInt8Calibrator(settings.calibrator);
         break;
     case nvinfer1::DataType::kFLOAT:
