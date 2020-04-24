@@ -20,7 +20,7 @@ int main(int argc, const char* argv[]) {
 
     torch::jit::script::Module mod;
     try {
-         // Deserialize the ScriptModule from a file using torch::jit::load().
+         /// Deserialize the ScriptModule from a file using torch::jit::load().
          mod = torch::jit::load(argv[1]);
     }
     catch (const c10::Error& e) {
@@ -28,7 +28,7 @@ int main(int argc, const char* argv[]) {
          return -1;
     }
 
-    // Create the calibration dataset
+    /// Create the calibration dataset
     const std::string data_dir = std::string(argv[2]);
     auto calibration_dataset = datasets::CIFAR10(data_dir, datasets::CIFAR10::Mode::kTest)
                                     .use_subset(320)
@@ -42,24 +42,23 @@ int main(int argc, const char* argv[]) {
     std::string calibration_cache_file = "/tmp/vgg16_TRT_ptq_calibration.cache";
 
     auto calibrator = trtorch::ptq::make_int8_calibrator(std::move(calibration_dataloader), calibration_cache_file, true);
-    //auto calibrator = trtorch::ptq::make_int8_cache_calibrator(calibration_cache_file);
 
 
     std::vector<std::vector<int64_t>> input_shape = {{32, 3, 32, 32}};
-    // Configure settings for compilation
+    /// Configure settings for compilation
     auto extra_info = trtorch::ExtraInfo({input_shape});
-    // Set operating precision to INT8
+    /// Set operating precision to INT8
     extra_info.op_precision = torch::kI8;
-    // Use the TensorRT Entropy Calibrator
+    /// Use the TensorRT Entropy Calibrator
     extra_info.ptq_calibrator = calibrator;
-    // Set max batch size for the engine
+    /// Set max batch size for the engine
     extra_info.max_batch_size = 32;
-    // Set a larger workspace
+    /// Set a larger workspace
     extra_info.workspace_size = 1 << 28;
 
     mod.eval();
 
-    // Dataloader moved into calibrator so need another for inference
+    /// Dataloader moved into calibrator so need another for inference
     auto eval_dataset = datasets::CIFAR10(data_dir, datasets::CIFAR10::Mode::kTest)
                                     .map(torch::data::transforms::Normalize<>({0.4914, 0.4822, 0.4465},
                                                                               {0.2023, 0.1994, 0.2010}))
@@ -68,7 +67,7 @@ int main(int argc, const char* argv[]) {
                                                                                                     .batch_size(32)
                                                                                                     .workers(2));
 
-    // Check the FP32 accuracy in JIT
+    /// Check the FP32 accuracy in JIT
     float correct = 0.0, total = 0.0;
     for (auto batch : *eval_dataloader) {
         auto images = batch.data.to(torch::kCUDA);
@@ -82,11 +81,11 @@ int main(int argc, const char* argv[]) {
     }
     std::cout << "Accuracy of JIT model on test set: " << 100 * (correct / total) << "%" << std::endl;
 
-    // Compile Graph
+    /// Compile Graph
     std::cout << "Compiling and quantizing module" << std::endl;
     auto trt_mod = trtorch::CompileGraph(mod, extra_info);
 
-    // Check the INT8 accuracy in TRT
+    /// Check the INT8 accuracy in TRT
     correct = 0.0;
     total = 0.0;
     for (auto batch : *eval_dataloader) {
@@ -94,7 +93,7 @@ int main(int argc, const char* argv[]) {
         auto targets = batch.target.to(torch::kCUDA);
 
         if (images.sizes()[0] < 32) {
-            // To handle smaller batches util Optimization profiles work with Int8
+            /// To handle smaller batches util Optimization profiles work with Int8
             auto diff = 32 - images.sizes()[0];
             auto img_padding = torch::zeros({diff, 3, 32, 32}, {torch::kCUDA});
             auto target_padding = torch::zeros({diff}, {torch::kCUDA});
@@ -107,7 +106,7 @@ int main(int argc, const char* argv[]) {
         predictions = predictions.reshape(predictions.sizes()[0]);
 
         if (predictions.sizes()[0] != targets.sizes()[0]) {
-            // To handle smaller batches util Optimization profiles work with Int8
+            /// To handle smaller batches util Optimization profiles work with Int8
             predictions = predictions.slice(0, 0, targets.sizes()[0]);
         }
 
@@ -116,7 +115,7 @@ int main(int argc, const char* argv[]) {
     }
     std::cout << "Accuracy of quantized model on test set: " << 100 * (correct / total) << "%" << std::endl;
 
-    // Time execution in INT8
+    /// Time execution in JIT-FP32 and TRT-INT8
     auto execution_timer = timers::PreciseCPUTimer();
     auto images = (*(*eval_dataloader).begin()).data.to(torch::kCUDA);
 
