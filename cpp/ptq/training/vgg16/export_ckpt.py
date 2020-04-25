@@ -19,6 +19,7 @@ def test(model, dataloader, crit):
     class_probs = []
     class_preds = []
     model.eval()
+
     with torch.no_grad():
         for data, labels in dataloader:
             data, labels = data.cuda(), labels.cuda(async=True)
@@ -53,14 +54,15 @@ if torch.cuda.device_count() > 1:
     weights = new_state_dict
 
 model.load_state_dict(weights)
+model.eval()
 
 jit_model = torch.jit.trace(model, torch.rand([32, 3, 32, 32]).to("cuda"))
 
 testing_dataset = datasets.CIFAR10(root='./data', train=False, download=True,
                                     transform=transforms.Compose([
                                     transforms.ToTensor(),
-                                        transforms.Normalize((0.4914, 0.4822, 0.4465),
-                                                            (0.2023, 0.1994, 0.2010))]))
+                                    transforms.Normalize((0.4914, 0.4822, 0.4465),
+                                                         (0.2023, 0.1994, 0.2010))]))
 
 testing_dataloader = torch.utils.data.DataLoader(testing_dataset, batch_size=32,
                                                  shuffle=False, num_workers=2)
@@ -68,6 +70,8 @@ testing_dataloader = torch.utils.data.DataLoader(testing_dataset, batch_size=32,
 crit = torch.nn.CrossEntropyLoss()
 test_loss, test_acc = test(model, testing_dataloader, crit)
 print("[PTH] Test Loss: {:.5f} Test Acc: {:.2f}%".format(test_loss, 100 * test_acc))
-print("[JIT] Test Loss: {:.5f} Test Acc: {:.2f}%".format(test_loss, 100 * test_acc))
 
 torch.jit.save(jit_model, "trained_vgg16.jit.pt")
+jit_model = torch.jit.load("trained_vgg16.jit.pt")
+test_loss, test_acc = test(jit_model, testing_dataloader, crit)
+print("[JIT] Test Loss: {:.5f} Test Acc: {:.2f}%".format(test_loss, 100 * test_acc))

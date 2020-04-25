@@ -12,7 +12,7 @@ pip3 install -r requirements.txt --user
 
 The following recipe should get somewhere between 89-92% accuracy on the CIFAR10 testset
 ```
-python3 main.py --lr 0.01 --batch-size 256 --drop-ratio 0.15 --ckpt-dir $(pwd)/vgg16_ckpts --epochs 100
+python3 main.py --lr 0.01 --batch-size 128 --drop-ratio 0.15 --ckpt-dir $(pwd)/vgg16_ckpts --epochs 100
 ```
 
 > 545 was the seed used in testing

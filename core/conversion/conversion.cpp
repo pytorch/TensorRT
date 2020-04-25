@@ -235,7 +235,7 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b) {
         if (!OpSupported(n)) {
             auto schema = n->maybeSchema();
             TRTORCH_CHECK(schema, "Unable to get schema for Node " << util::node_info(n) \
-                                    << " (conversion.VerifyCoverterSupportForBloxk");
+                                    << " (conversion.VerifyCoverterSupportForBlock");
             std::stringstream ss;
             ss << *schema;
             unsupported_ops.insert(ss.str());
