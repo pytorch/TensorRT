@@ -30,10 +30,10 @@ struct InputRange {
                std::vector<int64_t> max_shape);
 };
 
-struct ExtraInfo {
+struct ConversionInfo {
     std::vector<InputRange> input_ranges;
     BuilderSettings engine_settings;
-    ExtraInfo(std::vector<InputRange> input_ranges)
+    ConversionInfo(std::vector<InputRange> input_ranges)
         : input_ranges(std::move(input_ranges)), engine_settings(BuilderSettings()) {}
 };
 
@@ -43,7 +43,7 @@ GraphParams get_named_params(c10::ArrayRef<torch::jit::Value*> inputs, std::vect
 
 // Converts a already lowered block (blocks with no sub blocks) to
 // a serialized TensorRT engine that can be deserialized and run
-std::string ConvertBlockToEngine(const torch::jit::Block* b, ExtraInfo build_info, GraphParams& static_params);
+std::string ConvertBlockToEngine(const torch::jit::Block* b, ConversionInfo build_info, GraphParams& static_params);
 
 bool OpSupported(const torch::jit::Node* n);
 

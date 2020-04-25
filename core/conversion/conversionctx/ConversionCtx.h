@@ -20,13 +20,15 @@ struct BuilderSettings {
     nvinfer1::DataType op_precision = nvinfer1::DataType::kFLOAT;
     bool refit = false;
     bool debug = false;
-    bool strict_type = false;
+    bool strict_types = false;
     bool allow_gpu_fallback = true;
     nvinfer1::DeviceType device = nvinfer1::DeviceType::kGPU;
     nvinfer1::EngineCapability capability = nvinfer1::EngineCapability::kDEFAULT;
+    nvinfer1::IInt8Calibrator* calibrator = nullptr;
     uint64_t num_min_timing_iters = 2;
     uint64_t num_avg_timing_iters = 1;
     uint64_t workspace_size = 0;
+    uint64_t max_batch_size = 0;
 
     BuilderSettings() = default;
     BuilderSettings(const BuilderSettings& other) = default;

@@ -9,21 +9,24 @@ cc_library(
 
 cc_library(
     name = 'torch',
-    hdrs = glob([
-        'include/torch/**/*.h',
-    ],
-        exclude = ['include/torch/csrc/api/include/**/*.h']
+    hdrs = glob(
+        [
+            'include/torch/**/*.h',
+        ], exclude = [
+            'include/torch/csrc/api/include/**/*.h'
+        ]
     ) + glob([
         'include/torch/csrc/api/include/**/*.h'
     ]),
     srcs = ['lib/libtorch.so'],
-    strip_include_prefix = "include",
     deps = [
         ":ATen",
         ":torch_deps",
         ":c10_cuda",
-        #"@cuda//:cudart",
-        #"@cuda//:nvToolsExt"
+    ],
+    includes = [
+        "include",
+        "include/torch/csrc/api/include/"
     ]
 )
 

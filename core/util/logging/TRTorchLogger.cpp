@@ -15,7 +15,7 @@ namespace trt = nvinfer1;
 
 namespace util {
 namespace logging {
-    
+
 TRTorchLogger::TRTorchLogger(std::string prefix, Severity severity, bool color)
     : prefix_(prefix), reportable_severity_(severity), color_(color) {}
 
@@ -32,7 +32,7 @@ void TRTorchLogger::log(Severity severity, const char* msg) {
     if (severity > reportable_severity_) {
         return;
     }
-    
+
     if (color_) {
         switch (severity) {
         case Severity::kINTERNAL_ERROR: std::cerr << TERM_RED; break;
@@ -41,9 +41,9 @@ void TRTorchLogger::log(Severity severity, const char* msg) {
         case Severity::kINFO: std::cerr << TERM_GREEN; break;
         case Severity::kVERBOSE: std::cerr << TERM_MAGENTA; break;
         default: break;
-        }       
+        }
     }
-    
+
     switch (severity) {
     case Severity::kINTERNAL_ERROR: std::cerr << "INTERNAL_ERROR: "; break;
     case Severity::kERROR: std::cerr << "ERROR: "; break;
@@ -52,11 +52,11 @@ void TRTorchLogger::log(Severity severity, const char* msg) {
     case Severity::kVERBOSE: std::cerr << "DEBUG: "; break;
     default: std::cerr << "UNKNOWN: "; break;
     }
-    
+
     if (color_) {
         std::cerr << TERM_NORMAL;
     }
-    
+
     std::cerr << prefix_ << msg << std::endl;
 }
 
@@ -92,7 +92,7 @@ bool TRTorchLogger::get_is_colored_output_on() {
     return color_;
 }
 
-    
+
 namespace {
 
 TRTorchLogger& get_global_logger() {
@@ -104,7 +104,7 @@ TRTorchLogger& get_global_logger() {
     static TRTorchLogger global_logger("[TRTorch] - ",
                                        LogLevel::kERROR,
                                        false);
-    #endif 
+    #endif
     return global_logger;
 }
 

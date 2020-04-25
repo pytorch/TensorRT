@@ -79,20 +79,17 @@ auto pooling_registrations = RegisterNodeConversionPatterns()
             for (size_t i = 0; i < out_shape.size(); i++) {
                 stride[(stride.size() - 1) - i] = in_shape[(in_shape.size() - 1) - i] / out_shape[(out_shape.size() - 1) - i];
             }
-            LOG_DEBUG("Stride" << util::toDims(stride));
+            LOG_DEBUG("Stride: " << util::toDims(stride));
 
             std::vector<int64_t> window(out_shape.size());
             for (size_t i = 0; i < out_shape.size(); i++) {
                 window[window.size() - 1 - i] = in_shape[in_shape.size() - 1 - i] - (out_shape[out_shape.size() - 1 - i] - 1) * stride[stride.size() - 1 - i];
             }
 
-            LOG_DEBUG("Window" << util::toDims(window));
+            LOG_DEBUG("Window: " << util::toDims(window));
 
             auto new_layer = ctx->net->addPoolingNd(*in, nvinfer1::PoolingType::kAVERAGE, util::toDims(window));
-            if (!new_layer) {
-                LOG_ERROR("Unable to create average pooling layer from node: " << *n);
-                return false;
-            }
+            TRTORCH_CHECK(new_layer, "Unable to create average pooling layer from node: " << *n);
 
             new_layer->setStrideNd(util::toDims(stride));
 

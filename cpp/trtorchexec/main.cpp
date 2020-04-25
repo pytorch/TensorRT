@@ -12,7 +12,7 @@ bool checkRtol(const at::Tensor& diff, const std::vector<at::Tensor> inputs) {
         maxValue = fmax(tensor.abs().max().item<float>(), maxValue);
     }
     std::cout << "Max Difference: " << diff.abs().max().item<float>() << std::endl;
-    return diff.abs().max().item<float>() <= 2e-6 * maxValue;
+    return diff.abs().max().item<float>() <= 2e-5 * maxValue;
 }
 
 bool almostEqual(const at::Tensor& a, const at::Tensor& b) {
@@ -25,8 +25,8 @@ int main(int argc, const char* argv[]) {
                   << "       trtorchexec <path-to-exported-script-module> <min-input-size> <opt-input-size> <max-input-size>\n";
         return -1;
     }
-    
-    
+
+
     torch::jit::script::Module mod;
     try {
         // Deserialize the ScriptModule from a file using torch::jit::load().
@@ -38,7 +38,7 @@ int main(int argc, const char* argv[]) {
     }
 
     mod.to(at::kCUDA);
-    
+
     std::vector<std::vector<int64_t>> dims;
     for (int i = 2; i < argc; i++) {
         auto arg = std::string(argv[i]);
@@ -74,7 +74,7 @@ int main(int argc, const char* argv[]) {
     torch::jit::IValue jit_results_ivalues = mod.forward(jit_inputs_ivalues);
     std::vector<at::Tensor> jit_results;
     jit_results.push_back(jit_results_ivalues.toTensor());
-    
+
     auto trt_mod = trtorch::CompileGraph(mod, dims);
     torch::jit::IValue trt_results_ivalues = trt_mod.forward(trt_inputs_ivalues);
     std::vector<at::Tensor> trt_results;

@@ -133,7 +133,7 @@ void AddInputs(ConversionCtx* ctx,
                   "Expected dimension specifications for all input tensors" \
                   << ", but found " << input_tensors.size()                 \
                   << " input tensors and "                                  \
-                  << input_dims.size() << "dimension specs (conversion.AddInputs)");
+                  << input_dims.size() << " dimension specs (conversion.AddInputs)");
 
     auto profile = ctx->builder->createOptimizationProfile();
 
@@ -179,7 +179,7 @@ void AddParamsToCtxValueMap(ConversionCtx* ctx, GraphParams& params) {
     }
 }
 
-void ConvertBlockToNetDef(ConversionCtx* ctx, const torch::jit::Block* b, ExtraInfo build_info, GraphParams& static_params) {
+void ConvertBlockToNetDef(ConversionCtx* ctx, const torch::jit::Block* b, ConversionInfo build_info, GraphParams& static_params) {
      LOG_INFO(ctx->logger, "Converting Block");
 
     auto inputs = b->inputs();
@@ -221,7 +221,7 @@ void ConvertBlockToNetDef(ConversionCtx* ctx, const torch::jit::Block* b, ExtraI
 // a serialized TensorRT engine that can be deserialized and run
 
 // Probably should consolidate these two functions
-std::string ConvertBlockToEngine(const torch::jit::Block* b, ExtraInfo build_info, GraphParams& static_params) {
+std::string ConvertBlockToEngine(const torch::jit::Block* b, ConversionInfo build_info, GraphParams& static_params) {
     ConversionCtx ctx(build_info.engine_settings);
     ConvertBlockToNetDef(&ctx, b, build_info, static_params);
     std::string engine = ctx.SerializeEngine();
@@ -235,7 +235,7 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b) {
         if (!OpSupported(n)) {
             auto schema = n->maybeSchema();
             TRTORCH_CHECK(schema, "Unable to get schema for Node " << util::node_info(n) \
-                                    << " (conversion.AddLayer)");
+                                    << " (conversion.VerifyCoverterSupportForBlock");
             std::stringstream ss;
             ss << *schema;
             unsupported_ops.insert(ss.str());

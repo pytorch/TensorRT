@@ -23,7 +23,6 @@ cc_test(
     ]
 )
 
-
 cc_test(
     name = "test_modules_as_engines",
     srcs = ["test_modules_as_engines.cpp"],

@@ -17,13 +17,18 @@ More Information / System Architecture:
 ...
 auto compile_settings = trtorch::ExtraInfo(dims);
 // FP16 execution
-compile_settings.op_precision = torch::kHalf;
+compile_settings.op_precision = torch::kFloat;
 // Compile module
 auto trt_mod = trtorch::CompileGraph(ts_mod, compile_settings);
 // Run like normal
 auto results = trt_mod.forward({in_tensor});
 ...
 ```
+
+> Notes on running in lower precisions:
+> - Set precision with extra_info.op_precision
+> - The module should be left in FP32 before compilation (FP16 can support half tensor models)
+> - In FP16 only input tensors should be converted to FP16, other precisions use FP32
 
 ## Platform Support
 

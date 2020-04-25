@@ -7,7 +7,7 @@
 
 namespace trtorch {
 ExtraInfo::DataType::DataType(c10::ScalarType t) {
-    assert(t == at::kHalf || t == at::kFloat /*|| t == at::kChar*/);
+    TRTORCH_CHECK(t == at::kHalf || t == at::kFloat || t == at::kChar, "Data type is unsupported");
     switch (t) {
     case at::kHalf:
         value = DataType::kHalf;
@@ -16,16 +16,16 @@ ExtraInfo::DataType::DataType(c10::ScalarType t) {
     default:
         value = DataType::kFloat;
         break;
-    // case at::kChar:
-    //     value = DataType::kChar;
+    case at::kChar:
+         value = DataType::kChar;
     }
 }
 
 ExtraInfo::DeviceType::DeviceType(c10::DeviceType t) {
-    assert(t == at::kCUDA);
+    TRTORCH_CHECK(t == at::kCUDA, "Device type when specified using torch device enum must be torch::kCUDA");
     value = DeviceType::kGPU;
 }
-    
+
 ExtraInfo::InputRange::InputRange(std::vector<int64_t> opt) {
     this->opt = opt;
     this->min = opt;
@@ -74,51 +74,58 @@ std::vector<core::conversion::InputRange> to_vec_internal_input_ranges(std::vect
     return internal;
 }
 
-core::conversion::ExtraInfo to_internal_extra_info(ExtraInfo external) {
-    core::conversion::ExtraInfo internal(to_vec_internal_input_ranges(external.input_ranges));
+core::ExtraInfo to_internal_extra_info(ExtraInfo external) {
+    core::ExtraInfo internal(to_vec_internal_input_ranges(external.input_ranges));
 
     switch(external.op_precision) {
-    // case ExtraInfo::DataType::kChar:
-    //    internal.engine_settings.op_precision = nvinfer1::DataType::kINT8;
-    //    break;
+    case ExtraInfo::DataType::kChar:
+        internal.convert_info.engine_settings.op_precision = nvinfer1::DataType::kINT8;
+        break;
     case ExtraInfo::DataType::kHalf:
-        internal.engine_settings.op_precision = nvinfer1::DataType::kHALF;
+        internal.convert_info.engine_settings.op_precision = nvinfer1::DataType::kHALF;
         break;
     case ExtraInfo::DataType::kFloat:
     default:
-        internal.engine_settings.op_precision = nvinfer1::DataType::kFLOAT;
+        internal.convert_info.engine_settings.op_precision = nvinfer1::DataType::kFLOAT;
     }
-    
-    internal.engine_settings.refit = external.refit;     
-    internal.engine_settings.debug = external.debug; 
-    internal.engine_settings.strict_type = external.strict_type; 
-    internal.engine_settings.allow_gpu_fallback = external.allow_gpu_fallback; 
+
+    internal.convert_info.engine_settings.refit = external.refit;
+    internal.convert_info.engine_settings.debug = external.debug;
+    internal.convert_info.engine_settings.strict_types = external.strict_types;
+    internal.convert_info.engine_settings.allow_gpu_fallback = external.allow_gpu_fallback;
+    internal.convert_info.engine_settings.max_batch_size = external.max_batch_size;
 
     switch(external.device) {
     case ExtraInfo::DeviceType::kDLA:
-        internal.engine_settings.device = nvinfer1::DeviceType::kDLA;
+        internal.convert_info.engine_settings.device = nvinfer1::DeviceType::kDLA;
         break;
     case ExtraInfo::DeviceType::kGPU:
     default:
-        internal.engine_settings.device = nvinfer1::DeviceType::kGPU;
+        internal.convert_info.engine_settings.device = nvinfer1::DeviceType::kGPU;
     }
 
     switch(external.capability) {
     case ExtraInfo::EngineCapability::kSAFE_GPU:
-        internal.engine_settings.capability = nvinfer1::EngineCapability::kSAFE_GPU;
+        internal.convert_info.engine_settings.capability = nvinfer1::EngineCapability::kSAFE_GPU;
         break;
     case ExtraInfo::EngineCapability::kSAFE_DLA:
-        internal.engine_settings.capability = nvinfer1::EngineCapability::kSAFE_DLA;
+        internal.convert_info.engine_settings.capability = nvinfer1::EngineCapability::kSAFE_DLA;
         break;
     case ExtraInfo::EngineCapability::kDEFAULT:
     default:
-        internal.engine_settings.capability = nvinfer1::EngineCapability::kDEFAULT;
-            
+        internal.convert_info.engine_settings.capability = nvinfer1::EngineCapability::kDEFAULT;
+
     }
-    
-    internal.engine_settings.num_min_timing_iters = external.num_min_timing_iters; 
-    internal.engine_settings.num_avg_timing_iters = external.num_avg_timing_iters;     
-    internal.engine_settings.workspace_size = external.workspace_size;
+
+    internal.convert_info.engine_settings.num_min_timing_iters = external.num_min_timing_iters;
+    internal.convert_info.engine_settings.num_avg_timing_iters = external.num_avg_timing_iters;
+    internal.convert_info.engine_settings.workspace_size = external.workspace_size;
+
+    if (internal.convert_info.engine_settings.op_precision == nvinfer1::DataType::kINT8) {
+        internal.convert_info.engine_settings.calibrator = external.ptq_calibrator;
+    } else {
+        internal.convert_info.engine_settings.calibrator = nullptr;
+    }
 
     return internal;
 }

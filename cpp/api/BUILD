@@ -5,12 +5,13 @@ cc_library(
     hdrs = [
         "include/trtorch/trtorch.h",
         "include/trtorch/logging.h",
-        "include/trtorch/macros.h"
+        "include/trtorch/macros.h",
+        "include/trtorch/ptq.h"
     ],
     srcs = [
-        "src/trtorch.cpp",
         "src/extra_info.cpp",
-        "src/logging.cpp"
+        "src/logging.cpp",
+        "src/trtorch.cpp",
     ],
     deps = [
         "//core",
@@ -20,8 +21,8 @@ cc_library(
     linkstatic = True,
     alwayslink = True
 )
-    
-    
+
+
 filegroup(
     name = "api_headers",
     srcs = glob(["include/**/*.h"]),
