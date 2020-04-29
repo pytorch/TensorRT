@@ -14,9 +14,7 @@ namespace conversion {
 bool isNodeConversionBlacklisted(const torch::jit::Node* n);
 
 bool OpSupported(const torch::jit::Node* n) {
-    bool evalable = evaluators::shouldEvalAtConversionTime(n);
-    bool convertable = converters::node_is_convertable(n);
-    return evalable || convertable;
+    return evaluators::shouldEvalAtConversionTime(n) || converters::node_is_convertable(n);
 }
 
 c10::optional<torch::jit::IValue> EvaluateNode(ConversionCtx* ctx, const torch::jit::Node* n, int level=0, int limit=10) {

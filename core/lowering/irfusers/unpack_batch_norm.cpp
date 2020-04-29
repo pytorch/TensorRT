@@ -1,14 +1,12 @@
-#include "torch/csrc/jit/custom_operator.h"
+#include "torch/csrc/jit/runtime/custom_operator.h"
 #include "torch/csrc/jit/passes/fuse_linear.h"
 #include "torch/csrc/jit/passes/subgraph_rewrite.h"
 
 namespace torch {
 namespace jit {
 
-c10::OperatorOptions aliasAnalysisFromSchema() {
-    c10::OperatorOptions result;
-    result.setAliasAnalysis(c10::AliasAnalysisKind::FROM_SCHEMA);
-    return result;
+c10::AliasAnalysisKind aliasAnalysisFromSchema() {
+  return c10::AliasAnalysisKind::FROM_SCHEMA;
 }
 
 RegisterOperators trt_const_op_reg({
@@ -30,18 +28,18 @@ namespace irfusers {
 // // May be abusing aten::_tensor_to_list(Tensor self) -> int[]
 // // Treating it as an emit_constant by the converters
 // // We could register a custom op (trt::emit_constant) which we can use to convert
-// // constant tensors to TRT ITensors 
+// // constant tensors to TRT ITensors
 void UnpackBatchNorm(std::shared_ptr<torch::jit::Graph>& graph) {
     // Convert BatchNorm into individual operators
     // batch_norm = gamma * (in - mu) / sqrt(var + epsilon) + beta
     std::string batch_norm_pattern = R"IR(
-       graph(%input, %gamma, %beta, %mean, 
+       graph(%input, %gamma, %beta, %mean,
              %var, %training, %momentum, %eps, %cudnn):
            %1 = aten::batch_norm(%input, %gamma, %beta, %mean, %var, %training, %momentum, %eps, %cudnn)
            return (%1))IR";
 
     std::string expanded_batch_norm_pattern = R"IR(
-        graph(%input, %gamma, %beta, %mean, 
+        graph(%input, %gamma, %beta, %mean,
               %var, %training, %momentum, %eps, %cudnn):
             %gamma_trt = trt::const(%gamma)
             %beta_trt = trt::const(%beta)
@@ -57,7 +55,7 @@ void UnpackBatchNorm(std::shared_ptr<torch::jit::Graph>& graph) {
             %7: Scalar = prim::Constant[value=1]()
             %8 = aten::add(%6, %beta_trt, %7)
             return(%8))IR";
-    
+
     torch::jit::SubgraphRewriter unpack_batch_norm;
     unpack_batch_norm.RegisterRewritePattern(batch_norm_pattern, expanded_batch_norm_pattern);
     unpack_batch_norm.runOnGraph(graph);

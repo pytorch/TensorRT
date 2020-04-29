@@ -1,4 +1,4 @@
-#include "torch/csrc/jit/ir.h"
+#include "torch/csrc/jit/ir/ir.h"
 
 namespace torch {
 namespace jit {
@@ -14,7 +14,7 @@ namespace trtorch {
 namespace core {
 namespace lowering {
 
-// From torch/csrc/jit/interpreter.cpp     
+// From torch/csrc/jit/interpreter.cpp
 void DropUnusedNodes(torch::jit::Block* b) {
     auto create_drop_if_unused = [&](at::ArrayRef<torch::jit::Value*> values) -> torch::jit::Node* {
                                      std::vector<torch::jit::Value*> to_drop;
@@ -26,7 +26,7 @@ void DropUnusedNodes(torch::jit::Block* b) {
                                          return nullptr;
                                      return b->owningGraph()->create(torch::jit::prim::Drop, to_drop, 0);
                                  };
-    
+
     if (auto d = create_drop_if_unused(b->inputs())) {
         b->prependNode(d);
     }

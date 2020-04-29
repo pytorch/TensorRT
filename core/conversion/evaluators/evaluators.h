@@ -3,7 +3,7 @@
 #include <string>
 #include <map>
 
-#include "torch/csrc/jit/ir.h"
+#include "torch/csrc/jit/ir/ir.h"
 
 namespace trtorch {
 namespace core {
@@ -19,7 +19,7 @@ typedef std::map<const torch::jit::Value*, const torch::jit::IValue*> kwargs;
 // when writing evaluators
 typedef std::function<c10::optional<torch::jit::IValue>(const torch::jit::Node*, const kwargs&)> NodeEvaluator;
 
-struct EvalRegistration {    
+struct EvalRegistration {
     torch::jit::NodeKind kind;
     NodeEvaluator evaluator;
 };

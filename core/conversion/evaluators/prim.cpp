@@ -1,5 +1,5 @@
-#include "torch/csrc/jit/ir.h"
-#include "torch/csrc/jit/constants.h"
+#include "torch/csrc/jit/ir/ir.h"
+#include "torch/csrc/jit/ir/constants.h"
 #include "ATen/core/functional.h"
 #include "ATen/core/ivalue.h"
 #include "ATen/core/List.h"

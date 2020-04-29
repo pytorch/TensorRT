@@ -18,11 +18,17 @@ cc_library(
     ) + glob([
         'include/torch/csrc/api/include/**/*.h'
     ]),
-    srcs = ['lib/libtorch.so'],
+    srcs = [
+        'lib/libtorch.so',
+        'lib/libtorch_cuda.so',
+        'lib/libtorch_cpu.so',
+        'lib/libtorch_global_deps.so',
+    ],
     deps = [
         ":ATen",
         ":torch_deps",
         ":c10_cuda",
+        ":caffe2"
     ],
     includes = [
         "include",
@@ -34,7 +40,7 @@ cc_library(
     name = 'torch_deps',
     srcs = [
         'lib/libnvToolsExt-3965bdd0.so.1',
-        "lib/libcudart-1b201d85.so.10.1",
+        "lib/libcudart-80664282.so.10.2",
     ]
 )
 
@@ -66,8 +72,7 @@ cc_library(
 cc_library(
     name = "c10_deps",
     srcs = [
-        "lib/libgomp-753e6e92.so.1",
-        "lib/libcudart-1b201d85.so.10.1",
+        "lib/libcudart-80664282.so.10.2",
     ]
 )
 
@@ -84,7 +89,12 @@ cc_library(
     hdrs = glob([
         'include/caffe2/**/*.h'
     ]),
-    srcs = ['lib/libcaffe2_nvrtc.so'],
+    srcs = [
+        'lib/libcaffe2_nvrtc.so',
+        'lib/libcaffe2_detectron_ops_gpu.so',
+        'lib/libcaffe2_observers.so',
+        'lib/libcaffe2_module_test_dynamic.so'
+    ],
     strip_include_prefix = "include",
     deps = [
         ":caffe2_deps"
@@ -95,6 +105,5 @@ cc_library(
     name = 'caffe2_deps',
     srcs = [
         'lib/libnvToolsExt-3965bdd0.so.1',
-        'lib/libgomp-753e6e92.so.1'
     ]
 )

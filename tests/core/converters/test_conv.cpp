@@ -1,6 +1,6 @@
 #include <string>
 #include "gtest/gtest.h"
-#include "torch/csrc/jit/irparser.h"
+#include "torch/csrc/jit/ir/irparser.h"
 #include "tests/util/util.h"
 #include "core/compiler.h"
 
@@ -12,7 +12,7 @@
 
 void conv_test_helper(std::string graph_ir) {
     auto g = std::make_shared<torch::jit::Graph>();
-    torch::jit::script::parseIR(graph_ir, &*g);
+    torch::jit::parseIR(graph_ir, &*g);
 
     auto in = at::randint(1, 10, {1, 3, 10, 10}, {at::kCUDA});
     auto w = at::randint(1, 10, {8, 3, 5, 5}, {at::kCUDA});
@@ -54,7 +54,7 @@ TEST(Converters, ATenConvolutionConvertsCorrectly) {
         return (%12))IR";
 
     auto g = std::make_shared<torch::jit::Graph>();
-    torch::jit::script::parseIR(graph, &*g);
+    torch::jit::parseIR(graph, &*g);
 
     auto in = at::randint(1, 10, {1, 3, 10, 10}, {at::kCUDA});
     auto w = at::randint(1, 10, {8, 3, 5, 5}, {at::kCUDA});
@@ -96,7 +96,7 @@ TEST(Converters, ATenConvolutionNoBiasConvertsCorrectly) {
         return (%12))IR";
 
     auto g = std::make_shared<torch::jit::Graph>();
-    torch::jit::script::parseIR(graph, &*g);
+    torch::jit::parseIR(graph, &*g);
 
     auto in = at::randint(1, 2, {1, 1, 3, 3}, {at::kCUDA});
     auto w = at::randint(1, 2, {4, 1, 2, 2}, {at::kCUDA});
@@ -136,7 +136,7 @@ TEST(Converters, ATenConvolutionWithStrideConvertsCorrectly) {
         return (%13))IR";
 
     auto g = std::make_shared<torch::jit::Graph>();
-    torch::jit::script::parseIR(graph, &*g);
+    torch::jit::parseIR(graph, &*g);
 
     auto in = at::randint(1, 10, {1, 3, 9, 9}, {at::kCUDA});
     auto w = at::randint(1, 10, {4, 3, 3, 3}, {at::kCUDA});
@@ -179,7 +179,7 @@ TEST(Converters, ATenConvolutionWithPaddingConvertsCorrectly) {
         return (%13))IR";
 
     auto g = std::make_shared<torch::jit::Graph>();
-    torch::jit::script::parseIR(graph, &*g);
+    torch::jit::parseIR(graph, &*g);
 
     auto in = at::randint(1, 10, {1, 3, 4, 4}, {at::kCUDA});
     auto w = at::randint(1, 10, {4, 3, 2, 2}, {at::kCUDA});

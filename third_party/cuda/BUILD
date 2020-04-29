@@ -3,7 +3,7 @@ package(default_visibility = ["//visibility:public"])
 cc_library(
     name = "cudart",
     srcs = glob([
-        "lib/**/libcudart.so.10.1",
+        "lib/**/libcudart.so.10.2",
     ]),
     hdrs = glob([
         "include/**/*.h",

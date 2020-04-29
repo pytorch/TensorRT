@@ -1,6 +1,6 @@
 #include <string>
 #include "gtest/gtest.h"
-#include "torch/csrc/jit/irparser.h"
+#include "torch/csrc/jit/ir/irparser.h"
 #include "tests/util/util.h"
 #include "core/compiler.h"
 
@@ -18,7 +18,7 @@ TEST(Converters, ATenMaxPool2DConvertsCorrectly) {
         return (%10))IR";
 
     auto g = std::make_shared<torch::jit::Graph>();
-    torch::jit::script::parseIR(graph, &*g);
+    torch::jit::parseIR(graph, &*g);
 
     //PyTorch MaxPool needs a 3D input
     auto in = at::randint(-5, 5, {1, 4, 4}, at::kCUDA);
@@ -42,7 +42,7 @@ TEST(Converters, ATenAdaptiveAvgPool2DConvertsCorrectly) {
         return (%10))IR";
 
     auto g = std::make_shared<torch::jit::Graph>();
-    torch::jit::script::parseIR(graph, &*g);
+    torch::jit::parseIR(graph, &*g);
 
     //PyTorch MaxPool needs a 3D input
     auto in = at::randint(-5, 5, {1, 12, 16}, at::kCUDA);

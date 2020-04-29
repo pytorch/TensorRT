@@ -16,9 +16,7 @@
 namespace torch {
 namespace jit {
 struct Graph;
-namespace script {
 struct Module;
-} // namespace script
 } // namespace jit
 } // namespace torch
 
@@ -240,7 +238,7 @@ TRTORCH_API void dump_build_info();
  *
  * Will print out a list of unsupported operators if the graph is unsupported
  */
-TRTORCH_API bool CheckMethodOperatorSupport(const torch::jit::script::Module& module, std::string method_name);
+TRTORCH_API bool CheckMethodOperatorSupport(const torch::jit::Module& module, std::string method_name);
 
 /**
  * @brief Compile a TorchScript module for NVIDIA GPUs using TensorRT
@@ -253,7 +251,7 @@ TRTORCH_API bool CheckMethodOperatorSupport(const torch::jit::script::Module& mo
  *
  * Converts specifically the forward method of a TorchScript Module
  */
-TRTORCH_API torch::jit::script::Module CompileGraph(const torch::jit::script::Module& module, ExtraInfo info);
+TRTORCH_API torch::jit::script::Module CompileGraph(const torch::jit::Module& module, ExtraInfo info);
 
 /**
  * @brief Compile a TorchScript method for NVIDIA GPUs using TensorRT
@@ -266,7 +264,7 @@ TRTORCH_API torch::jit::script::Module CompileGraph(const torch::jit::script::Mo
  * and will convert selected method to a serialized TensorRT engine which can be run with
  * TensorRT
  */
-TRTORCH_API std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& module, std::string method_name, ExtraInfo info);
+TRTORCH_API std::string ConvertGraphToTRTEngine(const torch::jit::Module& module, std::string method_name, ExtraInfo info);
 
 namespace ptq {
 /**

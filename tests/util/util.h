@@ -29,11 +29,11 @@ std::vector<at::Tensor> RunGraphEngine(std::shared_ptr<torch::jit::Graph>& g,
                                        std::vector<at::Tensor> inputs);
 
 // Run the forward method of a module and return results
-torch::jit::IValue RunModuleForward(torch::jit::script::Module& mod,
+torch::jit::IValue RunModuleForward(torch::jit::Module& mod,
                                     std::vector<torch::jit::IValue> inputs);
 
 // Convert the forward module to a TRT engine and return results
-std::vector<at::Tensor> RunModuleForwardAsEngine(torch::jit::script::Module& mod,
+std::vector<at::Tensor> RunModuleForwardAsEngine(torch::jit::Module& mod,
                                                  std::vector<at::Tensor> inputs);
 
 

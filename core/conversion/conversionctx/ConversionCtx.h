@@ -5,7 +5,7 @@
 #include <memory>
 
 //#include "ATen/ATen.h"
-#include "torch/csrc/jit/ir.h"
+#include "torch/csrc/jit/ir/ir.h"
 #include "NvInfer.h"
 
 #include "core/util/prelude.h"

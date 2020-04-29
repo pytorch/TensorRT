@@ -1,8 +1,8 @@
 #include "core/util/prelude.h"
 #include "NvInfer.h"
 #include "c10/cuda/CUDAStream.h"
-#include "torch/csrc/jit/ir.h"
-#include "torch/csrc/jit/irparser.h"
+#include "torch/csrc/jit/ir/ir.h"
+#include "torch/csrc/jit/ir/irparser.h"
 #include "core/conversion/conversion.h"
 #include "cuda_runtime_api.h"
 

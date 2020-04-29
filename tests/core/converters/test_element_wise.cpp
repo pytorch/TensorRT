@@ -1,12 +1,12 @@
 #include <string>
 #include "gtest/gtest.h"
-#include "torch/csrc/jit/irparser.h"
+#include "torch/csrc/jit/ir/irparser.h"
 #include "tests/util/util.h"
 #include "core/compiler.h"
 
 void pointwise_test_helper(std::string graph_ir) {
     auto g = std::make_shared<torch::jit::Graph>();
-    torch::jit::script::parseIR(graph_ir, &*g);
+    torch::jit::parseIR(graph_ir, &*g);
 
     auto in0 = at::randint(1, 5, {5}, {at::kCUDA});
     auto in1 = at::randint(1, 5, {5}, {at::kCUDA});
