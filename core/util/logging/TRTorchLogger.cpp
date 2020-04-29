@@ -17,39 +17,36 @@ namespace util {
 namespace logging {
 
 TRTorchLogger::TRTorchLogger(std::string prefix, Severity severity, bool color)
-    : prefix_(prefix), reportable_severity_(severity), color_(color) {}
+    : prefix_(prefix), reportable_severity_((LogLevel) severity), color_(color) {}
 
 TRTorchLogger::TRTorchLogger(std::string prefix, LogLevel lvl, bool color)
-    : prefix_(prefix), reportable_severity_((Severity) lvl), color_(color) {}
+    : prefix_(prefix), reportable_severity_(lvl), color_(color) {}
 
 void TRTorchLogger::log(LogLevel lvl, std::string msg) {
-    Severity severity = (Severity) lvl;
-    log(severity, msg.c_str());
-}
-
-void TRTorchLogger::log(Severity severity, const char* msg) {
     // suppress messages with severity enum value greater than the reportable
-    if (severity > reportable_severity_) {
+    if (lvl > reportable_severity_) {
         return;
     }
 
     if (color_) {
-        switch (severity) {
-        case Severity::kINTERNAL_ERROR: std::cerr << TERM_RED; break;
-        case Severity::kERROR: std::cerr << TERM_RED; break;
-        case Severity::kWARNING: std::cerr << TERM_YELLOW; break;
-        case Severity::kINFO: std::cerr << TERM_GREEN; break;
-        case Severity::kVERBOSE: std::cerr << TERM_MAGENTA; break;
+        switch (lvl) {
+        case LogLevel::kINTERNAL_ERROR: std::cerr << TERM_RED; break;
+        case LogLevel::kERROR: std::cerr << TERM_RED; break;
+        case LogLevel::kWARNING: std::cerr << TERM_YELLOW; break;
+        case LogLevel::kINFO: std::cerr << TERM_GREEN; break;
+        case LogLevel::kDEBUG: std::cerr << TERM_MAGENTA; break;
+        case LogLevel::kGRAPH: std::cerr << TERM_NORMAL; break;
         default: break;
         }
     }
 
-    switch (severity) {
-    case Severity::kINTERNAL_ERROR: std::cerr << "INTERNAL_ERROR: "; break;
-    case Severity::kERROR: std::cerr << "ERROR: "; break;
-    case Severity::kWARNING: std::cerr << "WARNING: "; break;
-    case Severity::kINFO: std::cerr << "INFO: "; break;
-    case Severity::kVERBOSE: std::cerr << "DEBUG: "; break;
+    switch (lvl) {
+    case LogLevel::kINTERNAL_ERROR: std::cerr << "INTERNAL_ERROR: "; break;
+    case LogLevel::kERROR: std::cerr << "ERROR: "; break;
+    case LogLevel::kWARNING: std::cerr << "WARNING: "; break;
+    case LogLevel::kINFO: std::cerr << "INFO: "; break;
+    case LogLevel::kDEBUG: std::cerr << "DEBUG: "; break;
+    case LogLevel::kGRAPH: std::cerr << "GRAPH: "; break;
     default: std::cerr << "UNKNOWN: "; break;
     }
 
@@ -60,16 +57,22 @@ void TRTorchLogger::log(Severity severity, const char* msg) {
     std::cerr << prefix_ << msg << std::endl;
 }
 
+
+void TRTorchLogger::log(Severity severity, const char* msg) {
+    LogLevel lvl = (LogLevel) severity;
+    log(lvl, std::string(msg));
+}
+
 void TRTorchLogger::set_logging_prefix(std::string prefix) {
     prefix_ = prefix;
 }
 
 void TRTorchLogger::set_reportable_severity(Severity severity) {
-    reportable_severity_ = severity;
+    reportable_severity_ = (LogLevel) severity;
 }
 
 void TRTorchLogger::set_reportable_log_level(LogLevel lvl) {
-    reportable_severity_ = (Severity) lvl;
+    reportable_severity_ = lvl;
 }
 
 void TRTorchLogger::set_is_colored_output_on(bool colored_output_on) {
@@ -81,11 +84,11 @@ std::string TRTorchLogger::get_logging_prefix() {
 }
 
 nvinfer1::ILogger::Severity TRTorchLogger::get_reportable_severity() {
-    return reportable_severity_;
+    return (Severity) reportable_severity_;
 }
 
 LogLevel TRTorchLogger::get_reportable_log_level() {
-    return (LogLevel) reportable_severity_;
+    return reportable_severity_;
 }
 
 bool TRTorchLogger::get_is_colored_output_on() {

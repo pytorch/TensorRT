@@ -8,12 +8,13 @@ namespace core {
 namespace util {
 namespace logging {
 
-enum LogLevel {
+enum class LogLevel : uint8_t {
     kINTERNAL_ERROR = (int) nvinfer1::ILogger::Severity::kINTERNAL_ERROR,
     kERROR = (int) nvinfer1::ILogger::Severity::kERROR,
     kWARNING = (int) nvinfer1::ILogger::Severity::kWARNING,
     kINFO = (int) nvinfer1::ILogger::Severity::kINFO,
     kDEBUG = (int) nvinfer1::ILogger::Severity::kVERBOSE,
+    kGRAPH
 };
 
 // Logger for TensorRT info/warning/errors
@@ -38,10 +39,10 @@ public:
 
 private:
     std::string prefix_;
-    Severity reportable_severity_;
+    LogLevel reportable_severity_;
     bool color_;
 };
-    
+
 TRTorchLogger& get_logger();
 
 } // namespace logging
