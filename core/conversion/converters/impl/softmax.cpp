@@ -1,4 +1,3 @@
-#include "core/util/prelude.h"
 #include "core/conversion/converters/converters.h"
 
 namespace trtorch {
@@ -29,12 +28,7 @@ static auto softmax_registrations = RegisterNodeConversionPatterns()
             auto softmax = ctx->net->addSoftMax(*in);
 
             TRTORCH_CHECK(softmax, "Unable to create softmax layer from node: " << *n);
-
-            if (!softmax) {
-                LOG_ERROR("Unable to create softmax layer from node: " << *n);
-                return false;
-            }
-            LOG_WARNING("Disregarding dtype argument, please verify");
+            LOG_DEBUG("Disregarding dtype argument");
 
             if (shape.size() > 3) {
                 softmax->setAxes(1 << (dim));
@@ -69,4 +63,4 @@ static auto softmax_registrations = RegisterNodeConversionPatterns()
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // trtorch
+} // namespace trtorch

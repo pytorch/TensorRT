@@ -5,6 +5,10 @@ converter_test(
 )
 
 converter_test(
+    name = "test_shuffle"
+)
+
+converter_test(
     name = "test_activation"
 )
 
@@ -36,6 +40,7 @@ test_suite(
     name = "test_converters",
     tests = [
         ":test_softmax",
+        ":test_shuffle",
         ":test_activation",
         ":test_pooling",
         ":test_unary",

@@ -17,6 +17,7 @@ cc_library(
         "impl/linear.cpp",
         "impl/pooling.cpp",
         "impl/reduce.cpp",
+        "impl/shuffle.cpp",
         "impl/softmax.cpp",
         "impl/unary.cpp",
     ],

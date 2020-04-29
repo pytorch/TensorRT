@@ -6,6 +6,7 @@
 #include "torch/csrc/jit/runtime/custom_operator.h"
 #include "ATen/core/function_schema.h"
 
+#include "core/util/prelude.h"
 #include "core/conversion/conversionctx/ConversionCtx.h"
 
 namespace trtorch {
