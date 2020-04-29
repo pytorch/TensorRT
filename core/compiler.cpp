@@ -71,22 +71,11 @@ void AddEngineToGraph(torch::jit::script::Module mod, std::shared_ptr<torch::jit
 
 bool CheckMethodOperatorSupport(const torch::jit::script::Module& mod,
                                 std::string method_name) {
-    auto g = mod.get_method(method_name).graph();
-    // Go through PyTorch Lowering to simplify graph and extract weight parameters
-    auto graph_and_parameters = torch::jit::LowerGraph(*g, mod._ivalue());
+    // Go through Lowering to simplify graph and extract weight parameters
+    auto graph_and_parameters = lowering::Lower(mod, method_name);
 
-    g = graph_and_parameters.first;
-
-    // Go through TRTorch Lowering to reformat graph to be conversion friendly
-    // and also segment for accelerators and executors (TRT-DLA, TRT-GPU, PYT)
-    lowering::LowerGraph(g);
-
-    auto params = graph_and_parameters.second;
-    auto named_params = conversion::get_named_params(g->inputs(), params);
+    auto g = graph_and_parameters.first;
     LOG_DEBUG(*g << "(CheckMethodOperatorSupport)\n");
-
-    // Is this necessary?
-    lowering::LowerBlock(g->block());
 
     return conversion::VerifyConverterSupportForBlock(g->block());
 }
@@ -94,24 +83,17 @@ bool CheckMethodOperatorSupport(const torch::jit::script::Module& mod,
 std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod,
                                     std::string method_name,
                                     ExtraInfo cfg) {
+
+    // Go through Lowering to simplify graph and extract weight parameters
+    auto graph_and_parameters = lowering::Lower(mod, method_name);
+
     auto convert_cfg = std::move(cfg.convert_info);
-
-    auto g = mod.get_method(method_name).graph();
-    // Go through PyTorch Lowering to simplify graph and extract weight parameters
-    auto graph_and_parameters = torch::jit::LowerGraph(*g, mod._ivalue());
-
-    g = graph_and_parameters.first;
-
-    // Go through TRTorch Lowering to reformat graph to be conversion friendly
-    // and also segment for accelerators and executors (TRT-DLA, TRT-GPU, PYT)
-    lowering::LowerGraph(g);
-
+    auto g = graph_and_parameters.first;
     auto params = graph_and_parameters.second;
     auto named_params = conversion::get_named_params(g->inputs(), params);
+
     LOG_INFO(*g << "(CompileGraph)\n");
 
-    // Is this necessary?
-    lowering::LowerBlock(g->block());
     auto engine = ConvertBlockToEngine(g->block(), convert_cfg, named_params);
     return std::move(engine);
 }
