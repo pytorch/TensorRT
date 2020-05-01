@@ -23,7 +23,7 @@ RegisterOperators trt_const_op_reg({
 namespace trtorch {
 namespace core {
 namespace lowering {
-namespace irfusers {
+namespace passes {
 
 // // May be abusing aten::_tensor_to_list(Tensor self) -> int[]
 // // Treating it as an emit_constant by the converters
@@ -60,7 +60,7 @@ void UnpackBatchNorm(std::shared_ptr<torch::jit::Graph>& graph) {
     unpack_batch_norm.RegisterRewritePattern(batch_norm_pattern, expanded_batch_norm_pattern);
     unpack_batch_norm.runOnGraph(graph);
 }
-} // Namespace Irfusers
+} // Namespace passes
 } // namespace lowering
 } // namespace core
 } // namespace trtorch

@@ -11,7 +11,8 @@ cc_library(
     ],
     deps = [
         "@libtorch//:libtorch",
-        "//core/lowering/irfusers"
+        "//core/lowering/passes",
+        "//core/util:prelude"
     ]
 )
 

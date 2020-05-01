@@ -4,7 +4,7 @@
 namespace trtorch {
 namespace core {
 namespace lowering {
-namespace irfusers {
+namespace passes {
 
 void RemoveDropout(std::shared_ptr<torch::jit::Graph>& graph) {
     std::string dropout_pattern = R"IR(
@@ -14,7 +14,7 @@ void RemoveDropout(std::shared_ptr<torch::jit::Graph>& graph) {
     std::string no_dropout_pattern = R"IR(
         graph(%input, %4, %5):
             return (%input))IR";
-    
+
     // replace matmul + add pattern to linear
     torch::jit::SubgraphRewriter remove_dropout;
     remove_dropout.RegisterRewritePattern(
@@ -22,7 +22,7 @@ void RemoveDropout(std::shared_ptr<torch::jit::Graph>& graph) {
     remove_dropout.runOnGraph(graph);
 }
 
-} // namespace irfusers
+} // namespace passes
 } // namespace lowering
 } // namespace core
 } // namespace trtorch

@@ -1,17 +1,19 @@
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
-    name = "irfusers",
+    name = "passes",
     hdrs = [
-        "irfusers.h",
+        "passes.h",
     ],
     srcs = [
         "fuse_flatten_linear.cpp",
         "expand_log_softmax.cpp",
         "remove_dropout.cpp",
-        "unpack_batch_norm.cpp"
+        "unpack_batch_norm.cpp",
+        "exception_elimination.cpp"
     ],
     deps = [
+        "//core/util:prelude",
         "@libtorch//:libtorch",
     ]
 )
