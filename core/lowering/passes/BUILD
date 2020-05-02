@@ -10,7 +10,8 @@ cc_library(
         "expand_log_softmax.cpp",
         "remove_dropout.cpp",
         "unpack_batch_norm.cpp",
-        "exception_elimination.cpp"
+        "exception_elimination.cpp",
+        "unpack_addmm.cpp"
     ],
     deps = [
         "//core/util:prelude",

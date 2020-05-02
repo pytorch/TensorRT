@@ -14,6 +14,15 @@ nvinfer1::ILayer* add_elementwise(ConversionCtx* ctx, nvinfer1::ElementWiseOpera
 
     TRTORCH_CHECK(util::volume(self_dims) == util::volume(other_dims), "Found inputs to elementwise operation do not have the same number of elements:\n  Found: self " << self_dims << " other " << other_dims);
 
+    if (self_dims != other_dims) {
+        LOG_DEBUG("Input shape dont match inserting shuffle layers to reshape to " << self_dims);
+        auto other_shuffle = ctx->net->addShuffle(*other);
+        other_shuffle->setReshapeDimensions(self_dims);
+        other_shuffle->setName(std::string("[Reshape other to " + util::toStr(self_dims) + ']').c_str());
+        other = other_shuffle->getOutput(0);
+    }
+
+
     nvinfer1::ILayer* ele;
     if (scalar != 1) {
         LOG_WARNING("Please verify scalar handling in add converter, channel axis set to 3 but scaling is uniform");

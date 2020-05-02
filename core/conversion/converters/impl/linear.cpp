@@ -9,13 +9,6 @@ namespace impl {
 namespace {
 
 auto linear_registrations = RegisterNodeConversionPatterns()
-    // .pattern({
-    //     "aten::addmm(Tensor self, Tensor mat1, Tensor mat2, *, Scalar beta=1, Scalar alpha=1) -> (Tensor)",
-    //     [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> {
-    //         auto in = args[0].ITensor();
-
-    //     }
-    // })
     .pattern({
         "aten::linear(Tensor input, Tensor weight, Tensor? bias = None) -> (Tensor)",
         [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
@@ -71,4 +64,4 @@ auto linear_registrations = RegisterNodeConversionPatterns()
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // trtorch
+} // namespace trtorch

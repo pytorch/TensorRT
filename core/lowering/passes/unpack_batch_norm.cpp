@@ -1,24 +1,4 @@
-#include "torch/csrc/jit/runtime/custom_operator.h"
-#include "torch/csrc/jit/passes/fuse_linear.h"
 #include "torch/csrc/jit/passes/subgraph_rewrite.h"
-
-namespace torch {
-namespace jit {
-
-c10::AliasAnalysisKind aliasAnalysisFromSchema() {
-  return c10::AliasAnalysisKind::FROM_SCHEMA;
-}
-
-RegisterOperators trt_const_op_reg({
-        Operator(
-            "trt::const(Tensor val) -> Tensor",
-            [](Stack& stack) {
-                return 0; //nop
-            },
-            aliasAnalysisFromSchema())});
-
-} // namespace jit
-} // namespace torch
 
 namespace trtorch {
 namespace core {

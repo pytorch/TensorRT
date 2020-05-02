@@ -15,6 +15,7 @@ cc_library(
         "impl/conv_deconv.cpp",
         "impl/element_wise.cpp",
         "impl/linear.cpp",
+        "impl/matrix_multiply.cpp",
         "impl/pooling.cpp",
         "impl/reduce.cpp",
         "impl/shuffle.cpp",

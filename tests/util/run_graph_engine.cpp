@@ -28,34 +28,35 @@ std::vector<at::Tensor> RunEngine(std::string& eng, std::vector<at::Tensor> inpu
     std::vector<at::Tensor> contig_inputs{};
     contig_inputs.reserve(inputs.size());
     for (size_t i = 0; i < inputs.size(); i++) {
+        TRTORCH_CHECK(inputs[i].is_cuda(), "Expected input tensors to have device cuda, found device " << inputs[i].device());
+        auto expected_type = core::util::toATenDType(ctx->getEngine().getBindingDataType(i));
+        TRTORCH_CHECK(inputs[i].dtype() == expected_type, "Expected input tensors to have type " << expected_type << ", found type " << inputs[i].dtype());
         auto dims = core::util::toDimsPad(inputs[i].sizes(), 1);
         auto shape = core::util::toVec(dims);
-        contig_inputs.push_back(inputs[i].to(at::kCUDA).view(shape).contiguous());
+        contig_inputs.push_back(inputs[i].view(shape).contiguous());
         LOG_DEBUG("In shape:" << shape);
         ctx->setBindingDimensions(i, dims);
         gpu_handles.push_back(contig_inputs.back().data_ptr());
     }
 
-    if (!ctx->allInputDimensionsSpecified()) {
-        LOG_ERROR("Not enough inputs provided (tests.runEngine)");
-        return {};
-    }
+    TRTORCH_CHECK(ctx->allInputDimensionsSpecified(), "Not enough inputs provided (execution.RunCudaEngine)");
 
     std::vector<at::Tensor> outputs;
-    for (int o = inputs.size(); o < engine->getNbBindings(); o++) {
+    for (int64_t o = inputs.size(); o < engine->getNbBindings(); o++) {
         auto out_shape = ctx->getBindingDimensions(o);
         LOG_DEBUG("Output: " << engine->getBindingName(o) << " out shape: " << out_shape);
         auto dims = core::util::toVec(out_shape);
-        outputs.push_back(at::empty(dims, {at::kCUDA}).contiguous());
+        auto type = core::util::toATenDType(ctx->getEngine().getBindingDataType(o));
+        outputs.push_back(at::empty(dims, {at::kCUDA}).to(type).contiguous());
         gpu_handles.push_back(outputs[outputs.size() - 1].data_ptr());
     }
 
-
-    c10::cuda::CUDAStream stream = c10::cuda::getStreamFromPool(true, 0);
+    // Is this the right stream?
+    c10::cuda::CUDAStream stream = c10::cuda::getCurrentCUDAStream(inputs[0].device().index());
 
     ctx->enqueueV2(gpu_handles.data(), stream, nullptr);
-    stream.synchronize();
 
+    stream.synchronize();
     return outputs;
 }
 

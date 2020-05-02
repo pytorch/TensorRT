@@ -73,7 +73,11 @@ void AddLayer(ConversionCtx* ctx, const torch::jit::Node* n) {
             LOG_DEBUG(ctx->logger, "Node input is a value that needs to be evaluated");
             auto eval = EvaluateNode(ctx, input_node);
             if (eval) {
-                LOG_DEBUG(ctx->logger, "Found the value to be: " << eval.value());
+                if (!eval.value().isTensor()) {
+                    LOG_DEBUG(ctx->logger, "Found the value to be: " << eval.value());
+                } else {
+                    LOG_DEBUG(ctx->logger, "Found the value to be a tensor (shape " << eval.value().toTensor().sizes() << ')');
+                }
                 ctx->evaluated_value_map[input] = std::move(eval.value());
                 node_args.push_back(&(ctx->evaluated_value_map[input]));
             } else {

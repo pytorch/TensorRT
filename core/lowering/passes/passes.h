@@ -11,6 +11,7 @@ void FuseFlattenLinear(std::shared_ptr<torch::jit::Graph>& graph);
 void ExpandLogSoftmax(std::shared_ptr<torch::jit::Graph>& graph);
 void RemoveDropout(std::shared_ptr<torch::jit::Graph>& graph);
 void UnpackBatchNorm(std::shared_ptr<torch::jit::Graph>& graph);
+void UnpackAddMM(std::shared_ptr<torch::jit::Graph>& graph);
 void EliminateExceptionOrPassPattern(std::shared_ptr<torch::jit::Graph> graph);
 
 } // namespace irfusers

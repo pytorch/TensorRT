@@ -89,6 +89,7 @@ std::string Arg::type_name() const {
 }
 
 const torch::jit::IValue* Arg::IValue() const {
+    TRTORCH_CHECK(isIValue(), "Requested IValue from Arg, however arg type is " << type_name());
     if (type_ == Type::kIValue) {
         return ptr_.ivalue;
     } else {
@@ -97,6 +98,7 @@ const torch::jit::IValue* Arg::IValue() const {
 }
 
 nvinfer1::ITensor* Arg::ITensor() const {
+    TRTORCH_CHECK(isITensor(), "Requested ITensor from Arg, however arg type is " << type_name());
     if (type_ == Type::kITensor) {
         return ptr_.tensor;
     } else {
