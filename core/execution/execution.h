@@ -17,7 +17,7 @@ struct TRTEngine {
     std::pair<uint64_t, uint64_t> num_io;
     EngineID id;
 
-    TRTEngine();
+    TRTEngine() = default;
     TRTEngine(nvinfer1::ILogger& logger, std::string& serialized_engine);
     TRTEngine& operator=(const TRTEngine& other);
 };

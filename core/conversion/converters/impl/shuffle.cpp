@@ -32,11 +32,12 @@ static auto shuffle_registrations = RegisterNodeConversionPatterns()
     "aten::reshape(Tensor self, int[] shape) -> (Tensor)",
     [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
       auto in = args[0].ITensor();
-      auto new_shape = util::toDimsPad(args[1].unwrapToIntList(), 2);
+      auto in_shape = util::toVec(in->getDimensions());
+      auto new_shape = torch::reshape(torch::rand(in_shape), args[1].unwrapToIntList().vec()).sizes();
 
       auto shuffle = ctx->net->addShuffle(*in);
       TRTORCH_CHECK(shuffle, "Unable to create shuffle layer from node: " << *n);
-      shuffle->setReshapeDimensions(new_shape);
+      shuffle->setReshapeDimensions(util::toDims(new_shape));
       shuffle->setName(util::node_info(n).c_str());
 
       auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], shuffle->getOutput(0));

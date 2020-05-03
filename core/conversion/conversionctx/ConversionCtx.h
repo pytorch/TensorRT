@@ -10,7 +10,6 @@
 
 #include "core/util/prelude.h"
 
-
 namespace trtorch {
 namespace core {
 namespace conversion {
@@ -39,6 +38,7 @@ struct ConversionCtx {
     ConversionCtx(BuilderSettings settings);
     std::string SerializeEngine();
     nvinfer1::ITensor* AssociateValueAndTensor(const torch::jit::Value* value, nvinfer1::ITensor* tensor);
+    torch::jit::IValue* AssociateValueAndIValue(const torch::jit::Value* value, torch::jit::IValue tensor);
     bool CheckLayerAddition(const torch::jit::Node* n);
 
     ~ConversionCtx();

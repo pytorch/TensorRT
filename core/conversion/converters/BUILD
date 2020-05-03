@@ -18,6 +18,7 @@ cc_library(
         "impl/matrix_multiply.cpp",
         "impl/pooling.cpp",
         "impl/reduce.cpp",
+        "impl/shape.cpp",
         "impl/shuffle.cpp",
         "impl/softmax.cpp",
         "impl/unary.cpp",

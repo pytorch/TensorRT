@@ -10,8 +10,6 @@ namespace trtorch {
 namespace core {
 namespace execution {
 
-TRTEngine::TRTEngine() {}
-
 TRTEngine::TRTEngine(nvinfer1::ILogger& logger, std::string& serialized_engine) {
     rt = nvinfer1::createInferRuntime(logger);
 

@@ -78,7 +78,7 @@ void AddLayer(ConversionCtx* ctx, const torch::jit::Node* n) {
                 } else {
                     LOG_DEBUG(ctx->logger, "Found the value to be a tensor (shape " << eval.value().toTensor().sizes() << ')');
                 }
-                ctx->evaluated_value_map[input] = std::move(eval.value());
+                ctx->AssociateValueAndIValue(input, eval.value());
                 node_args.push_back(&(ctx->evaluated_value_map[input]));
             } else {
                 LOG_DEBUG(ctx->logger, "Found the value is None");;

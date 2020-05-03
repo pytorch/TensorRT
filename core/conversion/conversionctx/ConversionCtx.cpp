@@ -103,9 +103,15 @@ nvinfer1::ITensor* ConversionCtx::AssociateValueAndTensor(const torch::jit::Valu
     return tensor;
 }
 
+torch::jit::IValue* ConversionCtx::AssociateValueAndIValue(const torch::jit::Value* value, torch::jit::IValue ivalue) {
+    this->evaluated_value_map[value] = std::move(ivalue);
+    return &this->evaluated_value_map[value];
+}
+
 std::string ConversionCtx::SerializeEngine() {
     auto engine = builder->buildEngineWithConfig(*net, *cfg);
     auto serialized_engine = engine->serialize();
+    engine->destroy();
     return std::string((const char*)serialized_engine->data(), serialized_engine->size());
 }
 
