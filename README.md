@@ -2,7 +2,7 @@
 
 > Ahead of Time (AOT) compiling for PyTorch JIT
 
-TRTorch is a compiler for PyTorch/TorchScript, targeting NVIDIA GPUs via NVIDIA's TensorRT Deep Learning Optimizer and Runtime. Unlike PyTorch's Just-In-Time (JIT) compiler, TRTorch is an Ahead-of-Time (AOT) compiler, meaning that before you deploy your TorchScript code, you go through an explicit compile step to convert a standard TorchScript program into an module targeting a TensorRT engine. TRTorch operates as a PyTorch extention and compiles modules that integrate into the JIT runtime seamlessly. After compilation using the optimized graph should feel no different than running a TorchScript module. You also have access to TensorRT's suite of configurations at compile time, so you are able to specify operating precision (FP32/F16/INT8) and other settings for your module.
+TRTorch is a compiler for PyTorch/TorchScript, targeting NVIDIA GPUs via NVIDIA's TensorRT Deep Learning Optimizer and Runtime. Unlike PyTorch's Just-In-Time (JIT) compiler, TRTorch is an Ahead-of-Time (AOT) compiler, meaning that before you deploy your TorchScript code, you go through an explicit compile step to convert a standard TorchScript program into an module targeting a TensorRT engine. TRTorch operates as a PyTorch extention and compiles modules that integrate into the JIT runtime seamlessly. After compilation using the optimized graph should feel no different than running a TorchScript module. You also have access to TensorRT's suite of configurations at compile time, so you are able to specify operating precision (FP32/FP16/INT8) and other settings for your module.
 
 More Information / System Architecture:
 
@@ -151,7 +151,7 @@ You can register a converter for your op using the `NodeConverterRegistry` insid
 
 ## Known Limitations
 
-- You cannot use both Adaptive Pooling in PyTorch and also use TRTorch Dynamic input shape
+- You cannot use both Adaptive Pooling in PyTorch and also use TRTorch Dynamic input shape (follow [#49](https://github.com/NVIDIA/TRTorch/issues/49) for the latest on the issue)
 
 ## Structure of the repo
 
