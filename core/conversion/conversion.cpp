@@ -214,9 +214,7 @@ void ConvertBlockToNetDef(ConversionCtx* ctx, const torch::jit::Block* b, Conver
     }
 
     for (const auto n : nodes) {
-        if (converters::node_is_convertable(n)) {
-            ctx->CheckLayerAddition(n);
-        }
+        ctx->CheckLayerAddition(n);
     }
 
     auto outputs = b->outputs();
