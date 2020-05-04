@@ -118,10 +118,13 @@ std::string ConversionCtx::SerializeEngine() {
 
 bool ConversionCtx::CheckLayerAddition(const torch::jit::Node* n) {
     for (auto out : n->outputs()) {
-        auto iter = this->value_tensor_map.find(out);
-        if (iter == this->value_tensor_map.end()) {
-            LOG_WARNING("Node " << util::node_info(n) << " output: " << out->debugName() << " does not have a coresponding output, may potentially indicate a defective converter");
-            return false;
+        auto iter_t = this->value_tensor_map.find(out);
+        if (iter_t == this->value_tensor_map.end()) {
+            auto iter_iv = this->evaluated_value_map.find(out);
+            if (iter_iv == this->evaluated_value_map.end()) {
+                LOG_WARNING("Node " << util::node_info(n) << " output: " << out->debugName() << " does not have a coresponding value or tensor, may potentially indicate a defective evaluator or converter");
+                return false;
+            }
         }
     }
     return true;
