@@ -160,6 +160,10 @@ void AddInputs(ConversionCtx* ctx,
     TRTORCH_CHECK(profile->isValid(), "Optimization profile is invalid, please check the input range provided (conversion.AddInputs)");
 
     ctx->cfg->addOptimizationProfile(profile);
+    // TODO: Enable in TRT 7.1
+    // if (ctx->op_precision == nvinfer1::DataType::kINT8) {
+    //     ctx->cfg->setCalibrationProfile(profile);
+    // }
 }
 
 void MarkOutputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> outputs) {

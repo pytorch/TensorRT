@@ -47,6 +47,7 @@ struct ConversionCtx {
     nvinfer1::INetworkDefinition* net;
     nvinfer1::IBuilderConfig* cfg;
     nvinfer1::DataType input_type;
+    nvinfer1::DataType op_precision;
     BuilderSettings settings;
     util::logging::TRTorchLogger logger;
     // Pointers to data that needs to remain alive until conversion is done

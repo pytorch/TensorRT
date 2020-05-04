@@ -60,6 +60,7 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
         input_type = nvinfer1::DataType::kFLOAT;
         break;
     }
+    op_precision = settings.op_precision;
 
     if (settings.refit) {
         cfg->setFlag(nvinfer1::BuilderFlag::kREFIT);
