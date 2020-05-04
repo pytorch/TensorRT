@@ -7,7 +7,7 @@ namespace logging {
 std::string get_logging_prefix() {
     return core::util::logging::get_logger().get_logging_prefix();
 }
-    
+
 void set_logging_prefix(std::string prefix) {
     core::util::logging::get_logger().set_logging_prefix(prefix);
 }
@@ -26,6 +26,9 @@ void set_reportable_log_level(Level lvl) {
         break;
     case Level::kINFO:
         log_lvl = core::util::logging::LogLevel::kINFO;
+        break;
+    case Level::kGRAPH:
+        log_lvl = core::util::logging::LogLevel::kGRAPH;
         break;
     case Level::kDEBUG:
     default:
@@ -50,12 +53,14 @@ Level get_reportable_log_level() {
         return Level::kWARNING;
     case core::util::logging::LogLevel::kINFO:
         return Level::kINFO;
+    case core::util::logging::LogLevel::kGRAPH:
+        return Level::kGRAPH;
     case core::util::logging::LogLevel::kDEBUG:
     default:
         return Level::kDEBUG;
     }
 }
-        
+
 bool get_is_colored_output_on() {
     return core::util::logging::get_logger().get_is_colored_output_on();
 }

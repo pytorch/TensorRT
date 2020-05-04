@@ -1,6 +1,8 @@
 #include "torch/csrc/jit/passes/fuse_linear.h"
 #include "torch/csrc/jit/passes/subgraph_rewrite.h"
 
+#include "core/util/prelude.h"
+
 namespace trtorch {
 namespace core {
 namespace lowering {
@@ -38,6 +40,7 @@ void FuseFlattenLinear(std::shared_ptr<torch::jit::Graph>& graph) {
     flatten_linear_bias_none_to_linear.RegisterRewritePattern(
         flatten_linear_bias_none_pattern, fused_linear_bias_none);
     flatten_linear_bias_none_to_linear.runOnGraph(graph);
+    LOG_GRAPH("Post flatten linear: " << *graph);
 }
 
 } // namespace passes

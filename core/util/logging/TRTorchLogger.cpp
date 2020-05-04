@@ -101,7 +101,7 @@ namespace {
 TRTorchLogger& get_global_logger() {
     #ifndef NDEBUG
     static TRTorchLogger global_logger("[TRTorch - Debug Build] - ",
-                                       LogLevel::kGRAPH,
+                                       LogLevel::kDEBUG,
                                        true);
     #else
     static TRTorchLogger global_logger("[TRTorch] - ",

@@ -1,12 +1,14 @@
 #include "torch/csrc/jit/passes/fuse_linear.h"
 #include "torch/csrc/jit/passes/subgraph_rewrite.h"
 
+#include "core/util/prelude.h"
+
 namespace trtorch {
 namespace core {
 namespace lowering {
 namespace passes {
 
-void ExpandLogSoftmax(std::shared_ptr<torch::jit::Graph>& graph) {
+void UnpackLogSoftmax(std::shared_ptr<torch::jit::Graph>& graph) {
     // Its easier for TensorRT if we seperate softmax and log
     // There might need to be a reshape inserted see:
     // https://github.com/onnx/onnx-tensorrt/blob/5dca8737851118f6ab8a33ea1f7bcb7c9f06caf5/builtin_op_importers.cpp#L1593
@@ -43,6 +45,7 @@ void ExpandLogSoftmax(std::shared_ptr<torch::jit::Graph>& graph) {
     logsoftmax_none_to_softmax_log_none.RegisterRewritePattern(
         logsoftmax_none_pattern, softmax_log_none_pattern);
     logsoftmax_none_to_softmax_log_none.runOnGraph(graph);
+    LOG_GRAPH("Post unpack logsoftmax: " << *graph);
 }
 
 } // namespace passes

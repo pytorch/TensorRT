@@ -1,6 +1,8 @@
 #include "torch/csrc/jit/passes/fuse_linear.h"
 #include "torch/csrc/jit/passes/subgraph_rewrite.h"
 
+#include "core/util/prelude.h"
+
 namespace trtorch {
 namespace core {
 namespace lowering {
@@ -23,6 +25,7 @@ void UnpackAddMM(std::shared_ptr<torch::jit::Graph>& graph) {
   torch::jit::SubgraphRewriter unpack_addmm;
   unpack_addmm.RegisterRewritePattern(addmm_pattern, mm_add_pattern);
   unpack_addmm.runOnGraph(graph);
+  LOG_GRAPH("Post unpack addmm: " << *graph);
 }
 
 

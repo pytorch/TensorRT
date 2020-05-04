@@ -102,7 +102,7 @@ torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod,
                                         ExtraInfo cfg) {
     // TODO: Should be doing a functional transform but need PR #31978
     // [jit] More robust mangling
-    // torch::jit::script::Module new_mod = mod.clone();
+    //torch::jit::script::Module new_mod = mod.clone();
     torch::jit::script::Module new_mod(mod._ivalue()->name() + "_trt");
     std::vector<std::shared_ptr<torch::jit::Graph>> graphs;
     for (const torch::jit::script::Method& method : mod.get_methods()) {

@@ -21,7 +21,6 @@ struct ExceptionOrPassPatternElimination {
     : graph_(std::move(graph)) {}
 
   void run() {
-    LOG_GRAPH("Pre exeception or pass elimination: " << *graph_);
     findExceptionOrPassNodes(graph_->block());
     torch::jit::EliminateDeadCode(graph_);
     LOG_GRAPH("Post exeception or pass elimination: " << *graph_);

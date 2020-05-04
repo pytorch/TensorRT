@@ -9,11 +9,12 @@ namespace logging {
  * Emum for setting message severity
  */
 enum Level {
-    kINTERNAL_ERROR,
-    kERROR,
-    kWARNING,
-    kINFO,
-    kDEBUG,
+    kINTERNAL_ERROR, // Only print messages for internal errors
+    kERROR,          // Print all internal errors and errors (default)
+    kWARNING,        // Print warnings and errors
+    kINFO,           // Print all info, warnings and errors
+    kDEBUG,          // Print all debug info, info, warnings and errors
+    kGRAPH,          // Print everything including the intermediate graphs of the lowering phase
 };
 
 // Are these ones necessary for the user?
@@ -35,7 +36,7 @@ TRTORCH_API void set_reportable_log_level(Level lvl);
 TRTORCH_API void set_is_colored_output_on(bool colored_output_on);
 
 /**
- * @brief Get the current reportable log level 
+ * @brief Get the current reportable log level
  */
 TRTORCH_API Level get_reportable_log_level();
 
@@ -45,10 +46,10 @@ TRTORCH_API Level get_reportable_log_level();
 TRTORCH_API bool get_is_colored_output_on();
 
 /**
- * @brief Adds a message to the global log 
+ * @brief Adds a message to the global log
  *
- * @param lvl: trtorch::logging::Level - Severity of the message 
- * @param msg: std::string - Message to be logged 
+ * @param lvl: trtorch::logging::Level - Severity of the message
+ * @param msg: std::string - Message to be logged
  */
 // Dont know if we want this?
 TRTORCH_API void log(Level lvl, std::string msg);

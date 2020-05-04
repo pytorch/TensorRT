@@ -1,6 +1,8 @@
 #include <torch/csrc/jit/passes/fuse_linear.h>
 #include <torch/csrc/jit/passes/subgraph_rewrite.h>
 
+#include "core/util/prelude.h"
+
 namespace trtorch {
 namespace core {
 namespace lowering {
@@ -20,6 +22,7 @@ void RemoveDropout(std::shared_ptr<torch::jit::Graph>& graph) {
     remove_dropout.RegisterRewritePattern(
         dropout_pattern, no_dropout_pattern);
     remove_dropout.runOnGraph(graph);
+    LOG_GRAPH("Post remove dropout: " << *graph);
 }
 
 } // namespace passes

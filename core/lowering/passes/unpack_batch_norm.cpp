@@ -1,5 +1,7 @@
 #include "torch/csrc/jit/passes/subgraph_rewrite.h"
 
+#include "core/util/prelude.h"
+
 namespace trtorch {
 namespace core {
 namespace lowering {
@@ -39,6 +41,7 @@ void UnpackBatchNorm(std::shared_ptr<torch::jit::Graph>& graph) {
     torch::jit::SubgraphRewriter unpack_batch_norm;
     unpack_batch_norm.RegisterRewritePattern(batch_norm_pattern, expanded_batch_norm_pattern);
     unpack_batch_norm.runOnGraph(graph);
+    LOG_GRAPH("Post unpack batchnorm: " << *graph);
 }
 } // Namespace passes
 } // namespace lowering

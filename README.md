@@ -149,6 +149,10 @@ Thanks for wanting to contribute! There are two main ways to handle supporting a
 
 You can register a converter for your op using the `NodeConverterRegistry` inside your application.
 
+## Known Limitations
+
+- You cannot use both Adaptive Pooling in PyTorch and also use TRTorch Dynamic input shape
+
 ## Structure of the repo
 
 | Component     | Description                                                  |
