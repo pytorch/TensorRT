@@ -54,7 +54,7 @@ TEST_P(AccuracyTests, FP16AccuracyIsClose) {
         jit_total += targets.sizes()[0];
         jit_correct += torch::sum(torch::eq(predictions, targets));
     }
-    torch::Tensor jit_accuracy = jit_correct / jit_total;
+    torch::Tensor jit_accuracy = (jit_correct / jit_total) * 100;
 
     // Compile Graph
     auto trt_mod = trtorch::CompileGraph(mod, extra_info);
@@ -72,7 +72,7 @@ TEST_P(AccuracyTests, FP16AccuracyIsClose) {
         trt_total += targets.sizes()[0];
         trt_correct += torch::sum(torch::eq(predictions, targets)).item().toFloat();
     }
-    torch::Tensor trt_accuracy = trt_correct / trt_total;
+    torch::Tensor trt_accuracy = (trt_correct / trt_total) * 100;
 
     ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_accuracy, trt_accuracy, 3));
 }

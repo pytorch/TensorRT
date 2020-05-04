@@ -20,6 +20,7 @@ public:
             std::cerr << "error loading the model\n";
             return;
         }
+        mod.eval();
     }
 
     void TearDown() {
