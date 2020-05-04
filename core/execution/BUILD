@@ -14,7 +14,8 @@ cc_library(
         "@tensorrt//:nvinfer",
         "@libtorch//:libtorch",
         "//core/util:prelude"
-    ]
+    ],
+    alwayslink = True,
 )
 
 load("@rules_pkg//:pkg.bzl", "pkg_tar")

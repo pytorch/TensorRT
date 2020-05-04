@@ -5,11 +5,10 @@
 #include <memory>
 
 //#include "ATen/ATen.h"
-#include "torch/csrc/jit/ir.h"
+#include "torch/csrc/jit/ir/ir.h"
 #include "NvInfer.h"
 
 #include "core/util/prelude.h"
-
 
 namespace trtorch {
 namespace core {
@@ -39,6 +38,7 @@ struct ConversionCtx {
     ConversionCtx(BuilderSettings settings);
     std::string SerializeEngine();
     nvinfer1::ITensor* AssociateValueAndTensor(const torch::jit::Value* value, nvinfer1::ITensor* tensor);
+    torch::jit::IValue* AssociateValueAndIValue(const torch::jit::Value* value, torch::jit::IValue tensor);
     bool CheckLayerAddition(const torch::jit::Node* n);
 
     ~ConversionCtx();
@@ -47,6 +47,7 @@ struct ConversionCtx {
     nvinfer1::INetworkDefinition* net;
     nvinfer1::IBuilderConfig* cfg;
     nvinfer1::DataType input_type;
+    nvinfer1::DataType op_precision;
     BuilderSettings settings;
     util::logging::TRTorchLogger logger;
     // Pointers to data that needs to remain alive until conversion is done

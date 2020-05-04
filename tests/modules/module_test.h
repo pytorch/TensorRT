@@ -4,6 +4,8 @@
 #include "tests/util/util.h"
 #include "trtorch/trtorch.h"
 #include "c10/cuda/CUDACachingAllocator.h"
+#include "cuda_runtime_api.h"
+
 
 using PathAndInSize = std::pair<std::string, std::vector<std::vector<int64_t>>>;
 
@@ -25,6 +27,7 @@ public:
     }
 
     void TearDown() {
+        cudaDeviceSynchronize();
         c10::cuda::CUDACachingAllocator::emptyCache();
     }
 protected:

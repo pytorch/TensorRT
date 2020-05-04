@@ -7,12 +7,11 @@
 
 #include "ATen/core/function_schema.h"
 
-#include "torch/csrc/jit/ir.h"
-#include "torch/csrc/jit/pass_manager.h"
+#include "torch/csrc/jit/frontend/function_schema_parser.h"
+#include "torch/csrc/jit/ir/ir.h"
+#include "torch/csrc/jit/passes/pass_manager.h"
 #include "torch/csrc/jit/passes/lower_graph.h"
 #include "torch/csrc/jit/passes/graph_fuser.h"
-#include "torch/csrc/jit/script/module.h"
-#include "torch/csrc/jit/script/function_schema_parser.h"
 
 #include "core/util/prelude.h"
 #include "core/compiler.h"
@@ -42,46 +41,41 @@ c10::FunctionSchema GenerateGraphSchema(torch::jit::script::Module mod, std::str
 
 void AddEngineToGraph(torch::jit::script::Module mod, std::shared_ptr<torch::jit::Graph>& g, std::string& serialized_engine) {
     execution::EngineID uid = execution::RegisterEngineFromSerializedEngine(serialized_engine);
-    auto schema = execution::GetEngineFunctionSchema(uid);
     auto num_io = execution::GetEngineIO(uid);
 
     auto self = g->addInput("self.1");
     self->setType(mod.type());
-    std::vector<torch::jit::Value*> graph_inputs;
+
+    auto id_val = g->insertConstant(uid);
+
+    std::vector<torch::jit::Value*> engine_inputs;
+    engine_inputs.push_back(id_val);
+
     for (uint64_t i = 0; i < num_io.first; i++) {
         auto in_val = g->addInput("");
         in_val->setType(c10::TensorType::get());
-        graph_inputs.push_back(in_val);
+        engine_inputs.push_back(in_val);
     }
 
-    auto engine_node = g->create(c10::Symbol::fromQualString(schema.name()), torch::jit::ArrayRef<torch::jit::Value*>(graph_inputs), num_io.second);
+    auto engine_node = g->create(c10::Symbol::fromQualString("trt::execute_engine"), torch::jit::ArrayRef<torch::jit::Value*>(engine_inputs), num_io.second);
     g->block()->appendNode(engine_node);
 
     for (auto o : engine_node->outputs()) {
         g->registerOutput(o);
     }
 
+    LOG_DEBUG(*g << "(AddEngineToGraph)\n");
+
     return;
 }
 
 bool CheckMethodOperatorSupport(const torch::jit::script::Module& mod,
                                 std::string method_name) {
-    auto g = mod.get_method(method_name).graph();
-    // Go through PyTorch Lowering to simplify graph and extract weight parameters
-    auto graph_and_parameters = torch::jit::LowerGraph(*g, mod._ivalue());
+    // Go through Lowering to simplify graph and extract weight parameters
+    auto graph_and_parameters = lowering::Lower(mod, method_name);
 
-    g = graph_and_parameters.first;
-
-    // Go through TRTorch Lowering to reformat graph to be conversion friendly
-    // and also segment for accelerators and executors (TRT-DLA, TRT-GPU, PYT)
-    lowering::LowerGraph(g);
-
-    auto params = graph_and_parameters.second;
-    auto named_params = conversion::get_named_params(g->inputs(), params);
+    auto g = graph_and_parameters.first;
     LOG_DEBUG(*g << "(CheckMethodOperatorSupport)\n");
-
-    // Is this necessary?
-    lowering::LowerBlock(g->block());
 
     return conversion::VerifyConverterSupportForBlock(g->block());
 }
@@ -89,24 +83,17 @@ bool CheckMethodOperatorSupport(const torch::jit::script::Module& mod,
 std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod,
                                     std::string method_name,
                                     ExtraInfo cfg) {
+
+    // Go through Lowering to simplify graph and extract weight parameters
+    auto graph_and_parameters = lowering::Lower(mod, method_name);
+
     auto convert_cfg = std::move(cfg.convert_info);
-
-    auto g = mod.get_method(method_name).graph();
-    // Go through PyTorch Lowering to simplify graph and extract weight parameters
-    auto graph_and_parameters = torch::jit::LowerGraph(*g, mod._ivalue());
-
-    g = graph_and_parameters.first;
-
-    // Go through TRTorch Lowering to reformat graph to be conversion friendly
-    // and also segment for accelerators and executors (TRT-DLA, TRT-GPU, PYT)
-    lowering::LowerGraph(g);
-
+    auto g = graph_and_parameters.first;
     auto params = graph_and_parameters.second;
     auto named_params = conversion::get_named_params(g->inputs(), params);
+
     LOG_INFO(*g << "(CompileGraph)\n");
 
-    // Is this necessary?
-    lowering::LowerBlock(g->block());
     auto engine = ConvertBlockToEngine(g->block(), convert_cfg, named_params);
     return std::move(engine);
 }
@@ -115,7 +102,7 @@ torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod,
                                         ExtraInfo cfg) {
     // TODO: Should be doing a functional transform but need PR #31978
     // [jit] More robust mangling
-    // torch::jit::script::Module new_mod = mod.clone();
+    //torch::jit::script::Module new_mod = mod.clone();
     torch::jit::script::Module new_mod(mod._ivalue()->name() + "_trt");
     std::vector<std::shared_ptr<torch::jit::Graph>> graphs;
     for (const torch::jit::script::Method& method : mod.get_methods()) {

@@ -1,6 +1,6 @@
 #include <string>
 #include "gtest/gtest.h"
-#include "torch/csrc/jit/irparser.h"
+#include "torch/csrc/jit/ir/irparser.h"
 #include "tests/util/util.h"
 #include "core/compiler.h"
 
@@ -11,7 +11,7 @@ TEST(Converters, ATenReLUConvertsCorrectly) {
         return (%3))IR";
 
     auto g = std::make_shared<torch::jit::Graph>();
-    torch::jit::script::parseIR(graph, &*g);
+    torch::jit::parseIR(graph, &*g);
 
     auto in = at::randint(-5, 5, {5}, {at::kCUDA});
     auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
@@ -31,7 +31,7 @@ TEST(Converters, ATenSigmoidConvertsCorrectly) {
         return (%3))IR";
 
     auto g = std::make_shared<torch::jit::Graph>();
-    torch::jit::script::parseIR(graph, &*g);
+    torch::jit::parseIR(graph, &*g);
 
     auto in = at::randint(-5, 5, {5}, {at::kCUDA});
     auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
@@ -51,7 +51,7 @@ TEST(Converters, ATenTanhConvertsCorrectly) {
         return (%3))IR";
 
     auto g = std::make_shared<torch::jit::Graph>();
-    torch::jit::script::parseIR(graph, &*g);
+    torch::jit::parseIR(graph, &*g);
 
     auto in = at::randint(-5, 5, {5}, {at::kCUDA});
     auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
@@ -96,7 +96,7 @@ TEST(Converters, ATenHardTanhCustomRangeConvertsCorrectly) {
         return (%3))IR";
 
     auto g = std::make_shared<torch::jit::Graph>();
-    torch::jit::script::parseIR(graph, &*g);
+    torch::jit::parseIR(graph, &*g);
 
     auto in = at::randint(-5, 5, {5}, {at::kCUDA});
     auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});

@@ -1,4 +1,4 @@
-#include "torch/csrc/jit/graph_executor.h"
+#include "torch/csrc/jit/runtime/graph_executor.h"
 #include "tests/util/util.h"
 
 namespace trtorch {
@@ -28,15 +28,15 @@ std::vector<at::Tensor> RunGraph(std::shared_ptr<torch::jit::Graph>& g,
         }
     }
 
-    torch::jit::GraphExecutor executor(g);
+    torch::jit::GraphExecutor executor(g, "");
     auto stack = CreateStack(std::move(inputs_));
-    
+
     executor.run(stack);
     std::vector<at::Tensor> outputs;
     for (size_t i = 0; i < g->outputs().size(); i++) {
         outputs.push_back(stack[i].toTensor());
     }
-    
+
     return outputs;
 }
 

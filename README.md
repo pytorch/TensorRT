@@ -2,7 +2,7 @@
 
 > Ahead of Time (AOT) compiling for PyTorch JIT
 
-TRTorch is a compiler for PyTorch/TorchScript, targeting NVIDIA GPUs via NVIDIA's TensorRT Deep Learning Optimizer and Runtime. Unlike PyTorch's Just-In-Time (JIT) compiler, TRTorch is an Ahead-of-Time (AOT) compiler, meaning that before you deploy your TorchScript code, you go through an explicit compile step to convert a standard TorchScript program into an module targeting a TensorRT engine. TRTorch operates as a PyTorch extention and compiles modules that integrate into the JIT runtime seamlessly. After compilation using the optimized graph should feel no different than running a TorchScript module. You also have access to TensorRT's suite of configurations at compile time, so you are able to specify operating precision (FP32/F16) and other settings for your module.
+TRTorch is a compiler for PyTorch/TorchScript, targeting NVIDIA GPUs via NVIDIA's TensorRT Deep Learning Optimizer and Runtime. Unlike PyTorch's Just-In-Time (JIT) compiler, TRTorch is an Ahead-of-Time (AOT) compiler, meaning that before you deploy your TorchScript code, you go through an explicit compile step to convert a standard TorchScript program into an module targeting a TensorRT engine. TRTorch operates as a PyTorch extention and compiles modules that integrate into the JIT runtime seamlessly. After compilation using the optimized graph should feel no different than running a TorchScript module. You also have access to TensorRT's suite of configurations at compile time, so you are able to specify operating precision (FP32/F16/INT8) and other settings for your module.
 
 More Information / System Architecture:
 
@@ -35,17 +35,17 @@ auto results = trt_mod.forward({in_tensor});
 | Platform | Support |
 | -------- | ------- |
 | Linux AMD64 / GPU   | **Supported** |
-| Linux aarch64 / GPU | **Planned/Possible with Native Compiation and small modifications to the build system** |
+| Linux aarch64 / GPU | **Planned/Possible with Native Compiation but untested** |
 | Linux aarch64 / DLA | **Planned/Possible with Native Compilation but untested** |
 | Windows / GPU       | - |
 | Linux ppc64le / GPU | - |
 
 ### Dependencies
 
-- Libtorch 1.4.0
-- CUDA 10.1
-- cuDNN 7.6
-- TensorRT 6.0.1
+- Libtorch 1.5.0
+- CUDA 10.2
+- cuDNN 7.6.5
+- TensorRT 7.0.0
 
 ## Prebuilt Binaries
 
@@ -53,10 +53,71 @@ Releases: https://github.com/NVIDIA/TRTorch/releases
 
 ## Compiling TRTorch
 
-Install TensorRT, CUDA and cuDNN on the system before starting to compile.
+### Installing Dependencies
 
+You need to start by having CUDA installed on the system, Libtorch will automatically be pulled for you by bazel,
+then you have two options.
+
+#### 1. Building using cuDNN & TensorRT tarball distributions
+
+> This is recommended so as to build TRTorch hermetically and insures any bugs are not caused by version issues
+
+> Make sure when running TRTorch that these versions of the libraries are prioritized in your `$LD_LIBRARY_PATH`
+
+1. You need to download the tarball distributions of TensorRT and cuDNN from the NVIDIA website.
+    - https://developer.nvidia.com/cudnn
+    - https://developer.nvidia.com/tensorrt
+2. Place these files in a directory (the directories `thrid_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]` exist for this purpose)
+3. Compile using:
 ``` shell
-bazel build //:libtrtorch --compilation_mode=opt
+bazel build //:libtrtorch --compilation_mode opt --distdir thrid_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]
+```
+
+#### 2. Building using locally installed cuDNN & TensorRT
+
+> If you find bugs and you compiled using this method please disclose it in the issue
+> (an `ldd` dump would be nice too)
+
+1. Install TensorRT, CUDA and cuDNN on the system before starting to compile.
+2. In `WORKSPACE` comment out
+```py
+# Downloaded distributions to use with --distdir
+http_archive(
+    name = "cudnn",
+    urls = ["<URL>",],
+
+    build_file = "@//third_party/cudnn/archive:BUILD",
+    sha256 = "<TAR SHA256>",
+    strip_prefix = "cuda"
+)
+
+http_archive(
+    name = "tensorrt",
+    urls = ["<URL>",],
+
+    build_file = "@//third_party/tensorrt/archive:BUILD",
+    sha256 = "<TAR SHA256>",
+    strip_prefix = "TensorRT-<VERSION>"
+)
+```
+and uncomment
+```py
+# Locally installed dependencies
+new_local_repository(
+    name = "cudnn",
+    path = "/usr/",
+    build_file = "@//third_party/cudnn/local:BUILD"
+)
+
+new_local_repository(
+   name = "tensorrt",
+   path = "/usr/",
+   build_file = "@//third_party/tensorrt/local:BUILD"
+)
+```
+3. Compile using:
+``` shell
+bazel build //:libtrtorch --compilation_mode opt
 ```
 
 ### Debug build
@@ -84,9 +145,13 @@ Thanks for wanting to contribute! There are two main ways to handle supporting a
 
 ### In my application?
 
-> The Node Converter Registry is not exposed in the top level API but you can try using the internal headers shipped with the tarball.
+> The Node Converter Registry is not exposed in the top level API but in the internal headers shipped with the tarball.
 
-You can register a converter for your op using the NodeConverterRegistry inside your application.
+You can register a converter for your op using the `NodeConverterRegistry` inside your application.
+
+## Known Limitations
+
+- You cannot use both Adaptive Pooling in PyTorch and also use TRTorch Dynamic input shape
 
 ## Structure of the repo
 

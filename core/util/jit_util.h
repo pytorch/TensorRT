@@ -3,7 +3,7 @@
 #include <string>
 #include <sstream>
 
-#include "torch/csrc/jit/ir.h"
+#include "torch/csrc/jit/ir/ir.h"
 
 namespace trtorch {
 namespace core {

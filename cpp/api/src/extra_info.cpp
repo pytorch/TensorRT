@@ -1,4 +1,4 @@
-#include "torch/csrc/jit/script/module.h"
+#include "torch/csrc/jit/api/module.h"
 
 #include "core/util/prelude.h"
 #include "core/compiler.h"

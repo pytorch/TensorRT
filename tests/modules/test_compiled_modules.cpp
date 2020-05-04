@@ -28,9 +28,9 @@ TEST_P(ModuleTests, CompiledModuleIsClose) {
 INSTANTIATE_TEST_SUITE_P(CompiledModuleForwardIsCloseSuite,
                          ModuleTests,
                          testing::Values(
-                            PathAndInSize({"tests/modules/resnet18.jit.pt",
+                            PathAndInSize({"tests/modules/resnet18_traced.jit.pt",
                                           {{1,3,224,224}}}),
-                            PathAndInSize({"tests/modules/resnet50.jit.pt",
+                            PathAndInSize({"tests/modules/resnet50_traced.jit.pt",
                                           {{1,3,224,224}}}),
-                            PathAndInSize({"tests/modules/mobilenet_v2.jit.pt",
+                            PathAndInSize({"tests/modules/mobilenet_v2_traced.jit.pt",
                                           {{1,3,224,224}}})));

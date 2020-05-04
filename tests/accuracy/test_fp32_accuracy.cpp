@@ -24,7 +24,7 @@ TEST_P(AccuracyTests, FP16AccuracyIsClose) {
         jit_total += targets.sizes()[0];
         jit_correct += torch::sum(torch::eq(predictions, targets));
     }
-    torch::Tensor jit_accuracy = jit_correct / jit_total;
+    torch::Tensor jit_accuracy = (jit_correct / jit_total) * 100;
 
     std::vector<std::vector<int64_t>> input_shape = {{32, 3, 32, 32}};
     auto extra_info = trtorch::ExtraInfo({input_shape});
@@ -45,7 +45,7 @@ TEST_P(AccuracyTests, FP16AccuracyIsClose) {
         trt_correct += torch::sum(torch::eq(predictions, targets));
     }
 
-    torch::Tensor trt_accuracy = trt_correct / trt_total;
+    torch::Tensor trt_accuracy = (trt_correct / trt_total) * 100;
 
     ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_accuracy, trt_accuracy, 3));
 }

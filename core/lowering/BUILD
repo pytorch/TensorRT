@@ -8,11 +8,14 @@ cc_library(
     srcs = [
         "lowering.cpp",
         "drop_unused_nodes.cpp",
+        "register_const_op.cpp"
     ],
     deps = [
         "@libtorch//:libtorch",
-        "//core/lowering/irfusers"
-    ]
+        "//core/lowering/passes",
+        "//core/util:prelude"
+    ],
+    alwayslink = True
 )
 
 load("@rules_pkg//:pkg.bzl", "pkg_tar")

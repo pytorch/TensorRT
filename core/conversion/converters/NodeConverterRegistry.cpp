@@ -1,6 +1,6 @@
 #include "core/util/prelude.h"
 #include "core/conversion/converters/converters.h"
-#include "torch/csrc/jit/script/function_schema_parser.h"
+#include "torch/csrc/jit/frontend/function_schema_parser.h"
 
 namespace trtorch {
 namespace core {

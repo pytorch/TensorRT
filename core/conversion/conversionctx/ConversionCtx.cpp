@@ -60,6 +60,7 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
         input_type = nvinfer1::DataType::kFLOAT;
         break;
     }
+    op_precision = settings.op_precision;
 
     if (settings.refit) {
         cfg->setFlag(nvinfer1::BuilderFlag::kREFIT);
@@ -103,18 +104,27 @@ nvinfer1::ITensor* ConversionCtx::AssociateValueAndTensor(const torch::jit::Valu
     return tensor;
 }
 
+torch::jit::IValue* ConversionCtx::AssociateValueAndIValue(const torch::jit::Value* value, torch::jit::IValue ivalue) {
+    this->evaluated_value_map[value] = std::move(ivalue);
+    return &this->evaluated_value_map[value];
+}
+
 std::string ConversionCtx::SerializeEngine() {
     auto engine = builder->buildEngineWithConfig(*net, *cfg);
     auto serialized_engine = engine->serialize();
+    engine->destroy();
     return std::string((const char*)serialized_engine->data(), serialized_engine->size());
 }
 
 bool ConversionCtx::CheckLayerAddition(const torch::jit::Node* n) {
     for (auto out : n->outputs()) {
-        auto iter = this->value_tensor_map.find(out);
-        if (iter == this->value_tensor_map.end()) {
-            LOG_WARNING("Node " << util::node_info(n) << " output: " << out->debugName() << " does not have a coresponding output, may potentially indicate a defective converter");
-            return false;
+        auto iter_t = this->value_tensor_map.find(out);
+        if (iter_t == this->value_tensor_map.end()) {
+            auto iter_iv = this->evaluated_value_map.find(out);
+            if (iter_iv == this->evaluated_value_map.end()) {
+                LOG_WARNING("Node " << util::node_info(n) << " output: " << out->debugName() << " does not have a coresponding value or tensor, may potentially indicate a defective evaluator or converter");
+                return false;
+            }
         }
     }
     return true;

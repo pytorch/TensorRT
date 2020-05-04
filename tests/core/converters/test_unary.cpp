@@ -1,6 +1,6 @@
 #include <string>
 #include "gtest/gtest.h"
-#include "torch/csrc/jit/irparser.h"
+#include "torch/csrc/jit/ir/irparser.h"
 #include "tests/util/util.h"
 #include "core/compiler.h"
 
@@ -19,7 +19,7 @@ std::string gen_test_graph(const std::string &unary) {
     const auto graph = gen_test_graph(#unary);                                    \
                                                                                   \
     auto g = std::make_shared<torch::jit::Graph>();                               \
-    torch::jit::script::parseIR(graph, &*g);                                      \
+    torch::jit::parseIR(graph, &*g);                                              \
                                                                                   \
     auto in = at::empty({10}, {at::kCUDA}).uniform_(0, 0.5);                      \
     auto params =                                                                 \

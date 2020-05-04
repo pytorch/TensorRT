@@ -14,9 +14,7 @@ namespace conversion {
 bool isNodeConversionBlacklisted(const torch::jit::Node* n);
 
 bool OpSupported(const torch::jit::Node* n) {
-    bool evalable = evaluators::shouldEvalAtConversionTime(n);
-    bool convertable = converters::node_is_convertable(n);
-    return evalable || convertable;
+    return evaluators::shouldEvalAtConversionTime(n) || converters::node_is_convertable(n);
 }
 
 c10::optional<torch::jit::IValue> EvaluateNode(ConversionCtx* ctx, const torch::jit::Node* n, int level=0, int limit=10) {
@@ -75,8 +73,12 @@ void AddLayer(ConversionCtx* ctx, const torch::jit::Node* n) {
             LOG_DEBUG(ctx->logger, "Node input is a value that needs to be evaluated");
             auto eval = EvaluateNode(ctx, input_node);
             if (eval) {
-                LOG_DEBUG(ctx->logger, "Found the value to be: " << eval.value());
-                ctx->evaluated_value_map[input] = std::move(eval.value());
+                if (!eval.value().isTensor()) {
+                    LOG_DEBUG(ctx->logger, "Found the value to be: " << eval.value());
+                } else {
+                    LOG_DEBUG(ctx->logger, "Found the value to be a tensor (shape " << eval.value().toTensor().sizes() << ')');
+                }
+                ctx->AssociateValueAndIValue(input, eval.value());
                 node_args.push_back(&(ctx->evaluated_value_map[input]));
             } else {
                 LOG_DEBUG(ctx->logger, "Found the value is None");;
@@ -158,6 +160,10 @@ void AddInputs(ConversionCtx* ctx,
     TRTORCH_CHECK(profile->isValid(), "Optimization profile is invalid, please check the input range provided (conversion.AddInputs)");
 
     ctx->cfg->addOptimizationProfile(profile);
+    // TODO: Enable in TRT 7.1
+    // if (ctx->op_precision == nvinfer1::DataType::kINT8) {
+    //     ctx->cfg->setCalibrationProfile(profile);
+    // }
 }
 
 void MarkOutputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> outputs) {
@@ -208,9 +214,7 @@ void ConvertBlockToNetDef(ConversionCtx* ctx, const torch::jit::Block* b, Conver
     }
 
     for (const auto n : nodes) {
-        if (converters::node_is_convertable(n)) {
-            ctx->CheckLayerAddition(n);
-        }
+        ctx->CheckLayerAddition(n);
     }
 
     auto outputs = b->outputs();

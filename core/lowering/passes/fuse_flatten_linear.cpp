@@ -1,10 +1,12 @@
 #include "torch/csrc/jit/passes/fuse_linear.h"
 #include "torch/csrc/jit/passes/subgraph_rewrite.h"
 
+#include "core/util/prelude.h"
+
 namespace trtorch {
 namespace core {
 namespace lowering {
-namespace irfusers {
+namespace passes {
 
 void FuseFlattenLinear(std::shared_ptr<torch::jit::Graph>& graph) {
     //TensorRT implicitly adds a flatten layer infront of FC layers if necessary
@@ -33,13 +35,15 @@ void FuseFlattenLinear(std::shared_ptr<torch::jit::Graph>& graph) {
     torch::jit::SubgraphRewriter flatten_linear_to_linear;
     flatten_linear_to_linear.RegisterRewritePattern(flatten_linear_pattern, fused_linear);
     flatten_linear_to_linear.runOnGraph(graph);
-    
+
     torch::jit::SubgraphRewriter flatten_linear_bias_none_to_linear;
     flatten_linear_bias_none_to_linear.RegisterRewritePattern(
         flatten_linear_bias_none_pattern, fused_linear_bias_none);
     flatten_linear_bias_none_to_linear.runOnGraph(graph);
+    LOG_GRAPH("Post flatten linear: " << *graph);
 }
-} // namespace irfusers
+
+} // namespace passes
 } // namespace lowering
 } // namespace core
 } // namespace trtorch

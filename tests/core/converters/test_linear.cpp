@@ -1,6 +1,6 @@
 #include <string>
 #include "gtest/gtest.h"
-#include "torch/csrc/jit/irparser.h"
+#include "torch/csrc/jit/ir/irparser.h"
 #include "tests/util/util.h"
 #include "core/compiler.h"
 
@@ -13,7 +13,7 @@ TEST(Converters, ATenLinearNoBiasConvertsCorrectly) {
         return (%3))IR";
 
     auto g = std::make_shared<torch::jit::Graph>();
-    torch::jit::script::parseIR(graph, &*g);
+    torch::jit::parseIR(graph, &*g);
 
     //Input Tensor needs to be 4D for TensorRT linear
     auto in = at::randint(1, 10, {1, 2}, {at::kCUDA});
@@ -40,7 +40,7 @@ TEST(Converters, ATenLinearBiasConvertsCorrectly) {
         return (%3))IR";
 
     auto g = std::make_shared<torch::jit::Graph>();
-    torch::jit::script::parseIR(graph, &*g);
+    torch::jit::parseIR(graph, &*g);
 
     // WARN: TRT expects a 4D input eventually, but pytorch does not require a channel dim
     auto in = at::randint(1, 5, {1, 3}, {at::kCUDA});

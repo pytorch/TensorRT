@@ -64,4 +64,4 @@ auto linear_registrations = RegisterNodeConversionPatterns()
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // trtorch
+} // namespace trtorch

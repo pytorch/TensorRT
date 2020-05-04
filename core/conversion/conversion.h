@@ -3,7 +3,7 @@
 #include <map>
 
 #include "NvInfer.h"
-#include "torch/csrc/jit/ir.h"
+#include "torch/csrc/jit/ir/ir.h"
 #include "core/conversion/conversionctx/ConversionCtx.h"
 
 namespace torch {

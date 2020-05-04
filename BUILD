@@ -11,7 +11,7 @@ pkg_tar(
         "//core/conversion/evaluators:include",
         "//core/execution:include",
         "//core/lowering:include",
-        "//core/lowering/irfusers:include",
+        "//core/lowering/passes:include",
         "//core/util:include",
         "//core/util/logging:include"
     ],

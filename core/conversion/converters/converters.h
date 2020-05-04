@@ -3,9 +3,10 @@
 #include <string>
 #include <map>
 
-#include "torch/csrc/jit/custom_operator.h"
+#include "torch/csrc/jit/runtime/custom_operator.h"
 #include "ATen/core/function_schema.h"
 
+#include "core/util/prelude.h"
 #include "core/conversion/conversionctx/ConversionCtx.h"
 
 namespace trtorch {

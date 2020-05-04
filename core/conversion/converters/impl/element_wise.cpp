@@ -8,11 +8,24 @@ namespace converters {
 namespace impl {
 namespace {
 
-nvinfer1::ILayer* add_elementwise(ConversionCtx* ctx, nvinfer1::ElementWiseOperation op,  nvinfer1::ITensor* self, nvinfer1::ITensor* other, float scalar=1) {
+nvinfer1::ILayer* add_elementwise(ConversionCtx* ctx, nvinfer1::ElementWiseOperation op,  nvinfer1::ITensor* self, nvinfer1::ITensor* other, const std::string& name, float scalar=1) {
     auto self_dims = self->getDimensions();
+    auto self_dims_vec = util::toVec(self_dims);
     auto other_dims = other->getDimensions();
+    auto other_dims_vec = util::toVec(other_dims);
+    auto other_batch = other_dims_vec[0];
 
-    TRTORCH_CHECK(util::volume(self_dims) == util::volume(other_dims), "Found inputs to elementwise operation do not have the same number of elements:\n  Found: self " << self_dims << " other " << other_dims);
+    // TODO: Proper broadcast check
+    TRTORCH_CHECK(util::volume(self_dims) == util::volume(other_dims) || util::volume(self_dims) == util::volume(other_dims) / other_batch, "Found inputs to elementwise operation do not have the same number of elements or is not broadcastable:\n  Found: self " << self_dims << " other " << other_dims);
+
+    if (self_dims != other_dims) {
+        LOG_DEBUG("Input shape dont match inserting shuffle layers to reshape to " << self_dims);
+        auto self_shuffle = ctx->net->addShuffle(*self);
+        self_shuffle->setReshapeDimensions(util::toDimsPad(self_dims_vec, other_dims_vec.size()));
+        self_shuffle->setName(std::string("[Reshape self to " + util::toStr(self_dims) + " for broadcasting (" + name + ")]").c_str());
+        self = self_shuffle->getOutput(0);
+    }
+
 
     nvinfer1::ILayer* ele;
     if (scalar != 1) {
@@ -63,7 +76,7 @@ auto element_wise_registrations = RegisterNodeConversionPatterns()
                 auto self = args[0].ITensor();
                 auto other = args[1].ITensor();
                 auto scalar = args[2].unwrapToScalar().to<float>();
-                auto add = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUM, self, other, scalar);
+                auto add = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUM, self, other, util::node_info(n), scalar);
 
                 TRTORCH_CHECK(add, "Unable to create add layer from node: " << *n);
 
@@ -80,7 +93,7 @@ auto element_wise_registrations = RegisterNodeConversionPatterns()
                 auto self = args[0].ITensor();
                 auto other = args[1].ITensor();
                 auto scalar = args[2].unwrapToScalar().to<float>();
-                auto add = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUM, self, other, scalar);
+                auto add = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUM, self, other, util::node_info(n), scalar);
 
                 TRTORCH_CHECK(add, "Unable to create add layer from node: " << *n);
 
@@ -97,7 +110,7 @@ auto element_wise_registrations = RegisterNodeConversionPatterns()
                 auto self = args[0].ITensor();
                 auto other = args[1].ITensor();
                 auto scalar = args[2].unwrapToScalar().to<float>();
-                auto sub = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUB, self, other, scalar);
+                auto sub = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUB, self, other, util::node_info(n), scalar);
 
                 TRTORCH_CHECK(sub, "Unable to create sub layer from node: " << *n);
 
@@ -113,7 +126,7 @@ auto element_wise_registrations = RegisterNodeConversionPatterns()
                 // Should implement self / other
                 auto self = args[0].ITensor();
                 auto other = args[1].ITensor();
-                auto div = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other);
+                auto div = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, util::node_info(n));
 
                 TRTORCH_CHECK(div, "Unable to create div layer from node: " << *n);
 
@@ -129,7 +142,7 @@ auto element_wise_registrations = RegisterNodeConversionPatterns()
                 // TODO: Remove with functionalization
                 auto self = args[0].ITensor();
                 auto other = args[1].ITensor();
-                auto div = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other);
+                auto div = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, util::node_info(n));
 
                 TRTORCH_CHECK(div, "Unable to create div layer from node: " << *n);
 
@@ -145,7 +158,7 @@ auto element_wise_registrations = RegisterNodeConversionPatterns()
                 // Should implement self * other
                 auto self = args[0].ITensor();
                 auto other = args[1].ITensor();
-                auto mul = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPROD, self, other);
+                auto mul = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPROD, self, other, util::node_info(n));
 
                 TRTORCH_CHECK(mul, "Unable to create mul layer from node: " << *n);
 
@@ -161,7 +174,7 @@ auto element_wise_registrations = RegisterNodeConversionPatterns()
                 // TODO: Remove with functionalization
                 auto self = args[0].ITensor();
                 auto other = args[1].ITensor();
-                auto mul = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPROD, self, other);
+                auto mul = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPROD, self, other, util::node_info(n));
 
                 TRTORCH_CHECK(mul, "Unable to create mul layer from node: " << *n);
 

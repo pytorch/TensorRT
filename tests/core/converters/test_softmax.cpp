@@ -1,6 +1,6 @@
 #include <string>
 #include "gtest/gtest.h"
-#include "torch/csrc/jit/irparser.h"
+#include "torch/csrc/jit/ir/irparser.h"
 #include "tests/util/util.h"
 #include "core/compiler.h"
 
@@ -13,7 +13,7 @@ TEST(Converters, ATenSoftmax1DConvertsCorrectly) {
         return (%3))IR";
 
     auto g = std::make_shared<torch::jit::Graph>();
-    torch::jit::script::parseIR(graph, &*g);
+    torch::jit::parseIR(graph, &*g);
 
     auto in = at::randint(0, 5, {5}, {at::kCUDA});
     auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
@@ -36,7 +36,7 @@ TEST(Converters, ATenSoftmaxNDConvertsCorrectlySub3DIndex) {
         return (%3))IR";
 
     auto g = std::make_shared<torch::jit::Graph>();
-    torch::jit::script::parseIR(graph, &*g);
+    torch::jit::parseIR(graph, &*g);
 
     auto in = at::randint(0, 5, {1,2,2,2,2}, {at::kCUDA});
 
@@ -60,7 +60,7 @@ TEST(Converters, ATenSoftmaxNDConvertsCorrectlyAbove3DIndex) {
         return (%3))IR";
 
     auto g = std::make_shared<torch::jit::Graph>();
-    torch::jit::script::parseIR(graph, &*g);
+    torch::jit::parseIR(graph, &*g);
 
     auto in = at::randint(0, 5, {1,2,2,2,2}, {at::kCUDA});
 
