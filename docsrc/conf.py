@@ -116,8 +116,8 @@ html_theme_options = {
     'globaltoc_includehidden': True,
     'master_doc': True,
     "version_info": {
-        "master": "https://nvidia.github.io/trtorch/",
-        "v0.0.1": "https://nvidia.github.io/trtorch/v0.0.1/",
+        "master": "https://nvidia.github.io/TRTorch/",
+        "v0.0.1": "https://nvidia.github.io/TRTorch/v0.0.1/",
     }
 }
 
