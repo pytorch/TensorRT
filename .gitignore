@@ -25,3 +25,6 @@ tests/accuracy/datasets/data/*
 ._.DS_Store
 *.tar.gz
 *.tgz
+docsrc/_build
+docsrc/_api
+docsrc/_tmp

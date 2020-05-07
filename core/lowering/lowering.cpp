@@ -25,6 +25,7 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g) {
     torch::jit::FuseLinear(g);
     passes::RemoveDropout(g);
     passes::FuseFlattenLinear(g);
+    passes::Conv2DToConvolution(g);
     passes::UnpackAddMM(g);
     passes::UnpackLogSoftmax(g);
     //passes::RemoveDimExeception(g);

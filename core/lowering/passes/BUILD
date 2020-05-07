@@ -6,6 +6,7 @@ cc_library(
         "passes.h",
     ],
     srcs = [
+        "conv2d_to_convolution.cpp",
         "exception_elimination.cpp",
         "fuse_flatten_linear.cpp",
         "remove_dropout.cpp",

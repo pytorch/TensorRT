@@ -7,6 +7,7 @@ namespace core {
 namespace lowering {
 namespace passes {
 
+void Conv2DToConvolution(std::shared_ptr<torch::jit::Graph>& graph);
 void FuseFlattenLinear(std::shared_ptr<torch::jit::Graph>& graph);
 void RemoveDropout(std::shared_ptr<torch::jit::Graph>& graph);
 void UnpackAddMM(std::shared_ptr<torch::jit::Graph>& graph);

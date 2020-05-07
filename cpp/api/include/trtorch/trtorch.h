@@ -13,6 +13,7 @@
 #include <memory>
 
 // Just include the .h?
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
 namespace torch {
 namespace jit {
 struct Graph;
@@ -30,6 +31,7 @@ class ArrayRef;
 namespace nvinfer1 {
 class IInt8EntropyCalibrator2;
 }
+#endif //DOXYGEN_SHOULD_SKIP_THIS
 
 #include "trtorch/macros.h"
 #include "trtorch/logging.h"
@@ -48,12 +50,39 @@ struct TRTORCH_API ExtraInfo {
      * input shapes allowed for the engine.
      */
     struct TRTORCH_API InputRange {
+        /// Minimum acceptable input size into the engine
         std::vector<int64_t> min;
+        /// Optimal input size into the engine (gets best performace)
         std::vector<int64_t> opt;
+        /// Maximum acceptable input size into the engine
         std::vector<int64_t> max;
+        /**
+         * @brief Construct a new Input Range object for static input size from vector
+         *
+         * @param opt
+         */
         InputRange(std::vector<int64_t> opt);
+        /**
+         * @brief Construct a new Input Range object static input size from c10::ArrayRef (the type produced by tensor.sizes())
+         *
+         * @param opt
+         */
         InputRange(c10::ArrayRef<int64_t> opt);
+        /**
+         * @brief Construct a new Input Range object dynamic input size from vectors for min, opt, and max supported sizes
+         *
+         * @param min
+         * @param opt
+         * @param max
+         */
         InputRange(std::vector<int64_t> min, std::vector<int64_t> opt, std::vector<int64_t> max);
+        /**
+         * @brief Construct a new Input Range object dynamic input size from c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max supported sizes
+         *
+         * @param min
+         * @param opt
+         * @param max
+         */
         InputRange(c10::ArrayRef<int64_t> min, c10::ArrayRef<int64_t> opt, c10::ArrayRef<int64_t> max);
     };
 
@@ -82,12 +111,44 @@ struct TRTORCH_API ExtraInfo {
             kChar,
         };
 
+        /**
+         * @brief Construct a new Data Type object
+         *
+         */
         DataType() = default;
+        /**
+         * @brief DataType constructor from enum
+         *
+         */
         constexpr DataType(Value t) : value(t) {}
+        /**
+         * @brief Construct a new Data Type object from torch type enums
+         *
+         * @param t
+         */
         DataType(c10::ScalarType t);
+        /**
+         * @brief Get the enum value of the DataType object
+         *
+         * @return Value
+         */
         operator Value() const  { return value; }
         explicit operator bool() = delete;
+        /**
+         * @brief Comparision operator for DataType
+         *
+         * @param other
+         * @return true
+         * @return false
+         */
         constexpr bool operator==(DataType other) const { return value == other.value; }
+        /**
+         * @brief Comparision operator for DataType
+         *
+         * @param other
+         * @return true
+         * @return false
+         */
         constexpr bool operator!=(DataType other) const { return value != other.value; }
     private:
         Value value;
@@ -120,12 +181,45 @@ struct TRTORCH_API ExtraInfo {
             kDLA,
         };
 
+        /**
+         * @brief Construct a new Device Type object
+         *
+         */
         DeviceType() = default;
+        /**
+         * @brief Construct a new Device Type object from internal enum
+         *
+         */
         constexpr DeviceType(Value t) : value(t) {}
+        /**
+         * @brief Construct a new Device Type object from torch device enums
+         * Note: The only valid value is torch::kCUDA (torch::kCPU is not supported)
+         *
+         * @param t
+         */
         DeviceType(c10::DeviceType t);
+        /**
+         * @brief Get the internal value from the Device object
+         *
+         * @return Value
+         */
         operator Value() const { return value; }
         explicit operator bool() = delete;
+        /**
+         * @brief Comparison operator for DeviceType
+         *
+         * @param other
+         * @return true
+         * @return false
+         */
         constexpr bool operator==(DeviceType other) const { return value == other.value; }
+        /**
+         * @brief Comparison operator for DeviceType
+         *
+         * @param other
+         * @return true
+         * @return false
+         */
         constexpr bool operator!=(DeviceType other) const { return value != other.value; }
     private:
         Value value;
@@ -140,9 +234,30 @@ struct TRTORCH_API ExtraInfo {
         kSAFE_DLA,
     };
 
+    /**
+     * @brief Construct a new Extra Info object from input ranges.
+     * Each entry in the vector represents a input and should be provided in call order.
+     *
+     * Use this constructor if you want to use dynamic shape
+     *
+     * @param input_ranges
+     */
     ExtraInfo(std::vector<InputRange> input_ranges)
         : input_ranges(std::move(input_ranges)) {}
+    /**
+     * @brief Construct a new Extra Info object
+     * Convienence constructor to set fixed input size from vectors describing size of input tensors.
+     * Each entry in the vector represents a input and should be provided in call order.
+     *
+     * @param fixed_sizes
+     */
     ExtraInfo(std::vector<std::vector<int64_t>> fixed_sizes);
+    /**
+     * @brief Construct a new Extra Info object
+     * Convienence constructor to set fixed input size from c10::ArrayRef's (the output of tensor.sizes()) describing size of input tensors.
+     * Each entry in the vector represents a input and should be provided in call order.
+     * @param fixed_sizes
+     */
     ExtraInfo(std::vector<c10::ArrayRef<int64_t>> fixed_sizes);
 
     // Defaults should reflect TensorRT defaults for BuilderConfig
@@ -206,7 +321,7 @@ struct TRTORCH_API ExtraInfo {
     uint64_t workspace_size = 0;
 
     /**
-     * Maximum batch size (must be =< 1 to be set, 0 means not set)
+     * Maximum batch size (must be >= 1 to be set, 0 means not set)
      */
     uint64_t max_batch_size = 0;
 
@@ -217,13 +332,17 @@ struct TRTORCH_API ExtraInfo {
 };
 
 /**
- * Get the version information for TRTorch including base libtorch and TensorRT versions
+ * @brief Get the build information for the library including the dependency versions
+ *
+ * @return std::string
  */
 TRTORCH_API std::string get_build_info();
 
+
 /**
- * Dump the version information for TRTorch including base libtorch and TensorRT versions
+ * @brief Dump the version information for TRTorch including base libtorch and TensorRT versions
  * to stdout
+ *
  */
 TRTORCH_API void dump_build_info();
 
@@ -237,32 +356,38 @@ TRTORCH_API void dump_build_info();
  * convertable operators
  *
  * Will print out a list of unsupported operators if the graph is unsupported
+ *
+ * @returns bool: Method is supported by TRTorch
  */
 TRTORCH_API bool CheckMethodOperatorSupport(const torch::jit::Module& module, std::string method_name);
 
 /**
  * @brief Compile a TorchScript module for NVIDIA GPUs using TensorRT
  *
- * @param module: torch::jit::script::Module - Existing TorchScript module
+ * @param module: torch::jit::Module - Existing TorchScript module
  * @param info: trtorch::ExtraInfo - Compilation settings
  *
  * Takes a existing TorchScript module and a set of settings to configure the compiler
  * and will convert methods to JIT Graphs which call equivalent TensorRT engines
  *
  * Converts specifically the forward method of a TorchScript Module
+ *
+ * @return: A new module trageting a TensorRT engine
  */
-TRTORCH_API torch::jit::script::Module CompileGraph(const torch::jit::Module& module, ExtraInfo info);
+TRTORCH_API torch::jit::Module CompileGraph(const torch::jit::Module& module, ExtraInfo info);
 
 /**
  * @brief Compile a TorchScript method for NVIDIA GPUs using TensorRT
  *
- * @param module: torch::jit::script::Module - Existing TorchScript module
+ * @param module: torch::jit::Module - Existing TorchScript module
  * @param method_name: std::string - Name of method to compile
  * @param info: trtorch::ExtraInfo - Compilation settings
  *
  * Takes a existing TorchScript module and a set of settings to configure the compiler
  * and will convert selected method to a serialized TensorRT engine which can be run with
  * TensorRT
+ *
+ * @return: std::string: Serialized TensorRT engine equivilant to the method graph
  */
 TRTORCH_API std::string ConvertGraphToTRTEngine(const torch::jit::Module& module, std::string method_name, ExtraInfo info);
 
@@ -270,15 +395,20 @@ namespace ptq {
 /**
  * @brief A factory to build a post training quantization calibrator from a torch dataloader
  *
- * Creates a calibrator to use for post training quantization
- * If there are multiple inputs, the dataset should produce a example which is a vector (or similar container) of tensors vs a single tensor
+ * Creates a calibrator to use for post training quantization. By default the returned calibrator uses TensorRT Entropy v2
+ * algorithm to perform calibration. This is recommended for feed forward networks. You can override the algorithm selection
+ * (such as to use the MinMax Calibrator recomended for NLP tasks) by calling make_int8_calibrator with the calibrator class
+ * as a template parameter.
  *
- * By default the returned calibrator uses TensorRT Entropy v2 algorithm to perform calibration. This is recommended for feed forward networks
- * You can override the algorithm selection (such as to use the MinMax Calibrator recomended for NLP tasks) by calling make_int8_calibrator with
- * the calibrator class as a template parameter.
- *
- * e.g. trtorch::ptq::make_int8_calibrator<nvinfer1::IInt8MinMaxCalibrator>(std::move(calibration_dataloader), calibration_cache_file, use_cache);
+ * e.g. ``trtorch::ptq::make_int8_calibrator<nvinfer1::IInt8MinMaxCalibrator>(std::move(calibration_dataloader), calibration_cache_file, use_cache);``
+ * @tparam Algorithm: class nvinfer1::IInt8Calibrator (Default: nvinfer1::IInt8EntropyCalibrator2) - Algorithm to use
+ * @tparam DataLoader: std::unique_ptr<torch::data::DataLoader> - DataLoader type
+ * @param dataloader: std::unique_ptr<torch::data::DataLoader> - DataLoader containing data
+ * @param cache_file_path: const std::string& - Path to read/write calibration cache
+ * @param use_cache: bool - use calibration cache
+ * @return Int8Calibrator<Algorithm, DataLoader>
  */
+
 template<typename Algorithm = nvinfer1::IInt8EntropyCalibrator2, typename DataLoader>
 TRTORCH_API inline Int8Calibrator<Algorithm, DataLoader> make_int8_calibrator(DataLoader dataloader, const std::string& cache_file_path, bool use_cache) {
     return Int8Calibrator<Algorithm, DataLoader>(std::move(dataloader), cache_file_path, use_cache);
@@ -297,6 +427,9 @@ TRTORCH_API inline Int8Calibrator<Algorithm, DataLoader> make_int8_calibrator(Da
  * the calibrator class as a template parameter.
  *
  * e.g. trtorch::ptq::make_int8_cache_calibrator<nvinfer1::IInt8MinMaxCalibrator>(calibration_cache_file);
+ * @tparam Algorithm: class nvinfer1::IInt8Calibrator (Default: nvinfer1::IInt8EntropyCalibrator2) - Algorithm to use
+ * @param cache_file_path: const std::string& - Path to read/write calibration cache
+ * @return Int8CacheCalibrator<Algorithm>
  */
 template<typename Algorithm = nvinfer1::IInt8EntropyCalibrator2>
 TRTORCH_API inline Int8CacheCalibrator<Algorithm> make_int8_cache_calibrator(const std::string& cache_file_path) {

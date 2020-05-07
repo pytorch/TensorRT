@@ -9,12 +9,18 @@ namespace logging {
  * Emum for setting message severity
  */
 enum Level {
-    kINTERNAL_ERROR, // Only print messages for internal errors
-    kERROR,          // Print all internal errors and errors (default)
-    kWARNING,        // Print warnings and errors
-    kINFO,           // Print all info, warnings and errors
-    kDEBUG,          // Print all debug info, info, warnings and errors
-    kGRAPH,          // Print everything including the intermediate graphs of the lowering phase
+    /// Only print messages for internal errors
+    kINTERNAL_ERROR,
+    /// Print all internal errors and errors (default)
+    kERROR,
+    /// Print warnings and errors
+    kWARNING,
+    /// Print all info, warnings and errors
+    kINFO,
+    /// Print all debug info, info, warnings and errors
+    kDEBUG,
+    /// Print everything including the intermediate graphs of the lowering phase
+    kGRAPH,
 };
 
 // Are these ones necessary for the user?
@@ -37,11 +43,15 @@ TRTORCH_API void set_is_colored_output_on(bool colored_output_on);
 
 /**
  * @brief Get the current reportable log level
+ *
+ * @return TRTORCH_API get_reportable_log_level
  */
 TRTORCH_API Level get_reportable_log_level();
 
 /**
  * @brief Is colored output enabled?
+ *
+ * @return TRTORCH_API get_is_colored_output_on
  */
 TRTORCH_API bool get_is_colored_output_on();
 
