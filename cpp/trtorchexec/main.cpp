@@ -27,7 +27,7 @@ int main(int argc, const char* argv[]) {
     }
 
 
-    torch::jit::script::Module mod;
+    torch::jit::Module mod;
     try {
         // Deserialize the ScriptModule from a file using torch::jit::load().
         mod = torch::jit::load(argv[1]);
