@@ -33,6 +33,7 @@ html:
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 	mkdir -p $(DESTDIR)
 	cp -r $(BUILDDIR)/html/* $(DESTDIR)
+	touch $(DESTDIR)/.nojekyll
 
 .PHONY: help clean check_clean html Makefile
 
