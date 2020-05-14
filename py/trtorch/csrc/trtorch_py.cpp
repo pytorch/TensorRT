@@ -108,7 +108,7 @@ struct ExtraInfo {
 
 torch::jit::Module CompileGraph(const torch::jit::Module& mod, ExtraInfo& info) {
   py::gil_scoped_acquire gil;
-  auto trt_mod = trtorch::CompileGraph(mod, info.toInternalExtraInfo());
+  auto trt_mod = core::CompileGraph(mod, info.toInternalExtraInfo());
   return trt_mod;
 }
 
@@ -139,8 +139,8 @@ PYBIND11_MODULE(_C, m) {
     .def_readwrite("max", &InputRange::max)
     .def("_to_internal_input_range", &InputRange::toInternalInputRange);
 
-  py::class_<core::conversion::InputRange>(m, "_InternalInputRange")
-      .def(py::init<>());
+  //py::class_<core::conversion::InputRange>(m, "_InternalInputRange")
+  //    .def(py::init<>());
 
   py::enum_<DataType>(m, "dtype")
     .value("float",   DataType::kFloat)
@@ -176,10 +176,10 @@ PYBIND11_MODULE(_C, m) {
     .def_readwrite("max_batch_size",       &ExtraInfo::max_batch_size);
 
   m.doc() = "TRTorch Internal C Bindings: Ahead of Time compilation for PyTorch JIT. A tool to convert PyTorch JIT to TensorRT";
-  m.def("_compile_graph", &trtorch::pyapi::CompileGraph, "Ingest a PyTorch JIT module and convert supported subgraphs to TensorRT engines, returns a JIT module with the engines embedded");
+  m.def("_compile_graph",               &trtorch::pyapi::CompileGraph, "Ingest a PyTorch JIT module and convert supported subgraphs to TensorRT engines, returns a JIT module with the engines embedded");
   m.def("_convert_graph_to_trt_engine", &trtorch::pyapi::ConvertGraphToTRTEngine, "Given a PyTorch JIT Module, convert forward into a TensorRT engine and return a serialized engine");
-  m.def("_check_method_op_support", &trtorch::pyapi::CheckMethodOperatorSupport, "Takes a module and a method name and checks if the method graph contains purely convertable operators");
-  m.def("_get_build_info", &get_build_info, "Returns build info about the compiler as a string");
+  m.def("_check_method_op_support",     &trtorch::pyapi::CheckMethodOperatorSupport, "Takes a module and a method name and checks if the method graph contains purely convertable operators");
+  m.def("_get_build_info",              &get_build_info, "Returns build info about the compiler as a string");
   m.def("_test", &test);
 }
 

@@ -1,8 +1,12 @@
-from setuptools import setup, Extension, find_packages
-from setuptools.command.build_ext import build_ext
+import os
 import sys
 import setuptools
-import os
+from setuptools import setup, Extension, find_packages
+from setuptools.command.build_ext import build_ext
+from setuptools.command.develop import develop
+from setuptools.command.install import install
+from distutils.cmd import Command
+
 from torch.utils import cpp_extension
 from shutil import copyfile
 
@@ -27,7 +31,6 @@ def copy_libtrtorch():
 
 class DevelopCommand(develop):
     description = "Builds the package and symlinks it into the PYTHONPATH"
-    user_options = develop.user_options + plugins_user_options
 
     def initialize_options(self):
         develop.initialize_options(self)
@@ -43,7 +46,6 @@ class DevelopCommand(develop):
 
 class InstallCommand(install):
     description = "Builds the package"
-    user_options = install.user_options + plugins_user_options
 
     def initialize_options(self):
         install.initialize_options(self)

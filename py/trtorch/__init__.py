@@ -16,7 +16,7 @@ def _load_trtorch_lib():
 _load_trtorch_lib()
 
 from .version import __version__
-#from trtorch import _C
+from trtorch import _C
 from trtorch.compiler import *
 from trtorch.types import *
 
