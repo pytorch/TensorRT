@@ -1,5 +1,6 @@
 import os
 import sys
+import glob
 import setuptools
 from setuptools import setup, Extension, find_packages
 from setuptools.command.build_ext import build_ext
@@ -8,7 +9,7 @@ from setuptools.command.install import install
 from distutils.cmd import Command
 
 from torch.utils import cpp_extension
-from shutil import copyfile
+from shutil import copyfile, rmtree
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -60,7 +61,7 @@ class InstallCommand(install):
 
 class CleanCommand(Command):
     """Custom clean command to tidy up the project root."""
-    PY_CLEAN_FILES = ['./build', './dist', './trtorch/__pycache__', './*.pyc', './*.tgz', './*.egg-info']
+    PY_CLEAN_FILES = ['./build', './dist', './trtorch/__pycache__', './trtorch/lib', './*.pyc', './*.tgz', './*.egg-info']
     description = "Command to tidy up the project root"
     user_options = []
 
@@ -75,11 +76,11 @@ class CleanCommand(Command):
             # Make paths absolute and relative to this path
             abs_paths = glob.glob(os.path.normpath(os.path.join(dir_path, path_spec)))
             for path in [str(p) for p in abs_paths]:
-                if not path.startswith(root_dir):
+                if not path.startswith(dir_path):
                     # Die if path in CLEAN_FILES is absolute + outside this directory
-                    raise ValueError("%s is not a path inside %s" % (path, root_dir))
+                    raise ValueError("%s is not a path inside %s" % (path, dir_path))
                 print('Removing %s' % os.path.relpath(path))
-                shutil.rmtree(path)
+                rmtree(path)
 
 ext_modules = [
     cpp_extension.CUDAExtension('trtorch._C',

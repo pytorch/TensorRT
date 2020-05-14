@@ -18,6 +18,9 @@ struct InputRange {
   std::vector<int64_t> max;
 
   core::conversion::InputRange toInternalInputRange() {
+    for (auto o : opt) {
+      std::cout << o << std::endl;
+    }
     return core::conversion::InputRange(min, opt, max);
   }
 };
@@ -76,7 +79,11 @@ nvinfer1::EngineCapability toTRTEngineCapability(EngineCapability value) {
 struct ExtraInfo {
 
   core::ExtraInfo toInternalExtraInfo() {
-    auto info = core::ExtraInfo(input_ranges);
+    std::cout << "HELLO" << input_ranges.size() << std::endl;
+    for (auto i : input_ranges) {
+      internal_input_ranges.push_back(i.toInternalInputRange());
+    }
+    auto info = core::ExtraInfo(internal_input_ranges);
     info.convert_info.engine_settings.op_precision = toTRTDataType(op_precision);
     info.convert_info.engine_settings.refit = refit;
     info.convert_info.engine_settings.debug = debug;
@@ -91,7 +98,8 @@ struct ExtraInfo {
     return info;
   }
 
-  std::vector<core::conversion::InputRange> input_ranges;
+  std::vector<InputRange> input_ranges;
+  std::vector<core::conversion::InputRange> internal_input_ranges;
   DataType op_precision = DataType::kFloat;
   bool refit = false;
   bool debug = false;
@@ -112,10 +120,10 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, ExtraInfo& info) 
   return trt_mod;
 }
 
-std::string ConvertGraphToTRTEngine(const torch::jit::Module& mod, const std::string& method_name, ExtraInfo& info) {
+py::bytes ConvertGraphToTRTEngine(const torch::jit::Module& mod, const std::string& method_name, ExtraInfo& info) {
   py::gil_scoped_acquire gil;
   auto trt_engine = core::ConvertGraphToTRTEngine(mod, method_name, info.toInternalExtraInfo());
-  return trt_engine;
+  return py::bytes(trt_engine);
 }
 
 bool CheckMethodOperatorSupport(const torch::jit::Module& module, const std::string& method_name) {
@@ -136,11 +144,7 @@ PYBIND11_MODULE(_C, m) {
     .def(py::init<>())
     .def_readwrite("min", &InputRange::min)
     .def_readwrite("opt", &InputRange::opt)
-    .def_readwrite("max", &InputRange::max)
-    .def("_to_internal_input_range", &InputRange::toInternalInputRange);
-
-  //py::class_<core::conversion::InputRange>(m, "_InternalInputRange")
-  //    .def(py::init<>());
+    .def_readwrite("max", &InputRange::max);
 
   py::enum_<DataType>(m, "dtype")
     .value("float",   DataType::kFloat)

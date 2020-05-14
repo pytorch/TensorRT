@@ -15,7 +15,7 @@ def _supported_input_size_type(input_size: Any) -> bool:
     else:
         raise TypeError("Input sizes for inputs are required to be a List, tuple or torch.Size or a Dict of three sizes (min, opt, max), found type: " + str(type(input_size)))
 
-def _parse_input_sizes(input_sizes: List) -> List:
+def _parse_input_ranges(input_sizes: List) -> List:
 
     if any (not isinstance(i, dict) and not _supported_input_size_type(i) for i in input_sizes):
         raise KeyError("An input size must either be a static size or a range of three sizes (min, opt, max) as Dict")
@@ -28,16 +28,14 @@ def _parse_input_sizes(input_sizes: List) -> List:
                 in_range.min = i["min"]
                 in_range.opt = i["opt"]
                 in_range.max = i["max"]
-
-                parsed_input_sizes.append(in_range.to_internal_input_range())
+                parsed_input_sizes.append(in_range)
 
             elif "opt" in i:
                 in_range = trtorch._C.InputRange()
                 in_range.min = i["opt"]
                 in_range.opt = i["opt"]
                 in_range.max = i["opt"]
-
-                parsed_input_sizes.append(in_range.to_internal_input_range())
+                parsed_input_sizes.append(in_range)
 
             else:
                 raise KeyError("An input size must either be a static size or a range of three sizes (min, opt, max) as Dict")
@@ -47,8 +45,14 @@ def _parse_input_sizes(input_sizes: List) -> List:
             in_range.min = i
             in_range.opt = i
             in_range.max = i
+            parsed_input_sizes.append(in_range)
 
-            parsed_input_sizes.append(in_range.to_internal_input_range())
+        elif isinstance(i, tuple):
+            in_range = trtorch._C.InputRange()
+            in_range.min = list(i)
+            in_range.opt = list(i)
+            in_range.max = list(i)
+            parsed_input_sizes.append(in_range)
 
     return parsed_input_sizes
 
@@ -87,7 +91,8 @@ def _parse_extra_info(extra_info: Dict[str, Any]) -> trtorch._C._ExtraInfo:
     if "input_shapes" not in extra_info and not isinstance(extra_info["input_shapes"], list):
         raise KeyError("Input shapes for inputs are required as a List, provided as either a static sizes or a range of three sizes (min, opt, max) as Dict")
 
-    info.input_ranges = _parse_input_sizes(extra_info["input_shapes"])
+    info.input_ranges = _parse_input_ranges(extra_info["input_shapes"])
+    print(info.input_ranges)
 
     if "op_precision" in extra_info:
         info.op_precision = _parse_op_precision(extra_info["op_precision"])
