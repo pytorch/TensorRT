@@ -1,5 +1,12 @@
 package(default_visibility = ["//visibility:public"])
 
+config_setting(
+    name = "dont_use_cxx11_abi",
+    values = {
+        "define": "api=python",
+    }
+)
+
 cc_library(
     name = "converters",
     hdrs = [
@@ -24,11 +31,13 @@ cc_library(
         "impl/unary.cpp",
     ],
     deps = [
-        "@libtorch//:libtorch",
         "@tensorrt//:nvinfer",
         "//core/util:prelude",
-        "//core/conversion/conversionctx"
-    ],
+        "//core/conversion/conversionctx",
+    ] + select({
+        ":dont_use_cxx11_abi":  ["@libtorch_non_cxx11_abi//:libtorch"],
+        "//conditions:default":  ["@libtorch//:libtorch"],
+    }),
     alwayslink = True,
 )
 

@@ -28,3 +28,6 @@ tests/accuracy/datasets/data/*
 docsrc/_build
 docsrc/_api
 docsrc/_tmp
+*.so
+__pycache__
+*.egg-info

@@ -1,5 +1,12 @@
 package(default_visibility = ["//visibility:public"])
 
+config_setting(
+    name = "dont_use_cxx11_abi",
+    values = {
+        "define": "api=python",
+    }
+)
+
 cc_library(
     name = "core",
     hdrs = [
@@ -13,9 +20,11 @@ cc_library(
         "//core/execution",
         "//core/lowering",
         "//core/util/logging",
-        "@libtorch//:libtorch",
         "@tensorrt//:nvinfer"
-    ],
+    ] + select({
+        ":dont_use_cxx11_abi":  ["@libtorch_non_cxx11_abi//:libtorch"],
+        "//conditions:default":  ["@libtorch//:libtorch"],
+    }),
     alwayslink=True,
 )
 

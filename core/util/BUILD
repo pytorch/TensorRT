@@ -1,5 +1,12 @@
 package(default_visibility = ["//visibility:public"])
 
+config_setting(
+    name = "dont_use_cxx11_abi",
+    values = {
+        "define": "api=python",
+    }
+)
+
 cc_library(
     name = "prelude",
     hdrs = [
@@ -20,9 +27,10 @@ cc_library(
     hdrs = [
         "jit_util.h",
     ],
-    deps = [
-        "@libtorch//:libtorch",
-    ]
+    deps = select({
+        ":dont_use_cxx11_abi":  ["@libtorch_non_cxx11_abi//:libtorch"],
+        "//conditions:default":  ["@libtorch//:libtorch"],
+    })
 )
 
 cc_library(
@@ -51,9 +59,11 @@ cc_library(
         "build_info.h",
     ],
     deps = [
-        "@libtorch//:libtorch",
         "@tensorrt//:nvinfer"
-    ]
+    ] + select({
+        ":dont_use_cxx11_abi":  ["@libtorch_non_cxx11_abi//:libtorch"],
+        "//conditions:default":  ["@libtorch//:libtorch"],
+    })
 )
 
 cc_library(
@@ -65,11 +75,13 @@ cc_library(
         "trt_util.cpp"
     ],
     deps = [
-        "@libtorch//:libtorch",
         "@tensorrt//:nvinfer",
         "//core/util/logging",
         ":macros"
-    ]
+    ] + select({
+        ":dont_use_cxx11_abi":  ["@libtorch_non_cxx11_abi//:libtorch"],
+        "//conditions:default":  ["@libtorch//:libtorch"],
+    })
 )
 
 
@@ -79,7 +91,7 @@ pkg_tar(
     name = "include",
     package_dir = "core/util/",
     srcs = [
-	"//core/util:build_info.h",
+        "//core/util:build_info.h",
         "//core/util:macros.h",
         "//core/util:Exception.h",
         "//core/util:prelude.h",

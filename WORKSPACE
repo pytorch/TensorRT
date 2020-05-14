@@ -4,6 +4,8 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 
 
+
+
 http_archive(
     name = "rules_python",
     url = "https://github.com/bazelbuild/rules_python/releases/download/0.0.1/rules_python-0.0.1.tar.gz",
@@ -33,6 +35,14 @@ new_local_repository(
 )
 
 http_archive(
+    name = "libtorch_non_cxx11_abi",
+    build_file = "@//third_party/libtorch:BUILD",
+    strip_prefix = "libtorch",
+    sha256 = "ea8de17c5f70015583f3a7a43c7a5cdf91a1d4bd19a6a7bc11f074ef6cd69e27",
+    urls = ["https://download.pytorch.org/libtorch/cu102/libtorch-shared-with-deps-1.5.0.zip"],
+)
+
+http_archive(
     name = "libtorch",
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
@@ -43,8 +53,7 @@ http_archive(
 # Downloaded distributions to use with --distdir
 http_archive(
     name = "cudnn",
-    urls = ["https://developer.nvidia.com/compute/machine-learning/cudnn/secure/7.6.5.32/Production/10.2_20191118/cudnn-10.2-linux-x64-v7.6.5.32.tgz",],
-
+    urls = ["https://developer.nvidia.com/compute/machine-learning/cudnn/secure/7.6.5.32/Production/10.2_20191118/cudnn-10.2-linux-x64-v7.6.5.32.tgz"],
     build_file = "@//third_party/cudnn/archive:BUILD",
     sha256 = "600267f2caaed2fd58eb214ba669d8ea35f396a7d19b94822e6b36f9f7088c20",
     strip_prefix = "cuda"
@@ -52,8 +61,7 @@ http_archive(
 
 http_archive(
     name = "tensorrt",
-    urls = ["https://developer.nvidia.com/compute/machine-learning/tensorrt/secure/7.0/7.0.0.11/tars/TensorRT-7.0.0.11.Ubuntu-18.04.x86_64-gnu.cuda-10.2.cudnn7.6.tar.gz",],
-
+    urls = ["https://developer.nvidia.com/compute/machine-learning/tensorrt/secure/7.0/7.0.0.11/tars/TensorRT-7.0.0.11.Ubuntu-18.04.x86_64-gnu.cuda-10.2.cudnn7.6.tar.gz"],
     build_file = "@//third_party/tensorrt/archive:BUILD",
     sha256 = "c7d73b2585b18aae68b740249efa8c8ba5ae852abe9a023720595432a8eb4efd",
     strip_prefix = "TensorRT-7.0.0.11"
