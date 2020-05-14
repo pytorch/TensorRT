@@ -5,6 +5,10 @@ converter_test(
 )
 
 converter_test(
+  name = "test_batch_norm"
+)
+
+converter_test(
   name = "test_conv"
 )
 
@@ -44,6 +48,7 @@ test_suite(
   name = "test_converters",
   tests = [
     ":test_activation",
+    ":test_batch_norm",
     ":test_conv",
     ":test_element_wise",
     ":test_linear",

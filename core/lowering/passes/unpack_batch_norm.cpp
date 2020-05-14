@@ -41,6 +41,9 @@ void UnpackBatchNorm(std::shared_ptr<torch::jit::Graph>& graph) {
     torch::jit::SubgraphRewriter unpack_batch_norm;
     unpack_batch_norm.RegisterRewritePattern(batch_norm_pattern, expanded_batch_norm_pattern);
     unpack_batch_norm.runOnGraph(graph);
+    LOG_DEBUG("[Lowering Batch Norm]: momentum disregarded");
+    LOG_DEBUG("[Lowering Batch Norm]: training disregarded");
+    LOG_DEBUG("[Lowering Batch Norm]: cudnn disregarded");
     LOG_GRAPH("Post unpack batchnorm: " << *graph);
 }
 } // Namespace passes
