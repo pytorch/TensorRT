@@ -11,15 +11,33 @@ from distutils.cmd import Command
 from torch.utils import cpp_extension
 from shutil import copyfile, rmtree
 
+import subprocess
+
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
 __version__ = '0.0.1'
 
-def gen_version_file():
-    if not os.path.exists(dir_path + '/trtorch/version.py'):
-        os.mknod(dir_path + '/trtorch/version.py')
+def build_libtrtorch_pre_cxx11_abi(develop=True):
+    cmd = ["/usr/bin/bazel", "build"]
+    cmd.append("//cpp/api/lib:libtrtorch.so")
+    if develop:
+        cmd.append("--compilation_mode=dbg")
+    else:
+        cmd.append("--compilation_mode=opt")
+    cmd.append("--config=python")
 
-    with open(dir_path + '/trtorch/version.py', 'w') as f:
+    print("building libtrtorch")
+    status_code = subprocess.run(cmd).returncode
+
+    if status_code != 0:
+        sys.exit(status_code)
+
+
+def gen_version_file():
+    if not os.path.exists(dir_path + '/trtorch/_version.py'):
+        os.mknod(dir_path + '/trtorch/_version.py')
+
+    with open(dir_path + '/trtorch/_version.py', 'w') as f:
         print("creating version file")
         f.write("__version__ = \"" + __version__ + '\"')
 
@@ -40,6 +58,7 @@ class DevelopCommand(develop):
         develop.finalize_options(self)
 
     def run(self):
+        build_libtrtorch_pre_cxx11_abi(develop=True)
         gen_version_file()
         copy_libtrtorch()
         develop.run(self)
@@ -55,6 +74,7 @@ class InstallCommand(install):
         install.finalize_options(self)
 
     def run(self):
+        build_libtrtorch_pre_cxx11_abi(develop=False)
         gen_version_file()
         copy_libtrtorch()
         install.run(self)
@@ -110,7 +130,7 @@ ext_modules = [
 setup(
     name='trtorch',
     version=__version__,
-    author='NVIDIA Corporation.',
+    author='NVIDIA',
     author_email='narens@nvidia.com',
     url='https://github.com/nvidia/trtorch',
     description='A compiler backend for PyTorch JIT targeting NVIDIA GPUs',

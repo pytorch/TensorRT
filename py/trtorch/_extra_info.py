@@ -1,9 +1,7 @@
 from typing import List, Dict, Any
 import torch
-import tensorrt as trt
 import trtorch._C
-from trtorch import types
-from .version import __version__
+from trtorch import _types
 
 def _supported_input_size_type(input_size: Any) -> bool:
     if isinstance(input_size, torch.Size):
@@ -56,31 +54,31 @@ def _parse_input_ranges(input_sizes: List) -> List:
 
     return parsed_input_sizes
 
-def _parse_op_precision(precision: Any) -> types.dtype:
+def _parse_op_precision(precision: Any) -> _types.dtype:
     if isinstance(precision, torch.dtype):
         if precision == torch.int8:
-            return types.dtype.int8
+            return _types.dtype.int8
         elif precision == torch.half:
-            return types.dtype.half
+            return _types.dtype.half
         elif precision == torch.float:
-            return types.dtype.float
+            return _types.dtype.float
         else:
             raise TypeError("Provided an unsupported dtype as operating precision (support: int8, half, float), got: " + str(precision))
 
-    elif isinstance(precision, types.DataTypes):
+    elif isinstance(precision, _types.DataTypes):
         return precision
 
     else:
         raise TypeError("Op precision type needs to be specified with a torch.dtype or a trtorch.dtype, got: " + str(type(precision)))
 
-def _parse_device_type(device: Any) -> types.DeviceType:
+def _parse_device_type(device: Any) -> _types.DeviceType:
     if isinstance(device, torch.device):
         if torch.device.type == 'cuda':
-            return types.DeviceType.gpu
+            return _types.DeviceType.gpu
         else:
             raise TypeError("Valid device choices are GPU (and DLA if on Jetson platforms) however got device type" + str(device.type))
 
-    elif isinstance(device, types.DeviceType):
+    elif isinstance(device, _types.DeviceType):
         return device
 
     else:
@@ -120,7 +118,6 @@ def _parse_extra_info(extra_info: Dict[str, Any]) -> trtorch._C._ExtraInfo:
         assert isinstance(extra_info["capability"], type.EngineCapability)
         info.capability = extra_info["capability"]
 
-
     if "num_min_timing_iters" in extra_info:
         assert type(extra_info["num_min_timing_iters"]) is int
         info.num_min_timing_iters = extra_info["num_min_timing_iters"]
@@ -138,21 +135,3 @@ def _parse_extra_info(extra_info: Dict[str, Any]) -> trtorch._C._ExtraInfo:
         info.max_batch_size = extra_info["max_batch_size"]
 
     return info
-
-def compile_module(module: torch.jit.ScriptModule, extra_info: Any) -> torch.jit.ScriptModule:
-    return module
-
-def convert_graph_to_trt_engine(module: torch.jit.ScriptModule, method_name: str, extra_info: Any) -> str:
-    return trtorch._C._convert_graph_to_trt_engine(module._c, method_name, _parse_extra_info(extra_info))
-
-def check_method_op_support(module: torch.jit.ScriptModule, method_name: str) -> bool:
-    return trtorch._C._check_method_op_support(module._c, method_name)
-
-def dump_build_info():
-    print(get_build_info())
-
-def get_build_info() -> str:
-    build_info = trtorch._C._get_build_info()
-    build_info = "TRTorch Version: " + str(__version__) + '\n' + build_info
-    return build_info
-

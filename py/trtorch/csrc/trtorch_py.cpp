@@ -54,7 +54,7 @@ nvinfer1::DeviceType toTRTDeviceType(DeviceType value) {
     return nvinfer1::DeviceType::kDLA;
   case DeviceType::kGPU:
   default:
-    return nvinfer1::DeviceType::kDLA;
+    return nvinfer1::DeviceType::kGPU;
   }
 }
 
@@ -113,7 +113,6 @@ struct ExtraInfo {
   uint64_t max_batch_size = 0;
 };
 
-
 torch::jit::Module CompileGraph(const torch::jit::Module& mod, ExtraInfo& info) {
   py::gil_scoped_acquire gil;
   auto trt_mod = core::CompileGraph(mod, info.toInternalExtraInfo());
@@ -130,13 +129,43 @@ bool CheckMethodOperatorSupport(const torch::jit::Module& module, const std::str
   return core::CheckMethodOperatorSupport(module, method_name);
 }
 
-void test(torch::jit::Module& mod, torch::Tensor data) {
-  std::cout << mod.forward({data}) << std::endl;
-}
-
 std::string get_build_info() {
   auto info = core::util::get_build_info();
   return info;
+}
+
+namespace logging {
+std::string get_logging_prefix() {
+  return core::util::logging::get_logger().get_logging_prefix();
+}
+
+void set_logging_prefix(const std::string& prefix) {
+  std::string p;
+  p.assign(prefix);
+  core::util::logging::get_logger().set_logging_prefix(p);
+}
+
+void set_reportable_log_level(core::util::logging::LogLevel lvl) {
+  core::util::logging::get_logger().set_reportable_log_level(lvl);
+}
+
+void set_is_colored_output_on(bool colored_output_on) {
+  core::util::logging::get_logger().set_is_colored_output_on(colored_output_on);
+}
+
+core::util::logging::LogLevel get_reportable_log_level() {
+  return core::util::logging::get_logger().get_reportable_log_level();
+}
+
+bool get_is_colored_output_on() {
+  return core::util::logging::get_logger().get_is_colored_output_on();
+}
+
+void log(core::util::logging::LogLevel lvl, const std::string& msg) {
+  std::string m;
+  m.assign(msg);
+  core::util::logging::get_logger().log(lvl, m);
+}
 }
 
 PYBIND11_MODULE(_C, m) {
@@ -146,23 +175,23 @@ PYBIND11_MODULE(_C, m) {
     .def_readwrite("opt", &InputRange::opt)
     .def_readwrite("max", &InputRange::max);
 
-  py::enum_<DataType>(m, "dtype")
-    .value("float",   DataType::kFloat)
-    .value("float32", DataType::kFloat)
-    .value("half",    DataType::kHalf)
-    .value("float16", DataType::kHalf)
-    .value("int8",    DataType::kChar)
+  py::enum_<DataType>(m, "dtype", "Enum to specifiy operating precision for engine execution")
+    .value("float",   DataType::kFloat, "32 bit floating point number")
+    .value("float32",   DataType::kFloat, "32 bit floating point number")
+    .value("half",    DataType::kHalf, "16 bit floating point number")
+    .value("float16",    DataType::kHalf, "16 bit floating point number")
+    .value("int8",    DataType::kChar, "8 bit integer number")
     .export_values();
 
-  py::enum_<DeviceType>(m, "DeviceType")
-    .value("gpu", DeviceType::kGPU)
-    .value("dla", DeviceType::kDLA)
+  py::enum_<DeviceType>(m, "DeviceType", "Enum to specify device kinds to build TensorRT engines for")
+    .value("gpu", DeviceType::kGPU, "Specify using GPU to execute TensorRT Engine")
+    .value("dla", DeviceType::kDLA, "Specify using DLA to execute TensorRT Engine (Jetson Only)")
     .export_values();
 
-  py::enum_<EngineCapability>(m, "EngineCapability")
-    .value("safe_gpu", EngineCapability::kSAFE_GPU)
-    .value("safe_dla", EngineCapability::kSAFE_DLA)
-    .value("default",  EngineCapability::kDEFAULT);
+  py::enum_<EngineCapability>(m, "EngineCapability", "Enum to specify engine capability settings (selections of kernels to meet safety requirements)")
+    .value("safe_gpu", EngineCapability::kSAFE_GPU, "Use safety GPU kernels only")
+    .value("safe_dla", EngineCapability::kSAFE_DLA, "Use safety DLA kernels only")
+    .value("default",  EngineCapability::kDEFAULT, "Use default behavior");
 
   py::class_<ExtraInfo>(m, "_ExtraInfo")
     .def(py::init<>())
@@ -184,27 +213,23 @@ PYBIND11_MODULE(_C, m) {
   m.def("_convert_graph_to_trt_engine", &trtorch::pyapi::ConvertGraphToTRTEngine, "Given a PyTorch JIT Module, convert forward into a TensorRT engine and return a serialized engine");
   m.def("_check_method_op_support",     &trtorch::pyapi::CheckMethodOperatorSupport, "Takes a module and a method name and checks if the method graph contains purely convertable operators");
   m.def("_get_build_info",              &get_build_info, "Returns build info about the compiler as a string");
-  m.def("_test", &test);
+
+  m.def("_get_logging_prefix",       &logging::get_logging_prefix, "Get the current prefix for the logging output");
+  m.def("_set_logging_prefix",       &logging::set_logging_prefix, "Set the logging prefix for logging output");
+  m.def("_get_reportable_log_level", &logging::get_reportable_log_level, "Get the current log level");
+  m.def("_set_reportable_log_level", &logging::set_reportable_log_level, "Set the level required to be met for a log message to be printed");
+  m.def("_get_is_colored_output_on", &logging::get_is_colored_output_on, "Get if the logging output will be colored");
+  m.def("_set_is_colored_output_on", &logging::set_is_colored_output_on, "Set if the logging output should be colored");
+  m.def("_log",                      &logging::log, "Add a message to the logger");
+
+  py::enum_<core::util::logging::LogLevel>(m, "LogLevel", py::arithmetic())
+    .value("INTERNAL_ERROR", core::util::logging::LogLevel::kINTERNAL_ERROR)
+    .value("ERROR", core::util::logging::LogLevel::kERROR)
+    .value("WARNING", core::util::logging::LogLevel::kWARNING)
+    .value("INFO", core::util::logging::LogLevel::kINFO)
+    .value("DEBUG", core::util::logging::LogLevel::kDEBUG)
+    .export_values();
 }
 
-// namespace logging {
-// PYBIND11_MODULE(logging, m) {
-//     m.attr("__name__") = "trtorch.logging";
-//     m.def("get_logging_prefix", &trtorch::logging::get_logging_prefix, "Get the current prefix for the logging output");
-//     m.def("set_logging_prefix", &trtorch::logging::set_logging_prefix, "Set the logging prefix for logging output");
-//     m.def("get_reportable_log_level", &trtorch::logging::get_reportable_log_level, "Get the current log level");
-//     m.def("set_reportable_log_level", &trtorch::logging::set_reportable_log_level, "Set the level required to be met for a log message to be printed");
-//     m.def("get_is_colored_output_on", &trtorch::logging::get_is_colored_output_on, "Get if the logging output will be colored");
-//     m.def("set_is_colored_output_on", &trtorch::logging::set_is_colored_output_on, "Set if the logging output should be colored");
-//     m.def("log", &trtorch::logging::log, "Add a message to the logger");
-//     py::enum_<trtorch::logging::Level>(m, "Level", py::arithmetic())
-//         .value("INTERNAL_ERROR", trtorch::logging::Level::kINTERNAL_ERROR)
-//         .value("ERROR", trtorch::logging::Level::kERROR)
-//         .value("WARNING", trtorch::logging::Level::kWARNING)
-//         .value("INFO", trtorch::logging::Level::kINFO)
-//         .value("DEBUG", trtorch::logging::Level::kDEBUG)
-//         .export_values();
-// }
-//} // namespace logging
 } // namespace py
 } // namespace trtorch

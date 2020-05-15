@@ -15,10 +15,7 @@ def _load_trtorch_lib():
 
 _load_trtorch_lib()
 
-from .version import __version__
-from trtorch import _C
-from trtorch.compiler import *
-from trtorch.types import *
-
-def test(mod, data):
-    _C._test(mod._c, data)
+from trtorch._version import __version__
+from trtorch._compiler import *
+from trtorch._types import *
+from trtorch import logging
