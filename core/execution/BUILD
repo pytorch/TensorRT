@@ -1,9 +1,9 @@
 package(default_visibility = ["//visibility:public"])
 
 config_setting(
-    name = "dont_use_cxx11_abi",
+    name = "use_pre_cxx11_abi",
     values = {
-        "define": "api=python",
+        "define": "abi=pre_cxx11_abi",
     }
 )
 
@@ -21,7 +21,7 @@ cc_library(
         "@tensorrt//:nvinfer",
         "//core/util:prelude"
     ] + select({
-        ":dont_use_cxx11_abi":  ["@libtorch_non_cxx11_abi//:libtorch"],
+        ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default":  ["@libtorch//:libtorch"],
     }),
     alwayslink = True,

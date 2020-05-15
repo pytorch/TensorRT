@@ -31,3 +31,5 @@ docsrc/_tmp
 *.so
 __pycache__
 *.egg-info
+dist
+bdist
