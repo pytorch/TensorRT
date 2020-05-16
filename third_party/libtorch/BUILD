@@ -27,7 +27,6 @@ cc_library(
     deps = [
         ":ATen",
         ":c10_cuda",
-        ":caffe2"
     ],
     includes = [
         "include",

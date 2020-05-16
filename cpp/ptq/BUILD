@@ -9,6 +9,7 @@ cc_binary(
     deps = [
         "//cpp/ptq/datasets:cifar10",
         "@libtorch//:libtorch",
+        "@libtorch//:caffe2",
         "//cpp/api:trtorch",
         "@tensorrt//:nvinfer"
     ],
