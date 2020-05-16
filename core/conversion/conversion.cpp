@@ -117,7 +117,6 @@ void AddInputs(ConversionCtx* ctx,
                 at::ArrayRef<const torch::jit::Value*> inputs,
                 std::vector<InputRange>& input_dims) {
 
-    auto type_lut = torch::jit::script::string_to_type_lut();
     std::vector<const torch::jit::Value*> input_tensors;
     for (auto in : inputs) {
         // Disregarding inputs that are not tensors
@@ -125,8 +124,7 @@ void AddInputs(ConversionCtx* ctx,
         // Ex.
         // self.1:__torch__.alexnet -> ignored
         // input.1:Tensor -> used
-        auto pt_type = in->type();
-        if (pt_type == type_lut["Tensor"]) {
+        if (in->type()->isSubtypeOf(c10::TensorType::get()) && ctx->evaluated_value_map.find(in) == ctx->evaluated_value_map.end()) {
             input_tensors.push_back(in);
         }
     }
