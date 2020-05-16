@@ -13,3 +13,10 @@ test_suite(
         "//tests/accuracy:test_accuracy"
     ]
 )
+
+test_suite(
+    name = "python_api_tests",
+    tests = [
+        "//tests/py:test_api"
+    ]
+)

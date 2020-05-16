@@ -1,3 +1,10 @@
+config_setting(
+    name = "use_pre_cxx11_abi",
+    values = {
+        "define": "abi=pre_cxx11_abi",
+    }
+)
+
 filegroup(
     name = "jit_models",
     srcs = glob(["**/*.jit.pt"])
@@ -51,7 +58,9 @@ cc_library(
     deps = [
         "//cpp/api:trtorch",
         "//tests/util",
-        "@libtorch//:libtorch",
         "@googletest//:gtest_main",
-    ],
+    ] + select({
+        ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
+        "//conditions:default":  ["@libtorch//:libtorch"],
+    }),
 )
