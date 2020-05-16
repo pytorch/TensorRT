@@ -1,8 +1,12 @@
 from typing import List, Dict, Any
 import torch
+from torch import nn
+
 import trtorch._C
 from trtorch._extra_info import _parse_extra_info
 from trtorch._version import __version__
+from types import FunctionType
+
 
 def compile(module: torch.jit.ScriptModule, extra_info: Any) -> torch.jit.ScriptModule:
     """Compile a TorchScript module for NVIDIA GPUs using TensorRT
@@ -50,7 +54,11 @@ def compile(module: torch.jit.ScriptModule, extra_info: Any) -> torch.jit.Script
     Returns:
         torch.jit.ScriptModule: Compiled TorchScript Module, when run it will execute via TensorRT
     """
-    compiled_cpp_mod = trtorch._C._compile_graph(module._c, _parse_extra_info(extra_info))
+
+    if isinstance(module, torch.jit.ScriptFunction):
+        raise TypeError("torch.jit.ScriptFunction currently is not directly supported, wrap the function in a module to compile")
+
+    compiled_cpp_mod = trtorch._C.compile_graph(module._c, _parse_extra_info(extra_info))
     compiled_module = torch.jit._recursive.wrap_cpp_module(compiled_cpp_mod)
     return compiled_module
 
@@ -98,7 +106,10 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule, method_name: st
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
     """
-    return trtorch._C._convert_graph_to_trt_engine(module._c, method_name, _parse_extra_info(extra_info))
+    if isinstance(module, torch.jit.ScriptFunction):
+        raise TypeError("torch.jit.ScriptFunctions currently are not directly supported, wrap the function in a module to compile")
+
+    return trtorch._C.convert_graph_to_trt_engine(module._c, method_name, _parse_extra_info(extra_info))
 
 def check_method_op_support(module: torch.jit.ScriptModule, method_name: str) -> bool:
     """Checks to see if a method is fully supported by TRTorch
@@ -114,7 +125,7 @@ def check_method_op_support(module: torch.jit.ScriptModule, method_name: str) ->
     Returns:
         bool: True if supported Method
     """
-    return trtorch._C._check_method_op_support(module._c, method_name)
+    return trtorch._C.check_method_op_support(module._c, method_name)
 
 def dump_build_info():
     """Prints build information about the TRTorch distribution to stdout
@@ -127,7 +138,7 @@ def get_build_info() -> str:
     Returns:
         str: String containing the build information for TRTorch distribution
     """
-    build_info = trtorch._C._get_build_info()
+    build_info = trtorch._C.get_build_info()
     build_info = "TRTorch Version: " + str(__version__) + '\n' + build_info
     return build_info
 

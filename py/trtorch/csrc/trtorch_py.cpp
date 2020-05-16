@@ -18,9 +18,6 @@ struct InputRange {
   std::vector<int64_t> max;
 
   core::conversion::InputRange toInternalInputRange() {
-    for (auto o : opt) {
-      std::cout << o << std::endl;
-    }
     return core::conversion::InputRange(min, opt, max);
   }
 };
@@ -79,7 +76,6 @@ nvinfer1::EngineCapability toTRTEngineCapability(EngineCapability value) {
 struct ExtraInfo {
 
   core::ExtraInfo toInternalExtraInfo() {
-    std::cout << "HELLO" << input_ranges.size() << std::endl;
     for (auto i : input_ranges) {
       internal_input_ranges.push_back(i.toInternalInputRange());
     }
@@ -193,7 +189,7 @@ PYBIND11_MODULE(_C, m) {
     .value("safe_dla", EngineCapability::kSAFE_DLA, "Use safety DLA kernels only")
     .value("default",  EngineCapability::kDEFAULT, "Use default behavior");
 
-  py::class_<ExtraInfo>(m, "_ExtraInfo")
+  py::class_<ExtraInfo>(m, "ExtraInfo")
     .def(py::init<>())
     .def_readwrite("input_ranges",         &ExtraInfo::input_ranges)
     .def_readwrite("op_precision",         &ExtraInfo::op_precision)
@@ -209,10 +205,10 @@ PYBIND11_MODULE(_C, m) {
     .def_readwrite("max_batch_size",       &ExtraInfo::max_batch_size);
 
   m.doc() = "TRTorch Internal C Bindings: Ahead of Time compilation for PyTorch JIT. A tool to convert PyTorch JIT to TensorRT";
-  m.def("_compile_graph",               &trtorch::pyapi::CompileGraph, "Ingest a PyTorch JIT module and convert supported subgraphs to TensorRT engines, returns a JIT module with the engines embedded");
-  m.def("_convert_graph_to_trt_engine", &trtorch::pyapi::ConvertGraphToTRTEngine, "Given a PyTorch JIT Module, convert forward into a TensorRT engine and return a serialized engine");
-  m.def("_check_method_op_support",     &trtorch::pyapi::CheckMethodOperatorSupport, "Takes a module and a method name and checks if the method graph contains purely convertable operators");
-  m.def("_get_build_info",              &get_build_info, "Returns build info about the compiler as a string");
+  m.def("compile_graph",               &trtorch::pyapi::CompileGraph, "Ingest a PyTorch JIT module and convert supported subgraphs to TensorRT engines, returns a JIT module with the engines embedded");
+  m.def("convert_graph_to_trt_engine", &trtorch::pyapi::ConvertGraphToTRTEngine, "Given a PyTorch JIT Module, convert forward into a TensorRT engine and return a serialized engine");
+  m.def("check_method_op_support",     &trtorch::pyapi::CheckMethodOperatorSupport, "Takes a module and a method name and checks if the method graph contains purely convertable operators");
+  m.def("get_build_info",              &get_build_info, "Returns build info about the compiler as a string");
 
   m.def("_get_logging_prefix",       &logging::get_logging_prefix, "Get the current prefix for the logging output");
   m.def("_set_logging_prefix",       &logging::set_logging_prefix, "Set the logging prefix for logging output");

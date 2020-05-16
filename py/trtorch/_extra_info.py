@@ -84,13 +84,12 @@ def _parse_device_type(device: Any) -> _types.DeviceType:
     else:
         raise TypeError("Device specification must be of type torch.device or trtorch.DeviceType, but got: " + str(type(device)))
 
-def _parse_extra_info(extra_info: Dict[str, Any]) -> trtorch._C._ExtraInfo:
-    info = trtorch._C._ExtraInfo()
-    if "input_shapes" not in extra_info and not isinstance(extra_info["input_shapes"], list):
+def _parse_extra_info(extra_info: Dict[str, Any]) -> trtorch._C.ExtraInfo:
+    info = trtorch._C.ExtraInfo()
+    if "input_shapes" not in extra_info:
         raise KeyError("Input shapes for inputs are required as a List, provided as either a static sizes or a range of three sizes (min, opt, max) as Dict")
 
     info.input_ranges = _parse_input_ranges(extra_info["input_shapes"])
-    print(info.input_ranges)
 
     if "op_precision" in extra_info:
         info.op_precision = _parse_op_precision(extra_info["op_precision"])

@@ -121,7 +121,8 @@ ext_modules = [
                                 extra_link_args=[
                                     "-D_GLIBCXX_USE_CXX11_ABI=0"
                                     "-Wl,--no-as-needed",
-                                    "-ltrtorch"
+                                    "-ltrtorch",
+                                    "-Wl,-rpath,$ORIGIN/lib"
                                 ],
                                 undef_macros=[ "NDEBUG" ]
                             )

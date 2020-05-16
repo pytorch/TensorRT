@@ -40,7 +40,7 @@ def set_logging_prefix(prefix: str):
     Args:
         prefix (str): Prefix to use for logging messages
     """
-    _set_logging_prefix(str)
+    _set_logging_prefix(prefix)
 
 def get_reportable_log_level() -> Level:
     """Get the level required for a message to be printed in the log
@@ -84,4 +84,4 @@ def log(level: Level, msg: str):
         level (trtorch.logging.Level): Severity of the message
         msg (str): Actual message text
     """
-    _log(level, msg)
+    _log(Level._to_internal_level(level), msg)
