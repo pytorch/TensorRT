@@ -33,3 +33,4 @@ __pycache__
 *.egg-info
 dist
 bdist
+py/trtorch/_version.py
