@@ -5,6 +5,7 @@
 # from the environment for the first two.
 VERSION       ?=
 SPHINXOPTS    ?=
+SPHINXAPIDOC  ?= sphinx-apidoc
 SPHINXBUILD   ?= sphinx-build
 SOURCEDIR     = .
 BUILDDIR      = _build
@@ -20,6 +21,7 @@ check_clean:
 clean: check_clean
 	rm -rf $(BUILDDIR)/*
 ifndef VERSION
+	rm -rf /tmp/trtorch_docs
 	mkdir -p /tmp/trtorch_docs
 	mv $(DESTDIR)/v* /tmp/trtorch_docs
 endif
@@ -28,6 +30,10 @@ ifndef VERSION
 	mv /tmp/trtorch_docs/v* $(DESTDIR)
 	rm -rf /tmp/trtorch_docs
 endif
+	rm -rf $(SOURCEDIR)/_cpp_api
+	rm -rf $(SOURCEDIR)/_py_api
+	rm -rf $(SOURCEDIR)/_build
+	rm -rf $(SOURCEDIR)/_tmp
 
 html:
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)

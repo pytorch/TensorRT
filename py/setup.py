@@ -15,7 +15,7 @@ import subprocess
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
-__version__ = '0.0.1'
+__version__ = '0.0.2'
 
 def build_libtrtorch_pre_cxx11_abi(develop=True):
     cmd = ["/usr/bin/bazel", "build"]
@@ -133,7 +133,7 @@ setup(
     version=__version__,
     author='NVIDIA',
     author_email='narens@nvidia.com',
-    url='https://github.com/nvidia/trtorch',
+    url='https://nvidia.github.io/TRTorch',
     description='A compiler backend for PyTorch JIT targeting NVIDIA GPUs',
     long_description='',
     ext_modules=ext_modules,

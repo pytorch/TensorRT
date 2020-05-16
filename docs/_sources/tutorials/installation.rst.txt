@@ -3,6 +3,27 @@
 Installation
 =============
 
+Dependencies
+******************************************
+
+You need to have either PyTorch or LibTorch installed based on if you are using Python or C++
+and you must have CUDA, cuDNN and TensorRT installed.
+
+    * https://www.pytorch.org
+    * https://developer.nvidia.com/cuda
+    * https://developer.nvidia.com/cudnn
+    * https://developer.nvidia.com/tensorrt
+
+
+Python Package
+---------------
+
+You can install the python package using
+
+.. code-block:: sh
+
+    pip3 install trtorch
+
 .. _bin-dist:
 
 Binary Distribution
@@ -17,8 +38,8 @@ Compiling From Source
 
 .. _installing-deps:
 
-Installing Dependencies
-**************************
+Dependencies for Compilation
+******************************************
 
 TRTorch is built with Bazel, so begin by installing it. https://docs.bazel.build/versions/master/install.html
 
@@ -63,6 +84,12 @@ Debug build
 
     bazel build //:libtrtorch -c dbg --distdir thrid_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]
 
+Pre CXX11 ABI build
+^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: shell
+
+    bazel build //:libtrtorch --config pre_cxx11_abi -c [dbg/opt] --distdir thrid_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]
 
 A tarball with the include files and library can then be found in ``bazel-bin``
 
@@ -134,3 +161,30 @@ Debug build
 
 
 A tarball with the include files and library can then be found in ``bazel-bin``
+
+Pre CXX11 ABI build
+^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: shell
+
+    bazel build //:libtrtorch --config pre_cxx11_abi -c [dbg/opt]
+
+Building the Python package
+-----------------------------
+
+Begin by installing ``ninja``
+
+You can build the Python package using ``setup.py`` (this will also build the correct version of ``libtrtorch.so``)
+
+.. code-block:: shell
+
+    python3 setup.py [install/bdist_wheel]
+
+Debug build
+^^^^^^^^^^^^
+
+.. code-block:: shell
+
+    python3 setup.py develop [--user]
+
+This also compiles a debug build of ``libtrtorch.so``

@@ -37,6 +37,7 @@ Contributor Documentation
 --------------------------------
 * :ref:`system_overview`
 * :ref:`writing_converters`
+* :ref:`useful_links`
 
 .. toctree::
    :caption: Contributor Documentation
@@ -45,6 +46,20 @@ Contributor Documentation
 
    contributors/system_overview
    contributors/writing_converters
+   contributors/useful_links
+
+
+Python API Documenation
+------------------------
+* :ref:`trtorch_py`
+
+.. toctree::
+   :caption: Python API Documenation
+   :maxdepth: 0
+   :hidden:
+
+   py_api/trtorch
+   py_api/logging
 
 
 C++ API Documenation
@@ -56,7 +71,7 @@ C++ API Documenation
    :maxdepth: 1
    :hidden:
 
-   _api/trtorch_cpp
+   _cpp_api/trtorch_cpp
 
 
 Indices

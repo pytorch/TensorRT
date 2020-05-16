@@ -112,17 +112,58 @@ and the LeNet scripted module IR:
 
 You can see that the IR preserves the module structure we have in our python code.
 
-From here we can save either our traced or scripted module using ``torch.jit.save`` which will serialize the TorchScript code, weights and other information into a package.
-This is also where our dependency on Python ends.
+.. _ts_in_py:
+
+Working with TorchScript in Python
+-----------------------------------
+
+TorchScript Modules are run the same way you run normal PyTorch modules. You can run the forward pass using the
+``forward`` method or just calling the module ``torch_scirpt_module(in_tensor)`` The JIT compiler will compile
+and optimize the module on the fly and then returns the results.
+
+.. _compile_py:
+
+Compiling with TRTorch in Python
+---------------------------------
+
+To compile your TorchScript module with TRTorch, all you need to do is provide the module and some compiler settings
+to TRTorch and you will be returned an optimized TorchScript module to run or add into another PyTorch module. The
+only required setting is the input size or input range which is defined as a list of either list types like ``lists``, ``tuples``
+or PyTorch ``size`` objects or dictionaries of minimum, optimial and maximum sizes. You can also specify settings such as
+operating precision for the engine or target device.
 
 .. code-block:: python
 
-    torch_script_module.save("lenet.jit.pt")
+    import trtorch
+
+    ...
+    compile_settings = {
+        "input_shapes": [
+            {
+                "min": [1, 3, 224, 224],
+                "opt": [1, 3, 512, 512],
+                "max": [1, 3, 1024, 1024]
+            }, # For static size [1, 3, 224, 224]
+        ],
+        "op_precision": torch.half # Run with FP16
+    }
+
+    trt_ts_module = trtorch.compile(torch_script_module, compile_settings)
+
+    input_data = input_data.half()
+    result = trt_ts_module(input_data)
 
 .. _ts_in_cc:
 
 Working with TorchScript in C++
 --------------------------------
+
+If we are developing an application to deploy with C++, we can save either our traced or scripted module using ``torch.jit.save``
+which will serialize the TorchScript code, weights and other information into a package. This is also where our dependency on Python ends.
+
+.. code-block:: python
+
+    torch_script_module.save("lenet.jit.pt")
 
 From here we can now load our TorchScript module in C++
 
@@ -168,10 +209,10 @@ and to run on the GPU:
 
 As you can see it is pretty similar to the Python API. When you call the ``forward`` method, you invoke the PyTorch JIT compiler, which will optimize and run your TorchScript code.
 
-.. _compile:
+.. _compile_cpp:
 
-Compiling with TRTorch
------------------------
+Compiling with TRTorch in C++
+------------------------------
 We are also at the point were we can compile and optimize our module with TRTorch, but instead of in a JIT fashion we must do it ahead-of-time (AOT) i.e. before we start doing actual inference work
 since it takes a bit of time to optimize the module, it would not make sense to do this every time you run the module or even the first time you run it.
 
@@ -375,6 +416,9 @@ for example we can quickly get the output size by just running the operation in 
 
     int main() {
         ...
+
+To use this converter in Python, it is recommended to use PyTorch's `C++ / CUDA Extention <https://pytorch.org/tutorials/advanced/cpp_extension.html#custom-c-and-cuda-extensions>`_
+template to wrap your library of converters into a ``.so`` that you can load with ``ctypes.CDLL()`` in your Python application.
 
 You can find more information on all the details of writing converters in the contributors documentation (:ref:`writing_converters`).
 If you find yourself with a large library of converter implementations, do consider upstreaming them, PRs are welcome and it would be great for the community to benefit as well.

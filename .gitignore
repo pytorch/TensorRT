@@ -26,7 +26,7 @@ tests/accuracy/datasets/data/*
 *.tar.gz
 *.tgz
 docsrc/_build
-docsrc/_api
+docsrc/_cpp_api
 docsrc/_tmp
 *.so
 __pycache__
