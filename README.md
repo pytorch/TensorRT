@@ -25,6 +25,27 @@ auto results = trt_mod.forward({in_tensor});
 ...
 ```
 
+```py
+import trtorch
+
+...
+compile_settings = {
+    "input_shapes": [
+        {
+            "min": [1, 3, 224, 224],
+            "opt": [1, 3, 512, 512],
+            "max": [1, 3, 1024, 1024]
+        }, # For static size [1, 3, 224, 224]
+    ],
+    "op_precision": torch.half # Run with FP16
+}
+
+trt_ts_module = trtorch.compile(torch_script_module, compile_settings)
+
+input_data = input_data.half()
+result = trt_ts_module(input_data)
+```
+
 > Notes on running in lower precisions:
 > - Set precision with extra_info.op_precision
 > - The module should be left in FP32 before compilation (FP16 can support half tensor models)
@@ -47,7 +68,7 @@ auto results = trt_mod.forward({in_tensor});
 - cuDNN 7.6.5
 - TensorRT 7.0.0
 
-## Prebuilt Binaries
+## Prebuilt Binaries and Wheel files
 
 Releases: https://github.com/NVIDIA/TRTorch/releases
 
