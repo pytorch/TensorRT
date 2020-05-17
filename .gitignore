@@ -34,3 +34,5 @@ __pycache__
 dist
 bdist
 py/trtorch/_version.py
+py/wheelhouse
+py/.eggs
