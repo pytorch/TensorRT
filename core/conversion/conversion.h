@@ -6,14 +6,6 @@
 #include "torch/csrc/jit/ir/ir.h"
 #include "core/conversion/conversionctx/ConversionCtx.h"
 
-namespace torch {
-namespace jit {
-namespace script {
-const std::unordered_map<std::string, c10::TypePtr>& string_to_type_lut();
-}
-}
-}
-
 namespace trtorch {
 namespace core {
 namespace conversion {

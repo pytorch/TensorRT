@@ -1,5 +1,12 @@
 package(default_visibility = ["//visibility:public"])
 
+config_setting(
+    name = "use_pre_cxx11_abi",
+    values = {
+        "define": "abi=pre_cxx11_abi",
+    }
+)
+
 cc_library(
     name = "lowering",
     hdrs = [
@@ -11,10 +18,12 @@ cc_library(
         "register_const_op.cpp"
     ],
     deps = [
-        "@libtorch//:libtorch",
         "//core/lowering/passes",
         "//core/util:prelude"
-    ],
+    ] + select({
+        ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
+        "//conditions:default":  ["@libtorch//:libtorch"],
+    }),
     alwayslink = True
 )
 

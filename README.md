@@ -137,6 +137,16 @@ A tarball with the include files and library can then be found in bazel-bin
 bazel run //cpp/trtorchexec -- $(realpath <PATH TO GRAPH>) <input-size>
 ```
 
+## Compiling the Python Package
+
+To compile the python package for your local machine, just run `python3 setup.py install` in the `//py` directory.
+To build wheel files for different python versions, first build the Dockerfile in ``//py`` then run the following
+command
+```
+docker run -it -v$(pwd)/..:/workspace/TRTorch build_trtorch_wheel /bin/bash /workspace/TRTorch/py/build_whl.sh
+```
+Python compilation expects using the tarball based compilation strategy from above.
+
 ## How do I add support for a new op...
 
 ### In TRTorch?

@@ -22,7 +22,7 @@ std::vector<at::Tensor> RunCudaEngine(nvinfer1::IExecutionContext* ctx, std::pai
         auto dims = core::util::toDimsPad(inputs[i].sizes(), 1);
         auto shape = core::util::toVec(dims);
         contig_inputs.push_back(inputs[i].view(shape).contiguous());
-        LOG_DEBUG("In shape:" << shape);
+        LOG_DEBUG("In shape: " << shape);
         ctx->setBindingDimensions(i, dims);
         gpu_handles.push_back(contig_inputs.back().data_ptr());
     }
@@ -32,7 +32,7 @@ std::vector<at::Tensor> RunCudaEngine(nvinfer1::IExecutionContext* ctx, std::pai
     std::vector<at::Tensor> outputs;
     for (uint64_t o = inputs.size(); o < (io.first + io.second); o++) {
         auto out_shape = ctx->getBindingDimensions(o);
-        //LOG_DEBUG("Output: " << engine->getBindingName(o) << " out shape: " << out_shape);
+        LOG_DEBUG("Output shape: " << out_shape);
         auto dims = core::util::toVec(out_shape);
         auto type = util::toATenDType(ctx->getEngine().getBindingDataType(o));
         outputs.push_back(at::empty(dims, {at::kCUDA}).to(type).contiguous());

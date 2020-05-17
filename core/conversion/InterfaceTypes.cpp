@@ -10,10 +10,9 @@ namespace conversion {
 GraphParams get_named_params(c10::ArrayRef<torch::jit::Value*> inputs,
                              std::vector<at::Tensor> params) {
     GraphParams named_params;
-    auto type_lut = torch::jit::script::string_to_type_lut();
     auto param_it = params.begin();
     for (auto in : inputs) {
-        if (in->type() != type_lut["Tensor"]                            \
+        if (in->type() != c10::TensorType::get()                     \
             && in->isCompleteTensor() && param_it != params.end()) {
             named_params[in] = *param_it;
             ++param_it;
@@ -35,7 +34,7 @@ InputRange::InputRange(std::vector<int64_t> d) {
     min = util::toDims(d);
     max = util::toDims(d);
     input_shape = util::toDims(d);
-    
+
 }
 
 
@@ -48,14 +47,14 @@ InputRange::InputRange(std::vector<int64_t> min_shape, std::vector<int64_t> opt_
     sizes.insert(min_shape.size());
     sizes.insert(opt_shape.size());
     sizes.insert(max_shape.size());
-    
+
     if (sizes.size() != 1) {
         LOG_ERROR("Expected all input sizes have the same dimensions, but found dimensions: min(" \
                   << min_shape.size() << "), opt("
                   << opt_shape.size() << "), max("
                   << max_shape.size() << ")");
     }
-    
+
     min = util::toDimsPad(min_shape, 4);
     opt = util::toDimsPad(opt_shape, 4);
     max = util::toDimsPad(max_shape, 4);
@@ -72,9 +71,9 @@ InputRange::InputRange(std::vector<int64_t> min_shape, std::vector<int64_t> opt_
             dyn_shape.push_back(opt_shape[i]);
         }
     }
-    
+
     input_shape = util::toDimsPad(dyn_shape, 4);
-    
+
 }
 
 } // namespace conversion

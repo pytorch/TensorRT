@@ -26,21 +26,11 @@ cc_library(
     ],
     deps = [
         ":ATen",
-        ":torch_deps",
         ":c10_cuda",
-        ":caffe2"
     ],
     includes = [
         "include",
         "include/torch/csrc/api/include/"
-    ]
-)
-
-cc_library(
-    name = 'torch_deps',
-    srcs = [
-        'lib/libnvToolsExt-3965bdd0.so.1',
-        "lib/libcudart-80664282.so.10.2",
     ]
 )
 
@@ -63,17 +53,6 @@ cc_library(
     ]),
     srcs = ["lib/libc10.so"],
     strip_include_prefix = "include",
-    deps = [
-        ":c10_deps",
-        "@cuda//:cudart",
-    ]
-)
-
-cc_library(
-    name = "c10_deps",
-    srcs = [
-        "lib/libcudart-80664282.so.10.2",
-    ]
 )
 
 cc_library(
@@ -96,14 +75,4 @@ cc_library(
         'lib/libcaffe2_module_test_dynamic.so'
     ],
     strip_include_prefix = "include",
-    deps = [
-        ":caffe2_deps"
-    ]
-)
-
-cc_library(
-    name = 'caffe2_deps',
-    srcs = [
-        'lib/libnvToolsExt-3965bdd0.so.1',
-    ]
 )

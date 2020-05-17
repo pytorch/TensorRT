@@ -1,3 +1,10 @@
+config_setting(
+    name = "use_pre_cxx11_abi",
+    values = {
+        "define": "abi=pre_cxx11_abi",
+    }
+)
+
 def converter_test(name, visibility=None):
     native.cc_test(
         name = name,
@@ -6,8 +13,10 @@ def converter_test(name, visibility=None):
         deps = [
             "//tests/util",
             "//core",
-            "@libtorch//:libtorch",
             "@googletest//:gtest_main",
-        ],
+        ] + select({
+            ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
+            "//conditions:default":  ["@libtorch//:libtorch"],
+        }),
         timeout="short"
     )

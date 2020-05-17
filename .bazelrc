@@ -14,7 +14,7 @@
 # limitations under the License.
 #
 # File: DL4AGX/.bazelrc
-# Description: Default bazel settings and toolchain configuration 
+# Description: Default bazel settings and toolchain configuration
 ##########################################################################
 
 # +------------------------------------------------------------+
@@ -24,3 +24,12 @@
 build --cxxopt="-fdiagnostics-color=always"
 build --cxxopt='-std=c++14'
 #build --linkopt="-Wl,--no-as-needed"
+
+
+build:python --cxxopt="-D_GLIBCXX_USE_CXX11_ABI=0"
+build:python --linkopt="-D_GLIBCXX_USE_CXX11_ABI=0"
+build:python --define=abi=pre_cxx11_abi
+
+build:pre_cxx11_abi --cxxopt="-D_GLIBCXX_USE_CXX11_ABI=0"
+build:pre_cxx11_abi --linkopt="-D_GLIBCXX_USE_CXX11_ABI=0"
+build:pre_cxx11_abi --define=abi=pre_cxx11_abi

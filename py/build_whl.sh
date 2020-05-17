@@ -1,0 +1,36 @@
+#!/bin/bash
+
+# Example usage: docker run -it -v$(pwd)/..:/workspace/TRTorch build_trtorch_wheel /bin/bash /workspace/TRTorch/py/build_whl.sh
+
+cd /workspace/TRTorch/py
+
+export CXX=g++
+
+build_py35() {
+    /opt/python/cp35-cp35m/bin/python -m pip install -r requirements.txt
+    /opt/python/cp35-cp35m/bin/python setup.py bdist_wheel
+    #auditwheel repair --plat manylinux2014_x86_64
+}
+
+build_py36() {
+    /opt/python/cp36-cp36m/bin/python -m pip install -r requirements.txt
+    /opt/python/cp36-cp36m/bin/python setup.py bdist_wheel
+    #auditwheel repair --plat manylinux2014_x86_64
+}
+
+build_py37() {
+    /opt/python/cp37-cp37m/bin/python -m pip install -r requirements.txt
+    /opt/python/cp37-cp37m/bin/python setup.py bdist_wheel
+    #auditwheel repair --plat manylinux2014_x86_64
+}
+
+build_py38() {
+    /opt/python/cp38-cp38/bin/python -m pip install -r requirements.txt
+    /opt/python/cp38-cp38/bin/python setup.py bdist_wheel
+    #auditwheel repair --plat manylinux2014_x86_64
+}
+
+build_py35
+build_py36
+build_py37
+build_py38

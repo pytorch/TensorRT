@@ -22,7 +22,7 @@ copyright = '2020, NVIDIA Corporation'
 author = 'NVIDIA Corporation'
 
 # The full version, including alpha/beta/rc tags
-release = '0.0.1'
+release = '0.0.2'
 
 
 # -- General configuration ---------------------------------------------------
@@ -32,8 +32,14 @@ release = '0.0.1'
 # ones.
 extensions = [
     'breathe',
-    'exhale'
+    'exhale',
+    'sphinx.ext.napoleon',
+    'sphinx.ext.intersphinx',
+    'sphinx.ext.autosummary',
+    'sphinx.ext.autodoc',
 ]
+
+autosummary_generate = True
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -65,7 +71,7 @@ breathe_default_project = "TRTorch"
 # Setup the exhale extension
 exhale_args = {
     # These arguments are required
-    "containmentFolder":     "./_api",
+    "containmentFolder":     "./_cpp_api",
     "rootFileName":          "trtorch_cpp.rst",
     "rootFileTitle":         "TRTorch C++ API",
     "doxygenStripFromPath":  "..",
@@ -117,6 +123,7 @@ html_theme_options = {
     'master_doc': True,
     "version_info": {
         "master": "https://nvidia.github.io/TRTorch/",
+        "v0.0.2": "https://nvidia.github.io/TRTorch/v0.0.2/",
         "v0.0.1": "https://nvidia.github.io/TRTorch/v0.0.1/",
     }
 }

@@ -19,6 +19,7 @@ const std::unordered_set<std::string>& get_non_convertable_nodes() {
         "prim::device",
         "prim::GetAttr",
         "prim::CallMethod",
+        "prim::Drop",
         "aten:dropout",
     };
     return nonconvertable_nodes;

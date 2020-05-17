@@ -8,6 +8,7 @@ cc_binary(
     ],
     deps = [
         "@libtorch//:libtorch",
+        "@libtorch//:caffe2",
         "//cpp/api:trtorch"
     ],
 )
