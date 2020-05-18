@@ -10,6 +10,7 @@ More Information / System Architecture:
 
 ## Example Usage
 
+### C++
 ```c++
 #include "torch/script.h"
 #include "trtorch/trtorch.h"
@@ -25,6 +26,7 @@ auto results = trt_mod.forward({in_tensor});
 ...
 ```
 
+### Python
 ```py
 import trtorch
 
@@ -191,6 +193,7 @@ You can register a converter for your op using the `NodeConverterRegistry` insid
 | [**core**](core)  | Main JIT ingest, lowering, conversion and execution implementations |
 | [**cpp**](cpp)   | C++ specific components including API and example applications |
 | [**cpp/api**](cpp/api)   | C++ API for TRTorch |
+| [**py**](py)   | Python API for TRTorch |
 | [**tests**](tests) | Unit test for TRTorch |
 
 ## Contributing
