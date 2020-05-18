@@ -32,7 +32,7 @@ results = compiled_trt_model(data.half())
 ## Installation
 
 ```
-pip3 install trtorch
+python3 setup.py install
 ```
 
 ## Under the Hood
