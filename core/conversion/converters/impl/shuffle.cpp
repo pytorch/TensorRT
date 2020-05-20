@@ -45,6 +45,24 @@ static auto shuffle_registrations = RegisterNodeConversionPatterns()
 
       return true;
     }
+  }).pattern({
+    "aten::view(Tensor(a) self, int[] size) -> (Tensor(a))",
+    [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+      auto in = args[0].ITensor();
+      auto in_shape = util::toVec(in->getDimensions());
+      auto ex_tensor = torch::rand(in_shape);
+      auto new_shape = ex_tensor.view(args[1].unwrapToIntList().vec()).sizes();
+
+      auto shuffle = ctx->net->addShuffle(*in);
+      TRTORCH_CHECK(shuffle, "Unable to create shuffle layer from node: " << *n);
+      shuffle->setReshapeDimensions(util::toDims(new_shape));
+      shuffle->setName(util::node_info(n).c_str());
+
+      auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], shuffle->getOutput(0));
+      LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+
+      return true;
+    }
   });
 } // namespace
 } // namespace impl

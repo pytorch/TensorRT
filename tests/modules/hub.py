@@ -2,25 +2,72 @@ import torch
 import torchvision.models as models
 
 models = {
-          "alexnet": models.alexnet(pretrained=True),
-          "vgg16": models.vgg16(pretrained=True),
-          "squeezenet": models.squeezenet1_0(pretrained=True),
-          "densenet": models.densenet161(pretrained=True),
-          "inception_v3": models.inception_v3(pretrained=True),
+          "alexnet": {
+            "model": models.alexnet(pretrained=True),
+            "path": "both"
+          },
+          "vgg16": {
+            "model": models.vgg16(pretrained=True),
+            "path": "both"
+          },
+          "squeezenet": {
+            "model": models.squeezenet1_0(pretrained=True),
+            "path": "both"
+          },
+          "densenet": {
+            "model": models.densenet161(pretrained=True),
+            "path": "both"
+          },
+          "inception_v3": {
+            "model": models.inception_v3(pretrained=True),
+            "path": "both"
+          },
           #"googlenet": models.googlenet(pretrained=True),
-          "shufflenet": models.shufflenet_v2_x1_0(pretrained=True),
-          "mobilenet_v2": models.mobilenet_v2(pretrained=True),
-          "resnext50_32x4d": models.resnext50_32x4d(pretrained=True),
-          "wideresnet50_2": models.wide_resnet50_2(pretrained=True),
-          "mnasnet": models.mnasnet1_0(pretrained=True),
-          "resnet18": torch.hub.load('pytorch/vision:v0.5.0', 'resnet18', pretrained=True),
-          "resnet50": torch.hub.load('pytorch/vision:v0.5.0', 'resnet50', pretrained=True)}
+          "shufflenet": {
+            "model": models.shufflenet_v2_x1_0(pretrained=True),
+            "path": "both"
+          },
+          "mobilenet_v2": {
+            "model": models.mobilenet_v2(pretrained=True),
+            "path": "both"
+          },
+          "resnext50_32x4d": {
+            "model":  models.resnext50_32x4d(pretrained=True),
+            "path": "both"
+          },
+          "wideresnet50_2": {
+            "model": models.wide_resnet50_2(pretrained=True),
+            "path": "both"
+          },
+          "mnasnet": {
+            "model": models.mnasnet1_0(pretrained=True),
+            "path": "both"
+          },
+          "resnet18": {
+            "model": torch.hub.load('pytorch/vision:v0.6.0', 'resnet18', pretrained=True),
+            "path": "both"
+          },
+          "resnet50": {
+            "model":torch.hub.load('pytorch/vision:v0.6.0', 'resnet50', pretrained=True),
+            "path": "both"
+          },
+          "fcn_resnet101": {
+            "model": torch.hub.load('pytorch/vision:v0.6.0', 'fcn_resnet101', pretrained=True),
+            "path": "script"
+          },
+          "ssd": {
+                "model": torch.hub.load('NVIDIA/DeepLearningExamples:torchhub', 'nvidia_ssd', model_math="fp32"),
+                "path": "trace"
+          }
+    }
 
 for n, m in models.items():
     print("Downloading {}".format(n))
-    m = m.eval().cuda()
-    x = torch.ones((1, 3, 224, 224)).cuda()
-    trace_model = torch.jit.trace(m, x)
-    torch.jit.save(trace_model, n + '_traced.jit.pt')
-    script_model = torch.jit.script(m)
-    torch.jit.save(script_model, n + '_scripted.jit.pt')
+    m["model"] = m["model"].eval().cuda()
+    x = torch.ones((1, 3, 300, 300)).cuda()
+    if m["path"] == "both" or  m["path"] == "trace":
+        trace_model = torch.jit.trace(m["model"], [x])
+        torch.jit.save(trace_model, n + '_traced.jit.pt')
+    if m["path"] == "both" or  m["path"] == "script":
+        script_model = torch.jit.script(m["model"])
+        torch.jit.save(script_model, n + '_scripted.jit.pt')

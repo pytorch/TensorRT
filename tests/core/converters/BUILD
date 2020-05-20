@@ -1,5 +1,12 @@
 load("//tests/core/converters:converter_test.bzl", "converter_test")
 
+config_setting(
+    name = "use_pre_cxx11_abi",
+    values = {
+        "define": "abi=pre_cxx11_abi",
+    }
+)
+
 converter_test(
   name = "test_activation"
 )
