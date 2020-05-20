@@ -20,8 +20,6 @@ cc_library(
     ],
     deps = [
         "@tensorrt//:nvinfer",
-        "@libtorch//:libtorch",
-        "@libtorch//:caffe2",
         "//core/conversion",
         "//core/util:prelude",
         "//cpp/api:trtorch",
