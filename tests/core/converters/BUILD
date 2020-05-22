@@ -16,7 +16,7 @@ converter_test(
 )
 
 converter_test(
-  name = "test_conv"
+  name = "test_conv_deconv"
 )
 
 converter_test(
@@ -56,7 +56,7 @@ test_suite(
   tests = [
     ":test_activation",
     ":test_batch_norm",
-    ":test_conv",
+    ":test_conv_deconv",
     ":test_element_wise",
     ":test_linear",
     ":test_matrix_multiply",
