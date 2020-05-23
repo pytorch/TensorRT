@@ -136,6 +136,7 @@ int main(int argc, const char* argv[]) {
 
 #ifdef TRT
     auto extra_info = trtorch::ExtraInfo(dims);
+    extra_info.workspace_size = 1 << 24;
 
 #ifdef HALF
     extra_info.op_precision = at::kHalf;
