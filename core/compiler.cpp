@@ -60,8 +60,12 @@ void AddEngineToGraph(torch::jit::script::Module mod, std::shared_ptr<torch::jit
     auto engine_node = g->create(c10::Symbol::fromQualString("trt::execute_engine"), torch::jit::ArrayRef<torch::jit::Value*>(engine_inputs), num_io.second);
     g->block()->appendNode(engine_node);
 
-    for (auto o : engine_node->outputs()) {
-        g->registerOutput(o);
+    if (engine_node->outputs().size() > 1) {
+        auto return_tuple_node = g->createTuple(engine_node->outputs());
+        g->block()->appendNode(return_tuple_node);
+        g->registerOutput(return_tuple_node->outputs()[0]);
+    } else {
+        g->registerOutput(engine_node->outputs()[0]);
     }
 
     LOG_DEBUG(*g << "(AddEngineToGraph)\n");
