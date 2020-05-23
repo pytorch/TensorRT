@@ -84,6 +84,19 @@ all attributes accesses are replaced with explicit inputs of the graph
 graph are the trainable parameters used in this method. The remaining inputs
 are the true inputs to the function.
 
+Lower Tuples
+***************************************
+
+    `torch/csrc/jit/passes/lower_tuples.h <https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/lower_tuples.h>`_
+
+* ``LowerSimpleTuples``:
+
+Removes tuples where TupleConstruct and TupleUnpack are matched but leaves tuples in place across if statements, loops, and as inputs/outputs
+
+* ``LowerAllTuples``:
+
+Removes _all_ tuples and raises an error if some cannot be removed, this is used by ONNX to ensure there are not tuples before conversion, but will not work on graphs whose inputs contain tuples.
+
 Remove Dropout
 ***************************************
 

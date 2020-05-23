@@ -18,27 +18,25 @@ auto conv_registrations = RegisterNodeConversionPatterns()
             auto in = args[0].ITensor();
 
             auto w = Weights(ctx, args[1].unwrapToTensor());
-            auto stride = util::toDimsHW(args[3].unwrapToIntList());
+            auto stride = util::toDims(args[3].unwrapToIntList());
             LOG_DEBUG("stride: " << stride);
-            auto padding = util::toDimsHW(args[4].unwrapToIntList());
+            auto padding = util::toDims(args[4].unwrapToIntList());
             LOG_DEBUG("padding: " << padding);
-            auto dilation = util::toDimsHW(args[5].unwrapToIntList());
+            auto dilation = util::toDims(args[5].unwrapToIntList());
             LOG_DEBUG("dilation: " << dilation);
             bool transposed = args[6].unwrapToBool();
-            auto out_padding = util::toDimsHW(args[7].unwrapToIntList());
+            auto out_padding = util::toDims(args[7].unwrapToIntList());
             LOG_DEBUG("out_padding: " << out_padding);
             int64_t groups = args[8].unwrapToInt();
 
             nvinfer1::ILayer* new_layer;
             if (transposed) {
-                //TODO: Check deconv correctness
-                LOG_WARNING(ctx->logger, "Deconvolution converter has not be tested");
                 nvinfer1::IDeconvolutionLayer* deconv;
                 if (args[2].IValue()->isTensor()) {
                     Weights b(ctx, args[2].IValue()->toTensor());
-                    deconv = ctx->net->addDeconvolutionNd(*in, w.num_output_maps, w.kernel_shape, w.data, b.data);
+                    deconv = ctx->net->addDeconvolutionNd(*in, w.num_input_maps, w.kernel_shape, w.data, b.data);
                 } else {
-                    deconv = ctx->net->addDeconvolutionNd(*in, w.num_output_maps, w.kernel_shape, w.data, {});
+                    deconv = ctx->net->addDeconvolutionNd(*in, w.num_input_maps, w.kernel_shape, w.data, {});
                 }
 
                 TRTORCH_CHECK(deconv, "Unable to create deconvolution layer from node: " << *n);

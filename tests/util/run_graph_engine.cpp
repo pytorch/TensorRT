@@ -65,7 +65,9 @@ std::vector<at::Tensor> RunGraphEngine(std::shared_ptr<torch::jit::Graph>& g,
                                        std::vector<at::Tensor> inputs) {
     LOG_DEBUG("Running TRT version");
     auto in =  toInputRanges(inputs);
-    std::string eng = core::conversion::ConvertBlockToEngine(g->block(), in, named_params);
+    auto info = core::conversion::ConversionInfo(in);
+    info.engine_settings.workspace_size = 1 << 20;
+    std::string eng = core::conversion::ConvertBlockToEngine(g->block(), info, named_params);
     return RunEngine(eng, inputs);
 }
 
