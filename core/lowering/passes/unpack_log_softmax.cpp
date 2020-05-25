@@ -1,4 +1,3 @@
-#include "torch/csrc/jit/passes/fuse_linear.h"
 #include "torch/csrc/jit/passes/subgraph_rewrite.h"
 
 #include "core/util/prelude.h"
@@ -14,8 +13,6 @@ void UnpackLogSoftmax(std::shared_ptr<torch::jit::Graph>& graph) {
     // https://github.com/onnx/onnx-tensorrt/blob/5dca8737851118f6ab8a33ea1f7bcb7c9f06caf5/builtin_op_importers.cpp#L1593
     // Should the reshapes be added here or in the converter?
 
-    // TODO: In the future this should be removed for a deicated log_softmax converter (more efficent)
-    // But its easier to stand up a working system if the number of op converters is lower
     std::string logsoftmax_pattern = R"IR(
         graph(%input, %dim, %dtype):
             %log_softmax = aten::log_softmax(%input, %dim, %dtype)

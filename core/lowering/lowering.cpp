@@ -25,6 +25,7 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g) {
     passes::EliminateExceptionOrPassPattern(g);
     torch::jit::FuseLinear(g);
     torch::jit::LowerAllTuples(g);
+    passes::RemoveContiguous(g);
     passes::RemoveDropout(g);
     passes::FuseFlattenLinear(g);
     passes::Conv2DToConvolution(g);
