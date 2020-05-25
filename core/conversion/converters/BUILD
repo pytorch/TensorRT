@@ -15,9 +15,9 @@ cc_library(
     srcs = [
         "NodeConverterRegistry.cpp",
         "Weights.cpp",
-        "Arg.cpp",
         "impl/activation.cpp",
         "impl/batch_norm.cpp",
+        "impl/concat.cpp",
         "impl/constant.cpp",
         "impl/conv_deconv.cpp",
         "impl/element_wise.cpp",
@@ -33,6 +33,7 @@ cc_library(
     deps = [
         "@tensorrt//:nvinfer",
         "//core/util:prelude",
+        "//core/conversion/arg",
         "//core/conversion/conversionctx",
     ] + select({
         ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],

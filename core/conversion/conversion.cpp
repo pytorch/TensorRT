@@ -1,6 +1,7 @@
 #include <sstream>
 
 #include "core/util/prelude.h"
+#include "core/conversion/arg/Arg.h"
 #include "core/conversion/conversion.h"
 #include "core/conversion/converters/converters.h"
 #include "core/conversion/evaluators/evaluators.h"
@@ -44,7 +45,7 @@ c10::optional<torch::jit::IValue> EvaluateNode(ConversionCtx* ctx, const torch::
             }
         } else {
             TRTORCH_THROW_ERROR("Failed to evaluate node: " << *n                               \
-                                << "Reason: Node inputs cannot be evaluated at conversion time" \
+                                << "Reason: Node inputs cannot be evaluated at conversion time\n" \
                                 << "File a bug: https://www.github.com/NVIDIA/TRTorch/issues");
             return {};
         }
@@ -82,7 +83,7 @@ void AddLayer(ConversionCtx* ctx, const torch::jit::Node* n) {
                 node_args.push_back(&(ctx->evaluated_value_map[input]));
             } else {
                 LOG_DEBUG(ctx->logger, "Found the value is None");;
-                node_args.push_back(converters::Arg());
+                node_args.push_back(Arg());
             }
         } else {
             // Node input has not been converted yet or is a prim op
