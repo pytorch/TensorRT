@@ -3,17 +3,15 @@
 #include <string>
 #include <map>
 
-#include "torch/csrc/jit/runtime/custom_operator.h"
-#include "ATen/core/function_schema.h"
+#include "torch/csrc/jit/ir/ir.h"
 
 #include "core/util/prelude.h"
-#include "core/conversion/conversionctx/ConversionCtx.h"
 
 namespace trtorch {
 namespace core {
 namespace conversion {
 
-class Arg {
+class Var : torch::CustomClassHolder {
 public:
   enum Type {
     kITensor,
@@ -21,13 +19,13 @@ public:
     kNone
   };
 
-  Arg();
-  Arg(const torch::jit::IValue* p);
-  Arg(nvinfer1::ITensor* p);
-  Arg(const Arg& a);
-  Arg& operator=(const Arg& a);
-  Arg& operator=(const torch::jit::IValue* in);
-  Arg& operator=(nvinfer1::ITensor* in);
+  Var();
+  Var(const torch::jit::IValue* p);
+  Var(nvinfer1::ITensor* p);
+  Var(const Var& a);
+  Var& operator=(const Var& a);
+  Var& operator=(const torch::jit::IValue* in);
+  Var& operator=(nvinfer1::ITensor* in);
   const torch::jit::IValue* IValue() const;
   nvinfer1::ITensor* ITensor() const;
 
@@ -59,16 +57,16 @@ public:
   bool isIValue() const;
   bool isITensor() const;
   bool isNone() const;
-  Arg::Type type() const;
+  Var::Type type() const;
   std::string type_name() const;
 private:
-  union ArgContainer {
+  union VarContainer {
     const torch::jit::IValue* ivalue;
     nvinfer1::ITensor* tensor;
     void* none;
   };
 
-  ArgContainer ptr_;
+  VarContainer ptr_;
   Type type_;
 };
 
@@ -76,4 +74,4 @@ private:
 } // namespace core
 } // namespace trtorch
 
-#include "core/conversion/arg/Arg_inl.h"
+#include "core/conversion/var/Var_inl.h"

@@ -1,26 +1,26 @@
 #include "core/util/prelude.h"
-#include "core/conversion/arg/Arg.h"
+#include "core/conversion/var/Var.h"
 
 namespace trtorch {
 namespace core {
 namespace conversion {
 
-Arg::Arg() {
+Var::Var() {
   ptr_.none = nullptr;
   type_ = Type::kNone;
 }
 
-Arg::Arg(const torch::jit::IValue* p)
+Var::Var(const torch::jit::IValue* p)
   : type_(Type::kIValue) {
   ptr_.ivalue = p;
 }
 
-Arg::Arg(nvinfer1::ITensor* p)
+Var::Var(nvinfer1::ITensor* p)
   : type_(Type::kITensor) {
   ptr_.tensor = p;
 }
 
-Arg::Arg(const Arg& a) {
+Var::Var(const Var& a) {
   switch(a.type_) {
   case Type::kITensor:
     ptr_.tensor = a.ptr_.tensor;
@@ -37,7 +37,7 @@ Arg::Arg(const Arg& a) {
   }
 }
 
-Arg& Arg::operator=(const Arg& a) {
+Var& Var::operator=(const Var& a) {
   switch(a.type_) {
   case Type::kITensor:
     ptr_.tensor = a.ptr_.tensor;
@@ -55,23 +55,23 @@ Arg& Arg::operator=(const Arg& a) {
   return (*this);
 }
 
-Arg& Arg::operator=(const torch::jit::IValue* in) {
+Var& Var::operator=(const torch::jit::IValue* in) {
   ptr_.ivalue = in;
   type_ = Type::kIValue;
   return (*this);
 }
 
-Arg& Arg::operator=(nvinfer1::ITensor* in) {
+Var& Var::operator=(nvinfer1::ITensor* in) {
   ptr_.tensor = in;
   type_ = Type::kITensor;
   return (*this);
 }
 
-Arg::Type Arg::type() const {
+Var::Type Var::type() const {
   return type_;
 }
 
-std::string Arg::type_name() const {
+std::string Var::type_name() const {
   switch(type_) {
   case Type::kITensor:
     return "nvinfer1::ITensor";
@@ -85,8 +85,8 @@ std::string Arg::type_name() const {
   }
 }
 
-const torch::jit::IValue* Arg::IValue() const {
-  TRTORCH_CHECK(isIValue(), "Requested IValue from Arg, however arg type is " << type_name());
+const torch::jit::IValue* Var::IValue() const {
+  TRTORCH_CHECK(isIValue(), "Requested IValue from Var, however Var type is " << type_name());
   if (type_ == Type::kIValue) {
     return ptr_.ivalue;
   } else {
@@ -94,8 +94,8 @@ const torch::jit::IValue* Arg::IValue() const {
   }
 }
 
-nvinfer1::ITensor* Arg::ITensor() const {
-  TRTORCH_CHECK(isITensor(), "Requested ITensor from Arg, however arg type is " << type_name());
+nvinfer1::ITensor* Var::ITensor() const {
+  TRTORCH_CHECK(isITensor(), "Requested ITensor from Var, however Var type is " << type_name());
   if (type_ == Type::kITensor) {
     return ptr_.tensor;
   } else {
@@ -103,7 +103,7 @@ nvinfer1::ITensor* Arg::ITensor() const {
   }
 }
 
-bool Arg::isITensor() const {
+bool Var::isITensor() const {
   if (type_ == Type::kITensor) {
     return true;
   } else {
@@ -111,7 +111,7 @@ bool Arg::isITensor() const {
   }
 }
 
-bool Arg::isIValue() const {
+bool Var::isIValue() const {
   if (type_ == Type::kIValue) {
     return true;
   } else {
@@ -119,7 +119,7 @@ bool Arg::isIValue() const {
   }
 }
 
-bool Arg::isNone() const {
+bool Var::isNone() const {
   if (type_ == Type::kNone) {
     return true;
   } else {

@@ -8,18 +8,17 @@ config_setting(
 )
 
 cc_library(
-    name = "arg",
+    name = "var",
     hdrs = [
-        "Arg.h",
-        "Arg_inl.h"
+        "Var.h",
+        "Var_inl.h"
     ],
     srcs = [
-        "Arg.cpp",
+        "Var.cpp",
     ],
     deps = [
         "@tensorrt//:nvinfer",
         "//core/util:prelude",
-        "//core/conversion/conversionctx",
     ] + select({
         ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default":  ["@libtorch//:libtorch"],
@@ -33,7 +32,7 @@ pkg_tar(
     name = "include",
     package_dir = "core/conversion/arg/",
     srcs = [
-        "Arg.h",
-        "Arg_inl.h"
+        "Var.h",
+        "Var_inl.h"
     ],
 )

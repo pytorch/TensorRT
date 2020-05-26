@@ -1,21 +1,19 @@
 #pragma once
 
-//#include "core/conversion/arg/Arg.h"
-
 namespace trtorch {
 namespace core {
 namespace conversion {
 
 #define DEFINE_UNWRAP_TO(ival_type, method_variant) \
 template<> \
-inline ival_type Arg::unwrapTo<ival_type>() { \
+inline ival_type Var::unwrapTo<ival_type>() { \
   TRTORCH_CHECK(isIValue(), "Requested unwrapping of arg assuming it was an IValue, however arg type is " << type_name()); \
   auto ivalue = ptr_.ivalue; \
   TRTORCH_CHECK(ivalue->is##method_variant(), "Requested unwrapping of arg IValue assuming it was " << typeid(ival_type).name() << " however type is " << *(ptr_.ivalue->type())); \
   return ptr_.ivalue->to<ival_type>(); \
 } \
 template<> \
-inline ival_type Arg::unwrapTo(ival_type default_val) { \
+inline ival_type Var::unwrapTo(ival_type default_val) { \
   try { \
     return this->unwrapTo<ival_type>(); \
   } catch(trtorch::Error& e) { \
@@ -24,11 +22,11 @@ inline ival_type Arg::unwrapTo(ival_type default_val) { \
   } \
 } \
 \
-inline ival_type Arg::unwrapTo##method_variant(ival_type default_val) { \
+inline ival_type Var::unwrapTo##method_variant(ival_type default_val) { \
   return this->unwrapTo<ival_type>(default_val); \
 } \
 \
-inline ival_type Arg::unwrapTo##method_variant() { \
+inline ival_type Var::unwrapTo##method_variant() { \
   return this->unwrapTo<ival_type>(); \
 }
 
