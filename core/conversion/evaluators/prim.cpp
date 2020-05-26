@@ -74,8 +74,12 @@ auto prim_registrations = RegisterNodeEvaluators()
                 auto list = c10::impl::GenericList(elementType);
                 list.reserve(num_inputs);
                 for (auto in : n->inputs()) {
-                    auto x = torch::make_custom_class<TensorContainer>(reinterpret_cast<int64_t>(args.at(in).ITensor()));
-                    list.emplace_back(std::move(x));
+                    if (args.at(in).isITensor()) {
+                        auto x = torch::make_custom_class<TensorContainer>(reinterpret_cast<int64_t>(args.at(in).ITensor()));
+                        list.emplace_back(std::move(x));
+                    } else {
+                        list.emplace_back(std::move(args.at(in).unwrapToTensor()));
+                    }
                 }
                 return c10::optional<torch::jit::IValue>(std::move(torch::jit::IValue(list)));
             }
