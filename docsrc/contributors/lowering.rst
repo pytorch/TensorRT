@@ -97,6 +97,14 @@ Removes tuples where TupleConstruct and TupleUnpack are matched but leaves tuple
 
 Removes _all_ tuples and raises an error if some cannot be removed, this is used by ONNX to ensure there are not tuples before conversion, but will not work on graphs whose inputs contain tuples.
 
+Remove Contiguous
+***************************************
+
+    `trtorch/core/lowering/passes/remove_contiguous.cpp <https://github.com/nvidia/trtorch/blob/master/core/lowering/passes/remove_contiguous.cpp>`_
+
+Removes contiguous operators since we are doing TensorRT memory is already contiguous.
+
+
 Remove Dropout
 ***************************************
 
