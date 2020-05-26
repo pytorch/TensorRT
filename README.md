@@ -90,10 +90,10 @@ then you have two options.
 1. You need to download the tarball distributions of TensorRT and cuDNN from the NVIDIA website.
     - https://developer.nvidia.com/cudnn
     - https://developer.nvidia.com/tensorrt
-2. Place these files in a directory (the directories `thrid_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]` exist for this purpose)
+2. Place these files in a directory (the directories `third_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]` exist for this purpose)
 3. Compile using:
 ``` shell
-bazel build //:libtrtorch --compilation_mode opt --distdir thrid_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]
+bazel build //:libtrtorch --compilation_mode opt --distdir third_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]
 ```
 
 #### 2. Building using locally installed cuDNN & TensorRT
