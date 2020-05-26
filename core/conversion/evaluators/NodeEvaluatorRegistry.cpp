@@ -57,7 +57,7 @@ bool shouldEvalAtConversionTime(const torch::jit::Node* n) {
     return get_evaluator_registry().EvalAtConversionTime(n);
 }
 
-c10::optional<torch::jit::IValue> EvalNode(const torch::jit::Node* n, const kwargs& args) {
+c10::optional<torch::jit::IValue> EvalNode(const torch::jit::Node* n, kwargs& args) {
     auto evaluator = get_evaluator_registry().GetEvaluator(n->kind());
     return evaluator(n, args);
 }

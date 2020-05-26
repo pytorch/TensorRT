@@ -7,7 +7,7 @@
 #include "ATen/core/function_schema.h"
 
 #include "core/util/prelude.h"
-#include "core/conversion/arg/Arg.h"
+#include "core/conversion/var/Var.h"
 #include "core/conversion/conversionctx/ConversionCtx.h"
 
 namespace trtorch {
@@ -15,7 +15,7 @@ namespace core {
 namespace conversion {
 namespace converters {
 
-typedef std::vector<Arg> args;
+typedef std::vector<Var> args;
 typedef std::function<bool(ConversionCtx*, const torch::jit::Node*, args&)> OpConverter;
 struct ConversionPattern {
     std::string signature;

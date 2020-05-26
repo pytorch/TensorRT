@@ -8,32 +8,29 @@ config_setting(
 )
 
 cc_library(
-    name = "conversion",
+    name = "tensorcontainer",
     hdrs = [
-        "conversion.h",
+        "TensorContainer.h",
     ],
     srcs = [
-        "conversion.cpp",
-        "conversion_blacklist.cpp",
-        "InterfaceTypes.cpp"
+        "TensorContainer.cpp",
     ],
     deps = [
         "@tensorrt//:nvinfer",
-        "//core/conversion/var",
-        "//core/conversion/conversionctx",
-        "//core/conversion/converters",
-        "//core/conversion/evaluators",
-        "//core/util:prelude"
+        "//core/util:prelude",
     ] + select({
         ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default":  ["@libtorch//:libtorch"],
     }),
+    alwayslink = True,
 )
 
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 
 pkg_tar(
     name = "include",
-    package_dir = "core/conversion/",
-    srcs = ["conversion.h"],
+    package_dir = "core/conversion/tensorcontainer/",
+    srcs = [
+        "TensorContainer.h",
+    ],
 )

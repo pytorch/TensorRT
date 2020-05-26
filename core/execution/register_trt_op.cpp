@@ -22,7 +22,7 @@ std::vector<at::Tensor> RunCudaEngine(nvinfer1::IExecutionContext* ctx, std::pai
         auto dims = core::util::toDimsPad(inputs[i].sizes(), 1);
         auto shape = core::util::toVec(dims);
         contig_inputs.push_back(inputs[i].view(shape).contiguous());
-        LOG_DEBUG("In shape: " << shape);
+        LOG_DEBUG("Input shape: " << dims);
         ctx->setBindingDimensions(i, dims);
         gpu_handles.push_back(contig_inputs.back().data_ptr());
     }
