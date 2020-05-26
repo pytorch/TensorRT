@@ -7,9 +7,7 @@ namespace {
 
 static auto tensor_container =
   torch::class_<TensorContainer>("_eval_ivalue_types", "TensorContainer")
-      .def(torch::init<int64_t>())
-      .def("clone", &TensorContainer::clone);
-
+      .def(torch::init<>());
 } // namespace
 } // conversion
 } // core

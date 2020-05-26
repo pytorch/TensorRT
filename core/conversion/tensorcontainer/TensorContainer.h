@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "NvInfer.h"
 #include "torch/custom_class.h"
 
@@ -8,15 +10,13 @@ namespace core {
 namespace conversion {
 
 struct TensorContainer : torch::CustomClassHolder {
-  int64_t tensor_;
-  TensorContainer(int64_t init) : tensor_(init) {}
+  nvinfer1::ITensor* tensor_;
+  TensorContainer(){}
 
-  c10::intrusive_ptr<TensorContainer> clone() const {
-    return c10::make_intrusive<TensorContainer>(tensor_);
-  }
+  void hold_tensor(nvinfer1::ITensor* tensor) {tensor_ = tensor;}
 
   nvinfer1::ITensor* tensor() {
-    return reinterpret_cast<nvinfer1::ITensor*>(tensor_);
+    return tensor_;
   }
 };
 
