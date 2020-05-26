@@ -1,6 +1,7 @@
 #include <sstream>
 
 #include "core/util/prelude.h"
+#include "core/conversion/var/Var.h"
 #include "core/conversion/conversion.h"
 #include "core/conversion/converters/converters.h"
 #include "core/conversion/evaluators/evaluators.h"
@@ -34,6 +35,8 @@ c10::optional<torch::jit::IValue> EvaluateNode(ConversionCtx* ctx, const torch::
         }
         if (ctx->evaluated_value_map.find(eval_in) != ctx->evaluated_value_map.end()) {
             eval_args[eval_in] = &(ctx->evaluated_value_map[eval_in]);
+        } else if (ctx->value_tensor_map.find(eval_in) != ctx->value_tensor_map.end()) {
+            eval_args[eval_in] = ctx->value_tensor_map[eval_in];
         } else if (evaluators::shouldEvalAtConversionTime(eval_in->node())) {
             auto result = EvaluateNode(ctx, eval_in->node(), level++, limit);
             if (result) {
@@ -44,7 +47,7 @@ c10::optional<torch::jit::IValue> EvaluateNode(ConversionCtx* ctx, const torch::
             }
         } else {
             TRTORCH_THROW_ERROR("Failed to evaluate node: " << *n                               \
-                                << "Reason: Node inputs cannot be evaluated at conversion time" \
+                                << "Reason: Node inputs cannot be evaluated at conversion time\n" \
                                 << "File a bug: https://www.github.com/NVIDIA/TRTorch/issues");
             return {};
         }
@@ -81,8 +84,8 @@ void AddLayer(ConversionCtx* ctx, const torch::jit::Node* n) {
                 ctx->AssociateValueAndIValue(input, eval.value());
                 node_args.push_back(&(ctx->evaluated_value_map[input]));
             } else {
-                LOG_DEBUG(ctx->logger, "Found the value is None");;
-                node_args.push_back(converters::Arg());
+                LOG_DEBUG(ctx->logger, "Found the value is None");
+                node_args.push_back(Var());
             }
         } else {
             // Node input has not been converted yet or is a prim op

@@ -16,6 +16,7 @@ cc_library(
         "conv2d_to_convolution.cpp",
         "exception_elimination.cpp",
         "fuse_flatten_linear.cpp",
+        "remove_contiguous.cpp",
         "remove_dropout.cpp",
         "unpack_addmm.cpp",
         "unpack_batch_norm.cpp",

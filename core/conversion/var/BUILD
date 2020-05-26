@@ -8,30 +8,31 @@ config_setting(
 )
 
 cc_library(
-    name = "lowering",
+    name = "var",
     hdrs = [
-        "lowering.h",
+        "Var.h",
+        "Var_inl.h"
     ],
     srcs = [
-        "lowering.cpp",
-        "drop_unused_nodes.cpp",
-        "register_trt_placeholder_ops.cpp"
+        "Var.cpp",
     ],
     deps = [
-        "//core/lowering/passes",
-        "//core/util:prelude"
+        "@tensorrt//:nvinfer",
+        "//core/util:prelude",
     ] + select({
         ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default":  ["@libtorch//:libtorch"],
     }),
-    alwayslink = True
+    alwayslink = True,
 )
 
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 
 pkg_tar(
     name = "include",
-    package_dir = "core/lowering/",
-    srcs = ["lowering.h"],
+    package_dir = "core/conversion/arg/",
+    srcs = [
+        "Var.h",
+        "Var_inl.h"
+    ],
 )
-

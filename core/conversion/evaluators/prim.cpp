@@ -4,6 +4,7 @@
 #include "ATen/core/ivalue.h"
 #include "ATen/core/List.h"
 #include "ATen/core/stack.h"
+#include "c10/util/intrusive_ptr.h"
 
 #include "core/conversion/evaluators/evaluators.h"
 
@@ -16,7 +17,7 @@ namespace {
 auto prim_registrations = RegisterNodeEvaluators()
     .evaluator({
         torch::jit::prim::Constant,
-        [](const torch::jit::Node* n, const kwargs& args) -> c10::optional<torch::jit::IValue> {
+        [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
             if (n->output()->type()->kind() == at::FunctionType::Kind) {
                 return {};
             }
@@ -24,43 +25,63 @@ auto prim_registrations = RegisterNodeEvaluators()
         }
     }).evaluator({
         torch::jit::prim::ListConstruct,
-        [](const torch::jit::Node* n, const kwargs& args) -> c10::optional<torch::jit::IValue> {
+        [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
             const auto num_inputs = n->inputs().size();
-            c10::ListTypePtr lt = n->output()->type()->expect<c10::ListType>();
-            if (torch::jit::IntType::get() == lt->getElementType()) {
-                c10::List<int64_t> list;
-                list.reserve(num_inputs);
-                for (auto in : n->inputs()) {
-                    list.emplace_back(std::move(args.at(in)->to<int64_t>()));
+            if (constTypesOnly(args)) {
+                c10::ListTypePtr lt = n->output()->type()->expect<c10::ListType>();
+                if (torch::jit::IntType::get() == lt->getElementType()) {
+                    c10::List<int64_t> list;
+                    list.reserve(num_inputs);
+                    for (auto in : n->inputs()) {
+                        list.emplace_back(std::move(args.at(in).unwrapToInt()));
+                    }
+                    return c10::optional<torch::jit::IValue>(std::move(torch::jit::IValue(list)));
+                } else if (torch::jit::FloatType::get() == lt->getElementType()) {
+                    c10::List<double> list;
+                    list.reserve(num_inputs);
+                    for (auto in : n->inputs()) {
+                        list.emplace_back(std::move(args.at(in).unwrapToDouble()));
+                    }
+                    return c10::optional<torch::jit::IValue>(std::move(torch::jit::IValue(list)));
+                } else if (lt->getElementType() == torch::jit::BoolType::get()) {
+                    c10::List<bool> list;
+                    list.reserve(num_inputs);
+                    for (auto in : n->inputs()) {
+                        list.emplace_back(std::move(args.at(in).unwrapToBool()));
+                    }
+                    return c10::optional<torch::jit::IValue>(std::move(torch::jit::IValue(list)));
+                } else if (lt->getElementType()->isSubtypeOf(torch::jit::TensorType::get())) {
+                    c10::List<at::Tensor> list;
+                    list.reserve(num_inputs);
+                    for (auto in : n->inputs()) {
+                        if (args.at(in).isIValue()) {
+                            list.emplace_back(std::move(args.at(in).unwrapToTensor()));
+                        }
+                    }
+                    return c10::optional<torch::jit::IValue>(std::move(torch::jit::IValue(list)));
+                } else {
+                    c10::TypePtr elementType = lt->getElementType();
+                    auto list = c10::impl::GenericList(elementType);
+                    list.reserve(num_inputs);
+                    for (auto in : n->inputs()) {
+                        list.emplace_back(std::move(*(args.at(in).IValue())));
+                    }
+                    return c10::optional<torch::jit::IValue>(std::move(torch::jit::IValue(list)));
                 }
-                return c10::optional<torch::jit::IValue>(std::move(torch::jit::IValue(list)));
-            } else if (torch::jit::FloatType::get() == lt->getElementType()) {
-                c10::List<double> list;
-                list.reserve(num_inputs);
-                for (auto in : n->inputs()) {
-                    list.emplace_back(std::move(args.at(in)->to<double>()));
-                }
-                return c10::optional<torch::jit::IValue>(std::move(torch::jit::IValue(list)));
-            } else if (lt->getElementType() == torch::jit::BoolType::get()) {
-                c10::List<bool> list;
-                list.reserve(num_inputs);
-                for (auto in : n->inputs()) {
-                    list.emplace_back(std::move(args.at(in)->to<bool>()));
-                }
-                return c10::optional<torch::jit::IValue>(std::move(torch::jit::IValue(list)));
-            } else if (lt->getElementType()->isSubtypeOf(torch::jit::TensorType::get())) {
-                c10::List<at::Tensor> list;
-                list.reserve(num_inputs);
-                for (auto in : n->inputs()) {
-                    list.emplace_back(std::move(args.at(in)->toTensor()));
-                }
-                return c10::optional<torch::jit::IValue>(std::move(torch::jit::IValue(list)));
             } else {
+                c10::ListTypePtr lt = n->output()->type()->expect<c10::ListType>();
                 c10::TypePtr elementType = lt->getElementType();
                 auto list = c10::impl::GenericList(elementType);
                 list.reserve(num_inputs);
                 for (auto in : n->inputs()) {
-                    list.emplace_back(std::move(*(args.at(in))));
+                    if (args.at(in).isITensor()) {
+                        auto tensor_holder = TensorContainer();
+                        tensor_holder.hold_tensor(args.at(in).ITensor());
+                        auto ival = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
+                        list.emplace_back(std::move(ival));
+                    } else {
+                        list.emplace_back(std::move(args.at(in).unwrapToTensor()));
+                    }
                 }
                 return c10::optional<torch::jit::IValue>(std::move(torch::jit::IValue(list)));
             }

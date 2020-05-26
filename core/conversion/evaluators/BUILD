@@ -18,6 +18,8 @@ cc_library(
     ],
     deps = [
         "//core/util:prelude",
+        "//core/conversion/var",
+        "//core/conversion/tensorcontainer",
     ] + select({
         ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default":  ["@libtorch//:libtorch"],

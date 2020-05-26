@@ -101,7 +101,10 @@ It can be expected that inputs (meaning the parameters that would be passed into
 function of a module in PyTorch) will be ITensors but the Arg class also has mechanisms to inspect arguments safely
 before unwrapping if you are unsure. Args also have deep unwrap methods that let you get straight to the
 underlying data in an IValue if you know it's safe. You can also pass in a fallback value if there is a
-chance the IValue is None.
+chance the IValue is None. IValues have been extended to be able to hold a wrapper around ITensors only in the case of TensorLists.
+You can get an ITensor from an IValue by a pattern similar to this: ``ivalue.toCustomClass<TensorContainer>()->tensor()``.
+You can tell if an IValue contains a Tensor or an ITensor by using ``ivalue.isTensor()`` or ``ivalue.isCustomClass()``.
+
 
 Weights
 --------------

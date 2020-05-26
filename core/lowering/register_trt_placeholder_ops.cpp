@@ -7,15 +7,17 @@ c10::AliasAnalysisKind aliasAnalysisFromSchema() {
   return c10::AliasAnalysisKind::FROM_SCHEMA;
 }
 
-/// Op marks a Tensor to be conveted from an Torch Tensor
-/// to a TRT constant Tensor
-RegisterOperators trt_const_op_reg({
+RegisterOperators trt_placeholder_ops_reg({
+  /// Op marks a Tensor to be conveted from an Torch Tensor
+  /// to a TRT constant Tensor
   Operator(
     "trt::const(Tensor val) -> Tensor",
     [](Stack& stack) {
       return 0; //noop
     },
-    aliasAnalysisFromSchema())});
+    aliasAnalysisFromSchema()),
+});
+
 
 } // namespace jit
 } // namespace torch

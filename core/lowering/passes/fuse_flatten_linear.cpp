@@ -1,4 +1,3 @@
-#include "torch/csrc/jit/passes/fuse_linear.h"
 #include "torch/csrc/jit/passes/subgraph_rewrite.h"
 
 #include "core/util/prelude.h"
