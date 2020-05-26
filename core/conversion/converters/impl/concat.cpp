@@ -17,7 +17,6 @@ auto cat_registrations = RegisterNodeConversionPatterns()
 
             std::vector<nvinfer1::ITensor*> tensors;
             for (auto t : ts) {
-                std::cout << t << std::endl;
                 if (t.isTensor()) {
                     auto torch_tensor = t.toTensor();
                     auto t_weights = Weights(ctx, torch_tensor);
