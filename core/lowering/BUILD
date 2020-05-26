@@ -15,7 +15,7 @@ cc_library(
     srcs = [
         "lowering.cpp",
         "drop_unused_nodes.cpp",
-        "register_const_op.cpp"
+        "register_trt_placeholder_ops.cpp"
     ],
     deps = [
         "//core/lowering/passes",
