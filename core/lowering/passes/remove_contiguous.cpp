@@ -16,7 +16,7 @@ void RemoveContiguous(std::shared_ptr<torch::jit::Graph>& graph) {
         graph(%input, %1):
             return (%input))IR";
 
-    // replace matmul + add pattern to linear
+    // remove contiguous
     torch::jit::SubgraphRewriter remove_contiguous;
     remove_contiguous.RegisterRewritePattern(
         contiguous_pattern, no_contiguous_pattern);
