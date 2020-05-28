@@ -4,9 +4,9 @@ cc_binary(
     name = "ptq",
     srcs = [
         "main.cpp",
-        "timer.h"
     ],
     deps = [
+        "//cpp/ptq/benchmark",
         "//cpp/ptq/datasets:cifar10",
         "@libtorch//:libtorch",
         "@libtorch//:caffe2",

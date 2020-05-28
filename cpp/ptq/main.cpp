@@ -5,31 +5,34 @@
 #include "NvInfer.h"
 
 #include "datasets/cifar10.h"
-#include "timer.h"
+#include "benchmark/benchmark.h"
 
 #include <iostream>
 #include <sstream>
 #include <memory>
 #include <sys/stat.h>
 
-int main(int argc, const char* argv[]) {
-    if (argc < 3) {
-        std::cerr << "usage: ptq <path-to-module> <path-to-cifar10>\n";
-        return -1;
+namespace F = torch::nn::functional;
+
+// Actual PTQ application code
+struct Resize : public torch::data::transforms::TensorTransform<torch::Tensor> {
+    Resize(std::vector<int64_t> new_size)
+        : new_size_(new_size) {}
+
+    torch::Tensor operator()(torch::Tensor input) {
+        input = input.unsqueeze(0);
+        auto upsampled = F::interpolate(input, F::InterpolateFuncOptions()
+                                                        .size(new_size_)
+                                                        .align_corners(false)
+                                                        .mode(torch::kBilinear));
+        return upsampled.squeeze(0);
     }
 
-    torch::jit::Module mod;
-    try {
-         /// Deserialize the ScriptModule from a file using torch::jit::load().
-         mod = torch::jit::load(argv[1]);
-    }
-    catch (const c10::Error& e) {
-         std::cerr << "error loading the model\n";
-         return -1;
-    }
 
-    /// Create the calibration dataset
-    const std::string data_dir = std::string(argv[2]);
+    std::vector<int64_t> new_size_;
+};
+
+torch::jit::Module compile_int8_model(const std::string& data_dir, torch::jit::Module& mod) {
     auto calibration_dataset = datasets::CIFAR10(data_dir, datasets::CIFAR10::Mode::kTest)
                                     .use_subset(320)
                                     .map(torch::data::transforms::Normalize<>({0.4914, 0.4822, 0.4465},
@@ -58,14 +61,49 @@ int main(int argc, const char* argv[]) {
 
     mod.eval();
 
+#ifdef SAVE_ENGINE
+    std::cout << "Compiling graph to save as TRT engine (/tmp/engine_converted_from_jit.trt)" << std::endl;
+    auto engine = trtorch::ConvertGraphToTRTEngine(mod, "forward", extra_info);
+    std::ofstream out("/tmp/engine_converted_from_jit.trt");
+    out << engine;
+    out.close();
+#endif
+
+    std::cout << "Compiling and quantizing module" << std::endl;
+    auto trt_mod = trtorch::CompileGraph(mod, extra_info);
+    return std::move(trt_mod);
+}
+
+int main(int argc, const char* argv[]) {
+    at::globalContext().setBenchmarkCuDNN(true);
+
+    if (argc < 3) {
+        std::cerr << "usage: ptq <path-to-module> <path-to-cifar10>\n";
+        return -1;
+    }
+
+    torch::jit::Module mod;
+    try {
+         /// Deserialize the ScriptModule from a file using torch::jit::load().
+         mod = torch::jit::load(argv[1]);
+    }
+    catch (const c10::Error& e) {
+         std::cerr << "error loading the model\n";
+         return -1;
+    }
+
+    /// Create the calibration dataset
+    const std::string data_dir = std::string(argv[2]);
+    auto trt_mod = compile_int8_model(data_dir, mod);
+
     /// Dataloader moved into calibrator so need another for inference
     auto eval_dataset = datasets::CIFAR10(data_dir, datasets::CIFAR10::Mode::kTest)
                                     .map(torch::data::transforms::Normalize<>({0.4914, 0.4822, 0.4465},
-                                                                              {0.2023, 0.1994, 0.2010}))
+                                                                               {0.2023, 0.1994, 0.2010}))
                                     .map(torch::data::transforms::Stack<>());
-    auto eval_dataloader = torch::data::make_data_loader(std::move(eval_dataset), torch::data::DataLoaderOptions()
-                                                                                                    .batch_size(32)
-                                                                                                    .workers(2));
+    auto eval_dataloader = torch::data::make_data_loader(std::move(eval_dataset),
+                                                         torch::data::DataLoaderOptions().batch_size(32)
+                                                                                         .workers(2));
 
     /// Check the FP32 accuracy in JIT
     float correct = 0.0, total = 0.0;
@@ -80,10 +118,6 @@ int main(int argc, const char* argv[]) {
         correct += torch::sum(torch::eq(predictions, targets)).item().toFloat();
     }
     std::cout << "Accuracy of JIT model on test set: " << 100 * (correct / total) << "%" << std::endl;
-
-    /// Compile Graph
-    std::cout << "Compiling and quantizing module" << std::endl;
-    auto trt_mod = trtorch::CompileGraph(mod, extra_info);
 
     /// Check the INT8 accuracy in TRT
     correct = 0.0;
@@ -116,19 +150,13 @@ int main(int argc, const char* argv[]) {
     std::cout << "Accuracy of quantized model on test set: " << 100 * (correct / total) << "%" << std::endl;
 
     /// Time execution in JIT-FP32 and TRT-INT8
-    auto execution_timer = timers::PreciseCPUTimer();
-    auto images = (*(*eval_dataloader).begin()).data.to(torch::kCUDA);
+    std::vector<std::vector<int64_t>> dims = {{32, 3, 32, 32}};
 
-    execution_timer.start();
-    mod.forward({images});
-    execution_timer.stop();
-    std::cout << "Latency of JIT model FP32 (Batch Size 32): " << execution_timer.milliseconds() << "ms" << std::endl;
+    auto jit_runtimes = benchmark_module(mod, dims[0]);
+    print_avg_std_dev("JIT model FP32", jit_runtimes, dims[0][0]);
 
-    execution_timer.reset();
+    auto trt_runtimes = benchmark_module(trt_mod, dims[0]);
+    print_avg_std_dev("TRT quantized model", trt_runtimes, dims[0][0]);
 
-    execution_timer.start();
-    trt_mod.forward({images});
-    execution_timer.stop();
 
-    std::cout << "Latency of quantized model (Batch Size 32): " << execution_timer.milliseconds() << "ms" << std::endl;
 }

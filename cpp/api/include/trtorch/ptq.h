@@ -6,6 +6,8 @@
 #include <iostream>
 #include <sstream>
 
+#include "trtorch/logging.h"
+
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
 namespace nvinfer1 {
 class IInt8Calibrator;
@@ -13,9 +15,12 @@ class IInt8EntropyCalibrator2;
 }
 
 namespace torch {
-namespace data {
-template<typename Example>
-class Iterator;
+class Tensor;
+}
+
+namespace trtorch {
+namespace ptq {
+bool get_batch_impl(void* bindings[], const char* names[], int nbBindings, torch::Tensor& data);
 }
 }
 #endif //DOXYGEN_SHOULD_SKIP_THIS
@@ -45,7 +50,12 @@ public:
      * @param use_cache : bool - Whether to use the cache (if it exists)
      */
     Int8Calibrator(DataLoaderUniquePtr dataloader, const std::string& cache_file_path, bool use_cache)
-      : dataloader_(dataloader.get()), it_(dataloader_->end()), cache_file_path_(cache_file_path), use_cache_(use_cache) {}
+      : dataloader_(dataloader.get()), cache_file_path_(cache_file_path), use_cache_(use_cache) {
+          for (auto batch : *dataloader_) {
+            batched_data_.push_back(batch.data);
+          }
+          it_ = batched_data_.begin();
+      }
 
     /**
      * @brief Get the Batch Size for the next batch (always 1 due to issues with TRT and explicit batch)
@@ -70,26 +80,15 @@ public:
      * @return false - There is not a new batch for the calibrator to consume
      */
     bool getBatch(void* bindings[], const char* names[], int nbBindings) override {
-        // HACK: doesnt seem like the first try in the initializer list works
-        if (! it_created_) {
-            it_ = dataloader_->begin();
-            it_created_ = true;
-        }
-
-        if (it_ == dataloader_->end()) {
+        if (it_ != batched_data_.end()) {
+            auto status = get_batch_impl(bindings, names, nbBindings, *it_);
+            it_ = ++it_;
+            return status;
+        } else {
+            // Reset iterator if incase calibrator is going to be used again
+            it_ = batched_data_.begin();
             return false;
         }
-
-        auto batch = *it_;
-
-        for (int i = 0; i < nbBindings; i++) {
-            auto data = batch.data;
-            data = data.to(at::kCUDA).contiguous();
-            bindings[i] = data.data_ptr();
-        }
-
-        it_ = ++it_;
-        return true;
     }
 
     /**
@@ -151,8 +150,6 @@ public:
 private:
     /// Pointer to the dataloader
     DataLoader* dataloader_;
-    /// Iterator used to traverse the dataloader
-    torch::data::Iterator<Batch> it_;
     /// Path to cache file
     const std::string& cache_file_path_;
     /// Size of cache
@@ -161,10 +158,11 @@ private:
     bool use_cache_;
     /// Cache data
     std::vector<char> cache_;
-    /// If the iterator has been created, DataLoaders can only have 1 live iterator,
-    /// due to some issues this cannot be created at construction, so it is set in the first
-    /// batch, controlled by this flag
-    bool it_created_ = false;
+    /// Batched Data
+    std::vector<torch::Tensor> batched_data_;
+    /// Iterator to move through dataset
+    std::vector<torch::Tensor>::iterator it_;
+
 };
 
 /**
