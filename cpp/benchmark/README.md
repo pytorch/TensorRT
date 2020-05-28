@@ -1,6 +1,6 @@
 # Benchmarking
 
-This is a quick benchmarking application for TRTorch. It lets you run supported TorchScript modules both in JIT and TRT and returns the average runtime and throughput. 
+This is a quick benchmarking application for TRTorch. It lets you run supported TorchScript modules both in JIT and TRT and returns the average runtime and throughput.
 
 ## Compilation / Usage
 
@@ -20,12 +20,14 @@ bazel run //cpp/benchmark  --cxxopt="-DNDEBUG" --cxxopt="-DJIT" --cxxopt="-DTRT"
 
 ### Options
 
-You can run a module with JIT or TRT via TRTorch in either FP32 or FP16. These options are controlled by preprocessor directives. 
+You can run a module with JIT or TRT via TRTorch in either FP32 or FP16. These options are controlled by preprocessor directives.
 
 - To enable JIT profiling, add the argument `--cxxopt="-DJIT"`
 
 - To enable TRT profiling, add the argument `--cxxopt="-DTRT"`
 
 - To enable FP16 execution, add the argument `--cxxopt="-DHALF"`
+
+- To also save the TRT engine, add the argument `--cxxopt="-DSAVE_ENGINE"`
 
 > It's suggested to also define `--cxxopt="-DNDEBUG"` to supress debug information
