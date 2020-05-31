@@ -104,18 +104,17 @@ public:
             std::stringstream ss;
             ss << "Reading Calibration Cache from " << cache_file_path_;
             logging::log(logging::Level::kINFO, ss.str());
+
             cache_.clear();
-            std::ifstream cache_file(cache_file_path_, std::ios::binary);
-            cache_file >> std::noskipws;
-            if (cache_file.good()) {
-                std::copy(std::istream_iterator<char>(cache_file),
-                            std::istream_iterator<char>(),
-                            std::back_inserter(cache_));
-                ss << "Cache read";
-                logging::log(logging::Level::kDEBUG, ss.str());
+            std::ifstream input(cache_file_path_, std::ios::binary);
+            input >> std::noskipws;
+            if (input.good()) {
+                std::copy(std::istream_iterator<char>(input), std::istream_iterator<char>(),
+                    std::back_inserter(cache_));
+                logging::log(logging::Level::kDEBUG, "Cache read");
             }
-            cache_size_ = cache_.size();
-            return cache_size_ ? cache_.data() : nullptr;
+            length = cache_.size();
+            return length ? cache_.data() : nullptr;
         }
         return nullptr;
     }
@@ -220,23 +219,17 @@ public:
         std::stringstream ss;
         ss << "Reading Calibration Cache from " << cache_file_path_;
         logging::log(logging::Level::kINFO, ss.str());
+
         cache_.clear();
-        std::ifstream cache_file;
-        cache_file.open(cache_file_path_, std::ios::in | std::ios::binary);
-        cache_file.unsetf(std::ios::skipws);
-        cache_file.seekg(0, std::ios::beg);
-        cache_.reserve(cache_file.tellg());
-        cache_file.seekg(0, std::ios::beg);
-        if (cache_file.good()) {
-            std::cout << "Trying to read cache" << std::endl;
-            std::copy(std::istreambuf_iterator<char>(cache_file),
-                        std::istreambuf_iterator<char>(),
-                        std::back_inserter(cache_));
-            ss << "Cache read";
-            logging::log(logging::Level::kDEBUG, ss.str());
+        std::ifstream input(cache_file_path_, std::ios::binary);
+        input >> std::noskipws;
+        if (input.good()) {
+            std::copy(std::istream_iterator<char>(input), std::istream_iterator<char>(),
+                std::back_inserter(cache_));
+            logging::log(logging::Level::kDEBUG, "Cache read");
         }
-        cache_size_ = cache_.size();
-        return cache_size_ ? cache_.data() : nullptr;
+        length = cache_.size();
+        return length ? cache_.data() : nullptr;
     }
 
 
