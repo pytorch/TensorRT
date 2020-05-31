@@ -54,27 +54,19 @@ c10::AliasAnalysisKind aliasAnalysisFromSchema() {
 // Switched to a global operator because op implementations need to be non-capturing lambdas in PYT 1.5.0+
 torch::jit::RegisterOperators jit_registry({
     torch::jit::Operator(
-        "trt::execute_engine(int id, ...) -> ...",
+        "trt::execute_engine(Tensor[] inputs, __torch__.torch.classes.tensorrt.Engine engine) -> Tensor[]",
         [](torch::jit::Stack& stack) -> int {
-            size_t num_inputs = torch::jit::pop(stack).toInt();
             // Verify calling convention (right to left or left to right)
-            std::vector<at::Tensor> inputs;
-            for (uint64_t i = 0; i < num_inputs - 1; i++) {
-                at::Tensor in;
-                torch::jit::pop(stack, in);
-                inputs.insert(inputs.begin(), std::move(in));
-            }
+            auto engine = torch::jit::pop(stack).toCustomClass<TRTEngine>();
+            LOG_DEBUG("Attempting to run engine (ID: " << std::hex << engine->name << ")");
 
-            int64_t id = torch::jit::pop(stack).toInt();
-            LOG_DEBUG("Attempting to run engine (ID: " << std::hex << id << ")");
-            auto io = GetEngineIO(id);
-            auto num_out = io.second;
+            auto inputs = torch::jit::pop(stack).toTensorVector();
 
-            auto ctx = GetExecCtx(id);
+            auto io = engine->num_io;
+
+            auto ctx = engine->exec_ctx;
             auto outputs = RunCudaEngine(ctx, io, inputs);
-            for (uint64_t o = 0; o < num_out; o++) {
-                torch::jit::push(stack, std::move(outputs[o]));
-            }
+            torch::jit::push(stack, std::move(outputs));
             return 0;
         },
         aliasAnalysisFromSchema())
