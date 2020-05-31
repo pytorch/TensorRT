@@ -8,7 +8,7 @@ namespace conversion {
 namespace converters {
 namespace impl {
 namespace {
-auto cat_registrations = RegisterNodeConversionPatterns()
+auto cat_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
     .pattern({
         "aten::cat(Tensor[] tensors, int dim=0) -> Tensor",
         [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {

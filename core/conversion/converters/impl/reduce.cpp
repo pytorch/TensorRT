@@ -11,7 +11,7 @@ namespace {
 
 
 
-auto reduce_registrations = RegisterNodeConversionPatterns()
+auto reduce_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
     .pattern({
         "aten::mean(Tensor self, *, ScalarType? dtype=None) -> (Tensor)",
         [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {

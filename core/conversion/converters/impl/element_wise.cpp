@@ -68,7 +68,7 @@ nvinfer1::ILayer* add_elementwise(ConversionCtx* ctx, nvinfer1::ElementWiseOpera
 
 }
 
-auto element_wise_registrations = RegisterNodeConversionPatterns()
+auto element_wise_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
      .pattern({
             "aten::add.Tensor(Tensor self, Tensor other, Scalar alpha=1) -> Tensor",
             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {

@@ -8,7 +8,7 @@ namespace converters {
 namespace impl {
 namespace {
 
-auto linear_registrations = RegisterNodeConversionPatterns()
+auto linear_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
     .pattern({
         "aten::linear(Tensor input, Tensor weight, Tensor? bias = None) -> (Tensor)",
         [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
