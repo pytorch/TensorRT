@@ -56,6 +56,31 @@ Freeze Module
 
 Freeze attributes and inline constants and modules. Propogates constants in the graph.
 
+Fuse AddMM Branches
+***************************************
+
+    `trtorch/core/lowering/passes/fuse_addmm_branches.cpp <https://github.com/nvidia/trtorch/blob/master/core/lowering/passes/fuse_addmm_branches.cpp>`_
+
+A common pattern in scripted modules is tensors of different dimensions use different constructions for implementing linear layers. We fuse these
+different varients into a single one that will get caught by the Unpack AddMM pass.
+
+.. code-block:: none
+
+    %ret : Tensor = prim::If(%622)
+    block0():
+      %ret.1 : Tensor = aten::addmm(%self.fc.bias, %x9.1, %3677, %3, %3)
+      -> (%ret.1)
+    block1():
+      %output.1 : Tensor = aten::matmul(%x9.1, %3677)
+      %output0.1 : Tensor = aten::add_(%output.1, %self.fc.bias, %3)
+      -> (%output0.1)
+
+We fuse this set of blocks into a graph like this:
+
+.. code-block:: none
+
+    %ret : Tensor = aten::addmm(%self.fc.bias, %x9.1, %3677, %3, %3)
+
 Fuse Linear
 ***************************************
 

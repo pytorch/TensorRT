@@ -513,6 +513,11 @@
                  </a>
                 </li>
                 <li class="md-nav__item">
+                 <a class="md-nav__link" href="#fuse-addmm-branches">
+                  Fuse AddMM Branches
+                 </a>
+                </li>
+                <li class="md-nav__item">
                  <a class="md-nav__link" href="#fuse-linear">
                   Fuse Linear
                  </a>
@@ -690,6 +695,47 @@ guarded we are allowed to remove a guard on ops’ outputs
        <p>
         Freeze attributes and inline constants and modules. Propogates constants in the graph.
        </p>
+       <h3 id="fuse-addmm-branches">
+        Fuse AddMM Branches
+        <a class="headerlink" href="#fuse-addmm-branches" title="Permalink to this headline">
+         ¶
+        </a>
+       </h3>
+       <blockquote>
+        <div>
+         <p>
+          <a class="reference external" href="https://github.com/nvidia/trtorch/blob/master/core/lowering/passes/fuse_addmm_branches.cpp">
+           trtorch/core/lowering/passes/fuse_addmm_branches.cpp
+          </a>
+         </p>
+        </div>
+       </blockquote>
+       <p>
+        A common pattern in scripted modules is tensors of different dimensions use different constructions for implementing linear layers. We fuse these
+different varients into a single one that will get caught by the Unpack AddMM pass.
+       </p>
+       <div class="highlight-none notranslate">
+        <div class="highlight">
+         <pre><span></span>%ret : Tensor = prim::If(%622)
+block0():
+  %ret.1 : Tensor = aten::addmm(%self.fc.bias, %x9.1, %3677, %3, %3)
+  -&gt; (%ret.1)
+block1():
+  %output.1 : Tensor = aten::matmul(%x9.1, %3677)
+  %output0.1 : Tensor = aten::add_(%output.1, %self.fc.bias, %3)
+  -&gt; (%output0.1)
+</pre>
+        </div>
+       </div>
+       <p>
+        We fuse this set of blocks into a graph like this:
+       </p>
+       <div class="highlight-none notranslate">
+        <div class="highlight">
+         <pre><span></span>%ret : Tensor = aten::addmm(%self.fc.bias, %x9.1, %3677, %3, %3)
+</pre>
+        </div>
+       </div>
        <h3 id="fuse-linear">
         Fuse Linear
         <a class="headerlink" href="#fuse-linear" title="Permalink to this headline">
