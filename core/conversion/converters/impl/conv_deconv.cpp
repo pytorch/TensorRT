@@ -9,7 +9,7 @@ namespace conversion {
 namespace converters {
 namespace impl {
 namespace {
-auto conv_registrations = RegisterNodeConversionPatterns()
+auto conv_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
     .pattern({
         R"SIG(aten::_convolution(Tensor input, Tensor weight,
                                  Tensor? bias, int[] stride, int[] padding,

@@ -42,6 +42,7 @@ struct ConversionCtx {
 
     ~ConversionCtx();
 
+    bool input_is_dynamic = false;
     nvinfer1::IBuilder* builder;
     nvinfer1::INetworkDefinition* net;
     nvinfer1::IBuilderConfig* cfg;

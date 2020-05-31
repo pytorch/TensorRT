@@ -30,7 +30,7 @@ load("@rules_pkg//:pkg.bzl", "pkg_tar")
 
 pkg_tar(
     name = "include",
-    package_dir = "core/conversion/arg/",
+    package_dir = "core/conversion/var/",
     srcs = [
         "Var.h",
         "Var_inl.h"

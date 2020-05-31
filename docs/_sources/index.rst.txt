@@ -23,15 +23,18 @@ Getting Started
 * :ref:`installation`
 * :ref:`getting_started`
 * :ref:`ptq`
+* :ref:`trtorchc`
+
 
 .. toctree::
    :caption: Getting Started
-   :maxdepth: 2
+   :maxdepth: 1
    :hidden:
 
    tutorials/installation
    tutorials/getting_started
    tutorials/ptq
+   tutorials/trtorchc
 
 Contributor Documentation
 --------------------------------

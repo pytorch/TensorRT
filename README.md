@@ -23,6 +23,8 @@ compile_settings.op_precision = torch::kFloat;
 auto trt_mod = trtorch::CompileGraph(ts_mod, compile_settings);
 // Run like normal
 auto results = trt_mod.forward({in_tensor});
+// Save module for later
+trt_mod.save("trt_torchscript_module.ts");
 ...
 ```
 
@@ -46,6 +48,7 @@ trt_ts_module = trtorch.compile(torch_script_module, compile_settings)
 
 input_data = input_data.half()
 result = trt_ts_module(input_data)
+torch.jit.save(trt_ts_module, "trt_torchscript_module.ts")
 ```
 
 > Notes on running in lower precisions:

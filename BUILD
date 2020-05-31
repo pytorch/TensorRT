@@ -8,6 +8,8 @@ pkg_tar(
         "//core/conversion:include",
         "//core/conversion/conversionctx:include",
         "//core/conversion/converters:include",
+        "//core/conversion/var:include",
+        "//core/conversion/tensorcontainer:include",
         "//core/conversion/evaluators:include",
         "//core/execution:include",
         "//core/lowering:include",
@@ -35,6 +37,15 @@ pkg_tar(
 )
 
 
+pkg_tar(
+    name = "bin",
+    package_dir = "bin/",
+    srcs = [
+        "//cpp/trtorchc:trtorchc",
+    ],
+    mode = "0755",
+)
+
 
 
 pkg_tar(
@@ -46,6 +57,7 @@ pkg_tar(
     ],
     deps = [
         ":lib",
+        ":bin",
         ":include",
         ":include_core",
     ],

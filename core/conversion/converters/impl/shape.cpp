@@ -9,7 +9,7 @@ namespace converters {
 namespace impl {
 namespace {
 
-static auto shape_registrations = RegisterNodeConversionPatterns()
+static auto shape_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
   .pattern({
     // To use in static input size cases (explicit batch)
     "aten::size.int(Tensor self, int dim) -> (Tensor)",

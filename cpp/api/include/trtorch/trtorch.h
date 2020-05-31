@@ -149,7 +149,23 @@ struct TRTORCH_API ExtraInfo {
          * @return true
          * @return false
          */
+        constexpr bool operator==(DataType::Value other) const { return value == other; }
+        /**
+         * @brief Comparision operator for DataType
+         *
+         * @param other
+         * @return true
+         * @return false
+         */
         constexpr bool operator!=(DataType other) const { return value != other.value; }
+        /**
+         * @brief Comparision operator for DataType
+         *
+         * @param other
+         * @return true
+         * @return false
+         */
+        constexpr bool operator!=(DataType::Value other) const { return value != other; }
     private:
         Value value;
     };

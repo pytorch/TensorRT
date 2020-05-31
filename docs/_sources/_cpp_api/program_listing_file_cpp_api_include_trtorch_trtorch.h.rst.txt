@@ -74,7 +74,9 @@ Program Listing for File trtorch.h
            operator Value() const  { return value; }
            explicit operator bool() = delete;
            constexpr bool operator==(DataType other) const { return value == other.value; }
+           constexpr bool operator==(DataType::Value other) const { return value == other; }
            constexpr bool operator!=(DataType other) const { return value != other.value; }
+           constexpr bool operator!=(DataType::Value other) const { return value != other; }
        private:
            Value value;
        };

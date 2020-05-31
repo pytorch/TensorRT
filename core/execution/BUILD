@@ -14,7 +14,6 @@ cc_library(
     ],
     srcs = [
         "TRTEngine.cpp",
-        "TRTEngineManager.cpp",
         "register_trt_op.cpp",
     ],
     deps = [

@@ -7,7 +7,7 @@ namespace conversion {
 namespace converters {
 namespace impl {
 namespace {
-auto constant_registrations = RegisterNodeConversionPatterns()
+auto constant_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
     .pattern({
         "trt::const(Tensor self) -> Tensor",
         [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {

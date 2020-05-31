@@ -11,3 +11,7 @@ from trtorch._version import __version__
 from trtorch._compiler import *
 from trtorch._types import *
 from trtorch import logging
+
+def _register_with_torch():
+    trtorch_dir = os.path.dirname(__file__)
+    torch.ops.load_library(trtorch_dir + '/lib/trtorch.so')

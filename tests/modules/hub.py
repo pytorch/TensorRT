@@ -2,64 +2,68 @@ import torch
 import torchvision.models as models
 
 models = {
-          "alexnet": {
-            "model": models.alexnet(pretrained=True),
-            "path": "both"
-          },
-          "vgg16": {
-            "model": models.vgg16(pretrained=True),
-            "path": "both"
-          },
-          "squeezenet": {
-            "model": models.squeezenet1_0(pretrained=True),
-            "path": "both"
-          },
-          "densenet": {
-            "model": models.densenet161(pretrained=True),
-            "path": "both"
-          },
-          "inception_v3": {
-            "model": models.inception_v3(pretrained=True),
-            "path": "both"
-          },
-          #"googlenet": models.googlenet(pretrained=True),
-          "shufflenet": {
-            "model": models.shufflenet_v2_x1_0(pretrained=True),
-            "path": "both"
-          },
-          "mobilenet_v2": {
-            "model": models.mobilenet_v2(pretrained=True),
-            "path": "both"
-          },
-          "resnext50_32x4d": {
-            "model":  models.resnext50_32x4d(pretrained=True),
-            "path": "both"
-          },
-          "wideresnet50_2": {
-            "model": models.wide_resnet50_2(pretrained=True),
-            "path": "both"
-          },
-          "mnasnet": {
-            "model": models.mnasnet1_0(pretrained=True),
-            "path": "both"
-          },
-          "resnet18": {
-            "model": torch.hub.load('pytorch/vision:v0.6.0', 'resnet18', pretrained=True),
-            "path": "both"
-          },
-          "resnet50": {
-            "model":torch.hub.load('pytorch/vision:v0.6.0', 'resnet50', pretrained=True),
-            "path": "both"
-          },
-          "fcn_resnet101": {
-            "model": torch.hub.load('pytorch/vision:v0.6.0', 'fcn_resnet101', pretrained=True),
-            "path": "script"
-          },
-          "ssd": {
-                "model": torch.hub.load('NVIDIA/DeepLearningExamples:torchhub', 'nvidia_ssd', model_math="fp32"),
-                "path": "trace"
-          }
+    "alexnet": {
+        "model": models.alexnet(pretrained=True),
+        "path": "both"
+    },
+    "vgg16": {
+        "model": models.vgg16(pretrained=True),
+        "path": "both"
+    },
+    "squeezenet": {
+        "model": models.squeezenet1_0(pretrained=True),
+        "path": "both"
+    },
+    "densenet": {
+        "model": models.densenet161(pretrained=True),
+        "path": "both"
+    },
+    "inception_v3": {
+        "model": models.inception_v3(pretrained=True),
+        "path": "both"
+    },
+    #"googlenet": models.googlenet(pretrained=True),
+    "shufflenet": {
+        "model": models.shufflenet_v2_x1_0(pretrained=True),
+        "path": "both"
+    },
+    "mobilenet_v2": {
+        "model": models.mobilenet_v2(pretrained=True),
+        "path": "both"
+    },
+    "resnext50_32x4d": {
+        "model":  models.resnext50_32x4d(pretrained=True),
+        "path": "both"
+    },
+    "wideresnet50_2": {
+        "model": models.wide_resnet50_2(pretrained=True),
+        "path": "both"
+    },
+    "mnasnet": {
+        "model": models.mnasnet1_0(pretrained=True),
+        "path": "both"
+    },
+    "resnet18": {
+        "model": torch.hub.load('pytorch/vision:v0.6.0', 'resnet18', pretrained=True),
+        "path": "both"
+    },
+    "resnet50": {
+        "model":torch.hub.load('pytorch/vision:v0.6.0', 'resnet50', pretrained=True),
+        "path": "both"
+    },
+    "fcn_resnet101": {
+        "model": torch.hub.load('pytorch/vision:v0.6.0', 'fcn_resnet101', pretrained=True),
+        "path": "script"
+    },
+    "ssd": {
+        "model": torch.hub.load('NVIDIA/DeepLearningExamples:torchhub', 'nvidia_ssd', model_math="fp32"),
+        "path": "trace"
+    },
+    "faster_rcnn": {
+        "model": models.detection.fasterrcnn_resnet50_fpn(pretrained=True),
+        "path": "script"
     }
+}
 
 for n, m in models.items():
     print("Downloading {}".format(n))

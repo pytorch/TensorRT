@@ -8,7 +8,7 @@ namespace converters {
 namespace impl {
 namespace {
 
-auto pooling_registrations = RegisterNodeConversionPatterns()
+auto pooling_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
     .pattern({
         "aten::max_pool2d(Tensor self, int[2] kernel_size, int[2] stride=[], int[2] padding=[0, 0], int[2] dilation=[1, 1], bool ceil_mode=False) -> (Tensor)",
         [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
