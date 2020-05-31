@@ -15,6 +15,7 @@ cc_library(
     srcs = [
         "conv2d_to_convolution.cpp",
         "exception_elimination.cpp",
+        "fuse_addmm_branches.cpp",
         "fuse_flatten_linear.cpp",
         "remove_contiguous.cpp",
         "remove_dropout.cpp",

@@ -64,7 +64,7 @@ private:
     for (auto it = b->nodes().begin(); it != b->nodes().end(); it++) {
       auto n = *it;
       if (n->kind() == prim::If && isExceptionOrPassNode(n)) {
-        LOG_GRAPH("Found that node " << *n << "  is an exception or pass node (EliminateChecks)");
+        LOG_GRAPH("Found that node " << *n << "  is an exception or pass node (EliminateChecks)" << std::endl);
         it.destroyCurrent();
       }
     }
