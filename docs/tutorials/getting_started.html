@@ -1078,7 +1078,12 @@ since it takes a bit of time to optimize the module, it would not make sense to 
         </div>
        </div>
        <p>
-        TRTorch compiled TorchScript modules are loaded in the same way as normal TorchScript module.
+        TRTorch compiled TorchScript modules are loaded in the same way as normal TorchScript module. Make sure your deployment application is linked against
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          libtrtorch.so
+         </span>
+        </code>
        </p>
        <div class="highlight-c++ notranslate">
         <div class="highlight">

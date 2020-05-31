@@ -269,7 +269,7 @@ And now we are running the module in FP16 precision. You can then save the modul
 
     trt_mod.save("<PATH TO SAVED TRT/TS MOD>")
 
-TRTorch compiled TorchScript modules are loaded in the same way as normal TorchScript module.
+TRTorch compiled TorchScript modules are loaded in the same way as normal TorchScript module. Make sure your deployment application is linked against ``libtrtorch.so``
 
 .. code-block:: c++
 
