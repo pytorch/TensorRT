@@ -37,6 +37,8 @@ Includes
 
 - ``string``
 
+- ``trtorch/logging.h`` (:ref:`file_cpp_api_include_trtorch_logging.h`)
+
 - ``vector``
 
 

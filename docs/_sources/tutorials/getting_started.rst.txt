@@ -130,7 +130,8 @@ To compile your TorchScript module with TRTorch, all you need to do is provide t
 to TRTorch and you will be returned an optimized TorchScript module to run or add into another PyTorch module. The
 only required setting is the input size or input range which is defined as a list of either list types like ``lists``, ``tuples``
 or PyTorch ``size`` objects or dictionaries of minimum, optimial and maximum sizes. You can also specify settings such as
-operating precision for the engine or target device.
+operating precision for the engine or target device. After compilation you can save the module just like any other module
+to load in a deployment application. In order to load a TensorRT/TorchScript module, make sure you first import ``trtorch``.
 
 .. code-block:: python
 
@@ -150,6 +151,17 @@ operating precision for the engine or target device.
 
     trt_ts_module = trtorch.compile(torch_script_module, compile_settings)
 
+    input_data = input_data.half()
+    result = trt_ts_module(input_data)
+    torch.jit.save(trt_ts_module, "trt_ts_module.ts")
+
+.. code-block:: python
+
+    # Deployment application
+    import torch
+    import trtorch
+
+    trt_ts_module = torch.jit.load("trt_ts_module.ts")
     input_data = input_data.half()
     result = trt_ts_module(input_data)
 
@@ -251,7 +263,35 @@ We can also set settings like operating precision to run in FP16.
         auto trt_mod = trtorch::CompileGraph(mod, info);
         auto out = trt_mod.forward({in});
 
-And now we are running the module in FP16 precision.
+And now we are running the module in FP16 precision. You can then save the module to load later.
+
+.. code-block:: c++
+
+    trt_mod.save("<PATH TO SAVED TRT/TS MOD>")
+
+TRTorch compiled TorchScript modules are loaded in the same way as normal TorchScript module.
+
+.. code-block:: c++
+
+    #include "torch/script.h"
+    #include "trtorch/trtorch.h"
+
+    int main(int argc, const char* argv[]) {
+        torch::jit::Module module;
+        try {
+            // Deserialize the ScriptModule from a file using torch::jit::load().
+            module = torch::jit::load("<PATH TO SAVED TRT/TS MOD>");
+        }
+        catch (const c10::Error& e) {
+            std::cerr << "error loading the model\n";
+            return -1;
+        }
+
+        torch::Tensor in = torch::randn({1, 1, 32, 32}, torch::kCUDA);
+        auto out = mod.forward(in);
+
+        std::cout << "ok\n";
+    }
 
 If you want to save the engine produced by TRTorch to use in a TensorRT application you can use the ``ConvertGraphToTRTEngine`` API.
 

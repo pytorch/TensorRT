@@ -39,6 +39,8 @@ Included By
 -----------
 
 
+- :ref:`file_cpp_api_include_trtorch_ptq.h`
+
 - :ref:`file_cpp_api_include_trtorch_trtorch.h`
 
 
