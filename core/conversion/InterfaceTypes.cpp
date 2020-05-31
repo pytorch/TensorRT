@@ -34,7 +34,7 @@ InputRange::InputRange(std::vector<int64_t> d) {
     min = util::toDims(d);
     max = util::toDims(d);
     input_shape = util::toDims(d);
-
+    input_is_dynamic = false;
 }
 
 
@@ -67,6 +67,7 @@ InputRange::InputRange(std::vector<int64_t> min_shape, std::vector<int64_t> opt_
         dim.insert(max_shape[i]);
         if (dim.size() != 1) {
             dyn_shape.push_back(-1);
+            input_is_dynamic = true;
         } else {
             dyn_shape.push_back(opt_shape[i]);
         }

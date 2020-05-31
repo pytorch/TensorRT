@@ -155,6 +155,10 @@ void AddInputs(ConversionCtx* ctx,
         profile->setDimensions(trt_in->getName(), nvinfer1::OptProfileSelector::kOPT, dims.opt);
         profile->setDimensions(trt_in->getName(), nvinfer1::OptProfileSelector::kMAX, dims.max);
 
+        if (dims.input_is_dynamic) {
+            ctx->input_is_dynamic = true;
+        }
+
         ctx->value_tensor_map[in] = trt_in;
     }
 

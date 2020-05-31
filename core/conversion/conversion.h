@@ -15,6 +15,7 @@ struct InputRange {
     nvinfer1::Dims max;
     nvinfer1::Dims opt;
     nvinfer1::Dims input_shape;
+    bool input_is_dynamic = false;
     // Should we restrict to unsigned?
     InputRange(std::vector<int64_t> d);
     InputRange(std::vector<int64_t> min_shape,
