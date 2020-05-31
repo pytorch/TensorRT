@@ -19,11 +19,23 @@ auto batch_norm_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
       auto orig_shape = input->getDimensions();
       auto shape = util::toVec(orig_shape);
       auto options = torch::TensorOptions().dtype(torch::kFloat32);
-      auto gamma = args[1].unwrapToTensor(at::full({shape}, 1, {options}));
-      auto beta = args[2].unwrapToTensor(at::full({shape}, 1, {options}));
-      auto mean = args[3].unwrapToTensor(at::full({shape}, 0, {options}));
-      auto var = args[4].unwrapToTensor(at::full({shape}, 0, {options}));
+
+      torch::Tensor gamma, beta, mean, var;
+
+      if (ctx->input_is_dynamic) {
+        gamma = args[1].unwrapToTensor();
+        beta = args[2].unwrapToTensor();
+        mean = args[3].unwrapToTensor();
+        var = args[4].unwrapToTensor();
+      } else {
+        gamma = args[1].unwrapToTensor(at::full({shape}, 1, {options}));
+        beta = args[2].unwrapToTensor(at::full({shape}, 1, {options}));
+        mean = args[3].unwrapToTensor(at::full({shape}, 0, {options}));
+        var = args[4].unwrapToTensor(at::full({shape}, 0, {options}));
+      }
+
       auto eps = args[7].unwrapToDouble(1e-5f);
+
 
       LOG_DEBUG("momentum disregarded");
       LOG_DEBUG("training disregarded");
