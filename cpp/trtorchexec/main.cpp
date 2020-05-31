@@ -38,6 +38,7 @@ int main(int argc, const char* argv[]) {
     }
 
     mod.to(at::kCUDA);
+    mod.eval();
 
     std::vector<std::vector<int64_t>> dims;
     for (int i = 2; i < argc; i++) {
@@ -92,7 +93,7 @@ int main(int argc, const char* argv[]) {
     std::cout << "Running TRT module" << std::endl;
     torch::jit::IValue trt_results_ivalues = trt_mod.forward(trt_inputs_ivalues);
     std::vector<at::Tensor> trt_results;
-     if (trt_results_ivalues.isTensor()) {
+    if (trt_results_ivalues.isTensor()) {
         trt_results.push_back(trt_results_ivalues.toTensor());
     } else {
         auto results = trt_results_ivalues.toTuple()->elements();
@@ -106,5 +107,8 @@ int main(int argc, const char* argv[]) {
     }
 
     std::cout << "Converted Engine saved to /tmp/engine_converted_from_jit.trt" << std::endl;
+
+    trt_mod.save("/tmp/ts_trt.ts");
+    std::cout << "Compiled TorchScript program saved to /tmp/ts_trt.ts" << std::endl;
     std::cout << "ok\n";
 }
