@@ -9,7 +9,6 @@
 namespace trtorch {
 namespace core {
 namespace execution {
-namespace {
 std::vector<at::Tensor> RunCudaEngine(nvinfer1::IExecutionContext* ctx, std::pair<uint64_t, uint64_t> io, std::vector<at::Tensor>& inputs) {
     std::vector<void*> gpu_handles;
 
@@ -47,6 +46,7 @@ std::vector<at::Tensor> RunCudaEngine(nvinfer1::IExecutionContext* ctx, std::pai
     return outputs;
 }
 
+namespace {
 c10::AliasAnalysisKind aliasAnalysisFromSchema() {
   return c10::AliasAnalysisKind::FROM_SCHEMA;
 }

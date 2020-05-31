@@ -3,6 +3,7 @@
 #include "NvInfer.h"
 #include "ATen/core/function_schema.h"
 #include "torch/custom_class.h"
+#include "core/util/prelude.h"
 
 
 namespace trtorch {
@@ -19,14 +20,17 @@ struct TRTEngine : torch::CustomClassHolder {
     std::pair<uint64_t, uint64_t> num_io;
     EngineID id;
     std::string name;
+    util::logging::TRTorchLogger logger;
 
     TRTEngine() = default;
     TRTEngine(std::string serialized_engine);
-    TRTEngine(std::string name, std::string serialized_engine);
-    TRTEngine(nvinfer1::ILogger& logger, std::string name, std::string& serialized_engine);
+    TRTEngine(std::string mod_name, std::string serialized_engine);
     TRTEngine& operator=(const TRTEngine& other);
-    void test();
+    // TODO: Implement a call method
+    //c10::List<at::Tensor> Run(c10::List<at::Tensor> inputs);
 };
+
+std::vector<at::Tensor> RunCudaEngine(nvinfer1::IExecutionContext* ctx, std::pair<uint64_t, uint64_t> io, std::vector<at::Tensor>& inputs);
 
 } // namespace execution
 } // namespace core

@@ -45,7 +45,7 @@ void AddEngineToGraph(torch::jit::script::Module mod, std::shared_ptr<torch::jit
     auto engine = execution::TRTEngine(mod._ivalue()->name(), serialized_engine);
     // Get required metadata about the engine out
     auto num_io = engine.num_io;
-    auto name = engine.name + std::string("trt_engine");
+    auto name = engine.name;
 
     // Add the engine as an attribute of the module, this will let the engine be serialized and deserialized
     auto engine_ptr = c10::make_intrusive<execution::TRTEngine>(engine);
