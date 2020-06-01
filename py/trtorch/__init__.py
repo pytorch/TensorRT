@@ -14,4 +14,6 @@ from trtorch import logging
 
 def _register_with_torch():
     trtorch_dir = os.path.dirname(__file__)
-    torch.ops.load_library(trtorch_dir + '/lib/trtorch.so')
+    torch.ops.load_library(trtorch_dir + '/lib/libtrtorch.so')
+
+_register_with_torch()
