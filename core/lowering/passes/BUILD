@@ -19,6 +19,7 @@ cc_library(
         "fuse_flatten_linear.cpp",
         "remove_contiguous.cpp",
         "remove_dropout.cpp",
+        "remove_to.cpp",
         "unpack_addmm.cpp",
         "unpack_batch_norm.cpp",
         "unpack_log_softmax.cpp",

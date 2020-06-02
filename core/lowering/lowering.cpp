@@ -1,6 +1,8 @@
+#include "torch/csrc/jit/passes/common_subexpression_elimination.h"
 #include "torch/csrc/jit/passes/dead_code_elimination.h"
 #include "torch/csrc/jit/passes/fuse_linear.h"
 #include "torch/csrc/jit/passes/freeze_module.h"
+#include "torch/csrc/jit/passes/loop_unrolling.h"
 #include "torch/csrc/jit/passes/lower_graph.h"
 #include "torch/csrc/jit/passes/lower_tuples.h"
 #include "torch/csrc/jit/passes/quantization.h"
@@ -30,11 +32,13 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g) {
     passes::FuseFlattenLinear(g);
     passes::Conv2DToConvolution(g);
     passes::FuseAddMMBranches(g);
+    torch::jit::EliminateCommonSubexpression(g);
+    torch::jit::UnrollLoops(g);
+    torch::jit::EliminateCommonSubexpression(g);
     passes::UnpackAddMM(g);
     //passes::UnpackBatchNorm(g);
     passes::UnpackLogSoftmax(g);
-    //passes::RemoveDimExeception(g);
-    //irfusers::UnpackBatchNorm(g);
+    passes::RemoveTo(g);
     torch::jit::EliminateDeadCode(g);
     LOG_GRAPH(*g);
 }
