@@ -137,6 +137,14 @@ Remove Dropout
 
 Removes dropout operators since we are doing inference.
 
+Remove To
+***************************************
+
+    `trtorch/core/lowering/passes/remove_to.cpp <https://github.com/nvidia/trtorch/blob/master/core/lowering/passes/remove_to.cpp>`_
+
+Removes ``aten::to`` operators that do casting, since TensorRT mangages it itself. It is important that this is one of the last passes run so that
+other passes have a change to move required cast operators out of the main namespace.
+
 Unpack AddMM
 ***************************************
 
