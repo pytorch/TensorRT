@@ -1,0 +1,20 @@
+"component: api [C++]":
+  - cpp/api/**/*
+
+"component: api [Python]":
+  - py/api/**/*
+
+"component: conversion":
+  - core/conversion/**/*
+
+"component: converters":
+  - core/conversion/converters/**/*
+
+"component: evaluators":
+  - core/conversion/evaluators/**/*
+
+"component: execution":
+  - core/execution/**/*
+
+"component: lowering":
+ - core/lowering/**/*
