@@ -1,3 +1,5 @@
+#include <limits>
+
 #include "torch/csrc/jit/ir/ir.h"
 #include "torch/csrc/jit/ir/constants.h"
 #include "ATen/core/functional.h"
@@ -92,6 +94,29 @@ auto prim_registrations = RegisterNodeEvaluators()
                 return c10::optional<torch::jit::IValue>(std::move(torch::jit::IValue(list)));
             }
         }
+    }).evaluator({
+        torch::jit::prim::Loop,
+        [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+            std::cout << *n << std::endl;
+
+            return {};
+        },
+        EvalOptions().blacklistOutputTypes({c10::TensorType::get()})
+    }).evaluator({
+         c10::Symbol::fromQualString("prim::min"),
+         [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+            auto a = args.at(&(n->input()[0])).unwrapToIntList();
+            int64_t min = std::numeric_limits<int64_t>::max();
+
+            for (size_t i = 0; i < a.size(); i++) {
+                if (a[i] < min) {
+                    min = i;
+                }
+            }
+
+            return min;
+        },
+        EvalOptions().validSchemas({"prim::min.self_int(int[] self) -> (int)"})
     });
 }
 } // namespace evaluators
