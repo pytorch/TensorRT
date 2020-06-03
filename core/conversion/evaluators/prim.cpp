@@ -29,7 +29,7 @@ auto prim_registrations = RegisterNodeEvaluators()
     }).evaluator({
         torch::jit::prim::NumToTensor,
         [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-            return at::scalar_to_tensor(args.at(&(n->output()[0])).IValue()->toScalar());
+            return at::scalar_to_tensor(args.at(n->output(0)).IValue()->toScalar());
         }
     }).evaluator({
         torch::jit::prim::ListConstruct,
@@ -105,7 +105,7 @@ auto prim_registrations = RegisterNodeEvaluators()
     }).evaluator({
          c10::Symbol::fromQualString("prim::min"),
          [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-            auto a = args.at(&(n->input()[0])).unwrapToIntList();
+            auto a = args.at(n->input(0)).unwrapToIntList();
             int64_t min = std::numeric_limits<int64_t>::max();
 
             for (size_t i = 0; i < a.size(); i++) {
