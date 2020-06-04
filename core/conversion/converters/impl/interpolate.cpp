@@ -25,6 +25,12 @@ auto interpolate_registrations = RegisterNodeConversionPatterns()
                 auto output_size = util::toDims(args[1].unwrapToIntList());
 
                 TRTORCH_ASSERT(output_size.nbDims == 1, "aten::upsample_nearest1d input Tensor and output size dimension mismatch");
+
+                auto resize_layer = ctx->net->addResize(*in);
+                TRTORCH_CHECK(resize_layer, "Unable to create interpolation (resizing) layer from node" << *n);
+
+                resize_layer->setOutputDimensions(output_size);
+                resize_layer->setResizeMode(nvinfer1::ResizeMode::kNEAREST);
             } else {
                 LOG_DEBUG("scale factor parameters not supported yet.");
             }
@@ -34,7 +40,8 @@ auto interpolate_registrations = RegisterNodeConversionPatterns()
     }).pattern({
         "aten::upsample_nearest2d(Tensor self, int[2] output_size, float? scales_h=None, float? scales_w=None) -> (Tensor)",
         [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-//            std::raise(SIGINT);
+            // std::raise(SIGINT);
+
             TRTORCH_ASSERT(args[0].IValue()->isTensor(), "Input expected to be of type Tensor");
 
             auto in = args[0].ITensor();
@@ -46,12 +53,11 @@ auto interpolate_registrations = RegisterNodeConversionPatterns()
 
                 TRTORCH_ASSERT( (output_size.nbDims == 1 || output_size.nbDims == 2), "aten::upsample_nearest2d input Tensor and output size dimension mismatch");
 
-                nvinfer1::ILayer* new_layer;
+                auto resize_layer = ctx->net->addResize(*in);
+                TRTORCH_CHECK(resize_layer, "Unable to create interpolation (resizing) layer from node" << *n);
 
-
-        
-                //util::toDims(args[1].unwrapToIntList());
-
+                resize_layer->setOutputDimensions(output_size);
+                resize_layer->setResizeMode(nvinfer1::ResizeMode::kNEAREST);
             } else {
                 LOG_DEBUG("scale factor parameters not supported yet.");
             }
@@ -72,7 +78,11 @@ auto interpolate_registrations = RegisterNodeConversionPatterns()
 
                 TRTORCH_ASSERT( (output_size.nbDims == 1 || output_size.nbDims == 3), "aten::upsample_nearest3d input Tensor and output size dimension mismatch");
                 
+                auto resize_layer = ctx->net->addResize(*in);
+                TRTORCH_CHECK(resize_layer, "Unable to create interpolation (resizing) layer from node" << *n);
 
+                resize_layer->setOutputDimensions(output_size);
+                resize_layer->setResizeMode(nvinfer1::ResizeMode::kNEAREST);
             } else {
                 LOG_DEBUG("scale factor parameters not supported yet.");
             }
