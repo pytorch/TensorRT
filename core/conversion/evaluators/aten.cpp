@@ -38,6 +38,14 @@ auto aten_registrations = RegisterNodeEvaluators()
             return out_tensor;
         }
     }).evaluator({
+        c10::Symbol::fromQualString("aten::add"),
+        [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+            auto a = args.at(n->input(0)).unwrapToInt();
+            auto b = args.at(n->input(1)).unwrapToInt();
+            return a + b;
+        },
+        EvalOptions().validSchemas({"aten::add.int(int a, int b) -> (int)"})
+    }).evaluator({
         c10::Symbol::fromQualString("aten::mul"),
         [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
             auto a = args.at(n->input(0)).unwrapToInt();
@@ -127,6 +135,42 @@ auto aten_registrations = RegisterNodeEvaluators()
         EvalOptions().validSchemas({
             "aten::size(Tensor self) -> (int[])",
             "aten::size.int(Tensor self, int dim) -> (int)"
+        })
+    }).evaluator({
+        c10::Symbol::fromQualString("aten::__getitem__"),
+        [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+            auto list = args.at(n->input(0)).unwrapToIntList();
+            auto idx = args.at(n->input(1)).unwrapToInt();
+
+            const int64_t list_size = list.size();
+            const int64_t normalized_idx = normalizeIndex(idx, list_size);
+            TRTORCH_CHECK(normalized_idx >= 0 || normalized_idx < list_size, "List index out of range (aten::__getitem__)");
+            return list.get(normalized_idx);
+        },
+        EvalOptions().validSchemas({
+            "aten::__getitem__.t(t[](a) list, int idx) -> (t(*))",
+        })
+    }).evaluator({
+        c10::Symbol::fromQualString("aten::append"),
+        [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+            auto list = args.at(n->input(0)).unwrapToIntList();
+            auto el = args.at(n->input(1)).unwrapToInt();
+
+            list.push_back(std::move(el));
+            return list;
+        },
+        EvalOptions().validSchemas({
+            "aten::append.t(t[](a!) self, t(c -> *) el) -> (t[](a!))",
+        })
+    }).evaluator({
+        c10::Symbol::fromQualString("aten::neg"),
+        [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+            auto el = args.at(n->input(1)).unwrapToInt();
+
+            return el * -1;
+        },
+        EvalOptions().validSchemas({
+            "aten::neg.int(int a) -> (int)",
         })
     });
 }

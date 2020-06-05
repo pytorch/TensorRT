@@ -95,14 +95,6 @@ auto prim_registrations = RegisterNodeEvaluators()
             }
         }
     }).evaluator({
-        torch::jit::prim::Loop,
-        [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-            std::cout << *n << std::endl;
-
-            return {};
-        },
-        EvalOptions().blacklistOutputTypes({c10::TensorType::get()})
-    }).evaluator({
          c10::Symbol::fromQualString("prim::min"),
          [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
             auto a = args.at(n->input(0)).unwrapToIntList();
@@ -110,13 +102,29 @@ auto prim_registrations = RegisterNodeEvaluators()
 
             for (size_t i = 0; i < a.size(); i++) {
                 if (a[i] < min) {
-                    min = i;
+                    min = a[i];
                 }
             }
 
             return min;
         },
         EvalOptions().validSchemas({"prim::min.self_int(int[] self) -> (int)"})
+    }).evaluator({
+        c10::Symbol::fromQualString("prim::shape"),
+        [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+            LOG_WARNING("There may be undefined behavior using dynamic shape and prim::shape");
+            auto tensor_var = args.at(n->input(0));
+            if (tensor_var.isITensor()) {
+                auto tensor = tensor_var.ITensor();
+                return util::toVec(tensor->getDimensions());
+            } else {
+                auto tensor = tensor_var.unwrapToTensor();
+                return tensor.sizes();
+            }
+        },
+        EvalOptions().validSchemas({
+            "prim::shape(Tensor a) -> (int[])"
+        })
     });
 }
 } // namespace evaluators
