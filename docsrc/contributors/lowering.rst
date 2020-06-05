@@ -188,4 +188,4 @@ Unroll Loops
 
     `torch/csrc/jit/passes/loop_unrolling.h <https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/loop_unrolling.h>`_
 
-    Unrolls the operations of compatable loops (e.g. sufficently short) so that you only have to go through the loop once.
+Unrolls the operations of compatable loops (e.g. sufficently short) so that you only have to go through the loop once.
