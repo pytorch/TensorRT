@@ -14,6 +14,15 @@ You can see the effects of each pass by setting the log level to ``Level::kGraph
 Passes Used
 -------------
 
+EliminateCommonSubexpression
+***********************************
+
+    `torch/csrc/jit/passes/common_subexpression_elimination.h <https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/common_subexpression_elimination.h>`_
+
+Removes common subexpressions in the graph
+
+
+
 Eliminate Dead Code
 **************************
 
@@ -125,7 +134,7 @@ Removes _all_ tuples and raises an error if some cannot be removed, this is used
 Peephole Optimze
 ***************************************
 
-    `torch/csrc/jit/passes/peephole_optimze.h <https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/peephole.cpp>`_
+    `torch/csrc/jit/passes/peephole_optimze.h <https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/ppeephole_optimze.h>`_
 
 The intent for this optimization pass is to catch all of the small, easy to catch peephole optimizations you might be interested in doing.
 
@@ -177,6 +186,6 @@ Unpacks ``aten::logsoftmax`` into ``aten::softmax`` and ``aten::log``. This lets
 Unroll Loops
 ***************************************
 
-    `torch/csrc/jit/passes/lower_tuples.h <https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/loop_unrolling.cpp>`_
+    `torch/csrc/jit/passes/loop_unrolling.h <https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/loop_unrolling.h>`_
 
     Unrolls the operations of compatable loops (e.g. sufficently short) so that you only have to go through the loop once.
