@@ -303,7 +303,7 @@ std::string ConvertBlockToEngine(const torch::jit::Block* b, ConversionInfo buil
 std::set<std::string> GetUnsupportedOpsInBlock(const torch::jit::Block* b ) {
     std::set<std::string> unsupported_ops;
     for (const auto n : b->nodes()) {
-        if (!OpSupported(n) && n->kind() != torch::jit::prim::Loop) {
+        if (n->kind() != torch::jit::prim::Loop && !OpSupported(n)) {
             auto schema = n->maybeSchema();
             TRTORCH_CHECK(schema, "Unable to get schema for Node " << util::node_info(n) \
                                     << " (conversion.VerifyCoverterSupportForBlock");
