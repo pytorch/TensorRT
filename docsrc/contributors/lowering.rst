@@ -122,6 +122,18 @@ Removes tuples where TupleConstruct and TupleUnpack are matched but leaves tuple
 
 Removes _all_ tuples and raises an error if some cannot be removed, this is used by ONNX to ensure there are not tuples before conversion, but will not work on graphs whose inputs contain tuples.
 
+Peephole Optimze
+***************************************
+
+    `torch/csrc/jit/passes/peephole_optimze.h <https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/peephole.cpp>`_
+
+The intent for this optimization pass is to catch all of the small, easy to catch peephole optimizations you might be interested in doing.
+
+Right now, it does:
+    - Eliminate no-op 'expand' nodes
+    - Simply x.t().t() to x
+
+
 Remove Contiguous
 ***************************************
 
@@ -161,3 +173,10 @@ Unpack LogSoftmax
 
 Unpacks ``aten::logsoftmax`` into ``aten::softmax`` and ``aten::log``. This lets us reuse the
 ``aten::softmax`` and ``aten::log`` converters instead of needing a dedicated converter.
+
+Unroll Loops
+***************************************
+
+    `torch/csrc/jit/passes/lower_tuples.h <https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/loop_unrolling.cpp>`_
+
+    Unrolls the operations of compatable loops (e.g. sufficently short) so that you only have to go through the loop once.
