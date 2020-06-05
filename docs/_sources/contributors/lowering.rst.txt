@@ -14,6 +14,15 @@ You can see the effects of each pass by setting the log level to ``Level::kGraph
 Passes Used
 -------------
 
+EliminateCommonSubexpression
+***********************************
+
+    `torch/csrc/jit/passes/common_subexpression_elimination.h <https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/common_subexpression_elimination.h>`_
+
+Removes common subexpressions in the graph
+
+
+
 Eliminate Dead Code
 **************************
 
@@ -56,6 +65,31 @@ Freeze Module
 
 Freeze attributes and inline constants and modules. Propogates constants in the graph.
 
+Fuse AddMM Branches
+***************************************
+
+    `trtorch/core/lowering/passes/fuse_addmm_branches.cpp <https://github.com/nvidia/trtorch/blob/master/core/lowering/passes/fuse_addmm_branches.cpp>`_
+
+A common pattern in scripted modules is tensors of different dimensions use different constructions for implementing linear layers. We fuse these
+different varients into a single one that will get caught by the Unpack AddMM pass.
+
+.. code-block:: none
+
+    %ret : Tensor = prim::If(%622)
+    block0():
+      %ret.1 : Tensor = aten::addmm(%self.fc.bias, %x9.1, %3677, %3, %3)
+      -> (%ret.1)
+    block1():
+      %output.1 : Tensor = aten::matmul(%x9.1, %3677)
+      %output0.1 : Tensor = aten::add_(%output.1, %self.fc.bias, %3)
+      -> (%output0.1)
+
+We fuse this set of blocks into a graph like this:
+
+.. code-block:: none
+
+    %ret : Tensor = aten::addmm(%self.fc.bias, %x9.1, %3677, %3, %3)
+
 Fuse Linear
 ***************************************
 
@@ -97,6 +131,18 @@ Removes tuples where TupleConstruct and TupleUnpack are matched but leaves tuple
 
 Removes _all_ tuples and raises an error if some cannot be removed, this is used by ONNX to ensure there are not tuples before conversion, but will not work on graphs whose inputs contain tuples.
 
+Peephole Optimze
+***************************************
+
+    `torch/csrc/jit/passes/peephole_optimze.h <https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/ppeephole_optimze.h>`_
+
+The intent for this optimization pass is to catch all of the small, easy to catch peephole optimizations you might be interested in doing.
+
+Right now, it does:
+    - Eliminate no-op 'expand' nodes
+    - Simply x.t().t() to x
+
+
 Remove Contiguous
 ***************************************
 
@@ -111,6 +157,14 @@ Remove Dropout
     `trtorch/core/lowering/passes/remove_dropout.cpp <https://github.com/nvidia/trtorch/blob/master/core/lowering/passes/remove_dropout.cpp>`_
 
 Removes dropout operators since we are doing inference.
+
+Remove To
+***************************************
+
+    `trtorch/core/lowering/passes/remove_to.cpp <https://github.com/nvidia/trtorch/blob/master/core/lowering/passes/remove_to.cpp>`_
+
+Removes ``aten::to`` operators that do casting, since TensorRT mangages it itself. It is important that this is one of the last passes run so that
+other passes have a change to move required cast operators out of the main namespace.
 
 Unpack AddMM
 ***************************************
@@ -128,3 +182,10 @@ Unpack LogSoftmax
 
 Unpacks ``aten::logsoftmax`` into ``aten::softmax`` and ``aten::log``. This lets us reuse the
 ``aten::softmax`` and ``aten::log`` converters instead of needing a dedicated converter.
+
+Unroll Loops
+***************************************
+
+    `torch/csrc/jit/passes/loop_unrolling.h <https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/loop_unrolling.h>`_
+
+    Unrolls the operations of compatable loops (e.g. sufficently short) so that you only have to go through the loop once.

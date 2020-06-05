@@ -150,13 +150,16 @@ torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod,
     torch::jit::script::Module new_mod(mod._ivalue()->name() + "_trt");
     std::vector<std::shared_ptr<torch::jit::Graph>> graphs;
     for (const torch::jit::script::Method& method : mod.get_methods()) {
-        auto engine = ConvertGraphToTRTEngine(mod, method.name(), cfg);
-        auto new_g = std::make_shared<torch::jit::Graph>();
-        AddEngineToGraph(new_mod, new_g, engine);
-        auto new_method = new_mod._ivalue()->compilation_unit()->create_function(method.name(), new_g);
-        auto schema = GenerateGraphSchema(new_mod, new_method->name(), new_g);
-        new_mod.type()->addMethod(new_method);
-        new_method->setSchema(schema);
+        // Don't convert hidden methods
+        if (method.name().rfind("_", 0)) {
+            auto engine = ConvertGraphToTRTEngine(mod, method.name(), cfg);
+            auto new_g = std::make_shared<torch::jit::Graph>();
+            AddEngineToGraph(new_mod, new_g, engine);
+            auto new_method = new_mod._ivalue()->compilation_unit()->create_function(method.name(), new_g);
+            auto schema = GenerateGraphSchema(new_mod, new_method->name(), new_g);
+            new_mod.type()->addMethod(new_method);
+            new_method->setSchema(schema);
+        }
     }
 
     return new_mod;

@@ -35,9 +35,36 @@ inline bool constTypesOnly(kwargs& args) {
 // when writing evaluators
 typedef std::function<c10::optional<torch::jit::IValue>(const torch::jit::Node*, kwargs&)> NodeEvaluator;
 
+struct EvalOptions {
+    std::set<c10::TypePtr> blacklisted_output_types;
+    std::vector<c10::OperatorName> valid_schemas;
+    EvalOptions() = default;
+    EvalOptions& blacklistOutputTypes(std::set<c10::TypePtr> types) {
+        use_options = true;
+        blacklisted_output_types = types;
+        return *this;
+    }
+    EvalOptions& validSchemas(std::set<std::string> schemas) {
+        use_options = true;
+        for (auto s : schemas) {
+            valid_schemas.push_back(torch::jit::parseSchema(s).operator_name());
+        }
+        return *this;
+    }
+    bool use() { return use_options; }
+    private:
+        bool use_options = false;
+};
+
 struct EvalRegistration {
     torch::jit::NodeKind kind;
     NodeEvaluator evaluator;
+    EvalOptions options;
+    EvalRegistration() = default;
+    EvalRegistration(torch::jit::NodeKind _kind, NodeEvaluator _evaluator)
+        : kind(_kind), evaluator(_evaluator), options(EvalOptions()) {};
+    EvalRegistration(torch::jit::NodeKind _kind, NodeEvaluator _evaluator, EvalOptions _options)
+        : kind(_kind), evaluator(_evaluator), options(_options) {};
 };
 
 c10::optional<torch::jit::IValue> EvalNode(const torch::jit::Node* n, kwargs& args);

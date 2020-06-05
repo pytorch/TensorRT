@@ -190,6 +190,57 @@ void AddParamsToCtxValueMap(ConversionCtx* ctx, GraphParams& params) {
     }
 }
 
+void MapIValues(ConversionCtx* ctx, c10::ArrayRef<const torch::jit::Value*> in_list, c10::ArrayRef<const torch::jit::Value*> out_list, int64_t in_offset, int64_t out_offset) {
+    std::vector<std::pair<const torch::jit::Value*, const torch::jit::Value*>> input_output_pairs;
+    std::transform(in_list.begin() + in_offset, in_list.end(), out_list.begin() + out_offset,
+        std::back_inserter(input_output_pairs),
+        [](auto in, auto out){
+            return std::make_pair(in, out);
+        });
+
+    for (auto p : input_output_pairs) {
+        auto input = ctx->evaluated_value_map[p.first];
+        ctx->evaluated_value_map[p.second] = torch::jit::IValue(input);
+    }
+}
+
+// TODO: With functionalization pass we may be able to make this into a regular evaluator later
+void EvaluateLoopBlock(ConversionCtx* ctx, const torch::jit::Node* n) {
+    auto max_trip_count = ctx->evaluated_value_map[n->input(0)];
+    auto start_cond = ctx->evaluated_value_map[n->input(1)];
+    ctx->evaluated_value_map[n->blocks()[0]->inputs()[0]] = torch::jit::IValue(0);
+    auto trip_count = ctx->evaluated_value_map[n->blocks()[0]->inputs()[0]];
+
+    MapIValues(ctx, n->inputs(), n->outputs(), 2, 0);
+
+    LOG_DEBUG("(Loop Evaluation) Evaluating loop " << *n);
+    LOG_DEBUG("(Loop Evaluation) Max Trip Count: " << max_trip_count.toInt());
+    LOG_DEBUG("(Loop Evaluation) Start Condition: " << start_cond.toBool());
+    LOG_DEBUG("(Loop Evaluation) Current Trip Count: " << trip_count.toInt());
+
+    while (start_cond.toBool() && trip_count.toInt() < max_trip_count.toInt()) {
+        MapIValues(ctx, n->outputs(), n->blocks()[0]->inputs(), 0, 1);
+        for (auto bn : n->blocks()[0]->nodes()) {
+            auto eval = EvaluateNode(ctx, bn);
+            if (eval) {
+                if (!eval.value().isTensor()) {
+                    LOG_DEBUG(ctx->logger, "(Loop Evaluation) Found the value to be: " << eval.value());
+                } else {
+                    LOG_DEBUG(ctx->logger, "(Loop Evaluation) Found the value to be a tensor (shape " << eval.value().toTensor().sizes() << ')');
+                }
+                ctx->AssociateValueAndIValue(bn->output(0), eval.value());
+            }
+        }
+
+        MapIValues(ctx, n->blocks()[0]->outputs(), n->outputs(), 1, 0);
+        start_cond = ctx->evaluated_value_map[n->blocks()[0]->outputs()[0]];
+        auto new_trip_count = torch::jit::IValue(trip_count.toInt() + 1);
+        trip_count.swap(new_trip_count);
+        LOG_DEBUG("(Loop Evaluation) Condition: " << start_cond.toBool());
+        LOG_DEBUG("(Loop Evaluation) Current Trip Count: " << trip_count.toInt());
+    }
+}
+
 void ConvertBlockToNetDef(ConversionCtx* ctx, const torch::jit::Block* b, ConversionInfo build_info, GraphParams& static_params) {
      LOG_INFO(ctx->logger, "Converting Block");
 
@@ -202,7 +253,19 @@ void ConvertBlockToNetDef(ConversionCtx* ctx, const torch::jit::Block* b, Conver
     for (const auto n : nodes) {
         bool to_eval = evaluators::shouldEvalAtConversionTime(n);
         bool blacklisted = isNodeConversionBlacklisted(n);
-        if (!to_eval && !blacklisted) {
+        if (n->kind() == torch::jit::prim::Loop) {
+            EvaluateLoopBlock(ctx, n);
+        } else if (to_eval) {
+            auto eval = EvaluateNode(ctx, n);
+            if (eval) {
+                if (!eval.value().isTensor()) {
+                    LOG_DEBUG(ctx->logger, "Found the value to be: " << eval.value());
+                } else {
+                    LOG_DEBUG(ctx->logger, "Found the value to be a tensor (shape " << eval.value().toTensor().sizes() << ')');
+                }
+                ctx->AssociateValueAndIValue(n->output(0), eval.value());
+            }
+        } else if (!blacklisted) {
             // Should error out if something fails
             AddLayer(ctx, n);
         } else {
@@ -237,22 +300,29 @@ std::string ConvertBlockToEngine(const torch::jit::Block* b, ConversionInfo buil
     return engine;
 }
 
-bool VerifyConverterSupportForBlock(const torch::jit::Block* b) {
-    bool supported = true;
+std::set<std::string> GetUnsupportedOpsInBlock(const torch::jit::Block* b ) {
     std::set<std::string> unsupported_ops;
     for (const auto n : b->nodes()) {
-        if (!OpSupported(n)) {
+        if (!OpSupported(n) && n->kind() != torch::jit::prim::Loop) {
             auto schema = n->maybeSchema();
             TRTORCH_CHECK(schema, "Unable to get schema for Node " << util::node_info(n) \
                                     << " (conversion.VerifyCoverterSupportForBlock");
             std::stringstream ss;
             ss << *schema;
             unsupported_ops.insert(ss.str());
-            supported = false;
+        }
+        for (const auto sub_b : n->blocks()) {
+            auto sub_b_unsupported_ops = GetUnsupportedOpsInBlock(sub_b);
+            unsupported_ops.insert(sub_b_unsupported_ops.begin(), sub_b_unsupported_ops.end());
         }
     }
+    return unsupported_ops;
+}
 
-    if (!supported) {
+bool VerifyConverterSupportForBlock(const torch::jit::Block* b) {
+    auto unsupported_ops = GetUnsupportedOpsInBlock(b);
+
+    if (unsupported_ops.size() != 0) {
         std::stringstream unsupported_msg;
          unsupported_msg << "Method requested cannot be compiled by TRTorch.\nUnsupported operators listed below:" << std::endl;
         for (auto s : unsupported_ops) {
@@ -261,8 +331,10 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b) {
         unsupported_msg << "You can either implement converters for these ops in your application or request implementation" << std::endl;
         unsupported_msg <<  "https://www.github.com/nvidia/TRTorch/issues" << std::endl;
         LOG_ERROR(unsupported_msg.str());
+        return false;
+    } else {
+        return true;
     }
-    return supported;
 }
 
 } // namespace conversion

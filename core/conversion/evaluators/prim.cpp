@@ -1,3 +1,5 @@
+#include <limits>
+
 #include "torch/csrc/jit/ir/ir.h"
 #include "torch/csrc/jit/ir/constants.h"
 #include "ATen/core/functional.h"
@@ -5,6 +7,7 @@
 #include "ATen/core/List.h"
 #include "ATen/core/stack.h"
 #include "c10/util/intrusive_ptr.h"
+#include "torch/torch.h"
 
 #include "core/conversion/evaluators/evaluators.h"
 
@@ -22,6 +25,11 @@ auto prim_registrations = RegisterNodeEvaluators()
                 return {};
             }
             return torch::jit::toIValue(n->output());
+        }
+    }).evaluator({
+        torch::jit::prim::NumToTensor,
+        [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+            return at::scalar_to_tensor(args.at(n->output(0)).IValue()->toScalar());
         }
     }).evaluator({
         torch::jit::prim::ListConstruct,
@@ -86,6 +94,37 @@ auto prim_registrations = RegisterNodeEvaluators()
                 return c10::optional<torch::jit::IValue>(std::move(torch::jit::IValue(list)));
             }
         }
+    }).evaluator({
+         c10::Symbol::fromQualString("prim::min"),
+         [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+            auto a = args.at(n->input(0)).unwrapToIntList();
+            int64_t min = std::numeric_limits<int64_t>::max();
+
+            for (size_t i = 0; i < a.size(); i++) {
+                if (a[i] < min) {
+                    min = a[i];
+                }
+            }
+
+            return min;
+        },
+        EvalOptions().validSchemas({"prim::min.self_int(int[] self) -> (int)"})
+    }).evaluator({
+        c10::Symbol::fromQualString("prim::shape"),
+        [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+            LOG_WARNING("There may be undefined behavior using dynamic shape and prim::shape");
+            auto tensor_var = args.at(n->input(0));
+            if (tensor_var.isITensor()) {
+                auto tensor = tensor_var.ITensor();
+                return util::toVec(tensor->getDimensions());
+            } else {
+                auto tensor = tensor_var.unwrapToTensor();
+                return tensor.sizes();
+            }
+        },
+        EvalOptions().validSchemas({
+            "prim::shape(Tensor a) -> (int[])"
+        })
     });
 }
 } // namespace evaluators

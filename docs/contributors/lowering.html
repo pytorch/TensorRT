@@ -374,32 +374,32 @@
            <ul class="md-nav__list">
             <li class="md-nav__item">
              <a class="md-nav__link" href="useful_links.html#tensorrt-available-layers-and-expected-dimensions">
-              TensorRT Available Layers and Expected Dimensions:
+              TensorRT Available Layers and Expected Dimensions
              </a>
             </li>
             <li class="md-nav__item">
              <a class="md-nav__link" href="useful_links.html#tensorrt-c-documentation">
-              TensorRT C++ Documentation:
+              TensorRT C++ Documentation
              </a>
             </li>
             <li class="md-nav__item">
              <a class="md-nav__link" href="useful_links.html#tensorrt-python-documentation-sometimes-easier-to-read">
-              TensorRT Python Documentation (Sometimes easier to read):
+              TensorRT Python Documentation (Sometimes easier to read)
              </a>
             </li>
             <li class="md-nav__item">
              <a class="md-nav__link" href="useful_links.html#pytorch-functional-api">
-              PyTorch Functional API:
+              PyTorch Functional API
              </a>
             </li>
             <li class="md-nav__item">
              <a class="md-nav__link" href="useful_links.html#pytorch-native-ops">
-              PyTorch native_ops:
+              PyTorch native_ops
              </a>
             </li>
             <li class="md-nav__item">
              <a class="md-nav__link" href="useful_links.html#pytorch-ir-documentation">
-              PyTorch IR Documentation:
+              PyTorch IR Documentation
              </a>
             </li>
            </ul>
@@ -493,6 +493,11 @@
               <nav class="md-nav">
                <ul class="md-nav__list">
                 <li class="md-nav__item">
+                 <a class="md-nav__link" href="#eliminatecommonsubexpression">
+                  EliminateCommonSubexpression
+                 </a>
+                </li>
+                <li class="md-nav__item">
                  <a class="md-nav__link" href="#eliminate-dead-code">
                   Eliminate Dead Code
                  </a>
@@ -510,6 +515,11 @@
                 <li class="md-nav__item">
                  <a class="md-nav__link" href="#freeze-module">
                   Freeze Module
+                 </a>
+                </li>
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#fuse-addmm-branches">
+                  Fuse AddMM Branches
                  </a>
                 </li>
                 <li class="md-nav__item">
@@ -533,6 +543,11 @@
                  </a>
                 </li>
                 <li class="md-nav__item">
+                 <a class="md-nav__link" href="#peephole-optimze">
+                  Peephole Optimze
+                 </a>
+                </li>
+                <li class="md-nav__item">
                  <a class="md-nav__link" href="#remove-contiguous">
                   Remove Contiguous
                  </a>
@@ -543,6 +558,11 @@
                  </a>
                 </li>
                 <li class="md-nav__item">
+                 <a class="md-nav__link" href="#remove-to">
+                  Remove To
+                 </a>
+                </li>
+                <li class="md-nav__item">
                  <a class="md-nav__link" href="#unpack-addmm">
                   Unpack AddMM
                  </a>
@@ -550,6 +570,11 @@
                 <li class="md-nav__item">
                  <a class="md-nav__link" href="#unpack-logsoftmax">
                   Unpack LogSoftmax
+                 </a>
+                </li>
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#unroll-loops">
+                  Unroll Loops
                  </a>
                 </li>
                </ul>
@@ -601,6 +626,24 @@ reduce the scope of each converter.
          ¶
         </a>
        </h2>
+       <h3 id="eliminatecommonsubexpression">
+        EliminateCommonSubexpression
+        <a class="headerlink" href="#eliminatecommonsubexpression" title="Permalink to this headline">
+         ¶
+        </a>
+       </h3>
+       <blockquote>
+        <div>
+         <p>
+          <a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/common_subexpression_elimination.h">
+           torch/csrc/jit/passes/common_subexpression_elimination.h
+          </a>
+         </p>
+        </div>
+       </blockquote>
+       <p>
+        Removes common subexpressions in the graph
+       </p>
        <h3 id="eliminate-dead-code">
         Eliminate Dead Code
         <a class="headerlink" href="#eliminate-dead-code" title="Permalink to this headline">
@@ -690,6 +733,47 @@ guarded we are allowed to remove a guard on ops’ outputs
        <p>
         Freeze attributes and inline constants and modules. Propogates constants in the graph.
        </p>
+       <h3 id="fuse-addmm-branches">
+        Fuse AddMM Branches
+        <a class="headerlink" href="#fuse-addmm-branches" title="Permalink to this headline">
+         ¶
+        </a>
+       </h3>
+       <blockquote>
+        <div>
+         <p>
+          <a class="reference external" href="https://github.com/nvidia/trtorch/blob/master/core/lowering/passes/fuse_addmm_branches.cpp">
+           trtorch/core/lowering/passes/fuse_addmm_branches.cpp
+          </a>
+         </p>
+        </div>
+       </blockquote>
+       <p>
+        A common pattern in scripted modules is tensors of different dimensions use different constructions for implementing linear layers. We fuse these
+different varients into a single one that will get caught by the Unpack AddMM pass.
+       </p>
+       <div class="highlight-none notranslate">
+        <div class="highlight">
+         <pre><span></span>%ret : Tensor = prim::If(%622)
+block0():
+  %ret.1 : Tensor = aten::addmm(%self.fc.bias, %x9.1, %3677, %3, %3)
+  -&gt; (%ret.1)
+block1():
+  %output.1 : Tensor = aten::matmul(%x9.1, %3677)
+  %output0.1 : Tensor = aten::add_(%output.1, %self.fc.bias, %3)
+  -&gt; (%output0.1)
+</pre>
+        </div>
+       </div>
+       <p>
+        We fuse this set of blocks into a graph like this:
+       </p>
+       <div class="highlight-none notranslate">
+        <div class="highlight">
+         <pre><span></span>%ret : Tensor = aten::addmm(%self.fc.bias, %x9.1, %3677, %3, %3)
+</pre>
+        </div>
+       </div>
        <h3 id="fuse-linear">
         Fuse Linear
         <a class="headerlink" href="#fuse-linear" title="Permalink to this headline">
@@ -824,6 +908,43 @@ are the true inputs to the function.
        <p>
         Removes _all_ tuples and raises an error if some cannot be removed, this is used by ONNX to ensure there are not tuples before conversion, but will not work on graphs whose inputs contain tuples.
        </p>
+       <h3 id="peephole-optimze">
+        Peephole Optimze
+        <a class="headerlink" href="#peephole-optimze" title="Permalink to this headline">
+         ¶
+        </a>
+       </h3>
+       <blockquote>
+        <div>
+         <p>
+          <a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/ppeephole_optimze.h">
+           torch/csrc/jit/passes/peephole_optimze.h
+          </a>
+         </p>
+        </div>
+       </blockquote>
+       <p>
+        The intent for this optimization pass is to catch all of the small, easy to catch peephole optimizations you might be interested in doing.
+       </p>
+       <dl class="simple">
+        <dt>
+         Right now, it does:
+        </dt>
+        <dd>
+         <ul class="simple">
+          <li>
+           <p>
+            Eliminate no-op ‘expand’ nodes
+           </p>
+          </li>
+          <li>
+           <p>
+            Simply x.t().t() to x
+           </p>
+          </li>
+         </ul>
+        </dd>
+       </dl>
        <h3 id="remove-contiguous">
         Remove Contiguous
         <a class="headerlink" href="#remove-contiguous" title="Permalink to this headline">
@@ -859,6 +980,31 @@ are the true inputs to the function.
        </blockquote>
        <p>
         Removes dropout operators since we are doing inference.
+       </p>
+       <h3 id="remove-to">
+        Remove To
+        <a class="headerlink" href="#remove-to" title="Permalink to this headline">
+         ¶
+        </a>
+       </h3>
+       <blockquote>
+        <div>
+         <p>
+          <a class="reference external" href="https://github.com/nvidia/trtorch/blob/master/core/lowering/passes/remove_to.cpp">
+           trtorch/core/lowering/passes/remove_to.cpp
+          </a>
+         </p>
+        </div>
+       </blockquote>
+       <p>
+        Removes
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          aten::to
+         </span>
+        </code>
+        operators that do casting, since TensorRT mangages it itself. It is important that this is one of the last passes run so that
+other passes have a change to move required cast operators out of the main namespace.
        </p>
        <h3 id="unpack-addmm">
         Unpack AddMM
@@ -962,6 +1108,24 @@ are the true inputs to the function.
         </code>
         converters instead of needing a dedicated converter.
        </p>
+       <h3 id="unroll-loops">
+        Unroll Loops
+        <a class="headerlink" href="#unroll-loops" title="Permalink to this headline">
+         ¶
+        </a>
+       </h3>
+       <blockquote>
+        <div>
+         <p>
+          <a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/loop_unrolling.h">
+           torch/csrc/jit/passes/loop_unrolling.h
+          </a>
+         </p>
+         <p>
+          Unrolls the operations of compatable loops (e.g. sufficently short) so that you only have to go through the loop once.
+         </p>
+        </div>
+       </blockquote>
       </article>
      </div>
     </div>
