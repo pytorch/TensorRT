@@ -165,7 +165,7 @@ auto aten_registrations = RegisterNodeEvaluators()
     }).evaluator({
         c10::Symbol::fromQualString("aten::neg"),
         [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-            auto el = args.at(n->input(1)).unwrapToInt();
+            auto el = args.at(n->input(0)).unwrapToInt();
 
             return el * -1;
         },
