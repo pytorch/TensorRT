@@ -18,17 +18,6 @@ auto interpolate_registrations = RegisterNodeConversionPatterns()
             auto in = args[0].ITensor();
             auto in_shape = util::toVec(in->getDimensions());
 
-            // remove padding that TensorRt adds automatically
-            if (in_shape.size() >= 4) {
-                // remove first dimension
-                in_shape.erase(in_shape.begin());
-
-                auto shuffle = ctx->net->addShuffle(*in);
-                shuffle->setReshapeDimensions(util::toDims(in_shape));
-                shuffle->setName( (util::node_info(n) + " [Reshape to " + util::toStr(util::toDims(in_shape)) + "]").c_str() );
-                in = shuffle->getOutput(0);
-            }
-                
             // Case 1: user uses output size and not scales
             if (!args[1].IValue()->isNone() && args[2].IValue()->isNone()) {
                 auto out_size = util::toVec(util::toDims(args[1].unwrapToIntList()));
@@ -45,30 +34,8 @@ auto interpolate_registrations = RegisterNodeConversionPatterns()
                 resize_layer->setResizeMode(nvinfer1::ResizeMode::kNEAREST);
                 resize_layer->setName(util::node_info(n).c_str());
 
-                // auto out_tensor = resize_layer->getOutput(0);
-                // out_shape.erase(out_shape.begin());
-                // auto shuffle = ctx->net->addShuffle(*out_tensor);
-                // shuffle->setReshapeDimensions(util::toDims(out_shape));
-                // shuffle->setName( (util::node_info(n) + " [Reshape to " + util::toStr(util::toDims(out_shape)) + "]").c_str() );
-                // auto layer_output = ctx->AssociateValueAndTensor(n->outputs()[0], shuffle->getOutput(0));
-                // LOG_DEBUG("Output tensor shape: " << layer_output->getDimensions());
-                
-                // std::cout << "PRINTING STUFF AT THE END!" << std::endl;
-                // auto final = util::toVec(shuffle->getOutput(0)->getDimensions());
-                // for (auto iter = final.begin(); iter != final.end(); iter++) {
-                //     std::cout << *iter << std::endl;
-                // }
-
-                //std::raise(SIGABRT);
-                
                 auto layer_output = ctx->AssociateValueAndTensor(n->outputs()[0], resize_layer->getOutput(0));
                 LOG_DEBUG("Output tensor shape: " << layer_output->getDimensions());
-
-                // std::cout << "PRINTING STUFF AT THE END!" << std::endl;
-                // auto final = util::toVec(resize_layer->getOutput(0)->getDimensions());
-                // for (auto iter = final.begin(); iter != final.end(); iter++) {
-                //     std::cout << *iter << std::endl;
-                // }
             } else {
                 LOG_DEBUG("scale factor parameter not supported yet.");
             }
