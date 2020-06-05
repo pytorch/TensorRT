@@ -15,6 +15,7 @@ const std::unordered_set<std::string>& get_non_convertable_nodes() {
         "aten::backward",
         "aten::save",
         "aten::contiguous",
+        "aten::to",
         "prim::RaiseException",
         "prim::Print",
         "prim::device",
