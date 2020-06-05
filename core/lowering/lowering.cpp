@@ -2,11 +2,12 @@
 #include "torch/csrc/jit/passes/dead_code_elimination.h"
 #include "torch/csrc/jit/passes/fuse_linear.h"
 #include "torch/csrc/jit/passes/freeze_module.h"
+#include "torch/csrc/jit/passes/guard_elimination.h"
 #include "torch/csrc/jit/passes/loop_unrolling.h"
 #include "torch/csrc/jit/passes/lower_graph.h"
 #include "torch/csrc/jit/passes/lower_tuples.h"
+#include "torch/csrc/jit/passes/peephole.h"
 #include "torch/csrc/jit/passes/quantization.h"
-#include "torch/csrc/jit/passes/guard_elimination.h"
 
 #include "core/util/prelude.h"
 #include "core/lowering/lowering.h"
@@ -24,6 +25,7 @@ void LowerBlock(torch::jit::Block* b) {
 
 void LowerGraph(std::shared_ptr<torch::jit::Graph>& g) {
     torch::jit::EliminateRedundantGuards(g);
+    torch::jit::PeepholeOptimize(g, false);
     passes::EliminateExceptionOrPassPattern(g);
     torch::jit::FuseLinear(g);
     torch::jit::LowerAllTuples(g);
