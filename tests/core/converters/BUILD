@@ -51,6 +51,10 @@ converter_test(
   name = "test_unary"
 )
 
+converter_test(
+  name = "test_interpolate"
+)
+
 test_suite(
   name = "test_converters",
   tests = [
@@ -65,6 +69,7 @@ test_suite(
     ":test_shuffle",
     ":test_softmax",
     ":test_unary",
+    ":test_interpolate",
   ]
 )
 
