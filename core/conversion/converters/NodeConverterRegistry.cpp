@@ -46,7 +46,7 @@ using ConverterLUT = std::unordered_map<c10::OperatorName, OpConverter>;
 class NodeConverterRegistry {
 public:
     bool RegisterConverter(torch::jit::FunctionSchema* signature, OpConverter& converter) {
-        LOG_DEBUG("Registering Converter for " << canonical_schema_string(*signature));
+        LOG_DEBUG("Registering converter for " << canonical_schema_string(*signature));
         auto name = signature->operator_name();
         converter_lut_[name] = std::move(converter);
         return true;

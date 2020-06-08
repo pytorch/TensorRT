@@ -22,7 +22,7 @@ struct TRTEngine : torch::CustomClassHolder {
     std::string name;
     util::logging::TRTorchLogger logger;
 
-    TRTEngine() = default;
+    ~TRTEngine();
     TRTEngine(std::string serialized_engine);
     TRTEngine(std::string mod_name, std::string serialized_engine);
     TRTEngine& operator=(const TRTEngine& other);
