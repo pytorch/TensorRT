@@ -60,6 +60,12 @@ TRTEngine& TRTEngine::operator=(const TRTEngine& other) {
     return (*this);
 }
 
+TRTEngine::~TRTEngine() {
+    exec_ctx->destroy();
+    cuda_engine->destroy();
+    rt->destroy();
+}
+
 // TODO: Implement a call method
 // c10::List<at::Tensor> TRTEngine::Run(c10::List<at::Tensor> inputs) {
 //     auto input_vec = inputs.vec();
