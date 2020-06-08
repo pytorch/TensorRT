@@ -37,7 +37,7 @@ auto interpolate_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
                 auto layer_output = ctx->AssociateValueAndTensor(n->outputs()[0], resize_layer->getOutput(0));
                 LOG_DEBUG("Output tensor shape: " << layer_output->getDimensions());
             } else {
-                TRTORCH_THROW_ERROR("Unable to retrieve all node inputs for node: " << util::node_info(n) << "\nScale factor parameter not supported yet");
+                TRTORCH_THROW_ERROR("Unable to convert node: " << util::node_info(n) << "\nScale factor parameter for upsample_nearest1d not supported yet.");
             }
 
             return true;
@@ -67,7 +67,7 @@ auto interpolate_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
                 auto layer_output = ctx->AssociateValueAndTensor(n->outputs()[0], resize_layer->getOutput(0));
                 LOG_DEBUG("Output tensor shape: " << layer_output->getDimensions());
             } else {
-                TRTORCH_THROW_ERROR("Unable to retrieve all node inputs for node: " << util::node_info(n) << "\nScale factor parameter not supported yet");
+                TRTORCH_THROW_ERROR("Unable to convert node: " << util::node_info(n) << "\nScale factor parameter for upsample_nearest2d not supported yet.");
             }
 
             return true;
@@ -97,7 +97,7 @@ auto interpolate_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
                 auto layer_output = ctx->AssociateValueAndTensor(n->outputs()[0], resize_layer->getOutput(0));
                 LOG_DEBUG("Output tensor shape: " << layer_output->getDimensions());
             } else {
-                TRTORCH_THROW_ERROR("Unable to retrieve all node inputs for node: " << util::node_info(n) << "\nScale factor parameter not supported yet");
+                TRTORCH_THROW_ERROR("Unable to convert node: " << util::node_info(n) << "\nScale factor parameter for upsample_nearest3d not supported yet.");
             }
 
             return true;
