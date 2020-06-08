@@ -11,10 +11,10 @@ namespace converters {
 namespace impl {
 namespace {
 
-auto interpolate_registrations = RegisterNodeConversionPatterns()
+auto interpolate_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
     .pattern({
         "aten::upsample_nearest1d(Tensor self, int[1] output_size, float? scales=None) -> (Tensor)",
-        [](ConversionCtx* ctx, const torch::jit::Node*n, args& args) -> bool {
+        [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
             auto in = args[0].ITensor();
             auto in_shape = util::toVec(in->getDimensions());
 
@@ -37,7 +37,7 @@ auto interpolate_registrations = RegisterNodeConversionPatterns()
                 auto layer_output = ctx->AssociateValueAndTensor(n->outputs()[0], resize_layer->getOutput(0));
                 LOG_DEBUG("Output tensor shape: " << layer_output->getDimensions());
             } else {
-                LOG_DEBUG("scale factor parameter not supported yet.");
+                TRTORCH_THROW_ERROR("Unable to retrieve all node inputs for node: " << util::node_info(n) << "\nScale factor parameter not supported yet");
             }
 
             return true;
@@ -67,14 +67,14 @@ auto interpolate_registrations = RegisterNodeConversionPatterns()
                 auto layer_output = ctx->AssociateValueAndTensor(n->outputs()[0], resize_layer->getOutput(0));
                 LOG_DEBUG("Output tensor shape: " << layer_output->getDimensions());
             } else {
-                LOG_DEBUG("scale factor parameters not supported yet.");
+                TRTORCH_THROW_ERROR("Unable to retrieve all node inputs for node: " << util::node_info(n) << "\nScale factor parameter not supported yet");
             }
 
             return true;
         }
     }).pattern({
         "aten::upsample_nearest3d(Tensor self, int[3] output_size, float? scales_d=None, float? scales_h=None, float? scales_w=None) -> (Tensor)",
-        [](ConversionCtx* ctx, const torch::jit::Node*n, args& args) -> bool {
+        [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
             auto in = args[0].ITensor();
             auto in_shape = util::toVec(in->getDimensions());
 
@@ -97,7 +97,7 @@ auto interpolate_registrations = RegisterNodeConversionPatterns()
                 auto layer_output = ctx->AssociateValueAndTensor(n->outputs()[0], resize_layer->getOutput(0));
                 LOG_DEBUG("Output tensor shape: " << layer_output->getDimensions());
             } else {
-                LOG_DEBUG("scale factor parameters not supported yet.");
+                TRTORCH_THROW_ERROR("Unable to retrieve all node inputs for node: " << util::node_info(n) << "\nScale factor parameter not supported yet");
             }
 
             return true;
