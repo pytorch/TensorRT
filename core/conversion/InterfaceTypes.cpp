@@ -55,9 +55,9 @@ InputRange::InputRange(std::vector<int64_t> min_shape, std::vector<int64_t> opt_
                   << max_shape.size() << ")");
     }
 
-    min = util::toDimsPad(min_shape, 4);
-    opt = util::toDimsPad(opt_shape, 4);
-    max = util::toDimsPad(max_shape, 4);
+    min = util::toDims(min_shape);
+    opt = util::toDims(opt_shape);
+    max = util::toDims(max_shape);
 
     std::vector<int64_t> dyn_shape;
     for (size_t i = 0; i < opt_shape.size(); i++) {
@@ -73,7 +73,7 @@ InputRange::InputRange(std::vector<int64_t> min_shape, std::vector<int64_t> opt_
         }
     }
 
-    input_shape = util::toDimsPad(dyn_shape, 4);
+    input_shape = util::toDims(dyn_shape);
 
 }
 
