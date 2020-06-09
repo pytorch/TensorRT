@@ -163,13 +163,45 @@ auto interpolate_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
                 auto layer_output = ctx->AssociateValueAndTensor(n->outputs()[0], resize_layer->getOutput(0));
                 LOG_DEBUG("Output tensor shape: " << layer_output->getDimensions());
             } else {
-                TRTORCH_THROW_ERROR("Unable to convert node: " << util::node_info(n) << "\nScale factor parameter for upsample_linear1d not supported yet.");
+                TRTORCH_THROW_ERROR("Unable to convert node: " << util::node_info(n) << "\nScale factor parameter for upsample_bilinear2d not supported yet.");
+            }
+
+            return true;
+        }
+    }).pattern({
+        "aten::upsample_trilinear3d(Tensor self, int[3] output_size, bool align_corners, float? scales_d=None, float? scales_h=None, float? scales_w=None) -> (Tensor)",
+        [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+            auto in = args[0].ITensor();
+            auto in_shape = util::toVec(in->getDimensions());
+            
+            bool align_corners = args[2].IValue()->to<bool>();
+
+            // Case 1: user uses output size and not scales_d, scales_h, scales_w
+            if (!args[1].IValue()->isNone() && args[3].IValue()->isNone() && args[4].IValue()->isNone() && args[5].IValue()->isNone()) {
+                auto out_size = util::toVec(util::toDims(args[1].unwrapToIntList()));
+
+                TRTORCH_ASSERT(out_size.size() == 3, "aten::upsample_trilinear3d input Tensor and output size dimension mismatch");
+                
+                auto out_shape = in_shape;
+                std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
+
+                auto resize_layer = ctx->net->addResize(*in);
+                TRTORCH_CHECK(resize_layer, "Unable to create interpolation (resizing) layer from node" << *n);
+
+                resize_layer->setOutputDimensions(util::toDims(out_shape));
+                resize_layer->setResizeMode(nvinfer1::ResizeMode::kLINEAR);
+                resize_layer->setAlignCorners(align_corners);
+                resize_layer->setName(util::node_info(n).c_str());
+
+                auto layer_output = ctx->AssociateValueAndTensor(n->outputs()[0], resize_layer->getOutput(0));
+                LOG_DEBUG("Output tensor shape: " << layer_output->getDimensions());
+            } else {
+                TRTORCH_THROW_ERROR("Unable to convert node: " << util::node_info(n) << "\nScale factor parameter for upsample_trilinear3d not supported yet.");
             }
 
             return true;
         }
     });
-
 
 } // namespace
 } // namespace impl
