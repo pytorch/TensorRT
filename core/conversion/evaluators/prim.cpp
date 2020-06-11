@@ -10,6 +10,7 @@
 #include "torch/torch.h"
 
 #include "core/conversion/evaluators/evaluators.h"
+#include "core/conversion/evaluators/eval_macros.h"
 
 namespace trtorch {
 namespace core {
@@ -97,18 +98,121 @@ auto prim_registrations = RegisterNodeEvaluators()
     }).evaluator({
          c10::Symbol::fromQualString("prim::min"),
          [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-            auto a = args.at(n->input(0)).unwrapToIntList();
-            int64_t min = std::numeric_limits<int64_t>::max();
+            if (n->inputs().size() == 1) {
+                auto a = args.at(n->input(0)).unwrapToIntList();
+                int64_t min = std::numeric_limits<int64_t>::max();
 
-            for (size_t i = 0; i < a.size(); i++) {
-                if (a[i] < min) {
-                    min = a[i];
+                for (size_t i = 0; i < a.size(); i++) {
+                    if (a[i] < min) {
+                        min = a[i];
+                    }
                 }
-            }
 
-            return min;
+                return min;
+            } else if (n->inputs().size() == 2) {
+                if (args.at(n->input(0)).IValue()->isInt()) {
+                    auto a = args.at(n->input(0)).unwrapToInt();
+                    if (args.at(n->input(1)).IValue()->isInt()) {
+                        auto b = args.at(n->input(1)).unwrapToInt();
+                        return  a < b ? a : b;
+                    } else if (args.at(n->input(1)).IValue()->isDouble()) {
+                        auto b = args.at(n->input(1)).unwrapToDouble();
+                        return  a < b ? a : b;
+                    } else {
+                        TRTORCH_THROW_ERROR("Unimplemented data type for " << n->kind().toQualString() << " evaluator b arg: "
+                            << args.at(n->input(1)).IValue()->type()->str());
+                        return {};
+                    }
+                } else if (args.at(n->input(0)).IValue()->isDouble()) {
+                    auto a = args.at(n->input(0)).unwrapToDouble();
+                    if (args.at(n->input(1)).IValue()->isInt()) {
+                        auto b = args.at(n->input(1)).unwrapToInt();
+                        return  a < b ? a : b;
+                    } else if (args.at(n->input(1)).IValue()->isDouble()) {
+                        auto b = args.at(n->input(1)).unwrapToDouble();
+                        return  a < b ? a : b;
+                    } else {
+                        TRTORCH_THROW_ERROR("Unimplemented data type for " << n->kind().toQualString() << " evaluator b arg: "
+                            << args.at(n->input(1)).IValue()->type()->str());
+                        return {};
+                    }
+                } else {
+                    TRTORCH_THROW_ERROR("Unimplemented data type for " << n->kind().toQualString() << " evaluator a arg: "
+                        << args.at(n->input(0)).IValue()->type()->str());
+                    return {};
+                }
+            } else {
+                TRTORCH_THROW_ERROR("Unimplemented " << n->kind().toQualString() << " evaluator case");
+                    return {};
+            }
         },
-        EvalOptions().validSchemas({"prim::min.self_int(int[] self) -> (int)"})
+        EvalOptions().validSchemas({
+            "prim::min.self_int(int[] self) -> (int)",
+            "prim::min.bool(bool a, bool b) -> (bool)",
+            "prim::min.int(int a, int b) -> (bool)",
+            "prim::min.float(float a, float b) -> (bool)",
+            "prim::min.int_float(int a, float b) -> (bool)",
+            "prim::min.float_int(float a, int b) -> (bool)",
+        })
+    }).evaluator({
+         c10::Symbol::fromQualString("prim::max"),
+         [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+            if (n->inputs().size() == 1) {
+                auto a = args.at(n->input(0)).unwrapToIntList();
+                int64_t max = std::numeric_limits<int64_t>::min();
+
+                for (size_t i = 0; i < a.size(); i++) {
+                    if (a[i] > max) {
+                        max = a[i];
+                    }
+                }
+
+                return max;
+            } else if (n->inputs().size() == 2) {
+                if (args.at(n->input(0)).IValue()->isInt()) {
+                    auto a = args.at(n->input(0)).unwrapToInt();
+                    if (args.at(n->input(1)).IValue()->isInt()) {
+                        auto b = args.at(n->input(1)).unwrapToInt();
+                        return  a > b ? a : b;
+                    } else if (args.at(n->input(1)).IValue()->isDouble()) {
+                        auto b = args.at(n->input(1)).unwrapToDouble();
+                        return  a > b ? a : b;
+                    } else {
+                        TRTORCH_THROW_ERROR("Unimplemented data type for " << n->kind().toQualString() << " evaluator b arg: "
+                            << args.at(n->input(1)).IValue()->type()->str());
+                        return {};
+                    }
+                } else if (args.at(n->input(0)).IValue()->isDouble()) {
+                    auto a = args.at(n->input(0)).unwrapToDouble();
+                    if (args.at(n->input(1)).IValue()->isInt()) {
+                        auto b = args.at(n->input(1)).unwrapToInt();
+                        return  a > b ? a : b;
+                    } else if (args.at(n->input(1)).IValue()->isDouble()) {
+                        auto b = args.at(n->input(1)).unwrapToDouble();
+                        return  a > b ? a : b;
+                    } else {
+                        TRTORCH_THROW_ERROR("Unimplemented data type for " << n->kind().toQualString() << " evaluator b arg: "
+                            << args.at(n->input(1)).IValue()->type()->str());
+                        return {};
+                    }
+                } else {
+                    TRTORCH_THROW_ERROR("Unimplemented data type for " << n->kind().toQualString() << " evaluator a arg: "
+                        << args.at(n->input(0)).IValue()->type()->str());
+                    return {};
+                }
+            } else {
+                TRTORCH_THROW_ERROR("Unimplemented " << n->kind().toQualString() << " evaluator case");
+                    return {};
+            }
+        },
+        EvalOptions().validSchemas({
+            "prim::max.self_int(int[] self) -> (int)",
+            "prim::max.bool(bool a, bool b) -> (bool)",
+            "prim::max.int(int a, int b) -> (bool)",
+            "prim::max.float(float a, float b) -> (bool)",
+            "prim::max.int_float(int a, float b) -> (bool)",
+            "prim::max.float_int(float a, int b) -> (bool)",
+        })
     }).evaluator({
         c10::Symbol::fromQualString("prim::shape"),
         [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
@@ -125,6 +229,23 @@ auto prim_registrations = RegisterNodeEvaluators()
         EvalOptions().validSchemas({
             "prim::shape(Tensor a) -> (int[])"
         })
+    }).evaluator({
+        c10::Symbol::fromQualString("prim::unchecked_cast"),
+        [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+            return *(args.at(n->input(0)).IValue());
+        }
+    }).evaluator({
+        c10::Symbol::fromQualString("prim::Uninitialized"),
+        [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+            return c10::IValue::uninitialized();
+        }
+    }).evaluator({
+        c10::Symbol::fromQualString("prim::RaiseException"),
+        [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+            auto exception = args.at(n->input(0)).IValue()->toString();
+            TRTORCH_THROW_ERROR(exception);
+            return {};
+        }
     });
 }
 } // namespace evaluators
