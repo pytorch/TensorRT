@@ -48,7 +48,23 @@ Compiling From Source
 Dependencies for Compilation
 ******************************************
 
-TRTorch is built with Bazel, so begin by installing it. https://docs.bazel.build/versions/master/install.html
+TRTorch is built with Bazel, so begin by installing it.
+
+The easiest way is to install bazelisk using the method of you choosing https://github.com/bazelbuild/bazelisk
+
+Otherwise you can use the following instructions to install binaries https://docs.bazel.build/versions/master/install.html
+
+Finally if you need to compile from source (e.g. aarch64 until bazel distributes binaries for the architecture) you can use these instructions
+
+```sh
+export BAZEL_VERSION=3.2.0
+mkdir bazel
+cd bazel
+curl -fSsL -O https://github.com/bazelbuild/bazel/releases/download/$BAZEL_VERSION/bazel-$BAZEL_VERSION-dist.zip
+unzip bazel-$BAZEL_VERSION-dist.zip
+bash ./compile.sh
+cp output/bazel /usr/local/bin/
+```
 
 You will also need to have CUDA installed on the system (or if running in a container, the system must have
 the CUDA driver installed and the container must have CUDA)
