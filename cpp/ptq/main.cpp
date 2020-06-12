@@ -1,6 +1,7 @@
 #include "torch/script.h"
 #include "torch/torch.h"
 #include "trtorch/trtorch.h"
+#include "trtorch/ptq.h"
 
 #include "NvInfer.h"
 
