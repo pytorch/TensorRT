@@ -231,58 +231,103 @@
               <nav class="md-nav">
                <ul class="md-nav__list">
                 <li class="md-nav__item">
-                 <a class="md-nav__link" href="#dependencies">
-                  Dependencies
+                 <a class="md-nav__link" href="#precompiled-binaries">
+                  Precompiled Binaries
                  </a>
                  <nav class="md-nav">
                   <ul class="md-nav__list">
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#dependencies">
+                     Dependencies
+                    </a>
+                   </li>
                    <li class="md-nav__item">
                     <a class="md-nav__link" href="#python-package">
                      Python Package
                     </a>
                    </li>
                    <li class="md-nav__item">
-                    <a class="md-nav__link" href="#binary-distribution">
-                     Binary Distribution
-                    </a>
-                   </li>
-                   <li class="md-nav__item">
-                    <a class="md-nav__link" href="#compiling-from-source">
-                     Compiling From Source
+                    <a class="md-nav__link" href="#c-binary-distribution">
+                     C++ Binary Distribution
                     </a>
                    </li>
                   </ul>
                  </nav>
                 </li>
                 <li class="md-nav__item">
-                 <a class="md-nav__link" href="#dependencies-for-compilation">
-                  Dependencies for Compilation
-                 </a>
-                </li>
-                <li class="md-nav__item">
-                 <a class="md-nav__link" href="#building-using-cudnn-tensorrt-tarball-distributions">
-                  <strong>
-                   Building using cuDNN &amp; TensorRT tarball distributions
-                  </strong>
-                 </a>
-                </li>
-                <li class="md-nav__item">
-                 <a class="md-nav__link" href="#building-using-locally-installed-cudnn-tensorrt">
-                  <strong>
-                   Building using locally installed cuDNN &amp; TensorRT
-                  </strong>
+                 <a class="md-nav__link" href="#compiling-from-source">
+                  Compiling From Source
                  </a>
                  <nav class="md-nav">
                   <ul class="md-nav__list">
                    <li class="md-nav__item">
-                    <a class="md-nav__link" href="#building-the-python-package">
-                     Building the Python package
+                    <a class="md-nav__link" href="#dependencies-for-compilation">
+                     Dependencies for Compilation
+                    </a>
+                   </li>
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#building-using-cudnn-tensorrt-tarball-distributions">
+                     <strong>
+                      Building using cuDNN &amp; TensorRT tarball distributions
+                     </strong>
                     </a>
                     <nav class="md-nav">
                      <ul class="md-nav__list">
                       <li class="md-nav__item">
+                       <a class="md-nav__link" href="#release-build">
+                        Release Build
+                       </a>
+                      </li>
+                      <li class="md-nav__item">
                        <a class="md-nav__link" href="#debug-build">
-                        Debug build
+                        Debug Build
+                       </a>
+                      </li>
+                      <li class="md-nav__item">
+                       <a class="md-nav__link" href="#pre-cxx11-abi-build">
+                        Pre CXX11 ABI Build
+                       </a>
+                      </li>
+                     </ul>
+                    </nav>
+                   </li>
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#building-using-locally-installed-cudnn-tensorrt">
+                     <strong>
+                      Building using locally installed cuDNN &amp; TensorRT
+                     </strong>
+                    </a>
+                    <nav class="md-nav">
+                     <ul class="md-nav__list">
+                      <li class="md-nav__item">
+                       <a class="md-nav__link" href="#id2">
+                        Release Build
+                       </a>
+                      </li>
+                      <li class="md-nav__item">
+                       <a class="md-nav__link" href="#build-from-local-debug">
+                        Debug Build
+                       </a>
+                      </li>
+                      <li class="md-nav__item">
+                       <a class="md-nav__link" href="#id4">
+                        Pre CXX11 ABI Build
+                       </a>
+                      </li>
+                     </ul>
+                    </nav>
+                   </li>
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#building-the-python-package">
+                     <strong>
+                      Building the Python package
+                     </strong>
+                    </a>
+                    <nav class="md-nav">
+                     <ul class="md-nav__list">
+                      <li class="md-nav__item">
+                       <a class="md-nav__link" href="#id5">
+                        Debug Build
                        </a>
                       </li>
                      </ul>
@@ -303,27 +348,13 @@
            </nav>
            <ul class="md-nav__list">
             <li class="md-nav__item">
-             <a class="md-nav__link" href="#dependencies">
-              Dependencies
+             <a class="md-nav__link" href="#precompiled-binaries">
+              Precompiled Binaries
              </a>
             </li>
             <li class="md-nav__item">
-             <a class="md-nav__link" href="#dependencies-for-compilation">
-              Dependencies for Compilation
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="#building-using-cudnn-tensorrt-tarball-distributions">
-              <strong>
-               Building using cuDNN &amp; TensorRT tarball distributions
-              </strong>
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="#building-using-locally-installed-cudnn-tensorrt">
-              <strong>
-               Building using locally installed cuDNN &amp; TensorRT
-              </strong>
+             <a class="md-nav__link" href="#compiling-from-source">
+              Compiling From Source
              </a>
             </li>
            </ul>
@@ -386,6 +417,69 @@
            <a class="md-nav__link" href="trtorchc.html">
             trtorchc
            </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Python API Documenation
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/trtorch.html">
+            trtorch
+           </a>
+           <ul class="md-nav__list">
+            <li class="md-nav__item">
+             <a class="md-nav__link" href="../py_api/trtorch.html#functions">
+              Functions
+             </a>
+            </li>
+            <li class="md-nav__item">
+             <a class="md-nav__link" href="../py_api/trtorch.html#enums">
+              Enums
+             </a>
+            </li>
+            <li class="md-nav__item">
+             <a class="md-nav__link" href="../py_api/trtorch.html#submodules">
+              Submodules
+             </a>
+            </li>
+           </ul>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/logging.html">
+            trtorch.logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             C++ API Documenation
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html">
+            TRTorch C++ API
+           </a>
+           <ul class="md-nav__list">
+            <li class="md-nav__item">
+             <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html#class-hierarchy">
+              Class Hierarchy
+             </a>
+            </li>
+            <li class="md-nav__item">
+             <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html#file-hierarchy">
+              File Hierarchy
+             </a>
+            </li>
+            <li class="md-nav__item">
+             <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html#full-api">
+              Full API
+             </a>
+            </li>
+           </ul>
           </li>
           <li class="md-nav__item">
            <span class="md-nav__link caption">
@@ -485,69 +579,6 @@
             </li>
            </ul>
           </li>
-          <li class="md-nav__item">
-           <span class="md-nav__link caption">
-            <span class="caption-text">
-             Python API Documenation
-            </span>
-           </span>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/trtorch.html">
-            trtorch
-           </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../py_api/trtorch.html#functions">
-              Functions
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../py_api/trtorch.html#enums">
-              Enums
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../py_api/trtorch.html#submodules">
-              Submodules
-             </a>
-            </li>
-           </ul>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/logging.html">
-            trtorch.logging
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <span class="md-nav__link caption">
-            <span class="caption-text">
-             C++ API Documenation
-            </span>
-           </span>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html">
-            TRTorch C++ API
-           </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html#class-hierarchy">
-              Class Hierarchy
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html#file-hierarchy">
-              File Hierarchy
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html#full-api">
-              Full API
-             </a>
-            </li>
-           </ul>
-          </li>
          </ul>
         </nav>
        </div>
@@ -568,58 +599,103 @@
            <nav class="md-nav">
             <ul class="md-nav__list">
              <li class="md-nav__item">
-              <a class="md-nav__link" href="#dependencies">
-               Dependencies
+              <a class="md-nav__link" href="#precompiled-binaries">
+               Precompiled Binaries
               </a>
               <nav class="md-nav">
                <ul class="md-nav__list">
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#dependencies">
+                  Dependencies
+                 </a>
+                </li>
                 <li class="md-nav__item">
                  <a class="md-nav__link" href="#python-package">
                   Python Package
                  </a>
                 </li>
                 <li class="md-nav__item">
-                 <a class="md-nav__link" href="#binary-distribution">
-                  Binary Distribution
-                 </a>
-                </li>
-                <li class="md-nav__item">
-                 <a class="md-nav__link" href="#compiling-from-source">
-                  Compiling From Source
+                 <a class="md-nav__link" href="#c-binary-distribution">
+                  C++ Binary Distribution
                  </a>
                 </li>
                </ul>
               </nav>
              </li>
              <li class="md-nav__item">
-              <a class="md-nav__link" href="#dependencies-for-compilation">
-               Dependencies for Compilation
-              </a>
-             </li>
-             <li class="md-nav__item">
-              <a class="md-nav__link" href="#building-using-cudnn-tensorrt-tarball-distributions">
-               <strong>
-                Building using cuDNN &amp; TensorRT tarball distributions
-               </strong>
-              </a>
-             </li>
-             <li class="md-nav__item">
-              <a class="md-nav__link" href="#building-using-locally-installed-cudnn-tensorrt">
-               <strong>
-                Building using locally installed cuDNN &amp; TensorRT
-               </strong>
+              <a class="md-nav__link" href="#compiling-from-source">
+               Compiling From Source
               </a>
               <nav class="md-nav">
                <ul class="md-nav__list">
                 <li class="md-nav__item">
-                 <a class="md-nav__link" href="#building-the-python-package">
-                  Building the Python package
+                 <a class="md-nav__link" href="#dependencies-for-compilation">
+                  Dependencies for Compilation
+                 </a>
+                </li>
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#building-using-cudnn-tensorrt-tarball-distributions">
+                  <strong>
+                   Building using cuDNN &amp; TensorRT tarball distributions
+                  </strong>
                  </a>
                  <nav class="md-nav">
                   <ul class="md-nav__list">
                    <li class="md-nav__item">
+                    <a class="md-nav__link" href="#release-build">
+                     Release Build
+                    </a>
+                   </li>
+                   <li class="md-nav__item">
                     <a class="md-nav__link" href="#debug-build">
-                     Debug build
+                     Debug Build
+                    </a>
+                   </li>
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#pre-cxx11-abi-build">
+                     Pre CXX11 ABI Build
+                    </a>
+                   </li>
+                  </ul>
+                 </nav>
+                </li>
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#building-using-locally-installed-cudnn-tensorrt">
+                  <strong>
+                   Building using locally installed cuDNN &amp; TensorRT
+                  </strong>
+                 </a>
+                 <nav class="md-nav">
+                  <ul class="md-nav__list">
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#id2">
+                     Release Build
+                    </a>
+                   </li>
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#build-from-local-debug">
+                     Debug Build
+                    </a>
+                   </li>
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#id4">
+                     Pre CXX11 ABI Build
+                    </a>
+                   </li>
+                  </ul>
+                 </nav>
+                </li>
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#building-the-python-package">
+                  <strong>
+                   Building the Python package
+                  </strong>
+                 </a>
+                 <nav class="md-nav">
+                  <ul class="md-nav__list">
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#id5">
+                     Debug Build
                     </a>
                    </li>
                   </ul>
@@ -653,12 +729,18 @@
          ¶
         </a>
        </h1>
-       <h2 id="dependencies">
+       <h2 id="precompiled-binaries">
+        Precompiled Binaries
+        <a class="headerlink" href="#precompiled-binaries" title="Permalink to this headline">
+         ¶
+        </a>
+       </h2>
+       <h3 id="dependencies">
         Dependencies
         <a class="headerlink" href="#dependencies" title="Permalink to this headline">
          ¶
         </a>
-       </h2>
+       </h3>
        <p>
         You need to have either PyTorch or LibTorch installed based on if you are using Python or C++
 and you must have CUDA, cuDNN and TensorRT installed.
@@ -721,9 +803,9 @@ pip3 install  https://github.com/NVIDIA/TRTorch/releases/download/v0.0.2/trtorch
        </div>
        <span id="bin-dist">
        </span>
-       <h3 id="binary-distribution">
-        Binary Distribution
-        <a class="headerlink" href="#binary-distribution" title="Permalink to this headline">
+       <h3 id="c-binary-distribution">
+        C++ Binary Distribution
+        <a class="headerlink" href="#c-binary-distribution" title="Permalink to this headline">
          ¶
         </a>
        </h3>
@@ -735,20 +817,20 @@ pip3 install  https://github.com/NVIDIA/TRTorch/releases/download/v0.0.2/trtorch
        </p>
        <span id="compile-from-source">
        </span>
-       <h3 id="compiling-from-source">
+       <h2 id="compiling-from-source">
         Compiling From Source
         <a class="headerlink" href="#compiling-from-source" title="Permalink to this headline">
          ¶
         </a>
-       </h3>
+       </h2>
        <span id="installing-deps">
        </span>
-       <h2 id="dependencies-for-compilation">
+       <h3 id="dependencies-for-compilation">
         Dependencies for Compilation
         <a class="headerlink" href="#dependencies-for-compilation" title="Permalink to this headline">
          ¶
         </a>
-       </h2>
+       </h3>
        <p>
         TRTorch is built with Bazel, so begin by installing it.
        </p>
@@ -840,14 +922,14 @@ the CUDA driver installed and the container must have CUDA)
        </p>
        <span id="build-from-archive">
        </span>
-       <h2 id="building-using-cudnn-tensorrt-tarball-distributions">
+       <h3 id="building-using-cudnn-tensorrt-tarball-distributions">
         <strong>
          Building using cuDNN &amp; TensorRT tarball distributions
         </strong>
         <a class="headerlink" href="#building-using-cudnn-tensorrt-tarball-distributions" title="Permalink to this headline">
          ¶
         </a>
-       </h2>
+       </h3>
        <blockquote>
         <div>
          <p>
@@ -916,6 +998,12 @@ the CUDA driver installed and the container must have CUDA)
          </p>
         </div>
        </blockquote>
+       <h4 id="release-build">
+        Release Build
+        <a class="headerlink" href="#release-build" title="Permalink to this headline">
+         ¶
+        </a>
+       </h4>
        <div class="highlight-shell notranslate">
         <div class="highlight">
          <pre><span></span>bazel build //:libtrtorch -c opt --distdir thrid_party/distdir/<span class="o">[</span>x86_64-linux-gnu <span class="p">|</span> aarch64-linux-gnu<span class="o">]</span>
@@ -930,12 +1018,46 @@ the CUDA driver installed and the container must have CUDA)
          </span>
         </code>
        </p>
+       <span id="build-from-archive-debug">
+       </span>
+       <h4 id="debug-build">
+        Debug Build
+        <a class="headerlink" href="#debug-build" title="Permalink to this headline">
+         ¶
+        </a>
+       </h4>
+       <p>
+        To build with debug symbols use the following command
+       </p>
        <div class="highlight-shell notranslate">
         <div class="highlight">
          <pre><span></span>bazel build //:libtrtorch -c dbg --distdir thrid_party/distdir/<span class="o">[</span>x86_64-linux-gnu <span class="p">|</span> aarch64-linux-gnu<span class="o">]</span>
 </pre>
         </div>
        </div>
+       <p>
+        A tarball with the include files and library can then be found in
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          bazel-bin
+         </span>
+        </code>
+       </p>
+       <h4 id="pre-cxx11-abi-build">
+        Pre CXX11 ABI Build
+        <a class="headerlink" href="#pre-cxx11-abi-build" title="Permalink to this headline">
+         ¶
+        </a>
+       </h4>
+       <p>
+        To build using the pre-CXX11 ABI use the
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          pre_cxx11_abi
+         </span>
+        </code>
+        config
+       </p>
        <div class="highlight-shell notranslate">
         <div class="highlight">
          <pre><span></span>bazel build //:libtrtorch --config pre_cxx11_abi -c <span class="o">[</span>dbg/opt<span class="o">]</span> --distdir thrid_party/distdir/<span class="o">[</span>x86_64-linux-gnu <span class="p">|</span> aarch64-linux-gnu<span class="o">]</span>
@@ -952,14 +1074,14 @@ the CUDA driver installed and the container must have CUDA)
        </p>
        <span id="build-from-local">
        </span>
-       <h2 id="building-using-locally-installed-cudnn-tensorrt">
+       <h3 id="building-using-locally-installed-cudnn-tensorrt">
         <strong>
          Building using locally installed cuDNN &amp; TensorRT
         </strong>
         <a class="headerlink" href="#building-using-locally-installed-cudnn-tensorrt" title="Permalink to this headline">
          ¶
         </a>
-       </h2>
+       </h3>
        <blockquote>
         <div>
          <p>
@@ -1016,6 +1138,12 @@ the CUDA driver installed and the container must have CUDA)
 </pre>
         </div>
        </div>
+       <h4 id="id2">
+        Release Build
+        <a class="headerlink" href="#id2" title="Permalink to this headline">
+         ¶
+        </a>
+       </h4>
        <p>
         Compile using:
        </p>
@@ -1033,6 +1161,17 @@ the CUDA driver installed and the container must have CUDA)
          </span>
         </code>
        </p>
+       <span id="id3">
+       </span>
+       <h4 id="build-from-local-debug">
+        Debug Build
+        <a class="headerlink" href="#build-from-local-debug" title="Permalink to this headline">
+         ¶
+        </a>
+       </h4>
+       <p>
+        To build with debug symbols use the following command
+       </p>
        <div class="highlight-shell notranslate">
         <div class="highlight">
          <pre><span></span>bazel build //:libtrtorch -c dbg
@@ -1047,6 +1186,21 @@ the CUDA driver installed and the container must have CUDA)
          </span>
         </code>
        </p>
+       <h4 id="id4">
+        Pre CXX11 ABI Build
+        <a class="headerlink" href="#id4" title="Permalink to this headline">
+         ¶
+        </a>
+       </h4>
+       <p>
+        To build using the pre-CXX11 ABI use the
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          pre_cxx11_abi
+         </span>
+        </code>
+        config
+       </p>
        <div class="highlight-shell notranslate">
         <div class="highlight">
          <pre><span></span>bazel build //:libtrtorch --config pre_cxx11_abi -c <span class="o">[</span>dbg/opt<span class="o">]</span>
@@ -1054,7 +1208,9 @@ the CUDA driver installed and the container must have CUDA)
         </div>
        </div>
        <h3 id="building-the-python-package">
-        Building the Python package
+        <strong>
+         Building the Python package
+        </strong>
         <a class="headerlink" href="#building-the-python-package" title="Permalink to this headline">
          ¶
         </a>
@@ -1088,9 +1244,9 @@ the CUDA driver installed and the container must have CUDA)
 </pre>
         </div>
        </div>
-       <h4 id="debug-build">
-        Debug build
-        <a class="headerlink" href="#debug-build" title="Permalink to this headline">
+       <h4 id="id5">
+        Debug Build
+        <a class="headerlink" href="#id5" title="Permalink to this headline">
          ¶
         </a>
        </h4>

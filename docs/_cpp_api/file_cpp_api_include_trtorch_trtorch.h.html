@@ -215,27 +215,13 @@
            </a>
            <ul class="md-nav__list">
             <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/installation.html#dependencies">
-              Dependencies
+             <a class="md-nav__link" href="../tutorials/installation.html#precompiled-binaries">
+              Precompiled Binaries
              </a>
             </li>
             <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/installation.html#dependencies-for-compilation">
-              Dependencies for Compilation
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/installation.html#building-using-cudnn-tensorrt-tarball-distributions">
-              <strong>
-               Building using cuDNN &amp; TensorRT tarball distributions
-              </strong>
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/installation.html#building-using-locally-installed-cudnn-tensorrt">
-              <strong>
-               Building using locally installed cuDNN &amp; TensorRT
-              </strong>
+             <a class="md-nav__link" href="../tutorials/installation.html#compiling-from-source">
+              Compiling From Source
              </a>
             </li>
            </ul>
@@ -298,6 +284,69 @@
            <a class="md-nav__link" href="../tutorials/trtorchc.html">
             trtorchc
            </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Python API Documenation
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/trtorch.html">
+            trtorch
+           </a>
+           <ul class="md-nav__list">
+            <li class="md-nav__item">
+             <a class="md-nav__link" href="../py_api/trtorch.html#functions">
+              Functions
+             </a>
+            </li>
+            <li class="md-nav__item">
+             <a class="md-nav__link" href="../py_api/trtorch.html#enums">
+              Enums
+             </a>
+            </li>
+            <li class="md-nav__item">
+             <a class="md-nav__link" href="../py_api/trtorch.html#submodules">
+              Submodules
+             </a>
+            </li>
+           </ul>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/logging.html">
+            trtorch.logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             C++ API Documenation
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="trtorch_cpp.html">
+            TRTorch C++ API
+           </a>
+           <ul class="md-nav__list">
+            <li class="md-nav__item">
+             <a class="md-nav__link" href="trtorch_cpp.html#class-hierarchy">
+              Class Hierarchy
+             </a>
+            </li>
+            <li class="md-nav__item">
+             <a class="md-nav__link" href="trtorch_cpp.html#file-hierarchy">
+              File Hierarchy
+             </a>
+            </li>
+            <li class="md-nav__item">
+             <a class="md-nav__link" href="trtorch_cpp.html#full-api">
+              Full API
+             </a>
+            </li>
+           </ul>
           </li>
           <li class="md-nav__item">
            <span class="md-nav__link caption">
@@ -393,69 +442,6 @@
             <li class="md-nav__item">
              <a class="md-nav__link" href="../contributors/useful_links.html#pytorch-ir-documentation">
               PyTorch IR Documentation
-             </a>
-            </li>
-           </ul>
-          </li>
-          <li class="md-nav__item">
-           <span class="md-nav__link caption">
-            <span class="caption-text">
-             Python API Documenation
-            </span>
-           </span>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/trtorch.html">
-            trtorch
-           </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../py_api/trtorch.html#functions">
-              Functions
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../py_api/trtorch.html#enums">
-              Enums
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../py_api/trtorch.html#submodules">
-              Submodules
-             </a>
-            </li>
-           </ul>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/logging.html">
-            trtorch.logging
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <span class="md-nav__link caption">
-            <span class="caption-text">
-             C++ API Documenation
-            </span>
-           </span>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="trtorch_cpp.html">
-            TRTorch C++ API
-           </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="trtorch_cpp.html#class-hierarchy">
-              Class Hierarchy
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="trtorch_cpp.html#file-hierarchy">
-              File Hierarchy
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="trtorch_cpp.html#full-api">
-              Full API
              </a>
             </li>
            </ul>
@@ -648,22 +634,6 @@
          <p>
           <code class="docutils literal notranslate">
            <span class="pre">
-            trtorch/logging.h
-           </span>
-          </code>
-          (
-          <a class="reference internal" href="file_cpp_api_include_trtorch_logging.h.html#file-cpp-api-include-trtorch-logging-h">
-           <span class="std std-ref">
-            File logging.h
-           </span>
-          </a>
-          )
-         </p>
-        </li>
-        <li>
-         <p>
-          <code class="docutils literal notranslate">
-           <span class="pre">
             trtorch/macros.h
            </span>
           </code>
@@ -671,22 +641,6 @@
           <a class="reference internal" href="file_cpp_api_include_trtorch_macros.h.html#file-cpp-api-include-trtorch-macros-h">
            <span class="std std-ref">
             File macros.h
-           </span>
-          </a>
-          )
-         </p>
-        </li>
-        <li>
-         <p>
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            trtorch/ptq.h
-           </span>
-          </code>
-          (
-          <a class="reference internal" href="file_cpp_api_include_trtorch_ptq.h.html#file-cpp-api-include-trtorch-ptq-h">
-           <span class="std std-ref">
-            File ptq.h
            </span>
           </a>
           )
@@ -714,15 +668,6 @@
           <a class="reference internal" href="namespace_trtorch.html#namespace-trtorch">
            <span class="std std-ref">
             Namespace trtorch
-           </span>
-          </a>
-         </p>
-        </li>
-        <li>
-         <p>
-          <a class="reference internal" href="namespace_trtorch__ptq.html#namespace-trtorch-ptq">
-           <span class="std std-ref">
-            Namespace trtorch::ptq
            </span>
           </a>
          </p>
@@ -820,24 +765,6 @@
           <a class="reference internal" href="function_trtorch_8h_1a2cf17d43ba9117b3b4d652744b4f0447.html#exhale-function-trtorch-8h-1a2cf17d43ba9117b3b4d652744b4f0447">
            <span class="std std-ref">
             Function trtorch::get_build_info
-           </span>
-          </a>
-         </p>
-        </li>
-        <li>
-         <p>
-          <a class="reference internal" href="function_trtorch_8h_1a5f33b142bc2f3f2aaf462270b3ad7e31.html#exhale-function-trtorch-8h-1a5f33b142bc2f3f2aaf462270b3ad7e31">
-           <span class="std std-ref">
-            Template Function trtorch::ptq::make_int8_cache_calibrator
-           </span>
-          </a>
-         </p>
-        </li>
-        <li>
-         <p>
-          <a class="reference internal" href="function_trtorch_8h_1a4422781719d7befedb364cacd91c6247.html#exhale-function-trtorch-8h-1a4422781719d7befedb364cacd91c6247">
-           <span class="std std-ref">
-            Template Function trtorch::ptq::make_int8_calibrator
            </span>
           </a>
          </p>

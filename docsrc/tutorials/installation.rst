@@ -3,8 +3,11 @@
 Installation
 =============
 
+Precompiled Binaries
+*********************
+
 Dependencies
-******************************************
+---------------
 
 You need to have either PyTorch or LibTorch installed based on if you are using Python or C++
 and you must have CUDA, cuDNN and TensorRT installed.
@@ -33,20 +36,20 @@ You can install the python package using
 
 .. _bin-dist:
 
-Binary Distribution
-----------------------
+C++ Binary Distribution
+------------------------
 
 Precompiled tarballs for releases are provided here: https://github.com/NVIDIA/TRTorch/releases
 
 .. _compile-from-source:
 
 Compiling From Source
-----------------------
+******************************************
 
 .. _installing-deps:
 
 Dependencies for Compilation
-******************************************
+-------------------------------
 
 TRTorch is built with Bazel, so begin by installing it.
 
@@ -76,7 +79,7 @@ You then have two compilation options:
 .. _build-from-archive:
 
 **Building using cuDNN & TensorRT tarball distributions**
-***********************************************************
+--------------------------------------------------------------
 
     This is recommended so as to build TRTorch hermetically and insures any compilation errors are not caused by version issues
 
@@ -92,6 +95,9 @@ Then compile referencing the directory with the tarballs
 
     If you get errors regarding the packages, check their sha256 hashes and make sure they match the ones listed in ``WORKSPACE``
 
+Release Build
+^^^^^^^^^^^^^^^^^^^^^^^^
+
 .. code-block:: shell
 
     bazel build //:libtrtorch -c opt --distdir thrid_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]
@@ -100,15 +106,21 @@ A tarball with the include files and library can then be found in ``bazel-bin``
 
 .. _build-from-archive-debug:
 
-Debug build
-^^^^^^^^^^^^^
+Debug Build
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+To build with debug symbols use the following command
 
 .. code-block:: shell
 
     bazel build //:libtrtorch -c dbg --distdir thrid_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]
 
-Pre CXX11 ABI build
-^^^^^^^^^^^^^^^^^^^^
+A tarball with the include files and library can then be found in ``bazel-bin``
+
+Pre CXX11 ABI Build
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+To build using the pre-CXX11 ABI use the ``pre_cxx11_abi`` config
 
 .. code-block:: shell
 
@@ -119,7 +131,7 @@ A tarball with the include files and library can then be found in ``bazel-bin``
 .. _build-from-local:
 
 **Building using locally installed cuDNN & TensorRT**
-******************************************************
+--------------------------------------------------------------
 
     If you encounter bugs and you compiled using this method please disclose it in the issue (an ldd dump would be nice too)
 
@@ -165,6 +177,9 @@ and uncomment
     build_file = "@//third_party/tensorrt/local:BUILD"
     )
 
+Release Build
+^^^^^^^^^^^^^^^^^^^^^^^^
+
 Compile using:
 
 .. code-block:: shell
@@ -175,8 +190,10 @@ A tarball with the include files and library can then be found in ``bazel-bin``
 
 .. _build-from-local-debug:
 
-Debug build
+Debug Build
 ^^^^^^^^^^^^
+
+To build with debug symbols use the following command
 
 .. code-block:: shell
 
@@ -185,15 +202,17 @@ Debug build
 
 A tarball with the include files and library can then be found in ``bazel-bin``
 
-Pre CXX11 ABI build
-^^^^^^^^^^^^^^^^^^^^
+Pre CXX11 ABI Build
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+To build using the pre-CXX11 ABI use the ``pre_cxx11_abi`` config
 
 .. code-block:: shell
 
     bazel build //:libtrtorch --config pre_cxx11_abi -c [dbg/opt]
 
-Building the Python package
------------------------------
+**Building the Python package**
+--------------------------------
 
 Begin by installing ``ninja``
 
@@ -203,7 +222,7 @@ You can build the Python package using ``setup.py`` (this will also build the co
 
     python3 setup.py [install/bdist_wheel]
 
-Debug build
+Debug Build
 ^^^^^^^^^^^^
 
 .. code-block:: shell

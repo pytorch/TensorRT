@@ -41,13 +41,11 @@ Program Listing for File trtorch.h
    }
    
    namespace nvinfer1 {
-   class IInt8EntropyCalibrator2;
+   class IInt8Calibrator;
    }
    #endif //DOXYGEN_SHOULD_SKIP_THIS
    
    #include "trtorch/macros.h"
-   #include "trtorch/logging.h"
-   #include "trtorch/ptq.h"
    namespace trtorch {
    struct TRTORCH_API ExtraInfo {
        struct TRTORCH_API InputRange {
@@ -148,16 +146,4 @@ Program Listing for File trtorch.h
    TRTORCH_API torch::jit::Module CompileGraph(const torch::jit::Module& module, ExtraInfo info);
    
    TRTORCH_API std::string ConvertGraphToTRTEngine(const torch::jit::Module& module, std::string method_name, ExtraInfo info);
-   
-   namespace ptq {
-   template<typename Algorithm = nvinfer1::IInt8EntropyCalibrator2, typename DataLoader>
-   TRTORCH_API inline Int8Calibrator<Algorithm, DataLoader> make_int8_calibrator(DataLoader dataloader, const std::string& cache_file_path, bool use_cache) {
-       return Int8Calibrator<Algorithm, DataLoader>(std::move(dataloader), cache_file_path, use_cache);
-   }
-   
-   template<typename Algorithm = nvinfer1::IInt8EntropyCalibrator2>
-   TRTORCH_API inline Int8CacheCalibrator<Algorithm> make_int8_cache_calibrator(const std::string& cache_file_path) {
-       return Int8CacheCalibrator<Algorithm>(cache_file_path);
-   }
-   } // namespace ptq
    } // namespace trtorch
