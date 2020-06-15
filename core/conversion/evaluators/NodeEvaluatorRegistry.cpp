@@ -30,6 +30,10 @@ class NodeEvaluatorRegistry {
 public:
     void RegisterEvaluator(torch::jit::NodeKind node_kind, EvalRegistration eval_reg) {
         LOG_DEBUG("Registering evaluator for " << node_kind.toQualString());
+        auto iter = evaluator_lut_.find(node_kind);
+        if (iter != evaluator_lut_.end()) {
+            TRTORCH_THROW_ERROR("Attempting to override already registered evaluator " << node_kind.toQualString() << ", merge implementations instead");
+        }
         evaluator_lut_[node_kind] = std::move(eval_reg);
     }
 

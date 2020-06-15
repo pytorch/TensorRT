@@ -15,7 +15,8 @@ cc_library(
     srcs = [
         "NodeEvaluatorRegistry.cpp",
         "prim.cpp",
-        "aten.cpp"
+        "aten.cpp",
+        "eval_macros.h"
     ],
     deps = [
         "//core/util:prelude",

@@ -48,6 +48,10 @@ public:
     bool RegisterConverter(torch::jit::FunctionSchema* signature, OpConverter& converter) {
         LOG_DEBUG("Registering converter for " << canonical_schema_string(*signature));
         auto name = signature->operator_name();
+        auto iter = converter_lut_.find(name);
+        if (iter != converter_lut_.end()) {
+            LOG_WARNING("Overriding already registered converter " << signature->name() << ", unexpected behavior may occur");
+        }
         converter_lut_[name] = std::move(converter);
         return true;
     }
