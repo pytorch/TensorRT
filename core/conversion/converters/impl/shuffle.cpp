@@ -61,6 +61,27 @@ static auto shuffle_registrations TRTORCH_UNUSED = RegisterNodeConversionPattern
 
       return true;
     }
+  }).pattern({
+    "aten::permute(Tensor(a) self, int[] dims) -> (Tensor(a))",
+    [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+      auto in = args[0].ITensor();
+      auto in_shape = util::toVec(in->getDimensions());
+      auto new_order = args[1].unwrapToIntList().vec();
+
+      LOG_DEBUG("Shuffle to: " << util::toDims(new_order));
+
+      auto shuffle = ctx->net->addShuffle(*in);
+      TRTORCH_CHECK(shuffle, "Unable to create shuffle layer from node: " << *n);
+      nvinfer1::Permutation permute;
+      std::copy(new_order.begin(), new_order.end(), permute.order);
+      shuffle->setSecondTranspose(permute);
+      shuffle->setName(util::node_info(n).c_str());
+
+      auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], shuffle->getOutput(0));
+      LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+
+      return true;
+    }
   });
 } // namespace
 } // namespace impl
