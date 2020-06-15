@@ -207,7 +207,7 @@ auto aten_registrations TRTORCH_UNUSED = RegisterNodeEvaluators()
             auto list = args.at(n->input(0)).IValue()->to<c10::List<c10::IValue>>();
             auto el = args.at(n->input(1)).IValue();
 
-            list.push_back(std::move(el));
+            list.push_back(std::move(*el));
             return list;
         },
         EvalOptions().validSchemas({
@@ -430,7 +430,7 @@ auto aten_registrations TRTORCH_UNUSED = RegisterNodeEvaluators()
         [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
             auto el = args.at(n->input(0)).unwrapToDouble();
 
-            return std::floor(el);
+            return static_cast<int64_t>(std::floor(el));
         },
         EvalOptions().validSchemas({
             "aten::floor.float(float a) -> (int)",
@@ -438,8 +438,8 @@ auto aten_registrations TRTORCH_UNUSED = RegisterNodeEvaluators()
     }).evaluator({
         c10::Symbol::fromQualString("aten::warn"),
         [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-            auto warning = args.at(n->input(0)).IValue()->toString();
-            LOG_WARNING(warning);
+            auto warning = args.at(n->input(0)).IValue();
+            LOG_WARNING("Warning from TorchScript: " << *warning);
             return {};
         },
         EvalOptions()

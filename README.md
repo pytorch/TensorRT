@@ -68,6 +68,7 @@ torch.jit.save(trt_ts_module, "trt_torchscript_module.ts")
 
 ### Dependencies
 
+- Bazel 3.2.0
 - Libtorch 1.5.0
 - CUDA 10.2
 - cuDNN 7.6.5
@@ -81,7 +82,24 @@ Releases: https://github.com/NVIDIA/TRTorch/releases
 
 ### Installing Dependencies
 
-You need to start by having CUDA installed on the system, Libtorch will automatically be pulled for you by bazel,
+#### 0. Install Bazel
+
+If you don't have bazel installed, the easiest way is to install bazelisk using the method of you choosing https://github.com/bazelbuild/bazelisk
+
+Otherwise you can use the following instructions to install binaries https://docs.bazel.build/versions/master/install.html
+
+Finally if you need to compile from source (e.g. aarch64 until bazel distributes binaries for the architecture) you can use these instructions
+
+```sh
+export BAZEL_VERSION=<VERSION>
+mkdir bazel
+cd bazel
+curl -fSsL -O https://github.com/bazelbuild/bazel/releases/download/$BAZEL_VERSION/bazel-$BAZEL_VERSION-dist.zip
+unzip bazel-$BAZEL_VERSION-dist.zip
+bash ./compile.sh
+```
+
+You need to start by having CUDA installed on the system, LibTorch will automatically be pulled for you by bazel,
 then you have two options.
 
 #### 1. Building using cuDNN & TensorRT tarball distributions

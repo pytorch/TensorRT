@@ -242,8 +242,8 @@ auto prim_registrations = RegisterNodeEvaluators()
     }).evaluator({
         c10::Symbol::fromQualString("prim::RaiseException"),
         [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-            auto exception = args.at(n->input(0)).IValue()->toString();
-            TRTORCH_THROW_ERROR(exception);
+            auto exception = args.at(n->input(0)).IValue();
+            TRTORCH_THROW_ERROR("Error from TorchScript: " << *exception);
             return {};
         }
     });
