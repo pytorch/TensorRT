@@ -35,6 +35,7 @@ cc_library(
         "@tensorrt//:nvinfer",
         "//core/util:prelude",
         "//core/conversion/conversionctx",
+        "//core/conversion/converters/impl/plugins"
     ] + select({
         ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default":  ["@libtorch//:libtorch"],
