@@ -10,7 +10,7 @@ config_setting(
 cc_library(
     name = "converters",
     hdrs = [
-        "converters.h",
+        "converters.h"
     ],
     srcs = [
         "NodeConverterRegistry.cpp",

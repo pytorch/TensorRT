@@ -1,6 +1,8 @@
 #include "torch/torch.h"
 #include "core/util/prelude.h"
 #include "core/conversion/converters/converters.h"
+#include "NvInfer.h"
+#include "plugins/interpolate_plugin.h"
 
 #include <csignal>
 
@@ -108,7 +110,7 @@ auto interpolate_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
             auto in = args[0].ITensor();
             auto in_shape = util::toVec(in->getDimensions());
             
-            bool align_corners = args[2].IValue()->to<bool>();
+            bool align_corners = args[2].unwrapToBool();
 
             // Case 1: user uses output size and not scales
             if (!args[1].IValue()->isNone() && args[3].IValue()->isNone()) {
@@ -119,16 +121,29 @@ auto interpolate_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
                 auto out_shape = in_shape;
                 std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
 
-                auto resize_layer = ctx->net->addResize(*in);
-                TRTORCH_CHECK(resize_layer, "Unable to create interpolation (resizing) layer from node" << *n);
+                if (!align_corners) {
+                    //auto creator = getPluginRegistry()->getPluginCreator("interpolate", "1");
+                    //auto* plugin = creator->createPlugin(util::node_info(n).c_str(), in_shape, out_shape, out_size, std::string("linear"), align_corners);
+                    auto creator = new plugins::InterpolatePluginCreator();
 
-                resize_layer->setOutputDimensions(util::toDims(out_shape));
-                resize_layer->setResizeMode(nvinfer1::ResizeMode::kLINEAR);
-                resize_layer->setAlignCorners(align_corners);
-                resize_layer->setName(util::node_info(n).c_str());
+                    auto plugin = creator->createPlugin(util::node_info(n).c_str(), in_shape, out_shape, out_size, std::string("linear"), align_corners);
 
-                auto layer_output = ctx->AssociateValueAndTensor(n->outputs()[0], resize_layer->getOutput(0));
-                LOG_DEBUG("Output tensor shape: " << layer_output->getDimensions());
+                    auto resize_layer = ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(in), 1, *plugin);
+
+                    auto layer_output = ctx->AssociateValueAndTensor(n->outputs()[0], resize_layer->getOutput(0));
+                    LOG_DEBUG("Output tensor shape: " << layer_output->getDimensions());
+                } else {
+                    auto resize_layer = ctx->net->addResize(*in);
+                    TRTORCH_CHECK(resize_layer, "Unable to create interpolation (resizing) layer from node" << *n);
+
+                    resize_layer->setOutputDimensions(util::toDims(out_shape));
+                    resize_layer->setResizeMode(nvinfer1::ResizeMode::kLINEAR);
+                    resize_layer->setAlignCorners(align_corners);
+                    resize_layer->setName(util::node_info(n).c_str());
+
+                    auto layer_output = ctx->AssociateValueAndTensor(n->outputs()[0], resize_layer->getOutput(0));
+                    LOG_DEBUG("Output tensor shape: " << layer_output->getDimensions());
+                }
             } else {
                 TRTORCH_THROW_ERROR("Unable to convert node: " << util::node_info(n) << "\nScale factor parameter for upsample_linear1d not supported yet.");
             }

@@ -9,7 +9,9 @@ config_setting(
 
 cc_library(
     name = "plugins",
-    hdrs = [],
+    hdrs = [
+        "interpolate_plugin.h"
+    ],
     srcs = [
         "interpolate_plugin.cpp"
     ],
@@ -29,5 +31,5 @@ load("@rules_pkg//:pkg.bzl", "pkg_tar")
 pkg_tar(
     name = "include",
     package_dir = "core/conversion/converters/impl/plugins",
-    srcs = [],
+    srcs = ["interpolate_plugin.h"],
 )
