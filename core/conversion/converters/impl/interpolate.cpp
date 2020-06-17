@@ -118,19 +118,26 @@ auto interpolate_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
 
                 TRTORCH_ASSERT(out_size.size() == 1, "aten::upsample_linear1d input Tensor and output size dimension mismatch");
                 
-                auto out_shape = in_shape;
+                auto out_shape = in_shape; 
                 std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
 
                 if (!align_corners) {
+                    //auto plugin = creator->createPlugin(util::node_info(n).c_str(), in_shape, out_shape, out_size, std::string("linear"), align_corners);
+                    std::raise(SIGINT);
+
+                    //auto creator_auto = getPluginRegistry()->getPluginCreator("interpolate", "1");
+                    //auto plugin_auto = creator_auto->createPlugin(util::node_info(n).c_str(), nullptr);
+
                     //auto creator = getPluginRegistry()->getPluginCreator("interpolate", "1");
-                    //auto* plugin = creator->createPlugin(util::node_info(n).c_str(), in_shape, out_shape, out_size, std::string("linear"), align_corners);
+                    
                     auto creator = new plugins::InterpolatePluginCreator();
-
-                    auto plugin = creator->createPlugin(util::node_info(n).c_str(), in_shape, out_shape, out_size, std::string("linear"), align_corners);
-
-                    auto resize_layer = ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(in), 1, *plugin);
+                    auto plugin = creator->createPlugin("interpolate_plugin", in_shape, out_shape, out_size, std::string("linear"), align_corners);
+                    
+                    auto resize_layer = ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(&in), 1, *plugin);
+                    resize_layer->setName(util::node_info(n).c_str());
 
                     auto layer_output = ctx->AssociateValueAndTensor(n->outputs()[0], resize_layer->getOutput(0));
+
                     LOG_DEBUG("Output tensor shape: " << layer_output->getDimensions());
                 } else {
                     auto resize_layer = ctx->net->addResize(*in);

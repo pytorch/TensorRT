@@ -21,7 +21,6 @@ namespace conversion {
 namespace converters {
 namespace impl {
 namespace plugins {
-namespace {
 
 /* 
  * InterpolatePlugin class implementations
@@ -62,6 +61,18 @@ InterpolatePlugin::InterpolatePlugin(const char *data, size_t length) {
         input_archive.read("align_corners", value);
         align_corners = value.toBool();
     }
+}
+
+std::vector<int64_t> InterpolatePlugin::getInputShape() {
+    return in_shape;
+}
+
+std::vector<int64_t> InterpolatePlugin::getOutputShape() {
+    return out_shape;
+}
+
+std::vector<int64_t> InterpolatePlugin::getOutputSize() {
+    return size;
 }
 
 int InterpolatePlugin::getNbOutputs() const {
@@ -206,7 +217,7 @@ nvinfer1::IPluginV2* InterpolatePluginCreator::createPlugin(const char* name, co
     return nullptr;
 }
 
-nvinfer1::IPluginV2* InterpolatePluginCreator::createPlugin(const char* name, std::vector<int64_t> in_shape, std::vector<int64_t> out_shape, std::vector<int64_t> size, std::string mode, bool align_corners) {
+nvinfer1::IPluginV2DynamicExt* InterpolatePluginCreator::createPlugin(const char* name, std::vector<int64_t> in_shape, std::vector<int64_t> out_shape, std::vector<int64_t> size, std::string mode, bool align_corners) {
     name = name;
     return new InterpolatePlugin(in_shape, out_shape, size, mode, align_corners);
 }
@@ -222,7 +233,6 @@ const nvinfer1::PluginFieldCollection* InterpolatePluginCreator::getFieldNames()
 
 REGISTER_TENSORRT_PLUGIN(InterpolatePluginCreator);
 
-} // namespace
 } // namespace plugins
 } // namespace impl
 } // namespace converters
