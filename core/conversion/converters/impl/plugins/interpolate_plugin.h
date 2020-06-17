@@ -22,7 +22,6 @@ namespace conversion {
 namespace converters {
 namespace impl {
 namespace plugins {
-namespace {
 
 class InterpolatePlugin : public nvinfer1::IPluginV2DynamicExt {
 private:
@@ -51,6 +50,12 @@ public:
     InterpolatePlugin(const char *data, size_t length);
 
     InterpolatePlugin() = delete;
+
+    std::vector<int64_t> getInputShape();
+
+    std::vector<int64_t> getOutputShape();
+
+    std::vector<int64_t> getOutputSize();
 
     int getNbOutputs() const override;
 
@@ -110,14 +115,13 @@ public:
 
     nvinfer1::IPluginV2* createPlugin(const char* name, const nvinfer1::PluginFieldCollection *fc) override;
 
-    nvinfer1::IPluginV2* createPlugin(const char* name, std::vector<int64_t> in_shape, std::vector<int64_t> out_shape, std::vector<int64_t> size, std::string mode, bool align_corners);
+    nvinfer1::IPluginV2DynamicExt* createPlugin(const char* name, std::vector<int64_t> in_shape, std::vector<int64_t> out_shape, std::vector<int64_t> size, std::string mode, bool align_corners);
 
     nvinfer1::IPluginV2* deserializePlugin(const char* name, const void *serialData, size_t serialLength) override;
 
     const nvinfer1::PluginFieldCollection* getFieldNames() override;
 };
 
-} // namespace
 } // namespace plugins
 } // namespace impl
 } // namespace converters
