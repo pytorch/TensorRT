@@ -65,9 +65,7 @@ public:
 
     const char* getPluginNamespace() const override;
 
-    void setPluginNamespace(const char* pluginNamespace) {}
-
-    int getTensorRTVersion() const override;
+    void setPluginNamespace(const char* pluginNamespace) override {};
 
     nvinfer1::IPluginV2DynamicExt* clone() const override;
 
@@ -107,7 +105,7 @@ public:
 
     const char* getPluginNamespace() const override;
 
-    void setPluginNamespace(const char* libNamespace) override;
+    void setPluginNamespace(const char* libNamespace) override {};
     
     const char* getPluginName() const override;
 
@@ -115,7 +113,7 @@ public:
 
     nvinfer1::IPluginV2* createPlugin(const char* name, const nvinfer1::PluginFieldCollection *fc) override;
 
-    nvinfer1::IPluginV2DynamicExt* createPlugin(const char* name, std::vector<int64_t> in_shape, std::vector<int64_t> out_shape, std::vector<int64_t> size, std::string mode, bool align_corners);
+    InterpolatePlugin* createPlugin(const char* name, std::vector<int64_t> in_shape, std::vector<int64_t> out_shape, std::vector<int64_t> size, std::string mode, bool align_corners);
 
     nvinfer1::IPluginV2* deserializePlugin(const char* name, const void *serialData, size_t serialLength) override;
 
