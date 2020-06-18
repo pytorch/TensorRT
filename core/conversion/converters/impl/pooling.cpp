@@ -1,5 +1,7 @@
 #include "core/util/prelude.h"
 #include "core/conversion/converters/converters.h"
+#include "plugins/interpolate_plugin.h"
+
 
 namespace trtorch {
 namespace core {
@@ -273,30 +275,51 @@ auto pooling_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
                 in_shape = util::toVec(in->getDimensions());
             }
 
-            auto out_shape = args[1].IValue()->toIntList();
+            //auto out_size = args[1].IValue()->toIntList();
+            auto out_size = util::toVec(util::toDims(args[1].unwrapToIntList()));
+            
+            if (ctx->input_is_dynamic) {
+                LOG_WARNING("Pooling layer will be run through ATen, not TensorRT. Performance may differ.");
 
-            std::vector<int64_t> stride(out_shape.size());
-            for (size_t i = 0; i < out_shape.size(); i++) {
-                stride[(stride.size() - 1) - i] = in_shape[(in_shape.size() - 1) - i] / out_shape[(out_shape.size() - 1) - i];
+                auto out_shape = in_shape;
+                std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
+
+                auto creator = new plugins::InterpolatePluginCreator();
+                auto plugin = creator->createPlugin("adaptive_pool2d", in_shape, out_shape, out_size, std::string("adaptive_pool2d"), false);
+
+                auto pooling_layer = ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(&in), 1, *plugin);
+                TRTORCH_CHECK(pooling_layer, "Unable to create pooling (interpolation) plugin from node" << *n);
+
+                pooling_layer->setName(util::node_info(n).c_str());
+
+                auto layer_output = ctx->AssociateValueAndTensor(n->outputs()[0], pooling_layer->getOutput(0));
+
+                LOG_DEBUG("Output tensor shape: " << layer_output->getDimensions());
+            } else {
+                std::vector<int64_t> stride(out_size.size());
+                for (size_t i = 0; i < out_size.size(); i++) {
+                    stride[(stride.size() - 1) - i] = in_shape[(in_shape.size() - 1) - i] / out_size[(out_size.size() - 1) - i];
+                }
+                LOG_DEBUG("Stride: " << util::toDims(stride));
+
+                std::vector<int64_t> window(out_size.size());
+                for (size_t i = 0; i < out_size.size(); i++) {
+                    window[window.size() - 1 - i] = in_shape[in_shape.size() - 1 - i] - (out_size[out_size.size() - 1 - i] - 1) * stride[stride.size() - 1 - i];
+                }
+
+                LOG_DEBUG("Window: " << util::toDims(window));
+
+                auto new_layer = ctx->net->addPoolingNd(*in, nvinfer1::PoolingType::kAVERAGE, util::toDims(window));
+                TRTORCH_CHECK(new_layer, "Unable to create average pooling layer from node: " << *n);
+
+                new_layer->setStrideNd(util::toDims(stride));
+
+                new_layer->setName(util::node_info(n).c_str());
+                auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
+
+                LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
             }
-            LOG_DEBUG("Stride: " << util::toDims(stride));
-
-            std::vector<int64_t> window(out_shape.size());
-            for (size_t i = 0; i < out_shape.size(); i++) {
-                window[window.size() - 1 - i] = in_shape[in_shape.size() - 1 - i] - (out_shape[out_shape.size() - 1 - i] - 1) * stride[stride.size() - 1 - i];
-            }
-
-            LOG_DEBUG("Window: " << util::toDims(window));
-
-            auto new_layer = ctx->net->addPoolingNd(*in, nvinfer1::PoolingType::kAVERAGE, util::toDims(window));
-            TRTORCH_CHECK(new_layer, "Unable to create average pooling layer from node: " << *n);
-
-            new_layer->setStrideNd(util::toDims(stride));
-
-            new_layer->setName(util::node_info(n).c_str());
-            auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
-
-            LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+            
             return true;
         }
     });
@@ -306,3 +329,5 @@ auto pooling_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
 } // namespace conversion
 } // namespace core
 } // trtorch
+
+
