@@ -6,6 +6,9 @@
 #include "core/conversion/conversion.h"
 #include "cuda_runtime_api.h"
 
+#include <vector>
+#include <math.h>
+
 namespace trtorch {
 namespace tests {
 namespace util {
@@ -15,6 +18,34 @@ std::vector<core::conversion::InputRange> toInputRanges(std::vector<at::Tensor> 
     for (auto i : ten) {
         a.push_back(core::conversion::InputRange(core::util::toVec(i.sizes())));
     }
+    return std::move(a);
+}
+
+std::vector<core::conversion::InputRange> toInputRangesDynamic(std::vector<at::Tensor> ten) {
+    std::vector<core::conversion::InputRange> a;
+
+    for (auto i : ten) {
+        auto opt = core::util::toVec(i.sizes());
+
+        std::vector<int64_t> min_range(opt);
+        std::vector<int64_t> max_range(opt); 
+
+        min_range[0] = ceil(opt[0]/2.0);
+        max_range[0] = 2*opt[0];
+
+        // for (int64_t each : min_range) {
+        //     std::cout << each << std::endl;
+        // }
+        // for (int64_t each : opt) {
+        //     std::cout << each << std::endl;
+        // }
+        // for (int64_t each : max_range) {
+        //     std::cout << each << std::endl;
+        // }
+
+        a.push_back(core::conversion::InputRange(min_range, opt, max_range));
+    }
+
     return std::move(a);
 }
 
@@ -65,6 +96,17 @@ std::vector<at::Tensor> RunGraphEngine(std::shared_ptr<torch::jit::Graph>& g,
                                        std::vector<at::Tensor> inputs) {
     LOG_DEBUG("Running TRT version");
     auto in =  toInputRanges(inputs);
+    auto info = core::conversion::ConversionInfo(in);
+    info.engine_settings.workspace_size = 1 << 20;
+    std::string eng = core::conversion::ConvertBlockToEngine(g->block(), info, named_params);
+    return RunEngine(eng, inputs);
+}
+
+std::vector<at::Tensor> RunGraphEngineDynamic(std::shared_ptr<torch::jit::Graph>& g,
+                                              core::conversion::GraphParams& named_params,
+                                              std::vector<at::Tensor> inputs) {
+    LOG_DEBUG("Running TRT version");
+    auto in = toInputRangesDynamic(inputs);
     auto info = core::conversion::ConversionInfo(in);
     info.engine_settings.workspace_size = 1 << 20;
     std::string eng = core::conversion::ConvertBlockToEngine(g->block(), info, named_params);
