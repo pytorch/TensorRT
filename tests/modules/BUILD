@@ -1,3 +1,5 @@
+package(default_visibility = ["//visibility:public"])
+
 config_setting(
     name = "use_pre_cxx11_abi",
     values = {
@@ -15,7 +17,19 @@ test_suite(
     tests = [
         ":test_modules_as_engines",
         ":test_compiled_modules",
-        ":test_multiple_registered_engines"
+        ":test_multiple_registered_engines",
+        ":test_serialization"
+    ]
+)
+
+cc_test(
+    name = "test_serialization",
+    srcs = ["test_serialization.cpp"],
+    deps = [
+        ":module_test",
+    ],
+    data = [
+        ":jit_models"
     ]
 )
 

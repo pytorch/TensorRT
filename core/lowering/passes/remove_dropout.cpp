@@ -1,4 +1,3 @@
-#include <torch/csrc/jit/passes/fuse_linear.h>
 #include <torch/csrc/jit/passes/subgraph_rewrite.h>
 
 #include "core/util/prelude.h"
@@ -17,7 +16,6 @@ void RemoveDropout(std::shared_ptr<torch::jit::Graph>& graph) {
         graph(%input, %4, %5):
             return (%input))IR";
 
-    // replace matmul + add pattern to linear
     torch::jit::SubgraphRewriter remove_dropout;
     remove_dropout.RegisterRewritePattern(
         dropout_pattern, no_dropout_pattern);

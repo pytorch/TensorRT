@@ -9,7 +9,6 @@
 namespace trtorch {
 namespace core {
 namespace execution {
-namespace {
 std::vector<at::Tensor> RunCudaEngine(nvinfer1::IExecutionContext* ctx, std::pair<uint64_t, uint64_t> io, std::vector<at::Tensor>& inputs) {
     std::vector<void*> gpu_handles;
 
@@ -22,7 +21,7 @@ std::vector<at::Tensor> RunCudaEngine(nvinfer1::IExecutionContext* ctx, std::pai
         auto dims = core::util::toDimsPad(inputs[i].sizes(), 1);
         auto shape = core::util::toVec(dims);
         contig_inputs.push_back(inputs[i].view(shape).contiguous());
-        LOG_DEBUG("In shape: " << shape);
+        LOG_DEBUG("Input shape: " << dims);
         ctx->setBindingDimensions(i, dims);
         gpu_handles.push_back(contig_inputs.back().data_ptr());
     }
@@ -47,6 +46,7 @@ std::vector<at::Tensor> RunCudaEngine(nvinfer1::IExecutionContext* ctx, std::pai
     return outputs;
 }
 
+namespace {
 c10::AliasAnalysisKind aliasAnalysisFromSchema() {
   return c10::AliasAnalysisKind::FROM_SCHEMA;
 }
@@ -54,27 +54,19 @@ c10::AliasAnalysisKind aliasAnalysisFromSchema() {
 // Switched to a global operator because op implementations need to be non-capturing lambdas in PYT 1.5.0+
 torch::jit::RegisterOperators jit_registry({
     torch::jit::Operator(
-        "trt::execute_engine(int id, ...) -> ...",
+        "trt::execute_engine(Tensor[] inputs, __torch__.torch.classes.tensorrt.Engine engine) -> Tensor[]",
         [](torch::jit::Stack& stack) -> int {
-            size_t num_inputs = torch::jit::pop(stack).toInt();
             // Verify calling convention (right to left or left to right)
-            std::vector<at::Tensor> inputs;
-            for (uint64_t i = 0; i < num_inputs - 1; i++) {
-                at::Tensor in;
-                torch::jit::pop(stack, in);
-                inputs.insert(inputs.begin(), std::move(in));
-            }
+            auto engine = torch::jit::pop(stack).toCustomClass<TRTEngine>();
+            LOG_DEBUG("Attempting to run engine (ID: " << std::hex << engine->name << ")");
 
-            int64_t id = torch::jit::pop(stack).toInt();
-            LOG_DEBUG("Attempting to run engine (ID: " << std::hex << id << ")");
-            auto io = GetEngineIO(id);
-            auto num_out = io.second;
+            auto inputs = torch::jit::pop(stack).toTensorVector();
 
-            auto ctx = GetExecCtx(id);
+            auto io = engine->num_io;
+
+            auto ctx = engine->exec_ctx;
             auto outputs = RunCudaEngine(ctx, io, inputs);
-            for (uint64_t o = 0; o < num_out; o++) {
-                torch::jit::push(stack, std::move(outputs[o]));
-            }
+            torch::jit::push(stack, std::move(outputs));
             return 0;
         },
         aliasAnalysisFromSchema())

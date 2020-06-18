@@ -16,6 +16,10 @@ converter_test(
 )
 
 converter_test(
+  name = "test_concat"
+)
+
+converter_test(
   name = "test_conv_deconv"
 )
 

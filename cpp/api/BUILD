@@ -12,6 +12,7 @@ cc_library(
         "src/extra_info.cpp",
         "src/logging.cpp",
         "src/trtorch.cpp",
+        "src/ptq.cpp"
     ],
     deps = [
         "//core",

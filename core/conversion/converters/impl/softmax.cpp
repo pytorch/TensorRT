@@ -7,7 +7,7 @@ namespace converters {
 namespace impl {
 namespace {
 
-static auto softmax_registrations = RegisterNodeConversionPatterns()
+static auto softmax_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
     .pattern({
         "aten::softmax.int(Tensor self, int dim, int? dtype=None) -> (Tensor)",
         [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {

@@ -19,6 +19,7 @@ cc_library(
     ],
     deps = [
         "@tensorrt//:nvinfer",
+        "//core/conversion/var",
         "//core/conversion/conversionctx",
         "//core/conversion/converters",
         "//core/conversion/evaluators",

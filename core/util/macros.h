@@ -11,21 +11,21 @@
         l.log(sev, ss.str());                  \
     } while (0)
 
-#define LOG_GRAPH_GLOBAL(s)         TRTORCH_LOG(core::util::logging::get_logger(), core::util::logging::LogLevel::kGRAPH, s)
+#define LOG_GRAPH_GLOBAL(s)          TRTORCH_LOG(core::util::logging::get_logger(), core::util::logging::LogLevel::kGRAPH, s)
 #define LOG_DEBUG_GLOBAL(s)          TRTORCH_LOG(core::util::logging::get_logger(), core::util::logging::LogLevel::kDEBUG, s)
 #define LOG_INFO_GLOBAL(s)           TRTORCH_LOG(core::util::logging::get_logger(), core::util::logging::LogLevel::kINFO, s)
 #define LOG_WARNING_GLOBAL(s)        TRTORCH_LOG(core::util::logging::get_logger(), core::util::logging::LogLevel::kWARNING, s)
 #define LOG_ERROR_GLOBAL(s)          TRTORCH_LOG(core::util::logging::get_logger(), core::util::logging::LogLevel::kERROR, s)
 #define LOG_INTERNAL_ERROR_GLOBAL(s) TRTORCH_LOG(core::util::logging::get_logger(), core::util::logging::LogLevel::kINTERNAL_ERROR, s)
 
-#define LOG_GRAPH_OWN(l,s)          TRTORCH_LOG(l, core::util::logging::LogLevel::kGRAPH, s)
+#define LOG_GRAPH_OWN(l,s)           TRTORCH_LOG(l, core::util::logging::LogLevel::kGRAPH, s)
 #define LOG_DEBUG_OWN(l,s)           TRTORCH_LOG(l, core::util::logging::LogLevel::kDEBUG, s)
 #define LOG_INFO_OWN(l,s)            TRTORCH_LOG(l, core::util::logging::LogLevel::kINFO, s)
 #define LOG_WARNING_OWN(l,s)         TRTORCH_LOG(l, core::util::logging::LogLevel::kWARNING, s)
 #define LOG_ERROR_OWN(l,s)           TRTORCH_LOG(l, core::util::logging::LogLevel::kERROR, s)
 #define LOG_INTERNAL_ERROR_OWN(l,s)  TRTORCH_LOG(l, core::util::logging::LogLevel::kINTERNAL_ERROR, s)
 
-#define LOG_GRAPH(...)         GET_MACRO(__VA_ARGS__, LOG_GRAPH_OWN, LOG_GRAPH_GLOBAL)(__VA_ARGS__)
+#define LOG_GRAPH(...)          GET_MACRO(__VA_ARGS__, LOG_GRAPH_OWN, LOG_GRAPH_GLOBAL)(__VA_ARGS__)
 #define LOG_DEBUG(...)          GET_MACRO(__VA_ARGS__, LOG_DEBUG_OWN, LOG_DEBUG_GLOBAL)(__VA_ARGS__)
 #define LOG_INFO(...)           GET_MACRO(__VA_ARGS__, LOG_INFO_OWN, LOG_INFO_GLOBAL)(__VA_ARGS__)
 #define LOG_WARNING(...)        GET_MACRO(__VA_ARGS__, LOG_WARNING_OWN, LOG_WARNING_GLOBAL)(__VA_ARGS__)

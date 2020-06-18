@@ -9,7 +9,7 @@ namespace converters {
 namespace impl {
 namespace {
 
-static auto shuffle_registrations = RegisterNodeConversionPatterns()
+static auto shuffle_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
   .pattern({
     "aten::flatten.using_ints(Tensor self, int start_dim=0, int end_dim=-1) -> (Tensor)",
     [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
@@ -50,12 +50,31 @@ static auto shuffle_registrations = RegisterNodeConversionPatterns()
     [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
       auto in = args[0].ITensor();
       auto in_shape = util::toVec(in->getDimensions());
-      auto ex_tensor = torch::rand(in_shape);
-      auto new_shape = ex_tensor.view(args[1].unwrapToIntList().vec()).sizes();
 
       auto shuffle = ctx->net->addShuffle(*in);
       TRTORCH_CHECK(shuffle, "Unable to create shuffle layer from node: " << *n);
-      shuffle->setReshapeDimensions(util::toDims(new_shape));
+      shuffle->setReshapeDimensions(util::toDims(args[1].unwrapToIntList().vec()));
+      shuffle->setName(util::node_info(n).c_str());
+
+      auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], shuffle->getOutput(0));
+      LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+
+      return true;
+    }
+  }).pattern({
+    "aten::permute(Tensor(a) self, int[] dims) -> (Tensor(a))",
+    [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+      auto in = args[0].ITensor();
+      auto in_shape = util::toVec(in->getDimensions());
+      auto new_order = args[1].unwrapToIntList().vec();
+
+      LOG_DEBUG("Shuffle to: " << util::toDims(new_order));
+
+      auto shuffle = ctx->net->addShuffle(*in);
+      TRTORCH_CHECK(shuffle, "Unable to create shuffle layer from node: " << *n);
+      nvinfer1::Permutation permute;
+      std::copy(new_order.begin(), new_order.end(), permute.order);
+      shuffle->setSecondTranspose(permute);
       shuffle->setName(util::node_info(n).c_str());
 
       auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], shuffle->getOutput(0));

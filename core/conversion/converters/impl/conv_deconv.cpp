@@ -1,3 +1,5 @@
+#include "torch/torch.h"
+
 #include "core/util/prelude.h"
 #include "core/conversion/converters/converters.h"
 
@@ -7,7 +9,7 @@ namespace conversion {
 namespace converters {
 namespace impl {
 namespace {
-auto conv_registrations = RegisterNodeConversionPatterns()
+auto conv_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
     .pattern({
         R"SIG(aten::_convolution(Tensor input, Tensor weight,
                                  Tensor? bias, int[] stride, int[] padding,
@@ -50,7 +52,8 @@ auto conv_registrations = RegisterNodeConversionPatterns()
                     Weights b(ctx, args[2].unwrapToTensor());
                     conv = ctx->net->addConvolutionNd(*in, w.num_output_maps, w.kernel_shape, w.data, b.data);
                 } else {
-                    conv = ctx->net->addConvolutionNd(*in, w.num_output_maps, w.kernel_shape, w.data, Weights().data);
+                    Weights b(ctx, torch::zeros(args[1].unwrapToTensor().sizes()[0]));
+                    conv = ctx->net->addConvolutionNd(*in, w.num_output_maps, w.kernel_shape, w.data, b.data);
                 }
 
                 TRTORCH_CHECK(conv, "Unable to create convolution layer from node: " << *n);

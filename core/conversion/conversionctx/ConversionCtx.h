@@ -4,7 +4,6 @@
 #include <unordered_map>
 #include <memory>
 
-//#include "ATen/ATen.h"
 #include "torch/csrc/jit/ir/ir.h"
 #include "NvInfer.h"
 
@@ -43,6 +42,7 @@ struct ConversionCtx {
 
     ~ConversionCtx();
 
+    bool input_is_dynamic = false;
     nvinfer1::IBuilder* builder;
     nvinfer1::INetworkDefinition* net;
     nvinfer1::IBuilderConfig* cfg;

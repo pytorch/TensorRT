@@ -105,15 +105,6 @@ int main(int argc, const char* argv[]) {
 
     mod.to(at::kCUDA);
 
-#ifdef HALF
-    mod.to(torch::kHalf);
-    for (auto layer : mod.named_modules()) {
-        if (layer.name.find(".bn") != std::string::npos) {
-            layer.value.to(torch::kFloat);
-        }
-    }
-#endif
-
     std::vector<std::vector<int64_t>> dims;
     for (int i = 2; i < argc; i++) {
         auto arg = std::string(argv[i]);
@@ -129,22 +120,41 @@ int main(int argc, const char* argv[]) {
 
     at::globalContext().setBenchmarkCuDNN(true);
 
-#ifdef JIT
-    auto jit_runtimes = benchmark_module(mod, dims[0]);
-    print_avg_std_dev("JIT", jit_runtimes, dims[0][0]);
-#endif
-
 #ifdef TRT
     auto extra_info = trtorch::ExtraInfo(dims);
-    extra_info.workspace_size = 1 << 24;
+    extra_info.workspace_size = 1 << 20;
 
 #ifdef HALF
-    extra_info.op_precision = at::kHalf;
+    extra_info.op_precision = torch::kF16;
 #endif
 
     auto trt_mod = trtorch::CompileGraph(mod, extra_info);
+
+#ifdef SAVE_ENGINE
+    std::cout << "Compiling graph to save as TRT engine (/tmp/engine_converted_from_jit.trt)" << std::endl;
+    auto engine = trtorch::ConvertGraphToTRTEngine(mod, "forward", extra_info);
+    std::ofstream out("/tmp/engine_converted_from_jit.trt");
+    out << engine;
+    out.close();
+#endif
+
     auto trt_runtimes = benchmark_module(trt_mod, dims[0]);
     print_avg_std_dev("JIT/TRT", trt_runtimes, dims[0][0]);
+#endif
+
+
+#ifdef HALF
+    mod.to(torch::kHalf);
+    for (auto layer : mod.named_modules()) {
+        if (layer.name.find(".bn") != std::string::npos) {
+            layer.value.to(torch::kFloat);
+        }
+    }
+#endif
+
+#ifdef JIT
+    auto jit_runtimes = benchmark_module(mod, dims[0]);
+    print_avg_std_dev("JIT", jit_runtimes, dims[0][0]);
 #endif
 
     std::cout << "ok\n";

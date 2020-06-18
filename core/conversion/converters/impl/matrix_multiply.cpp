@@ -8,7 +8,7 @@ namespace converters {
 namespace impl {
 namespace {
 
-auto mm_registrations = RegisterNodeConversionPatterns()
+auto mm_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
   .pattern({
     "aten::matmul(Tensor self, Tensor other) -> (Tensor)",
     [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {

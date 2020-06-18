@@ -18,6 +18,8 @@ Program Listing for File ptq.h
    #include <iostream>
    #include <sstream>
    
+   #include "trtorch/logging.h"
+   
    #ifndef DOXYGEN_SHOULD_SKIP_THIS
    namespace nvinfer1 {
    class IInt8Calibrator;
@@ -25,9 +27,12 @@ Program Listing for File ptq.h
    }
    
    namespace torch {
-   namespace data {
-   template<typename Example>
-   class Iterator;
+   class Tensor;
+   }
+   
+   namespace trtorch {
+   namespace ptq {
+   bool get_batch_impl(void* bindings[], const char* names[], int nbBindings, torch::Tensor& data);
    }
    }
    #endif //DOXYGEN_SHOULD_SKIP_THIS
@@ -41,7 +46,12 @@ Program Listing for File ptq.h
        using Batch = typename DataLoader::super::BatchType;
    public:
        Int8Calibrator(DataLoaderUniquePtr dataloader, const std::string& cache_file_path, bool use_cache)
-         : dataloader_(dataloader.get()), it_(dataloader_->end()), cache_file_path_(cache_file_path), use_cache_(use_cache) {}
+         : dataloader_(dataloader.get()), cache_file_path_(cache_file_path), use_cache_(use_cache) {
+             for (auto batch : *dataloader_) {
+               batched_data_.push_back(batch.data);
+             }
+             it_ = batched_data_.begin();
+         }
    
        int getBatchSize() const override {
            // HACK: TRTorch only uses explict batch sizing, INT8 Calibrator does not
@@ -52,26 +62,15 @@ Program Listing for File ptq.h
        }
    
        bool getBatch(void* bindings[], const char* names[], int nbBindings) override {
-           // HACK: doesnt seem like the first try in the initializer list works
-           if (! it_created_) {
-               it_ = dataloader_->begin();
-               it_created_ = true;
-           }
-   
-           if (it_ == dataloader_->end()) {
+           if (it_ != batched_data_.end()) {
+               auto status = get_batch_impl(bindings, names, nbBindings, *it_);
+               it_ = ++it_;
+               return status;
+           } else {
+               // Reset iterator if incase calibrator is going to be used again
+               it_ = batched_data_.begin();
                return false;
            }
-   
-           auto batch = *it_;
-   
-           for (int i = 0; i < nbBindings; i++) {
-               auto data = batch.data;
-               data = data.to(at::kCUDA).contiguous();
-               bindings[i] = data.data_ptr();
-           }
-   
-           it_ = ++it_;
-           return true;
        }
    
        const void* readCalibrationCache(size_t& length) override {
@@ -79,18 +78,17 @@ Program Listing for File ptq.h
                std::stringstream ss;
                ss << "Reading Calibration Cache from " << cache_file_path_;
                logging::log(logging::Level::kINFO, ss.str());
+   
                cache_.clear();
-               std::ifstream cache_file(cache_file_path_, std::ios::binary);
-               cache_file >> std::noskipws;
-               if (cache_file.good()) {
-                   std::copy(std::istream_iterator<char>(cache_file),
-                               std::istream_iterator<char>(),
-                               std::back_inserter(cache_));
-                   ss << "Cache read";
-                   logging::log(logging::Level::kDEBUG, ss.str());
+               std::ifstream input(cache_file_path_, std::ios::binary);
+               input >> std::noskipws;
+               if (input.good()) {
+                   std::copy(std::istream_iterator<char>(input), std::istream_iterator<char>(),
+                       std::back_inserter(cache_));
+                   logging::log(logging::Level::kDEBUG, "Cache read");
                }
-               cache_size_ = cache_.size();
-               return cache_size_ ? cache_.data() : nullptr;
+               length = cache_.size();
+               return length ? cache_.data() : nullptr;
            }
            return nullptr;
        }
@@ -109,12 +107,13 @@ Program Listing for File ptq.h
    
    private:
        DataLoader* dataloader_;
-       torch::data::Iterator<Batch> it_;
        const std::string& cache_file_path_;
        size_t cache_size_ = 0;
        bool use_cache_;
        std::vector<char> cache_;
-       bool it_created_ = false;
+       std::vector<torch::Tensor> batched_data_;
+       std::vector<torch::Tensor>::iterator it_;
+   
    };
    
    template<typename Algorithm>
@@ -138,23 +137,17 @@ Program Listing for File ptq.h
            std::stringstream ss;
            ss << "Reading Calibration Cache from " << cache_file_path_;
            logging::log(logging::Level::kINFO, ss.str());
+   
            cache_.clear();
-           std::ifstream cache_file;
-           cache_file.open(cache_file_path_, std::ios::in | std::ios::binary);
-           cache_file.unsetf(std::ios::skipws);
-           cache_file.seekg(0, std::ios::beg);
-           cache_.reserve(cache_file.tellg());
-           cache_file.seekg(0, std::ios::beg);
-           if (cache_file.good()) {
-               std::cout << "Trying to read cache" << std::endl;
-               std::copy(std::istreambuf_iterator<char>(cache_file),
-                           std::istreambuf_iterator<char>(),
-                           std::back_inserter(cache_));
-               ss << "Cache read";
-               logging::log(logging::Level::kDEBUG, ss.str());
+           std::ifstream input(cache_file_path_, std::ios::binary);
+           input >> std::noskipws;
+           if (input.good()) {
+               std::copy(std::istream_iterator<char>(input), std::istream_iterator<char>(),
+                   std::back_inserter(cache_));
+               logging::log(logging::Level::kDEBUG, "Cache read");
            }
-           cache_size_ = cache_.size();
-           return cache_size_ ? cache_.data() : nullptr;
+           length = cache_.size();
+           return length ? cache_.data() : nullptr;
        }
    
    

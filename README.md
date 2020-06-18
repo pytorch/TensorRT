@@ -23,6 +23,8 @@ compile_settings.op_precision = torch::kFloat;
 auto trt_mod = trtorch::CompileGraph(ts_mod, compile_settings);
 // Run like normal
 auto results = trt_mod.forward({in_tensor});
+// Save module for later
+trt_mod.save("trt_torchscript_module.ts");
 ...
 ```
 
@@ -46,6 +48,7 @@ trt_ts_module = trtorch.compile(torch_script_module, compile_settings)
 
 input_data = input_data.half()
 result = trt_ts_module(input_data)
+torch.jit.save(trt_ts_module, "trt_torchscript_module.ts")
 ```
 
 > Notes on running in lower precisions:
@@ -65,6 +68,7 @@ result = trt_ts_module(input_data)
 
 ### Dependencies
 
+- Bazel 3.2.0
 - Libtorch 1.5.0
 - CUDA 10.2
 - cuDNN 7.6.5
@@ -78,7 +82,24 @@ Releases: https://github.com/NVIDIA/TRTorch/releases
 
 ### Installing Dependencies
 
-You need to start by having CUDA installed on the system, Libtorch will automatically be pulled for you by bazel,
+#### 0. Install Bazel
+
+If you don't have bazel installed, the easiest way is to install bazelisk using the method of you choosing https://github.com/bazelbuild/bazelisk
+
+Otherwise you can use the following instructions to install binaries https://docs.bazel.build/versions/master/install.html
+
+Finally if you need to compile from source (e.g. aarch64 until bazel distributes binaries for the architecture) you can use these instructions
+
+```sh
+export BAZEL_VERSION=<VERSION>
+mkdir bazel
+cd bazel
+curl -fSsL -O https://github.com/bazelbuild/bazel/releases/download/$BAZEL_VERSION/bazel-$BAZEL_VERSION-dist.zip
+unzip bazel-$BAZEL_VERSION-dist.zip
+bash ./compile.sh
+```
+
+You need to start by having CUDA installed on the system, LibTorch will automatically be pulled for you by bazel,
 then you have two options.
 
 #### 1. Building using cuDNN & TensorRT tarball distributions
@@ -90,10 +111,10 @@ then you have two options.
 1. You need to download the tarball distributions of TensorRT and cuDNN from the NVIDIA website.
     - https://developer.nvidia.com/cudnn
     - https://developer.nvidia.com/tensorrt
-2. Place these files in a directory (the directories `thrid_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]` exist for this purpose)
+2. Place these files in a directory (the directories `third_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]` exist for this purpose)
 3. Compile using:
 ``` shell
-bazel build //:libtrtorch --compilation_mode opt --distdir thrid_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]
+bazel build //:libtrtorch --compilation_mode opt --distdir third_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]
 ```
 
 #### 2. Building using locally installed cuDNN & TensorRT

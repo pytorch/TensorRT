@@ -15,9 +15,9 @@ cc_library(
     srcs = [
         "NodeConverterRegistry.cpp",
         "Weights.cpp",
-        "Arg.cpp",
         "impl/activation.cpp",
         "impl/batch_norm.cpp",
+        "impl/concat.cpp",
         "impl/constant.cpp",
         "impl/conv_deconv.cpp",
         "impl/element_wise.cpp",
@@ -25,7 +25,6 @@ cc_library(
         "impl/matrix_multiply.cpp",
         "impl/pooling.cpp",
         "impl/reduce.cpp",
-        "impl/shape.cpp",
         "impl/shuffle.cpp",
         "impl/softmax.cpp",
         "impl/unary.cpp",
@@ -34,6 +33,8 @@ cc_library(
     deps = [
         "@tensorrt//:nvinfer",
         "//core/util:prelude",
+        "//core/conversion/var",
+        "//core/conversion/tensorcontainer",
         "//core/conversion/conversionctx",
         "//core/conversion/converters/impl/plugins"
     ] + select({
