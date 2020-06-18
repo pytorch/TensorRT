@@ -9,6 +9,7 @@ pkg_tar(
         "//core/conversion/conversionctx:include",
         "//core/conversion/converters:include",
         "//core/conversion/evaluators:include",
+        "//core/conversion/converters/impl/plugins:include",
         "//core/execution:include",
         "//core/lowering:include",
         "//core/lowering/passes:include",
@@ -33,7 +34,6 @@ pkg_tar(
     ],
     mode = "0755",
 )
-
 
 
 
