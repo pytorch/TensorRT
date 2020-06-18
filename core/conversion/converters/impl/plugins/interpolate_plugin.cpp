@@ -175,6 +175,8 @@ int InterpolatePlugin::enqueue(const nvinfer1::PluginTensorDesc* inputDesc, cons
         at::upsample_bilinear2d_out(output, input, {size[0], size[1]}, align_corners);
     } else if (mode == "trilinear") {
         at::upsample_trilinear3d_out(output, input, {size[0], size[1], size[2]}, align_corners);
+    } else if (mode == "adaptive_pool2d") {
+        at::adaptive_avg_pool2d_out(output, input, {size[0], size[1]});
     }
 
     cudaEvent_t torch_event;
