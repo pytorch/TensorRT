@@ -28,6 +28,12 @@ std::vector<at::Tensor> RunGraphEngine(std::shared_ptr<torch::jit::Graph>& g,
                                        core::conversion::GraphParams& named_params,
                                        std::vector<at::Tensor> inputs);
 
+// Runs an arbitrary JIT graph with dynamic input sizes by converting it to TensorRT
+// and running inference and returns results
+std::vector<at::Tensor> RunGraphEngineDynamic(std::shared_ptr<torch::jit::Graph>& g,
+                                              core::conversion::GraphParams& named_params,
+                                              std::vector<at::Tensor> inputs);
+
 // Run the forward method of a module and return results
 torch::jit::IValue RunModuleForward(torch::jit::Module& mod,
                                     std::vector<torch::jit::IValue> inputs);

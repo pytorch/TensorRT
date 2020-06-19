@@ -11,6 +11,7 @@ pkg_tar(
         "//core/conversion/var:include",
         "//core/conversion/tensorcontainer:include",
         "//core/conversion/evaluators:include",
+        "//core/conversion/converters/impl/plugins:include",
         "//core/execution:include",
         "//core/lowering:include",
         "//core/lowering/passes:include",
@@ -45,7 +46,6 @@ pkg_tar(
     ],
     mode = "0755",
 )
-
 
 
 pkg_tar(

@@ -31,4 +31,6 @@ INSTANTIATE_TEST_SUITE_P(CompiledModuleForwardIsCloseSuite,
                          ModuleTests,
                          testing::Values(
                             PathAndInSize({"tests/modules/resnet18_traced.jit.pt",
-                                          {{1,3,224,224}}})));
+                                          {{1,3,224,224}}}),
+                            PathAndInSize({"tests/modules/interpolate_traced.jit.pt",
+                                          {{1,3,5,5,5}}})));
