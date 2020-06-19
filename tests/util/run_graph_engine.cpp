@@ -30,18 +30,8 @@ std::vector<core::conversion::InputRange> toInputRangesDynamic(std::vector<at::T
         std::vector<int64_t> min_range(opt);
         std::vector<int64_t> max_range(opt); 
 
-        min_range[0] = ceil(opt[0]/2.0);
-        max_range[0] = 2*opt[0];
-
-        // for (int64_t each : min_range) {
-        //     std::cout << each << std::endl;
-        // }
-        // for (int64_t each : opt) {
-        //     std::cout << each << std::endl;
-        // }
-        // for (int64_t each : max_range) {
-        //     std::cout << each << std::endl;
-        // }
+        min_range[1] = ceil(opt[1]/2.0);
+        max_range[1] = 2*opt[1];
 
         a.push_back(core::conversion::InputRange(min_range, opt, max_range));
     }
