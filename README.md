@@ -203,8 +203,6 @@ Thanks for wanting to contribute! There are two main ways to handle supporting a
 
 You can register a converter for your op using the `NodeConverterRegistry` inside your application.
 
-## Known Limitations
-
 ## Structure of the repo
 
 | Component     | Description                                                  |
