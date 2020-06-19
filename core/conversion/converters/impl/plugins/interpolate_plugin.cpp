@@ -134,15 +134,20 @@ size_t InterpolatePlugin::getSerializationSize() const {
 }
 
 bool InterpolatePlugin::supportsFormatCombination(int pos, const nvinfer1::PluginTensorDesc* inOut, int nbInputs, int nbOutputs) {
-    if (inOut->format != nvinfer1::TensorFormat::kLINEAR) {
-        return false;
-    } 
+    TRTORCH_ASSERT(0 <= pos && pos <= 1, "There should be exactly 2 connections to the plugin - 1 input, 1 output");
+    TRTORCH_ASSERT(nbInputs == 1, "Expected a single tensor as input to interpolate plugin");
+    TRTORCH_ASSERT(nbOutputs == 1, "Expected a single tensor as output to interpolate plugin");
 
-    if (inOut->type == DataType::kINT32 || inOut->type == DataType::kINT8) {
-        return false;
+    const PluginTensorDesc& in = inOut[0];
+
+    if (pos == 0) {
+        return (in.type == nvinfer1::DataType::kFLOAT) && (in.format == nvinfer1::TensorFormat::kLINEAR);
     }
 
-    return true;
+    // pos == 1, accessing information about output tensor
+    const PluginTensorDesc& out = inOut[1];
+    
+    return (in.type == out.type) && (in.format == out.format);
 }
 
 void InterpolatePlugin::configurePlugin(const nvinfer1::DynamicPluginTensorDesc* in, int nbInputs, const nvinfer1::DynamicPluginTensorDesc* out, int nbOutputs) {
@@ -156,16 +161,7 @@ size_t InterpolatePlugin::getWorkspaceSize(const nvinfer1::PluginTensorDesc* inp
 int InterpolatePlugin::enqueue(const nvinfer1::PluginTensorDesc* inputDesc, const nvinfer1::PluginTensorDesc* outputDesc, const void *const *inputs, 
                                                                                                         void *const *outputs, void *workspace, 
                                                                                                         cudaStream_t stream) {
-    at::Tensor input;
-
-    if (mode == "adaptive_pool2d") {
-        // use dynamically inferred input shape (for pooling)
-        input = at::from_blob((void*) inputs[0], util::toVec(inputDesc->dims), [](void*){}, tensor_options);
-    } else {
-        // use precomputed input shape (for interpolation/upsampling)
-        input = at::from_blob((void*) inputs[0], in_shape, [](void*){}, tensor_options);
-    }
-
+    at::Tensor input = at::from_blob((void*) inputs[0], util::toVec(inputDesc->dims), [](void*){}, tensor_options);
     at::Tensor output = at::from_blob(outputs[0], out_shape, [](void*){}, tensor_options);
 
     at::cuda::CUDAStream torch_stream = at::cuda::getStreamFromPool();
