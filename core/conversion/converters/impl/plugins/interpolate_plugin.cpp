@@ -156,8 +156,16 @@ size_t InterpolatePlugin::getWorkspaceSize(const nvinfer1::PluginTensorDesc* inp
 int InterpolatePlugin::enqueue(const nvinfer1::PluginTensorDesc* inputDesc, const nvinfer1::PluginTensorDesc* outputDesc, const void *const *inputs, 
                                                                                                         void *const *outputs, void *workspace, 
                                                                                                         cudaStream_t stream) {
+    at::Tensor input;
 
-    at::Tensor input = at::from_blob((void*) inputs[0], in_shape, [](void*){}, tensor_options);
+    if (mode == "adaptive_pool2d") {
+        // use dynamically inferred input shape (for pooling)
+        input = at::from_blob((void*) inputs[0], util::toVec(inputDesc->dims), [](void*){}, tensor_options);
+    } else {
+        // use precomputed input shape (for interpolation/upsampling)
+        input = at::from_blob((void*) inputs[0], in_shape, [](void*){}, tensor_options);
+    }
+
     at::Tensor output = at::from_blob(outputs[0], out_shape, [](void*){}, tensor_options);
 
     at::cuda::CUDAStream torch_stream = at::cuda::getStreamFromPool();
