@@ -1,5 +1,5 @@
 ---
-name: "\U00002194Op Converter Request"
+name: "\U00002194 Op Converter Request"
 about: Submit a proposal/request to support a new PyTorch operator in TRTorch
 
 ---
