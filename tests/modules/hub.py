@@ -92,5 +92,3 @@ x = torch.ones([1, 3, 5, 5, 5]).cuda()
 
 trace_model = torch.jit.trace(model, x)
 torch.jit.save(trace_model, "interpolate_traced.jit.pt")
-
-

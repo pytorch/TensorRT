@@ -7,6 +7,27 @@ config_setting(
     }
 )
 
+config_setting(
+   name = "use_pre_cxx11_abi_aarch64",
+    values = {
+        "define": "abi=pre_cxx11_abi",
+        "cpu" : "aarch64",
+    }
+)
+
+config_setting(
+    name="aarch64",
+    values={
+        "cpu":"aarch64"
+    },
+)
+config_setting(
+    name="x86_64",
+    values={
+        "cpu":"x86_64"
+    },
+)
+
 cc_library(
     name = "core",
     hdrs = [
@@ -20,10 +41,14 @@ cc_library(
         "//core/execution",
         "//core/lowering",
         "//core/util/logging",
-        "@tensorrt//:nvinfer"
     ] + select({
+        ":use_pre_cxx11_abi_aarch64": ["@libtorch_pre_cxx11_abi_aarch64//:libtorch"],
+        ":aarch64": ["@libtorch_aarch64//:libtorch"],
         ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default":  ["@libtorch//:libtorch"],
+    }) + select({
+        ":aarch64": ["@tensorrt_aarch64//:nvinfer"],
+        "//conditions:default":  ["@tensorrt//:nvinfer"]
     }),
     alwayslink=True,
 )

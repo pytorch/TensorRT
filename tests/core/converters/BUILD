@@ -7,6 +7,28 @@ config_setting(
     }
 )
 
+config_setting(
+    name = "use_pre_cxx11_abi_aarch64",
+    values = {
+        "define": "abi=pre_cxx11_abi",
+        "cpu" : "aarch64"
+    }
+)
+
+config_setting(
+    name = "aarch64",
+    values = {
+       "cpu" : "aarch64"
+       }
+)
+
+config_setting(
+    name = "x86_64",
+    values = {
+       "cpu" : "x86_64"
+       }
+)
+
 converter_test(
   name = "test_activation"
 )

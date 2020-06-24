@@ -11,8 +11,10 @@ cc_binary(
         "@libtorch//:libtorch",
         "@libtorch//:caffe2",
         "//cpp/api:trtorch",
-        "@tensorrt//:nvinfer"
-    ],
+    ] + select([
+	":aarch64" : ["@tensorrt_aarch64//:nvinfer"],
+	"//conditions:default" : ["@tensorrt//:nvinfer"],
+		    ]),
     copts = [
         "-pthread"
     ],

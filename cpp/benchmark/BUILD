@@ -7,8 +7,11 @@ cc_binary(
         "timer.h"
     ],
     deps = [
-        "@libtorch//:libtorch",
-        "@libtorch//:caffe2",
-        "//cpp/api:trtorch"
-    ],
+    ] = select([
+        ":aarch64": ["@libtorch_aarch64//:libtorch"],
+	     "//conditions:default": ["@libtorch//:libtorch",
+			                      "@libtorch//:caffe2",
+			                      "//cpp/api:trtorch"
+			                     ],
+	]),
 )

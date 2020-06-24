@@ -7,6 +7,27 @@ config_setting(
     }
 )
 
+config_setting(
+    name = "use_pre_cxx11_abi_aarch64",
+    values = {
+        "define": "abi=pre_cxx11_abi",
+        "cpu" : "aarch64",
+    }
+)
+
+config_setting(
+    name="aarch64",
+    values={
+        "cpu":"aarch64"
+    },
+)
+config_setting(
+    name="x86_64",
+    values={
+        "cpu":"x86_64"
+    },
+)
+
 cc_library(
     name = "lowering",
     hdrs = [
@@ -21,7 +42,9 @@ cc_library(
         "//core/lowering/passes",
         "//core/util:prelude"
     ] + select({
+	    ":aarch64": ["@libtorch_aarch64//:libtorch"],
         ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
+        ":use_pre_cxx11_abi_aarch64":  ["@libtorch_pre_cxx11_abi_aarch64//:libtorch"],
         "//conditions:default":  ["@libtorch//:libtorch"],
     }),
     alwayslink = True
