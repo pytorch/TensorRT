@@ -21,12 +21,6 @@ config_setting(
         "cpu":"aarch64"
     },
 )
-config_setting(
-    name="x86_64",
-    values={
-        "cpu":"x86_64"
-    },
-)
 
 cc_library(
     name = "prelude",
@@ -51,6 +45,7 @@ cc_library(
     deps = select({
 	":aarch64": ["@libtorch_aarch64//:libtorch"],
         ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
+        ":use_pre_cxx11_abi_aarch64":  ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default":  ["@libtorch//:libtorch"],
     }),
 )

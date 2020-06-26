@@ -129,24 +129,30 @@ new_local_repository(
 new_local_repository(
     name = "cuda_aarch64",
     path = "/usr/local/cuda/targets/aarch64-linux-gnu",
-    build_file = "third_party/libs/cuda.BUILD"
+    build_file = "third_party/cuda/BUILD"
 )
 
 new_local_repository(
     name = "tensorrt_aarch64",
     path = "/usr",
-    build_file = "third_party/libs/tensorrt.BUILD"
+    build_file = "third_party/tensorrt/local/BUILD"
 )
 
 new_local_repository(
     name = "cudnn_aarch64",
     path = "/usr",
-    build_file = "third_party/libs/cudnn.BUILD"
+    build_file = "third_party/cudnn/local/BUILD"
 )
 
 
 new_local_repository(
     name = "libtorch_aarch64",
-    path = "/media/nvidia/SCRATCH/anuragd-ws/pkgs/aarch64-linux-gnu",
-    build_file = "third_party/libs/torch.BUILD"
+    path = "/usr/local/lib/python3.6/dist-packages/torch",
+    build_file = "third_party/libtorch/BUILD"
+)
+
+new_local_repository(
+    name = "libtorch_pre_cxx11_abi_aarch64",
+    path = "/usr/local/lib/python3.6/dist-packages/torch",
+    build_file = "third_party/libtorch/BUILD"
 )

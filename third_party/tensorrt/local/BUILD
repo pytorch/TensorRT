@@ -1,20 +1,45 @@
 package(default_visibility = ["//visibility:public"])
 
+config_setting(
+   name = "aarch64",
+   values = {
+	"cpu" : "aarch64"
+   },
+)
+
 cc_library(
     name = "nvinfer_headers",
-    hdrs = glob([
-        "include/NvInfer*.h",
-    ], exclude=[
-        "include/NvInferPlugin.h",
-        "include/NvInferPluginUtils.h"
-    ]),
-    includes = ["include/"],
+    hdrs = select({
+	":aarch64" : [
+	                "include/aarch64-linux-gnu/NvUtils.h",
+     	             ] + glob([
+                               "include/aarch64-linux-gnu/NvInfer*.h",
+                              ], exclude=[
+                                          "include/aarch64-linux-gnu/NvInferPlugin.h",
+                                          "include/aarch64-linux-gnu/NvInferPluginUtils.h"
+                             ]),
+	"//conditions:default" : [
+		 	        "include/NvUtils.h",
+         			] + glob([
+                                "include/NvInfer*.h",
+                                         ], exclude=[
+                                          "include/NvInferPlugin.h",
+                                          "include/NvInferPluginUtils.h"
+                                           ]),
+    }),
+    includes = select({
+        ":aarch64" : ["include/aarch64-linux-gnu"],
+	"//conditions:default" : ["include/"],
+    }),
     visibility = ["//visibility:private"],
 )
 
 cc_import(
     name = "nvinfer_lib",
-    shared_library = "lib/x86_64-linux-gnu/libnvinfer.so",
+    shared_library = select({
+	"aarch64" : "lib/aarch64-linux-gnu/libnvinfer.so",
+	"//conditions:default" : "lib/x86_64-linux-gnu/libnvinfer.so",
+    }),
     visibility = ["//visibility:private"],
 )
 
@@ -23,10 +48,19 @@ cc_library(
     deps = [
         "nvinfer_headers",
         "nvinfer_lib",
-        "@cuda//:cudart",
-        "@cuda//:cublas",
-        "@cudnn//:cudnn"
-    ],
+    ] + select({
+	":aarch64": [
+			"@cuda_aarch64//:cudart",
+			"@cuda_aarch64//:cublas",
+			"@cudnn_aarch64//:cudnn"
+			],
+	"//conditions:default":  [
+			"@cuda//:cudart",
+			"@cuda//:cublas",
+			"@cudnn//:cudnn"
+			 ],
+    }),
+
     visibility = ["//visibility:public"],
 )
 
@@ -34,7 +68,10 @@ cc_library(
 
 cc_import(
     name = "nvparsers_lib",
-    shared_library = "lib/x86_64-linux-gnu/libnvparsers.so",
+    shared_library = select({
+        "aarch64" : "lib/aarch64-linux-gnu/libnvparsers.so",
+        "//conditions:default" : "lib/x86_64-linux-gnu/libnvparsers.so",
+    }),
     visibility = ["//visibility:private"],
 )
 
@@ -66,7 +103,10 @@ cc_library(
 
 cc_import(
     name = "nvonnxparser_lib",
-    shared_library = "lib/x86_64-linux-gnu/libnvonnxparser.so",
+    shared_library = select({
+	"aarch64" : "lib/aarch64-linux-gnu/libnvonnxparser.so",
+	"//conditions:default" : "lib/x86_64-linux-gnu/libnvonnxparser.so",
+    }),
     visibility = ["//visibility:private"],
 )
 
@@ -95,7 +135,10 @@ cc_library(
 
 cc_import(
     name = "nvonnxparser_runtime_lib",
-    shared_library = "lib/x86_64-linux-gnu/libnvonnxparser_runtime.so",
+    shared_library = select({
+       "aarch64" : "lib/x86_64-linux-gnu/libnvonnxparser_runtime.so",
+       "//conditions:default" : "lib/x86_64-linux-gnu/libnvonnxparser_runtime.so",
+    }),
     visibility = ["//visibility:public"],
 )
 
@@ -120,7 +163,10 @@ cc_library(
 
 cc_import(
     name = "nvcaffeparser_lib",
-    shared_library = "lib/x86_64-linux-gnu/libnvcaffe_parsers.so",
+    shared_library = select({
+	"aarch64" : "lib/aarch64-linux-gnu/libnvcaffe_parsers.so",
+	"//conditions:default" : "lib/x86_64-linux-gnu/libnvcaffe_parsers.so",
+    }),
     visibility = ["//visibility:private"],
 )
 
@@ -145,7 +191,10 @@ cc_library(
 
 cc_import(
     name = "nvinferplugin_lib",
-    shared_library = "lib/x86_64-linux-gnu/libnvinfer_plugin.so",
+    shared_library = select({
+       "aarch64" : "lib/x86_64-linux-gnu/libnvinfer_plugin.so",
+       "//conditions:default" : "lib/x86_64-linux-gnu/libnvinfer_plugin.so",
+    }),
     visibility = ["//visibility:private"],
 )
 

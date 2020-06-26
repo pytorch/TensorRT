@@ -1,5 +1,12 @@
 package(default_visibility = ["//visibility:public"])
 
+config_setting(
+   name = "aarch64",
+   values = {
+	"cpu" : "aarch64",
+   },
+)
+
 cc_library(
     name = "cudnn_headers",
     hdrs = ["include/cudnn.h"] + glob(["include/cudnn+.h"]),
@@ -9,7 +16,10 @@ cc_library(
 
 cc_import(
     name = "cudnn_lib",
-    shared_library = "lib/x86_64-linux-gnu/libcudnn.so.7.6.5",
+    shared_library = select({
+	"aarch64" : "lib/aarch64-linux-gnu/libcudnn.so",
+	"//conditions:default" : "lib/x86_64-linux-gnu/libcudnn.so.7.6.5",
+	}),
     visibility = ["//visibility:private"],
 )
 

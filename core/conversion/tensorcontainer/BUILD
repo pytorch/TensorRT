@@ -20,12 +20,6 @@ config_setting(
         "cpu":"aarch64"
     },
 )
-config_setting(
-    name="x86_64",
-    values={
-        "cpu":"x86_64"
-    },
-)
 
 cc_library(
     name = "tensorcontainer",
