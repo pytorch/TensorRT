@@ -82,6 +82,30 @@ nvinfer1::Dims toDimsPad(c10::List<int64_t> l, uint64_t pad_to) {
     return dims;
 }
 
+nvinfer1::Dims unpadDims(const nvinfer1::Dims& d) {
+    nvinfer1::Dims dims;
+
+    int j = 0;
+    bool pad_dims_done = false;
+
+    for (int i = 0; i < d.nbDims; i++) {
+        if (d.d[i] == 1 && !pad_dims_done) {
+            // skip over unecessary dimension
+            continue;
+        } else {
+            dims.d[j] = d.d[i];
+            j++;
+
+            // keep all other dimensions (don't skip over them)
+            pad_dims_done = true;
+        }
+    }
+
+    dims.nbDims = j;
+
+    return dims;
+}
+
 std::vector<int64_t> toVec(nvinfer1::Dims d) {
     std::vector<int64_t> dims;
     for (int i = 0; i < d.nbDims; i++) {
