@@ -106,6 +106,32 @@ nvinfer1::Dims unpadDims(const nvinfer1::Dims& d) {
     return dims;
 }
 
+nvinfer1::Dims unsqueezeDims(const nvinfer1::Dims& d, int pos) {
+    // acceptable range for pos is [0, d.nbDims]
+    TRTORCH_ASSERT(pos >= 0 && pos <= d.nbDims, "ERROR: Index to unsqueeze is out of bounds.");
+    
+    nvinfer1::Dims dims;
+
+    int i = 0;
+    int j = 0;
+
+    while (i <= d.nbDims) {
+        if (j != pos) {
+            dims.d[j] = d.d[i];
+            i++;
+        } else {
+            // add new dimension at pos
+            dims.d[j] = 1;
+        }
+
+        j++;
+    }
+
+    dims.nbDims = d.nbDims+1;
+
+    return dims;
+}
+
 std::vector<int64_t> toVec(nvinfer1::Dims d) {
     std::vector<int64_t> dims;
     for (int i = 0; i < d.nbDims; i++) {
