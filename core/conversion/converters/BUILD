@@ -29,7 +29,8 @@ cc_library(
         "impl/softmax.cpp",
         "impl/unary.cpp",
         "impl/interpolate.cpp",
-        "impl/select.cpp"
+        "impl/select.cpp",
+        "impl/stack.cpp"
     ],
     deps = [
         "@tensorrt//:nvinfer",
