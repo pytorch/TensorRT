@@ -20,40 +20,34 @@ auto select_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
     .pattern({
         "aten::select.int(Tensor(a) self, int dim, int index) -> (Tensor(a))",
         [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-            std::cout << "select.int converter recognized" << std::endl;
-
             auto in = args[0].ITensor();
             auto axis  = args[1].unwrapToInt();
             auto ind = (int32_t) args[2].unwrapToInt();
 
-            // tried: vector for input
-            //std::vector<int32_t> indices_input = {ind};
-
-            auto options = torch::TensorOptions().device(torch::kCUDA, 1).dtype(torch::kInt32);
-            at::Tensor indices = torch::tensor(torch::detail::TensorDataContainer(ind), options);
-            
+            // index to access needs to be an at::Tensor
+            at::Tensor indices = torch::tensor({ind}).to(torch::kI32);
             auto weights = Weights(ctx, indices);
-            // manually setting weights
-            // weights.data.type = nvinfer1::DataType::kINT32;
 
+            // IConstantLayer to convert indices from Weights to ITensor
             auto const_layer = ctx->net->addConstant(weights.shape, weights.data);
-            const_layer->setName(util::node_info(n).c_str());
-            // manually setting output type
-            // const_layer->setOutputType(0, nvinfer1::DataType::kINT32);
-
-            auto const_out = ctx->AssociateValueAndTensor(n->outputs()[0], const_layer->getOutput(0)); 
+            TRTORCH_CHECK(const_layer, "Unable to create constant layer from node: " << *n);
+            auto const_out = const_layer->getOutput(0);
             
+            // IGatherLayer takes in input tensor, the indices, and the axis of input tensor to take indices from
             auto gather_layer = ctx->net->addGather(*in, *const_out, axis);
-            gather_layer->setName(util::node_info(n).c_str());
-            // manually setting output type
-            // gather_layer->setOutputType(0, nvinfer1::DataType::kINT32);
+            TRTORCH_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
+            auto gather_out = gather_layer->getOutput(0);
 
-            auto gather_output = ctx->AssociateValueAndTensor(n->outputs()[0], gather_layer->getOutput(0));
+            // IShuffleLayer removes redundant dimensions
+            auto shuffle_layer = ctx->net->addShuffle(*gather_out);
+            TRTORCH_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
+            shuffle_layer->setReshapeDimensions(util::unpadDims(gather_out->getDimensions()));
+            shuffle_layer->setName(util::node_info(n).c_str());
+            auto shuffle_out = shuffle_layer->getOutput(0);
 
-            LOG_DEBUG("Output tensor shape: " << gather_output->getDimensions());
-            
-            // for debugging
-            // std::raise(SIGTRAP);
+            auto out = ctx->AssociateValueAndTensor(n->outputs()[0], shuffle_out);
+
+            LOG_DEBUG("Output tensor shape: " << out->getDimensions());
 
             return true;
         }
