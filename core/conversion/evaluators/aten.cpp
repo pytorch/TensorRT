@@ -10,8 +10,6 @@
 #include "core/conversion/evaluators/evaluators.h"
 #include "core/conversion/evaluators/eval_macros.h"
 
-// #include <csignal>
-
 namespace trtorch {
 namespace core {
 namespace conversion {
@@ -247,21 +245,29 @@ auto aten_registrations TRTORCH_UNUSED = RegisterNodeEvaluators()
         })
     }).evaluator({
         c10::Symbol::fromQualString("aten::add_"),
-        [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-            LOG_DEBUG("aten::add_ evaluator is found");
-
-            // std::raise(SIGINT);
-
+        [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {            
             if (args.at(n->input(0)).IValue()->isList()) {
-                auto a = args.at(n->input(0)).IValue()->to<c10::List<c10::IValue>>();
-                auto b = args.at(n->input(1)).IValue()->to<c10::List<c10::IValue>>();
+                auto a = args.at(n->input(0)).IValue()->toListRef();
+                auto b = args.at(n->input(1)).IValue()->toListRef();
 
-                // incorrect syntax
-                // for (auto each : b) {
-                //     a.push_back(each);
-                // }
+                c10::ListTypePtr lt = n->output()->type()->expect<c10::ListType>();
+                c10::TypePtr elementType = lt->getElementType();
 
-                return a;
+                auto merged = c10::impl::GenericList(elementType);
+                merged.reserve(a.size() + b.size());
+
+                for (auto each : a) {
+                    merged.emplace_back(each);
+                }
+
+                for (auto each : b) {
+                    merged.emplace_back(each);
+                }
+
+                return merged;
+            } else {
+                TRTORCH_THROW_ERROR("Unimplemented data type for aten::add_ evaluator: " << args.at(n->input(0)).IValue()->type()->str());
+                return {};
             }
         },
         EvalOptions().validSchemas({
