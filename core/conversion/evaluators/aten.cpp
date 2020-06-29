@@ -10,6 +10,8 @@
 #include "core/conversion/evaluators/evaluators.h"
 #include "core/conversion/evaluators/eval_macros.h"
 
+// #include <csignal>
+
 namespace trtorch {
 namespace core {
 namespace conversion {
@@ -242,6 +244,28 @@ auto aten_registrations TRTORCH_UNUSED = RegisterNodeEvaluators()
         EvalOptions().validSchemas({
             "aten::add.int(int a, int b) -> (int)",
             "aten::add.float(float a, float b) -> (float)"
+        })
+    }).evaluator({
+        c10::Symbol::fromQualString("aten::add_"),
+        [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+            LOG_DEBUG("aten::add_ evaluator is found");
+
+            // std::raise(SIGINT);
+
+            if (args.at(n->input(0)).IValue()->isList()) {
+                auto a = args.at(n->input(0)).IValue()->to<c10::List<c10::IValue>>();
+                auto b = args.at(n->input(1)).IValue()->to<c10::List<c10::IValue>>();
+
+                // incorrect syntax
+                // for (auto each : b) {
+                //     a.push_back(each);
+                // }
+
+                return a;
+            }
+        },
+        EvalOptions().validSchemas({
+            "aten::add_.t(t[](a!) self, t[] b) -> (t[])"
         })
     }).evaluator({
         c10::Symbol::fromQualString("aten::mul"),
