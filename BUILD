@@ -1,20 +1,5 @@
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 
-config_setting(
-    name="aarch64",
-    values={
-        "cpu":"aarch64"
-    },
-)
-
-config_setting(
-    name = "use_pre_cxx11_abi_aarch64",
-    values = {
-	"define":"abi=pre_cxx11_abi",
-	"cpu":"aarch64"
-    },
-)
-
 pkg_tar(
     name = "include_core",
     package_dir = "include/trtorch",

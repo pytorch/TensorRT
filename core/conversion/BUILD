@@ -38,13 +38,14 @@ cc_library(
         "//core/conversion/evaluators",
         "//core/util:prelude"
     ] + select({
-        ":use_pre_cxx11_abi_aarch64": ["@libtorch_pre_cxx11_abi_aarch64//:libtorch"],
-        ":aarch64": ["@libtorch_aarch64//:libtorch"],
-        ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default":  ["@libtorch//:libtorch"],
-    }) + select({
-        ":aarch64": ["@tensorrt_aarch64//:nvinfer"],
-        "//conditions:default":  ["@tensorrt//:nvinfer"],
+        ":aarch64": ["@libtorch_aarch64//:libtorch",
+		     "@tensorrt_aarch64//:nvinfer"],
+        ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch",
+				"@tensorrt//:nvinfer"],
+        ":use_pre_cxx11_abi_aarch64": ["@libtorch_pre_cxx11_abi_aarch64//:libtorch",
+				       "@tensorrt_aarch64//:nvinfer"],
+        "//conditions:default":  ["@libtorch//:libtorch",
+				  "@tensorrt//:nvinfer"],
     }),
 )
 

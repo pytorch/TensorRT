@@ -16,7 +16,7 @@ cc_library(
 
 cc_library(
     name = 'torch',
-    hdrs = glob(
+    hdrs = ['include'] + glob(
         [
             'include/torch/**/*.h',
         ], exclude = [

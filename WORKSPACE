@@ -144,15 +144,14 @@ new_local_repository(
     build_file = "third_party/cudnn/local/BUILD"
 )
 
-
 new_local_repository(
-    name = "libtorch_aarch64",
+    name = "libtorch_pre_cxx11_abi_aarch64",
     path = "/usr/local/lib/python3.6/dist-packages/torch",
     build_file = "third_party/libtorch/BUILD"
 )
 
 new_local_repository(
-    name = "libtorch_pre_cxx11_abi_aarch64",
+    name = "libtorch_aarch64",
     path = "/usr/local/lib/python3.6/dist-packages/torch",
     build_file = "third_party/libtorch/BUILD"
 )
