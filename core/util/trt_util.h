@@ -79,6 +79,8 @@ int64_t volume(const nvinfer1::Dims& d);
 
 nvinfer1::Dims toDimsPad(c10::IntArrayRef l, uint64_t pad_to);
 nvinfer1::Dims toDimsPad(c10::List<int64_t> l, uint64_t pad_to);
+nvinfer1::Dims unpadDims(const nvinfer1::Dims& d);
+nvinfer1::Dims unsqueezeDims(const nvinfer1::Dims& d, int pos);
 nvinfer1::Dims toDims(c10::IntArrayRef l);
 nvinfer1::Dims toDims(c10::List<int64_t> l);
 nvinfer1::DimsHW toDimsHW(c10::List<int64_t> l);

@@ -82,6 +82,56 @@ nvinfer1::Dims toDimsPad(c10::List<int64_t> l, uint64_t pad_to) {
     return dims;
 }
 
+nvinfer1::Dims unpadDims(const nvinfer1::Dims& d) {
+    nvinfer1::Dims dims;
+
+    int j = 0;
+    bool pad_dims_done = false;
+
+    for (int i = 0; i < d.nbDims; i++) {
+        if (d.d[i] == 1 && !pad_dims_done) {
+            // skip over unecessary dimension
+            continue;
+        } else {
+            dims.d[j] = d.d[i];
+            j++;
+
+            // keep all other dimensions (don't skip over them)
+            pad_dims_done = true;
+        }
+    }
+
+    dims.nbDims = j;
+
+    return dims;
+}
+
+nvinfer1::Dims unsqueezeDims(const nvinfer1::Dims& d, int pos) {
+    // acceptable range for pos is [0, d.nbDims]
+    TRTORCH_ASSERT(pos >= 0 && pos <= d.nbDims, "ERROR: Index to unsqueeze is out of bounds.");
+    
+    nvinfer1::Dims dims;
+
+    int i = 0;
+    int j = 0;
+
+    while (i <= d.nbDims) {
+        if (j != pos) {
+            dims.d[j] = d.d[i];
+            i++;
+        } else {
+            // add new dimension at pos
+            dims.d[j] = 1;
+        }
+
+        j++;
+    }
+
+    dims.nbDims = d.nbDims+1;
+
+    return dims;
+}
+
 std::vector<int64_t> toVec(nvinfer1::Dims d) {
     std::vector<int64_t> dims;
     for (int i = 0; i < d.nbDims; i++) {

@@ -10,7 +10,7 @@ config_setting(
 cc_library(
     name = "converters",
     hdrs = [
-        "converters.h",
+        "converters.h"
     ],
     srcs = [
         "NodeConverterRegistry.cpp",
@@ -28,7 +28,9 @@ cc_library(
         "impl/shuffle.cpp",
         "impl/softmax.cpp",
         "impl/unary.cpp",
-        "impl/interpolate.cpp"
+        "impl/interpolate.cpp",
+        "impl/select.cpp",
+        "impl/stack.cpp"
     ],
     deps = [
         "@tensorrt//:nvinfer",
@@ -36,6 +38,7 @@ cc_library(
         "//core/conversion/var",
         "//core/conversion/tensorcontainer",
         "//core/conversion/conversionctx",
+        "//core/conversion/converters/impl/plugins"
     ] + select({
         ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default":  ["@libtorch//:libtorch"],
