@@ -244,6 +244,36 @@ auto aten_registrations TRTORCH_UNUSED = RegisterNodeEvaluators()
             "aten::add.float(float a, float b) -> (float)"
         })
     }).evaluator({
+        c10::Symbol::fromQualString("aten::add_"),
+        [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {            
+            if (args.at(n->input(0)).IValue()->isList()) {
+                auto a = args.at(n->input(0)).IValue()->toListRef();
+                auto b = args.at(n->input(1)).IValue()->toListRef();
+
+                c10::ListTypePtr lt = n->output()->type()->expect<c10::ListType>();
+                c10::TypePtr elementType = lt->getElementType();
+
+                auto merged = c10::impl::GenericList(elementType);
+                merged.reserve(a.size() + b.size());
+
+                for (auto each : a) {
+                    merged.emplace_back(each);
+                }
+
+                for (auto each : b) {
+                    merged.emplace_back(each);
+                }
+
+                return merged;
+            } else {
+                TRTORCH_THROW_ERROR("Unimplemented data type for aten::add_ evaluator: " << args.at(n->input(0)).IValue()->type()->str());
+                return {};
+            }
+        },
+        EvalOptions().validSchemas({
+            "aten::add_.t(t[](a!) self, t[] b) -> (t[])"
+        })
+    }).evaluator({
         c10::Symbol::fromQualString("aten::mul"),
         [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
             if (args.at(n->input(0)).IValue()->isInt()) {
