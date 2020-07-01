@@ -23,5 +23,5 @@ cc_binary(
             "@libtorch//:libtorch",
             "@libtorch//:caffe2",
         ]
-    }),,
+    }),
 )
