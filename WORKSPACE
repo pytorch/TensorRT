@@ -25,46 +25,52 @@ http_archive(
 load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
 rules_pkg_dependencies()
 
+git_repository(
+    name = "googletest",
+    remote = "https://github.com/google/googletest",
+    commit = "703bd9caab50b139428cea1aaff9974ebee5742e",
+    shallow_since = "1570114335 -0400"
+)
+
 # CUDA should be installed on the system locally
-#new_local_repository(
-#    name = "cuda",
-#    path = "/usr/local/cuda-10.2/targets/x86_64-linux/",
-#    build_file = "@//third_party/cuda:BUILD",
-#)
-
-http_archive(
-    name = "libtorch_pre_cxx11_abi",
-    build_file = "@//third_party/libtorch:BUILD",
-    strip_prefix = "libtorch",
-    sha256 = "ea8de17c5f70015583f3a7a43c7a5cdf91a1d4bd19a6a7bc11f074ef6cd69e27",
-    urls = ["https://download.pytorch.org/libtorch/cu102/libtorch-shared-with-deps-1.5.0.zip"],
+new_local_repository(
+    name = "cuda",
+    path = "/usr/local/cuda-10.2/",
+    build_file = "@//third_party/cuda:BUILD",
 )
 
-http_archive(
-    name = "libtorch",
-    build_file = "@//third_party/libtorch:BUILD",
-    strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/cu102/libtorch-cxx11-abi-shared-with-deps-1.5.0.zip"],
-    sha256 = "0efdd4e709ab11088fa75f0501c19b0e294404231442bab1d1fb953924feb6b5"
+new_local_repository(
+    name = "cublas",
+    path = "/usr",
+    build_file = "@//third_party/cublas:BUILD",
 )
 
-#pip3_import(
-#    name = "trtorch_py_deps",
-#    requirements = "//py:requirements.txt"
-#)
+#############################################################################################################
+# Tarballs and fetched dependencies (default - use in cases when building from precompiled bin and tarballs)
+#############################################################################################################
 
-#load("@trtorch_py_deps//:requirements.bzl", "pip_install")
-#pip_install()
+# TODO: Uncomment these and comment out the lower section before merge into master
 
-#pip3_import(
-#    name = "py_test_deps",
-#    requirements = "//tests/py:requirements.txt"
-#)
+# http_archive(
+#    name = "libtorch",
+#    build_file = "@//third_party/libtorch:BUILD",
+#    strip_prefix = "libtorch",
+#    urls = ["https://download.pytorch.org/libtorch/cu102/libtorch-cxx11-abi-shared-with-deps-1.5.0.zip"],
+#    sha256 = "0efdd4e709ab11088fa75f0501c19b0e294404231442bab1d1fb953924feb6b5"
+# )
 
-#load("@py_test_deps//:requirements.bzl", "pip_install")
-#pip_install()
+# http_archive(
+#    name = "libtorch_pre_cxx11_abi",
+#    build_file = "@//third_party/libtorch:BUILD",
+#    strip_prefix = "libtorch",
+#    sha256 = "ea8de17c5f70015583f3a7a43c7a5cdf91a1d4bd19a6a7bc11f074ef6cd69e27",
+#    urls = ["https://download.pytorch.org/libtorch/cu102/libtorch-shared-with-deps-1.5.0.zip"],
+# )
 
-# Downloaded distributions to use with --distdir
+# Download these tarballs manually from the NVIDIA website
+# Either place them in the distdir directory in third_party and use the --distdir flag
+# or modify the urls to "file:///<PATH TO TARBALL>/<TARBALL NAME>.tar.gz
+
 #http_archive(
 #    name = "cudnn",
 #    urls = ["https://developer.nvidia.com/compute/machine-learning/cudnn/secure/7.6.5.32/Production/10.2_20191118/cudnn-10.2-linux-x64-v7.6.5.32.tgz"],
@@ -81,77 +87,61 @@ http_archive(
 #    strip_prefix = "TensorRT-7.0.0.11"
 #)
 
-## Locally installed dependencies
-# new_local_repository(
-#    name = "cudnn",
-#    path = "/usr/",
-#    build_file = "@//third_party/cudnn/local:BUILD"
-#)
+####################################################################################
+# Locally installed dependencies (use in cases of custom dependencies or aarch64)
+####################################################################################
 
-# new_local_repository(
-#   name = "tensorrt",
-#   path = "/usr/",
-#   build_file = "@//third_party/tensorrt/local:BUILD"
-#)
+# NOTE: In the case you are using just the pre-cxx11-abi path or just the cxx11 abi path 
+# with your local libtorch, just point deps at the same path to satisfy bazel.
 
-git_repository(
-    name = "googletest",
-    remote = "https://github.com/google/googletest",
-    commit = "703bd9caab50b139428cea1aaff9974ebee5742e",
-    shallow_since = "1570114335 -0400"
-)
+# NOTE: NVIDIA's aarch64 PyTorch (python) wheel file uses the CXX11 ABI unlike PyTorch's standard
+# x86_64 python distribution. If using NVIDIA's version just point to the root of the package 
+# for both versions here and do not use --config=pre-cxx11-abi
 
-
-###################################################
-#  x86_64 libraries
-###################################################
 new_local_repository(
-    name = "cuda",
-    path = "/usr/local/cuda/targets/x86_64-linux/",
-    build_file = "third_party/libs/cuda.BUILD"
+    name = "libtorch",
+    #path = "/usr/local/lib/python3.6/dist-packages/torch",
+    # TODO: Remove this and use the above line before merge into master
+    path = "/home/nvidia/.local/lib/python3.6/site-packages/torch",
+    build_file = "third_party/libtorch/BUILD"
 )
 
 new_local_repository(
-    name = "tensorrt",
-    path = "/usr/local/cuda/targets/x86_64-linux/",
-    build_file = "third_party/libs/tensorrt.BUILD"
+    name = "libtorch_pre_cxx11_abi",
+    #path = "/usr/local/lib/python3.6/dist-packages/torch",
+    # TODO: Remove this and use above line before merge into master
+    path = "/home/nvidia/.local/lib/python3.6/site-packages/torch",
+    build_file = "third_party/libtorch/BUILD"
 )
 
 new_local_repository(
     name = "cudnn",
-    path = "/usr/local/cuda/targets/x86_64-linux/",
-    build_file = "third_party/libs/cudnn.BUILD"
-)
-
-###################################################
-#  ARM libraries
-###################################################
-new_local_repository(
-    name = "cuda_aarch64",
-    path = "/usr/local/cuda/targets/aarch64-linux-gnu",
-    build_file = "third_party/cuda/BUILD"
+    path = "/usr/",
+    build_file = "@//third_party/cudnn/local:BUILD"
 )
 
 new_local_repository(
-    name = "tensorrt_aarch64",
-    path = "/usr",
-    build_file = "third_party/tensorrt/local/BUILD"
+   name = "tensorrt",
+   path = "/usr/",
+   build_file = "@//third_party/tensorrt/local:BUILD"
 )
 
-new_local_repository(
-    name = "cudnn_aarch64",
-    path = "/usr",
-    build_file = "third_party/cudnn/local/BUILD"
-)
+#########################################################################
+# Testing Dependencies (optional - comment out on aarch64)
+#########################################################################
 
-new_local_repository(
-    name = "libtorch_pre_cxx11_abi_aarch64",
-    path = "/usr/local/lib/python3.6/dist-packages/torch",
-    build_file = "third_party/libtorch/BUILD"
-)
+#pip3_import(
+#    name = "trtorch_py_deps",
+#    requirements = "//py:requirements.txt"
+#)
 
-new_local_repository(
-    name = "libtorch_aarch64",
-    path = "/usr/local/lib/python3.6/dist-packages/torch",
-    build_file = "third_party/libtorch/BUILD"
-)
+#load("@trtorch_py_deps//:requirements.bzl", "pip_install")
+#pip_install()
+
+#pip3_import(
+#    name = "py_test_deps",
+#    requirements = "//tests/py:requirements.txt"
+#)
+
+#load("@py_test_deps//:requirements.bzl", "pip_install")
+#pip_install()

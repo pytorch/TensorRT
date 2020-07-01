@@ -7,20 +7,6 @@ config_setting(
     }
 )
 
-config_setting(
-    name = "use_pre_cxx11_abi_aarch64",
-    values = {
-        "define": "abi=pre_cxx11_abi",
-        "cpu" : "aarch64",
-    }
-)
-config_setting(
-    name="aarch64",
-    values={
-        "cpu":"aarch64"
-    },
-)
-
 cc_library(
     name = "evaluators",
     hdrs = [
@@ -36,9 +22,8 @@ cc_library(
         "//core/util:prelude",
         "//core/conversion/var",
         "//core/conversion/tensorcontainer",
+        "@tensorrt//:nvinfer"
     ] + select({
-        ":aarch64": ["@libtorch_aarch64//:libtorch"],
-        ":use_pre_cxx11_abi_aarch64" : ["@libtorch_pre_cxx11_abi_aarch64//:libtorch"],
         ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default":  ["@libtorch//:libtorch"],
     }),

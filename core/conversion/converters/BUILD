@@ -7,21 +7,6 @@ config_setting(
     }
 )
 
-config_setting(
-    name = "use_pre_cxx11_abi_aarch64",
-    values = {
-        "define": "abi=pre_cxx11_abi",
-        "cpu" : "aarch64",
-    }
-)
-
-config_setting(
-    name="aarch64",
-    values={
-        "cpu":"aarch64"
-    },
-)
-
 cc_library(
     name = "converters",
     hdrs = [
@@ -52,16 +37,11 @@ cc_library(
         "//core/conversion/var",
         "//core/conversion/tensorcontainer",
         "//core/conversion/conversionctx",
-        "//core/conversion/converters/impl/plugins"
+        "//core/conversion/converters/impl/plugins",
+	"@tensorrt//:nvinfer"
     ] + select({
-        ":aarch64": ["@libtorch_aarch64//:libtorch",
-		     "@tensorrt_aarch64//:nvinfer"],
-        ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch",
-				"@tensorrt//:nvinfer"],
-        ":use_pre_cxx11_abi_aarch64": ["@libtorch_pre_cxx11_abi_aarch64//:libtorch",
-				       "@tensorrt_aarch64//:nvinfer"],
-        "//conditions:default":  ["@libtorch//:libtorch",
-				  "@tensorrt//:nvinfer"],
+        ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
+        "//conditions:default":  ["@libtorch//:libtorch"],
     }),
     alwayslink = True,
 )

@@ -10,22 +10,22 @@ config_setting(
 cc_library(
     name = "nvinfer_headers",
     hdrs = select({
-	":aarch64" : [
-	                "include/aarch64-linux-gnu/NvUtils.h",
-     	             ] + glob([
-                               "include/aarch64-linux-gnu/NvInfer*.h",
-                              ], exclude=[
-                                          "include/aarch64-linux-gnu/NvInferPlugin.h",
-                                          "include/aarch64-linux-gnu/NvInferPluginUtils.h"
-                             ]),
+        ":aarch64" : [
+	    "include/aarch64-linux-gnu/NvUtils.h",
+     	] + glob([
+            "include/aarch64-linux-gnu/NvInfer*.h",
+        ], exclude=[
+             "include/aarch64-linux-gnu/NvInferPlugin.h",
+             "include/aarch64-linux-gnu/NvInferPluginUtils.h"
+        ]),
 	"//conditions:default" : [
-		 	        "include/NvUtils.h",
-         			] + glob([
-                                "include/NvInfer*.h",
-                                         ], exclude=[
-                                          "include/NvInferPlugin.h",
-                                          "include/NvInferPluginUtils.h"
-                                           ]),
+            "include/NvUtils.h",
+         ] + glob([
+             "include/NvInfer*.h",
+         ], exclude=[
+             "include/NvInferPlugin.h",
+             "include/NvInferPluginUtils.h"
+         ]),
     }),
     includes = select({
         ":aarch64" : ["include/aarch64-linux-gnu"],
@@ -48,19 +48,10 @@ cc_library(
     deps = [
         "nvinfer_headers",
         "nvinfer_lib",
-    ] + select({
-	":aarch64": [
-			"@cuda_aarch64//:cudart",
-			"@cuda_aarch64//:cublas",
-			"@cudnn_aarch64//:cudnn"
-			],
-	"//conditions:default":  [
-			"@cuda//:cudart",
-			"@cuda//:cublas",
-			"@cudnn//:cudnn"
-			 ],
-    }),
-
+	"@cuda//:cudart",
+	"@cublas//:cublas",
+	"@cudnn//:cudnn"
+    ],
     visibility = ["//visibility:public"],
 )
 

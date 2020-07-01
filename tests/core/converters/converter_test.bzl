@@ -10,8 +10,6 @@ def converter_test(name, visibility=None):
             "@googletest//:gtest_main",
         ] + select({
             ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
-            ":use_pre_cxx11_abi_aarch64":  ["@libtorch_pre_cxx11_abi_aarch64//:libtorch"],
-            ":aarch64":  ["@libtorch_aarch64//:libtorch"],
             "//conditions:default":  ["@libtorch//:libtorch"],
         }),
         timeout="short"

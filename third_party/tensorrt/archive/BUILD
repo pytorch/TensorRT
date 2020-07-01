@@ -24,7 +24,7 @@ cc_library(
         "nvinfer_headers",
         "nvinfer_lib",
         "@cuda//:cudart",
-        "@cuda//:cublas",
+        "@cublas//:cublas",
         "@cudnn//:cudnn"
     ],
     visibility = ["//visibility:public"],
