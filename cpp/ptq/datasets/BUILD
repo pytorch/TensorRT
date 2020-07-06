@@ -4,16 +4,16 @@ config_setting(
     name = "use_pre_cxx11_abi",
     values = {
         "define": "abi=pre_cxx11_abi",
-    }
+    },
 )
 
 cc_library(
     name = "cifar10",
-    hdrs = [
-        "cifar10.h"
-    ],
     srcs = [
-        "cifar10.cpp"
+        "cifar10.cpp",
+    ],
+    hdrs = [
+        "cifar10.h",
     ],
     deps = select({
         ":use_pre_cxx11_abi": [
@@ -21,6 +21,6 @@ cc_library(
         ],
         "//conditions:default": [
             "@libtorch//:libtorch",
-        ]
-    })
+        ],
+    }),
 )

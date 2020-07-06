@@ -4,20 +4,20 @@ config_setting(
     name = "use_pre_cxx11_abi",
     values = {
         "define": "abi=pre_cxx11_abi",
-    }
+    },
 )
 
 cc_library(
     name = "benchmark",
-    hdrs = [
-        "benchmark.h"
-    ],
     srcs = [
         "benchmark.cpp",
-        "timer.h"
+        "timer.h",
+    ],
+    hdrs = [
+        "benchmark.h",
     ],
     deps = [
-        "//cpp/api:trtorch"
+        "//cpp/api:trtorch",
     ] + select({
         ":use_pre_cxx11_abi": [
             "@libtorch_pre_cxx11_abi//:libtorch",
@@ -26,6 +26,6 @@ cc_library(
         "//conditions:default": [
             "@libtorch//:libtorch",
             "@libtorch//:caffe2",
-        ]
+        ],
     }),
 )

@@ -1,21 +1,22 @@
 package(default_visibility = ["//visibility:public"])
 
 config_setting(
-   name = "aarch64",
-   values = {
-	"cpu" : "aarch64",
-   },
+    name = "aarch64_linux",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
 )
 
 cc_library(
     name = "cudart",
     srcs = select({
-	":aarch64": [
+        ":aarch64_linux": [
             "targets/aarch64-linux-gnu/lib/libcudart.so",
         ],
-	"//conditions:default": [
-	    "targets/x86_64-linux/lib/libcudart.so",
-	]
+        "//conditions:default": [
+            "targets/x86_64-linux/lib/libcudart.so",
+        ],
     }),
     hdrs = glob([
         "include/**/*.h",
@@ -28,24 +29,24 @@ cc_library(
 cc_library(
     name = "nvToolsExt",
     srcs = select({
-        ":aarch64": [
+        ":aarch64_linux": [
             "targets/aarch64-linux-gnu/lib/libnvToolsExt.so.1",
         ],
         "//conditions:default": [
             "targets/x86_64-linux/lib/libnvToolsExt.so.1",
-        ]
+        ],
     }),
 )
 
 cc_library(
     name = "cuda",
     srcs = select({
-        ":aarch64": glob([
+        ":aarch64_linux": glob([
             "targets/aarch64-linux-gnu/lib/**/lib*.so",
         ]),
         "//conditions:default": glob([
             "targets/x86_64-linux/lib/**/lib*.so",
-        ])
+        ]),
     }),
     hdrs = glob([
         "include/**/*.h",
@@ -55,4 +56,3 @@ cc_library(
     includes = ["include/"],
     linkopts = ["-Wl,-rpath,lib/"],
 )
-

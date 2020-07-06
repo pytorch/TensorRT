@@ -173,7 +173,7 @@ bazel build //:libtrtorch --compilation_mode=dbg
 
 ### Native compilation on NVIDIA Jetson AGX
 ``` shell
-bazel build //:libtrtorch --distdir third_party/distdir/aarch64-linux-gnu --config=pre_cxx11_abi_aarch64
+bazel build //:libtrtorch --cpu=aarch64 --distdir third_party/distdir/aarch64-linux-gnu
 ```
 
 A tarball with the include files and library can then be found in bazel-bin

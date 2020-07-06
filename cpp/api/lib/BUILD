@@ -3,9 +3,9 @@ package(default_visibility = ["//visibility:public"])
 cc_binary(
     name = "libtrtorch.so",
     srcs = [],
-    deps = [
-        "//cpp/api:trtorch"
-    ],
+    linkshared = True,
     linkstatic = True,
-    linkshared = True
+    deps = [
+        "//cpp/api:trtorch",
+    ],
 )

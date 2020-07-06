@@ -4,24 +4,24 @@ config_setting(
     name = "use_pre_cxx11_abi",
     values = {
         "define": "abi=pre_cxx11_abi",
-    }
+    },
 )
 
 cc_library(
     name = "execution",
-    hdrs = [
-        "execution.h",
-    ],
     srcs = [
         "TRTEngine.cpp",
         "register_trt_op.cpp",
     ],
+    hdrs = [
+        "execution.h",
+    ],
     deps = [
         "//core/util:prelude",
-	"@tensorrt//:nvinfer"
+        "@tensorrt//:nvinfer",
     ] + select({
-        ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default":  ["@libtorch//:libtorch"],
+        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
+        "//conditions:default": ["@libtorch//:libtorch"],
     }),
     alwayslink = True,
 )
@@ -30,6 +30,6 @@ load("@rules_pkg//:pkg.bzl", "pkg_tar")
 
 pkg_tar(
     name = "include",
-    package_dir = "core/execution/",
     srcs = ["execution.h"],
+    package_dir = "core/execution/",
 )

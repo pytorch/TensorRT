@@ -4,13 +4,13 @@ config_setting(
     name = "use_pre_cxx11_abi",
     values = {
         "define": "abi=pre_cxx11_abi",
-    }
+    },
 )
 
 cc_binary(
     name = "trtorchc",
     srcs = [
-        "main.cpp"
+        "main.cpp",
     ],
     deps = [
         "//third_party/args",
@@ -23,6 +23,6 @@ cc_binary(
         "//conditions:default": [
             "@libtorch//:libtorch",
             "@libtorch//:caffe2",
-        ]
+        ],
     }),
 )

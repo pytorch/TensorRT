@@ -15,11 +15,9 @@ cc_import(
 
 cc_library(
     name = "cudnn",
+    visibility = ["//visibility:public"],
     deps = [
         "cudnn_headers",
-        "cudnn_lib"
+        "cudnn_lib",
     ],
-    visibility = ["//visibility:public"],
 )
-
-

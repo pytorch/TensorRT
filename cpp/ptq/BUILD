@@ -4,7 +4,7 @@ config_setting(
     name = "use_pre_cxx11_abi",
     values = {
         "define": "abi=pre_cxx11_abi",
-    }
+    },
 )
 
 cc_binary(
@@ -12,11 +12,17 @@ cc_binary(
     srcs = [
         "main.cpp",
     ],
+    copts = [
+        "-pthread",
+    ],
+    linkopts = [
+        "-lpthread",
+    ],
     deps = [
         "//cpp/ptq/benchmark",
         "//cpp/ptq/datasets:cifar10",
         "//cpp/api:trtorch",
-	"@tensorrt//:nvinfer"
+        "@tensorrt//:nvinfer",
     ] + select({
         ":use_pre_cxx11_abi": [
             "@libtorch_pre_cxx11_abi//:libtorch",
@@ -25,12 +31,6 @@ cc_binary(
         "//conditions:default": [
             "@libtorch//:libtorch",
             "@libtorch//:caffe2",
-        ]
-    }), 
-    copts = [
-        "-pthread"
-    ],
-    linkopts = [
-        "-lpthread",
-    ]
+        ],
+    }),
 )
