@@ -60,7 +60,31 @@ converter_test(
 )
 
 converter_test(
-    name = "test_select",
+  name = "test_select"
+)
+
+converter_test(
+  name = "test_stack"
+)
+
+test_suite(
+  name = "test_converters",
+  tests = [
+    ":test_activation",
+    ":test_batch_norm",
+    ":test_conv_deconv",
+    ":test_element_wise",
+    ":test_linear",
+    ":test_matrix_multiply",
+    ":test_pooling",
+    ":test_reduce",
+    ":test_shuffle",
+    ":test_softmax",
+    ":test_unary",
+    ":test_interpolate",
+    ":test_select",
+    ":test_stack"
+  ]
 )
 
 converter_test(

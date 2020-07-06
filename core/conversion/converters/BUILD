@@ -9,6 +9,9 @@ config_setting(
 
 cc_library(
     name = "converters",
+    hdrs = [
+        "converters.h"
+    ],
     srcs = [
         "NodeConverterRegistry.cpp",
         "Weights.cpp",
@@ -29,9 +32,6 @@ cc_library(
         "impl/stack.cpp",
         "impl/unary.cpp",
     ],
-    hdrs = [
-        "converters.h",
-    ],
     deps = [
         "//core/util:prelude",
         "//core/conversion/var",
@@ -39,6 +39,7 @@ cc_library(
         "//core/conversion/conversionctx",
         "//core/conversion/converters/impl/plugins",
         "@tensorrt//:nvinfer",
+
     ] + select({
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default": ["@libtorch//:libtorch"],
