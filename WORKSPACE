@@ -99,16 +99,12 @@ http_archive(
 #new_local_repository(
 #    name = "libtorch",
 #    path = "/usr/local/lib/python3.6/dist-packages/torch",
-#    # Use below for aarch64
-#    #path = "/home/nvidia/.local/lib/python3.6/site-packages/torch",
 #    build_file = "third_party/libtorch/BUILD"
 #)
 
 #new_local_repository(
 #    name = "libtorch_pre_cxx11_abi",
 #    path = "/usr/local/lib/python3.6/dist-packages/torch",
-#    # Use below for aarch64
-#    #path = "/home/nvidia/.local/lib/python3.6/site-packages/torch",
 #    build_file = "third_party/libtorch/BUILD"
 #)
 

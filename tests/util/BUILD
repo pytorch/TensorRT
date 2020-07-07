@@ -23,6 +23,7 @@ cc_library(
         "//core/conversion",
         "//core/util:prelude",
         "//cpp/api:trtorch",
+	"@tensorrt//:nvinfer"
     ] + select({
         ":use_pre_cxx11_abi":  [
             "@libtorch_pre_cxx11_abi//:libtorch",
