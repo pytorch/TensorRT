@@ -25,11 +25,36 @@ http_archive(
 load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
 rules_pkg_dependencies()
 
+git_repository(
+    name = "googletest",
+    remote = "https://github.com/google/googletest",
+    commit = "703bd9caab50b139428cea1aaff9974ebee5742e",
+    shallow_since = "1570114335 -0400"
+)
+
 # CUDA should be installed on the system locally
 new_local_repository(
     name = "cuda",
-    path = "/usr/local/cuda-10.2/targets/x86_64-linux/",
+    path = "/usr/local/cuda-10.2/",
     build_file = "@//third_party/cuda:BUILD",
+)
+
+new_local_repository(
+    name = "cublas",
+    path = "/usr",
+    build_file = "@//third_party/cublas:BUILD",
+)
+
+#############################################################################################################
+# Tarballs and fetched dependencies (default - use in cases when building from precompiled bin and tarballs)
+#############################################################################################################
+
+http_archive(
+    name = "libtorch",
+    build_file = "@//third_party/libtorch:BUILD",
+    strip_prefix = "libtorch",
+    urls = ["https://download.pytorch.org/libtorch/cu102/libtorch-cxx11-abi-shared-with-deps-1.5.0.zip"],
+    sha256 = "0efdd4e709ab11088fa75f0501c19b0e294404231442bab1d1fb953924feb6b5"
 )
 
 http_archive(
@@ -40,31 +65,10 @@ http_archive(
     urls = ["https://download.pytorch.org/libtorch/cu102/libtorch-shared-with-deps-1.5.0.zip"],
 )
 
-http_archive(
-    name = "libtorch",
-    build_file = "@//third_party/libtorch:BUILD",
-    strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/cu102/libtorch-cxx11-abi-shared-with-deps-1.5.0.zip"],
-    sha256 = "0efdd4e709ab11088fa75f0501c19b0e294404231442bab1d1fb953924feb6b5"
-)
+# Download these tarballs manually from the NVIDIA website
+# Either place them in the distdir directory in third_party and use the --distdir flag
+# or modify the urls to "file:///<PATH TO TARBALL>/<TARBALL NAME>.tar.gz
 
-pip3_import(
-    name = "trtorch_py_deps",
-    requirements = "//py:requirements.txt"
-)
-
-load("@trtorch_py_deps//:requirements.bzl", "pip_install")
-pip_install()
-
-pip3_import(
-    name = "py_test_deps",
-    requirements = "//tests/py:requirements.txt"
-)
-
-load("@py_test_deps//:requirements.bzl", "pip_install")
-pip_install()
-
-# Downloaded distributions to use with --distdir
 http_archive(
     name = "cudnn",
     urls = ["https://developer.nvidia.com/compute/machine-learning/cudnn/secure/7.6.5.32/Production/10.2_20191118/cudnn-10.2-linux-x64-v7.6.5.32.tgz"],
@@ -81,22 +85,57 @@ http_archive(
     strip_prefix = "TensorRT-7.0.0.11"
 )
 
-## Locally installed dependencies
-# new_local_repository(
+####################################################################################
+# Locally installed dependencies (use in cases of custom dependencies or aarch64)
+####################################################################################
+
+# NOTE: In the case you are using just the pre-cxx11-abi path or just the cxx11 abi path 
+# with your local libtorch, just point deps at the same path to satisfy bazel.
+
+# NOTE: NVIDIA's aarch64 PyTorch (python) wheel file uses the CXX11 ABI unlike PyTorch's standard
+# x86_64 python distribution. If using NVIDIA's version just point to the root of the package 
+# for both versions here and do not use --config=pre-cxx11-abi
+
+#new_local_repository(
+#    name = "libtorch",
+#    path = "/usr/local/lib/python3.6/dist-packages/torch",
+#    build_file = "third_party/libtorch/BUILD"
+#)
+
+#new_local_repository(
+#    name = "libtorch_pre_cxx11_abi",
+#    path = "/usr/local/lib/python3.6/dist-packages/torch",
+#    build_file = "third_party/libtorch/BUILD"
+#)
+
+#new_local_repository(
 #    name = "cudnn",
 #    path = "/usr/",
 #    build_file = "@//third_party/cudnn/local:BUILD"
 #)
 
-# new_local_repository(
+#new_local_repository(
 #   name = "tensorrt",
 #   path = "/usr/",
 #   build_file = "@//third_party/tensorrt/local:BUILD"
 #)
 
-git_repository(
-    name = "googletest",
-    remote = "https://github.com/google/googletest",
-    commit = "703bd9caab50b139428cea1aaff9974ebee5742e",
-    shallow_since = "1570114335 -0400"
+#########################################################################
+# Testing Dependencies (optional - comment out on aarch64)
+#########################################################################
+pip3_import(
+    name = "trtorch_py_deps",
+    requirements = "//py:requirements.txt"
 )
+
+load("@trtorch_py_deps//:requirements.bzl", "pip_install")
+pip_install()
+
+pip3_import(
+    name = "py_test_deps",
+    requirements = "//tests/py:requirements.txt"
+)
+
+load("@py_test_deps//:requirements.bzl", "pip_install")
+pip_install()
+
