@@ -21,6 +21,9 @@ For example, we can define a LeNet module like this:
 .. code-block:: python
     :linenos:
 
+    import torch.nn as nn
+    import torch.nn.functional as F
+
     class LeNetFeatExtractor(nn.Module):
         def __init__(self):
             super(LeNetFeatExtractor, self).__init__()
@@ -56,6 +59,7 @@ For example, we can define a LeNet module like this:
             x = self.feat(x)
             x = self.classifer(x)
             return x
+
 .
 
     Obviously you may want to consolidate such a simple model into a single module but we can see the composability of PyTorch here
@@ -67,14 +71,19 @@ To trace an instance of our LeNet module, we can call ``torch.jit.trace`` with a
 
 .. code-block:: python
 
+    import torch.jit
+
     model = LeNet()
-    traced_model = torch.jit.trace(model, torch.empty([1,1,32,32]))
+    input_data = torch.empty([1,1,32,32])
+    traced_model = torch.jit.trace(model, input_data)
 
 Scripting actually inspects your code with a compiler and generates an equivalent TorchScript program. The difference is that since tracing
 is following the execution of your module, it cannot pick up control flow for instance. By working from the Python code, the compiler can
 include these components. We can run the script compiler on our LeNet module by calling ``torch.jit.script``
 
 .. code-block:: python
+
+    import torch.jit
 
     model = LeNet()
     script_model = torch.jit.script(model)
@@ -138,20 +147,23 @@ to load in a deployment application. In order to load a TensorRT/TorchScript mod
     import trtorch
 
     ...
+
+    script_model.eval() # torch module needs to be in eval (not training) mode
+
     compile_settings = {
         "input_shapes": [
             {
-                "min": [1, 3, 224, 224],
-                "opt": [1, 3, 512, 512],
-                "max": [1, 3, 1024, 1024]
-            }, # For static size [1, 3, 224, 224]
+                "min": [1, 1, 32, 32],
+                "opt": [1, 1, 32, 32],
+                "max": [1, 1, 32, 32]
+            },
         ],
-        "op_precision": torch.half # Run with FP16
+        "op_precision": torch.half # Run with fp16
     }
 
-    trt_ts_module = trtorch.compile(torch_script_module, compile_settings)
+    trt_ts_module = trtorch.compile(script_model, compile_settings)
 
-    input_data = input_data.half()
+    input_data = input_data.to('cuda').half()
     result = trt_ts_module(input_data)
     torch.jit.save(trt_ts_module, "trt_ts_module.ts")
 
@@ -162,7 +174,7 @@ to load in a deployment application. In order to load a TensorRT/TorchScript mod
     import trtorch
 
     trt_ts_module = torch.jit.load("trt_ts_module.ts")
-    input_data = input_data.half()
+    input_data = input_data.to('cuda').half()
     result = trt_ts_module(input_data)
 
 .. _ts_in_cc:
