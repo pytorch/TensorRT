@@ -9,28 +9,26 @@ config_setting(
 )
 
 cc_library(
-    name = "cudnn_headers",
-    hdrs = ["include/cudnn.h"] + glob(["include/cudnn+.h"]),
+    name = "cublas_headers",
+    hdrs = ["include/cublas.h"] + glob(["include/cublas+.h"]),
     includes = ["include/"],
     visibility = ["//visibility:private"],
 )
 
 cc_import(
-    name = "cudnn_lib",
+    name = "cublas_lib",
     shared_library = select({
-        ":aarch64_linux": "lib/aarch64-linux-gnu/libcudnn.so",
-        "//conditions:default": "lib/x86_64-linux-gnu/libcudnn.so.7.6.5",
+        ":aarch64_linux": "lib/aarch64-linux-gnu/libcublas.so.10",
+        "//conditions:default": "lib/x86_64-linux-gnu/libcublas.so.10",
     }),
     visibility = ["//visibility:private"],
 )
 
 cc_library(
-    name = "cudnn",
-    deps = [
-        "cudnn_headers",
-        "cudnn_lib"
-    ],
+    name = "cublas",
     visibility = ["//visibility:public"],
+    deps = [
+        "cublas_headers",
+        "cublas_lib",
+    ],
 )
-
-

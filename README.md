@@ -63,10 +63,12 @@ torch.jit.save(trt_ts_module, "trt_torchscript_module.ts")
 | Platform | Support |
 | -------- | ------- |
 | Linux AMD64 / GPU   | **Supported** |
-| Linux aarch64 / GPU | **Planned/Possible with Native Compiation but untested** |
-| Linux aarch64 / DLA | **Planned/Possible with Native Compilation but untested** |
+| Linux aarch64 / GPU | **Native Compilation Supported on JetPack-4.4** |
+| Linux aarch64 / DLA | **Native Compilation Supported on JetPack-4.4 but untested** |
 | Windows / GPU       | - |
 | Linux ppc64le / GPU | - |
+
+> Note: Refer NVIDIA NGC container(https://ngc.nvidia.com/catalog/containers/nvidia:l4t-pytorch) for PyTorch libraries on JetPack.
 
 ### Dependencies
 
@@ -169,6 +171,11 @@ bazel build //:libtrtorch --compilation_mode opt
 ### Debug build
 ``` shell
 bazel build //:libtrtorch --compilation_mode=dbg
+```
+
+### Native compilation on NVIDIA Jetson AGX
+``` shell
+bazel build //:libtrtorch --distdir third_party/distdir/aarch64-linux-gnu
 ```
 
 A tarball with the include files and library can then be found in bazel-bin
