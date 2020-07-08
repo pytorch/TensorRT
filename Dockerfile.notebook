@@ -10,7 +10,7 @@ RUN ln -s /usr/bin/bazel-3.2.0 /usr/bin/bazel
 RUN pip install torch==1.5.0
 
 COPY . /workspace/TRTorch
-COPY ./notebooks/WORKSPACE  /workspace/TRTorch
+COPY ./notebooks/WORKSPACE.notebook  /workspace/TRTorch/WORKSPACE
 
 WORKDIR /workspace/TRTorch
 RUN bazel build //:libtrtorch --compilation_mode opt
