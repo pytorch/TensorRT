@@ -18,7 +18,13 @@ dir_path = os.path.dirname(os.path.realpath(__file__))
 
 __version__ = '0.0.2'
 
-def build_libtrtorch_pre_cxx11_abi(develop=True, use_dist_dir=True):
+CXX11_ABI = False
+
+if "--use-cxx11-abi" in sys.argv:
+    sys.argv.remove("--use-cxx11-abi")
+    CXX11_ABI = True
+
+def build_libtrtorch_pre_cxx11_abi(develop=True, use_dist_dir=True, cxx11_abi=False):
     cmd = ["/usr/bin/bazel", "build"]
     cmd.append("//cpp/api/lib:libtrtorch.so")
     if develop:
@@ -27,7 +33,10 @@ def build_libtrtorch_pre_cxx11_abi(develop=True, use_dist_dir=True):
         cmd.append("--compilation_mode=opt")
     if use_dist_dir:
         cmd.append("--distdir=third_party/dist_dir/x86_64-linux-gnu")
-    cmd.append("--config=python")
+    if not cxx11_abi:
+        cmd.append("--config=python")
+    else:
+        print("using CXX11 ABI build")
 
     print("building libtrtorch")
     status_code = subprocess.run(cmd).returncode
@@ -64,7 +73,8 @@ class DevelopCommand(develop):
         develop.finalize_options(self)
 
     def run(self):
-        build_libtrtorch_pre_cxx11_abi(develop=True)
+        global CXX11_ABI
+        build_libtrtorch_pre_cxx11_abi(develop=True, cxx11_abi=CXX11_ABI)
         gen_version_file()
         copy_libtrtorch()
         develop.run(self)
@@ -80,7 +90,8 @@ class InstallCommand(install):
         install.finalize_options(self)
 
     def run(self):
-        build_libtrtorch_pre_cxx11_abi(develop=False)
+        global CXX11_ABI
+        build_libtrtorch_pre_cxx11_abi(develop=False, cxx11_abi=CXX11_ABI)
         gen_version_file()
         copy_libtrtorch()
         install.run(self)
@@ -95,7 +106,8 @@ class BdistCommand(bdist_wheel):
         bdist_wheel.finalize_options(self)
 
     def run(self):
-        build_libtrtorch_pre_cxx11_abi(develop=False)
+        global CXX11_ABI
+        build_libtrtorch_pre_cxx11_abi(develop=False, cxx11_abi=CXX11_ABI)
         gen_version_file()
         copy_libtrtorch()
         bdist_wheel.run(self)
@@ -138,15 +150,16 @@ ext_modules = [
                                     dir_path + "/../bazel-TRTorch/external/tensorrt/include",
                                 ],
                                 extra_compile_args=[
-                                    "-D_GLIBCXX_USE_CXX11_ABI=0",
-                                    "-Wno-deprecated-declaration",
-                                ],
+                                    "-Wno-deprecated",
+                                    "-Wno-deprecated-declarations",
+                                ] + ["-D_GLIBCXX_USE_CXX11_ABI=1"] if CXX11_ABI else ["-D_GLIBCXX_USE_CXX11_ABI=0"],
                                 extra_link_args=[
-                                    "-D_GLIBCXX_USE_CXX11_ABI=0"
+                                    "-Wno-deprecated",
+                                    "-Wno-deprecated-declarations",
                                     "-Wl,--no-as-needed",
                                     "-ltrtorch",
                                     "-Wl,-rpath,$ORIGIN/lib"
-                                ],
+                                ] + ["-D_GLIBCXX_USE_CXX11_ABI=1"] if CXX11_ABI else ["-D_GLIBCXX_USE_CXX11_ABI=0"],
                                 undef_macros=[ "NDEBUG" ]
                             )
 ]
@@ -178,7 +191,6 @@ setup(
     zip_safe=False,
     license="BSD",
     packages=find_packages(),
-    platform="Linux",
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Environment :: GPU :: NVIDIA CUDA",
