@@ -18,4 +18,4 @@ RUN bazel build //:libtrtorch --compilation_mode opt
 WORKDIR /workspace/TRTorch/py
 RUN python3 setup.py install
 
-
+WORKDIR /workspace/TRTorch/notebooks
