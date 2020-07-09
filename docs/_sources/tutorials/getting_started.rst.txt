@@ -153,9 +153,9 @@ to load in a deployment application. In order to load a TensorRT/TorchScript mod
     compile_settings = {
         "input_shapes": [
             {
-                "min": [1, 1, 32, 32],
+                "min": [1, 1, 16, 16],
                 "opt": [1, 1, 32, 32],
-                "max": [1, 1, 32, 32]
+                "max": [1, 1, 64, 64]
             },
         ],
         "op_precision": torch.half # Run with fp16
