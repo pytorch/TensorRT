@@ -60,7 +60,7 @@ Otherwise you can use the following instructions to install binaries https://doc
 Finally if you need to compile from source (e.g. aarch64 until bazel distributes binaries for the architecture) you can use these instructions
 
 ```sh
-export BAZEL_VERSION=3.2.0
+export BAZEL_VERSION=3.3.1
 mkdir bazel
 cd bazel
 curl -fSsL -O https://github.com/bazelbuild/bazel/releases/download/$BAZEL_VERSION/bazel-$BAZEL_VERSION-dist.zip
