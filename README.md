@@ -72,11 +72,11 @@ torch.jit.save(trt_ts_module, "trt_torchscript_module.ts")
 
 ### Dependencies
 
-- Bazel 3.2.0
-- Libtorch 1.5.0
+- Bazel 3.3.1
+- Libtorch 1.5.1
 - CUDA 10.2
-- cuDNN 7.6.5
-- TensorRT 7.0.0
+- cuDNN 8.0.1
+- TensorRT 7.1.3
 
 ## Prebuilt Binaries and Wheel files
 
