@@ -2,6 +2,7 @@
 <html>
  <head>
   <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -548,6 +549,7 @@
 <span class="cp">#include</span> <span class="cpf">"trtorch/logging.h"</span><span class="cp"></span>
 <span class="cp">#include</span> <span class="cpf">"trtorch/ptq.h"</span><span class="cp"></span>
 <span class="k">namespace</span> <span class="n">trtorch</span> <span class="p">{</span>
+
 <span class="k">struct</span> <span class="n">TRTORCH_API</span> <span class="n">ExtraInfo</span> <span class="p">{</span>
     <span class="k">struct</span> <span class="n">TRTORCH_API</span> <span class="n">InputRange</span> <span class="p">{</span>
         <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">min</span><span class="p">;</span>
@@ -621,9 +623,34 @@
 
     <span class="kt">bool</span> <span class="n">strict_types</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
 
-    <span class="kt">bool</span> <span class="n">allow_gpu_fallback</span> <span class="o">=</span> <span class="nb">true</span><span class="p">;</span>
 
-    <span class="n">DeviceType</span> <span class="n">device</span> <span class="o">=</span> <span class="n">DeviceType</span><span class="o">::</span><span class="n">kGPU</span><span class="p">;</span>
+    <span class="cm">/*</span>
+<span class="cm">     * Setting data structure for Target device</span>
+<span class="cm">     */</span>
+    <span class="k">struct</span> <span class="n">Device</span> <span class="p">{</span>
+    <span class="n">DeviceType</span> <span class="n">device_type</span><span class="p">;</span>
+
+    <span class="cm">/*</span>
+<span class="cm">     * Target gpu id</span>
+<span class="cm">     */</span>
+    <span class="kt">uint64_t</span> <span class="n">gpu_id</span><span class="p">;</span>
+
+        <span class="cm">/*</span>
+<span class="cm">         * When using DLA core on NVIDIA AGX platforms gpu_id should be set as Xavier device</span>
+<span class="cm">         */</span>
+    <span class="kt">int</span> <span class="n">dla_core</span><span class="p">;</span>
+
+    <span class="kt">bool</span> <span class="n">allow_gpu_fallback</span><span class="p">;</span>
+
+    <span class="n">Device</span><span class="p">()</span> <span class="o">:</span>
+        <span class="n">device_type</span><span class="p">(</span><span class="n">DeviceType</span><span class="o">::</span><span class="n">kGPU</span><span class="p">),</span>
+        <span class="n">gpu_id</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span>
+        <span class="n">dla_core</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">),</span>
+        <span class="n">allow_gpu_fallback</span><span class="p">(</span><span class="nb">false</span><span class="p">)</span>
+        <span class="p">{}</span>
+    <span class="p">};</span>
+
+    <span class="n">Device</span> <span class="n">device</span><span class="p">;</span>
 
     <span class="n">EngineCapability</span> <span class="n">capability</span> <span class="o">=</span> <span class="n">EngineCapability</span><span class="o">::</span><span class="n">kDEFAULT</span><span class="p">;</span>
 
@@ -683,7 +710,7 @@
       <a href="http://www.sphinx-doc.org/">
        Sphinx
       </a>
-      3.0.3.
+      3.1.2.
              and
       <a href="https://github.com/bashtage/sphinx-material/">
        Material for

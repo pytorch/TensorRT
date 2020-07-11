@@ -2,6 +2,7 @@
 <html>
  <head>
   <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -56,7 +57,7 @@
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
-  <link href="structtrtorch_1_1ExtraInfo_1_1InputRange.html" rel="next" title="Struct ExtraInfo::InputRange"/>
+  <link href="structtrtorch_1_1ExtraInfo_1_1Device.html" rel="next" title="Struct ExtraInfo::Device"/>
   <link href="namespace_trtorch__ptq.html" rel="prev" title="Namespace trtorch::ptq"/>
  </head>
  <body data-md-color-accent="light-green" data-md-color-primary="light-green" dir="ltr">
@@ -566,6 +567,15 @@
         </li>
         <li>
          <p>
+          <a class="reference internal" href="structtrtorch_1_1ExtraInfo_1_1Device.html#exhale-struct-structtrtorch-1-1extrainfo-1-1device">
+           <span class="std std-ref">
+            Struct ExtraInfo::Device
+           </span>
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
           <a class="reference internal" href="classtrtorch_1_1ExtraInfo_1_1DeviceType.html#exhale-class-classtrtorch-1-1extrainfo-1-1devicetype">
            <span class="std std-ref">
             Class ExtraInfo::DeviceType
@@ -1051,52 +1061,21 @@
            </dd>
           </dl>
           <dl class="cpp var">
-           <dt id="_CPPv4N7trtorch9ExtraInfo18allow_gpu_fallbackE">
-            <span id="_CPPv3N7trtorch9ExtraInfo18allow_gpu_fallbackE">
-            </span>
-            <span id="_CPPv2N7trtorch9ExtraInfo18allow_gpu_fallbackE">
-            </span>
-            <span id="trtorch::ExtraInfo::allow_gpu_fallback__b">
-            </span>
-            <span class="target" id="structtrtorch_1_1ExtraInfo_1a0c30c7d22e31f85725c7a31533452650">
-            </span>
-            bool
-            <code class="sig-name descname">
-             allow_gpu_fallback
-            </code>
-            = true
-            <a class="headerlink" href="#_CPPv4N7trtorch9ExtraInfo18allow_gpu_fallbackE" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             (Only used when targeting DLA (device)) Lets engine run layers on GPU if they are not supported on DLA
-            </p>
-           </dd>
-          </dl>
-          <dl class="cpp var">
            <dt id="_CPPv4N7trtorch9ExtraInfo6deviceE">
             <span id="_CPPv3N7trtorch9ExtraInfo6deviceE">
             </span>
             <span id="_CPPv2N7trtorch9ExtraInfo6deviceE">
             </span>
-            <span id="trtorch::ExtraInfo::device__DeviceType">
+            <span id="trtorch::ExtraInfo::device__Device">
             </span>
-            <span class="target" id="structtrtorch_1_1ExtraInfo_1a6cd5bc4176cc8e991ecff924d2c178fa">
+            <span class="target" id="structtrtorch_1_1ExtraInfo_1abbd318890b2b7363c77359b742299fec">
             </span>
-            <a class="reference internal" href="classtrtorch_1_1ExtraInfo_1_1DeviceType.html#_CPPv4N7trtorch9ExtraInfo10DeviceTypeE" title="trtorch::ExtraInfo::DeviceType">
-             DeviceType
+            <a class="reference internal" href="#_CPPv4N7trtorch9ExtraInfo6DeviceE" title="trtorch::ExtraInfo::Device">
+             Device
             </a>
             <code class="sig-name descname">
              device
             </code>
-            =
-            <a class="reference internal" href="classtrtorch_1_1ExtraInfo_1_1DeviceType.html#_CPPv4N7trtorch9ExtraInfo10DeviceTypeE" title="trtorch::ExtraInfo::DeviceType">
-             DeviceType
-            </a>
-            ::kGPU
             <a class="headerlink" href="#_CPPv4N7trtorch9ExtraInfo6deviceE" title="Permalink to this definition">
              ¶
             </a>
@@ -1990,6 +1969,163 @@
            </div>
           </dd>
          </dl>
+         <dl class="cpp struct">
+          <dt id="_CPPv4N7trtorch9ExtraInfo6DeviceE">
+           <span id="_CPPv3N7trtorch9ExtraInfo6DeviceE">
+           </span>
+           <span id="_CPPv2N7trtorch9ExtraInfo6DeviceE">
+           </span>
+           <span id="trtorch::ExtraInfo::Device">
+           </span>
+           <span class="target" id="structtrtorch_1_1ExtraInfo_1_1Device">
+           </span>
+           <em class="property">
+            struct
+           </em>
+           <code class="sig-name descname">
+            Device
+           </code>
+           <a class="headerlink" href="#_CPPv4N7trtorch9ExtraInfo6DeviceE" title="Permalink to this definition">
+            ¶
+           </a>
+           <br/>
+          </dt>
+          <dd>
+           <div class="breathe-sectiondef docutils container">
+            <p class="breathe-sectiondef-title rubric">
+             Public Functions
+            </p>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch9ExtraInfo6Device6DeviceEv">
+              <span id="_CPPv3N7trtorch9ExtraInfo6Device6DeviceEv">
+              </span>
+              <span id="_CPPv2N7trtorch9ExtraInfo6Device6DeviceEv">
+              </span>
+              <span id="trtorch::ExtraInfo::Device::Device">
+              </span>
+              <span class="target" id="structtrtorch_1_1ExtraInfo_1_1Device_1a010d2abe39f261bca49a9a07ed9435b8">
+              </span>
+              <code class="sig-name descname">
+               Device
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N7trtorch9ExtraInfo6Device6DeviceEv" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+             </dd>
+            </dl>
+           </div>
+           <div class="breathe-sectiondef docutils container">
+            <p class="breathe-sectiondef-title rubric">
+             Public Members
+            </p>
+            <dl class="cpp var">
+             <dt id="_CPPv4N7trtorch9ExtraInfo6Device11device_typeE">
+              <span id="_CPPv3N7trtorch9ExtraInfo6Device11device_typeE">
+              </span>
+              <span id="_CPPv2N7trtorch9ExtraInfo6Device11device_typeE">
+              </span>
+              <span id="trtorch::ExtraInfo::Device::device_type__DeviceType">
+              </span>
+              <span class="target" id="structtrtorch_1_1ExtraInfo_1_1Device_1aa07fa295589494d35c54c5054fdcab6b">
+              </span>
+              <a class="reference internal" href="classtrtorch_1_1ExtraInfo_1_1DeviceType.html#_CPPv4N7trtorch9ExtraInfo10DeviceTypeE" title="trtorch::ExtraInfo::DeviceType">
+               DeviceType
+              </a>
+              <code class="sig-name descname">
+               device_type
+              </code>
+              <a class="headerlink" href="#_CPPv4N7trtorch9ExtraInfo6Device11device_typeE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Setting data structure for device This struct will hold Target device related parameters such as device_type, gpu_id, dla_core.
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp var">
+             <dt id="_CPPv4N7trtorch9ExtraInfo6Device6gpu_idE">
+              <span id="_CPPv3N7trtorch9ExtraInfo6Device6gpu_idE">
+              </span>
+              <span id="_CPPv2N7trtorch9ExtraInfo6Device6gpu_idE">
+              </span>
+              <span id="trtorch::ExtraInfo::Device::gpu_id__uint64_t">
+              </span>
+              <span class="target" id="structtrtorch_1_1ExtraInfo_1_1Device_1a8f4c86e244d80607966533fad7420928">
+              </span>
+              uint64_t
+              <code class="sig-name descname">
+               gpu_id
+              </code>
+              <a class="headerlink" href="#_CPPv4N7trtorch9ExtraInfo6Device6gpu_idE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+             </dd>
+            </dl>
+            <dl class="cpp var">
+             <dt id="_CPPv4N7trtorch9ExtraInfo6Device8dla_coreE">
+              <span id="_CPPv3N7trtorch9ExtraInfo6Device8dla_coreE">
+              </span>
+              <span id="_CPPv2N7trtorch9ExtraInfo6Device8dla_coreE">
+              </span>
+              <span id="trtorch::ExtraInfo::Device::dla_core__i">
+              </span>
+              <span class="target" id="structtrtorch_1_1ExtraInfo_1_1Device_1a0bb3872da73f0ff34b7f075957a1df35">
+              </span>
+              int
+              <code class="sig-name descname">
+               dla_core
+              </code>
+              <a class="headerlink" href="#_CPPv4N7trtorch9ExtraInfo6Device8dla_coreE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+             </dd>
+            </dl>
+            <dl class="cpp var">
+             <dt id="_CPPv4N7trtorch9ExtraInfo6Device18allow_gpu_fallbackE">
+              <span id="_CPPv3N7trtorch9ExtraInfo6Device18allow_gpu_fallbackE">
+              </span>
+              <span id="_CPPv2N7trtorch9ExtraInfo6Device18allow_gpu_fallbackE">
+              </span>
+              <span id="trtorch::ExtraInfo::Device::allow_gpu_fallback__b">
+              </span>
+              <span class="target" id="structtrtorch_1_1ExtraInfo_1_1Device_1acac0999bcf82eb4153c9e1a81a2d37da">
+              </span>
+              bool
+              <code class="sig-name descname">
+               allow_gpu_fallback
+              </code>
+              <a class="headerlink" href="#_CPPv4N7trtorch9ExtraInfo6Device18allow_gpu_fallbackE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               (Only used when targeting DLA (device)) Lets engine run layers on GPU if they are not supported on DLA
+              </p>
+             </dd>
+            </dl>
+           </div>
+          </dd>
+         </dl>
          <dl class="cpp class">
           <dt id="_CPPv4N7trtorch9ExtraInfo10DeviceTypeE">
            <span id="_CPPv3N7trtorch9ExtraInfo10DeviceTypeE">
@@ -2010,7 +2146,13 @@
           </dt>
           <dd>
            <p>
-            Supported Device Types that can be used with TensorRT engines
+            Supported
+            <a class="reference internal" href="structtrtorch_1_1ExtraInfo_1_1Device.html#structtrtorch_1_1ExtraInfo_1_1Device">
+             <span class="std std-ref">
+              Device
+             </span>
+            </a>
+            Types that can be used with TensorRT engines
            </p>
            <p>
             This class is compatable with c10::DeviceTypes (but will check for TRT support) but the only applicable value is at::kCUDA, which maps to
@@ -2166,7 +2308,13 @@
              </dt>
              <dd>
               <p>
-               Construct a new Device Type object.
+               Construct a new
+               <a class="reference internal" href="structtrtorch_1_1ExtraInfo_1_1Device.html#structtrtorch_1_1ExtraInfo_1_1Device">
+                <span class="std std-ref">
+                 Device
+                </span>
+               </a>
+               Type object.
               </p>
              </dd>
             </dl>
@@ -2202,7 +2350,13 @@
              </dt>
              <dd>
               <p>
-               Construct a new Device Type object from internal enum.
+               Construct a new
+               <a class="reference internal" href="structtrtorch_1_1ExtraInfo_1_1Device.html#structtrtorch_1_1ExtraInfo_1_1Device">
+                <span class="std std-ref">
+                 Device
+                </span>
+               </a>
+               Type object from internal enum.
               </p>
              </dd>
             </dl>
@@ -2233,7 +2387,13 @@
              </dt>
              <dd>
               <p>
-               Construct a new Device Type object from torch device enums Note: The only valid value is torch::kCUDA (torch::kCPU is not supported)
+               Construct a new
+               <a class="reference internal" href="structtrtorch_1_1ExtraInfo_1_1Device.html#structtrtorch_1_1ExtraInfo_1_1Device">
+                <span class="std std-ref">
+                 Device
+                </span>
+               </a>
+               Type object from torch device enums Note: The only valid value is torch::kCUDA (torch::kCPU is not supported)
               </p>
               <p>
               </p>
@@ -2286,7 +2446,13 @@
              </dt>
              <dd>
               <p>
-               Get the internal value from the Device object.
+               Get the internal value from the
+               <a class="reference internal" href="structtrtorch_1_1ExtraInfo_1_1Device.html#structtrtorch_1_1ExtraInfo_1_1Device">
+                <span class="std std-ref">
+                 Device
+                </span>
+               </a>
+               object.
               </p>
               <p>
               </p>
@@ -2933,13 +3099,13 @@
        </span>
       </div>
      </a>
-     <a class="md-flex md-footer-nav__link md-footer-nav__link--next" href="structtrtorch_1_1ExtraInfo_1_1InputRange.html" rel="next" title="Struct ExtraInfo::InputRange">
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--next" href="structtrtorch_1_1ExtraInfo_1_1Device.html" rel="next" title="Struct ExtraInfo::Device">
       <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
        <span class="md-flex__ellipsis">
         <span class="md-footer-nav__direction">
          Next
         </span>
-        Struct ExtraInfo::InputRange
+        Struct ExtraInfo::Device
        </span>
       </div>
       <div class="md-flex__cell md-flex__cell--shrink">
@@ -2959,7 +3125,7 @@
       <a href="http://www.sphinx-doc.org/">
        Sphinx
       </a>
-      3.0.3.
+      3.1.2.
              and
       <a href="https://github.com/bashtage/sphinx-material/">
        Material for

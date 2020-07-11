@@ -1,0 +1,22 @@
+.. _exhale_struct_structtrtorch_1_1ExtraInfo_1_1Device:
+
+Struct ExtraInfo::Device
+========================
+
+- Defined in :ref:`file_cpp_api_include_trtorch_trtorch.h`
+
+
+Nested Relationships
+--------------------
+
+This struct is a nested type of :ref:`exhale_struct_structtrtorch_1_1ExtraInfo`.
+
+
+Struct Documentation
+--------------------
+
+
+.. doxygenstruct:: trtorch::ExtraInfo::Device
+   :members:
+   :protected-members:
+   :undoc-members:

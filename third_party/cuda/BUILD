@@ -12,7 +12,7 @@ cc_library(
     name = "cudart",
     srcs = select({
         ":aarch64_linux": [
-            "targets/aarch64-linux/lib/libcudart.so",
+            "targets/aarch64-linux-gnu/lib/libcudart.so",
         ],
         "//conditions:default": [
             "targets/x86_64-linux/lib/libcudart.so",

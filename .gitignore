@@ -36,3 +36,4 @@ bdist
 py/trtorch/_version.py
 py/wheelhouse
 py/.eggs
+tags

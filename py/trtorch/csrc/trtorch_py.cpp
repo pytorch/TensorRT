@@ -84,8 +84,8 @@ struct ExtraInfo {
     info.convert_info.engine_settings.refit = refit;
     info.convert_info.engine_settings.debug = debug;
     info.convert_info.engine_settings.strict_types = strict_types;
-    info.convert_info.engine_settings.allow_gpu_fallback = allow_gpu_fallback;
-    info.convert_info.engine_settings.device = toTRTDeviceType(device);
+    info.convert_info.engine_settings.device.allow_gpu_fallback = allow_gpu_fallback;
+    info.convert_info.engine_settings.device.device_type = toTRTDeviceType(device.device_type);
     info.convert_info.engine_settings.capability = toTRTEngineCapability(capability);
     info.convert_info.engine_settings.num_min_timing_iters = num_min_timing_iters;
     info.convert_info.engine_settings.num_avg_timing_iters = num_avg_timing_iters;
@@ -100,8 +100,8 @@ struct ExtraInfo {
   bool refit = false;
   bool debug = false;
   bool strict_types = false;
-  bool allow_gpu_fallback = true;
-  DeviceType device = DeviceType::kGPU;
+  bool allow_gpu_fallback = false;
+  Device device(DeviceType::kGPU, 0, -1, false);
   EngineCapability capability = EngineCapability::kDEFAULT;
   uint64_t num_min_timing_iters = 2;
   uint64_t num_avg_timing_iters = 1;
@@ -196,8 +196,10 @@ PYBIND11_MODULE(_C, m) {
     .def_readwrite("refit",                &ExtraInfo::refit)
     .def_readwrite("debug",                &ExtraInfo::debug)
     .def_readwrite("strict_types",         &ExtraInfo::strict_types)
-    .def_readwrite("allow_gpu_fallback",   &ExtraInfo::allow_gpu_fallback)
-    .def_readwrite("device",               &ExtraInfo::device)
+    .def_readwrite("allow_gpu_fallback",   &ExtraInfo::device::allow_gpu_fallback)
+    .def_readwrite("device_type",          &ExtraInfo::device::device_type)
+    .def_readwrite("gpu_id",               &ExtraInfo::device::gpu_id)
+    .def_readwrite("dla_core",             &ExtraInfo::device::dla_core)
     .def_readwrite("capability",           &ExtraInfo::capability)
     .def_readwrite("num_min_timing_iters", &ExtraInfo::num_min_timing_iters)
     .def_readwrite("num_avg_timing_iters", &ExtraInfo::num_avg_timing_iters)

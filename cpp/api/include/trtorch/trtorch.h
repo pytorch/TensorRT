@@ -37,6 +37,7 @@ class IInt8EntropyCalibrator2;
 #include "trtorch/logging.h"
 #include "trtorch/ptq.h"
 namespace trtorch {
+
 /**
  * Settings data structure for TRTorch compilation
  *
@@ -306,16 +307,45 @@ struct TRTORCH_API ExtraInfo {
      */
     bool strict_types = false;
 
-    /**
-     * (Only used when targeting DLA (device))
-     * Lets engine run layers on GPU if they are not supported on DLA
+
+    /*
+     * Setting data structure for Target device
      */
-    bool allow_gpu_fallback = true;
+    struct Device {
+	/**
+	 * @brief Setting data structure for device
+	 * This struct will hold Target device related parameters such as device_type, gpu_id, dla_core
+	 */
+	DeviceType device_type;
+
+	/*
+	 * Target gpu id
+	 */
+	uint64_t gpu_id;
+
+        /*
+         * When using DLA core on NVIDIA AGX platforms gpu_id should be set as Xavier device
+         */
+	int dla_core;
+
+        /**
+         * (Only used when targeting DLA (device))
+         * Lets engine run layers on GPU if they are not supported on DLA
+         */
+	bool allow_gpu_fallback;
+
+	Device() :
+		device_type(DeviceType::kGPU),
+		gpu_id(0),
+		dla_core(-1),
+		allow_gpu_fallback(false)
+	    {}
+    };
 
     /**
      * Target device type
      */
-    DeviceType device = DeviceType::kGPU;
+    Device device;
 
     /**
      * Sets the restrictions for the engine (CUDA Safety)

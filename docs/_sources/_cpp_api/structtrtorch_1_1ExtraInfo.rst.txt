@@ -14,6 +14,7 @@ Nested Types
 ************
 
 - :ref:`exhale_class_classtrtorch_1_1ExtraInfo_1_1DataType`
+- :ref:`exhale_struct_structtrtorch_1_1ExtraInfo_1_1Device`
 - :ref:`exhale_class_classtrtorch_1_1ExtraInfo_1_1DeviceType`
 - :ref:`exhale_struct_structtrtorch_1_1ExtraInfo_1_1InputRange`
 

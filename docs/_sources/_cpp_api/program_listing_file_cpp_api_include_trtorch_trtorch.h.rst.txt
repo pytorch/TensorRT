@@ -49,6 +49,7 @@ Program Listing for File trtorch.h
    #include "trtorch/logging.h"
    #include "trtorch/ptq.h"
    namespace trtorch {
+   
    struct TRTORCH_API ExtraInfo {
        struct TRTORCH_API InputRange {
            std::vector<int64_t> min;
@@ -122,9 +123,34 @@ Program Listing for File trtorch.h
    
        bool strict_types = false;
    
-       bool allow_gpu_fallback = true;
    
-       DeviceType device = DeviceType::kGPU;
+       /*
+        * Setting data structure for Target device
+        */
+       struct Device {
+       DeviceType device_type;
+   
+       /*
+        * Target gpu id
+        */
+       uint64_t gpu_id;
+   
+           /*
+            * When using DLA core on NVIDIA AGX platforms gpu_id should be set as Xavier device
+            */
+       int dla_core;
+   
+       bool allow_gpu_fallback;
+   
+       Device() :
+           device_type(DeviceType::kGPU),
+           gpu_id(0),
+           dla_core(-1),
+           allow_gpu_fallback(false)
+           {}
+       };
+   
+       Device device;
    
        EngineCapability capability = EngineCapability::kDEFAULT;
    

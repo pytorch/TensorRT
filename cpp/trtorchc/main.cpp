@@ -14,6 +14,7 @@
 #include "torch/torch.h"
 #include "torch/script.h"
 #include "trtorch/trtorch.h"
+#include <cuda_runtime.h>
 
 bool checkRtol(const at::Tensor& diff, const std::vector<at::Tensor> inputs, float threshold) {
     double maxValue = 0.0;
@@ -133,6 +134,8 @@ int main(int argc, char** argv) {
 
     args::ValueFlag<std::string> op_precision(parser, "precision", "Default operating precision for the engine (Int8 requires a calibration-cache argument) [ float | float32 | f32 | half | float16 | f16 | int8 | i8 ] (default: float)", {'p', "default-op-precision"});
     args::ValueFlag<std::string> device_type(parser, "type", "The type of device the engine should be built for [ gpu | dla ] (default: gpu)", {'d', "device-type"});
+    args::ValueFlag<int> gpu_id(parser, "gpu_id", "GPU id if running on multi-GPU platform (defaults to 0)", {"gpu-id"});
+    args::ValueFlag<int> dla_core(parser, "dla_core", "DLACore id if running on available DLA (defaults to 0)", {"dla-core"});
     args::ValueFlag<std::string> engine_capability(parser, "capability", "The type of device the engine should be built for [ default | safe_gpu | safe_dla ]", {"engine-capability"});
 
     args::ValueFlag<std::string> calibration_cache_file(parser, "file_path", "Path to calibration cache file to use for post training quantization", {"calibration-cache-file"});
@@ -204,7 +207,7 @@ int main(int argc, char** argv) {
     }
 
     if (allow_gpu_fallback) {
-        compile_settings.allow_gpu_fallback = true;
+        compile_settings.device.allow_gpu_fallback = true;
     }
 
     std::string calibration_cache_file_path = "";
@@ -240,10 +243,17 @@ int main(int argc, char** argv) {
     if (device_type) {
         auto device = args::get(device_type);
         std::transform(device.begin(), device.end(), device.begin(), [](unsigned char c){ return std::tolower(c); });
+	if (gpu_id) {
+	    compile_settings.device.gpu_id = args::get(gpu_id);
+	    cudaSetDevice(compile_settings.device.gpu_id);
+	}
         if (device == "gpu") {
-            compile_settings.device = trtorch::ExtraInfo::DeviceType::kGPU;
+            compile_settings.device.device_type = trtorch::ExtraInfo::DeviceType::kGPU;
         } else if (device == "dla") {
-            compile_settings.device = trtorch::ExtraInfo::DeviceType::kDLA;
+            compile_settings.device.device_type = trtorch::ExtraInfo::DeviceType::kDLA;
+	    if (dla_core) {
+	        compile_settings.device.dla_core = args::get(dla_core);
+	    }
         } else {
             trtorch::logging::log(trtorch::logging::Level::kERROR, "Invalid device type, options are [ gpu | dla ]");
             std::cerr << parser;

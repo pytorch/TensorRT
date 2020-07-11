@@ -61,6 +61,8 @@ Classes
 
 - :ref:`exhale_struct_structtrtorch_1_1ExtraInfo`
 
+- :ref:`exhale_struct_structtrtorch_1_1ExtraInfo_1_1Device`
+
 - :ref:`exhale_struct_structtrtorch_1_1ExtraInfo_1_1InputRange`
 
 - :ref:`exhale_class_classtrtorch_1_1ExtraInfo_1_1DataType`

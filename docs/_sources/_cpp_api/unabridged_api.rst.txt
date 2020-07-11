@@ -33,6 +33,11 @@ Classes and Structs
 .. toctree::
    :maxdepth: 5
 
+   structtrtorch_1_1ExtraInfo_1_1Device.rst
+
+.. toctree::
+   :maxdepth: 5
+
    structtrtorch_1_1ExtraInfo_1_1InputRange.rst
 
 .. toctree::
