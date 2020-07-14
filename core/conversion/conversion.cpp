@@ -7,6 +7,12 @@
 #include "core/conversion/evaluators/evaluators.h"
 #include "core/conversion/conversionctx/ConversionCtx.h"
 
+#include "NvInfer.h"
+#include "torch/torch.h"
+
+#include <ATen/ATen.h>
+#include <csignal>
+
 namespace trtorch {
 namespace core {
 namespace conversion {
@@ -280,7 +286,7 @@ void EvaluateLoopBlock(ConversionCtx* ctx, const torch::jit::Node* n) {
                 }
                 ctx->AssociateValueAndIValue(bn->output(0), eval.value());
             }
-        }
+        }   
 
         MapIValues(ctx, n->blocks()[0]->outputs(), n->outputs(), 1, 0);
         start_cond = ctx->evaluated_value_map[n->blocks()[0]->outputs()[0]];
@@ -289,6 +295,48 @@ void EvaluateLoopBlock(ConversionCtx* ctx, const torch::jit::Node* n) {
         LOG_DEBUG(ctx->logger, "(Loop Evaluation) Condition: " << start_cond.toBool());
         LOG_DEBUG(ctx->logger, "(Loop Evaluation) Current Trip Count: " << trip_count.toInt());
     }
+}
+
+void EvaluateLoopBlockTensorOutput(ConversionCtx* ctx, const torch::jit::Node* n) {
+    auto max_trip_count = ctx->evaluated_value_map[n->input(0)];
+    auto start_cond = ctx->evaluated_value_map[n->input(1)];
+
+    ctx->evaluated_value_map[n->blocks()[0]->inputs()[0]] = torch::jit::IValue(0);
+    auto trip_count = ctx->evaluated_value_map[n->blocks()[0]->inputs()[0]];
+
+    MapIValues(ctx, n->inputs(), n->outputs(), 2, 0);
+
+    LOG_DEBUG(ctx->logger, "(Loop Evaluation) Evaluating loop " << *n);
+    LOG_DEBUG(ctx->logger, "(Loop Evaluation) Max Trip Count: " << max_trip_count.toInt());
+    LOG_DEBUG(ctx->logger, "(Loop Evaluation) Start Condition: " << start_cond.toBool());
+    LOG_DEBUG(ctx->logger, "(Loop Evaluation) Current Trip Count: " << trip_count.toInt());
+
+    auto nodes_inside = n->blocks()[0]->nodes();
+
+    //std::raise(SIGINT);
+
+    auto loop = ctx->net->addLoop();
+    loop->addTripLimit(*ctx->net->addConstant(count_weight.shape, count_weight.data)->getOutput(0), nvinfer1::TripLimit::kCOUNT);
+    loop->addTripLimit(*ctx->net->addConstant(cond_weight.shape, cond_weight.data)->getOutput(0), nvinfer1::TripLimit::kWHILE);
+
+    auto count_weight = converters::Weights(ctx, torch::tensor({trip_count.toInt()}));
+    auto cond_weight = converters::Weights(ctx, torch::tensor({start_cond.toBool() ? 1 : 0}));
+
+    int i = 0;  
+    for (auto bn : nodes_inside) {
+        LOG_DEBUG(ctx->logger, "there are this many nodes inside: " << i);
+        LOG_DEBUG(ctx->logger, bn->kind());
+        i++;
+
+        auto eval = EvaluateNode(ctx, n);
+
+        loop->addRecurrence(eval.value());
+        ctx->AssociateValueAndIValue(bn->output(0), eval.value());
+    }
+
+    // return loop->addLoopOutput(//TODO);
+
+    LOG_DEBUG(ctx->logger, "Please stop before this!");
 }
 
 void ConvertBlockToNetDef(ConversionCtx* ctx, const torch::jit::Block* b, ConversionInfo build_info, GraphParams& static_params) {
@@ -304,7 +352,20 @@ void ConvertBlockToNetDef(ConversionCtx* ctx, const torch::jit::Block* b, Conver
         bool to_eval = evaluators::shouldEvalAtConversionTime(n);
         bool blacklisted = isNodeConversionBlacklisted(n);
         if (n->kind() == torch::jit::prim::Loop) {
-            EvaluateLoopBlock(ctx, n);
+            bool returns_tensor = false;
+
+            for (unsigned int i = 0; i < n->outputs().size(); i++) {
+                if (n->output(i)->type()->isSubtypeOf(c10::TensorType::get())) {
+                    returns_tensor = true;
+                }
+            }
+
+            if (returns_tensor) {
+                EvaluateLoopBlockTensorOutput(ctx, n);
+            } else {
+                EvaluateLoopBlock(ctx, n);
+            }
+
         } else if (n->kind() == torch::jit::prim::If) {
             EvaluateConditionalBlock(ctx, n);
         } else if (to_eval) {
