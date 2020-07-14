@@ -24,6 +24,12 @@ cc_library(
         "//conditions:default":  ["@libtorch//:libtorch"],
     }),
     alwayslink = True,
+    copts = [
+        "-pthread"
+    ],
+    linkopts = [
+        "-lpthread",
+    ]
 )
 
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
