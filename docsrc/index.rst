@@ -16,7 +16,8 @@ You also have access to TensorRT's suite of configurations at compile time, so y
 operating precision (FP32/FP16/INT8) and other settings for your module.
 
 More Information / System Architecture:
-  * `GTC 2020 Talk <https://developer.nvidia.com/gtc/2020/video/s21671>`_
+
+* `GTC 2020 Talk <https://developer.nvidia.com/gtc/2020/video/s21671>`_
 
 Getting Started
 ----------------
@@ -36,6 +37,29 @@ Getting Started
    tutorials/ptq
    tutorials/trtorchc
 
+Python API Documenation
+------------------------
+* :ref:`trtorch_py`
+
+.. toctree::
+   :caption: Python API Documenation
+   :maxdepth: 0
+   :hidden:
+
+   py_api/trtorch
+   py_api/logging
+
+C++ API Documenation
+----------------------
+* :ref:`namespace_trtorch`
+
+.. toctree::
+   :caption: C++ API Documenation
+   :maxdepth: 1
+   :hidden:
+
+   _cpp_api/trtorch_cpp
+
 Contributor Documentation
 --------------------------------
 * :ref:`system_overview`
@@ -50,32 +74,6 @@ Contributor Documentation
    contributors/system_overview
    contributors/writing_converters
    contributors/useful_links
-
-
-Python API Documenation
-------------------------
-* :ref:`trtorch_py`
-
-.. toctree::
-   :caption: Python API Documenation
-   :maxdepth: 0
-   :hidden:
-
-   py_api/trtorch
-   py_api/logging
-
-
-C++ API Documenation
-----------------------
-* :ref:`namespace_trtorch`
-
-.. toctree::
-   :caption: C++ API Documenation
-   :maxdepth: 1
-   :hidden:
-
-   _cpp_api/trtorch_cpp
-
 
 Indices
 ----------------

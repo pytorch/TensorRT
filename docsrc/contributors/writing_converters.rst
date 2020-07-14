@@ -125,6 +125,5 @@ Other advice
 --------------
 
 You have the benefit of the full aten library when dealing with weights and other static values. This means that you
-can do quite a bit of work during conversion time to produce efficient conversion. A good example is 2D batch_norm
-converter where the converter does fusion of the batch norm operations to a conv layer in the converter using the
-tensors passed in.
+can do quite a bit of work during conversion time to produce efficient conversion. A good example is batch_norm
+converter where the converter does fusion of operations with PyTorch before creating the TensorRT layer.

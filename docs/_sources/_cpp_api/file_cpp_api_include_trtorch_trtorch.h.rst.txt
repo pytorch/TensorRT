@@ -33,11 +33,7 @@ Includes
 
 - ``string``
 
-- ``trtorch/logging.h`` (:ref:`file_cpp_api_include_trtorch_logging.h`)
-
 - ``trtorch/macros.h`` (:ref:`file_cpp_api_include_trtorch_macros.h`)
-
-- ``trtorch/ptq.h`` (:ref:`file_cpp_api_include_trtorch_ptq.h`)
 
 - ``vector``
 
@@ -51,8 +47,6 @@ Namespaces
 
 
 - :ref:`namespace_trtorch`
-
-- :ref:`namespace_trtorch__ptq`
 
 
 Classes
@@ -81,8 +75,4 @@ Functions
 - :ref:`exhale_function_trtorch_8h_1a726f6e7091b6b7be45b5a4275b2ffb10`
 
 - :ref:`exhale_function_trtorch_8h_1a2cf17d43ba9117b3b4d652744b4f0447`
-
-- :ref:`exhale_function_trtorch_8h_1a5f33b142bc2f3f2aaf462270b3ad7e31`
-
-- :ref:`exhale_function_trtorch_8h_1a4422781719d7befedb364cacd91c6247`
 

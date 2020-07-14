@@ -131,12 +131,12 @@ Functions
 .. toctree::
    :maxdepth: 5
 
-   function_trtorch_8h_1a5f33b142bc2f3f2aaf462270b3ad7e31.rst
+   function_ptq_8h_1a5f33b142bc2f3f2aaf462270b3ad7e31.rst
 
 .. toctree::
    :maxdepth: 5
 
-   function_trtorch_8h_1a4422781719d7befedb364cacd91c6247.rst
+   function_ptq_8h_1a4422781719d7befedb364cacd91c6247.rst
 
 Defines
 *******

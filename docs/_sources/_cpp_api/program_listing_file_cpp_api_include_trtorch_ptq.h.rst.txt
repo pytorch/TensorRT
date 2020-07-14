@@ -10,24 +10,31 @@ Program Listing for File ptq.h
 
 .. code-block:: cpp
 
+   /*
+    * Copyright (c) NVIDIA Corporation.
+    * All rights reserved.
+    *
+    * This library is licensed under the BSD-style license found in the
+    * LICENSE file in the root directory of this source tree.
+    */
    #pragma once
    
    #include <string>
    #include <vector>
    #include <memory>
    #include <iostream>
+   #include <fstream>
+   #include <iterator>
    #include <sstream>
    
+   #include "torch/torch.h"
    #include "trtorch/logging.h"
+   #include "NvInfer.h"
    
    #ifndef DOXYGEN_SHOULD_SKIP_THIS
    namespace nvinfer1 {
    class IInt8Calibrator;
    class IInt8EntropyCalibrator2;
-   }
-   
-   namespace torch {
-   class Tensor;
    }
    
    namespace trtorch {
@@ -168,6 +175,16 @@ Program Listing for File ptq.h
        size_t cache_size_ = 0;
        std::vector<char> cache_;
    };
+   
+   template<typename Algorithm = nvinfer1::IInt8EntropyCalibrator2, typename DataLoader>
+   TRTORCH_API inline Int8Calibrator<Algorithm, DataLoader> make_int8_calibrator(DataLoader dataloader, const std::string& cache_file_path, bool use_cache) {
+       return Int8Calibrator<Algorithm, DataLoader>(std::move(dataloader), cache_file_path, use_cache);
+   }
+   
+   template<typename Algorithm = nvinfer1::IInt8EntropyCalibrator2>
+   TRTORCH_API inline Int8CacheCalibrator<Algorithm> make_int8_cache_calibrator(const std::string& cache_file_path) {
+       return Int8CacheCalibrator<Algorithm>(cache_file_path);
+   }
    
    } // namespace ptq
    } // namespace trtorch

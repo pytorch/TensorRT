@@ -1,21 +1,28 @@
+/*
+ * Copyright (c) NVIDIA Corporation.
+ * All rights reserved.
+ *
+ * This library is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
 #pragma once
 
 #include <string>
 #include <vector>
 #include <memory>
 #include <iostream>
+#include <fstream>
+#include <iterator>
 #include <sstream>
 
+#include "torch/torch.h"
 #include "trtorch/logging.h"
+#include "NvInfer.h"
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
 namespace nvinfer1 {
 class IInt8Calibrator;
 class IInt8EntropyCalibrator2;
-}
-
-namespace torch {
-class Tensor;
 }
 
 namespace trtorch {
@@ -268,6 +275,50 @@ private:
     /// Cache data
     std::vector<char> cache_;
 };
+
+/**
+ * @brief A factory to build a post training quantization calibrator from a torch dataloader
+ *
+ * Creates a calibrator to use for post training quantization. By default the returned calibrator uses TensorRT Entropy v2
+ * algorithm to perform calibration. This is recommended for feed forward networks. You can override the algorithm selection
+ * (such as to use the MinMax Calibrator recomended for NLP tasks) by calling make_int8_calibrator with the calibrator class
+ * as a template parameter.
+ *
+ * e.g. ``trtorch::ptq::make_int8_calibrator<nvinfer1::IInt8MinMaxCalibrator>(std::move(calibration_dataloader), calibration_cache_file, use_cache);``
+ * @tparam Algorithm: class nvinfer1::IInt8Calibrator (Default: nvinfer1::IInt8EntropyCalibrator2) - Algorithm to use
+ * @tparam DataLoader: std::unique_ptr<torch::data::DataLoader> - DataLoader type
+ * @param dataloader: std::unique_ptr<torch::data::DataLoader> - DataLoader containing data
+ * @param cache_file_path: const std::string& - Path to read/write calibration cache
+ * @param use_cache: bool - use calibration cache
+ * @return Int8Calibrator<Algorithm, DataLoader>
+ */
+
+template<typename Algorithm = nvinfer1::IInt8EntropyCalibrator2, typename DataLoader>
+TRTORCH_API inline Int8Calibrator<Algorithm, DataLoader> make_int8_calibrator(DataLoader dataloader, const std::string& cache_file_path, bool use_cache) {
+    return Int8Calibrator<Algorithm, DataLoader>(std::move(dataloader), cache_file_path, use_cache);
+}
+
+/**
+ * @brief A factory to build a post training quantization calibrator from a torch dataloader that only uses the calibration cache
+ *
+ * Creates a calibrator to use for post training quantization which reads from a previously created calibration cache, therefore
+ * you can have a calibration cache generating program that requires a dataloader and a dataset, then save the cache to use later
+ * in a different program that needs to calibrate from scratch and not have the dataset dependency. However, the network should also
+ *  be recalibrated if its structure changes, or the input data set changes, and it is the responsibility of the application to ensure this.
+ *
+ * By default the returned calibrator uses TensorRT Entropy v2 algorithm to perform calibration. This is recommended for feed forward networks
+ * You can override the algorithm selection (such as to use the MinMax Calibrator recomended for NLP tasks) by calling make_int8_calibrator with
+ * the calibrator class as a template parameter.
+ *
+ * e.g. trtorch::ptq::make_int8_cache_calibrator<nvinfer1::IInt8MinMaxCalibrator>(calibration_cache_file);
+ * @tparam Algorithm: class nvinfer1::IInt8Calibrator (Default: nvinfer1::IInt8EntropyCalibrator2) - Algorithm to use
+ * @param cache_file_path: const std::string& - Path to read/write calibration cache
+ * @return Int8CacheCalibrator<Algorithm>
+ */
+template<typename Algorithm = nvinfer1::IInt8EntropyCalibrator2>
+TRTORCH_API inline Int8CacheCalibrator<Algorithm> make_int8_cache_calibrator(const std::string& cache_file_path) {
+    return Int8CacheCalibrator<Algorithm>(cache_file_path);
+}
 
 } // namespace ptq
 } // namespace trtorch

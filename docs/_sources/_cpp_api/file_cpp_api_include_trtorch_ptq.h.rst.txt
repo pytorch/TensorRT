@@ -29,7 +29,13 @@ Includes
 --------
 
 
+- ``NvInfer.h``
+
+- ``fstream``
+
 - ``iostream``
+
+- ``iterator``
 
 - ``memory``
 
@@ -37,17 +43,13 @@ Includes
 
 - ``string``
 
+- ``torch/torch.h``
+
 - ``trtorch/logging.h`` (:ref:`file_cpp_api_include_trtorch_logging.h`)
 
 - ``vector``
 
 
-
-Included By
------------
-
-
-- :ref:`file_cpp_api_include_trtorch_trtorch.h`
 
 
 
@@ -68,4 +70,13 @@ Classes
 - :ref:`exhale_class_classtrtorch_1_1ptq_1_1Int8CacheCalibrator`
 
 - :ref:`exhale_class_classtrtorch_1_1ptq_1_1Int8Calibrator`
+
+
+Functions
+---------
+
+
+- :ref:`exhale_function_ptq_8h_1a5f33b142bc2f3f2aaf462270b3ad7e31`
+
+- :ref:`exhale_function_ptq_8h_1a4422781719d7befedb364cacd91c6247`
 
