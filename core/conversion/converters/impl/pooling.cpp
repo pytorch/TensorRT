@@ -277,9 +277,9 @@ auto pooling_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
 
             //auto out_size = args[1].IValue()->toIntList();
             auto out_size = util::toVec(util::toDims(args[1].unwrapToIntList()));
-            
+
             if (ctx->input_is_dynamic) {
-                LOG_WARNING("Pooling layer will be run through ATen, not TensorRT. Performance may differ.");
+                LOG_WARNING("Adaptive pooling layer will be run through ATen (on CPU), via not TensorRT, performace will suffer. Consider switching either to static input shape or moving to non adaptive pooling");
 
                 auto out_shape = in_shape;
                 std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
@@ -319,7 +319,7 @@ auto pooling_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
 
                 LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
             }
-            
+
             return true;
         }
     });
