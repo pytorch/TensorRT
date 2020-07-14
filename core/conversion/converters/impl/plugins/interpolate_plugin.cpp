@@ -98,7 +98,11 @@ nvinfer1::DataType InterpolatePlugin::getOutputDataType(int index, const nvinfer
 }
 
 int InterpolatePlugin::initialize() {
+#if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1)
+    tensor_options_ = tensor_options_.device(c10::kCUDA);
+#else
     tensor_options_ = tensor_options_.device(c10::kCPU);
+#endif
 
     // c10::kFloat = FLOAT32
     tensor_options_ = tensor_options_.dtype(c10::kFloat);
@@ -161,6 +165,40 @@ size_t InterpolatePlugin::getWorkspaceSize(const nvinfer1::PluginTensorDesc* inp
 int InterpolatePlugin::enqueue(const nvinfer1::PluginTensorDesc* inputDesc, const nvinfer1::PluginTensorDesc* outputDesc, const void* const* inputs,
                                                                                                         void* const* outputs, void* workspace,
                                                                                                         cudaStream_t stream) {
+#if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1)
+    at::Tensor input = at::from_blob((void*) inputs[0], util::toVec(inputDesc->dims), [](void*){}, tensor_options_);
+    at::Tensor output = at::from_blob(outputs[0], util::volume(outputDesc->dims), [](void*){}, tensor_options_);
+
+    at::cuda::CUDAStream torch_stream = at::cuda::getStreamFromPool();
+    at::cuda::CUDAStreamGuard torch_guard(torch_stream);
+
+    cudaEvent_t event;
+    cudaEventCreate(&event);
+    cudaEventRecord(event, stream);
+
+    cudaStreamWaitEvent(torch_stream.stream(), event, 0);
+
+    if (mode == "linear") {
+        at::upsample_linear1d_out(output, input, {size_[0]}, align_corners_);
+    } else if (mode == "bilinear") {
+        at::upsample_bilinear2d_out(output, input, {size_[0], size_[1]}, align_corners_);
+    } else if (mode == "trilinear") {
+        at::upsample_trilinear3d_out(output, input, {size_[0], size_[1], size_[2]}, align_corners_);
+    } else if (mode == "adaptive_pool2d") {
+        at::adaptive_avg_pool2d_out(output, input, {size_[0], size_[1]});
+    }
+
+    cudaEvent_t torch_event;
+    cudaEventCreate(&torch_event);
+    cudaEventRecord(torch_event, torch_stream.stream());
+
+    cudaStreamWaitEvent(stream, torch_event, 0);
+
+    cudaEventDestroy(event);
+    cudaEventDestroy(torch_event);
+
+    return 0;
+#else
     // TODO: When PyTorch updates to cuDNN 8 try moving back to CUDA based ATen kernels
     // HACK: WAR because there is a segfault if you try to create a CUDA Tensor in the context of TensorRT execution
     float* input_blob = (float*) malloc(util::volume(inputDesc->dims) * sizeof(float));
@@ -185,6 +223,7 @@ int InterpolatePlugin::enqueue(const nvinfer1::PluginTensorDesc* inputDesc, cons
     free(input_blob);
 
     return 0;
+#endif
 }
 
 /*

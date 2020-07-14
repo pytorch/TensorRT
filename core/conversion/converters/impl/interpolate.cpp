@@ -15,6 +15,27 @@ namespace {
 /*
  * Helper functions
  */
+#if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1)
+void create_plugin(ConversionCtx* ctx, const torch::jit::Node* n, nvinfer1::ITensor* in, const char* name,
+                                                                                         std::vector<int64_t> in_shape,
+                                                                                         std::vector<int64_t> out_shape,
+                                                                                         std::vector<int64_t> out_size,
+                                                                                         std::string mode) {
+    LOG_WARNING("Interpolation layer will be run through ATen, not TensorRT. Performance may differ.");
+
+    auto creator = new plugins::InterpolatePluginCreator();
+    auto plugin = creator->createPlugin(name, in_shape, out_shape, out_size, mode, false);
+
+    auto resize_layer = ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(&in), 1, *plugin);
+    TRTORCH_CHECK(resize_layer, "Unable to create interpolation plugin from node" << *n);
+
+    resize_layer->setName(util::node_info(n).c_str());
+
+    auto layer_output = ctx->AssociateValueAndTensor(n->outputs()[0], resize_layer->getOutput(0));
+
+    LOG_DEBUG("Output tensor shape: " << layer_output->getDimensions());
+}
+#endif
 
 void resize_layer_size(ConversionCtx* ctx, const torch::jit::Node* n, nvinfer1::ITensor* in, std::vector<int64_t> out_shape,
                                                                                              nvinfer1::ResizeMode mode, bool align_corners=false) {
@@ -27,7 +48,11 @@ void resize_layer_size(ConversionCtx* ctx, const torch::jit::Node* n, nvinfer1::
 
     // if interpolation mode is linear, align corners must have been set to true. else, don't use align corners.
     if (mode == nvinfer1::ResizeMode::kLINEAR) {
-        resize_layer->setAlignCorners(align_corners);
+#if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1)
+    resize_layer->setAlignCorners(true);
+#else
+    resize_layer->setAlignCorners(align_corners);
+#endif
     }
 
     auto layer_output = ctx->AssociateValueAndTensor(n->outputs()[0], resize_layer->getOutput(0));
@@ -123,7 +148,16 @@ auto interpolate_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
                 auto out_shape = in_shape;
                 std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
 
+#if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1)
+                if (!align_corners) {
+                    // align_corners not supported in TensorRT, create plugin and run layer through PyTorch
+                    create_plugin(ctx, n, in, "linear1d", in_shape, out_shape, out_size, std::string("linear"));
+                } else {
+                    resize_layer_size(ctx, n, in, out_shape, nvinfer1::ResizeMode::kLINEAR. true);
+                }
+#else
                 resize_layer_size(ctx, n, in, out_shape, nvinfer1::ResizeMode::kLINEAR, align_corners);
+#endif
             } else {
                 TRTORCH_THROW_ERROR("Unable to convert node: " << util::node_info(n) << "\nScale factor parameter for upsample_linear1d not supported yet.");
             }
@@ -146,7 +180,16 @@ auto interpolate_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
                 auto out_shape = in_shape;
                 std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
 
+#if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1)
+                if (!align_corners) {
+                    // align_corners not supported in TensorRT, create plugin and run layer through PyTorch
+                    create_plugin(ctx, n, in, "bilinear2d", in_shape, out_shape, out_size, std::string("bilinear"));
+                } else {
+                    resize_layer_size(ctx, n, in, out_shape, nvinfer1::ResizeMode::kLINEAR. true);
+                }
+#else
                 resize_layer_size(ctx, n, in, out_shape, nvinfer1::ResizeMode::kLINEAR, align_corners);
+#endif
             } else {
                 TRTORCH_THROW_ERROR("Unable to convert node: " << util::node_info(n) << "\nScale factor parameter for upsample_bilinear2d not supported yet.");
             }
@@ -169,7 +212,16 @@ auto interpolate_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
                 auto out_shape = in_shape;
                 std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
 
+#if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1)
+                if (!align_corners) {
+                    // align_corners not supported in TensorRT, create plugin and run layer through PyTorch
+                    create_plugin(ctx, n, in, "trilinear3d", in_shape, out_shape, out_size, std::string("trilinear"));
+                } else {
+                    resize_layer_size(ctx, n, in, out_shape, nvinfer1::ResizeMode::kLINEAR. true);
+                }
+#else
                 resize_layer_size(ctx, n, in, out_shape, nvinfer1::ResizeMode::kLINEAR, align_corners);
+#endif
             } else {
                 TRTORCH_THROW_ERROR("Unable to convert node: " << util::node_info(n) << "\nScale factor parameter for upsample_trilinear3d not supported yet.");
             }
