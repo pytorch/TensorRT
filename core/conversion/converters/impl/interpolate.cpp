@@ -21,7 +21,7 @@ void create_plugin(ConversionCtx* ctx, const torch::jit::Node* n, nvinfer1::ITen
                                                                                          std::vector<int64_t> out_shape,
                                                                                          std::vector<int64_t> out_size,
                                                                                          std::string mode) {
-    LOG_WARNING("Interpolation layer will be run through ATen, not TensorRT. Performance may differ.");
+    LOG_WARNING("Interpolation layer will be run through ATen, not TensorRT. Performance may be lower than expected");
 
     auto creator = new plugins::InterpolatePluginCreator();
     auto plugin = creator->createPlugin(name, in_shape, out_shape, out_size, mode, false);
