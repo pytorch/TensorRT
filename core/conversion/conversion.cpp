@@ -11,8 +11,8 @@ namespace trtorch {
 namespace core {
 namespace conversion {
 
-// Defined in core/conversion/conversion_blacklist.cpp
-bool isNodeConversionBlacklisted(const torch::jit::Node* n);
+// Defined in core/conversion/conversion_ignorelist.cpp
+bool isNodeConversionIgnored(const torch::jit::Node* n);
 
 bool OpSupported(const torch::jit::Node* n) {
     return evaluators::shouldEvalAtConversionTime(n) || converters::node_is_convertable(n);
@@ -302,7 +302,7 @@ void ConvertBlockToNetDef(ConversionCtx* ctx, const torch::jit::Block* b, Conver
 
     for (const auto n : nodes) {
         bool to_eval = evaluators::shouldEvalAtConversionTime(n);
-        bool blacklisted = isNodeConversionBlacklisted(n);
+        bool ignored = isNodeConversionIgnored(n);
         if (n->kind() == torch::jit::prim::Loop) {
             EvaluateLoopBlock(ctx, n);
         } else if (n->kind() == torch::jit::prim::If) {
@@ -317,7 +317,7 @@ void ConvertBlockToNetDef(ConversionCtx* ctx, const torch::jit::Block* b, Conver
                 }
                 ctx->AssociateValueAndIValue(n->output(0), eval.value());
             }
-        } else if (!blacklisted) {
+        } else if (!ignored) {
             // Should error out if something fails
             AddLayer(ctx, n);
         } else {
@@ -325,8 +325,8 @@ void ConvertBlockToNetDef(ConversionCtx* ctx, const torch::jit::Block* b, Conver
             if (to_eval) {
                 reason += " (to be evaluated)";
             }
-            if (blacklisted) {
-                reason += " (explicitly blacklisted)";
+            if (ignored) {
+                reason += " (explicitly ignored)";
             }
             LOG_DEBUG(ctx->logger,
                       "Skipping Node: " << util::node_info(n) << reason);
