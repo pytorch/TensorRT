@@ -14,7 +14,7 @@ cc_library(
     ],
     srcs = [
         "conversion.cpp",
-        "conversion_blacklist.cpp",
+        "conversion_ignorelist.cpp",
         "InterfaceTypes.cpp"
     ],
     deps = [

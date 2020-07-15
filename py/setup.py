@@ -139,7 +139,6 @@ ext_modules = [
     cpp_extension.CUDAExtension('trtorch._C',
                                 ['trtorch/csrc/trtorch_py.cpp'],
                                 library_dirs=[
-                                    dir_path + '/trtorch/lib/libtrtorch.so',
                                     dir_path + '/trtorch/lib/'
                                 ],
                                 libraries=[
@@ -152,14 +151,14 @@ ext_modules = [
                                 extra_compile_args=[
                                     "-Wno-deprecated",
                                     "-Wno-deprecated-declarations",
-                                ] + ["-D_GLIBCXX_USE_CXX11_ABI=1"] if CXX11_ABI else ["-D_GLIBCXX_USE_CXX11_ABI=0"],
+                                ] + (["-D_GLIBCXX_USE_CXX11_ABI=1"] if CXX11_ABI else ["-D_GLIBCXX_USE_CXX11_ABI=0"]),
                                 extra_link_args=[
                                     "-Wno-deprecated",
                                     "-Wno-deprecated-declarations",
                                     "-Wl,--no-as-needed",
                                     "-ltrtorch",
                                     "-Wl,-rpath,$ORIGIN/lib"
-                                ] + ["-D_GLIBCXX_USE_CXX11_ABI=1"] if CXX11_ABI else ["-D_GLIBCXX_USE_CXX11_ABI=0"],
+                                ] + (["-D_GLIBCXX_USE_CXX11_ABI=1"] if CXX11_ABI else ["-D_GLIBCXX_USE_CXX11_ABI=0"]),
                                 undef_macros=[ "NDEBUG" ]
                             )
 ]

@@ -28,7 +28,7 @@ const std::unordered_set<std::string>& get_non_convertable_nodes() {
     return nonconvertable_nodes;
 }
 
-bool isNodeConversionBlacklisted(const torch::jit::Node* n) {
+bool isNodeConversionIgnored(const torch::jit::Node* n) {
     auto kind = n->kind();
     auto convertableIt = get_non_convertable_nodes().find(kind.toQualString());
     if (convertableIt == get_non_convertable_nodes().end()) {
