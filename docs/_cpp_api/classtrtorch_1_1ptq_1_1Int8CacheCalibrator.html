@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
  <head>
   <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -40,19 +41,21 @@
   <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/pygments.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/collapsible-lists/css/tree_view.css" rel="stylesheet" type="text/css"/>
-  <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js" type="text/javascript">
+  <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js">
   </script>
-  <script src="../_static/jquery.js" type="text/javascript">
+  <script src="../_static/jquery.js">
   </script>
-  <script src="../_static/underscore.js" type="text/javascript">
+  <script src="../_static/underscore.js">
   </script>
-  <script src="../_static/doctools.js" type="text/javascript">
+  <script src="../_static/doctools.js">
   </script>
-  <script src="../_static/language_data.js" type="text/javascript">
+  <script src="../_static/language_data.js">
   </script>
-  <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js" type="text/javascript">
+  <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js">
   </script>
-  <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js" type="text/javascript">
+  <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
+  </script>
+  <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -220,76 +223,32 @@
            <a class="md-nav__link" href="../tutorials/installation.html">
             Installation
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/installation.html#precompiled-binaries">
-              Precompiled Binaries
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/installation.html#compiling-from-source">
-              Compiling From Source
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../tutorials/getting_started.html">
             Getting Started
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/getting_started.html#creating-a-torchscript-module">
-              Creating a TorchScript Module
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/getting_started.html#working-with-torchscript-in-python">
-              Working with TorchScript in Python
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/getting_started.html#compiling-with-trtorch-in-python">
-              Compiling with TRTorch in Python
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/getting_started.html#working-with-torchscript-in-c">
-              Working with TorchScript in C++
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/getting_started.html#compiling-with-trtorch-in-c">
-              Compiling with TRTorch in C++
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/getting_started.html#under-the-hood">
-              Under The Hood
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/getting_started.html#working-with-unsupported-operators">
-              Working with Unsupported Operators
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../tutorials/ptq.html">
             Post Training Quantization (PTQ)
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/ptq.html#how-to-create-your-own-ptq-application">
-              How to create your own PTQ application
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../tutorials/trtorchc.html">
             trtorchc
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Notebooks
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/lenet-getting-started.html">
+            TRTorch Getting Started - LeNet
            </a>
           </li>
           <li class="md-nav__item">
@@ -303,23 +262,6 @@
            <a class="md-nav__link" href="../py_api/trtorch.html">
             trtorch
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../py_api/trtorch.html#functions">
-              Functions
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../py_api/trtorch.html#enums">
-              Enums
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../py_api/trtorch.html#submodules">
-              Submodules
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../py_api/logging.html">
@@ -337,23 +279,6 @@
            <a class="md-nav__link" href="trtorch_cpp.html">
             TRTorch C++ API
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="trtorch_cpp.html#class-hierarchy">
-              Class Hierarchy
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="trtorch_cpp.html#file-hierarchy">
-              File Hierarchy
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="trtorch_cpp.html#full-api">
-              Full API
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <span class="md-nav__link caption">
@@ -366,92 +291,16 @@
            <a class="md-nav__link" href="../contributors/system_overview.html">
             System Overview
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/system_overview.html#compiler-phases">
-              Compiler Phases
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../contributors/writing_converters.html">
             Writing Converters
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#background">
-              Background
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#converters">
-              Converters
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#converter-contract">
-              Converter Contract
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#conversion-context">
-              Conversion Context
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#args">
-              Args
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#weights">
-              Weights
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#other-advice">
-              Other advice
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../contributors/useful_links.html">
             Useful Links for TRTorch Development
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/useful_links.html#tensorrt-available-layers-and-expected-dimensions">
-              TensorRT Available Layers and Expected Dimensions
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/useful_links.html#tensorrt-c-documentation">
-              TensorRT C++ Documentation
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/useful_links.html#tensorrt-python-documentation-sometimes-easier-to-read">
-              TensorRT Python Documentation (Sometimes easier to read)
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/useful_links.html#pytorch-functional-api">
-              PyTorch Functional API
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/useful_links.html#pytorch-native-ops">
-              PyTorch native_ops
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/useful_links.html#pytorch-ir-documentation">
-              PyTorch IR Documentation
-             </a>
-            </li>
-           </ul>
           </li>
          </ul>
         </nav>
@@ -560,23 +409,25 @@
          ¶
         </a>
        </h2>
-       <dl class="class">
+       <dl class="cpp class">
         <dt id="_CPPv4I0EN7trtorch3ptq19Int8CacheCalibratorE">
-         <span id="_CPPv3I0EN7trtorch3ptq19Int8CacheCalibratorE">
-         </span>
-         <span id="_CPPv2I0EN7trtorch3ptq19Int8CacheCalibratorE">
-         </span>
-         <span class="target" id="classtrtorch_1_1ptq_1_1Int8CacheCalibrator">
-         </span>
          template&lt;typename
          <code class="sig-name descname">
           Algorithm
          </code>
          &gt;
          <br/>
+         <span class="target" id="classtrtorch_1_1ptq_1_1Int8CacheCalibrator">
+         </span>
          <em class="property">
           class
          </em>
+         <code class="sig-prename descclassname">
+          trtorch::ptq
+          <code class="sig-prename descclassname">
+           ::
+          </code>
+         </code>
          <code class="sig-name descname">
           Int8CacheCalibrator
          </code>
@@ -629,14 +480,8 @@
           <p class="breathe-sectiondef-title rubric">
            Public Functions
           </p>
-          <dl class="function">
+          <dl class="cpp function">
            <dt id="_CPPv4N7trtorch3ptq19Int8CacheCalibrator19Int8CacheCalibratorERKNSt6stringE">
-            <span id="_CPPv3N7trtorch3ptq19Int8CacheCalibrator19Int8CacheCalibratorERKNSt6stringE">
-            </span>
-            <span id="_CPPv2N7trtorch3ptq19Int8CacheCalibrator19Int8CacheCalibratorERKNSt6stringE">
-            </span>
-            <span id="trtorch::ptq::Int8CacheCalibrator::Int8CacheCalibrator__ssCR">
-            </span>
             <span class="target" id="classtrtorch_1_1ptq_1_1Int8CacheCalibrator_1a1cb859553ee0372e49bb971d44c1e491">
             </span>
             <code class="sig-name descname">
@@ -689,14 +534,8 @@
             </dl>
            </dd>
           </dl>
-          <dl class="function">
+          <dl class="cpp function">
            <dt id="_CPPv4NK7trtorch3ptq19Int8CacheCalibrator12getBatchSizeEv">
-            <span id="_CPPv3NK7trtorch3ptq19Int8CacheCalibrator12getBatchSizeEv">
-            </span>
-            <span id="_CPPv2NK7trtorch3ptq19Int8CacheCalibrator12getBatchSizeEv">
-            </span>
-            <span id="trtorch::ptq::Int8CacheCalibrator::getBatchSizeC">
-            </span>
             <span class="target" id="classtrtorch_1_1ptq_1_1Int8CacheCalibrator_1afd6e8c7a8653b6bf24a1bd1f9a43dd7c">
             </span>
             int
@@ -711,6 +550,9 @@
             </span>
             <em class="property">
              const
+            </em>
+            <em class="property">
+             override
             </em>
             <a class="headerlink" href="#_CPPv4NK7trtorch3ptq19Int8CacheCalibrator12getBatchSizeEv" title="Permalink to this definition">
              ¶
@@ -737,14 +579,8 @@
             </dl>
            </dd>
           </dl>
-          <dl class="function">
+          <dl class="cpp function">
            <dt id="_CPPv4N7trtorch3ptq19Int8CacheCalibrator8getBatchEA_PvA_PKci">
-            <span id="_CPPv3N7trtorch3ptq19Int8CacheCalibrator8getBatchEA_PvA_PKci">
-            </span>
-            <span id="_CPPv2N7trtorch3ptq19Int8CacheCalibrator8getBatchEA_PvA_PKci">
-            </span>
-            <span id="trtorch::ptq::Int8CacheCalibrator::getBatch__voidPA.cCPA.i">
-            </span>
             <span class="target" id="classtrtorch_1_1ptq_1_1Int8CacheCalibrator_1aa2ea4cdfdd049e7d8036d604cbde0a4a">
             </span>
             bool
@@ -773,6 +609,9 @@
             <span class="sig-paren">
              )
             </span>
+            <em class="property">
+             override
+            </em>
             <a class="headerlink" href="#_CPPv4N7trtorch3ptq19Int8CacheCalibrator8getBatchEA_PvA_PKci" title="Permalink to this definition">
              ¶
             </a>
@@ -840,14 +679,8 @@
             </dl>
            </dd>
           </dl>
-          <dl class="function">
+          <dl class="cpp function">
            <dt id="_CPPv4N7trtorch3ptq19Int8CacheCalibrator20readCalibrationCacheER6size_t">
-            <span id="_CPPv3N7trtorch3ptq19Int8CacheCalibrator20readCalibrationCacheER6size_t">
-            </span>
-            <span id="_CPPv2N7trtorch3ptq19Int8CacheCalibrator20readCalibrationCacheER6size_t">
-            </span>
-            <span id="trtorch::ptq::Int8CacheCalibrator::readCalibrationCache__sR">
-            </span>
             <span class="target" id="classtrtorch_1_1ptq_1_1Int8CacheCalibrator_1aec8bb116112ff70f23598c10b8108e18">
             </span>
             <em class="property">
@@ -867,6 +700,9 @@
             <span class="sig-paren">
              )
             </span>
+            <em class="property">
+             override
+            </em>
             <a class="headerlink" href="#_CPPv4N7trtorch3ptq19Int8CacheCalibrator20readCalibrationCacheER6size_t" title="Permalink to this definition">
              ¶
             </a>
@@ -914,14 +750,8 @@
             </dl>
            </dd>
           </dl>
-          <dl class="function">
+          <dl class="cpp function">
            <dt id="_CPPv4N7trtorch3ptq19Int8CacheCalibrator21writeCalibrationCacheEPKv6size_t">
-            <span id="_CPPv3N7trtorch3ptq19Int8CacheCalibrator21writeCalibrationCacheEPKv6size_t">
-            </span>
-            <span id="_CPPv2N7trtorch3ptq19Int8CacheCalibrator21writeCalibrationCacheEPKv6size_t">
-            </span>
-            <span id="trtorch::ptq::Int8CacheCalibrator::writeCalibrationCache__voidCP.s">
-            </span>
             <span class="target" id="classtrtorch_1_1ptq_1_1Int8CacheCalibrator_1a6b86c10eb2c62d464de4fd852fa6a55b">
             </span>
             void
@@ -945,6 +775,9 @@
             <span class="sig-paren">
              )
             </span>
+            <em class="property">
+             override
+            </em>
             <a class="headerlink" href="#_CPPv4N7trtorch3ptq19Int8CacheCalibrator21writeCalibrationCacheEPKv6size_t" title="Permalink to this definition">
              ¶
             </a>
@@ -992,18 +825,12 @@
             </dl>
            </dd>
           </dl>
-          <dl class="function">
+          <dl class="cpp function">
            <dt id="_CPPv4N7trtorch3ptq19Int8CacheCalibratorcvPN8nvinfer115IInt8CalibratorEEv">
-            <span id="_CPPv3N7trtorch3ptq19Int8CacheCalibratorcvPN8nvinfer115IInt8CalibratorEEv">
-            </span>
-            <span id="_CPPv2N7trtorch3ptq19Int8CacheCalibratorcvPN8nvinfer115IInt8CalibratorEEv">
-            </span>
-            <span id="trtorch::ptq::Int8CacheCalibrator::castto-nvinfer1::IInt8CalibratorP-operator">
-            </span>
             <span class="target" id="classtrtorch_1_1ptq_1_1Int8CacheCalibrator_1ad431c60cde7d35da8148c4f5442eabb4">
             </span>
             <code class="sig-name descname">
-             operator nvinfer1::IInt8Calibrator *
+             operator nvinfer1::IInt8Calibrator*
             </code>
             <span class="sig-paren">
              (
@@ -1095,7 +922,7 @@
       <a href="http://www.sphinx-doc.org/">
        Sphinx
       </a>
-      2.3.1.
+      3.1.2.
              and
       <a href="https://github.com/bashtage/sphinx-material/">
        Material for

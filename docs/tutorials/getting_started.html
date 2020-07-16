@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
  <head>
   <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -40,19 +41,21 @@
   <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/pygments.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/collapsible-lists/css/tree_view.css" rel="stylesheet" type="text/css"/>
-  <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js" type="text/javascript">
+  <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js">
   </script>
-  <script src="../_static/jquery.js" type="text/javascript">
+  <script src="../_static/jquery.js">
   </script>
-  <script src="../_static/underscore.js" type="text/javascript">
+  <script src="../_static/underscore.js">
   </script>
-  <script src="../_static/doctools.js" type="text/javascript">
+  <script src="../_static/doctools.js">
   </script>
-  <script src="../_static/language_data.js" type="text/javascript">
+  <script src="../_static/language_data.js">
   </script>
-  <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js" type="text/javascript">
+  <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js">
   </script>
-  <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js" type="text/javascript">
+  <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
+  </script>
+  <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -215,18 +218,6 @@
            <a class="md-nav__link" href="installation.html">
             Installation
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="installation.html#precompiled-binaries">
-              Precompiled Binaries
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="installation.html#compiling-from-source">
-              Compiling From Source
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <input class="md-toggle md-nav__toggle" data-md-toggle="toc" id="__toc" type="checkbox"/>
@@ -248,6 +239,192 @@
               <nav class="md-nav">
                <ul class="md-nav__list">
                 <li class="md-nav__item">
+                 <a class="md-nav__link" href="#background">
+                  Background
+                 </a>
+                 <nav class="md-nav">
+                  <ul class="md-nav__list">
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#creating-a-torchscript-module">
+                     Creating a TorchScript Module
+                    </a>
+                   </li>
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#working-with-torchscript-in-python">
+                     Working with TorchScript in Python
+                    </a>
+                   </li>
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#saving-torchscript-module-to-disk">
+                     Saving TorchScript Module to Disk
+                    </a>
+                   </li>
+                  </ul>
+                 </nav>
+                </li>
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#using-trtorch">
+                  Using TRTorch
+                 </a>
+                 <nav class="md-nav">
+                  <ul class="md-nav__list">
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#trtorch-quickstart-compiling-torchscript-modules-with-trtorchc">
+                     [TRTorch Quickstart] Compiling TorchScript Modules with
+                     <code class="docutils literal notranslate">
+                      <span class="pre">
+                       trtorchc
+                      </span>
+                     </code>
+                    </a>
+                   </li>
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#compiling-with-trtorch-in-python">
+                     Compiling with TRTorch in Python
+                    </a>
+                   </li>
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#working-with-torchscript-in-c">
+                     Working with TorchScript in C++
+                    </a>
+                   </li>
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#compiling-with-trtorch-in-c">
+                     Compiling with TRTorch in C++
+                    </a>
+                   </li>
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#under-the-hood">
+                     Under The Hood
+                    </a>
+                   </li>
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#working-with-unsupported-operators">
+                     Working with Unsupported Operators
+                    </a>
+                    <nav class="md-nav">
+                     <ul class="md-nav__list">
+                      <li class="md-nav__item">
+                       <a class="md-nav__link" href="#registering-custom-converters">
+                        Registering Custom Converters
+                       </a>
+                      </li>
+                     </ul>
+                    </nav>
+                   </li>
+                  </ul>
+                 </nav>
+                </li>
+               </ul>
+              </nav>
+             </li>
+             <li class="md-nav__item">
+              <a class="md-nav__extra_link" href="../_sources/tutorials/getting_started.rst.txt">
+               Show Source
+              </a>
+             </li>
+            </ul>
+           </nav>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="ptq.html">
+            Post Training Quantization (PTQ)
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="trtorchc.html">
+            trtorchc
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Notebooks
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/lenet-getting-started.html">
+            TRTorch Getting Started - LeNet
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Python API Documenation
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/trtorch.html">
+            trtorch
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/logging.html">
+            trtorch.logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             C++ API Documenation
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html">
+            TRTorch C++ API
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Contributor Documentation
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../contributors/system_overview.html">
+            System Overview
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../contributors/writing_converters.html">
+            Writing Converters
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../contributors/useful_links.html">
+            Useful Links for TRTorch Development
+           </a>
+          </li>
+         </ul>
+        </nav>
+       </div>
+      </div>
+     </div>
+     <div class="md-sidebar md-sidebar--secondary" data-md-component="toc">
+      <div class="md-sidebar__scrollwrap">
+       <div class="md-sidebar__inner">
+        <nav class="md-nav md-nav--secondary">
+         <label class="md-nav__title" for="__toc">
+          Contents
+         </label>
+         <ul class="md-nav__list" data-md-scrollfix="">
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="#tutorials-getting-started--page-root">
+            Getting Started
+           </a>
+           <nav class="md-nav">
+            <ul class="md-nav__list">
+             <li class="md-nav__item">
+              <a class="md-nav__link" href="#background">
+               Background
+              </a>
+              <nav class="md-nav">
+               <ul class="md-nav__list">
+                <li class="md-nav__item">
                  <a class="md-nav__link" href="#creating-a-torchscript-module">
                   Creating a TorchScript Module
                  </a>
@@ -255,6 +432,30 @@
                 <li class="md-nav__item">
                  <a class="md-nav__link" href="#working-with-torchscript-in-python">
                   Working with TorchScript in Python
+                 </a>
+                </li>
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#saving-torchscript-module-to-disk">
+                  Saving TorchScript Module to Disk
+                 </a>
+                </li>
+               </ul>
+              </nav>
+             </li>
+             <li class="md-nav__item">
+              <a class="md-nav__link" href="#using-trtorch">
+               Using TRTorch
+              </a>
+              <nav class="md-nav">
+               <ul class="md-nav__list">
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#trtorch-quickstart-compiling-torchscript-modules-with-trtorchc">
+                  [TRTorch Quickstart] Compiling TorchScript Modules with
+                  <code class="docutils literal notranslate">
+                   <span class="pre">
+                    trtorchc
+                   </span>
+                  </code>
                  </a>
                 </li>
                 <li class="md-nav__item">
@@ -294,292 +495,6 @@
                </ul>
               </nav>
              </li>
-             <li class="md-nav__item">
-              <a class="md-nav__extra_link" href="../_sources/tutorials/getting_started.rst.txt">
-               Show Source
-              </a>
-             </li>
-            </ul>
-           </nav>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="#creating-a-torchscript-module">
-              Creating a TorchScript Module
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="#working-with-torchscript-in-python">
-              Working with TorchScript in Python
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="#compiling-with-trtorch-in-python">
-              Compiling with TRTorch in Python
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="#working-with-torchscript-in-c">
-              Working with TorchScript in C++
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="#compiling-with-trtorch-in-c">
-              Compiling with TRTorch in C++
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="#under-the-hood">
-              Under The Hood
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="#working-with-unsupported-operators">
-              Working with Unsupported Operators
-             </a>
-            </li>
-           </ul>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="ptq.html">
-            Post Training Quantization (PTQ)
-           </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="ptq.html#how-to-create-your-own-ptq-application">
-              How to create your own PTQ application
-             </a>
-            </li>
-           </ul>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="trtorchc.html">
-            trtorchc
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <span class="md-nav__link caption">
-            <span class="caption-text">
-             Python API Documenation
-            </span>
-           </span>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/trtorch.html">
-            trtorch
-           </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../py_api/trtorch.html#functions">
-              Functions
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../py_api/trtorch.html#enums">
-              Enums
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../py_api/trtorch.html#submodules">
-              Submodules
-             </a>
-            </li>
-           </ul>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/logging.html">
-            trtorch.logging
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <span class="md-nav__link caption">
-            <span class="caption-text">
-             C++ API Documenation
-            </span>
-           </span>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html">
-            TRTorch C++ API
-           </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html#class-hierarchy">
-              Class Hierarchy
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html#file-hierarchy">
-              File Hierarchy
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html#full-api">
-              Full API
-             </a>
-            </li>
-           </ul>
-          </li>
-          <li class="md-nav__item">
-           <span class="md-nav__link caption">
-            <span class="caption-text">
-             Contributor Documentation
-            </span>
-           </span>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../contributors/system_overview.html">
-            System Overview
-           </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/system_overview.html#compiler-phases">
-              Compiler Phases
-             </a>
-            </li>
-           </ul>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../contributors/writing_converters.html">
-            Writing Converters
-           </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#background">
-              Background
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#converters">
-              Converters
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#converter-contract">
-              Converter Contract
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#conversion-context">
-              Conversion Context
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#args">
-              Args
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#weights">
-              Weights
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#other-advice">
-              Other advice
-             </a>
-            </li>
-           </ul>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../contributors/useful_links.html">
-            Useful Links for TRTorch Development
-           </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/useful_links.html#tensorrt-available-layers-and-expected-dimensions">
-              TensorRT Available Layers and Expected Dimensions
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/useful_links.html#tensorrt-c-documentation">
-              TensorRT C++ Documentation
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/useful_links.html#tensorrt-python-documentation-sometimes-easier-to-read">
-              TensorRT Python Documentation (Sometimes easier to read)
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/useful_links.html#pytorch-functional-api">
-              PyTorch Functional API
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/useful_links.html#pytorch-native-ops">
-              PyTorch native_ops
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/useful_links.html#pytorch-ir-documentation">
-              PyTorch IR Documentation
-             </a>
-            </li>
-           </ul>
-          </li>
-         </ul>
-        </nav>
-       </div>
-      </div>
-     </div>
-     <div class="md-sidebar md-sidebar--secondary" data-md-component="toc">
-      <div class="md-sidebar__scrollwrap">
-       <div class="md-sidebar__inner">
-        <nav class="md-nav md-nav--secondary">
-         <label class="md-nav__title" for="__toc">
-          Contents
-         </label>
-         <ul class="md-nav__list" data-md-scrollfix="">
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="#tutorials-getting-started--page-root">
-            Getting Started
-           </a>
-           <nav class="md-nav">
-            <ul class="md-nav__list">
-             <li class="md-nav__item">
-              <a class="md-nav__link" href="#creating-a-torchscript-module">
-               Creating a TorchScript Module
-              </a>
-             </li>
-             <li class="md-nav__item">
-              <a class="md-nav__link" href="#working-with-torchscript-in-python">
-               Working with TorchScript in Python
-              </a>
-             </li>
-             <li class="md-nav__item">
-              <a class="md-nav__link" href="#compiling-with-trtorch-in-python">
-               Compiling with TRTorch in Python
-              </a>
-             </li>
-             <li class="md-nav__item">
-              <a class="md-nav__link" href="#working-with-torchscript-in-c">
-               Working with TorchScript in C++
-              </a>
-             </li>
-             <li class="md-nav__item">
-              <a class="md-nav__link" href="#compiling-with-trtorch-in-c">
-               Compiling with TRTorch in C++
-              </a>
-             </li>
-             <li class="md-nav__item">
-              <a class="md-nav__link" href="#under-the-hood">
-               Under The Hood
-              </a>
-             </li>
-             <li class="md-nav__item">
-              <a class="md-nav__link" href="#working-with-unsupported-operators">
-               Working with Unsupported Operators
-              </a>
-              <nav class="md-nav">
-               <ul class="md-nav__list">
-                <li class="md-nav__item">
-                 <a class="md-nav__link" href="#registering-custom-converters">
-                  Registering Custom Converters
-                 </a>
-                </li>
-               </ul>
-              </nav>
-             </li>
             </ul>
            </nav>
           </li>
@@ -613,12 +528,18 @@
          </span>
         </a>
        </p>
-       <h2 id="creating-a-torchscript-module">
+       <h2 id="background">
+        Background
+        <a class="headerlink" href="#background" title="Permalink to this headline">
+         ¶
+        </a>
+       </h2>
+       <h3 id="creating-a-torchscript-module">
         Creating a TorchScript Module
         <a class="headerlink" href="#creating-a-torchscript-module" title="Permalink to this headline">
          ¶
         </a>
-       </h2>
+       </h3>
        <p>
         Once you have a trained model you want to compile with TRTorch, you need to start by converting that model from Python code to TorchScript code.
 PyTorch has detailed documentation on how to do this
@@ -626,16 +547,22 @@ PyTorch has detailed documentation on how to do this
          https://pytorch.org/tutorials/beginner/Intro_to_TorchScript_tutorial.html
         </a>
         but briefly here is the
-here is key background and the process:
+here is key background information and the process:
        </p>
        <p>
         PyTorch programs are based around
-        <a href="#id2">
-         <span class="problematic" id="id3">
-          `
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          Module
          </span>
-        </a>
-        Module`s which can be used to compose higher level modules. Modules contain a constructor to set up the modules, parameters and sub-modules
+        </code>
+        s which can be used to compose higher level modules.
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          Modules
+         </span>
+        </code>
+        contain a constructor to set up the modules, parameters and sub-modules
 and a forward function which describes how to use the parameters and submodules when the module is invoked.
        </p>
        <p>
@@ -828,12 +755,12 @@ in a intermediate representation that TRTorch can consume.
        </p>
        <span id="ts-in-py">
        </span>
-       <h2 id="working-with-torchscript-in-python">
+       <h3 id="working-with-torchscript-in-python">
         Working with TorchScript in Python
         <a class="headerlink" href="#working-with-torchscript-in-python" title="Permalink to this headline">
          ¶
         </a>
-       </h2>
+       </h3>
        <p>
         TorchScript Modules are run the same way you run normal PyTorch modules. You can run the forward pass using the
         <code class="docutils literal notranslate">
@@ -850,16 +777,119 @@ in a intermediate representation that TRTorch can consume.
         The JIT compiler will compile
 and optimize the module on the fly and then returns the results.
        </p>
-       <span id="compile-py">
-       </span>
-       <h2 id="compiling-with-trtorch-in-python">
-        Compiling with TRTorch in Python
-        <a class="headerlink" href="#compiling-with-trtorch-in-python" title="Permalink to this headline">
+       <h3 id="saving-torchscript-module-to-disk">
+        Saving TorchScript Module to Disk
+        <a class="headerlink" href="#saving-torchscript-module-to-disk" title="Permalink to this headline">
+         ¶
+        </a>
+       </h3>
+       <p>
+        For either traced or scripted modules, you can save the module to disk with the following command
+       </p>
+       <div class="highlight-python notranslate">
+        <div class="highlight">
+         <pre><span></span><span class="kn">import</span> <span class="nn">torch.jit</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">LeNet</span><span class="p">()</span>
+<span class="n">script_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">script</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+<span class="n">script_model</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="s2">"lenet_scripted.ts"</span><span class="p">)</span>
+</pre>
+        </div>
+       </div>
+       <h2 id="using-trtorch">
+        Using TRTorch
+        <a class="headerlink" href="#using-trtorch" title="Permalink to this headline">
          ¶
         </a>
        </h2>
        <p>
-        To compile your TorchScript module with TRTorch, all you need to do is provide the module and some compiler settings
+        Now that there is some understanding of TorchScript and how to use it, we can now complete the pipeline and compile
+our TorchScript into TensorRT accelerated TorchScript. Unlike the PyTorch JIT compiler, TRTorch is an Ahead-of-Time
+(AOT) compiler. This means that unlike with PyTorch where the JIT compiler compiles from the high level PyTorch IR
+to kernel implementation at runtime, modules that are to be compiled with TRTorch are compiled fully before runtime
+(consider how you use a C compiler for an analogy). TRTorch has 3 main interfaces for using the compiler. You can
+use a CLI application similar to how you may use GCC called
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          trtorchc
+         </span>
+        </code>
+        , or you can embed the compiler in a model
+freezing application / pipeline.
+       </p>
+       <span id="trtorch-quickstart">
+       </span>
+       <h3 id="trtorch-quickstart-compiling-torchscript-modules-with-trtorchc">
+        [TRTorch Quickstart] Compiling TorchScript Modules with
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          trtorchc
+         </span>
+        </code>
+        <a class="headerlink" href="#trtorch-quickstart-compiling-torchscript-modules-with-trtorchc" title="Permalink to this headline">
+         ¶
+        </a>
+       </h3>
+       <p>
+        An easy way to get started with TRTorch and to check if your model can be supported without extra work is to run it through
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          trtorchc
+         </span>
+        </code>
+        , which supports almost all features of the compiler from the command line including post training quantization
+(given a previously created calibration cache). For example we can compile our lenet model by setting our preferred operating
+precision and input size. This new TorchScript file can be loaded into Python (note: you need to
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          import
+         </span>
+         <span class="pre">
+          trtorch
+         </span>
+        </code>
+        before loading
+these compiled modules because the compiler extends the PyTorch the deserializer and runtime to execute compiled modules).
+       </p>
+       <div class="highlight-shell notranslate">
+        <div class="highlight">
+         <pre><span></span>❯ trtorchc -p f16 lenet_scripted.ts trt_lenet_scripted.ts <span class="s2">"(1,1,32,32)"</span>
+
+❯ python3
+Python <span class="m">3</span>.6.9 <span class="o">(</span>default, Apr <span class="m">18</span> <span class="m">2020</span>, <span class="m">01</span>:56:04<span class="o">)</span>
+<span class="o">[</span>GCC <span class="m">8</span>.4.0<span class="o">]</span> on linux
+Type <span class="s2">"help"</span>, <span class="s2">"copyright"</span>, <span class="s2">"credits"</span> or <span class="s2">"license"</span> <span class="k">for</span> more information.
+&gt;&gt;&gt; import torch
+&gt;&gt;&gt; import trtorch
+&gt;&gt;&gt; <span class="nv">ts_model</span> <span class="o">=</span> torch.jit.load<span class="o">(</span>“trt_lenet_scripted.ts”<span class="o">)</span>
+&gt;&gt;&gt; ts_model<span class="o">(</span>torch.randn<span class="o">((</span><span class="m">1</span>,1,32,32<span class="o">))</span>.to<span class="o">(</span>“cuda”<span class="o">)</span>.half<span class="o">())</span>
+</pre>
+        </div>
+       </div>
+       <p>
+        You can learn more about
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          trtorchc
+         </span>
+        </code>
+        usage here:
+        <a class="reference internal" href="trtorchc.html#trtorchc">
+         <span class="std std-ref">
+          trtorchc
+         </span>
+        </a>
+       </p>
+       <span id="compile-py">
+       </span>
+       <h3 id="compiling-with-trtorch-in-python">
+        Compiling with TRTorch in Python
+        <a class="headerlink" href="#compiling-with-trtorch-in-python" title="Permalink to this headline">
+         ¶
+        </a>
+       </h3>
+       <p>
+        To compile your TorchScript module with TRTorch embedded into Python, all you need to do is provide the module and some compiler settings
 to TRTorch and you will be returned an optimized TorchScript module to run or add into another PyTorch module. The
 only required setting is the input size or input range which is defined as a list of either list types like
         <code class="docutils literal notranslate">
@@ -930,12 +960,12 @@ to load in a deployment application. In order to load a TensorRT/TorchScript mod
        </div>
        <span id="ts-in-cc">
        </span>
-       <h2 id="working-with-torchscript-in-c">
+       <h3 id="working-with-torchscript-in-c">
         Working with TorchScript in C++
         <a class="headerlink" href="#working-with-torchscript-in-c" title="Permalink to this headline">
          ¶
         </a>
-       </h2>
+       </h3>
        <p>
         If we are developing an application to deploy with C++, we can save either our traced or scripted module using
         <code class="docutils literal notranslate">
@@ -962,10 +992,10 @@ to load in a deployment application. In order to load a TensorRT/TorchScript mod
 <span class="cp">#include</span> <span class="cpf">&lt;memory&gt;</span><span class="cp"></span>
 
 <span class="kt">int</span> <span class="nf">main</span><span class="p">(</span><span class="kt">int</span> <span class="n">argc</span><span class="p">,</span> <span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <span class="n">argv</span><span class="p">[])</span> <span class="p">{</span>
-    <span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Module</span> <span class="n">module</span><span class="p">;</span>
+    <span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Module</span> <span class="k">module</span><span class="p">;</span>
     <span class="k">try</span> <span class="p">{</span>
         <span class="c1">// Deserialize the ScriptModule from a file using torch::jit::load().</span>
-        <span class="n">module</span> <span class="o">=</span> <span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">load</span><span class="p">(</span><span class="s">"&lt;PATH TO SAVED TS MOD&gt;"</span><span class="p">);</span>
+        <span class="k">module</span> <span class="o">=</span> <span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">load</span><span class="p">(</span><span class="s">"&lt;PATH TO SAVED TS MOD&gt;"</span><span class="p">);</span>
     <span class="p">}</span>
     <span class="k">catch</span> <span class="p">(</span><span class="k">const</span> <span class="n">c10</span><span class="o">::</span><span class="n">Error</span><span class="o">&amp;</span> <span class="n">e</span><span class="p">)</span> <span class="p">{</span>
         <span class="n">std</span><span class="o">::</span><span class="n">cerr</span> <span class="o">&lt;&lt;</span> <span class="s">"error loading the model</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
@@ -1016,12 +1046,12 @@ For instance we can do inference with our LeNet module like this:
        </p>
        <span id="compile-cpp">
        </span>
-       <h2 id="compiling-with-trtorch-in-c">
+       <h3 id="compiling-with-trtorch-in-c">
         Compiling with TRTorch in C++
         <a class="headerlink" href="#compiling-with-trtorch-in-c" title="Permalink to this headline">
          ¶
         </a>
-       </h2>
+       </h3>
        <p>
         We are also at the point were we can compile and optimize our module with TRTorch, but instead of in a JIT fashion we must do it ahead-of-time (AOT) i.e. before we start doing actual inference work
 since it takes a bit of time to optimize the module, it would not make sense to do this every time you run the module or even the first time you run it.
@@ -1091,10 +1121,10 @@ since it takes a bit of time to optimize the module, it would not make sense to 
 <span class="cp">#include</span> <span class="cpf">"trtorch/trtorch.h"</span><span class="cp"></span>
 
 <span class="kt">int</span> <span class="nf">main</span><span class="p">(</span><span class="kt">int</span> <span class="n">argc</span><span class="p">,</span> <span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <span class="n">argv</span><span class="p">[])</span> <span class="p">{</span>
-    <span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Module</span> <span class="n">module</span><span class="p">;</span>
+    <span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Module</span> <span class="k">module</span><span class="p">;</span>
     <span class="k">try</span> <span class="p">{</span>
         <span class="c1">// Deserialize the ScriptModule from a file using torch::jit::load().</span>
-        <span class="n">module</span> <span class="o">=</span> <span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">load</span><span class="p">(</span><span class="s">"&lt;PATH TO SAVED TRT/TS MOD&gt;"</span><span class="p">);</span>
+        <span class="k">module</span> <span class="o">=</span> <span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">load</span><span class="p">(</span><span class="s">"&lt;PATH TO SAVED TRT/TS MOD&gt;"</span><span class="p">);</span>
     <span class="p">}</span>
     <span class="k">catch</span> <span class="p">(</span><span class="k">const</span> <span class="n">c10</span><span class="o">::</span><span class="n">Error</span><span class="o">&amp;</span> <span class="n">e</span><span class="p">)</span> <span class="p">{</span>
         <span class="n">std</span><span class="o">::</span><span class="n">cerr</span> <span class="o">&lt;&lt;</span> <span class="s">"error loading the model</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
@@ -1138,14 +1168,14 @@ since it takes a bit of time to optimize the module, it would not make sense to 
 </pre>
         </div>
        </div>
-       <span id="id4">
+       <span id="id2">
        </span>
-       <h2 id="under-the-hood">
+       <h3 id="under-the-hood">
         Under The Hood
         <a class="headerlink" href="#under-the-hood" title="Permalink to this headline">
          ¶
         </a>
-       </h2>
+       </h3>
        <p>
         When a module is provided to TRTorch, the compiler starts by mapping a graph like you saw above to a graph like this:
        </p>
@@ -1208,26 +1238,26 @@ by the TRTorch runtime.
        </p>
        <div class="highlight-none notranslate">
         <div class="highlight">
-         <pre><span></span>graph(%self.1 : __torch__.___torch_mangle_10.LeNet_trt,
-    %2 : Tensor):
-    %1 : int = prim::Constant[value=94106001690080]()
-    %3 : Tensor = trt::execute_engine(%1, %2)
-    return (%3)
-(AddEngineToGraph)
+         <pre><span></span>graph(%self_1 : __torch__.lenet, %input_0 : Tensor):
+    %1 : ...trt.Engine = prim::GetAttr[name="lenet"](%self_1)
+    %3 : Tensor[] = prim::ListConstruct(%input_0)
+    %4 : Tensor[] = trt::execute_engine(%3, %1)
+    %5 : Tensor = prim::ListUnpack(%4)
+    return (%5)
 </pre>
         </div>
        </div>
        <p>
-        You can see the call where the engine is executed, based on a constant which is the ID of the engine, telling JIT how to find the engine and the input tensor which will be fed to TensorRT.
+        You can see the call where the engine is executed, after extracting the attribute containing the engine and constructing a list of inputs, then returns the tensors back to the user.
        </p>
        <span id="unsupported-ops">
        </span>
-       <h2 id="working-with-unsupported-operators">
+       <h3 id="working-with-unsupported-operators">
         Working with Unsupported Operators
         <a class="headerlink" href="#working-with-unsupported-operators" title="Permalink to this headline">
          ¶
         </a>
-       </h2>
+       </h3>
        <p>
         TRTorch is a new library and the PyTorch operator library is quite large, so there will be ops that aren’t supported natively by the compiler. You can either use the composition techinques
 shown above to make modules are fully TRTorch supported and ones that are not and stitch the modules together in the deployment application or you can register converters for missing ops.
@@ -1255,17 +1285,23 @@ shown above to make modules are fully TRTorch supported and ones that are not an
           </code>
           api
 to see what operators are not supported.
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            trtorchc
+           </span>
+          </code>
+          automatically checks modules with this method before starting compilation and will print out a list of operators that are not supported.
          </p>
         </div>
        </blockquote>
        <span id="custom-converters">
        </span>
-       <h3 id="registering-custom-converters">
+       <h4 id="registering-custom-converters">
         Registering Custom Converters
         <a class="headerlink" href="#registering-custom-converters" title="Permalink to this headline">
          ¶
         </a>
-       </h3>
+       </h4>
        <p>
         Operations are mapped to TensorRT through the use of modular converters, a function that takes a node from a the JIT graph and produces an equivalent layer or subgraph in TensorRT.
 TRTorch ships with a library of these converters stored in a registry, that will be executed depending on the node being parsed. For instance a
@@ -1479,7 +1515,7 @@ If you find yourself with a large library of converter implementations, do consi
       <a href="http://www.sphinx-doc.org/">
        Sphinx
       </a>
-      2.3.1.
+      3.1.2.
              and
       <a href="https://github.com/bashtage/sphinx-material/">
        Material for
