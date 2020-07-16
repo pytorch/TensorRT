@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
  <head>
   <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -40,19 +41,21 @@
   <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/pygments.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/collapsible-lists/css/tree_view.css" rel="stylesheet" type="text/css"/>
-  <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js" type="text/javascript">
+  <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js">
   </script>
-  <script src="../_static/jquery.js" type="text/javascript">
+  <script src="../_static/jquery.js">
   </script>
-  <script src="../_static/underscore.js" type="text/javascript">
+  <script src="../_static/underscore.js">
   </script>
-  <script src="../_static/doctools.js" type="text/javascript">
+  <script src="../_static/doctools.js">
   </script>
-  <script src="../_static/language_data.js" type="text/javascript">
+  <script src="../_static/language_data.js">
   </script>
-  <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js" type="text/javascript">
+  <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js">
   </script>
-  <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js" type="text/javascript">
+  <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
+  </script>
+  <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -220,76 +223,32 @@
            <a class="md-nav__link" href="../tutorials/installation.html">
             Installation
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/installation.html#precompiled-binaries">
-              Precompiled Binaries
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/installation.html#compiling-from-source">
-              Compiling From Source
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../tutorials/getting_started.html">
             Getting Started
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/getting_started.html#creating-a-torchscript-module">
-              Creating a TorchScript Module
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/getting_started.html#working-with-torchscript-in-python">
-              Working with TorchScript in Python
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/getting_started.html#compiling-with-trtorch-in-python">
-              Compiling with TRTorch in Python
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/getting_started.html#working-with-torchscript-in-c">
-              Working with TorchScript in C++
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/getting_started.html#compiling-with-trtorch-in-c">
-              Compiling with TRTorch in C++
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/getting_started.html#under-the-hood">
-              Under The Hood
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/getting_started.html#working-with-unsupported-operators">
-              Working with Unsupported Operators
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../tutorials/ptq.html">
             Post Training Quantization (PTQ)
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/ptq.html#how-to-create-your-own-ptq-application">
-              How to create your own PTQ application
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../tutorials/trtorchc.html">
             trtorchc
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Notebooks
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/lenet-getting-started.html">
+            TRTorch Getting Started - LeNet
            </a>
           </li>
           <li class="md-nav__item">
@@ -303,23 +262,6 @@
            <a class="md-nav__link" href="trtorch.html">
             trtorch
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="trtorch.html#functions">
-              Functions
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="trtorch.html#enums">
-              Enums
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="trtorch.html#submodules">
-              Submodules
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <input class="md-toggle md-nav__toggle" data-md-toggle="toc" id="__toc" type="checkbox"/>
@@ -350,23 +292,6 @@
            <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html">
             TRTorch C++ API
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html#class-hierarchy">
-              Class Hierarchy
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html#file-hierarchy">
-              File Hierarchy
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html#full-api">
-              Full API
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <span class="md-nav__link caption">
@@ -379,92 +304,16 @@
            <a class="md-nav__link" href="../contributors/system_overview.html">
             System Overview
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/system_overview.html#compiler-phases">
-              Compiler Phases
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../contributors/writing_converters.html">
             Writing Converters
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#background">
-              Background
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#converters">
-              Converters
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#converter-contract">
-              Converter Contract
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#conversion-context">
-              Conversion Context
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#args">
-              Args
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#weights">
-              Weights
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#other-advice">
-              Other advice
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../contributors/useful_links.html">
             Useful Links for TRTorch Development
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/useful_links.html#tensorrt-available-layers-and-expected-dimensions">
-              TensorRT Available Layers and Expected Dimensions
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/useful_links.html#tensorrt-c-documentation">
-              TensorRT C++ Documentation
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/useful_links.html#tensorrt-python-documentation-sometimes-easier-to-read">
-              TensorRT Python Documentation (Sometimes easier to read)
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/useful_links.html#pytorch-functional-api">
-              PyTorch Functional API
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/useful_links.html#pytorch-native-ops">
-              PyTorch native_ops
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/useful_links.html#pytorch-ir-documentation">
-              PyTorch IR Documentation
-             </a>
-            </li>
-           </ul>
           </li>
          </ul>
         </nav>
@@ -496,6 +345,505 @@
          ¶
         </a>
        </h1>
+       <span class="target" id="module-trtorch.logging">
+       </span>
+       <dl class="py class">
+        <dt id="trtorch.logging.Level">
+         <em class="property">
+          class
+         </em>
+         <code class="sig-prename descclassname">
+          trtorch.logging.
+         </code>
+         <code class="sig-name descname">
+          Level
+         </code>
+         <span class="sig-paren">
+          (
+         </span>
+         <em class="sig-param">
+          <span class="n">
+           value
+          </span>
+         </em>
+         <span class="sig-paren">
+          )
+         </span>
+         <a class="headerlink" href="#trtorch.logging.Level" title="Permalink to this definition">
+          ¶
+         </a>
+        </dt>
+        <dd>
+         <p>
+          Bases:
+          <code class="xref cpp cpp-class docutils literal notranslate">
+           <span class="pre">
+            enum.Enum
+           </span>
+          </code>
+         </p>
+         <p>
+          Enum to set the minimum required logging level to print a message to stdout
+         </p>
+         <dl class="py attribute">
+          <dt id="trtorch.logging.Level.Debug">
+           <code class="sig-name descname">
+            Debug
+           </code>
+           <em class="property">
+            = LogLevel.DEBUG
+           </em>
+           <a class="headerlink" href="#trtorch.logging.Level.Debug" title="Permalink to this definition">
+            ¶
+           </a>
+          </dt>
+          <dd>
+          </dd>
+         </dl>
+         <dl class="py attribute">
+          <dt id="trtorch.logging.Level.Error">
+           <code class="sig-name descname">
+            Error
+           </code>
+           <em class="property">
+            = LogLevel.ERROR
+           </em>
+           <a class="headerlink" href="#trtorch.logging.Level.Error" title="Permalink to this definition">
+            ¶
+           </a>
+          </dt>
+          <dd>
+          </dd>
+         </dl>
+         <dl class="py attribute">
+          <dt id="trtorch.logging.Level.Info">
+           <code class="sig-name descname">
+            Info
+           </code>
+           <em class="property">
+            = LogLevel.INFO
+           </em>
+           <a class="headerlink" href="#trtorch.logging.Level.Info" title="Permalink to this definition">
+            ¶
+           </a>
+          </dt>
+          <dd>
+          </dd>
+         </dl>
+         <dl class="py attribute">
+          <dt id="trtorch.logging.Level.InternalError">
+           <code class="sig-name descname">
+            InternalError
+           </code>
+           <em class="property">
+            = LogLevel.INTERNAL_ERROR
+           </em>
+           <a class="headerlink" href="#trtorch.logging.Level.InternalError" title="Permalink to this definition">
+            ¶
+           </a>
+          </dt>
+          <dd>
+          </dd>
+         </dl>
+         <dl class="py attribute">
+          <dt id="trtorch.logging.Level.Warning">
+           <code class="sig-name descname">
+            Warning
+           </code>
+           <em class="property">
+            = LogLevel.WARNING
+           </em>
+           <a class="headerlink" href="#trtorch.logging.Level.Warning" title="Permalink to this definition">
+            ¶
+           </a>
+          </dt>
+          <dd>
+          </dd>
+         </dl>
+        </dd>
+       </dl>
+       <dl class="py function">
+        <dt id="trtorch.logging.get_is_colored_output_on">
+         <code class="sig-prename descclassname">
+          trtorch.logging.
+         </code>
+         <code class="sig-name descname">
+          get_is_colored_output_on
+         </code>
+         <span class="sig-paren">
+          (
+         </span>
+         <span class="sig-paren">
+          )
+         </span>
+         → bool
+         <a class="headerlink" href="#trtorch.logging.get_is_colored_output_on" title="Permalink to this definition">
+          ¶
+         </a>
+        </dt>
+        <dd>
+         <p>
+          Get if colored output is enabled for logging
+         </p>
+         <dl class="field-list simple">
+          <dt class="field-odd">
+           Returns
+          </dt>
+          <dd class="field-odd">
+           <p>
+            If colored output is one
+           </p>
+          </dd>
+          <dt class="field-even">
+           Return type
+          </dt>
+          <dd class="field-even">
+           <p>
+            bool
+           </p>
+          </dd>
+         </dl>
+        </dd>
+       </dl>
+       <dl class="py function">
+        <dt id="trtorch.logging.get_logging_prefix">
+         <code class="sig-prename descclassname">
+          trtorch.logging.
+         </code>
+         <code class="sig-name descname">
+          get_logging_prefix
+         </code>
+         <span class="sig-paren">
+          (
+         </span>
+         <span class="sig-paren">
+          )
+         </span>
+         → str
+         <a class="headerlink" href="#trtorch.logging.get_logging_prefix" title="Permalink to this definition">
+          ¶
+         </a>
+        </dt>
+        <dd>
+         <p>
+          Get the prefix set for logging messages
+         </p>
+         <dl class="field-list simple">
+          <dt class="field-odd">
+           Returns
+          </dt>
+          <dd class="field-odd">
+           <p>
+            Prefix used for logger
+           </p>
+          </dd>
+          <dt class="field-even">
+           Return type
+          </dt>
+          <dd class="field-even">
+           <p>
+            str
+           </p>
+          </dd>
+         </dl>
+        </dd>
+       </dl>
+       <dl class="py function">
+        <dt id="trtorch.logging.get_reportable_log_level">
+         <code class="sig-prename descclassname">
+          trtorch.logging.
+         </code>
+         <code class="sig-name descname">
+          get_reportable_log_level
+         </code>
+         <span class="sig-paren">
+          (
+         </span>
+         <span class="sig-paren">
+          )
+         </span>
+         →
+         <a class="reference internal" href="#trtorch.logging.Level" title="trtorch.logging.Level">
+          trtorch.logging.Level
+         </a>
+         <a class="headerlink" href="#trtorch.logging.get_reportable_log_level" title="Permalink to this definition">
+          ¶
+         </a>
+        </dt>
+        <dd>
+         <p>
+          Get the level required for a message to be printed in the log
+         </p>
+         <dl class="field-list simple">
+          <dt class="field-odd">
+           Returns
+          </dt>
+          <dd class="field-odd">
+           <p>
+            The enum representing the level required to print
+           </p>
+          </dd>
+          <dt class="field-even">
+           Return type
+          </dt>
+          <dd class="field-even">
+           <p>
+            <a class="reference internal" href="#trtorch.logging.Level" title="trtorch.logging.Level">
+             trtorch.logging.Level
+            </a>
+           </p>
+          </dd>
+         </dl>
+        </dd>
+       </dl>
+       <dl class="py function">
+        <dt id="trtorch.logging.log">
+         <code class="sig-prename descclassname">
+          trtorch.logging.
+         </code>
+         <code class="sig-name descname">
+          log
+         </code>
+         <span class="sig-paren">
+          (
+         </span>
+         <em class="sig-param">
+          <span class="n">
+           level
+          </span>
+          <span class="p">
+           :
+          </span>
+          <span class="n">
+           <a class="reference internal" href="#trtorch.logging.Level" title="trtorch.logging.Level">
+            trtorch.logging.Level
+           </a>
+          </span>
+         </em>
+         ,
+         <em class="sig-param">
+          <span class="n">
+           msg
+          </span>
+          <span class="p">
+           :
+          </span>
+          <span class="n">
+           str
+          </span>
+         </em>
+         <span class="sig-paren">
+          )
+         </span>
+         <a class="headerlink" href="#trtorch.logging.log" title="Permalink to this definition">
+          ¶
+         </a>
+        </dt>
+        <dd>
+         <p>
+          Add a new message to the log
+         </p>
+         <p>
+          Adds a new message to the log at a specified level. The message
+will only get printed out if Level &gt; reportable_log_level
+         </p>
+         <dl class="field-list simple">
+          <dt class="field-odd">
+           Parameters
+          </dt>
+          <dd class="field-odd">
+           <ul class="simple">
+            <li>
+             <p>
+              <strong>
+               level
+              </strong>
+              (
+              <a class="reference internal" href="#trtorch.logging.Level" title="trtorch.logging.Level">
+               <em>
+                trtorch.logging.Level
+               </em>
+              </a>
+              ) – Severity of the message
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               msg
+              </strong>
+              (
+              <em>
+               str
+              </em>
+              ) – Actual message text
+             </p>
+            </li>
+           </ul>
+          </dd>
+         </dl>
+        </dd>
+       </dl>
+       <dl class="py function">
+        <dt id="trtorch.logging.set_is_colored_output_on">
+         <code class="sig-prename descclassname">
+          trtorch.logging.
+         </code>
+         <code class="sig-name descname">
+          set_is_colored_output_on
+         </code>
+         <span class="sig-paren">
+          (
+         </span>
+         <em class="sig-param">
+          <span class="n">
+           colored_output_on
+          </span>
+          <span class="p">
+           :
+          </span>
+          <span class="n">
+           bool
+          </span>
+         </em>
+         <span class="sig-paren">
+          )
+         </span>
+         <a class="headerlink" href="#trtorch.logging.set_is_colored_output_on" title="Permalink to this definition">
+          ¶
+         </a>
+        </dt>
+        <dd>
+         <p>
+          Enable or disable color in the log output
+         </p>
+         <dl class="field-list simple">
+          <dt class="field-odd">
+           Parameters
+          </dt>
+          <dd class="field-odd">
+           <p>
+            <strong>
+             colored_output_on
+            </strong>
+            (
+            <em>
+             bool
+            </em>
+            ) – If colored output should be enabled or not
+           </p>
+          </dd>
+         </dl>
+        </dd>
+       </dl>
+       <dl class="py function">
+        <dt id="trtorch.logging.set_logging_prefix">
+         <code class="sig-prename descclassname">
+          trtorch.logging.
+         </code>
+         <code class="sig-name descname">
+          set_logging_prefix
+         </code>
+         <span class="sig-paren">
+          (
+         </span>
+         <em class="sig-param">
+          <span class="n">
+           prefix
+          </span>
+          <span class="p">
+           :
+          </span>
+          <span class="n">
+           str
+          </span>
+         </em>
+         <span class="sig-paren">
+          )
+         </span>
+         <a class="headerlink" href="#trtorch.logging.set_logging_prefix" title="Permalink to this definition">
+          ¶
+         </a>
+        </dt>
+        <dd>
+         <p>
+          Set the prefix used when logging messages
+         </p>
+         <dl class="field-list simple">
+          <dt class="field-odd">
+           Parameters
+          </dt>
+          <dd class="field-odd">
+           <p>
+            <strong>
+             prefix
+            </strong>
+            (
+            <em>
+             str
+            </em>
+            ) – Prefix to use for logging messages
+           </p>
+          </dd>
+         </dl>
+        </dd>
+       </dl>
+       <dl class="py function">
+        <dt id="trtorch.logging.set_reportable_log_level">
+         <code class="sig-prename descclassname">
+          trtorch.logging.
+         </code>
+         <code class="sig-name descname">
+          set_reportable_log_level
+         </code>
+         <span class="sig-paren">
+          (
+         </span>
+         <em class="sig-param">
+          <span class="n">
+           level
+          </span>
+          <span class="p">
+           :
+          </span>
+          <span class="n">
+           <a class="reference internal" href="#trtorch.logging.Level" title="trtorch.logging.Level">
+            trtorch.logging.Level
+           </a>
+          </span>
+         </em>
+         <span class="sig-paren">
+          )
+         </span>
+         <a class="headerlink" href="#trtorch.logging.set_reportable_log_level" title="Permalink to this definition">
+          ¶
+         </a>
+        </dt>
+        <dd>
+         <p>
+          Set the level required for a message to be printed to the log
+         </p>
+         <dl class="field-list simple">
+          <dt class="field-odd">
+           Parameters
+          </dt>
+          <dd class="field-odd">
+           <p>
+            <strong>
+             level
+            </strong>
+            (
+            <a class="reference internal" href="#trtorch.logging.Level" title="trtorch.logging.Level">
+             <em>
+              trtorch.logging.Level
+             </em>
+            </a>
+            ) – The enum representing the level required to print
+           </p>
+          </dd>
+         </dl>
+        </dd>
+       </dl>
       </article>
      </div>
     </div>
@@ -544,7 +892,7 @@
       <a href="http://www.sphinx-doc.org/">
        Sphinx
       </a>
-      2.3.1.
+      3.1.2.
              and
       <a href="https://github.com/bashtage/sphinx-material/">
        Material for

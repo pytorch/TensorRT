@@ -5,15 +5,18 @@ Getting Started
 
 If you haven't already, aquire a tarball of the library by following the instructions in :ref:`Installation`
 
+Background
+*********************
+
 .. _creating_a_ts_mod:
 Creating a TorchScript Module
 ------------------------------
 
 Once you have a trained model you want to compile with TRTorch, you need to start by converting that model from Python code to TorchScript code.
 PyTorch has detailed documentation on how to do this https://pytorch.org/tutorials/beginner/Intro_to_TorchScript_tutorial.html but briefly here is the
-here is key background and the process:
+here is key background information and the process:
 
-PyTorch programs are based around `Module`s which can be used to compose higher level modules. Modules contain a constructor to set up the modules, parameters and sub-modules
+PyTorch programs are based around ``Module`` s which can be used to compose higher level modules. ``Modules`` contain a constructor to set up the modules, parameters and sub-modules
 and a forward function which describes how to use the parameters and submodules when the module is invoked.
 
 For example, we can define a LeNet module like this:
@@ -130,12 +133,62 @@ TorchScript Modules are run the same way you run normal PyTorch modules. You can
 ``forward`` method or just calling the module ``torch_scirpt_module(in_tensor)`` The JIT compiler will compile
 and optimize the module on the fly and then returns the results.
 
+Saving TorchScript Module to Disk
+-----------------------------------
+
+For either traced or scripted modules, you can save the module to disk with the following command
+
+.. code-block:: python
+
+    import torch.jit
+
+    model = LeNet()
+    script_model = torch.jit.script(model)
+    script_model.save("lenet_scripted.ts")
+
+Using TRTorch
+*********************
+
+Now that there is some understanding of TorchScript and how to use it, we can now complete the pipeline and compile
+our TorchScript into TensorRT accelerated TorchScript. Unlike the PyTorch JIT compiler, TRTorch is an Ahead-of-Time
+(AOT) compiler. This means that unlike with PyTorch where the JIT compiler compiles from the high level PyTorch IR
+to kernel implementation at runtime, modules that are to be compiled with TRTorch are compiled fully before runtime
+(consider how you use a C compiler for an analogy). TRTorch has 3 main interfaces for using the compiler. You can
+use a CLI application similar to how you may use GCC called ``trtorchc``, or you can embed the compiler in a model
+freezing application / pipeline.
+
+.. _trtorch_quickstart:
+
+[TRTorch Quickstart] Compiling TorchScript Modules with ``trtorchc``
+---------------------------------------------------------------------
+
+An easy way to get started with TRTorch and to check if your model can be supported without extra work is to run it through
+``trtorchc``, which supports almost all features of the compiler from the command line including post training quantization
+(given a previously created calibration cache). For example we can compile our lenet model by setting our preferred operating
+precision and input size. This new TorchScript file can be loaded into Python (note: you need to ``import trtorch`` before loading
+these compiled modules because the compiler extends the PyTorch the deserializer and runtime to execute compiled modules).
+
+.. code-block:: shell
+
+    ❯ trtorchc -p f16 lenet_scripted.ts trt_lenet_scripted.ts "(1,1,32,32)"
+
+    ❯ python3
+    Python 3.6.9 (default, Apr 18 2020, 01:56:04)
+    [GCC 8.4.0] on linux
+    Type "help", "copyright", "credits" or "license" for more information.
+    >>> import torch
+    >>> import trtorch
+    >>> ts_model = torch.jit.load(“trt_lenet_scripted.ts”)
+    >>> ts_model(torch.randn((1,1,32,32)).to(“cuda”).half())
+
+You can learn more about ``trtorchc`` usage here: :ref:`trtorchc`
+
 .. _compile_py:
 
 Compiling with TRTorch in Python
 ---------------------------------
 
-To compile your TorchScript module with TRTorch, all you need to do is provide the module and some compiler settings
+To compile your TorchScript module with TRTorch embedded into Python, all you need to do is provide the module and some compiler settings
 to TRTorch and you will be returned an optimized TorchScript module to run or add into another PyTorch module. The
 only required setting is the input size or input range which is defined as a list of either list types like ``lists``, ``tuples``
 or PyTorch ``size`` objects or dictionaries of minimum, optimial and maximum sizes. You can also specify settings such as
@@ -386,14 +439,15 @@ Here is the graph that you get back after compilation is complete:
 
 .. code-block:: none
 
-    graph(%self.1 : __torch__.___torch_mangle_10.LeNet_trt,
-        %2 : Tensor):
-        %1 : int = prim::Constant[value=94106001690080]()
-        %3 : Tensor = trt::execute_engine(%1, %2)
-        return (%3)
-    (AddEngineToGraph)
+    graph(%self_1 : __torch__.lenet, %input_0 : Tensor):
+        %1 : ...trt.Engine = prim::GetAttr[name="lenet"](%self_1)
+        %3 : Tensor[] = prim::ListConstruct(%input_0)
+        %4 : Tensor[] = trt::execute_engine(%3, %1)
+        %5 : Tensor = prim::ListUnpack(%4)
+        return (%5)
 
-You can see the call where the engine is executed, based on a constant which is the ID of the engine, telling JIT how to find the engine and the input tensor which will be fed to TensorRT.
+
+You can see the call where the engine is executed, after extracting the attribute containing the engine and constructing a list of inputs, then returns the tensors back to the user.
 
 .. _unsupported_ops:
 
@@ -404,7 +458,7 @@ TRTorch is a new library and the PyTorch operator library is quite large, so the
 shown above to make modules are fully TRTorch supported and ones that are not and stitch the modules together in the deployment application or you can register converters for missing ops.
 
     You can check support without going through the full compilation pipleine using the ``trtorch::CheckMethodOperatorSupport(const torch::jit::Module& module, std::string method_name)`` api
-    to see what operators are not supported.
+    to see what operators are not supported. ``trtorchc`` automatically checks modules with this method before starting compilation and will print out a list of operators that are not supported.
 
 .. _custom_converters:
 

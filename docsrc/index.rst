@@ -36,6 +36,19 @@ Getting Started
    tutorials/getting_started
    tutorials/ptq
    tutorials/trtorchc
+   _notebooks/lenet
+
+Notebooks
+------------
+* :ref:`lenet`
+
+.. toctree::
+   :caption: Notebooks
+   :maxdepth: 1
+   :hidden:
+
+   _notebooks/lenet-getting-started
+
 
 Python API Documenation
 ------------------------

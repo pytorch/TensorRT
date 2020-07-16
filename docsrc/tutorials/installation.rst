@@ -53,21 +53,20 @@ Dependencies for Compilation
 
 TRTorch is built with Bazel, so begin by installing it.
 
-The easiest way is to install bazelisk using the method of you choosing https://github.com/bazelbuild/bazelisk
+    * The easiest way is to install bazelisk using the method of you choosing https://github.com/bazelbuild/bazelisk
+    * Otherwise you can use the following instructions to install binaries https://docs.bazel.build/versions/master/install.html
+    * Finally if you need to compile from source (e.g. aarch64 until bazel distributes binaries for the architecture) you can use these instructions
 
-Otherwise you can use the following instructions to install binaries https://docs.bazel.build/versions/master/install.html
+    .. code-block:: shell
 
-Finally if you need to compile from source (e.g. aarch64 until bazel distributes binaries for the architecture) you can use these instructions
+        export BAZEL_VERSION=$(cat <PATH_TO_TRTORCH_ROOT>/.bazelversion)
+        mkdir bazel
+        cd bazel
+        curl -fSsL -O https://github.com/bazelbuild/bazel/releases/download/$BAZEL_VERSION/bazel-$BAZEL_VERSION-dist.zip
+        unzip bazel-$BAZEL_VERSION-dist.zip
+        bash ./compile.sh
+        cp output/bazel /usr/local/bin/
 
-```sh
-export BAZEL_VERSION=3.3.1
-mkdir bazel
-cd bazel
-curl -fSsL -O https://github.com/bazelbuild/bazel/releases/download/$BAZEL_VERSION/bazel-$BAZEL_VERSION-dist.zip
-unzip bazel-$BAZEL_VERSION-dist.zip
-bash ./compile.sh
-cp output/bazel /usr/local/bin/
-```
 
 You will also need to have CUDA installed on the system (or if running in a container, the system must have
 the CUDA driver installed and the container must have CUDA)
@@ -231,12 +230,25 @@ Debug Build
 
 This also compiles a debug build of ``libtrtorch.so``
 
-Building natively on aarch64 platform
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+**Building Natively on aarch64 (Jetson)**
+-------------------------------------------
 
-To build natively on aarch64-linux-gnu platform, configure the WORKSPACE with local available dependencies.
+Prerequisites
+^^^^^^^^^^^^^^
 
-1. Disable the rules with http_archive for x86_64 platform by commenting rules as:
+Install or compile a build of PyTorch/LibTorch for aarch64
+
+NVIDIA hosts builds the latest release branch for Jetson here:
+
+    https://forums.developer.nvidia.com/t/pytorch-for-jetson-nano-version-1-5-0-now-available/72048
+
+
+Enviorment Setup
+^^^^^^^^^^^^^^^^^
+
+To build natively on aarch64-linux-gnu platform, configure the ``WORKSPACE`` with local available dependencies.
+
+1. Disable the rules with ``http_archive`` for x86_64 by commenting the following rules:
 
 .. code-block:: shell
 
@@ -277,7 +289,7 @@ To build natively on aarch64-linux-gnu platform, configure the WORKSPACE with lo
     #)
 
 
-2. Disable the pip3_import rules as:
+2. Disable Python API testing dependencies:
 
 .. code-block:: shell
 
@@ -298,19 +310,27 @@ To build natively on aarch64-linux-gnu platform, configure the WORKSPACE with lo
     #pip_install()
 
 
-3. Configuring the local available dependencies by using new_local_repository rules as:
+3. Configure the correct paths to directory roots containing local dependencies in the ``new_local_repository`` rules:
+
+    NOTE: If you installed PyTorch using a pip package, the correct path is the path to the root of the python torch package.
+    In the case that you installed with ``sudo pip install`` this will be ``/usr/local/lib/python3.6/dist-packages/torch``.
+    In the case you installed with ``pip install --user`` this will be ``$HOME/.local/lib/python3.6/site-packages/torch``.
+
+In the case you are using NVIDIA compiled pip packages, set the path for both libtorch sources to the same path. This is because unlike
+PyTorch on x86_64, NVIDIA aarch64 PyTorch uses the CXX11-ABI. If you compiled for source using the pre_cxx11_abi and only would like to
+use that library, set the paths to the same path but when you compile make sure to add the flag ``--config=pre_cxx11_abi``
 
 .. code-block:: shell
 
     new_local_repository(
         name = "libtorch",
-        path = "/usr/local/lib/python3.6/site-packages/torch",
+        path = "/usr/local/lib/python3.6/dist-packages/torch",
         build_file = "third_party/libtorch/BUILD"
     )
 
     new_local_repository(
         name = "libtorch_pre_cxx11_abi",
-        path = "/usr/local/lib/python3.6/site-packages/torch",
+        path = "/usr/local/lib/python3.6/dist-packages/torch",
         build_file = "third_party/libtorch/BUILD"
     )
 
@@ -326,12 +346,22 @@ To build natively on aarch64-linux-gnu platform, configure the WORKSPACE with lo
         build_file = "@//third_party/tensorrt/local:BUILD"
     )
 
+Compile C++ Library and Compiler CLI
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Note: If pip library for torch is installed using --user, configure the new_local_repository path for torch accordingly.
-
-
-Compile TRTorch library using bazel command as:
+Compile TRTorch library using bazel command:
 
 .. code-block:: shell
 
    bazel build //:libtrtorch
+
+Compile Python API
+^^^^^^^^^^^^^^^^^^^^
+
+Compile the Python API using the following command from the ``//py`` directory:
+
+.. code-block:: shell
+
+    python3 setup.py install --use-cxx11-abi
+
+If you have a build of PyTorch that uses Pre-CXX11 ABI drop the ``--use-cxx11-abi`` flag

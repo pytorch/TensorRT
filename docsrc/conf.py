@@ -33,6 +33,7 @@ release = '0.0.2'
 extensions = [
     'breathe',
     'exhale',
+    'nbsphinx',
     'sphinx.ext.napoleon',
     'sphinx.ext.intersphinx',
     'sphinx.ext.autosummary',
@@ -115,7 +116,7 @@ html_theme_options = {
     'repo_name': 'TRTorch',
 
     # Visible levels of the global TOC; -1 means unlimited
-    'globaltoc_depth': 2,
+    'globaltoc_depth': 1,
     # If False, expand all TOC entries
     'globaltoc_collapse': False,
     # If True, show hidden TOC entries
