@@ -38,7 +38,7 @@ in, for example:
 ```http://[host machine]:8888/?token=aae96ae9387cd28151868fee318c3b3581a2d794f3b25c6b```
 
 
-Within the container, this notebooks itself is located at `/workspace/TRTorch/notebooks`.
+Within the container, the notebooks itself is located at `/workspace/TRTorch/notebooks`.
 
 ## 2. Notebook list
 
