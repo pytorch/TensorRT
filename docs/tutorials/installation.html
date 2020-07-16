@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
  <head>
   <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -40,19 +41,21 @@
   <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/pygments.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/collapsible-lists/css/tree_view.css" rel="stylesheet" type="text/css"/>
-  <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js" type="text/javascript">
+  <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js">
   </script>
-  <script src="../_static/jquery.js" type="text/javascript">
+  <script src="../_static/jquery.js">
   </script>
-  <script src="../_static/underscore.js" type="text/javascript">
+  <script src="../_static/underscore.js">
   </script>
-  <script src="../_static/doctools.js" type="text/javascript">
+  <script src="../_static/doctools.js">
   </script>
-  <script src="../_static/language_data.js" type="text/javascript">
+  <script src="../_static/language_data.js">
   </script>
-  <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js" type="text/javascript">
+  <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js">
   </script>
-  <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js" type="text/javascript">
+  <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
+  </script>
+  <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -330,9 +333,35 @@
                         Debug Build
                        </a>
                       </li>
+                     </ul>
+                    </nav>
+                   </li>
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#building-natively-on-aarch64-jetson">
+                     <strong>
+                      Building Natively on aarch64 (Jetson)
+                     </strong>
+                    </a>
+                    <nav class="md-nav">
+                     <ul class="md-nav__list">
                       <li class="md-nav__item">
-                       <a class="md-nav__link" href="#building-natively-on-aarch64-platform">
-                        Building natively on aarch64 platform
+                       <a class="md-nav__link" href="#prerequisites">
+                        Prerequisites
+                       </a>
+                      </li>
+                      <li class="md-nav__item">
+                       <a class="md-nav__link" href="#enviorment-setup">
+                        Enviorment Setup
+                       </a>
+                      </li>
+                      <li class="md-nav__item">
+                       <a class="md-nav__link" href="#compile-c-library-and-compiler-cli">
+                        Compile C++ Library and Compiler CLI
+                       </a>
+                      </li>
+                      <li class="md-nav__item">
+                       <a class="md-nav__link" href="#compile-python-api">
+                        Compile Python API
                        </a>
                       </li>
                      </ul>
@@ -351,76 +380,32 @@
              </li>
             </ul>
            </nav>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="#precompiled-binaries">
-              Precompiled Binaries
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="#compiling-from-source">
-              Compiling From Source
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="getting_started.html">
             Getting Started
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="getting_started.html#creating-a-torchscript-module">
-              Creating a TorchScript Module
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="getting_started.html#working-with-torchscript-in-python">
-              Working with TorchScript in Python
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="getting_started.html#compiling-with-trtorch-in-python">
-              Compiling with TRTorch in Python
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="getting_started.html#working-with-torchscript-in-c">
-              Working with TorchScript in C++
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="getting_started.html#compiling-with-trtorch-in-c">
-              Compiling with TRTorch in C++
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="getting_started.html#under-the-hood">
-              Under The Hood
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="getting_started.html#working-with-unsupported-operators">
-              Working with Unsupported Operators
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="ptq.html">
             Post Training Quantization (PTQ)
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="ptq.html#how-to-create-your-own-ptq-application">
-              How to create your own PTQ application
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="trtorchc.html">
             trtorchc
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Notebooks
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/lenet-getting-started.html">
+            TRTorch Getting Started - LeNet
            </a>
           </li>
           <li class="md-nav__item">
@@ -434,23 +419,6 @@
            <a class="md-nav__link" href="../py_api/trtorch.html">
             trtorch
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../py_api/trtorch.html#functions">
-              Functions
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../py_api/trtorch.html#enums">
-              Enums
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../py_api/trtorch.html#submodules">
-              Submodules
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../py_api/logging.html">
@@ -468,23 +436,6 @@
            <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html">
             TRTorch C++ API
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html#class-hierarchy">
-              Class Hierarchy
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html#file-hierarchy">
-              File Hierarchy
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html#full-api">
-              Full API
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <span class="md-nav__link caption">
@@ -497,92 +448,16 @@
            <a class="md-nav__link" href="../contributors/system_overview.html">
             System Overview
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/system_overview.html#compiler-phases">
-              Compiler Phases
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../contributors/writing_converters.html">
             Writing Converters
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#background">
-              Background
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#converters">
-              Converters
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#converter-contract">
-              Converter Contract
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#conversion-context">
-              Conversion Context
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#args">
-              Args
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#weights">
-              Weights
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#other-advice">
-              Other advice
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../contributors/useful_links.html">
             Useful Links for TRTorch Development
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/useful_links.html#tensorrt-available-layers-and-expected-dimensions">
-              TensorRT Available Layers and Expected Dimensions
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/useful_links.html#tensorrt-c-documentation">
-              TensorRT C++ Documentation
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/useful_links.html#tensorrt-python-documentation-sometimes-easier-to-read">
-              TensorRT Python Documentation (Sometimes easier to read)
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/useful_links.html#pytorch-functional-api">
-              PyTorch Functional API
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/useful_links.html#pytorch-native-ops">
-              PyTorch native_ops
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/useful_links.html#pytorch-ir-documentation">
-              PyTorch IR Documentation
-             </a>
-            </li>
-           </ul>
           </li>
          </ul>
         </nav>
@@ -703,9 +578,35 @@
                      Debug Build
                     </a>
                    </li>
+                  </ul>
+                 </nav>
+                </li>
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#building-natively-on-aarch64-jetson">
+                  <strong>
+                   Building Natively on aarch64 (Jetson)
+                  </strong>
+                 </a>
+                 <nav class="md-nav">
+                  <ul class="md-nav__list">
                    <li class="md-nav__item">
-                    <a class="md-nav__link" href="#building-natively-on-aarch64-platform">
-                     Building natively on aarch64 platform
+                    <a class="md-nav__link" href="#prerequisites">
+                     Prerequisites
+                    </a>
+                   </li>
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#enviorment-setup">
+                     Enviorment Setup
+                    </a>
+                   </li>
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#compile-c-library-and-compiler-cli">
+                     Compile C++ Library and Compiler CLI
+                    </a>
+                   </li>
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#compile-python-api">
+                     Compile Python API
                     </a>
                    </li>
                   </ul>
@@ -844,82 +745,45 @@ pip3 install  https://github.com/NVIDIA/TRTorch/releases/download/v0.0.2/trtorch
        <p>
         TRTorch is built with Bazel, so begin by installing it.
        </p>
-       <p>
-        The easiest way is to install bazelisk using the method of you choosing
-        <a class="reference external" href="https://github.com/bazelbuild/bazelisk">
-         https://github.com/bazelbuild/bazelisk
-        </a>
-       </p>
-       <p>
-        Otherwise you can use the following instructions to install binaries
-        <a class="reference external" href="https://docs.bazel.build/versions/master/install.html">
-         https://docs.bazel.build/versions/master/install.html
-        </a>
-       </p>
-       <p>
-        Finally if you need to compile from source (e.g. aarch64 until bazel distributes binaries for the architecture) you can use these instructions
-       </p>
-       <p>
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          `sh
-         </span>
-         <span class="pre">
-          export
-         </span>
-         <span class="pre">
-          BAZEL_VERSION=3.3.1
-         </span>
-         <span class="pre">
-          mkdir
-         </span>
-         <span class="pre">
-          bazel
-         </span>
-         <span class="pre">
-          cd
-         </span>
-         <span class="pre">
-          bazel
-         </span>
-         <span class="pre">
-          curl
-         </span>
-         <span class="pre">
-          -fSsL
-         </span>
-         <span class="pre">
-          -O
-         </span>
-         <span class="pre">
-          https://github.com/bazelbuild/bazel/releases/download/$BAZEL_VERSION/bazel-$BAZEL_VERSION-dist.zip
-         </span>
-         <span class="pre">
-          unzip
-         </span>
-         <span class="pre">
-          bazel-$BAZEL_VERSION-dist.zip
-         </span>
-         <span class="pre">
-          bash
-         </span>
-         <span class="pre">
-          ./compile.sh
-         </span>
-         <span class="pre">
-          cp
-         </span>
-         <span class="pre">
-          output/bazel
-         </span>
-         <span class="pre">
-          /usr/local/bin/
-         </span>
-         <span class="pre">
-          `
-         </span>
-        </code>
-       </p>
+       <blockquote>
+        <div>
+         <ul class="simple">
+          <li>
+           <p>
+            The easiest way is to install bazelisk using the method of you choosing
+            <a class="reference external" href="https://github.com/bazelbuild/bazelisk">
+             https://github.com/bazelbuild/bazelisk
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            Otherwise you can use the following instructions to install binaries
+            <a class="reference external" href="https://docs.bazel.build/versions/master/install.html">
+             https://docs.bazel.build/versions/master/install.html
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            Finally if you need to compile from source (e.g. aarch64 until bazel distributes binaries for the architecture) you can use these instructions
+           </p>
+          </li>
+         </ul>
+         <div class="highlight-shell notranslate">
+          <div class="highlight">
+           <pre><span></span><span class="nb">export</span> <span class="nv">BAZEL_VERSION</span><span class="o">=</span><span class="k">$(</span>cat &lt;PATH_TO_TRTORCH_ROOT&gt;/.bazelversion<span class="k">)</span>
+mkdir bazel
+<span class="nb">cd</span> bazel
+curl -fSsL -O https://github.com/bazelbuild/bazel/releases/download/<span class="nv">$BAZEL_VERSION</span>/bazel-<span class="nv">$BAZEL_VERSION</span>-dist.zip
+unzip bazel-<span class="nv">$BAZEL_VERSION</span>-dist.zip
+bash ./compile.sh
+cp output/bazel /usr/local/bin/
+</pre>
+          </div>
+         </div>
+        </div>
+       </blockquote>
        <p>
         You will also need to have CUDA installed on the system (or if running in a container, the system must have
 the CUDA driver installed and the container must have CUDA)
@@ -1274,19 +1138,60 @@ the CUDA driver installed and the container must have CUDA)
          </span>
         </code>
        </p>
-       <h4 id="building-natively-on-aarch64-platform">
-        Building natively on aarch64 platform
-        <a class="headerlink" href="#building-natively-on-aarch64-platform" title="Permalink to this headline">
+       <h3 id="building-natively-on-aarch64-jetson">
+        <strong>
+         Building Natively on aarch64 (Jetson)
+        </strong>
+        <a class="headerlink" href="#building-natively-on-aarch64-jetson" title="Permalink to this headline">
+         ¶
+        </a>
+       </h3>
+       <h4 id="prerequisites">
+        Prerequisites
+        <a class="headerlink" href="#prerequisites" title="Permalink to this headline">
          ¶
         </a>
        </h4>
        <p>
-        To build natively on aarch64-linux-gnu platform, configure the WORKSPACE with local available dependencies.
+        Install or compile a build of PyTorch/LibTorch for aarch64
+       </p>
+       <p>
+        NVIDIA hosts builds the latest release branch for Jetson here:
+       </p>
+       <blockquote>
+        <div>
+         <p>
+          <a class="reference external" href="https://forums.developer.nvidia.com/t/pytorch-for-jetson-nano-version-1-5-0-now-available/72048">
+           https://forums.developer.nvidia.com/t/pytorch-for-jetson-nano-version-1-5-0-now-available/72048
+          </a>
+         </p>
+        </div>
+       </blockquote>
+       <h4 id="enviorment-setup">
+        Enviorment Setup
+        <a class="headerlink" href="#enviorment-setup" title="Permalink to this headline">
+         ¶
+        </a>
+       </h4>
+       <p>
+        To build natively on aarch64-linux-gnu platform, configure the
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          WORKSPACE
+         </span>
+        </code>
+        with local available dependencies.
        </p>
        <ol class="arabic simple">
         <li>
          <p>
-          Disable the rules with http_archive for x86_64 platform by commenting rules as:
+          Disable the rules with
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            http_archive
+           </span>
+          </code>
+          for x86_64 by commenting the following rules:
          </p>
         </li>
        </ol>
@@ -1333,7 +1238,7 @@ the CUDA driver installed and the container must have CUDA)
        <ol class="arabic simple" start="2">
         <li>
          <p>
-          Disable the pip3_import rules as:
+          Disable Python API testing dependencies:
          </p>
         </li>
        </ol>
@@ -1357,24 +1262,85 @@ the CUDA driver installed and the container must have CUDA)
 </pre>
         </div>
        </div>
-       <ol class="arabic simple" start="3">
+       <ol class="arabic" start="3">
         <li>
          <p>
-          Configuring the local available dependencies by using new_local_repository rules as:
+          Configure the correct paths to directory roots containing local dependencies in the
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            new_local_repository
+           </span>
+          </code>
+          rules:
          </p>
+         <blockquote>
+          <div>
+           <p>
+            NOTE: If you installed PyTorch using a pip package, the correct path is the path to the root of the python torch package.
+In the case that you installed with
+            <code class="docutils literal notranslate">
+             <span class="pre">
+              sudo
+             </span>
+             <span class="pre">
+              pip
+             </span>
+             <span class="pre">
+              install
+             </span>
+            </code>
+            this will be
+            <code class="docutils literal notranslate">
+             <span class="pre">
+              /usr/local/lib/python3.6/dist-packages/torch
+             </span>
+            </code>
+            .
+In the case you installed with
+            <code class="docutils literal notranslate">
+             <span class="pre">
+              pip
+             </span>
+             <span class="pre">
+              install
+             </span>
+             <span class="pre">
+              --user
+             </span>
+            </code>
+            this will be
+            <code class="docutils literal notranslate">
+             <span class="pre">
+              $HOME/.local/lib/python3.6/site-packages/torch
+             </span>
+            </code>
+            .
+           </p>
+          </div>
+         </blockquote>
         </li>
        </ol>
+       <p>
+        In the case you are using NVIDIA compiled pip packages, set the path for both libtorch sources to the same path. This is because unlike
+PyTorch on x86_64, NVIDIA aarch64 PyTorch uses the CXX11-ABI. If you compiled for source using the pre_cxx11_abi and only would like to
+use that library, set the paths to the same path but when you compile make sure to add the flag
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          --config=pre_cxx11_abi
+         </span>
+        </code>
+       </p>
        <div class="highlight-shell notranslate">
         <div class="highlight">
          <pre><span></span>new_local_repository<span class="o">(</span>
     <span class="nv">name</span> <span class="o">=</span> <span class="s2">"libtorch"</span>,
-    <span class="nv">path</span> <span class="o">=</span> <span class="s2">"/usr/local/lib/python3.6/site-packages/torch"</span>,
+    <span class="nv">path</span> <span class="o">=</span> <span class="s2">"/usr/local/lib/python3.6/dist-packages/torch"</span>,
     <span class="nv">build_file</span> <span class="o">=</span> <span class="s2">"third_party/libtorch/BUILD"</span>
 <span class="o">)</span>
 
 new_local_repository<span class="o">(</span>
     <span class="nv">name</span> <span class="o">=</span> <span class="s2">"libtorch_pre_cxx11_abi"</span>,
-    <span class="nv">path</span> <span class="o">=</span> <span class="s2">"/usr/local/lib/python3.6/site-packages/torch"</span>,
+    <span class="nv">path</span> <span class="o">=</span> <span class="s2">"/usr/local/lib/python3.6/dist-packages/torch"</span>,
     <span class="nv">build_file</span> <span class="o">=</span> <span class="s2">"third_party/libtorch/BUILD"</span>
 <span class="o">)</span>
 
@@ -1392,11 +1358,14 @@ new_local_repository<span class="o">(</span>
 </pre>
         </div>
        </div>
+       <h4 id="compile-c-library-and-compiler-cli">
+        Compile C++ Library and Compiler CLI
+        <a class="headerlink" href="#compile-c-library-and-compiler-cli" title="Permalink to this headline">
+         ¶
+        </a>
+       </h4>
        <p>
-        Note: If pip library for torch is installed using –user, configure the new_local_repository path for torch accordingly.
-       </p>
-       <p>
-        Compile TRTorch library using bazel command as:
+        Compile TRTorch library using bazel command:
        </p>
        <div class="highlight-shell notranslate">
         <div class="highlight">
@@ -1404,6 +1373,36 @@ new_local_repository<span class="o">(</span>
 </pre>
         </div>
        </div>
+       <h4 id="compile-python-api">
+        Compile Python API
+        <a class="headerlink" href="#compile-python-api" title="Permalink to this headline">
+         ¶
+        </a>
+       </h4>
+       <p>
+        Compile the Python API using the following command from the
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          //py
+         </span>
+        </code>
+        directory:
+       </p>
+       <div class="highlight-shell notranslate">
+        <div class="highlight">
+         <pre><span></span>python3 setup.py install --use-cxx11-abi
+</pre>
+        </div>
+       </div>
+       <p>
+        If you have a build of PyTorch that uses Pre-CXX11 ABI drop the
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          --use-cxx11-abi
+         </span>
+        </code>
+        flag
+       </p>
       </article>
      </div>
     </div>
@@ -1452,7 +1451,7 @@ new_local_repository<span class="o">(</span>
       <a href="http://www.sphinx-doc.org/">
        Sphinx
       </a>
-      2.3.1.
+      3.1.2.
              and
       <a href="https://github.com/bashtage/sphinx-material/">
        Material for
