@@ -3,7 +3,7 @@ This folder contains demo notebooks for TRTorch.
 
 ## 1. Requirements
 
-The most convenient way to run these notebooks is via a docker container, which provides a self-contained, isolated and re-producible environment for all experiments. 
+The most convenient way to run these notebooks is via a docker container, which provides a self-contained, isolated and re-producible environment for all experiments.
 
 First, clone the repository:
 
@@ -11,16 +11,16 @@ First, clone the repository:
 git clone https://github.com/NVIDIA/TRTorch
 ```
 
-Next, build the NVIDIA TRTorch container:
+Next, build the NVIDIA TRTorch container (from repo root):
 
 ```
-docker build -t trtorch -f Dockerfile.notebook .  
+docker build -t trtorch -f notebooks/Dockerfile.notebook .
 ```
 
 Then launch the container with:
 
 ```
-docker run --runtime=nvidia -it --rm --ipc=host --net=host trtorch 
+docker run --runtime=nvidia -it --rm --ipc=host --net=host trtorch
 ```
 
 Within the docker interactive bash session, start Jupyter with
@@ -38,7 +38,7 @@ in, for example:
 ```http://[host machine]:8888/?token=aae96ae9387cd28151868fee318c3b3581a2d794f3b25c6b```
 
 
-Within the container, this notebook itself is located at `/workspace/TRTorch/notebooks`.
+Within the container, the notebooks themselves are located at `/workspace/TRTorch/notebooks`.
 
 ## 2. Notebook list
 

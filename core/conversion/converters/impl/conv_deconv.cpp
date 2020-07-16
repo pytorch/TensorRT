@@ -45,9 +45,10 @@ auto conv_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
 
                 deconv->setStrideNd(stride);
                 deconv->setPaddingNd(padding);
+#if NV_TENSORRT_MAJOR > 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR == 1)
                 deconv->setDilationNd(dilation);
                 deconv->setNbGroups(groups);
-
+#endif
                 new_layer = deconv;
             } else {
                 nvinfer1::IConvolutionLayer* conv;

@@ -23,20 +23,20 @@ cc_library(
             ],
         ),
         "//conditions:default": [
-            "include/NvUtils.h",
+            "include/x86_64-linux-gnu/NvUtils.h",
         ] + glob(
             [
-                "include/NvInfer*.h",
+                "include/x86_64-linux-gnu/NvInfer*.h",
             ],
             exclude = [
-                "include/NvInferPlugin.h",
-                "include/NvInferPluginUtils.h",
+                "include/x86_64-linux-gnu/NvInferPlugin.h",
+                "include/x86_64-linux-gnu/NvInferPluginUtils.h",
             ],
         ),
     }),
     includes = select({
         ":aarch64_linux": ["include/aarch64-linux-gnu"],
-        "//conditions:default": ["include/"],
+        "//conditions:default": ["include/x86_64-linux-gnu/"],
     }),
     visibility = ["//visibility:private"],
 )
@@ -76,14 +76,26 @@ cc_import(
 
 cc_library(
     name = "nvparsers_headers",
-    hdrs = [
-        "include/NvCaffeParser.h",
-        "include/NvOnnxParser.h",
-        "include/NvOnnxParserRuntime.h",
-        "include/NvOnnxConfig.h",
-        "include/NvUffParser.h"
-    ],
-    includes = ["include/"],
+    hdrs = select({
+        ":aarch64_linux": [
+            "include/aarch64-linux-gnu/NvCaffeParser.h",
+            "include/aarch64-linux-gnu/NvOnnxParser.h",
+            "include/aarch64-linux-gnu/NvOnnxParserRuntime.h",
+            "include/aarch64-linux-gnu/NvOnnxConfig.h",
+            "include/aarch64-linux-gnu/NvUffParser.h"
+        ],
+        "//conditions:default": [
+            "include/x86_64-linux-gnu/NvCaffeParser.h",
+            "include/x86_64-linux-gnu/NvOnnxParser.h",
+            "include/x86_64-linux-gnu/NvOnnxParserRuntime.h",
+            "include/x86_64-linux-gnu/NvOnnxConfig.h",
+            "include/x86_64-linux-gnu/NvUffParser.h"
+        ]
+    }),
+    includes = select({
+        ":aarch64_linux": ["include/aarch64-linux-gnu"],
+        "//conditions:default": ["include/x86_64-linux-gnu/"],
+    }),
     visibility = ["//visibility:private"],
 )
 
@@ -110,12 +122,22 @@ cc_import(
 
 cc_library(
     name = "nvonnxparser_headers",
-    hdrs = [
-        "include/NvOnnxParser.h",
-        "include/NvOnnxParserRuntime.h",
-        "include/NvOnnxConfig.h"
-    ],
-    includes = ["include/"],
+    hdrs = select({
+        ":aarch64_linux": [
+            "include/aarch64-linux-gnu/NvOnnxParser.h",
+            "include/aarch64-linux-gnu/NvOnnxParserRuntime.h",
+            "include/aarch64-linux-gnu/NvOnnxConfig.h"
+        ],
+        "//conditions:default": [
+            "include/x86_64-linux-gnu/NvOnnxParser.h",
+            "include/x86_64-linux-gnu/NvOnnxParserRuntime.h",
+            "include/x86_64-linux-gnu/NvOnnxConfig.h"
+        ]
+    }),
+    includes = select({
+        ":aarch64_linux": ["include/aarch64-linux-gnu"],
+        "//conditions:default": ["include/x86_64-linux-gnu/"],
+    }),
     visibility = ["//visibility:private"],
 )
 
@@ -142,8 +164,18 @@ cc_import(
 
 cc_library(
     name = "nvonnxparser_runtime_header",
-    hdrs = ["include/NvOnnxParserRuntime.h"],
-    includes = ["include/"],
+    hdrs = select({
+        ":aarch64_linux": [
+            "include/aarch64-linux-gnu/NvOnnxParserRuntime.h",
+        ],
+        "//conditions:default": [
+            "include/x86_64-linux-gnu/NvOnnxParserRuntime.h",
+        ]
+    }),
+    includes = select({
+        ":aarch64_linux": ["include/aarch64-linux-gnu"],
+        "//conditions:default": ["include/x86_64-linux-gnu/"],
+    }),
     visibility = ["//visibility:private"],
 )
 
@@ -170,8 +202,18 @@ cc_import(
 
 cc_library(
     name = "nvcaffeparser_headers",
-    hdrs = ["include/NvCaffeParser.h"],
-    includes = ["include/"],
+    hdrs = select({
+        ":aarch64_linux": [
+            "include/aarch64-linux-gnu/NvCaffeParser.h",
+        ],
+        "//conditions:default": [
+            "include/x86_64-linux-gnu/NvCaffeParser.h",
+        ]
+    }),
+    includes = select({
+        ":aarch64_linux": ["include/aarch64-linux-gnu"],
+        "//conditions:default": ["include/x86_64-linux-gnu/"],
+    }),
     visibility = ["//visibility:private"],
 )
 
@@ -198,8 +240,14 @@ cc_import(
 
 cc_library(
     name = "nvinferplugin_headers",
-    hdrs = glob(["include/NvInferPlugin*.h"]),
-    includes = ["include/"],
+    hdrs = select({
+        ":aarch64_linux": glob(["include/aarch64-linux-gnu/NvInferPlugin*.h"]),
+        "//conditions:default": glob(["include/x86_64-linux-gnu/NvInferPlugin*.h"])
+    }),
+    includes = select({
+        ":aarch64_linux": ["include/aarch64-linux-gnu"],
+        "//conditions:default": ["include/x86_64-linux-gnu/"],
+    }),
     visibility = ["//visibility:private"],
 )
 
