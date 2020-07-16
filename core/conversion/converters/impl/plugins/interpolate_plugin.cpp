@@ -178,13 +178,13 @@ int InterpolatePlugin::enqueue(const nvinfer1::PluginTensorDesc* inputDesc, cons
 
     cudaStreamWaitEvent(torch_stream.stream(), event, 0);
 
-    if (mode == "linear") {
+    if (mode_ == "linear") {
         at::upsample_linear1d_out(output, input, {size_[0]}, align_corners_);
-    } else if (mode == "bilinear") {
+    } else if (mode_ == "bilinear") {
         at::upsample_bilinear2d_out(output, input, {size_[0], size_[1]}, align_corners_);
-    } else if (mode == "trilinear") {
+    } else if (mode_ == "trilinear") {
         at::upsample_trilinear3d_out(output, input, {size_[0], size_[1], size_[2]}, align_corners_);
-    } else if (mode == "adaptive_pool2d") {
+    } else if (mode_ == "adaptive_pool2d") {
         at::adaptive_avg_pool2d_out(output, input, {size_[0], size_[1]});
     }
 
@@ -210,11 +210,6 @@ int InterpolatePlugin::enqueue(const nvinfer1::PluginTensorDesc* inputDesc, cons
     at::Tensor output;
     if (mode_ == "adaptive_pool2d") {
         output = at::adaptive_avg_pool2d(input, {size_[0], size_[1]});
-    }
-
-    output = output.contiguous();
-    for (int i = 0; i < util::volume(outputDesc->dims); i++) {
-        std::cout << ((float*)output.data_ptr())[i] << std::endl;
     }
 
     cudaMemcpyAsync(outputs[0], output.data_ptr(), util::volume(outputDesc->dims) * sizeof(float), cudaMemcpyHostToDevice, stream);

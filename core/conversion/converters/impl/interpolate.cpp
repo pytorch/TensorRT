@@ -153,7 +153,7 @@ auto interpolate_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
                     // align_corners not supported in TensorRT, create plugin and run layer through PyTorch
                     create_plugin(ctx, n, in, "linear1d", in_shape, out_shape, out_size, std::string("linear"));
                 } else {
-                    resize_layer_size(ctx, n, in, out_shape, nvinfer1::ResizeMode::kLINEAR. true);
+                    resize_layer_size(ctx, n, in, out_shape, nvinfer1::ResizeMode::kLINEAR, true);
                 }
 #else
                 resize_layer_size(ctx, n, in, out_shape, nvinfer1::ResizeMode::kLINEAR, align_corners);
@@ -185,7 +185,7 @@ auto interpolate_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
                     // align_corners not supported in TensorRT, create plugin and run layer through PyTorch
                     create_plugin(ctx, n, in, "bilinear2d", in_shape, out_shape, out_size, std::string("bilinear"));
                 } else {
-                    resize_layer_size(ctx, n, in, out_shape, nvinfer1::ResizeMode::kLINEAR. true);
+                    resize_layer_size(ctx, n, in, out_shape, nvinfer1::ResizeMode::kLINEAR, true);
                 }
 #else
                 resize_layer_size(ctx, n, in, out_shape, nvinfer1::ResizeMode::kLINEAR, align_corners);
@@ -217,7 +217,7 @@ auto interpolate_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
                     // align_corners not supported in TensorRT, create plugin and run layer through PyTorch
                     create_plugin(ctx, n, in, "trilinear3d", in_shape, out_shape, out_size, std::string("trilinear"));
                 } else {
-                    resize_layer_size(ctx, n, in, out_shape, nvinfer1::ResizeMode::kLINEAR. true);
+                    resize_layer_size(ctx, n, in, out_shape, nvinfer1::ResizeMode::kLINEAR, true);
                 }
 #else
                 resize_layer_size(ctx, n, in, out_shape, nvinfer1::ResizeMode::kLINEAR, align_corners);
