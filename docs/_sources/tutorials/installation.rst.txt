@@ -334,4 +334,4 @@ Compile TRTorch library using bazel command as:
 
 .. code-block:: shell
 
-   bazel build //:libtrtorch --distdir third_party/distdir/aarch64-linux-gnu
+   bazel build //:libtrtorch
