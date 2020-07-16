@@ -134,7 +134,10 @@ cc_library(
             "include/x86_64-linux-gnu/NvOnnxConfig.h"
         ]
     }),
-    includes = ["include/"],
+    includes = select({
+        ":aarch64_linux": ["include/aarch64-linux-gnu"],
+        "//conditions:default": ["include/x86_64-linux-gnu/"],
+    }),
     visibility = ["//visibility:private"],
 )
 
@@ -169,7 +172,10 @@ cc_library(
             "include/x86_64-linux-gnu/NvOnnxParserRuntime.h",
         ]
     }),
-    includes = ["include/"],
+    includes = select({
+        ":aarch64_linux": ["include/aarch64-linux-gnu"],
+        "//conditions:default": ["include/x86_64-linux-gnu/"],
+    }),
     visibility = ["//visibility:private"],
 )
 
@@ -204,7 +210,10 @@ cc_library(
             "include/x86_64-linux-gnu/NvCaffeParser.h",
         ]
     }),
-    includes = ["include/"],
+    includes = select({
+        ":aarch64_linux": ["include/aarch64-linux-gnu"],
+        "//conditions:default": ["include/x86_64-linux-gnu/"],
+    }),
     visibility = ["//visibility:private"],
 )
 
@@ -235,7 +244,10 @@ cc_library(
         ":aarch64_linux": glob(["include/aarch64-linux-gnu/NvInferPlugin*.h"]),
         "//conditions:default": glob(["include/x86_64-linux-gnu/NvInferPlugin*.h"])
     }),
-    includes = ["include/"],
+    includes = select({
+        ":aarch64_linux": ["include/aarch64-linux-gnu"],
+        "//conditions:default": ["include/x86_64-linux-gnu/"],
+    }),
     visibility = ["//visibility:private"],
 )
 
