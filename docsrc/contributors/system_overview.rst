@@ -12,9 +12,13 @@ The repository is structured into:
 * core: Main compiler source code
 * cpp: C++ API
 * tests: tests of the C++ API, the core and converters
+* py: Python API
+* notebooks: Example applications built with TRTorch
 * docs: Documentation
 * docsrc: Documentation Source
 * third_party: BUILD files for dependency libraries
+* toolchains: Toolchains for different platforms
+
 
 The C++ API is unstable and subject to change until the library matures, though most work is done under the hood in the core.
 

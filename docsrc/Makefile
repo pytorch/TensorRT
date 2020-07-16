@@ -31,11 +31,14 @@ ifndef VERSION
 	rm -rf /tmp/trtorch_docs
 endif
 	rm -rf $(SOURCEDIR)/_cpp_api
+	rm -rf $(SOURCEDIR)/_notebooks
 	rm -rf $(SOURCEDIR)/_py_api
 	rm -rf $(SOURCEDIR)/_build
 	rm -rf $(SOURCEDIR)/_tmp
 
 html:
+	mkdir -p $(SOURCEDIR)/_notebooks
+	cp -r $(SOURCEDIR)/../notebooks/*.ipynb $(SOURCEDIR)/_notebooks
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 	mkdir -p $(DESTDIR)
 	cp -r $(BUILDDIR)/html/* $(DESTDIR)
