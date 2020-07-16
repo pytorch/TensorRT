@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html xmlns="http://www.w3.org/1999/xhtml">
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
@@ -40,19 +40,19 @@
   <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/pygments.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/collapsible-lists/css/tree_view.css" rel="stylesheet" type="text/css"/>
-  <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js">
+  <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js" type="text/javascript">
   </script>
-  <script src="../_static/jquery.js">
+  <script src="../_static/jquery.js" type="text/javascript">
   </script>
-  <script src="../_static/underscore.js">
+  <script src="../_static/underscore.js" type="text/javascript">
   </script>
-  <script src="../_static/doctools.js">
+  <script src="../_static/doctools.js" type="text/javascript">
   </script>
-  <script src="../_static/language_data.js">
+  <script src="../_static/language_data.js" type="text/javascript">
   </script>
-  <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js">
+  <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js" type="text/javascript">
   </script>
-  <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
+  <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js" type="text/javascript">
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -328,6 +328,11 @@
                       <li class="md-nav__item">
                        <a class="md-nav__link" href="#id5">
                         Debug Build
+                       </a>
+                      </li>
+                      <li class="md-nav__item">
+                       <a class="md-nav__link" href="#building-natively-on-aarch64-platform">
+                        Building natively on aarch64 platform
                        </a>
                       </li>
                      </ul>
@@ -696,6 +701,11 @@
                    <li class="md-nav__item">
                     <a class="md-nav__link" href="#id5">
                      Debug Build
+                    </a>
+                   </li>
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#building-natively-on-aarch64-platform">
+                     Building natively on aarch64 platform
                     </a>
                    </li>
                   </ul>
@@ -1264,6 +1274,136 @@ the CUDA driver installed and the container must have CUDA)
          </span>
         </code>
        </p>
+       <h4 id="building-natively-on-aarch64-platform">
+        Building natively on aarch64 platform
+        <a class="headerlink" href="#building-natively-on-aarch64-platform" title="Permalink to this headline">
+         ¶
+        </a>
+       </h4>
+       <p>
+        To build natively on aarch64-linux-gnu platform, configure the WORKSPACE with local available dependencies.
+       </p>
+       <ol class="arabic simple">
+        <li>
+         <p>
+          Disable the rules with http_archive for x86_64 platform by commenting rules as:
+         </p>
+        </li>
+       </ol>
+       <div class="highlight-shell notranslate">
+        <div class="highlight">
+         <pre><span></span><span class="c1">#http_archive(</span>
+<span class="c1">#    name = "libtorch",</span>
+<span class="c1">#    build_file = "@//third_party/libtorch:BUILD",</span>
+<span class="c1">#    strip_prefix = "libtorch",</span>
+<span class="c1">#    urls = ["https://download.pytorch.org/libtorch/cu102/libtorch-cxx11-abi-shared-with-deps-1.5.1.zip"],</span>
+<span class="c1">#    sha256 = "cf0691493d05062fe3239cf76773bae4c5124f4b039050dbdd291c652af3ab2a"</span>
+<span class="c1">#)</span>
+
+<span class="c1">#http_archive(</span>
+<span class="c1">#    name = "libtorch_pre_cxx11_abi",</span>
+<span class="c1">#    build_file = "@//third_party/libtorch:BUILD",</span>
+<span class="c1">#    strip_prefix = "libtorch",</span>
+<span class="c1">#    sha256 = "818977576572eadaf62c80434a25afe44dbaa32ebda3a0919e389dcbe74f8656",</span>
+<span class="c1">#    urls = ["https://download.pytorch.org/libtorch/cu102/libtorch-shared-with-deps-1.5.1.zip"],</span>
+<span class="c1">#)</span>
+
+<span class="c1"># Download these tarballs manually from the NVIDIA website</span>
+<span class="c1"># Either place them in the distdir directory in third_party and use the --distdir flag</span>
+<span class="c1"># or modify the urls to "file:///&lt;PATH TO TARBALL&gt;/&lt;TARBALL NAME&gt;.tar.gz</span>
+
+<span class="c1">#http_archive(</span>
+<span class="c1">#    name = "cudnn",</span>
+<span class="c1">#    urls = ["https://developer.nvidia.com/compute/machine-learning/cudnn/secure/8.0.1.13/10.2_20200626/cudnn-10.2-linux-x64-v8.0.1.13.tgz"],</span>
+<span class="c1">#    build_file = "@//third_party/cudnn/archive:BUILD",</span>
+<span class="c1">#    sha256 = "0c106ec84f199a0fbcf1199010166986da732f9b0907768c9ac5ea5b120772db",</span>
+<span class="c1">#    strip_prefix = "cuda"</span>
+<span class="c1">#)</span>
+
+<span class="c1">#http_archive(</span>
+<span class="c1">#    name = "tensorrt",</span>
+<span class="c1">#    urls = ["https://developer.nvidia.com/compute/machine-learning/tensorrt/secure/7.1/tars/TensorRT-7.1.3.4.Ubuntu-18.04.x86_64-gnu.cuda-10.2.cudnn8.0.tar.gz"],</span>
+<span class="c1">#    build_file = "@//third_party/tensorrt/archive:BUILD",</span>
+<span class="c1">#    sha256 = "9205bed204e2ae7aafd2e01cce0f21309e281e18d5bfd7172ef8541771539d41",</span>
+<span class="c1">#    strip_prefix = "TensorRT-7.1.3.4"</span>
+<span class="c1">#)</span>
+</pre>
+        </div>
+       </div>
+       <ol class="arabic simple" start="2">
+        <li>
+         <p>
+          Disable the pip3_import rules as:
+         </p>
+        </li>
+       </ol>
+       <div class="highlight-shell notranslate">
+        <div class="highlight">
+         <pre><span></span><span class="c1">#pip3_import(</span>
+<span class="c1">#    name = "trtorch_py_deps",</span>
+<span class="c1">#    requirements = "//py:requirements.txt"</span>
+<span class="c1">#)</span>
+
+<span class="c1">#load("@trtorch_py_deps//:requirements.bzl", "pip_install")</span>
+<span class="c1">#pip_install()</span>
+
+<span class="c1">#pip3_import(</span>
+<span class="c1">#   name = "py_test_deps",</span>
+<span class="c1">#   requirements = "//tests/py:requirements.txt"</span>
+<span class="c1">#)</span>
+
+<span class="c1">#load("@py_test_deps//:requirements.bzl", "pip_install")</span>
+<span class="c1">#pip_install()</span>
+</pre>
+        </div>
+       </div>
+       <ol class="arabic simple" start="3">
+        <li>
+         <p>
+          Configuring the local available dependencies by using new_local_repository rules as:
+         </p>
+        </li>
+       </ol>
+       <div class="highlight-shell notranslate">
+        <div class="highlight">
+         <pre><span></span>new_local_repository<span class="o">(</span>
+    <span class="nv">name</span> <span class="o">=</span> <span class="s2">"libtorch"</span>,
+    <span class="nv">path</span> <span class="o">=</span> <span class="s2">"/usr/local/lib/python3.6/site-packages/torch"</span>,
+    <span class="nv">build_file</span> <span class="o">=</span> <span class="s2">"third_party/libtorch/BUILD"</span>
+<span class="o">)</span>
+
+new_local_repository<span class="o">(</span>
+    <span class="nv">name</span> <span class="o">=</span> <span class="s2">"libtorch_pre_cxx11_abi"</span>,
+    <span class="nv">path</span> <span class="o">=</span> <span class="s2">"/usr/local/lib/python3.6/site-packages/torch"</span>,
+    <span class="nv">build_file</span> <span class="o">=</span> <span class="s2">"third_party/libtorch/BUILD"</span>
+<span class="o">)</span>
+
+new_local_repository<span class="o">(</span>
+    <span class="nv">name</span> <span class="o">=</span> <span class="s2">"cudnn"</span>,
+    <span class="nv">path</span> <span class="o">=</span> <span class="s2">"/usr/"</span>,
+    <span class="nv">build_file</span> <span class="o">=</span> <span class="s2">"@//third_party/cudnn/local:BUILD"</span>
+<span class="o">)</span>
+
+new_local_repository<span class="o">(</span>
+    <span class="nv">name</span> <span class="o">=</span> <span class="s2">"tensorrt"</span>,
+    <span class="nv">path</span> <span class="o">=</span> <span class="s2">"/usr/"</span>,
+    <span class="nv">build_file</span> <span class="o">=</span> <span class="s2">"@//third_party/tensorrt/local:BUILD"</span>
+<span class="o">)</span>
+</pre>
+        </div>
+       </div>
+       <p>
+        Note: If pip library for torch is installed using –user, configure the new_local_repository path for torch accordingly.
+       </p>
+       <p>
+        Compile TRTorch library using bazel command as:
+       </p>
+       <div class="highlight-shell notranslate">
+        <div class="highlight">
+         <pre><span></span>bazel build //:libtrtorch --distdir third_party/distdir/aarch64-linux-gnu
+</pre>
+        </div>
+       </div>
       </article>
      </div>
     </div>
@@ -1312,7 +1452,7 @@ the CUDA driver installed and the container must have CUDA)
       <a href="http://www.sphinx-doc.org/">
        Sphinx
       </a>
-      3.0.3.
+      2.3.1.
              and
       <a href="https://github.com/bashtage/sphinx-material/">
        Material for
