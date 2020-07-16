@@ -24,8 +24,27 @@ if "--use-cxx11-abi" in sys.argv:
     sys.argv.remove("--use-cxx11-abi")
     CXX11_ABI = True
 
+def which(program):
+    import os
+    def is_exe(fpath):
+        return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
+
+    fpath, fname = os.path.split(program)
+    if fpath:
+        if is_exe(program):
+            return program
+    else:
+        for path in os.environ["PATH"].split(os.pathsep):
+            exe_file = os.path.join(path, program)
+            if is_exe(exe_file):
+                return exe_file
+
+    return None
+
+BAZEL_EXE = which("bazel")
+
 def build_libtrtorch_pre_cxx11_abi(develop=True, use_dist_dir=True, cxx11_abi=False):
-    cmd = ["/usr/bin/bazel", "build"]
+    cmd = [BAZEL_EXE, "build"]
     cmd.append("//cpp/api/lib:libtrtorch.so")
     if develop:
         cmd.append("--compilation_mode=dbg")
