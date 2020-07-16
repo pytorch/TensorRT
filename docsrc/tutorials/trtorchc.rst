@@ -14,7 +14,7 @@ All that is required to run the program after compilation is for C++ linking aga
 or in Python importing the trtorch package. All other aspects of using compiled modules are identical
 to standard TorchScript. Load with ``torch.jit.load()`` and run like you would run any other module.
 
-.. code-block:: txt
+.. code-block::txt
 
     trtorchc [input_file_path] [output_file_path]
         [input_shapes...] {OPTIONS}
@@ -86,6 +86,6 @@ to standard TorchScript. Load with ``torch.jit.load()`` and run like you would r
 
 e.g.
 
-.. code-block:: txt
+.. code-block:: shell
 
     trtorchc tests/modules/ssd_traced.jit.pt ssd_trt.ts "[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]" -p f16

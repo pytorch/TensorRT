@@ -1,9 +1,9 @@
 # Building the Documentation
 
-We use Sphinx and Doxygen for documentation, so begin by installing the dependencies:
+We use Sphinx, Doxygen and pandoc for documentation, so begin by installing the dependencies:
 
 ```
-apt install doxygen
+apt install doxygen pandoc
 ```
 
 ```
