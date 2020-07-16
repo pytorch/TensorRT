@@ -177,6 +177,7 @@ bazel build //:libtrtorch --compilation_mode=dbg
 ``` shell
 bazel build //:libtrtorch --distdir third_party/distdir/aarch64-linux-gnu
 ```
+> Note: Please refer [installation](docs/tutorials/installation.html) instructions for Pre-requisites
 
 A tarball with the include files and library can then be found in bazel-bin
 

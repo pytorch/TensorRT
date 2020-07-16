@@ -230,3 +230,108 @@ Debug Build
     python3 setup.py develop [--user]
 
 This also compiles a debug build of ``libtrtorch.so``
+
+Building natively on aarch64 platform
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+To build natively on aarch64-linux-gnu platform, configure the WORKSPACE with local available dependencies.
+
+1. Disable the rules with http_archive for x86_64 platform by commenting rules as:
+
+.. code-block:: shell
+
+    #http_archive(
+    #    name = "libtorch",
+    #    build_file = "@//third_party/libtorch:BUILD",
+    #    strip_prefix = "libtorch",
+    #    urls = ["https://download.pytorch.org/libtorch/cu102/libtorch-cxx11-abi-shared-with-deps-1.5.1.zip"],
+    #    sha256 = "cf0691493d05062fe3239cf76773bae4c5124f4b039050dbdd291c652af3ab2a"
+    #)
+
+    #http_archive(
+    #    name = "libtorch_pre_cxx11_abi",
+    #    build_file = "@//third_party/libtorch:BUILD",
+    #    strip_prefix = "libtorch",
+    #    sha256 = "818977576572eadaf62c80434a25afe44dbaa32ebda3a0919e389dcbe74f8656",
+    #    urls = ["https://download.pytorch.org/libtorch/cu102/libtorch-shared-with-deps-1.5.1.zip"],
+    #)
+
+    # Download these tarballs manually from the NVIDIA website
+    # Either place them in the distdir directory in third_party and use the --distdir flag
+    # or modify the urls to "file:///<PATH TO TARBALL>/<TARBALL NAME>.tar.gz
+
+    #http_archive(
+    #    name = "cudnn",
+    #    urls = ["https://developer.nvidia.com/compute/machine-learning/cudnn/secure/8.0.1.13/10.2_20200626/cudnn-10.2-linux-x64-v8.0.1.13.tgz"],
+    #    build_file = "@//third_party/cudnn/archive:BUILD",
+    #    sha256 = "0c106ec84f199a0fbcf1199010166986da732f9b0907768c9ac5ea5b120772db",
+    #    strip_prefix = "cuda"
+    #)
+
+    #http_archive(
+    #    name = "tensorrt",
+    #    urls = ["https://developer.nvidia.com/compute/machine-learning/tensorrt/secure/7.1/tars/TensorRT-7.1.3.4.Ubuntu-18.04.x86_64-gnu.cuda-10.2.cudnn8.0.tar.gz"],
+    #    build_file = "@//third_party/tensorrt/archive:BUILD",
+    #    sha256 = "9205bed204e2ae7aafd2e01cce0f21309e281e18d5bfd7172ef8541771539d41",
+    #    strip_prefix = "TensorRT-7.1.3.4"
+    #)
+
+
+2. Disable the pip3_import rules as:
+
+.. code-block:: shell
+
+    #pip3_import(
+    #    name = "trtorch_py_deps",
+    #    requirements = "//py:requirements.txt"
+    #)
+
+    #load("@trtorch_py_deps//:requirements.bzl", "pip_install")
+    #pip_install()
+
+    #pip3_import(
+    #   name = "py_test_deps",
+    #   requirements = "//tests/py:requirements.txt"
+    #)
+
+    #load("@py_test_deps//:requirements.bzl", "pip_install")
+    #pip_install()
+
+
+3. Configuring the local available dependencies by using new_local_repository rules as:
+
+.. code-block:: shell
+
+    new_local_repository(
+        name = "libtorch",
+        path = "/usr/local/lib/python3.6/site-packages/torch",
+        build_file = "third_party/libtorch/BUILD"
+    )
+
+    new_local_repository(
+        name = "libtorch_pre_cxx11_abi",
+        path = "/usr/local/lib/python3.6/site-packages/torch",
+        build_file = "third_party/libtorch/BUILD"
+    )
+
+    new_local_repository(
+        name = "cudnn",
+        path = "/usr/",
+        build_file = "@//third_party/cudnn/local:BUILD"
+    )
+
+    new_local_repository(
+        name = "tensorrt",
+        path = "/usr/",
+        build_file = "@//third_party/tensorrt/local:BUILD"
+    )
+
+
+Note: If pip library for torch is installed using --user, configure the new_local_repository path for torch accordingly.
+
+
+Compile TRTorch library using bazel command as:
+
+.. code-block:: shell
+
+   bazel build //:libtrtorch
