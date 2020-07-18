@@ -14,7 +14,7 @@ All that is required to run the program after compilation is for C++ linking aga
 or in Python importing the trtorch package. All other aspects of using compiled modules are identical
 to standard TorchScript. Load with ``torch.jit.load()`` and run like you would run any other module.
 
-.. code-block::txt
+.. code-block:: txt
 
     trtorchc [input_file_path] [output_file_path]
         [input_shapes...] {OPTIONS}

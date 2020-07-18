@@ -22,7 +22,7 @@ copyright = '2020, NVIDIA Corporation'
 author = 'NVIDIA Corporation'
 
 # The full version, including alpha/beta/rc tags
-release = '0.0.2'
+release = 'master'
 
 
 # -- General configuration ---------------------------------------------------
@@ -124,6 +124,7 @@ html_theme_options = {
     'master_doc': True,
     "version_info": {
         "master": "https://nvidia.github.io/TRTorch/",
+        "v0.0.3": "https://nvidia.github.io/TRTorch/v0.0.3/",
         "v0.0.2": "https://nvidia.github.io/TRTorch/v0.0.2/",
         "v0.0.1": "https://nvidia.github.io/TRTorch/v0.0.1/",
     }
