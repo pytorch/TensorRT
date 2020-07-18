@@ -26,13 +26,13 @@ You can install the python package using
 .. code-block:: sh
 
     # Python 3.5
-    pip3 install  https://github.com/NVIDIA/TRTorch/releases/download/v0.0.2/trtorch-0.0.2-cp35-cp35m-linux_x86_64.whl
+    pip3 install  https://github.com/NVIDIA/TRTorch/releases/download/v0.0.3/trtorch-0.0.3-cp35-cp35m-linux_x86_64.whl
     # Python 3.6
-    pip3 install  https://github.com/NVIDIA/TRTorch/releases/download/v0.0.2/trtorch-0.0.2-cp36-cp36m-linux_x86_64.whl
+    pip3 install  https://github.com/NVIDIA/TRTorch/releases/download/v0.0.3/trtorch-0.0.3-cp36-cp36m-linux_x86_64.whl
     # Python 3.7
-    pip3 install  https://github.com/NVIDIA/TRTorch/releases/download/v0.0.2/trtorch-0.0.2-cp37-cp37m-linux_x86_64.whl
+    pip3 install  https://github.com/NVIDIA/TRTorch/releases/download/v0.0.3/trtorch-0.0.3-cp37-cp37m-linux_x86_64.whl
     # Python 3.8
-    pip3 install  https://github.com/NVIDIA/TRTorch/releases/download/v0.0.2/trtorch-0.0.2-cp38-cp38-linux_x86_64.whl
+    pip3 install  https://github.com/NVIDIA/TRTorch/releases/download/v0.0.3/trtorch-0.0.3-cp38-cp38-linux_x86_64.whl
 
 .. _bin-dist:
 
@@ -72,6 +72,10 @@ You will also need to have CUDA installed on the system (or if running in a cont
 the CUDA driver installed and the container must have CUDA)
 
 The correct LibTorch version will be pulled down for you by bazel.
+
+    NOTE: For best compatability with official PyTorch, use TensorRT 7.0 and cuDNN 7.6 however TRTorch itself supports
+    TensorRT 7.1 and cuDNN 8.0 for usecases such as using NVIDIA compiled distributions of PyTorch that use cuDNN 8
+    e.g. aarch64 or custom compiled version of PyTorch that use cuDNN 8.
 
 You then have two compilation options:
 

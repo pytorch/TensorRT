@@ -75,8 +75,8 @@ torch.jit.save(trt_ts_module, "trt_torchscript_module.ts")
 - Bazel 3.3.1
 - Libtorch 1.5.1
 - CUDA 10.2
-- cuDNN 8.0.1
-- TensorRT 7.1.3
+- cuDNN 7.6.5 (by default, cuDNN 8 supported with compatable PyTorch build)
+- TensorRT 7.0.0 (by default, TensorRT 7.1 supported with compatable PyTorch build)
 
 ## Prebuilt Binaries and Wheel files
 
