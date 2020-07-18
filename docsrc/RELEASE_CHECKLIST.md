@@ -23,6 +23,7 @@ will result in a minor version bump and sigificant bug fixes will result in a pa
 3. Version bump PR
     - There should be a PR which will be the PR that bumps the actual version of the library, this PR should contain the following
         - Bump version in `py/setup.py`
+        - Make sure dependency versions are updated in `py/requirements.txt`, `tests/py/requirements.txt` and `py/setup.py`
         - Bump version in `cpp/api/include/macros.h`
         - Add new link to doc versions in `docsrc/conf.py`
         - Generate frozen docs for new version
@@ -40,3 +41,5 @@ will result in a minor version bump and sigificant bug fixes will result in a pa
         - TODO: Add cxx11-abi build for aarch64 when a manylinux container for aarch64 exists
     - Generate Python packages for Python 3.5/3.6/3.7/3.8 for x86_64
         - TODO: Build a manylinux container for aarch64
+        - `docker run -it -v$(pwd)/..:/workspace/TRTorch build_trtorch_wheel /bin/bash /workspace/TRTorch/py/build_whl.sh` generates all wheels
+            - To build container `docker build -t build_trtorch_wheel .`
