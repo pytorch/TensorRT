@@ -31,7 +31,7 @@ will result in a minor version bump and sigificant bug fixes will result in a pa
             - Reset `docsrc/conf.py` version
             - `make html`
         - Generate changelog
-            - `conventional-changelog -p angular -i CHANGELOG.md -s -t 0.0.0`
+            - `conventional-changelog -p angular -s CHANGELOG.md -t <last version tag> -a`
 4. Once PR is merged tag commit and start creating release on GitHub
     - Paste in Milestone information and Changelog information into release notes
     - Generate libtrtorch.tar.gz for the following platforms:
