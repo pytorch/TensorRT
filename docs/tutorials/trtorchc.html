@@ -36,7 +36,7 @@
   <script src="../_static/javascripts/modernizr.js">
   </script>
   <title>
-   trtorchc — TRTorch 0.0.2 documentation
+   trtorchc — TRTorch master documentation
   </title>
   <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/pygments.css" rel="stylesheet" type="text/css"/>
@@ -82,7 +82,7 @@
    <nav class="md-header-nav md-grid">
     <div class="md-flex navheader">
      <div class="md-flex__cell md-flex__cell--shrink">
-      <a class="md-header-nav__button md-logo" href="../index.html" title="TRTorch 0.0.2 documentation">
+      <a class="md-header-nav__button md-logo" href="../index.html" title="TRTorch master documentation">
        <i class="md-icon">
         
        </i>
@@ -154,6 +154,9 @@
        <a href="https://nvidia.github.io/TRTorch/" title="master">
         master
        </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.0.3/" title="v0.0.3">
+        v0.0.3
+       </a>
        <a href="https://nvidia.github.io/TRTorch/v0.0.2/" title="v0.0.2">
         v0.0.2
        </a>
@@ -171,7 +174,7 @@
      <ul class="md-tabs__list">
       <li class="md-tabs__item">
        <a class="md-tabs__link" href="../index.html">
-        TRTorch 0.0.2 documentation
+        TRTorch master documentation
        </a>
       </li>
      </ul>
@@ -184,12 +187,12 @@
        <div class="md-sidebar__inner">
         <nav class="md-nav md-nav--primary" data-md-level="0">
          <label class="md-nav__title md-nav__title--site" for="__drawer">
-          <a class="md-nav__button md-logo" href="../index.html" title="TRTorch 0.0.2 documentation">
+          <a class="md-nav__button md-logo" href="../index.html" title="TRTorch master documentation">
            <i class="md-icon">
             
            </i>
           </a>
-          <a href="../index.html" title="TRTorch 0.0.2 documentation">
+          <a href="../index.html" title="TRTorch master documentation">
            TRTorch
           </a>
          </label>
@@ -371,6 +374,77 @@ to standard TorchScript. Load with
         </code>
         and run like you would run any other module.
        </p>
+       <div class="highlight-txt notranslate">
+        <div class="highlight">
+         <pre><span></span>trtorchc [input_file_path] [output_file_path]
+    [input_shapes...] {OPTIONS}
+
+    TRTorch is a compiler for TorchScript, it will compile and optimize
+    TorchScript programs to run on NVIDIA GPUs using TensorRT
+
+OPTIONS:
+
+    -h, --help                        Display this help menu
+    Verbiosity of the compiler
+        -v, --verbose                     Dumps debugging information about the
+                                        compilation process onto the console
+        -w, --warnings                    Disables warnings generated during
+                                        compilation onto the console (warnings
+                                        are on by default)
+        --info                            Dumps info messages generated during
+                                        compilation onto the console
+    --build-debuggable-engine         Creates a debuggable engine
+    --use-strict-types                Restrict operating type to only use set
+                                        default operation precision
+                                        (op_precision)
+    --allow-gpu-fallback              (Only used when targeting DLA
+                                        (device-type)) Lets engine run layers on
+                                        GPU if they are not supported on DLA
+    -p[precision],
+    --default-op-precision=[precision]
+                                        Default operating precision for the
+                                        engine (Int8 requires a
+                                        calibration-cache argument) [ float |
+                                        float32 | f32 | half | float16 | f16 |
+                                        int8 | i8 ] (default: float)
+    -d[type], --device-type=[type]    The type of device the engine should be
+                                        built for [ gpu | dla ] (default: gpu)
+    --engine-capability=[capability]  The type of device the engine should be
+                                        built for [ default | safe_gpu |
+                                        safe_dla ]
+    --calibration-cache-file=[file_path]
+                                        Path to calibration cache file to use
+                                        for post training quantization
+    --num-min-timing-iter=[num_iters] Number of minimization timing iterations
+                                        used to select kernels
+    --num-avg-timing-iters=[num_iters]
+                                        Number of averaging timing iterations
+                                        used to select kernels
+    --workspace-size=[workspace_size] Maximum size of workspace given to
+                                        TensorRT
+    --max-batch-size=[max_batch_size] Maximum batch size (must be &gt;= 1 to be
+                                        set, 0 means not set)
+    -t[threshold],
+    --threshold=[threshold]           Maximum acceptable numerical deviation
+                                        from standard torchscript output
+                                        (default 2e-5)
+    --save-engine                     Instead of compiling a full a
+                                        TorchScript program, save the created
+                                        engine to the path specified as the
+                                        output path
+    input_file_path                   Path to input TorchScript file
+    output_file_path                  Path for compiled TorchScript (or
+                                        TensorRT engine) file
+    input_shapes...                   Sizes for inputs to engine, can either
+                                        be a single size or a range defined by
+                                        Min, Optimal, Max sizes, e.g.
+                                        "(N,..,C,H,W)"
+                                        "[(MIN_N,..,MIN_C,MIN_H,MIN_W);(OPT_N,..,OPT_C,OPT_H,OPT_W);(MAX_N,..,MAX_C,MAX_H,MAX_W)]"
+    "--" can be used to terminate flag options and force all following
+    arguments to be treated as positional options
+</pre>
+        </div>
+       </div>
        <p>
         e.g.
        </p>
