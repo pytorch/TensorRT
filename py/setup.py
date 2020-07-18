@@ -196,7 +196,7 @@ setup(
     long_description=long_description,
     ext_modules=ext_modules,
     install_requires=[
-        'torch==1.5.0',
+        'torch==1.5.1',
     ],
     setup_requires=[],
     cmdclass={
@@ -224,7 +224,7 @@ setup(
         "Topic :: Software Development",
         "Topic :: Software Development :: Libraries"
     ],
-    python_requires='>=3.6',
+    python_requires='>=3.5',
     include_package_data=True,
     package_data={
         'trtorch': ['lib/*.so'],
