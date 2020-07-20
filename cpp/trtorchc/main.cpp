@@ -1,12 +1,19 @@
 #include <iostream>
 #include <sstream>
 #include <stdlib.h>
-#include <unistd.h>
 
 #ifdef linux
 #include <linux/limits.h>
 #else
 #define PATH_MAX 260
+#endif
+
+#ifdef _WIN32
+#include <direct.h>
+#define getcwd _getcwd
+#define realpath(N,R) _fullpath((R),(N),PATH_MAX)
+#elif
+#include <unistd.h>
 #endif
 
 #include "NvInfer.h"
