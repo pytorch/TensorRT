@@ -90,7 +90,7 @@ struct TRTORCH_API ExtraInfo {
      * This class is compatable with c10::DataTypes (but will check for TRT support)
      * so there should not be a reason that you need to use this type explictly.
      */
-    class DataType {
+    class TRTORCH_API DataType {
     public:
         /**
          * Underlying enum class to support the DataType Class
