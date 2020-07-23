@@ -8,13 +8,31 @@ config_setting(
 )
 
 cc_library(
+    name = "weights",
+    hdrs = [
+        "Weights.h"
+    ],
+    srcs = [
+        "Weights.cpp"
+    ],
+    deps = [
+        "@tensorrt//:nvinfer",
+        "//core/util:prelude",
+        "//core/conversion/conversionctx"
+    ] + select({
+        ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
+        "//conditions:default":  ["@libtorch//:libtorch"],
+    }),
+    alwayslink = True,
+)
+
+cc_library(
     name = "converters",
     hdrs = [
         "converters.h"
     ],
     srcs = [
         "NodeConverterRegistry.cpp",
-        "Weights.cpp",
         "impl/activation.cpp",
         "impl/batch_norm.cpp",
         "impl/concat.cpp",
@@ -51,5 +69,8 @@ load("@rules_pkg//:pkg.bzl", "pkg_tar")
 pkg_tar(
     name = "include",
     package_dir = "core/conversion/converters/",
-    srcs = ["converters.h"],
+    srcs = [
+        "converters.h",
+        "Weights.h"
+    ],
 )

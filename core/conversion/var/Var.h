@@ -4,7 +4,8 @@
 #include <map>
 
 #include "torch/csrc/jit/ir/ir.h"
-
+#include "core/conversion/conversionctx/ConversionCtx.h"
+#include "core/conversion/converters/Weights.h"
 #include "core/util/prelude.h"
 
 namespace trtorch {
@@ -48,6 +49,7 @@ public:
   c10::List<bool> unwrapToBoolList();
   c10::List<at::Tensor> unwrapToTensorList(c10::List<at::Tensor> default_val);
   c10::List<at::Tensor> unwrapToTensorList();
+  nvinfer1::ITensor* ITensorOrFreeze(ConversionCtx* ctx);
 
   template<typename T>
   T unwrapTo(T default_val);

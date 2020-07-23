@@ -9,6 +9,7 @@
 #include "core/util/prelude.h"
 #include "core/conversion/var/Var.h"
 #include "core/conversion/conversionctx/ConversionCtx.h"
+#include "core/conversion/converters/Weights.h"
 
 namespace trtorch {
 namespace core {
@@ -38,28 +39,6 @@ public:
 
 bool node_is_convertable(const torch::jit::Node* n);
 OpConverter get_node_converter_for(const torch::jit::FunctionSchema* signature);
-
-struct Weights {
-    //TODO: Rebuild this in a way that makes sense for more than just conv2/3D and linear
-    nvinfer1::Weights data;
-    nvinfer1::Dims kernel_shape;
-    nvinfer1::Dims shape;
-    int64_t num_input_maps;
-    int64_t num_output_maps;
-
-    Weights();
-    Weights(ConversionCtx* ctx, at::Tensor t);
-    Weights(ConversionCtx* ctx, float val);
-    friend std::ostream& operator<<(std::ostream& os, const Weights& w);
-};
-
-inline nvinfer1::ITensor* tensor_to_const(ConversionCtx* ctx, at::Tensor t) {
-    auto t_weights = Weights(ctx, t);
-    auto const_layer = ctx->net->addConstant(t_weights.shape, t_weights.data);
-    TRTORCH_CHECK(const_layer, "Unable to freeze tensor");
-    const_layer->setName("[Freeze Tensor]");
-    return const_layer->getOutput(0);
-}
 
 } // namespace converters
 } // namespace conversion

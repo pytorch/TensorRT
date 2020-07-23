@@ -15,7 +15,7 @@ auto reduce_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
     .pattern({
         "aten::mean(Tensor self, *, ScalarType? dtype=None) -> (Tensor)",
         [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-            auto in_tensor = args[0].ITensor();
+            auto in_tensor = args[0].ITensorOrFreeze(ctx);
             auto in_dims = util::toVec(in_tensor->getDimensions());
             LOG_WARNING("Mean Converter disregards dtype");
 
@@ -34,7 +34,7 @@ auto reduce_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
     }).pattern({
         "aten::mean.dim(Tensor self, int[] dim, bool keepdim=False, *, int? dtype=None) -> (Tensor)",
         [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-            auto in_tensor = args[0].ITensor();
+            auto in_tensor = args[0].ITensorOrFreeze(ctx);
             auto dims = args[1].unwrapToIntList();
             LOG_DEBUG("Dim to reduce:" << util::toDims(dims)); // Some abuse of toDim but just for debug info
 
@@ -61,7 +61,7 @@ auto reduce_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
     }).pattern({
         "aten::sum(Tensor self, *, ScalarType? dtype=None) -> Tensor",
         [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-            auto in_tensor = args[0].ITensor();
+            auto in_tensor = args[0].ITensorOrFreeze(ctx);
             auto in_dims = util::toVec(in_tensor->getDimensions());
             LOG_WARNING("Sum Converter disregards dtype");
 
@@ -80,7 +80,7 @@ auto reduce_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
     }).pattern({
         "aten::sum.dim_IntList(Tensor self, int[1] dim, bool keepdim=False, *, ScalarType? dtype=None) -> Tensor",
         [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-            auto in_tensor = args[0].ITensor();
+            auto in_tensor = args[0].ITensorOrFreeze(ctx);
             auto dims = args[1].unwrapToIntList();
             LOG_DEBUG("Dim to reduce:" << util::toDims(dims)); // Some abuse of toDim but just for debug info
 
@@ -107,7 +107,7 @@ auto reduce_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
     }).pattern({
         "aten::prod(Tensor self, *, ScalarType? dtype=None) -> Tensor",
         [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-            auto in_tensor = args[0].ITensor();
+            auto in_tensor = args[0].ITensorOrFreeze(ctx);
             auto in_dims = util::toVec(in_tensor->getDimensions());
             LOG_WARNING("Prod Converter disregards dtype");
 
@@ -126,7 +126,7 @@ auto reduce_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
     }).pattern({
         "aten::prod.dim_int(Tensor self, int dim, bool keepdim=False, *, ScalarType? dtype=None) -> Tensor",
         [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-            auto in_tensor = args[0].ITensor();
+            auto in_tensor = args[0].ITensorOrFreeze(ctx);
             auto dim = args[1].unwrapToInt();
             LOG_DEBUG("Dim to reduce:" << dim); // Some abuse of toDim but just for debug info
 
@@ -150,7 +150,7 @@ auto reduce_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
     }).pattern({
         "aten::max(Tensor self) -> Tensor",
         [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-            auto in_tensor = args[0].ITensor();
+            auto in_tensor = args[0].ITensorOrFreeze(ctx);
             auto in_dims = util::toVec(in_tensor->getDimensions());
 
             uint32_t axis_mask = (uint32_t)(((uint64_t)1 << in_dims.size()) - 1);
@@ -168,7 +168,7 @@ auto reduce_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
     }).pattern({
         "aten::min(Tensor self) -> Tensor",
         [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-            auto in_tensor = args[0].ITensor();
+            auto in_tensor = args[0].ITensorOrFreeze(ctx);
             auto in_dims = util::toVec(in_tensor->getDimensions());
 
             uint32_t axis_mask = (uint32_t)(((uint64_t)1 << in_dims.size()) - 1);
