@@ -112,7 +112,7 @@ cc_library(
             "include/NvOnnxParserRuntime.h",
             "include/NvOnnxConfig.h",
             "include/NvUffParser.h"
-        ]
+        ],
         "//conditions:default": [
             "include/x86_64-linux-gnu/NvCaffeParser.h",
             "include/x86_64-linux-gnu/NvOnnxParser.h",
@@ -163,7 +163,7 @@ cc_library(
             "include/NvOnnxParser.h",
             "include/NvOnnxParserRuntime.h",
             "include/NvOnnxConfig.h"
-        ]
+        ],
         "//conditions:default": [
             "include/x86_64-linux-gnu/NvOnnxParser.h",
             "include/x86_64-linux-gnu/NvOnnxParserRuntime.h",
@@ -208,7 +208,7 @@ cc_library(
         ],
         ":windows": [
             "include/NvOnnxParserRuntime.h",
-        ]
+        ],
         "//conditions:default": [
             "include/x86_64-linux-gnu/NvOnnxParserRuntime.h",
         ]
@@ -251,7 +251,7 @@ cc_library(
         ],
         ":windows": [
             "include/NvCaffeParser.h",
-        ]
+        ],
         "//conditions:default": [
             "include/x86_64-linux-gnu/NvCaffeParser.h",
         ]
@@ -290,7 +290,7 @@ cc_library(
     name = "nvinferplugin_headers",
     hdrs = select({
         ":aarch64_linux": glob(["include/aarch64-linux-gnu/NvInferPlugin*.h"]),
-        ":windows": glob(["include/NvInferPlugin*.h"])
+        ":windows": glob(["include/NvInferPlugin*.h"]),
         "//conditions:default": glob(["include/x86_64-linux-gnu/NvInferPlugin*.h"])
     }),
     includes = select({
