@@ -85,6 +85,27 @@ std::string Var::type_name() const {
   }
 }
 
+nvinfer1::ITensor* Var::ITensorOrFreeze(ConversionCtx* ctx, const torch::jit::Node* n) {
+  TRTORCH_CHECK(isITensor() || isIValue(), "Requested either IValue or ITensor, however Var type is " << type_name());
+  nvinfer1::ITensor* out;
+
+  if (isIValue()) {
+    auto weights = converters::Weights(ctx, ptr_.ivalue->toTensor());
+
+    auto const_layer = ctx->net->addConstant(weights.shape, weights.data);
+    TRTORCH_CHECK(const_layer, "Unable to freeze tensor for node: " << *n);
+    const_layer->setName((util::node_info(n) + " [Freeze Tensor]").c_str());
+
+    out = const_layer->getOutput(0);
+  } else {
+    out = ptr_.tensor;
+  }
+
+  LOG_DEBUG("Frozen tensor shape: " << out->getDimensions());
+
+  return out;
+}
+
 const torch::jit::IValue* Var::IValue() const {
   TRTORCH_CHECK(isIValue(), "Requested IValue from Var, however Var type is " << type_name());
   if (type_ == Type::kIValue) {

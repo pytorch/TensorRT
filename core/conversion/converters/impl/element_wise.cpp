@@ -26,7 +26,6 @@ nvinfer1::ILayer* add_elementwise(ConversionCtx* ctx, nvinfer1::ElementWiseOpera
         self = self_shuffle->getOutput(0);
     }
 
-
     nvinfer1::ILayer* ele;
     if (scalar != 1) {
         LOG_WARNING("Please verify scalar handling in add converter, channel axis set to 3 but scaling is uniform");
@@ -73,8 +72,8 @@ auto element_wise_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns(
             "aten::add.Tensor(Tensor self, Tensor other, Scalar alpha=1) -> Tensor",
             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                 // Should implement self + alpha * other
-                auto self = args[0].ITensor();
-                auto other = args[1].ITensor();
+                auto self = args[0].ITensorOrFreeze(ctx, n);
+                auto other = args[1].ITensorOrFreeze(ctx, n);
                 auto scalar = args[2].unwrapToScalar().to<float>();
                 auto add = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUM, self, other, util::node_info(n), scalar);
 
@@ -90,8 +89,8 @@ auto element_wise_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns(
             "aten::add_.Tensor(Tensor(a!) self, Tensor other, *, Scalar alpha=1) -> (Tensor(a!))",
             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                 // Should implement self + alpha * other
-                auto self = args[0].ITensor();
-                auto other = args[1].ITensor();
+                auto self = args[0].ITensorOrFreeze(ctx, n);
+                auto other = args[1].ITensorOrFreeze(ctx, n);
                 auto scalar = args[2].unwrapToScalar().to<float>();
                 auto add = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUM, self, other, util::node_info(n), scalar);
 
@@ -107,8 +106,8 @@ auto element_wise_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns(
             "aten::sub.Tensor(Tensor self, Tensor other, Scalar alpha=1) -> Tensor",
             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                 // Should implement self - alpha * other
-                auto self = args[0].ITensor();
-                auto other = args[1].ITensor();
+                auto self = args[0].ITensorOrFreeze(ctx, n);
+                auto other = args[1].ITensorOrFreeze(ctx, n);
                 auto scalar = args[2].unwrapToScalar().to<float>();
                 auto sub = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUB, self, other, util::node_info(n), scalar);
 
@@ -124,8 +123,8 @@ auto element_wise_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns(
             "aten::div.Tensor(Tensor self, Tensor other) -> Tensor",
             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                 // Should implement self / other
-                auto self = args[0].ITensor();
-                auto other = args[1].ITensor();
+                auto self = args[0].ITensorOrFreeze(ctx, n);
+                auto other = args[1].ITensorOrFreeze(ctx, n);
                 auto div = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, util::node_info(n));
 
                 TRTORCH_CHECK(div, "Unable to create div layer from node: " << *n);
@@ -140,8 +139,8 @@ auto element_wise_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns(
             "aten::div_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)",
             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                 // TODO: Remove with functionalization
-                auto self = args[0].ITensor();
-                auto other = args[1].ITensor();
+                auto self = args[0].ITensorOrFreeze(ctx, n);
+                auto other = args[1].ITensorOrFreeze(ctx, n);
                 auto div = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, util::node_info(n));
 
                 TRTORCH_CHECK(div, "Unable to create div layer from node: " << *n);
@@ -156,8 +155,8 @@ auto element_wise_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns(
             "aten::mul.Tensor(Tensor self, Tensor other) -> Tensor",
             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                 // Should implement self * other
-                auto self = args[0].ITensor();
-                auto other = args[1].ITensor();
+                auto self = args[0].ITensorOrFreeze(ctx, n);
+                auto other = args[1].ITensorOrFreeze(ctx, n);
                 auto mul = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPROD, self, other, util::node_info(n));
 
                 TRTORCH_CHECK(mul, "Unable to create mul layer from node: " << *n);
@@ -172,8 +171,8 @@ auto element_wise_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns(
             "aten::mul_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)",
             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                 // TODO: Remove with functionalization
-                auto self = args[0].ITensor();
-                auto other = args[1].ITensor();
+                auto self = args[0].ITensorOrFreeze(ctx, n);
+                auto other = args[1].ITensorOrFreeze(ctx, n);
                 auto mul = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPROD, self, other, util::node_info(n));
 
                 TRTORCH_CHECK(mul, "Unable to create mul layer from node: " << *n);

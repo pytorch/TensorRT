@@ -17,7 +17,7 @@ auto conv_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
                                  int[] output_padding, int groups, bool benchmark,
                                  bool deterministic, bool cudnn_enabled) -> (Tensor))SIG",
         [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-            auto in = args[0].ITensor();
+            auto in = args[0].ITensorOrFreeze(ctx, n);
 
             auto w = Weights(ctx, args[1].unwrapToTensor());
             auto stride = util::toDims(args[3].unwrapToIntList());
