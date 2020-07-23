@@ -321,26 +321,37 @@ void ConvertLoopBlock(ConversionCtx* ctx, const torch::jit::Node* n) {
 
     auto loop = ctx->net->addLoop();
 
-    // std::raise(SIGINT);
 
     // trip limit: max_trip_limit
-    auto count_weight = converters::Weights(ctx, torch::tensor({max_trip_count.toInt()}).to(torch::kI32));
+    auto count_weight = converters::Weights(ctx, (int32_t) max_trip_count.toInt());
     auto for_const = ctx->net->addConstant(count_weight.shape, count_weight.data);
+    TRTORCH_CHECK(for_const, "Unable to create constant layer from node: " << *n);
+
     auto count_limit = loop->addTripLimit(*for_const->getOutput(0), nvinfer1::TripLimit::kCOUNT);
+    TRTORCH_CHECK(count_limit, "Unable to create trip limit layer from node: " << *n);
+    count_limit->setName("max trip limit layer");
 
     // trip limit AND recurrent layer: loop condition
-    auto cond_weight = converters::Weights(ctx, torch::tensor({start_cond.toBool() ? 1 : 0}).to(torch::kI32));
+    auto cond_weight = converters::Weights(ctx, (int32_t) (start_cond.toBool() ? 1 : 0));
     auto while_const = ctx->net->addIdentity(*ctx->net->addConstant(cond_weight.shape, cond_weight.data)->getOutput(0));
+    TRTORCH_CHECK(while_const, "Unable to create identity layer from node: " << *n);
     while_const->setOutputType(0, nvinfer1::DataType::kBOOL);    
+    
     auto cond_limit = loop->addTripLimit(*while_const->getOutput(0), nvinfer1::TripLimit::kWHILE);
+    TRTORCH_CHECK(cond_limit, "Unable to create trip limit layer from node: " << *n);
+    cond_limit->setName("boolean condition trip limit layer");
     auto recurrent_cond = loop->addRecurrence(*while_const->getOutput(0));
+    TRTORCH_CHECK(recurrent_cond, "Unable to create recurrent layer from node: " << *n);
 
     ctx->AssociateValueAndTensor(block->outputs()[0], recurrent_cond->getOutput(0));
 
     // recurrent layer: trip_count 
-    auto trip_weight = converters::Weights(ctx, torch::tensor({trip_count.toInt()}).to(torch::kI32));
+    auto trip_weight = converters::Weights(ctx, (int32_t) trip_count.toInt());
     auto trip_const = ctx->net->addConstant(trip_weight.shape, trip_weight.data);
+    TRTORCH_CHECK(trip_const, "Unable to create constant layer from node: " << *n);
+    
     auto recurrent_trip = loop->addRecurrence(*trip_const->getOutput(0));
+    TRTORCH_CHECK(recurrent_trip, "Unable to create recurrent layer from node: " << *n);
 
     ctx->AssociateValueAndTensor(block->inputs()[0], recurrent_trip->getOutput(0));
 
@@ -352,11 +363,15 @@ void ConvertLoopBlock(ConversionCtx* ctx, const torch::jit::Node* n) {
         auto inp = n->inputs()[i];
 
         if (inp->type()->isSubtypeOf(c10::TensorType::get())) {
-            recurrent_tensors.push_back(loop->addRecurrence(*ctx->value_tensor_map[inp]));
+            auto recur = loop->addRecurrence(*ctx->value_tensor_map[inp]);
+            TRTORCH_CHECK(recur, "Unable to create recurrent layer from node: " << *n);
+            recurrent_tensors.push_back(recur);
         } else {
             TRTORCH_THROW_ERROR("Only recurrent Tensors allowed as input to Loop");
         }
     }
+
+    // std::raise(SIGINT);
 
     // evaluate/convert all nodes inside block
     for (auto bn : block->nodes()) {
@@ -369,20 +384,23 @@ void ConvertLoopBlock(ConversionCtx* ctx, const torch::jit::Node* n) {
         }
     }
 
-    // recurrent backedge input for loop condition
+    // recurrent backedge input for loop condition and input for condition TripLimit (cond_limit)
     auto iter_cond = ctx->evaluated_value_map[block->outputs()[0]];
-    auto iter_cond_weight = converters::Weights(ctx, torch::tensor({iter_cond.toBool() ? 1 : 0}).to(torch::kI32));
+    auto iter_cond_weight = converters::Weights(ctx, (int32_t) (iter_cond.toBool() ? 1 : 0));
     auto new_while_const = ctx->net->addIdentity(*ctx->net->addConstant(iter_cond_weight.shape, iter_cond_weight.data)->getOutput(0));
+    TRTORCH_CHECK(new_while_const, "Unable to create identity layer from node: " << *n);
     new_while_const->setOutputType(0, nvinfer1::DataType::kBOOL);
 
     recurrent_cond->setInput(1, *new_while_const->getOutput(0));
     cond_limit->setInput(0, *recurrent_cond->getOutput(0));
     ctx->AssociateValueAndTensor(block->outputs()[0], recurrent_cond->getOutput(0));
 
-    // recurrent backedge inut for trip_count
-    auto one_weight = converters::Weights(ctx, torch::tensor({1}).to(torch::kI32));
+    // recurrent backedge input for trip_count
+    auto one_weight = converters::Weights(ctx, (int32_t) 1);
     auto one_const = ctx->net->addConstant(one_weight.shape, one_weight.data);
+    TRTORCH_CHECK(one_const, "Unable to create constant layer from node: " << *n);
     auto add_layer = ctx->net->addElementWise(*recurrent_trip->getOutput(0), *one_const->getOutput(0), nvinfer1::ElementWiseOperation::kSUM);
+    TRTORCH_CHECK(add_layer, "Unable to create add layer from node: " << *n);
 
     recurrent_trip->setInput(1, *add_layer->getOutput(0));
     ctx->AssociateValueAndTensor(block->inputs()[0], recurrent_trip->getOutput(0));
@@ -401,6 +419,7 @@ void ConvertLoopBlock(ConversionCtx* ctx, const torch::jit::Node* n) {
     // map recurrent tensors --> n->outputs()
     for (unsigned int i = 0; i < recurrent_tensors.size(); i++) {
         auto out = loop->addLoopOutput(*recurrent_tensors[i]->getOutput(0), nvinfer1::LoopOutput::kLAST_VALUE);
+        TRTORCH_CHECK(out, "Unable to create loop output layer from node: " << *n);
         ctx->AssociateValueAndTensor(n->outputs()[i], out->getOutput(0));
     }
 
