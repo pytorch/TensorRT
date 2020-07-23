@@ -82,6 +82,27 @@ auto acthardtanh TRTORCH_UNUSED = RegisterNodeConversionPatterns()
       LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
       return true;
     }
+  }).pattern({
+    "aten::prelu(Tensor self, Tensor weight) -> (Tensor)",
+    [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+      auto in = args[0].ITensor();
+      auto slopes = args[1].unwrapToTensor();
+
+      //if (slopes.numel() != 1) {
+      //  auto in_dims = util::toVec(in.getDimensions());
+      // auto per_channel_shape = std::vector<int64_t>(in_dims.begin() + 2, in_dims.end());
+      //  for ()
+      //}
+
+      auto slope_tensor = tensor_to_const(ctx, slopes);
+
+      auto new_layer = ctx->net->addParametricReLU(*in, *slope_tensor);
+      new_layer->setName(util::node_info(n).c_str());
+      auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
+
+      LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+      return true;
+    }
   });
 
 
