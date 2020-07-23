@@ -8,11 +8,11 @@
 #define PATH_MAX 260
 #endif
 
-#ifdef _WIN32
+#if defined(_WIN32)
 #include <direct.h>
 #define getcwd _getcwd
 #define realpath(N,R) _fullpath((R),(N),PATH_MAX)
-#elif
+#else
 #include <unistd.h>
 #endif
 
