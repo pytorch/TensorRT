@@ -371,7 +371,7 @@ void ConvertLoopBlock(ConversionCtx* ctx, const torch::jit::Node* n) {
         }
     }
 
-    // std::raise(SIGINT);
+    std::raise(SIGINT);
 
     // evaluate/convert all nodes inside block
     for (auto bn : block->nodes()) {
