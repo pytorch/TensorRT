@@ -12,7 +12,7 @@
 #include "core/conversion/converters/Weights.h"
 
 namespace trtorch {
-namespace core {    
+namespace core {
 namespace conversion {
 namespace converters {
 
