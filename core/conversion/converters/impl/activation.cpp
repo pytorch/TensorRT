@@ -10,7 +10,7 @@ namespace {
 
 #define convert(act, trt_type)                                                 \
   bool act(ConversionCtx* ctx, const torch::jit::Node* n, args& args) {        \
-    auto in = args[0].ITensorOrFreeze(ctx, n);                                               \
+    auto in = args[0].ITensorOrFreeze(ctx);                                               \
                                                                                \
     auto new_layer =                                                           \
         ctx->net->addActivation(*in, nvinfer1::ActivationType::trt_type);      \
@@ -46,7 +46,7 @@ auto acthardtanh TRTORCH_UNUSED = RegisterNodeConversionPatterns()
   .pattern({
     "aten::hardtanh(Tensor self, Scalar min_val=-1, Scalar max_val=1) -> (Tensor)",
     [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-      auto in = args[0].ITensorOrFreeze(ctx, n);
+      auto in = args[0].ITensorOrFreeze(ctx);
       auto min = args[1].unwrapToDouble();
       auto max = args[2].unwrapToDouble();
 
@@ -66,7 +66,7 @@ auto acthardtanh TRTORCH_UNUSED = RegisterNodeConversionPatterns()
     //TODO: Remove after functionalization
     "aten::hardtanh_(Tensor(a!) self, Scalar min_val=-1, Scalar max_val=1) -> (Tensor(a!))",
     [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-      auto in = args[0].ITensorOrFreeze(ctx, n);
+      auto in = args[0].ITensorOrFreeze(ctx);
       auto min = args[1].unwrapToDouble();
       auto max = args[2].unwrapToDouble();
 

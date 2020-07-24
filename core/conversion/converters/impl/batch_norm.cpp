@@ -15,7 +15,7 @@ auto batch_norm_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
                             Tensor? mean, Tensor? var,
                             bool training, float momentum, float eps, bool cudnn_enabled) -> (Tensor))SIG",
     [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-      auto input = args[0].ITensorOrFreeze(ctx, n);
+      auto input = args[0].ITensor(); // assumes non-static input Tensor
       auto orig_shape = input->getDimensions();
       auto shape = util::toVec(orig_shape);
       auto options = torch::TensorOptions().dtype(torch::kFloat32);

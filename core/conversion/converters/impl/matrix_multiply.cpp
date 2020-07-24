@@ -12,10 +12,10 @@ auto mm_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
   .pattern({
     "aten::matmul(Tensor self, Tensor other) -> (Tensor)",
     [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-      auto self = args[0].ITensorOrFreeze(ctx, n);
+      auto self = args[0].ITensorOrFreeze(ctx);
       LOG_DEBUG("self tensor shape: " << self->getDimensions());
 
-      auto other = args[1].ITensorOrFreeze(ctx, n);
+      auto other = args[1].ITensorOrFreeze(ctx);
       LOG_DEBUG("other tensor shape: " << other->getDimensions());
 
       auto mm_layer = ctx->net->addMatrixMultiply(*self, nvinfer1::MatrixOperation::kNONE, *other, nvinfer1::MatrixOperation::kNONE);

@@ -13,7 +13,7 @@ static auto shuffle_registrations TRTORCH_UNUSED = RegisterNodeConversionPattern
   .pattern({
     "aten::flatten.using_ints(Tensor self, int start_dim=0, int end_dim=-1) -> (Tensor)",
     [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-      auto in = args[0].ITensorOrFreeze(ctx, n);
+      auto in = args[0].ITensorOrFreeze(ctx);
       auto start_dim = args[1].unwrapToInt();
       auto end_dim = args[2].unwrapToInt();
       auto in_shape = util::toVec(in->getDimensions());
@@ -36,7 +36,7 @@ static auto shuffle_registrations TRTORCH_UNUSED = RegisterNodeConversionPattern
   }).pattern({
     "aten::reshape(Tensor self, int[] shape) -> (Tensor)",
     [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-      auto in = args[0].ITensorOrFreeze(ctx, n);
+      auto in = args[0].ITensorOrFreeze(ctx);
       auto in_shape = util::toVec(in->getDimensions());
       std::vector<int64_t> new_shape;
       if (ctx->input_is_dynamic) {
@@ -58,7 +58,7 @@ static auto shuffle_registrations TRTORCH_UNUSED = RegisterNodeConversionPattern
   }).pattern({
     "aten::view(Tensor(a) self, int[] size) -> (Tensor(a))",
     [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-      auto in = args[0].ITensorOrFreeze(ctx, n);
+      auto in = args[0].ITensorOrFreeze(ctx);
       auto in_shape = util::toVec(in->getDimensions());
 
       auto shuffle = ctx->net->addShuffle(*in);
@@ -74,7 +74,7 @@ static auto shuffle_registrations TRTORCH_UNUSED = RegisterNodeConversionPattern
   }).pattern({
     "aten::permute(Tensor(a) self, int[] dims) -> (Tensor(a))",
     [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-      auto in = args[0].ITensorOrFreeze(ctx, n);
+      auto in = args[0].ITensorOrFreeze(ctx);
       auto in_shape = util::toVec(in->getDimensions());
       auto new_order = args[1].unwrapToIntList().vec();
 

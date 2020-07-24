@@ -14,7 +14,7 @@ namespace {
           {"aten::" #unary "(Tensor self) -> Tensor",                           \
            [](ConversionCtx *ctx, const torch::jit::Node *n,                    \
               args &args) -> bool {                                             \
-             auto in = args[0].ITensorOrFreeze(ctx, n);                                       \
+             auto in = args[0].ITensorOrFreeze(ctx);                                       \
              auto unary =                                                       \
                  ctx->net->addUnary(*in, nvinfer1::UnaryOperation::trt_type);   \
                                                                                 \
