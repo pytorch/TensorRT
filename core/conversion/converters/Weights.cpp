@@ -24,9 +24,9 @@ Weights::Weights(ConversionCtx* ctx, float val) {
     this->data.values = buf;
     this->data.count = 1;
     ctx->builder_resources.push_back(buf);
-    
-    this->kernel_shape.nbDims = 1;
-    this->kernel_shape.d[0] = 1;
+
+    this->shape.nbDims = 0;
+    this->kernel_shape.nbDims = 0;
 }
 
 Weights::Weights(ConversionCtx* ctx, int32_t val) {
@@ -41,8 +41,8 @@ Weights::Weights(ConversionCtx* ctx, int32_t val) {
     ctx->builder_resources.push_back(buf);
 
     this->shape.nbDims = 0;
+    this->kernel_shape.nbDims = 0;
 }
-
 
 Weights::Weights(ConversionCtx* ctx, at::Tensor t) {
     if (t.sizes().size() > nvinfer1::Dims::MAX_DIMS) {
