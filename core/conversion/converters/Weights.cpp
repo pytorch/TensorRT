@@ -47,7 +47,7 @@ Weights::Weights(ConversionCtx* ctx, int32_t val) {
 Weights::Weights(ConversionCtx* ctx, at::Tensor t) {
     if (t.sizes().size() > nvinfer1::Dims::MAX_DIMS) {
         //TODO: Handle this with exceptions or whatever
-        LOG_INTERNAL_ERROR("The tensor requested to be converted to nvinfer1::Weights exceeds the max number of dimensions for TensorRT");
+        TRTORCH_THROW_ERROR("The tensor requested to be converted to nvinfer1::Weights exceeds the max number of dimensions for TensorRT");
     }
     this->shape = util::toDims(t.sizes());
     if (t.sizes().size() >= 2) {

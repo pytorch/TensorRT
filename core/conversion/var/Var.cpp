@@ -88,7 +88,11 @@ std::string Var::type_name() const {
 }
 
 nvinfer1::ITensor* Var::ITensorOrFreeze(ConversionCtx* ctx) {
+  if (isIValue()) {
+    LOG_DEBUG(ctx->logger, "Found IValue containing object of type " << *(ptr_.ivalue->type()));
+  }
   TRTORCH_CHECK(isITensor() || (isIValue() && ptr_.ivalue->isTensor()), "Requested either IValue containing a Tensor, or ITensor, however Var type is " << type_name());
+  
   nvinfer1::ITensor* out;
 
   if (isIValue()) {
