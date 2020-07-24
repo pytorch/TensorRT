@@ -77,7 +77,7 @@ Weights::Weights(ConversionCtx* ctx, at::Tensor t) {
     if (!dtype_optional) {
         //TODO: Handle this with exceptions or whatever
         //TODO: Implement handling for the Torch Types
-       LOG_INTERNAL_ERROR("The tensor requested to be converted to nvinfer1::Weights is of an unsupported type");
+       TRTORCH_THROW_ERROR("The tensor requested to be converted to nvinfer1::Weights is of an unsupported type");
     }
 
     // Store the data in the conversion context so it remains until building is complete
