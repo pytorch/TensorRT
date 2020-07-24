@@ -87,7 +87,7 @@ std::string Var::type_name() const {
   }
 }
 
-nvinfer1::ITensor* Var::ITensorOrFreeze(ConversionCtx* ctx, const torch::jit::Node* n) {
+nvinfer1::ITensor* Var::ITensorOrFreeze(ConversionCtx* ctx) {
   TRTORCH_CHECK(isITensor() || (isIValue() && ptr_.ivalue->isTensor()), "Requested either IValue containing a Tensor, or ITensor, however Var type is " << type_name());
   nvinfer1::ITensor* out;
 
@@ -95,7 +95,7 @@ nvinfer1::ITensor* Var::ITensorOrFreeze(ConversionCtx* ctx, const torch::jit::No
     auto weights = converters::Weights(ctx, ptr_.ivalue->toTensor());
 
     auto const_layer = ctx->net->addConstant(weights.shape, weights.data);
-    TRTORCH_CHECK(const_layer, "Unable to freeze tensor for node: " << *n);
+    TRTORCH_CHECK(const_layer, "Unable to freeze tensor into constant layer");
 
     out = const_layer->getOutput(0);
 
@@ -103,7 +103,7 @@ nvinfer1::ITensor* Var::ITensorOrFreeze(ConversionCtx* ctx, const torch::jit::No
     tensor_id << reinterpret_cast<int*>(out);
 
     LOG_DEBUG(ctx->logger, "Freezing tensor " << tensor_id.str() << " as an IConstantLayer");
-    const_layer->setName((util::node_info(n) + " [Freeze Tensor " + tensor_id.str() + " ]").c_str());
+    const_layer->setName(("[Freeze Tensor " + tensor_id.str() + " ]").c_str());
   } else {
     out = ptr_.tensor;
   }

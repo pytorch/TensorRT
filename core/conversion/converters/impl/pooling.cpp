@@ -11,7 +11,7 @@ namespace impl {
 namespace {
 
 bool MaxPoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& args) {
-    auto in = args[0].ITensorOrFreeze(ctx, n);
+    auto in = args[0].ITensorOrFreeze(ctx);
     auto shape = util::toVec(in->getDimensions());
 
     // Max Pool needs at least 4D input
@@ -65,7 +65,7 @@ bool MaxPoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& ar
 }
 
 bool AvgPoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& args) {
-    auto in = args[0].ITensorOrFreeze(ctx, n);
+    auto in = args[0].ITensorOrFreeze(ctx);
     auto shape = util::toVec(in->getDimensions());
 
     // Avg Pool needs at least 4D input
@@ -122,7 +122,7 @@ auto pooling_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
     .pattern({
         "aten::max_pool1d(Tensor self, int[1] kernel_size, int[1] stride=[], int[1] padding=[], int[1] dilation=[], bool ceil_mode=False) -> (Tensor)",
         [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-            auto in = args[0].ITensorOrFreeze(ctx, n);
+            auto in = args[0].ITensorOrFreeze(ctx);
             auto shape = util::toVec(in->getDimensions());
 
             // Max Pool needs at least 4D input
@@ -182,7 +182,7 @@ auto pooling_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
     }).pattern({
         "aten::avg_pool1d(Tensor self, int[1] kernel_size, int[1] stride=[], int[1] padding=0, bool ceil_mode=False, bool count_include_pad=True) -> Tensor",
         [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-            auto in = args[0].ITensorOrFreeze(ctx, n);
+            auto in = args[0].ITensorOrFreeze(ctx);
             auto shape = util::toVec(in->getDimensions());
 
             // Avg Pool needs at least 4D input
@@ -262,7 +262,7 @@ auto pooling_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
     }).pattern({
         "aten::adaptive_avg_pool2d(Tensor self, int[2] output_size) -> (Tensor)",
         [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-            auto in = args[0].ITensorOrFreeze(ctx, n);
+            auto in = args[0].ITensorOrFreeze(ctx);
             auto in_shape = util::toVec(in->getDimensions());
 
             if (in_shape.size() < 4) {
