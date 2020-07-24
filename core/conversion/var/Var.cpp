@@ -1,3 +1,5 @@
+#include <sstream>
+
 #include "core/util/prelude.h"
 #include "core/conversion/var/Var.h"
 
@@ -86,7 +88,7 @@ std::string Var::type_name() const {
 }
 
 nvinfer1::ITensor* Var::ITensorOrFreeze(ConversionCtx* ctx, const torch::jit::Node* n) {
-  TRTORCH_CHECK(isITensor() || isIValue(), "Requested either IValue or ITensor, however Var type is " << type_name());
+  TRTORCH_CHECK(isITensor() || (isIValue() && ptr_.ivalue->isTensor()), "Requested either IValue containing a Tensor, or ITensor, however Var type is " << type_name());
   nvinfer1::ITensor* out;
 
   if (isIValue()) {
@@ -94,9 +96,14 @@ nvinfer1::ITensor* Var::ITensorOrFreeze(ConversionCtx* ctx, const torch::jit::No
 
     auto const_layer = ctx->net->addConstant(weights.shape, weights.data);
     TRTORCH_CHECK(const_layer, "Unable to freeze tensor for node: " << *n);
-    const_layer->setName((util::node_info(n) + " [Freeze Tensor]").c_str());
 
     out = const_layer->getOutput(0);
+
+    std::ostringstream tensor_id;
+    tensor_id << reinterpret_cast<int*>(out);
+
+    LOG_DEBUG(ctx->logger, "Freezing tensor " << tensor_id.str() << " as an IConstantLayer");
+    const_layer->setName((util::node_info(n) + " [Freeze Tensor " + tensor_id.str() + " ]").c_str());
   } else {
     out = ptr_.tensor;
   }
