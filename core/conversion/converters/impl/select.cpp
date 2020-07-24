@@ -17,13 +17,13 @@ auto select_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
     .pattern({
         "aten::select.int(Tensor(a) self, int dim, int index) -> (Tensor(a))",
         [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-            auto in = args[0].ITensorOrFreeze(ctx, n);
+            auto in = args[0].ITensorOrFreeze(ctx);
             auto axis  = args[1].unwrapToInt();
 
             nvinfer1::ITensor* ind_tensor;
 
             if (args[2].isITensor()) {
-                ind_tensor = args[2].ITensorOrFreeze(ctx, n);
+                ind_tensor = args[2].ITensorOrFreeze(ctx);
             } else {
                 auto weights = Weights(ctx, (int32_t) args[2].unwrapToInt());
 
