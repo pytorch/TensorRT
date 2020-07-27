@@ -46,7 +46,6 @@ Weights::Weights(ConversionCtx* ctx, int32_t val) {
 
 Weights::Weights(ConversionCtx* ctx, at::Tensor t) {
     if (t.sizes().size() > nvinfer1::Dims::MAX_DIMS) {
-        //TODO: Handle this with exceptions or whatever
         TRTORCH_THROW_ERROR("The tensor requested to be converted to nvinfer1::Weights exceeds the max number of dimensions for TensorRT");
     }
     this->shape = util::toDims(t.sizes());
@@ -75,8 +74,6 @@ Weights::Weights(ConversionCtx* ctx, at::Tensor t) {
     t_cpu = t_cpu.contiguous();
     auto dtype_optional = util::toTRTDataType(t_cpu.dtype());
     if (!dtype_optional) {
-        //TODO: Handle this with exceptions or whatever
-        //TODO: Implement handling for the Torch Types
        TRTORCH_THROW_ERROR("The tensor requested to be converted to nvinfer1::Weights is of an unsupported type");
     }
 
