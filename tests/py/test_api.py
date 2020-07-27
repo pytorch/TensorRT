@@ -85,7 +85,7 @@ def test_suite():
     suite = unittest.TestSuite()
     suite.addTest(TestCompile.parametrize(TestCompile, model=models.resnet18(pretrained=True)))
     suite.addTest(TestCompile.parametrize(TestCompile, model=models.resnet50(pretrained=True)))
-    suite.addTest(TestCompile.parametrize(TestCompile, model=models.mobilenet_v2(pretrained=True)))
+    #suite.addTest(TestCompile.parametrize(TestCompile, model=models.mobilenet_v2(pretrained=True)))
     suite.addTest(unittest.makeSuite(TestCheckMethodOpSupport))
     suite.addTest(unittest.makeSuite(TestLoggingAPIs))
 
