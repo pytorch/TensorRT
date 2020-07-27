@@ -8,25 +8,38 @@
 #include "torch/csrc/jit/ir/ir.h"
 
 #include "core/util/prelude.h"
+#include <cuda_runtime.h>
 
 namespace trtorch {
 namespace core {
 namespace conversion {
 
+struct Device {
+    nvinfer1::DeviceType device_type;
+    uint64_t gpu_id;
+    uint64_t dla_core;
+    bool allow_gpu_fallback;
+    Device():
+            device_type(nvinfer1::DeviceType::kGPU),
+            gpu_id(0),
+            dla_core(0),
+            allow_gpu_fallback(false)
+    {}
+};
+
+
 struct BuilderSettings {
-  // Defaults should reflect TensorRT defaults for BuilderConfig
-  nvinfer1::DataType op_precision = nvinfer1::DataType::kFLOAT;
-  bool refit = false;
-  bool debug = false;
-  bool strict_types = false;
-  bool allow_gpu_fallback = true;
-  nvinfer1::DeviceType device = nvinfer1::DeviceType::kGPU;
-  nvinfer1::EngineCapability capability = nvinfer1::EngineCapability::kDEFAULT;
-  nvinfer1::IInt8Calibrator* calibrator = nullptr;
-  uint64_t num_min_timing_iters = 2;
-  uint64_t num_avg_timing_iters = 1;
-  uint64_t workspace_size = 0;
-  uint64_t max_batch_size = 0;
+    nvinfer1::DataType op_precision = nvinfer1::DataType::kFLOAT;
+    bool refit = false;
+    bool debug = false;
+    bool strict_types = false;
+    Device device;
+    nvinfer1::EngineCapability capability = nvinfer1::EngineCapability::kDEFAULT;
+    nvinfer1::IInt8Calibrator* calibrator = nullptr;
+    uint64_t num_min_timing_iters = 2;
+    uint64_t num_avg_timing_iters = 1;
+    uint64_t workspace_size = 0;
+    uint64_t max_batch_size = 0;
 
   BuilderSettings() = default;
   BuilderSettings(const BuilderSettings& other) = default;

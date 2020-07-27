@@ -60,26 +60,48 @@ nvinfer1::ILayer* add_elementwise(
       self = self_shuffle->getOutput(0);
     }
 
-    auto scale = Weights(ctx, scalar);
-    auto scaled = ctx->net->addScaleNd(*other, nvinfer1::ScaleMode::kUNIFORM, {}, scale.data, {}, 0);
-    auto scaled_other = scaled->getOutput(0);
+    nvinfer1::ILayer* ele;
+    if (scalar != 1) {
+        LOG_WARNING("Please verify scalar handling in add converter, channel axis set to 3 but scaling is uniform");
 
-    // if (shape.size() < 4) {
-    //      LOG_DEBUG("Input shape wass less than 3D got, so was reshaped for
-    //      scale, reshaping back to: " << util::toDims(shape)); auto shuffle =
-    //      ctx->net->addShuffle(*scaled_other);
-    //      shuffle->setReshapeDimensions(util::toDims(shape));
-    //      shuffle->setName(std::string("[Reshape other to " +
-    //      util::toStr(util::toDims(shape)) + ']').c_str()); scaled_other =
-    //      shuffle->getOutput(0);
-    // }
+        auto shape = util::toVec(other_dims);
 
-    ele = ctx->net->addElementWise(*self, *scaled_other, op);
-  } else {
-    ele = ctx->net->addElementWise(*self, *other, op);
-  }
+        if (shape.size() < 4) {
+             auto new_shape = util::toDimsPad(shape, 4);
+             LOG_DEBUG("Input shape is less than 4D got: " << util::toDims(shape) << ", inserting shuffle layers to reshape to 4D tensor shape: " << new_shape);
+             auto other_shuffle = ctx->net->addShuffle(*other);
+             other_shuffle->setReshapeDimensions(new_shape);
+             other_shuffle->setName(std::string("[Reshape other to " + util::toStr(new_shape) + ']').c_str());
+             other = other_shuffle->getOutput(0);
 
-  return ele;
+             auto self_shuffle = ctx->net->addShuffle(*self);
+             self_shuffle->setReshapeDimensions(new_shape);
+             self_shuffle->setName(std::string("[Reshape self to " + util::toStr(new_shape) + ']').c_str());
+             self = self_shuffle->getOutput(0);
+        }
+
+        auto tensor_type = util::toATenDType(self->getType());
+        auto scale = Weights(ctx, scalar);
+        auto power =  Weights(ctx, at::ones({1}).to(tensor_type));
+        auto shift = Weights(ctx, at::zeros({1}).to(tensor_type));
+        auto scaled = ctx->net->addScaleNd(*other, nvinfer1::ScaleMode::kUNIFORM, shift.data, scale.data, power.data, 0);
+        auto scaled_other = scaled->getOutput(0);
+
+        // if (shape.size() < 4) {
+        //      LOG_DEBUG("Input shape wass less than 3D got, so was reshaped for scale, reshaping back to: " << util::toDims(shape));
+        //      auto shuffle = ctx->net->addShuffle(*scaled_other);
+        //      shuffle->setReshapeDimensions(util::toDims(shape));
+        //      shuffle->setName(std::string("[Reshape other to " + util::toStr(util::toDims(shape)) + ']').c_str());
+        //      scaled_other = shuffle->getOutput(0);
+        // }
+
+        ele = ctx->net->addElementWise(*self, *scaled_other, op);
+    } else {
+        ele = ctx->net->addElementWise(*self, *other, op);
+    }
+
+    return ele;
+
 }
 
 auto element_wise_registrations TRTORCH_UNUSED =

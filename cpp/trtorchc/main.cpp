@@ -131,121 +131,58 @@ std::string resolve_path(std::string path) {
 }
 
 int main(int argc, char** argv) {
-  trtorch::logging::set_is_colored_output_on(true);
-  trtorch::logging::set_reportable_log_level(trtorch::logging::Level::kWARNING);
-  trtorch::logging::set_logging_prefix("");
+    trtorch::logging::set_is_colored_output_on(true);
+    trtorch::logging::set_reportable_log_level(trtorch::logging::Level::kWARNING);
+    trtorch::logging::set_logging_prefix("");
 
-  args::ArgumentParser parser(
-      "TRTorch is a compiler for TorchScript, it will compile and optimize TorchScript programs to run on NVIDIA GPUs using TensorRT",
-      "");
-  args::HelpFlag help(parser, "help", "Display this help menu", {'h', "help"});
 
-  args::Group group(parser, "Verbiosity of the compiler", args::Group::Validators::AtMostOne);
-  args::Flag verbose(
-      group, "verbose", "Dumps debugging information about the compilation process onto the console", {'v', "verbose"});
-  args::Flag warning(
-      group,
-      "warning",
-      "Disables warnings generated during compilation onto the console (warnings are on by default)",
-      {'w', "warnings"});
-  args::Flag info(group, "info", "Dumps info messages generated during compilation onto the console", {"i", "info"});
+    args::ArgumentParser parser("TRTorch is a compiler for TorchScript, it will compile and optimize TorchScript programs to run on NVIDIA GPUs using TensorRT", "");
+    args::HelpFlag help(parser, "help", "Display this help menu", {'h', "help"});
 
-  args::Flag build_debuggable_engine(
-      parser, "build-debuggable-engine", "Creates a debuggable engine", {"build-debuggable-engine"});
-  args::Flag use_strict_types(
-      parser,
-      "use-strict-types",
-      "Restrict operating type to only use set default operation precision (op_precision)",
-      {"use-strict-types"});
-  args::Flag allow_gpu_fallback(
-      parser,
-      "allow-gpu-fallback",
-      "(Only used when targeting DLA (device-type)) Lets engine run layers on GPU if they are not supported on DLA",
-      {"allow-gpu-fallback"});
+    args::Group group(parser, "Verbiosity of the compiler", args::Group::Validators::AtMostOne);
+    args::Flag verbose(group, "verbose", "Dumps debugging information about the compilation process onto the console", {'v', "verbose"});
+    args::Flag warning(group, "warning", "Disables warnings generated during compilation onto the console (warnings are on by default)", {'w', "warnings"});
+    args::Flag info(group, "info", "Dumps info messages generated during compilation onto the console", {"i", "info"});
 
-  args::ValueFlag<std::string> op_precision(
-      parser,
-      "precision",
-      "Default operating precision for the engine (Int8 requires a calibration-cache argument) [ float | float32 | f32 | half | float16 | f16 | int8 | i8 ] (default: float)",
-      {'p', "default-op-precision"});
-  args::ValueFlag<std::string> device_type(
-      parser,
-      "type",
-      "The type of device the engine should be built for [ gpu | dla ] (default: gpu)",
-      {'d', "device-type"});
-  args::ValueFlag<std::string> engine_capability(
-      parser,
-      "capability",
-      "The type of device the engine should be built for [ default | safe_gpu | safe_dla ]",
-      {"engine-capability"});
+    args::Flag build_debuggable_engine(parser, "build-debuggable-engine", "Creates a debuggable engine", {"build-debuggable-engine"});
+    args::Flag use_strict_types(parser, "use-strict-types", "Restrict operating type to only use set default operation precision (op_precision)", {"use-strict-types"});
+    args::Flag allow_gpu_fallback(parser, "allow-gpu-fallback", "(Only used when targeting DLA (device-type)) Lets engine run layers on GPU if they are not supported on DLA", {"allow-gpu-fallback"});
 
-  args::ValueFlag<std::string> calibration_cache_file(
-      parser,
-      "file_path",
-      "Path to calibration cache file to use for post training quantization",
-      {"calibration-cache-file"});
-  args::ValueFlag<int> num_min_timing_iters(
-      parser, "num_iters", "Number of minimization timing iterations used to select kernels", {"num-min-timing-iter"});
-  args::ValueFlag<int> num_avg_timing_iters(
-      parser, "num_iters", "Number of averaging timing iterations used to select kernels", {"num-avg-timing-iters"});
-  args::ValueFlag<int> workspace_size(
-      parser, "workspace_size", "Maximum size of workspace given to TensorRT", {"workspace-size"});
-  args::ValueFlag<int> max_batch_size(
-      parser, "max_batch_size", "Maximum batch size (must be >= 1 to be set, 0 means not set)", {"max-batch-size"});
-  args::ValueFlag<double> threshold(
-      parser,
-      "threshold",
-      "Maximum acceptable numerical deviation from standard torchscript output (default 2e-5)",
-      {'t', "threshold"});
+    args::ValueFlag<std::string> op_precision(parser, "precision", "Default operating precision for the engine (Int8 requires a calibration-cache argument) [ float | float32 | f32 | half | float16 | f16 | int8 | i8 ] (default: float)", {'p', "default-op-precision"});
+    args::ValueFlag<std::string> device_type(parser, "type", "The type of device the engine should be built for [ gpu | dla ] (default: gpu)", {'d', "device-type"});
+    args::ValueFlag<int> gpu_id(parser, "gpu_id", "GPU id if running on multi-GPU platform (defaults to 0)", {"gpu-id"});
+    args::ValueFlag<int> dla_core(parser, "dla_core", "DLACore id if running on available DLA (defaults to 0)", {"dla-core"});
 
-  args::Flag save_engine(
-      parser,
-      "save_engine",
-      "Instead of compiling a full a TorchScript program, save the created engine to the path specified as the output path",
-      {"save-engine"});
-  args::Positional<std::string> input_path(parser, "input_file_path", "Path to input TorchScript file");
-  args::Positional<std::string> output_path(
-      parser, "output_file_path", "Path for compiled TorchScript (or TensorRT engine) file");
-  args::PositionalList<std::string> input_shapes(
-      parser,
-      "input_shapes",
-      "Sizes for inputs to engine, can either be a single size or a range defined by Min, Optimal, Max sizes, e.g. \"(N,..,C,H,W)\" \"[(MIN_N,..,MIN_C,MIN_H,MIN_W);(OPT_N,..,OPT_C,OPT_H,OPT_W);(MAX_N,..,MAX_C,MAX_H,MAX_W)]\"");
+    args::ValueFlag<std::string> engine_capability(parser, "capability", "The type of device the engine should be built for [ default | safe_gpu | safe_dla ]", {"engine-capability"});
 
-  try {
-    parser.ParseCLI(argc, argv);
-  } catch (args::Help) {
-    std::cout << parser;
-    return 0;
-  } catch (args::ParseError e) {
-    std::cerr << e.what() << std::endl;
-    std::cerr << parser;
-    return 1;
-  } catch (args::ValidationError e) {
-    std::cerr << e.what() << std::endl;
-    std::cerr << parser;
-    return 1;
-  }
+    args::ValueFlag<std::string> calibration_cache_file(parser, "file_path", "Path to calibration cache file to use for post training quantization", {"calibration-cache-file"});
+    args::ValueFlag<int> num_min_timing_iters(parser, "num_iters", "Number of minimization timing iterations used to select kernels", {"num-min-timing-iter"});
+    args::ValueFlag<int> num_avg_timing_iters(parser, "num_iters", "Number of averaging timing iterations used to select kernels", {"num-avg-timing-iters"});
+    args::ValueFlag<int> workspace_size(parser, "workspace_size", "Maximum size of workspace given to TensorRT", {"workspace-size"});
+    args::ValueFlag<int> max_batch_size(parser, "max_batch_size", "Maximum batch size (must be >= 1 to be set, 0 means not set)", {"max-batch-size"});
+    args::ValueFlag<double> threshold(parser, "threshold", "Maximum acceptable numerical deviation from standard torchscript output (default 2e-5)", {'t',  "threshold"});
 
-  if (verbose) {
-    trtorch::logging::set_reportable_log_level(trtorch::logging::Level::kDEBUG);
-  } else if (info) {
-    trtorch::logging::set_reportable_log_level(trtorch::logging::Level::kINFO);
-  } else if (warning) {
-    trtorch::logging::set_reportable_log_level(trtorch::logging::Level::kERROR);
-  }
 
-  std::vector<trtorch::CompileSpec::InputRange> ranges;
-  for (const auto shapes : args::get(input_shapes)) {
-    if (shapes.rfind("(", 0) == 0) {
-      ranges.push_back(trtorch::CompileSpec::InputRange(parseSingleDim(shapes)));
-    } else if (shapes.rfind("[", 0) == 0) {
-      ranges.push_back(parseDynamicDim(shapes));
-    } else {
-      trtorch::logging::log(
-          trtorch::logging::Level::kERROR,
-          "Dimensions should be specified in one of these types \"(N,..,C,H,W)\" \"[(MIN_N,..,MIN_C,MIN_H,MIN_W);(OPT_N,..,OPT_C,OPT_H,OPT_W);(MAX_N,..,MAX_C,MAX_H,MAX_W)]\"\n e.g \"(3,3,300,300)\" \"[(3,3,100,100);(3,3,200,200);(3,3,300,300)]\"");
-      std::cerr << parser;
-      exit(1);
+    args::Flag save_engine(parser, "save_engine", "Instead of compiling a full a TorchScript program, save the created engine to the path specified as the output path", {"save-engine"});
+    args::Positional<std::string> input_path(parser, "input_file_path", "Path to input TorchScript file");
+    args::Positional<std::string> output_path(parser, "output_file_path", "Path for compiled TorchScript (or TensorRT engine) file");
+    args::PositionalList<std::string> input_shapes(parser, "input_shapes", "Sizes for inputs to engine, can either be a single size or a range defined by Min, Optimal, Max sizes, e.g. \"(N,..,C,H,W)\" \"[(MIN_N,..,MIN_C,MIN_H,MIN_W);(OPT_N,..,OPT_C,OPT_H,OPT_W);(MAX_N,..,MAX_C,MAX_H,MAX_W)]\"");
+
+
+    try
+    {
+        parser.ParseCLI(argc, argv);
+    }
+    catch (args::Help)
+    {
+        std::cout << parser;
+        return 0;
+    }
+    catch (args::ParseError e)
+    {
+        std::cerr << e.what() << std::endl;
+        std::cerr << parser;
+        return 1;
     }
   }
 
@@ -296,19 +233,65 @@ int main(int argc, char** argv) {
       std::cerr << parser;
       return 1;
     }
-  }
 
-  if (device_type) {
-    auto device = args::get(device_type);
-    std::transform(device.begin(), device.end(), device.begin(), [](unsigned char c) { return std::tolower(c); });
-    if (device == "gpu") {
-      compile_settings.device = trtorch::CompileSpec::DeviceType::kGPU;
-    } else if (device == "dla") {
-      compile_settings.device = trtorch::CompileSpec::DeviceType::kDLA;
-    } else {
-      trtorch::logging::log(trtorch::logging::Level::kERROR, "Invalid device type, options are [ gpu | dla ]");
-      std::cerr << parser;
-      return 1;
+    if (device_type) {
+        auto device = args::get(device_type);
+        std::transform(device.begin(), device.end(), device.begin(), [](unsigned char c){ return std::tolower(c); });
+
+        if (gpu_id) {
+            compile_settings.device.gpu_id = args::get(gpu_id);
+            trtorch::set_device(compile_settings.device.gpu_id);
+        }
+
+        if (device == "gpu") {
+            compile_settings.device.device_type = trtorch::CompileSpec::DeviceType::kGPU;
+        } else if (device == "dla") {
+            compile_settings.device.device_type = trtorch::CompileSpec::DeviceType::kDLA;
+            if (dla_core) {
+		    compile_settings.device.dla_core = args::get(dla_core);
+	    }
+        } else {
+            trtorch::logging::log(trtorch::logging::Level::kERROR, "Invalid device type, options are [ gpu | dla ]");
+            std::cerr << parser;
+            return 1;
+        }
+      }
+
+
+    if (verbose) {
+        trtorch::logging::set_reportable_log_level(trtorch::logging::Level::kDEBUG);
+    } else if (info) {
+        trtorch::logging::set_reportable_log_level(trtorch::logging::Level::kINFO);
+    } else if (warning) {
+        trtorch::logging::set_reportable_log_level(trtorch::logging::Level::kERROR);
+    }
+
+
+    std::vector<trtorch::CompileSpec::InputRange> ranges;
+    for (const auto shapes : args::get(input_shapes)) {
+        if (shapes.rfind("(", 0) == 0) {
+            ranges.push_back(trtorch::CompileSpec::InputRange(parseSingleDim(shapes)));
+        } else if (shapes.rfind("[", 0) == 0) {
+            ranges.push_back(parseDynamicDim(shapes));
+        } else {
+            trtorch::logging::log(trtorch::logging::Level::kERROR, "Dimensions should be specified in one of these types \"(N,..,C,H,W)\" \"[(MIN_N,..,MIN_C,MIN_H,MIN_W);(OPT_N,..,OPT_C,OPT_H,OPT_W);(MAX_N,..,MAX_C,MAX_H,MAX_W)]\"\n e.g \"(3,3,300,300)\" \"[(3,3,100,100);(3,3,200,200);(3,3,300,300)]\"");
+            std::cerr << parser;
+            exit(1);
+        }
+    }
+
+    auto compile_settings = trtorch::CompileSpec(ranges);
+
+    if (build_debuggable_engine) {
+        compile_settings.debug = true;
+    }
+
+    if (use_strict_types) {
+        compile_settings.strict_types = true;
+    }
+
+    if (allow_gpu_fallback) {
+        compile_settings.device.allow_gpu_fallback = true;
     }
   }
 
@@ -406,8 +389,7 @@ int main(int argc, char** argv) {
         auto results = trt_results_ivalues.toTuple()->elements();
         for (auto r : results) {
           trt_results.push_back(r.toTensor());
-        }
-      }
+    }
 
       for (size_t i = 0; i < trt_results.size(); i++) {
         if (!almostEqual(jit_results[i], trt_results[i].reshape_as(jit_results[i]), threshold_val)) {

@@ -86,51 +86,46 @@ PYBIND11_MODULE(_C, m) {
       .export_values();
 
   py::enum_<DeviceType>(m, "DeviceType", "Enum to specify device kinds to build TensorRT engines for")
-      .value("gpu", DeviceType::kGPU, "Specify using GPU to execute TensorRT Engine")
-      .value("dla", DeviceType::kDLA, "Specify using DLA to execute TensorRT Engine (Jetson Only)")
-      .export_values();
+    .value("GPU", DeviceType::kGPU, "Specify using GPU to execute TensorRT Engine")
+    .value("DLA", DeviceType::kDLA, "Specify using DLA to execute TensorRT Engine (Jetson Only)")
+    .export_values();
 
-  py::enum_<EngineCapability>(
-      m,
-      "EngineCapability",
-      "Enum to specify engine capability settings (selections of kernels to meet safety requirements)")
-      .value("safe_gpu", EngineCapability::kSAFE_GPU, "Use safety GPU kernels only")
-      .value("safe_dla", EngineCapability::kSAFE_DLA, "Use safety DLA kernels only")
-      .value("default", EngineCapability::kDEFAULT, "Use default behavior");
+  py::enum_<EngineCapability>(m, "EngineCapability", "Enum to specify engine capability settings (selections of kernels to meet safety requirements)")
+    .value("safe_gpu", EngineCapability::kSAFE_GPU, "Use safety GPU kernels only")
+    .value("safe_dla", EngineCapability::kSAFE_DLA, "Use safety DLA kernels only")
+    .value("default",  EngineCapability::kDEFAULT, "Use default behavior");
 
   py::class_<CompileSpec>(m, "CompileSpec")
-      .def(py::init<>())
-      .def_readwrite("input_ranges", &CompileSpec::input_ranges)
-      .def_readwrite("op_precision", &CompileSpec::op_precision)
-      .def_readwrite("refit", &CompileSpec::refit)
-      .def_readwrite("debug", &CompileSpec::debug)
-      .def_readwrite("strict_types", &CompileSpec::strict_types)
-      .def_readwrite("allow_gpu_fallback", &CompileSpec::allow_gpu_fallback)
-      .def_readwrite("device", &CompileSpec::device)
-      .def_readwrite("capability", &CompileSpec::capability)
-      .def_readwrite("num_min_timing_iters", &CompileSpec::num_min_timing_iters)
-      .def_readwrite("num_avg_timing_iters", &CompileSpec::num_avg_timing_iters)
-      .def_readwrite("workspace_size", &CompileSpec::workspace_size)
-      .def_readwrite("max_batch_size", &CompileSpec::max_batch_size);
+    .def(py::init<>())
+    .def_readwrite("input_ranges",         &CompileSpec::input_ranges)
+    .def_readwrite("op_precision",         &CompileSpec::op_precision)
+    .def_readwrite("refit",                &CompileSpec::refit)
+    .def_readwrite("debug",                &CompileSpec::debug)
+    .def_readwrite("strict_types",         &CompileSpec::strict_types)
+    .def_readwrite("allow_gpu_fallback",   &CompileSpec::allow_gpu_fallback)
+    .def_readwrite("device",               &CompileSpec::device)
+    .def_readwrite("capability",           &CompileSpec::capability)
+    .def_readwrite("num_min_timing_iters", &CompileSpec::num_min_timing_iters)
+    .def_readwrite("num_avg_timing_iters", &CompileSpec::num_avg_timing_iters)
+    .def_readwrite("workspace_size",       &CompileSpec::workspace_size)
+    .def_readwrite("max_batch_size",       &CompileSpec::max_batch_size);
 
-  m.doc() =
-      "TRTorch Internal C Bindings: Ahead of Time compilation for PyTorch JIT. A tool to convert PyTorch JIT to TensorRT";
-  m.def(
-      "compile_graph",
-      &trtorch::pyapi::CompileGraph,
-      "Ingest a PyTorch JIT module and convert supported subgraphs to TensorRT engines, returns a JIT module with the engines embedded");
-  m.def(
-      "convert_graph_to_trt_engine",
-      &trtorch::pyapi::ConvertGraphToTRTEngine,
-      "Given a PyTorch JIT Module, convert forward into a TensorRT engine and return a serialized engine");
-  m.def(
-      "check_method_op_support",
-      &trtorch::pyapi::CheckMethodOperatorSupport,
-      "Takes a module and a method name and checks if the method graph contains purely convertable operators");
-  m.def("get_build_info", &get_build_info, "Returns build info about the compiler as a string");
+  py::class_<Device>(m, "Device")
+    .def(py::init<>())
+    .def_readwrite("device_type",          &Device::device_type)
+    .def_readwrite("gpu_id",               &Device::gpu_id)
+    .def_readwrite("dla_core",             &Device::dla_core)
+    .def_readwrite("allow_gpu_fallback",   &Device::allow_gpu_fallback);
 
-  m.def("_get_logging_prefix", &logging::get_logging_prefix, "Get the current prefix for the logging output");
-  m.def("_set_logging_prefix", &logging::set_logging_prefix, "Set the logging prefix for logging output");
+
+  m.doc() = "TRTorch Internal C Bindings: Ahead of Time compilation for PyTorch JIT. A tool to convert PyTorch JIT to TensorRT";
+  m.def("compile_graph",               &trtorch::pyapi::CompileGraph, "Ingest a PyTorch JIT module and convert supported subgraphs to TensorRT engines, returns a JIT module with the engines embedded");
+  m.def("convert_graph_to_trt_engine", &trtorch::pyapi::ConvertGraphToTRTEngine, "Given a PyTorch JIT Module, convert forward into a TensorRT engine and return a serialized engine");
+  m.def("check_method_op_support",     &trtorch::pyapi::CheckMethodOperatorSupport, "Takes a module and a method name and checks if the method graph contains purely convertable operators");
+  m.def("get_build_info",              &get_build_info, "Returns build info about the compiler as a string");
+
+  m.def("_get_logging_prefix",       &logging::get_logging_prefix, "Get the current prefix for the logging output");
+  m.def("_set_logging_prefix",       &logging::set_logging_prefix, "Set the logging prefix for logging output");
   m.def("_get_reportable_log_level", &logging::get_reportable_log_level, "Get the current log level");
   m.def(
       "_set_reportable_log_level",

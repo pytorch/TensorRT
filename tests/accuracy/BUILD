@@ -4,6 +4,17 @@ filegroup(
 )
 
 test_suite(
+    name = "test_accuracy_aarch64",
+    tests = [
+        ":test_dla_int8_accuracy",
+	":test_dla_fp16_accuracy",
+        ":test_int8_accuracy",
+        ":test_fp16_accuracy",
+        ":test_fp32_accuracy",
+    ]
+)
+
+test_suite(
     name = "test_accuracy",
     tests = [
         ":test_int8_accuracy",
@@ -39,6 +50,30 @@ cc_test(
 cc_test(
     name = "test_fp32_accuracy",
     srcs = ["test_fp32_accuracy.cpp"],
+    deps = [
+        ":accuracy_test",
+        "//tests/accuracy/datasets:cifar10"
+    ],
+    data = [
+        ":jit_models",
+    ]
+)
+
+cc_test(
+    name = "test_dla_int8_accuracy",
+    srcs = ["test_dla_int8_accuracy.cpp"],
+    deps = [
+        ":accuracy_test",
+        "//tests/accuracy/datasets:cifar10"
+    ],
+    data = [
+        ":jit_models",
+    ]
+)
+
+cc_test(
+    name = "test_dla_fp16_accuracy",
+    srcs = ["test_dla_fp16_accuracy.cpp"],
     deps = [
         ":accuracy_test",
         "//tests/accuracy/datasets:cifar10"
