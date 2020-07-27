@@ -109,3 +109,50 @@ TEST(Converters, ATenHardTanhCustomRangeConvertsCorrectly) {
     ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
+TEST(Converters, ATenPReLUConvertsCorrectly) {
+    const auto graph = R"IR(
+      graph(%0 : Tensor,
+            %1 : Float(1)):
+        %3 : Tensor = aten::prelu(%0, %1)
+        return (%3))IR";
+
+    auto g = std::make_shared<torch::jit::Graph>();
+    torch::jit::parseIR(graph, &*g);
+
+    auto in = at::randint(-5, 5, {5}, {at::kCUDA});
+    auto slope = at::randint(-5, 5, {1}, {at::kCUDA});
+
+    auto params = trtorch::core::conversion::get_named_params(g->inputs(), {slope});
+    auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
+
+    in = at::clone(in);
+    params = trtorch::core::conversion::get_named_params(g->inputs(), {slope});
+    auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
+
+    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+}
+
+TEST(Converters, ATenPReLUMultiChannelConvertsCorrectly) {
+    const auto graph = R"IR(
+      graph(%0 : Tensor,
+            %1 : Float(10)):
+        %3 : Tensor = aten::prelu(%0, %1)
+        return (%3))IR";
+
+    auto g = std::make_shared<torch::jit::Graph>();
+    torch::jit::parseIR(graph, &*g);
+
+    auto in = at::randint(-5, 5, {1,10, 1, 1}, {at::kCUDA});
+    auto slope = at::randint(-5, 5, {10}, {at::kCUDA});
+
+    auto params = trtorch::core::conversion::get_named_params(g->inputs(), {slope});
+    auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
+
+    in = at::clone(in);
+    params = trtorch::core::conversion::get_named_params(g->inputs(), {slope});
+    auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
+
+    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+}
+
+

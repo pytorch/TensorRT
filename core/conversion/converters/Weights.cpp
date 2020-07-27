@@ -103,6 +103,7 @@ std::ostream& operator<<(std::ostream& os, const Weights& w) {
     os << ']';
     return os;
 }
+
 } // namespace converters
 } // namespace conversion
 } // namespace core
