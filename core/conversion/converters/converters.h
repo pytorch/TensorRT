@@ -55,7 +55,10 @@ struct Weights {
 
 inline nvinfer1::ITensor* tensor_to_const(ConversionCtx* ctx, at::Tensor t) {
     auto t_weights = Weights(ctx, t);
-    return ctx->net->addConstant(t_weights.shape, t_weights.data)->getOutput(0);
+    auto const_layer = ctx->net->addConstant(t_weights.shape, t_weights.data);
+    TRTORCH_CHECK(const_layer, "Unable to freeze tensor");
+    const_layer->setName("[Freeze Tensor]");
+    return const_layer->getOutput(0);
 }
 
 } // namespace converters
