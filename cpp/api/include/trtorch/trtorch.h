@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <cuda_runtime.h>
 
 // Just include the .h?
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
@@ -304,16 +305,44 @@ struct TRTORCH_API ExtraInfo {
      */
     bool strict_types = false;
 
-    /**
-     * (Only used when targeting DLA (device))
-     * Lets engine run layers on GPU if they are not supported on DLA
+    /*
+     * Setting data structure for Target device
      */
-    bool allow_gpu_fallback = true;
+    struct Device {
+       /**
+        * @brief Setting data structure for device
+        * This struct will hold Target device related parameters such as device_type, gpu_id, dla_core
+        */
+       DeviceType device_type;
 
-    /**
-     * Target device type
+       /*
+        * Target gpu id
+        */
+       uint64_t gpu_id;
+
+        /*
+         * When using DLA core on NVIDIA AGX platforms gpu_id should be set as Xavier device
+         */
+       uint64_t dla_core;
+
+        /**
+         * (Only used when targeting DLA (device))
+         * Lets engine run layers on GPU if they are not supported on DLA
+         */
+       bool allow_gpu_fallback;
+
+       Device() :
+               device_type(DeviceType::kGPU),
+               gpu_id(0),
+               dla_core(0),
+               allow_gpu_fallback(false)
+          {}
+    };
+
+    /*
+     * Target Device
      */
-    DeviceType device = DeviceType::kGPU;
+    Device device;
 
     /**
      * Sets the restrictions for the engine (CUDA Safety)
@@ -404,4 +433,16 @@ TRTORCH_API torch::jit::Module CompileGraph(const torch::jit::Module& module, Ex
  * @return: std::string: Serialized TensorRT engine equivilant to the method graph
  */
 TRTORCH_API std::string ConvertGraphToTRTEngine(const torch::jit::Module& module, std::string method_name, ExtraInfo info);
+
+/**
+ * @brief Set gpu device id
+ *
+ * @param gpu_id
+ *
+ * Sets gpu id using cudaSetDevice
+ *
+ * @return: cudaError_t return status
+ */
+TRTORCH_API cudaError_t set_device(const int gpu_id);
+
 } // namespace trtorch

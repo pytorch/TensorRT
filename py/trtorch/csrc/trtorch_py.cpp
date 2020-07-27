@@ -45,6 +45,19 @@ enum DeviceType : int8_t {
   kDLA,
 };
 
+struct Device {
+    DeviceType device_type;
+    uint64_t gpu_id;
+    uint64_t dla_core;
+    bool allow_gpu_fallback;
+    Device():
+            device_type(DeviceType::kGPU), // device_type
+            gpu_id(0),                     // gpu_id
+            dla_core(0),                   // dla_core
+            allow_gpu_fallback(false)       // allow_gpu_fallback
+    {}
+};
+
 nvinfer1::DeviceType toTRTDeviceType(DeviceType value) {
   switch (value) {
   case DeviceType::kDLA:
@@ -84,13 +97,16 @@ struct ExtraInfo {
     info.convert_info.engine_settings.refit = refit;
     info.convert_info.engine_settings.debug = debug;
     info.convert_info.engine_settings.strict_types = strict_types;
-    info.convert_info.engine_settings.allow_gpu_fallback = allow_gpu_fallback;
-    info.convert_info.engine_settings.device = toTRTDeviceType(device);
     info.convert_info.engine_settings.capability = toTRTEngineCapability(capability);
     info.convert_info.engine_settings.num_min_timing_iters = num_min_timing_iters;
     info.convert_info.engine_settings.num_avg_timing_iters = num_avg_timing_iters;
     info.convert_info.engine_settings.workspace_size = workspace_size;
     info.convert_info.engine_settings.max_batch_size = max_batch_size;
+    info.convert_info.engine_settings.device.device_type = toTRTDeviceType(device.device_type);
+    info.convert_info.engine_settings.device.gpu_id = device.gpu_id;
+    info.convert_info.engine_settings.device.dla_core = device.dla_core;
+    info.convert_info.engine_settings.device.allow_gpu_fallback = device.allow_gpu_fallback;
+
     return info;
   }
 
@@ -100,8 +116,7 @@ struct ExtraInfo {
   bool refit = false;
   bool debug = false;
   bool strict_types = false;
-  bool allow_gpu_fallback = true;
-  DeviceType device = DeviceType::kGPU;
+  Device device;
   EngineCapability capability = EngineCapability::kDEFAULT;
   uint64_t num_min_timing_iters = 2;
   uint64_t num_avg_timing_iters = 1;
@@ -180,14 +195,21 @@ PYBIND11_MODULE(_C, m) {
     .export_values();
 
   py::enum_<DeviceType>(m, "DeviceType", "Enum to specify device kinds to build TensorRT engines for")
-    .value("gpu", DeviceType::kGPU, "Specify using GPU to execute TensorRT Engine")
-    .value("dla", DeviceType::kDLA, "Specify using DLA to execute TensorRT Engine (Jetson Only)")
+    .value("GPU", DeviceType::kGPU, "Specify using GPU to execute TensorRT Engine")
+    .value("DLA", DeviceType::kDLA, "Specify using DLA to execute TensorRT Engine (Jetson Only)")
     .export_values();
 
   py::enum_<EngineCapability>(m, "EngineCapability", "Enum to specify engine capability settings (selections of kernels to meet safety requirements)")
     .value("safe_gpu", EngineCapability::kSAFE_GPU, "Use safety GPU kernels only")
     .value("safe_dla", EngineCapability::kSAFE_DLA, "Use safety DLA kernels only")
     .value("default",  EngineCapability::kDEFAULT, "Use default behavior");
+
+  py::class_<Device>(m, "Device")
+    .def(py::init<>())
+    .def_readwrite("device_type",          &Device::device_type)
+    .def_readwrite("gpu_id",               &Device::gpu_id)
+    .def_readwrite("dla_core",             &Device::dla_core)
+    .def_readwrite("allow_gpu_fallback",   &Device::allow_gpu_fallback);
 
   py::class_<ExtraInfo>(m, "ExtraInfo")
     .def(py::init<>())
@@ -196,13 +218,12 @@ PYBIND11_MODULE(_C, m) {
     .def_readwrite("refit",                &ExtraInfo::refit)
     .def_readwrite("debug",                &ExtraInfo::debug)
     .def_readwrite("strict_types",         &ExtraInfo::strict_types)
-    .def_readwrite("allow_gpu_fallback",   &ExtraInfo::allow_gpu_fallback)
-    .def_readwrite("device",               &ExtraInfo::device)
     .def_readwrite("capability",           &ExtraInfo::capability)
     .def_readwrite("num_min_timing_iters", &ExtraInfo::num_min_timing_iters)
     .def_readwrite("num_avg_timing_iters", &ExtraInfo::num_avg_timing_iters)
     .def_readwrite("workspace_size",       &ExtraInfo::workspace_size)
-    .def_readwrite("max_batch_size",       &ExtraInfo::max_batch_size);
+    .def_readwrite("max_batch_size",       &ExtraInfo::max_batch_size)
+    .def_readwrite("device",               &ExtraInfo::device);
 
   m.doc() = "TRTorch Internal C Bindings: Ahead of Time compilation for PyTorch JIT. A tool to convert PyTorch JIT to TensorRT";
   m.def("compile_graph",               &trtorch::pyapi::CompileGraph, "Ingest a PyTorch JIT module and convert supported subgraphs to TensorRT engines, returns a JIT module with the engines embedded");

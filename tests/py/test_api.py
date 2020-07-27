@@ -28,6 +28,12 @@ class TestCompile(ModelTestCase):
     def test_compile_traced(self):
         extra_info = {
             "input_shapes": [self.input.shape],
+            "device": {
+                "device_type": trtorch.DeviceType.GPU,
+                "gpu_id": 0,
+                "dla_core": 0,
+                "allow_gpu_fallback": False
+                }
         }
 
         trt_mod = trtorch.compile(self.traced_model, extra_info)
@@ -37,6 +43,12 @@ class TestCompile(ModelTestCase):
     def test_compile_script(self):
         extra_info = {
             "input_shapes": [self.input.shape],
+            "device": {
+                "device_type": trtorch.DeviceType.GPU,
+                "gpu_id": 0,
+                "dla_core": 0,
+                "allow_gpu_fallback": False
+                }
         }
 
         trt_mod = trtorch.compile(self.scripted_model, extra_info)
@@ -73,7 +85,7 @@ def test_suite():
     suite = unittest.TestSuite()
     suite.addTest(TestCompile.parametrize(TestCompile, model=models.resnet18(pretrained=True)))
     suite.addTest(TestCompile.parametrize(TestCompile, model=models.resnet50(pretrained=True)))
-    suite.addTest(TestCompile.parametrize(TestCompile, model=models.mobilenet_v2(pretrained=True)))
+    #suite.addTest(TestCompile.parametrize(TestCompile, model=models.mobilenet_v2(pretrained=True)))
     suite.addTest(unittest.makeSuite(TestCheckMethodOpSupport))
     suite.addTest(unittest.makeSuite(TestLoggingAPIs))
 

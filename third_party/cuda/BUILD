@@ -19,7 +19,7 @@ cc_library(
     name = "cudart",
     srcs = select({
         ":aarch64_linux": [
-            "targets/aarch64-linux/lib/libcudart.so",
+            "targets/aarch64-linux-gnu/lib/libcudart.so",
         ],
         ":windows": [
             "lib/x64/cudart.lib",
@@ -40,7 +40,7 @@ cc_library(
     name = "nvToolsExt",
     srcs = select({
         ":aarch64_linux": [
-            "targets/aarch64-linux/lib/libnvToolsExt.so.1",
+            "targets/aarch64-linux-gnu/lib/libnvToolsExt.so.1",
         ],
         ":windows": [
             "bin/nvToolsExt64_1.dll",
@@ -55,7 +55,7 @@ cc_library(
     name = "cuda",
     srcs = select({
         ":aarch64_linux": glob([
-            "targets/aarch64-linux/lib/**/lib*.so",
+            "targets/aarch64-linux-gnu/lib/**/lib*.so",
         ]),
         ":windows": [
             "bin/*.dll",

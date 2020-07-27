@@ -14,7 +14,7 @@ std::ostream& operator<<(std::ostream& os, const BuilderSettings& s) {
        << "\n    Make Refittable Engine: " << s.refit                                      \
        << "\n    Debuggable Engine: " << s.debug                                           \
        << "\n    Strict Types: " << s.strict_types                                         \
-       << "\n    Allow GPU Fallback (if running on DLA): " << s.allow_gpu_fallback         \
+       << "\n    Allow GPU Fallback (if running on DLA): " << s.device.allow_gpu_fallback  \
        << "\n    Min Timing Iterations: " << s.num_min_timing_iters                        \
        << "\n    Avg Timing Iterations: " << s.num_avg_timing_iters                        \
        << "\n    Max Workspace Size: " << s.workspace_size;
@@ -25,8 +25,13 @@ std::ostream& operator<<(std::ostream& os, const BuilderSettings& s) {
         os << "\n    Max Batch Size: Not set";
     }
 
-    os << "\n    Device Type: " << s.device                                                \
-       << "\n    Engine Capability: " << s.capability                                      \
+    os << "\n    Device Type: " << s.device.device_type                                    \
+       << "\n    GPU ID: " << s.device.gpu_id;
+    if (s.device.device_type == nvinfer1::DeviceType::kDLA)
+    {
+        os << "\n    DLACore: " << s.device.dla_core;
+    }
+    os << "\n    Engine Capability: " << s.capability                                      \
        << "\n    Calibrator Created: " << (s.calibrator != nullptr);
     return os;
 }
@@ -77,7 +82,7 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
         cfg->setFlag(nvinfer1::BuilderFlag::kSTRICT_TYPES);
     }
 
-    if (settings.allow_gpu_fallback) {
+    if (settings.device.allow_gpu_fallback) {
         cfg->setFlag(nvinfer1::BuilderFlag::kGPU_FALLBACK);
     }
 
@@ -88,8 +93,18 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
     cfg->setMinTimingIterations(settings.num_min_timing_iters);
     cfg->setAvgTimingIterations(settings.num_avg_timing_iters);
     cfg->setMaxWorkspaceSize(settings.workspace_size);
-    cfg->setDefaultDeviceType(settings.device);
+    cfg->setDefaultDeviceType(settings.device.device_type);
     cfg->setEngineCapability(settings.capability);
+
+    if (settings.device.gpu_id) {
+         TRTORCH_CHECK(cudaSetDevice(settings.device.gpu_id), "Unable to set gpu id: " << settings.device.gpu_id);
+    }
+
+    if (settings.device.device_type == nvinfer1::DeviceType::kDLA) {
+         auto nbDLACores = builder->getNbDLACores();
+         TRTORCH_CHECK(static_cast<int>(settings.device.dla_core) < nbDLACores, "Configured DLA Core ID: " << settings.device.dla_core << " not available. Total number of available DLA Cores: " << nbDLACores);
+         cfg->setDLACore(settings.device.dla_core);
+    }
 }
 
 ConversionCtx::~ConversionCtx() {

@@ -3,6 +3,7 @@
 #include <sstream>
 #include <vector>
 
+#include <cuda_runtime.h>
 #include "NvInfer.h"
 
 #include "ATen/core/function_schema.h"
@@ -162,6 +163,10 @@ torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod,
     }
 
     return new_mod;
+}
+
+cudaError_t set_device(const int gpu_id) {
+    return cudaSetDevice(gpu_id);
 }
 
 } // namespace core

@@ -92,16 +92,16 @@ core::ExtraInfo to_internal_extra_info(ExtraInfo external) {
     internal.convert_info.engine_settings.refit = external.refit;
     internal.convert_info.engine_settings.debug = external.debug;
     internal.convert_info.engine_settings.strict_types = external.strict_types;
-    internal.convert_info.engine_settings.allow_gpu_fallback = external.allow_gpu_fallback;
+    internal.convert_info.engine_settings.device.allow_gpu_fallback = external.device.allow_gpu_fallback;
     internal.convert_info.engine_settings.max_batch_size = external.max_batch_size;
 
-    switch(external.device) {
+    switch(external.device.device_type) {
     case ExtraInfo::DeviceType::kDLA:
-        internal.convert_info.engine_settings.device = nvinfer1::DeviceType::kDLA;
+        internal.convert_info.engine_settings.device.device_type = nvinfer1::DeviceType::kDLA;
         break;
     case ExtraInfo::DeviceType::kGPU:
     default:
-        internal.convert_info.engine_settings.device = nvinfer1::DeviceType::kGPU;
+        internal.convert_info.engine_settings.device.device_type = nvinfer1::DeviceType::kGPU;
     }
 
     switch(external.capability) {
@@ -117,6 +117,8 @@ core::ExtraInfo to_internal_extra_info(ExtraInfo external) {
 
     }
 
+    internal.convert_info.engine_settings.device.gpu_id = external.device.gpu_id;
+    internal.convert_info.engine_settings.device.dla_core = external.device.dla_core;
     internal.convert_info.engine_settings.num_min_timing_iters = external.num_min_timing_iters;
     internal.convert_info.engine_settings.num_avg_timing_iters = external.num_avg_timing_iters;
     internal.convert_info.engine_settings.workspace_size = external.workspace_size;
