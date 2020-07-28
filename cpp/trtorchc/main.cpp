@@ -25,6 +25,9 @@ bool checkRtol(const at::Tensor& diff, const std::vector<at::Tensor> inputs, flo
     }
     trtorch::logging::log(trtorch::logging::Level::kDEBUG, std::string("Max Difference: ") + std::to_string(diff.abs().max().item<float>()));
     trtorch::logging::log(trtorch::logging::Level::kDEBUG, std::string("Acceptable Threshold: ") + std::to_string(threshold));
+
+    std::cout << "Max difference is: " << diff.abs().max().item<float>() << std::endl;
+    
     return diff.abs().max().item<float>() <= threshold * maxValue;
 }
 
