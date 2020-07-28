@@ -10,7 +10,7 @@ namespace {
 
 #define convert(act, trt_type)                                                 \
   bool act(ConversionCtx* ctx, const torch::jit::Node* n, args& args) {        \
-    auto in = args[0].ITensorOrFreeze(ctx);                                               \
+    auto in = args[0].ITensorOrFreeze(ctx);                                    \
                                                                                \
     auto new_layer =                                                           \
         ctx->net->addActivation(*in, nvinfer1::ActivationType::trt_type);      \
