@@ -384,7 +384,7 @@ void ConvertLoopBlock(ConversionCtx* ctx, const torch::jit::Node* n) {
             auto eval = EvaluateNode(ctx, bn);
 
             ctx->AssociateValueAndIValue(bn->output(0), eval.value());
-        } else if (!isNodeConversionBlacklisted(bn)) {
+        } else if (!isNodeConversionIgnored(bn)) {
             AddLayer(ctx, bn);
         }
     }
@@ -442,7 +442,7 @@ void ConvertBlockToNetDef(ConversionCtx* ctx, const torch::jit::Block* b, Conver
 
     for (const auto n : nodes) {
         bool to_eval = evaluators::shouldEvalAtConversionTime(n);
-        bool ignored = isNodeConversionIgnored(n);
+        bool blacklisted = isNodeConversionIgnored(n);
         if (n->kind() == torch::jit::prim::Loop) {
             bool returns_tensor = false;
 
@@ -471,7 +471,7 @@ void ConvertBlockToNetDef(ConversionCtx* ctx, const torch::jit::Block* b, Conver
                 }
                 ctx->AssociateValueAndIValue(n->output(0), eval.value());
             }
-        } else if (!ignored) {
+        } else if (!blacklisted) {
             // Should error out if something fails
             AddLayer(ctx, n);
         } else {
@@ -479,8 +479,8 @@ void ConvertBlockToNetDef(ConversionCtx* ctx, const torch::jit::Block* b, Conver
             if (to_eval) {
                 reason += " (to be evaluated)";
             }
-            if (ignored) {
-                reason += " (explicitly ignored)";
+            if (blacklisted) {
+                reason += " (explicitly blacklisted)";
             }
             LOG_DEBUG(ctx->logger,
                       "Skipping Node: " << util::node_info(n) << reason);
