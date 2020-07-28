@@ -1,3 +1,5 @@
+#include <sstream>
+
 #include "core/util/prelude.h"
 #include "core/conversion/var/Var.h"
 
@@ -83,6 +85,36 @@ std::string Var::type_name() const {
   default:
     return "None";
   }
+}
+
+nvinfer1::ITensor* Var::ITensorOrFreeze(ConversionCtx* ctx) {
+  if (isIValue()) {
+    LOG_DEBUG(ctx->logger, "Found IValue containing object of type " << *(ptr_.ivalue->type()));
+  }
+  TRTORCH_CHECK(isITensor() || (isIValue() && ptr_.ivalue->isTensor()), "Requested either IValue containing a Tensor, or ITensor, however Var type is " << type_name());
+  
+  nvinfer1::ITensor* out;
+
+  if (isIValue()) {
+    auto weights = converters::Weights(ctx, ptr_.ivalue->toTensor());
+
+    auto const_layer = ctx->net->addConstant(weights.shape, weights.data);
+    TRTORCH_CHECK(const_layer, "Unable to freeze tensor into constant layer");
+
+    out = const_layer->getOutput(0);
+
+    std::ostringstream tensor_id;
+    tensor_id << reinterpret_cast<int*>(out);
+
+    LOG_DEBUG(ctx->logger, "Freezing tensor " << tensor_id.str() << " as an IConstantLayer");
+    const_layer->setName(("[Freeze Tensor " + tensor_id.str() + " ]").c_str());
+  } else {
+    out = ptr_.tensor;
+  }
+
+  LOG_DEBUG("Frozen tensor shape: " << out->getDimensions());
+
+  return out;
 }
 
 const torch::jit::IValue* Var::IValue() const {

@@ -11,7 +11,7 @@ static auto softmax_registrations TRTORCH_UNUSED = RegisterNodeConversionPattern
     .pattern({
         "aten::softmax.int(Tensor self, int dim, int? dtype=None) -> (Tensor)",
         [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-            auto in = args[0].ITensor();
+            auto in = args[0].ITensorOrFreeze(ctx);
             auto shape = util::toVec(in->getDimensions());
 
             // SoftMax needs at least 4D input
