@@ -94,9 +94,12 @@ some take time, then define the preprocessing to apply to the images in the data
                                                                                                 .workers(2));
 
 
-Next we create a calibrator from the ``calibration_dataloader`` using the calibrator factory:
+Next we create a calibrator from the ``calibration_dataloader`` using the calibrator factory (found in ``trtorch/ptq.h``):
 
 .. code-block:: c++
+
+    #include "trtorch/ptq.h"
+    ...
 
     auto calibrator = trtorch::ptq::make_int8_calibrator(std::move(calibration_dataloader), calibration_cache_file, true);
 
@@ -130,7 +133,7 @@ Then all thats required to setup the module for INT8 calibration is to set the f
 
 If you have an existing Calibrator implementation for TensorRT you may directly set the ``ptq_calibrator`` field with a pointer to your calibrator and it will work as well.
 
-From here not much changes in terms of how to execution works. You are still able to fully use Libtorch as the sole interface for inference. Data should remain
+From here not much changes in terms of how to execution works. You are still able to fully use LibTorch as the sole interface for inference. Data should remain
 in FP32 precision when it's passed into `trt_mod.forward`. There exists an example application in the TRTorch demo that takes you from training a VGG16 network on
 CIFAR10 to deploying in INT8 with TRTorch here: https://github.com/NVIDIA/TRTorch/tree/master/cpp/ptq
 

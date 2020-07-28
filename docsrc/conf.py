@@ -10,9 +10,9 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-# import os
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
+import os
+import sys
+sys.path.append(os.path.join(os.path.dirname(__name__), '../py'))
 
 import sphinx_material
 # -- Project information -----------------------------------------------------
@@ -22,7 +22,7 @@ copyright = '2020, NVIDIA Corporation'
 author = 'NVIDIA Corporation'
 
 # The full version, including alpha/beta/rc tags
-release = '0.0.2'
+release = 'master'
 
 
 # -- General configuration ---------------------------------------------------
@@ -33,6 +33,7 @@ release = '0.0.2'
 extensions = [
     'breathe',
     'exhale',
+    'nbsphinx',
     'sphinx.ext.napoleon',
     'sphinx.ext.intersphinx',
     'sphinx.ext.autosummary',
@@ -115,7 +116,7 @@ html_theme_options = {
     'repo_name': 'TRTorch',
 
     # Visible levels of the global TOC; -1 means unlimited
-    'globaltoc_depth': 2,
+    'globaltoc_depth': 1,
     # If False, expand all TOC entries
     'globaltoc_collapse': False,
     # If True, show hidden TOC entries
@@ -123,6 +124,7 @@ html_theme_options = {
     'master_doc': True,
     "version_info": {
         "master": "https://nvidia.github.io/TRTorch/",
+        "v0.0.3": "https://nvidia.github.io/TRTorch/v0.0.3/",
         "v0.0.2": "https://nvidia.github.io/TRTorch/v0.0.2/",
         "v0.0.1": "https://nvidia.github.io/TRTorch/v0.0.1/",
     }

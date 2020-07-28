@@ -2,6 +2,7 @@
 <html>
  <head>
   <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -35,7 +36,7 @@
   <script src="../_static/javascripts/modernizr.js">
   </script>
   <title>
-   Struct ExtraInfo — TRTorch 0.0.2 documentation
+   Struct ExtraInfo — TRTorch master documentation
   </title>
   <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/pygments.css" rel="stylesheet" type="text/css"/>
@@ -53,6 +54,8 @@
   <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js">
   </script>
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
+  </script>
+  <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -79,7 +82,7 @@
    <nav class="md-header-nav md-grid">
     <div class="md-flex navheader">
      <div class="md-flex__cell md-flex__cell--shrink">
-      <a class="md-header-nav__button md-logo" href="../index.html" title="TRTorch 0.0.2 documentation">
+      <a class="md-header-nav__button md-logo" href="../index.html" title="TRTorch master documentation">
        <i class="md-icon">
         
        </i>
@@ -151,6 +154,9 @@
        <a href="https://nvidia.github.io/TRTorch/" title="master">
         master
        </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.0.3/" title="v0.0.3">
+        v0.0.3
+       </a>
        <a href="https://nvidia.github.io/TRTorch/v0.0.2/" title="v0.0.2">
         v0.0.2
        </a>
@@ -168,7 +174,7 @@
      <ul class="md-tabs__list">
       <li class="md-tabs__item">
        <a class="md-tabs__link" href="../index.html">
-        TRTorch 0.0.2 documentation
+        TRTorch master documentation
        </a>
       </li>
       <li class="md-tabs__item">
@@ -186,12 +192,12 @@
        <div class="md-sidebar__inner">
         <nav class="md-nav md-nav--primary" data-md-level="0">
          <label class="md-nav__title md-nav__title--site" for="__drawer">
-          <a class="md-nav__button md-logo" href="../index.html" title="TRTorch 0.0.2 documentation">
+          <a class="md-nav__button md-logo" href="../index.html" title="TRTorch master documentation">
            <i class="md-icon">
             
            </i>
           </a>
-          <a href="../index.html" title="TRTorch 0.0.2 documentation">
+          <a href="../index.html" title="TRTorch master documentation">
            TRTorch
           </a>
          </label>
@@ -220,86 +226,16 @@
            <a class="md-nav__link" href="../tutorials/installation.html">
             Installation
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/installation.html#dependencies">
-              Dependencies
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/installation.html#dependencies-for-compilation">
-              Dependencies for Compilation
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/installation.html#building-using-cudnn-tensorrt-tarball-distributions">
-              <strong>
-               Building using cuDNN &amp; TensorRT tarball distributions
-              </strong>
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/installation.html#building-using-locally-installed-cudnn-tensorrt">
-              <strong>
-               Building using locally installed cuDNN &amp; TensorRT
-              </strong>
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../tutorials/getting_started.html">
             Getting Started
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/getting_started.html#creating-a-torchscript-module">
-              Creating a TorchScript Module
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/getting_started.html#working-with-torchscript-in-python">
-              Working with TorchScript in Python
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/getting_started.html#compiling-with-trtorch-in-python">
-              Compiling with TRTorch in Python
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/getting_started.html#working-with-torchscript-in-c">
-              Working with TorchScript in C++
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/getting_started.html#compiling-with-trtorch-in-c">
-              Compiling with TRTorch in C++
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/getting_started.html#under-the-hood">
-              Under The Hood
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/getting_started.html#working-with-unsupported-operators">
-              Working with Unsupported Operators
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../tutorials/ptq.html">
             Post Training Quantization (PTQ)
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/ptq.html#how-to-create-your-own-ptq-application">
-              How to create your own PTQ application
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../tutorials/trtorchc.html">
@@ -309,100 +245,14 @@
           <li class="md-nav__item">
            <span class="md-nav__link caption">
             <span class="caption-text">
-             Contributor Documentation
+             Notebooks
             </span>
            </span>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="../contributors/system_overview.html">
-            System Overview
+           <a class="md-nav__link" href="../_notebooks/lenet-getting-started.html">
+            TRTorch Getting Started - LeNet
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/system_overview.html#compiler-phases">
-              Compiler Phases
-             </a>
-            </li>
-           </ul>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../contributors/writing_converters.html">
-            Writing Converters
-           </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#background">
-              Background
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#converters">
-              Converters
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#converter-contract">
-              Converter Contract
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#conversion-context">
-              Conversion Context
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#args">
-              Args
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#weights">
-              Weights
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/writing_converters.html#other-advice">
-              Other advice
-             </a>
-            </li>
-           </ul>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../contributors/useful_links.html">
-            Useful Links for TRTorch Development
-           </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/useful_links.html#tensorrt-available-layers-and-expected-dimensions">
-              TensorRT Available Layers and Expected Dimensions
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/useful_links.html#tensorrt-c-documentation">
-              TensorRT C++ Documentation
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/useful_links.html#tensorrt-python-documentation-sometimes-easier-to-read">
-              TensorRT Python Documentation (Sometimes easier to read)
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/useful_links.html#pytorch-functional-api">
-              PyTorch Functional API
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/useful_links.html#pytorch-native-ops">
-              PyTorch native_ops
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../contributors/useful_links.html#pytorch-ir-documentation">
-              PyTorch IR Documentation
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <span class="md-nav__link caption">
@@ -415,23 +265,6 @@
            <a class="md-nav__link" href="../py_api/trtorch.html">
             trtorch
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../py_api/trtorch.html#functions">
-              Functions
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../py_api/trtorch.html#enums">
-              Enums
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../py_api/trtorch.html#submodules">
-              Submodules
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../py_api/logging.html">
@@ -449,23 +282,28 @@
            <a class="md-nav__link" href="trtorch_cpp.html">
             TRTorch C++ API
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="trtorch_cpp.html#class-hierarchy">
-              Class Hierarchy
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="trtorch_cpp.html#file-hierarchy">
-              File Hierarchy
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="trtorch_cpp.html#full-api">
-              Full API
-             </a>
-            </li>
-           </ul>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Contributor Documentation
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../contributors/system_overview.html">
+            System Overview
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../contributors/writing_converters.html">
+            Writing Converters
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../contributors/useful_links.html">
+            Useful Links for TRTorch Development
+           </a>
           </li>
          </ul>
         </nav>
@@ -591,12 +429,6 @@
        </h2>
        <dl class="cpp struct">
         <dt id="_CPPv4N7trtorch9ExtraInfoE">
-         <span id="_CPPv3N7trtorch9ExtraInfoE">
-         </span>
-         <span id="_CPPv2N7trtorch9ExtraInfoE">
-         </span>
-         <span id="trtorch::ExtraInfo">
-         </span>
          <span class="target" id="structtrtorch_1_1ExtraInfo">
          </span>
          <em class="property">
@@ -626,10 +458,6 @@
           </p>
           <dl class="cpp enum">
            <dt id="_CPPv4N7trtorch9ExtraInfo16EngineCapabilityE">
-            <span id="_CPPv3N7trtorch9ExtraInfo16EngineCapabilityE">
-            </span>
-            <span id="_CPPv2N7trtorch9ExtraInfo16EngineCapabilityE">
-            </span>
             <span class="target" id="structtrtorch_1_1ExtraInfo_1a171df38cd584a261c6a4cc3e9a453bfb">
             </span>
             <em class="property">
@@ -654,10 +482,6 @@
             </p>
             <dl class="cpp enumerator">
              <dt id="_CPPv4N7trtorch9ExtraInfo16EngineCapability8kDEFAULTE">
-              <span id="_CPPv3N7trtorch9ExtraInfo16EngineCapability8kDEFAULTE">
-              </span>
-              <span id="_CPPv2N7trtorch9ExtraInfo16EngineCapability8kDEFAULTE">
-              </span>
               <span class="target" id="structtrtorch_1_1ExtraInfo_1a171df38cd584a261c6a4cc3e9a453bfba2eb05989f1bbfd98f356f4f3ac2ba2ec">
               </span>
               <em class="property">
@@ -676,10 +500,6 @@
             </dl>
             <dl class="cpp enumerator">
              <dt id="_CPPv4N7trtorch9ExtraInfo16EngineCapability9kSAFE_GPUE">
-              <span id="_CPPv3N7trtorch9ExtraInfo16EngineCapability9kSAFE_GPUE">
-              </span>
-              <span id="_CPPv2N7trtorch9ExtraInfo16EngineCapability9kSAFE_GPUE">
-              </span>
               <span class="target" id="structtrtorch_1_1ExtraInfo_1a171df38cd584a261c6a4cc3e9a453bfbad2298f1c40120466f5d4dc4e664095d0">
               </span>
               <em class="property">
@@ -698,10 +518,6 @@
             </dl>
             <dl class="cpp enumerator">
              <dt id="_CPPv4N7trtorch9ExtraInfo16EngineCapability9kSAFE_DLAE">
-              <span id="_CPPv3N7trtorch9ExtraInfo16EngineCapability9kSAFE_DLAE">
-              </span>
-              <span id="_CPPv2N7trtorch9ExtraInfo16EngineCapability9kSAFE_DLAE">
-              </span>
               <span class="target" id="structtrtorch_1_1ExtraInfo_1a171df38cd584a261c6a4cc3e9a453bfba5b44fe262f772396a08fbf720d156a64">
               </span>
               <em class="property">
@@ -727,12 +543,6 @@
           </p>
           <dl class="cpp function">
            <dt id="_CPPv4N7trtorch9ExtraInfo9ExtraInfoENSt6vectorI10InputRangeEE">
-            <span id="_CPPv3N7trtorch9ExtraInfo9ExtraInfoENSt6vectorI10InputRangeEE">
-            </span>
-            <span id="_CPPv2N7trtorch9ExtraInfo9ExtraInfoENSt6vectorI10InputRangeEE">
-            </span>
-            <span id="trtorch::ExtraInfo::ExtraInfo__std::vector:InputRange:">
-            </span>
             <span class="target" id="structtrtorch_1_1ExtraInfo_1aa28731fe8ce2451a8d6a4c5660303595">
             </span>
             <code class="sig-name descname">
@@ -791,12 +601,6 @@
           </dl>
           <dl class="cpp function">
            <dt id="_CPPv4N7trtorch9ExtraInfo9ExtraInfoENSt6vectorINSt6vectorI7int64_tEEEE">
-            <span id="_CPPv3N7trtorch9ExtraInfo9ExtraInfoENSt6vectorINSt6vectorI7int64_tEEEE">
-            </span>
-            <span id="_CPPv2N7trtorch9ExtraInfo9ExtraInfoENSt6vectorINSt6vectorI7int64_tEEEE">
-            </span>
-            <span id="trtorch::ExtraInfo::ExtraInfo__std::vector:std::vector:int64_t::">
-            </span>
             <span class="target" id="structtrtorch_1_1ExtraInfo_1ac24a7f0e106b424e9356b99da6d5767c">
             </span>
             <code class="sig-name descname">
@@ -848,12 +652,6 @@
           </dl>
           <dl class="cpp function">
            <dt id="_CPPv4N7trtorch9ExtraInfo9ExtraInfoENSt6vectorIN3c108ArrayRefI7int64_tEEEE">
-            <span id="_CPPv3N7trtorch9ExtraInfo9ExtraInfoENSt6vectorIN3c108ArrayRefI7int64_tEEEE">
-            </span>
-            <span id="_CPPv2N7trtorch9ExtraInfo9ExtraInfoENSt6vectorIN3c108ArrayRefI7int64_tEEEE">
-            </span>
-            <span id="trtorch::ExtraInfo::ExtraInfo__std::vector:c10::ArrayRef:int64_t::">
-            </span>
             <span class="target" id="structtrtorch_1_1ExtraInfo_1aba3d0def0e13fe127fbab24db66f20dd">
             </span>
             <code class="sig-name descname">
@@ -910,12 +708,6 @@
           </p>
           <dl class="cpp var">
            <dt id="_CPPv4N7trtorch9ExtraInfo12input_rangesE">
-            <span id="_CPPv3N7trtorch9ExtraInfo12input_rangesE">
-            </span>
-            <span id="_CPPv2N7trtorch9ExtraInfo12input_rangesE">
-            </span>
-            <span id="trtorch::ExtraInfo::input_ranges__std::vector:InputRange:">
-            </span>
             <span class="target" id="structtrtorch_1_1ExtraInfo_1a9ec332f62bb7cb48efe3f971374e4efe">
             </span>
             std::vector&lt;
@@ -942,12 +734,6 @@
           </dl>
           <dl class="cpp var">
            <dt id="_CPPv4N7trtorch9ExtraInfo12op_precisionE">
-            <span id="_CPPv3N7trtorch9ExtraInfo12op_precisionE">
-            </span>
-            <span id="_CPPv2N7trtorch9ExtraInfo12op_precisionE">
-            </span>
-            <span id="trtorch::ExtraInfo::op_precision__DataType">
-            </span>
             <span class="target" id="structtrtorch_1_1ExtraInfo_1abd896550e87582cea918aefa1692c2d3">
             </span>
             <a class="reference internal" href="classtrtorch_1_1ExtraInfo_1_1DataType.html#_CPPv4N7trtorch9ExtraInfo8DataTypeE" title="trtorch::ExtraInfo::DataType">
@@ -960,7 +746,10 @@
             <a class="reference internal" href="classtrtorch_1_1ExtraInfo_1_1DataType.html#_CPPv4N7trtorch9ExtraInfo8DataTypeE" title="trtorch::ExtraInfo::DataType">
              DataType
             </a>
-            ::kFloat
+            ::
+            <a class="reference internal" href="classtrtorch_1_1ExtraInfo_1_1DataType.html#_CPPv4N7trtorch9ExtraInfo8DataType5Value6kFloatE" title="trtorch::ExtraInfo::DataType::kFloat">
+             kFloat
+            </a>
             <a class="headerlink" href="#_CPPv4N7trtorch9ExtraInfo12op_precisionE" title="Permalink to this definition">
              ¶
             </a>
@@ -974,12 +763,6 @@
           </dl>
           <dl class="cpp var">
            <dt id="_CPPv4N7trtorch9ExtraInfo5refitE">
-            <span id="_CPPv3N7trtorch9ExtraInfo5refitE">
-            </span>
-            <span id="_CPPv2N7trtorch9ExtraInfo5refitE">
-            </span>
-            <span id="trtorch::ExtraInfo::refit__b">
-            </span>
             <span class="target" id="structtrtorch_1_1ExtraInfo_1ae9e6afc0bd08b6d4eaaf34ba4c15037a">
             </span>
             bool
@@ -1000,12 +783,6 @@
           </dl>
           <dl class="cpp var">
            <dt id="_CPPv4N7trtorch9ExtraInfo5debugE">
-            <span id="_CPPv3N7trtorch9ExtraInfo5debugE">
-            </span>
-            <span id="_CPPv2N7trtorch9ExtraInfo5debugE">
-            </span>
-            <span id="trtorch::ExtraInfo::debug__b">
-            </span>
             <span class="target" id="structtrtorch_1_1ExtraInfo_1acecf42148fe4168d6694c28896dc6fbe">
             </span>
             bool
@@ -1026,12 +803,6 @@
           </dl>
           <dl class="cpp var">
            <dt id="_CPPv4N7trtorch9ExtraInfo12strict_typesE">
-            <span id="_CPPv3N7trtorch9ExtraInfo12strict_typesE">
-            </span>
-            <span id="_CPPv2N7trtorch9ExtraInfo12strict_typesE">
-            </span>
-            <span id="trtorch::ExtraInfo::strict_types__b">
-            </span>
             <span class="target" id="structtrtorch_1_1ExtraInfo_1a2a64b68a7eee3169cca91128704056c3">
             </span>
             bool
@@ -1052,12 +823,6 @@
           </dl>
           <dl class="cpp var">
            <dt id="_CPPv4N7trtorch9ExtraInfo18allow_gpu_fallbackE">
-            <span id="_CPPv3N7trtorch9ExtraInfo18allow_gpu_fallbackE">
-            </span>
-            <span id="_CPPv2N7trtorch9ExtraInfo18allow_gpu_fallbackE">
-            </span>
-            <span id="trtorch::ExtraInfo::allow_gpu_fallback__b">
-            </span>
             <span class="target" id="structtrtorch_1_1ExtraInfo_1a0c30c7d22e31f85725c7a31533452650">
             </span>
             bool
@@ -1078,12 +843,6 @@
           </dl>
           <dl class="cpp var">
            <dt id="_CPPv4N7trtorch9ExtraInfo6deviceE">
-            <span id="_CPPv3N7trtorch9ExtraInfo6deviceE">
-            </span>
-            <span id="_CPPv2N7trtorch9ExtraInfo6deviceE">
-            </span>
-            <span id="trtorch::ExtraInfo::device__DeviceType">
-            </span>
             <span class="target" id="structtrtorch_1_1ExtraInfo_1a6cd5bc4176cc8e991ecff924d2c178fa">
             </span>
             <a class="reference internal" href="classtrtorch_1_1ExtraInfo_1_1DeviceType.html#_CPPv4N7trtorch9ExtraInfo10DeviceTypeE" title="trtorch::ExtraInfo::DeviceType">
@@ -1096,7 +855,10 @@
             <a class="reference internal" href="classtrtorch_1_1ExtraInfo_1_1DeviceType.html#_CPPv4N7trtorch9ExtraInfo10DeviceTypeE" title="trtorch::ExtraInfo::DeviceType">
              DeviceType
             </a>
-            ::kGPU
+            ::
+            <a class="reference internal" href="classtrtorch_1_1ExtraInfo_1_1DeviceType.html#_CPPv4N7trtorch9ExtraInfo10DeviceType5Value4kGPUE" title="trtorch::ExtraInfo::DeviceType::kGPU">
+             kGPU
+            </a>
             <a class="headerlink" href="#_CPPv4N7trtorch9ExtraInfo6deviceE" title="Permalink to this definition">
              ¶
             </a>
@@ -1110,12 +872,6 @@
           </dl>
           <dl class="cpp var">
            <dt id="_CPPv4N7trtorch9ExtraInfo10capabilityE">
-            <span id="_CPPv3N7trtorch9ExtraInfo10capabilityE">
-            </span>
-            <span id="_CPPv2N7trtorch9ExtraInfo10capabilityE">
-            </span>
-            <span id="trtorch::ExtraInfo::capability__EngineCapability">
-            </span>
             <span class="target" id="structtrtorch_1_1ExtraInfo_1ac7d53e2046bcd6f09889dfcf3e5af874">
             </span>
             <a class="reference internal" href="#_CPPv4N7trtorch9ExtraInfo16EngineCapabilityE" title="trtorch::ExtraInfo::EngineCapability">
@@ -1145,12 +901,6 @@
           </dl>
           <dl class="cpp var">
            <dt id="_CPPv4N7trtorch9ExtraInfo20num_min_timing_itersE">
-            <span id="_CPPv3N7trtorch9ExtraInfo20num_min_timing_itersE">
-            </span>
-            <span id="_CPPv2N7trtorch9ExtraInfo20num_min_timing_itersE">
-            </span>
-            <span id="trtorch::ExtraInfo::num_min_timing_iters__uint64_t">
-            </span>
             <span class="target" id="structtrtorch_1_1ExtraInfo_1abccef37622d7d63f965ec2b4cb89c5ea">
             </span>
             uint64_t
@@ -1171,12 +921,6 @@
           </dl>
           <dl class="cpp var">
            <dt id="_CPPv4N7trtorch9ExtraInfo20num_avg_timing_itersE">
-            <span id="_CPPv3N7trtorch9ExtraInfo20num_avg_timing_itersE">
-            </span>
-            <span id="_CPPv2N7trtorch9ExtraInfo20num_avg_timing_itersE">
-            </span>
-            <span id="trtorch::ExtraInfo::num_avg_timing_iters__uint64_t">
-            </span>
             <span class="target" id="structtrtorch_1_1ExtraInfo_1a841f6bfd41e6a3119d9c74dcf9adf5d9">
             </span>
             uint64_t
@@ -1197,12 +941,6 @@
           </dl>
           <dl class="cpp var">
            <dt id="_CPPv4N7trtorch9ExtraInfo14workspace_sizeE">
-            <span id="_CPPv3N7trtorch9ExtraInfo14workspace_sizeE">
-            </span>
-            <span id="_CPPv2N7trtorch9ExtraInfo14workspace_sizeE">
-            </span>
-            <span id="trtorch::ExtraInfo::workspace_size__uint64_t">
-            </span>
             <span class="target" id="structtrtorch_1_1ExtraInfo_1ada309755e1f127a28bb08cce03bbf2a0">
             </span>
             uint64_t
@@ -1223,12 +961,6 @@
           </dl>
           <dl class="cpp var">
            <dt id="_CPPv4N7trtorch9ExtraInfo14max_batch_sizeE">
-            <span id="_CPPv3N7trtorch9ExtraInfo14max_batch_sizeE">
-            </span>
-            <span id="_CPPv2N7trtorch9ExtraInfo14max_batch_sizeE">
-            </span>
-            <span id="trtorch::ExtraInfo::max_batch_size__uint64_t">
-            </span>
             <span class="target" id="structtrtorch_1_1ExtraInfo_1aae44384d21c024b588a315d8319ed9ca">
             </span>
             uint64_t
@@ -1249,12 +981,6 @@
           </dl>
           <dl class="cpp var">
            <dt id="_CPPv4N7trtorch9ExtraInfo14ptq_calibratorE">
-            <span id="_CPPv3N7trtorch9ExtraInfo14ptq_calibratorE">
-            </span>
-            <span id="_CPPv2N7trtorch9ExtraInfo14ptq_calibratorE">
-            </span>
-            <span id="trtorch::ExtraInfo::ptq_calibrator__nvinfer1::IInt8CalibratorP">
-            </span>
             <span class="target" id="structtrtorch_1_1ExtraInfo_1aae50d49a37fba4235db6755f1ecf46a5">
             </span>
             nvinfer1::IInt8Calibrator *
@@ -1276,12 +1002,6 @@
          </div>
          <dl class="cpp class">
           <dt id="_CPPv4N7trtorch9ExtraInfo8DataTypeE">
-           <span id="_CPPv3N7trtorch9ExtraInfo8DataTypeE">
-           </span>
-           <span id="_CPPv2N7trtorch9ExtraInfo8DataTypeE">
-           </span>
-           <span id="trtorch::ExtraInfo::DataType">
-           </span>
            <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DataType">
            </span>
            <em class="property">
@@ -1305,10 +1025,6 @@
             </p>
             <dl class="cpp enum">
              <dt id="_CPPv4N7trtorch9ExtraInfo8DataType5ValueE">
-              <span id="_CPPv3N7trtorch9ExtraInfo8DataType5ValueE">
-              </span>
-              <span id="_CPPv2N7trtorch9ExtraInfo8DataType5ValueE">
-              </span>
               <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DataType_1add381a20928ea55ac06904d41759524b">
               </span>
               <em class="property">
@@ -1354,10 +1070,6 @@
               </p>
               <dl class="cpp enumerator">
                <dt id="_CPPv4N7trtorch9ExtraInfo8DataType5Value6kFloatE">
-                <span id="_CPPv3N7trtorch9ExtraInfo8DataType5Value6kFloatE">
-                </span>
-                <span id="_CPPv2N7trtorch9ExtraInfo8DataType5Value6kFloatE">
-                </span>
                 <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DataType_1add381a20928ea55ac06904d41759524ba096ba6c03e28117f8edc306af08f6379">
                 </span>
                 <em class="property">
@@ -1376,10 +1088,6 @@
               </dl>
               <dl class="cpp enumerator">
                <dt id="_CPPv4N7trtorch9ExtraInfo8DataType5Value5kHalfE">
-                <span id="_CPPv3N7trtorch9ExtraInfo8DataType5Value5kHalfE">
-                </span>
-                <span id="_CPPv2N7trtorch9ExtraInfo8DataType5Value5kHalfE">
-                </span>
                 <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DataType_1add381a20928ea55ac06904d41759524badd09892803c231c39229470098898962">
                 </span>
                 <em class="property">
@@ -1398,10 +1106,6 @@
               </dl>
               <dl class="cpp enumerator">
                <dt id="_CPPv4N7trtorch9ExtraInfo8DataType5Value5kCharE">
-                <span id="_CPPv3N7trtorch9ExtraInfo8DataType5Value5kCharE">
-                </span>
-                <span id="_CPPv2N7trtorch9ExtraInfo8DataType5Value5kCharE">
-                </span>
                 <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DataType_1add381a20928ea55ac06904d41759524ba3c89752669e8a64742642c0b0809c75c">
                 </span>
                 <em class="property">
@@ -1427,12 +1131,6 @@
             </p>
             <dl class="cpp function">
              <dt id="_CPPv4N7trtorch9ExtraInfo8DataType8DataTypeEv">
-              <span id="_CPPv3N7trtorch9ExtraInfo8DataType8DataTypeEv">
-              </span>
-              <span id="_CPPv2N7trtorch9ExtraInfo8DataType8DataTypeEv">
-              </span>
-              <span id="trtorch::ExtraInfo::DataType::DataType">
-              </span>
               <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DataType_1ad3aef293d993a097a40d26893d10b5b8">
               </span>
               <code class="sig-name descname">
@@ -1455,12 +1153,6 @@
             </dl>
             <dl class="cpp function">
              <dt id="_CPPv4N7trtorch9ExtraInfo8DataType8DataTypeE5Value">
-              <span id="_CPPv3N7trtorch9ExtraInfo8DataType8DataTypeE5Value">
-              </span>
-              <span id="_CPPv2N7trtorch9ExtraInfo8DataType8DataTypeE5Value">
-              </span>
-              <span id="trtorch::ExtraInfo::DataType::DataType__ValueCE">
-              </span>
               <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DataType_1a9c1703c7669c4ff27e5ab85992206ac6">
               </span>
               <em class="property">
@@ -1496,12 +1188,6 @@
             </dl>
             <dl class="cpp function">
              <dt id="_CPPv4N7trtorch9ExtraInfo8DataType8DataTypeEN3c1010ScalarTypeE">
-              <span id="_CPPv3N7trtorch9ExtraInfo8DataType8DataTypeEN3c1010ScalarTypeE">
-              </span>
-              <span id="_CPPv2N7trtorch9ExtraInfo8DataType8DataTypeEN3c1010ScalarTypeE">
-              </span>
-              <span id="trtorch::ExtraInfo::DataType::DataType__c10::ScalarType">
-              </span>
               <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DataType_1a4084fd72e6e3a1da3628a0ed96207af0">
               </span>
               <code class="sig-name descname">
@@ -1550,12 +1236,6 @@
             </dl>
             <dl class="cpp function">
              <dt id="_CPPv4NK7trtorch9ExtraInfo8DataTypecv5ValueEv">
-              <span id="_CPPv3NK7trtorch9ExtraInfo8DataTypecv5ValueEv">
-              </span>
-              <span id="_CPPv2NK7trtorch9ExtraInfo8DataTypecv5ValueEv">
-              </span>
-              <span id="trtorch::ExtraInfo::DataType::castto-Value-operatorC">
-              </span>
               <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DataType_1a06df2c5e9ced3f4cabbf7a25c608be67">
               </span>
               <code class="sig-name descname">
@@ -1600,12 +1280,6 @@
             </dl>
             <dl class="cpp function">
              <dt id="_CPPv4N7trtorch9ExtraInfo8DataTypecvbEv">
-              <span id="_CPPv3N7trtorch9ExtraInfo8DataTypecvbEv">
-              </span>
-              <span id="_CPPv2N7trtorch9ExtraInfo8DataTypecvbEv">
-              </span>
-              <span id="trtorch::ExtraInfo::DataType::castto-b-operator">
-              </span>
               <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DataType_1ab8f80746475f73463728d4994ca493d8">
               </span>
               <code class="sig-name descname">
@@ -1625,12 +1299,6 @@
             </dl>
             <dl class="cpp function">
              <dt id="_CPPv4NK7trtorch9ExtraInfo8DataTypeeqE8DataType">
-              <span id="_CPPv3NK7trtorch9ExtraInfo8DataTypeeqE8DataType">
-              </span>
-              <span id="_CPPv2NK7trtorch9ExtraInfo8DataTypeeqE8DataType">
-              </span>
-              <span id="trtorch::ExtraInfo::DataType::eq-operator__DataTypeCCE">
-              </span>
               <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DataType_1a9733600e44e3745df5d7f0653e0e5fe8">
               </span>
               <em class="property">
@@ -1714,12 +1382,6 @@
             </dl>
             <dl class="cpp function">
              <dt id="_CPPv4NK7trtorch9ExtraInfo8DataTypeeqEN8DataType5ValueE">
-              <span id="_CPPv3NK7trtorch9ExtraInfo8DataTypeeqEN8DataType5ValueE">
-              </span>
-              <span id="_CPPv2NK7trtorch9ExtraInfo8DataTypeeqEN8DataType5ValueE">
-              </span>
-              <span id="trtorch::ExtraInfo::DataType::eq-operator__DataType::ValueCCE">
-              </span>
               <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DataType_1a61d6f3e6a3929edec1d3659330b8297d">
               </span>
               <em class="property">
@@ -1807,12 +1469,6 @@
             </dl>
             <dl class="cpp function">
              <dt id="_CPPv4NK7trtorch9ExtraInfo8DataTypeneE8DataType">
-              <span id="_CPPv3NK7trtorch9ExtraInfo8DataTypeneE8DataType">
-              </span>
-              <span id="_CPPv2NK7trtorch9ExtraInfo8DataTypeneE8DataType">
-              </span>
-              <span id="trtorch::ExtraInfo::DataType::neq-operator__DataTypeCCE">
-              </span>
               <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DataType_1a436087fd6b2cc460cb2a4d010c6a8a01">
               </span>
               <em class="property">
@@ -1896,12 +1552,6 @@
             </dl>
             <dl class="cpp function">
              <dt id="_CPPv4NK7trtorch9ExtraInfo8DataTypeneEN8DataType5ValueE">
-              <span id="_CPPv3NK7trtorch9ExtraInfo8DataTypeneEN8DataType5ValueE">
-              </span>
-              <span id="_CPPv2NK7trtorch9ExtraInfo8DataTypeneEN8DataType5ValueE">
-              </span>
-              <span id="trtorch::ExtraInfo::DataType::neq-operator__DataType::ValueCCE">
-              </span>
               <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DataType_1afac08806f8da094821031a3bf0ee5fa7">
               </span>
               <em class="property">
@@ -1992,12 +1642,6 @@
          </dl>
          <dl class="cpp class">
           <dt id="_CPPv4N7trtorch9ExtraInfo10DeviceTypeE">
-           <span id="_CPPv3N7trtorch9ExtraInfo10DeviceTypeE">
-           </span>
-           <span id="_CPPv2N7trtorch9ExtraInfo10DeviceTypeE">
-           </span>
-           <span id="trtorch::ExtraInfo::DeviceType">
-           </span>
            <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DeviceType">
            </span>
            <em class="property">
@@ -2044,10 +1688,6 @@
             </p>
             <dl class="cpp enum">
              <dt id="_CPPv4N7trtorch9ExtraInfo10DeviceType5ValueE">
-              <span id="_CPPv3N7trtorch9ExtraInfo10DeviceType5ValueE">
-              </span>
-              <span id="_CPPv2N7trtorch9ExtraInfo10DeviceType5ValueE">
-              </span>
               <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DeviceType_1a3c9473714c76e79ca7d8f02fc38e0bc9">
               </span>
               <em class="property">
@@ -2093,10 +1733,6 @@
               </p>
               <dl class="cpp enumerator">
                <dt id="_CPPv4N7trtorch9ExtraInfo10DeviceType5Value4kGPUE">
-                <span id="_CPPv3N7trtorch9ExtraInfo10DeviceType5Value4kGPUE">
-                </span>
-                <span id="_CPPv2N7trtorch9ExtraInfo10DeviceType5Value4kGPUE">
-                </span>
                 <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DeviceType_1a3c9473714c76e79ca7d8f02fc38e0bc9a2df1660a7ea56d4721cd8e169f9a1a8c">
                 </span>
                 <em class="property">
@@ -2115,10 +1751,6 @@
               </dl>
               <dl class="cpp enumerator">
                <dt id="_CPPv4N7trtorch9ExtraInfo10DeviceType5Value4kDLAE">
-                <span id="_CPPv3N7trtorch9ExtraInfo10DeviceType5Value4kDLAE">
-                </span>
-                <span id="_CPPv2N7trtorch9ExtraInfo10DeviceType5Value4kDLAE">
-                </span>
                 <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DeviceType_1a3c9473714c76e79ca7d8f02fc38e0bc9a2ee6411cb96ad9a080b6c3f4ac0ab80f">
                 </span>
                 <em class="property">
@@ -2144,12 +1776,6 @@
             </p>
             <dl class="cpp function">
              <dt id="_CPPv4N7trtorch9ExtraInfo10DeviceType10DeviceTypeEv">
-              <span id="_CPPv3N7trtorch9ExtraInfo10DeviceType10DeviceTypeEv">
-              </span>
-              <span id="_CPPv2N7trtorch9ExtraInfo10DeviceType10DeviceTypeEv">
-              </span>
-              <span id="trtorch::ExtraInfo::DeviceType::DeviceType">
-              </span>
               <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DeviceType_1ad6c691ad7e3daa4a88630a66fa9afdda">
               </span>
               <code class="sig-name descname">
@@ -2172,12 +1798,6 @@
             </dl>
             <dl class="cpp function">
              <dt id="_CPPv4N7trtorch9ExtraInfo10DeviceType10DeviceTypeE5Value">
-              <span id="_CPPv3N7trtorch9ExtraInfo10DeviceType10DeviceTypeE5Value">
-              </span>
-              <span id="_CPPv2N7trtorch9ExtraInfo10DeviceType10DeviceTypeE5Value">
-              </span>
-              <span id="trtorch::ExtraInfo::DeviceType::DeviceType__ValueCE">
-              </span>
               <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DeviceType_1ab93fce6bbcddb003e94caabb223bcf8d">
               </span>
               <em class="property">
@@ -2208,12 +1828,6 @@
             </dl>
             <dl class="cpp function">
              <dt id="_CPPv4N7trtorch9ExtraInfo10DeviceType10DeviceTypeEN3c1010DeviceTypeE">
-              <span id="_CPPv3N7trtorch9ExtraInfo10DeviceType10DeviceTypeEN3c1010DeviceTypeE">
-              </span>
-              <span id="_CPPv2N7trtorch9ExtraInfo10DeviceType10DeviceTypeEN3c1010DeviceTypeE">
-              </span>
-              <span id="trtorch::ExtraInfo::DeviceType::DeviceType__c10::DeviceType">
-              </span>
               <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DeviceType_1aede9e2bc5d5c7a0e62d9b898a936416d">
               </span>
               <code class="sig-name descname">
@@ -2262,12 +1876,6 @@
             </dl>
             <dl class="cpp function">
              <dt id="_CPPv4NK7trtorch9ExtraInfo10DeviceTypecv5ValueEv">
-              <span id="_CPPv3NK7trtorch9ExtraInfo10DeviceTypecv5ValueEv">
-              </span>
-              <span id="_CPPv2NK7trtorch9ExtraInfo10DeviceTypecv5ValueEv">
-              </span>
-              <span id="trtorch::ExtraInfo::DeviceType::castto-Value-operatorC">
-              </span>
               <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DeviceType_1a9ea8f47c285eae863b3b040d873824d2">
               </span>
               <code class="sig-name descname">
@@ -2306,12 +1914,6 @@
             </dl>
             <dl class="cpp function">
              <dt id="_CPPv4N7trtorch9ExtraInfo10DeviceTypecvbEv">
-              <span id="_CPPv3N7trtorch9ExtraInfo10DeviceTypecvbEv">
-              </span>
-              <span id="_CPPv2N7trtorch9ExtraInfo10DeviceTypecvbEv">
-              </span>
-              <span id="trtorch::ExtraInfo::DeviceType::castto-b-operator">
-              </span>
               <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DeviceType_1adfd0e60fedcb1bee2200687a2a0d3bc2">
               </span>
               <code class="sig-name descname">
@@ -2331,12 +1933,6 @@
             </dl>
             <dl class="cpp function">
              <dt id="_CPPv4NK7trtorch9ExtraInfo10DeviceTypeeqE10DeviceType">
-              <span id="_CPPv3NK7trtorch9ExtraInfo10DeviceTypeeqE10DeviceType">
-              </span>
-              <span id="_CPPv2NK7trtorch9ExtraInfo10DeviceTypeeqE10DeviceType">
-              </span>
-              <span id="trtorch::ExtraInfo::DeviceType::eq-operator__DeviceTypeCCE">
-              </span>
               <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DeviceType_1ac93424fcc161c67ebe273dc193bd15e2">
               </span>
               <em class="property">
@@ -2420,12 +2016,6 @@
             </dl>
             <dl class="cpp function">
              <dt id="_CPPv4NK7trtorch9ExtraInfo10DeviceTypeneE10DeviceType">
-              <span id="_CPPv3NK7trtorch9ExtraInfo10DeviceTypeneE10DeviceType">
-              </span>
-              <span id="_CPPv2NK7trtorch9ExtraInfo10DeviceTypeneE10DeviceType">
-              </span>
-              <span id="trtorch::ExtraInfo::DeviceType::neq-operator__DeviceTypeCCE">
-              </span>
               <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DeviceType_1a3c96b55a60e6c57c8609983e92cc708a">
               </span>
               <em class="property">
@@ -2512,12 +2102,6 @@
          </dl>
          <dl class="cpp struct">
           <dt id="_CPPv4N7trtorch9ExtraInfo10InputRangeE">
-           <span id="_CPPv3N7trtorch9ExtraInfo10InputRangeE">
-           </span>
-           <span id="_CPPv2N7trtorch9ExtraInfo10InputRangeE">
-           </span>
-           <span id="trtorch::ExtraInfo::InputRange">
-           </span>
            <span class="target" id="structtrtorch_1_1ExtraInfo_1_1InputRange">
            </span>
            <em class="property">
@@ -2544,12 +2128,6 @@
             </p>
             <dl class="cpp function">
              <dt id="_CPPv4N7trtorch9ExtraInfo10InputRange10InputRangeENSt6vectorI7int64_tEE">
-              <span id="_CPPv3N7trtorch9ExtraInfo10InputRange10InputRangeENSt6vectorI7int64_tEE">
-              </span>
-              <span id="_CPPv2N7trtorch9ExtraInfo10InputRange10InputRangeENSt6vectorI7int64_tEE">
-              </span>
-              <span id="trtorch::ExtraInfo::InputRange::InputRange__std::vector:int64_t:">
-              </span>
               <span class="target" id="structtrtorch_1_1ExtraInfo_1_1InputRange_1a8436e9f55699602fa0033e464aa4b71d">
               </span>
               <code class="sig-name descname">
@@ -2601,12 +2179,6 @@
             </dl>
             <dl class="cpp function">
              <dt id="_CPPv4N7trtorch9ExtraInfo10InputRange10InputRangeEN3c108ArrayRefI7int64_tEE">
-              <span id="_CPPv3N7trtorch9ExtraInfo10InputRange10InputRangeEN3c108ArrayRefI7int64_tEE">
-              </span>
-              <span id="_CPPv2N7trtorch9ExtraInfo10InputRange10InputRangeEN3c108ArrayRefI7int64_tEE">
-              </span>
-              <span id="trtorch::ExtraInfo::InputRange::InputRange__c10::ArrayRef:int64_t:">
-              </span>
               <span class="target" id="structtrtorch_1_1ExtraInfo_1_1InputRange_1a184457db2946af9e035ff00d4c0fa8cf">
               </span>
               <code class="sig-name descname">
@@ -2658,12 +2230,6 @@
             </dl>
             <dl class="cpp function">
              <dt id="_CPPv4N7trtorch9ExtraInfo10InputRange10InputRangeENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE">
-              <span id="_CPPv3N7trtorch9ExtraInfo10InputRange10InputRangeENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE">
-              </span>
-              <span id="_CPPv2N7trtorch9ExtraInfo10InputRange10InputRangeENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE">
-              </span>
-              <span id="trtorch::ExtraInfo::InputRange::InputRange__std::vector:int64_t:.std::vector:int64_t:.std::vector:int64_t:">
-              </span>
               <span class="target" id="structtrtorch_1_1ExtraInfo_1_1InputRange_1a8c0e2c9c642f0c4ae37b6776fe83a235">
               </span>
               <code class="sig-name descname">
@@ -2743,12 +2309,6 @@
             </dl>
             <dl class="cpp function">
              <dt id="_CPPv4N7trtorch9ExtraInfo10InputRange10InputRangeEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE">
-              <span id="_CPPv3N7trtorch9ExtraInfo10InputRange10InputRangeEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE">
-              </span>
-              <span id="_CPPv2N7trtorch9ExtraInfo10InputRange10InputRangeEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE">
-              </span>
-              <span id="trtorch::ExtraInfo::InputRange::InputRange__c10::ArrayRef:int64_t:.c10::ArrayRef:int64_t:.c10::ArrayRef:int64_t:">
-              </span>
               <span class="target" id="structtrtorch_1_1ExtraInfo_1_1InputRange_1a65739fbfd19fef06bed384bfc5ecd57e">
               </span>
               <code class="sig-name descname">
@@ -2833,12 +2393,6 @@
             </p>
             <dl class="cpp var">
              <dt id="_CPPv4N7trtorch9ExtraInfo10InputRange3minE">
-              <span id="_CPPv3N7trtorch9ExtraInfo10InputRange3minE">
-              </span>
-              <span id="_CPPv2N7trtorch9ExtraInfo10InputRange3minE">
-              </span>
-              <span id="trtorch::ExtraInfo::InputRange::min__std::vector:int64_t:">
-              </span>
               <span class="target" id="structtrtorch_1_1ExtraInfo_1_1InputRange_1a8ae29716eb5158d7552dd7ce271585cf">
               </span>
               std::vector&lt;int64_t&gt;
@@ -2858,12 +2412,6 @@
             </dl>
             <dl class="cpp var">
              <dt id="_CPPv4N7trtorch9ExtraInfo10InputRange3optE">
-              <span id="_CPPv3N7trtorch9ExtraInfo10InputRange3optE">
-              </span>
-              <span id="_CPPv2N7trtorch9ExtraInfo10InputRange3optE">
-              </span>
-              <span id="trtorch::ExtraInfo::InputRange::opt__std::vector:int64_t:">
-              </span>
               <span class="target" id="structtrtorch_1_1ExtraInfo_1_1InputRange_1ade14b3adbf9f0da69d3faff6c7c61a1d">
               </span>
               std::vector&lt;int64_t&gt;
@@ -2883,12 +2431,6 @@
             </dl>
             <dl class="cpp var">
              <dt id="_CPPv4N7trtorch9ExtraInfo10InputRange3maxE">
-              <span id="_CPPv3N7trtorch9ExtraInfo10InputRange3maxE">
-              </span>
-              <span id="_CPPv2N7trtorch9ExtraInfo10InputRange3maxE">
-              </span>
-              <span id="trtorch::ExtraInfo::InputRange::max__std::vector:int64_t:">
-              </span>
               <span class="target" id="structtrtorch_1_1ExtraInfo_1_1InputRange_1a2b19d2370a274f1d13ef7ac091815739">
               </span>
               std::vector&lt;int64_t&gt;
@@ -2959,7 +2501,7 @@
       <a href="http://www.sphinx-doc.org/">
        Sphinx
       </a>
-      3.0.3.
+      3.1.2.
              and
       <a href="https://github.com/bashtage/sphinx-material/">
        Material for

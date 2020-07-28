@@ -7,8 +7,6 @@ RUN wget https://copr.fedorainfracloud.org/coprs/vbatts/bazel/repo/epel-7/vbatts
 
 RUN yum install -y bazel3
 
-RUN mv /usr/bin/ninja-build /usr/bin/ninja
-
 RUN mkdir /workspace
 
 WORKDIR /workspace

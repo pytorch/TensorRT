@@ -25,14 +25,14 @@ namespace plugins {
 
 class InterpolatePlugin : public nvinfer1::IPluginV2DynamicExt {
 private:
-    at::TensorOptions tensor_options;
-    DataType dtype;
+    at::TensorOptions tensor_options_;
+    DataType dtype_;
 
-    std::vector<int64_t> in_shape;
-    std::vector<int64_t> out_shape;
-    std::vector<int64_t> size;
-    std::string mode;
-    bool align_corners;
+    std::vector<int64_t> in_shape_;
+    std::vector<int64_t> out_shape_;
+    std::vector<int64_t> size_;
+    std::string mode_;
+    bool align_corners_;
 
 protected:
     // To prevent compiler warnings
@@ -46,7 +46,7 @@ protected:
 
 public:
     InterpolatePlugin(std::vector<int64_t> in_shape, std::vector<int64_t> out_shape, std::vector<int64_t> size, std::string mode, bool align_corners);
-    
+
     InterpolatePlugin(const char *data, size_t length);
 
     InterpolatePlugin() = delete;
@@ -91,14 +91,14 @@ public:
 
     size_t getWorkspaceSize(const nvinfer1::PluginTensorDesc* inputs, int nbInputs, const nvinfer1::PluginTensorDesc* outputs, int nbOutputs) const override;
 
-    int enqueue(const nvinfer1::PluginTensorDesc* inputDesc, const nvinfer1::PluginTensorDesc* outputDesc, const void *const *inputs, 
-                                                                                                           void *const *outputs, void *workspace, 
+    int enqueue(const nvinfer1::PluginTensorDesc* inputDesc, const nvinfer1::PluginTensorDesc* outputDesc, const void *const *inputs,
+                                                                                                           void *const *outputs, void *workspace,
                                                                                                            cudaStream_t stream) override;
 };
 
 class InterpolatePluginCreator : public nvinfer1::IPluginCreator {
 private:
-    std::string name;
+    std::string name_;
 
 public:
     InterpolatePluginCreator() = default;
@@ -106,7 +106,7 @@ public:
     const char* getPluginNamespace() const override;
 
     void setPluginNamespace(const char* libNamespace) override {};
-    
+
     const char* getPluginName() const override;
 
     const char* getPluginVersion() const override;

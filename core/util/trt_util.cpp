@@ -6,6 +6,59 @@ namespace trtorch {
 namespace core {
 namespace util {
 
+bool broadcastable(nvinfer1::Dims a, nvinfer1::Dims b, bool multidirectional) {
+    if (a == b) {
+        return true;
+    }
+
+    if (multidirectional) {
+        nvinfer1::Dims a_dims_eq;
+        nvinfer1::Dims b_dims_eq;
+        if (a.nbDims > b.nbDims) {
+            a_dims_eq = a;
+            b_dims_eq = toDimsPad(toVec(b), a.nbDims);
+        } else if (a.nbDims < b.nbDims) {
+            a_dims_eq = toDimsPad(toVec(a), b.nbDims);
+            b_dims_eq = b;
+        } else {
+            a_dims_eq = a;
+            b_dims_eq = b;
+        }
+
+        bool broadcastable = true;
+        for (int i = 0; i < a_dims_eq.nbDims; i++) {
+            if (b_dims_eq.d[i] == a_dims_eq.d[i] || (b_dims_eq.d[i] == 1 || a_dims_eq.d[i] == 1)) {
+                continue;
+            } else {
+                broadcastable = false;
+                break;
+            }
+        }
+        return broadcastable;
+    } else {
+        nvinfer1::Dims b_dims_eq;
+        if (a.nbDims > b.nbDims) {
+            b_dims_eq = toDimsPad(toVec(b), a.nbDims);
+        } else if (a.nbDims < b.nbDims) {
+            return false;
+        } else {
+            b_dims_eq = b;
+        }
+
+        bool broadcastable = true;
+        for (int i = 0; i < a.nbDims; i++) {
+            if (b_dims_eq.d[i] == a.d[i] || b_dims_eq.d[i] == 1) {
+                continue;
+            } else {
+                broadcastable = false;
+                break;
+            }
+        }
+        return broadcastable;
+    }
+}
+
+
 int64_t volume(const nvinfer1::Dims& d) {
     return std::accumulate(d.d, d.d + d.nbDims, 1, std::multiplies<int64_t>());
 }
@@ -16,10 +69,7 @@ nvinfer1::Dims toDimsPad(c10::IntArrayRef l, uint64_t pad_to) {
         return toDims(l);
     }
 
-    if (pad_to > nvinfer1::Dims::MAX_DIMS) {
-        //TODO: Handle this with exceptions or whatever
-        LOG_INTERNAL_ERROR("The list requested to be converted to nvinfer1::Dims exceeds the max number of dimensions for TensorRT");
-    }
+    TRTORCH_CHECK(pad_to <= nvinfer1::Dims::MAX_DIMS, "The list requested to be converted to nvinfer1::Dims exceeds the max number of dimensions for TensorRT");
 
     nvinfer1::Dims dims;
     dims.nbDims = pad_to;
@@ -34,10 +84,8 @@ nvinfer1::Dims toDimsPad(c10::IntArrayRef l, uint64_t pad_to) {
 }
 
 nvinfer1::Dims toDims(c10::IntArrayRef l) {
-    if (l.size() > nvinfer1::Dims::MAX_DIMS) {
-        //TODO: Handle this with exceptions or whatever
-        LOG_INTERNAL_ERROR("The list requested to be converted to nvinfer1::Dims exceeds the max number of dimensions for TensorRT");
-    }
+    TRTORCH_CHECK(l.size() <= nvinfer1::Dims::MAX_DIMS, "The list requested to be converted to nvinfer1::Dims exceeds the max number of dimensions for TensorRT");
+
     nvinfer1::Dims dims;
     dims.nbDims = l.size();
     for (size_t i = 0; i < l.size(); i++) {
@@ -47,10 +95,8 @@ nvinfer1::Dims toDims(c10::IntArrayRef l) {
 }
 
 nvinfer1::Dims toDims(c10::List<int64_t> l) {
-    if (l.size() > nvinfer1::Dims::MAX_DIMS) {
-        //TODO: Handle this with exceptions or whatever
-        LOG_INTERNAL_ERROR("The list requested to be converted to nvinfer1::Dims exceeds the max number of dimensions for TensorRT");
-    }
+    TRTORCH_CHECK(l.size() <= nvinfer1::Dims::MAX_DIMS, "The list requested to be converted to nvinfer1::Dims exceeds the max number of dimensions for TensorRT");
+
     nvinfer1::Dims dims;
     dims.nbDims = l.size();
     for (size_t i = 0; i < l.size(); i++) {
@@ -65,10 +111,8 @@ nvinfer1::Dims toDimsPad(c10::List<int64_t> l, uint64_t pad_to) {
         return toDims(l);
     }
 
-    if (pad_to > nvinfer1::Dims::MAX_DIMS) {
-        //TODO: Handle this with exceptions or whatever
-        LOG_INTERNAL_ERROR("The list requested to be converted to nvinfer1::Dims exceeds the max number of dimensions for TensorRT");
-    }
+    TRTORCH_CHECK(pad_to <= nvinfer1::Dims::MAX_DIMS, "The list requested to be converted to nvinfer1::Dims exceeds the max number of dimensions for TensorRT");
+
 
     nvinfer1::Dims dims;
     dims.nbDims = pad_to;
@@ -109,7 +153,7 @@ nvinfer1::Dims unpadDims(const nvinfer1::Dims& d) {
 nvinfer1::Dims unsqueezeDims(const nvinfer1::Dims& d, int pos) {
     // acceptable range for pos is [0, d.nbDims]
     TRTORCH_ASSERT(pos >= 0 && pos <= d.nbDims, "ERROR: Index to unsqueeze is out of bounds.");
-    
+
     nvinfer1::Dims dims;
 
     int i = 0;
@@ -148,10 +192,8 @@ std::string toStr(nvinfer1::Dims d) {
 
 
 nvinfer1::DimsHW toDimsHW(c10::List<int64_t> l) {
-    if (l.size() != 2) {
-        //TODO: Handle this with exceptions or whatever
-        LOG_INTERNAL_ERROR("The list requested to be converted to nvinfer1::DimsHW is not 2");
-    }
+    TRTORCH_CHECK(l.size() == 2, "The list requested to be converted to nvinfer1::DimsHW is not 2");
+
     nvinfer1::DimsHW dims;
     dims.nbDims = l.size();
     for (size_t i = 0; i < l.size(); i++) {
@@ -161,10 +203,8 @@ nvinfer1::DimsHW toDimsHW(c10::List<int64_t> l) {
 }
 
 nvinfer1::DimsHW toDimsHW(c10::IntArrayRef l) {
-    if (l.size() != 2) {
-        //TODO: Handle this with exceptions or whatever
-        LOG_INTERNAL_ERROR("The list requested to be converted to nvinfer1::DimsHW is not 2");
-    }
+    TRTORCH_CHECK(l.size() == 2, "The list requested to be converted to nvinfer1::DimsHW is not 2");
+
     nvinfer1::DimsHW dims;
     dims.nbDims = l.size();
     for (size_t i = 0; i < l.size(); i++) {

@@ -2,7 +2,10 @@
   - cpp/api/**/*
 
 "component: api [Python]":
-  - py/api/**/*
+  - py/**/*
+
+"component: core":
+  - core/**/*
 
 "component: conversion":
   - core/conversion/**/*
@@ -17,4 +20,16 @@
   - core/execution/**/*
 
 "component: lowering":
- - core/lowering/**/*
+  - core/lowering/**/*
+
+"component: tests":
+  - tests/**/*
+
+"component: build system":
+  - WORKSPACE
+  - BUILD
+
+"documentation":
+  - docs/**/*
+  - docsrc/**/*
+ 

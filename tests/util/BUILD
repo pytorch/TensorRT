@@ -19,10 +19,10 @@ cc_library(
         "run_forward.cpp"
     ],
     deps = [
-        "@tensorrt//:nvinfer",
         "//core/conversion",
         "//core/util:prelude",
         "//cpp/api:trtorch",
+        "@tensorrt//:nvinfer"
     ] + select({
         ":use_pre_cxx11_abi":  [
             "@libtorch_pre_cxx11_abi//:libtorch",

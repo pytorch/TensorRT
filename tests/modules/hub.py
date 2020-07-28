@@ -79,18 +79,18 @@ for n, m in models.items():
         script_model = torch.jit.script(m["model"])
         torch.jit.save(script_model, n + '_scripted.jit.pt')
 
-# Sample Interpolation Model (align_corners=False, for Testing Interpolate Plugin specifically)
-class Interpolate(nn.Module):
+# Sample Pool Model (for testing plugin serialization)
+class Pool(nn.Module):
     def __init__(self):
-        super(Interpolate, self).__init__()
+        super(Pool, self).__init__()
 
     def forward(self, x):
-        return F.interpolate(x, size=(10, 10, 10), align_corners=False, mode="trilinear")
+        return F.adaptive_avg_pool2d(x, (5, 5))
 
-model = Interpolate().eval().cuda()
-x = torch.ones([1, 3, 5, 5, 5]).cuda()
+model = Pool().eval().cuda()
+x = torch.ones([1, 3, 10, 10]).cuda()
 
 trace_model = torch.jit.trace(model, x)
-torch.jit.save(trace_model, "interpolate_traced.jit.pt")
+torch.jit.save(trace_model, "pooling_traced.jit.pt")
 
 

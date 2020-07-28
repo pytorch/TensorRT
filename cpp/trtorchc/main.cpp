@@ -13,7 +13,10 @@
 #include "third_party/args/args.hpp"
 #include "torch/torch.h"
 #include "torch/script.h"
+
+#include "trtorch/logging.h"
 #include "trtorch/trtorch.h"
+#include "trtorch/ptq.h"
 
 bool checkRtol(const at::Tensor& diff, const std::vector<at::Tensor> inputs, float threshold) {
     double maxValue = 0.0;

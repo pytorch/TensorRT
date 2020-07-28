@@ -2,6 +2,7 @@
 <html>
  <head>
   <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -35,7 +36,7 @@
   <script src="../_static/javascripts/modernizr.js">
   </script>
   <title>
-   System Overview — TRTorch 0.0.2 documentation
+   System Overview — TRTorch master documentation
   </title>
   <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/pygments.css" rel="stylesheet" type="text/css"/>
@@ -54,10 +55,12 @@
   </script>
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
   </script>
+  <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
+  </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
   <link href="lowering.html" rel="next" title="Lowering Phase"/>
-  <link href="../tutorials/trtorchc.html" rel="prev" title="trtorchc"/>
+  <link href="../_cpp_api/define_macros_8h_1abe87b341f562fd1cf40b7672e4d759da.html" rel="prev" title="Define XSTR"/>
  </head>
  <body data-md-color-accent="light-green" data-md-color-primary="light-green" dir="ltr">
   <svg class="md-svg">
@@ -79,7 +82,7 @@
    <nav class="md-header-nav md-grid">
     <div class="md-flex navheader">
      <div class="md-flex__cell md-flex__cell--shrink">
-      <a class="md-header-nav__button md-logo" href="../index.html" title="TRTorch 0.0.2 documentation">
+      <a class="md-header-nav__button md-logo" href="../index.html" title="TRTorch master documentation">
        <i class="md-icon">
         
        </i>
@@ -151,6 +154,9 @@
        <a href="https://nvidia.github.io/TRTorch/" title="master">
         master
        </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.0.3/" title="v0.0.3">
+        v0.0.3
+       </a>
        <a href="https://nvidia.github.io/TRTorch/v0.0.2/" title="v0.0.2">
         v0.0.2
        </a>
@@ -168,7 +174,7 @@
      <ul class="md-tabs__list">
       <li class="md-tabs__item">
        <a class="md-tabs__link" href="../index.html">
-        TRTorch 0.0.2 documentation
+        TRTorch master documentation
        </a>
       </li>
      </ul>
@@ -181,12 +187,12 @@
        <div class="md-sidebar__inner">
         <nav class="md-nav md-nav--primary" data-md-level="0">
          <label class="md-nav__title md-nav__title--site" for="__drawer">
-          <a class="md-nav__button md-logo" href="../index.html" title="TRTorch 0.0.2 documentation">
+          <a class="md-nav__button md-logo" href="../index.html" title="TRTorch master documentation">
            <i class="md-icon">
             
            </i>
           </a>
-          <a href="../index.html" title="TRTorch 0.0.2 documentation">
+          <a href="../index.html" title="TRTorch master documentation">
            TRTorch
           </a>
          </label>
@@ -215,90 +221,61 @@
            <a class="md-nav__link" href="../tutorials/installation.html">
             Installation
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/installation.html#dependencies">
-              Dependencies
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/installation.html#dependencies-for-compilation">
-              Dependencies for Compilation
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/installation.html#building-using-cudnn-tensorrt-tarball-distributions">
-              <strong>
-               Building using cuDNN &amp; TensorRT tarball distributions
-              </strong>
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/installation.html#building-using-locally-installed-cudnn-tensorrt">
-              <strong>
-               Building using locally installed cuDNN &amp; TensorRT
-              </strong>
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../tutorials/getting_started.html">
             Getting Started
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/getting_started.html#creating-a-torchscript-module">
-              Creating a TorchScript Module
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/getting_started.html#working-with-torchscript-in-python">
-              Working with TorchScript in Python
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/getting_started.html#compiling-with-trtorch-in-python">
-              Compiling with TRTorch in Python
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/getting_started.html#working-with-torchscript-in-c">
-              Working with TorchScript in C++
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/getting_started.html#compiling-with-trtorch-in-c">
-              Compiling with TRTorch in C++
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/getting_started.html#under-the-hood">
-              Under The Hood
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/getting_started.html#working-with-unsupported-operators">
-              Working with Unsupported Operators
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../tutorials/ptq.html">
             Post Training Quantization (PTQ)
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../tutorials/ptq.html#how-to-create-your-own-ptq-application">
-              How to create your own PTQ application
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../tutorials/trtorchc.html">
             trtorchc
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Notebooks
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/lenet-getting-started.html">
+            TRTorch Getting Started - LeNet
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Python API Documenation
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/trtorch.html">
+            trtorch
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/logging.html">
+            trtorch.logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             C++ API Documenation
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html">
+            TRTorch C++ API
            </a>
           </li>
           <li class="md-nav__item">
@@ -361,155 +338,16 @@
              </li>
             </ul>
            </nav>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="#compiler-phases">
-              Compiler Phases
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="writing_converters.html">
             Writing Converters
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="writing_converters.html#background">
-              Background
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="writing_converters.html#converters">
-              Converters
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="writing_converters.html#converter-contract">
-              Converter Contract
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="writing_converters.html#conversion-context">
-              Conversion Context
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="writing_converters.html#args">
-              Args
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="writing_converters.html#weights">
-              Weights
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="writing_converters.html#other-advice">
-              Other advice
-             </a>
-            </li>
-           </ul>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="useful_links.html">
             Useful Links for TRTorch Development
            </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="useful_links.html#tensorrt-available-layers-and-expected-dimensions">
-              TensorRT Available Layers and Expected Dimensions
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="useful_links.html#tensorrt-c-documentation">
-              TensorRT C++ Documentation
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="useful_links.html#tensorrt-python-documentation-sometimes-easier-to-read">
-              TensorRT Python Documentation (Sometimes easier to read)
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="useful_links.html#pytorch-functional-api">
-              PyTorch Functional API
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="useful_links.html#pytorch-native-ops">
-              PyTorch native_ops
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="useful_links.html#pytorch-ir-documentation">
-              PyTorch IR Documentation
-             </a>
-            </li>
-           </ul>
-          </li>
-          <li class="md-nav__item">
-           <span class="md-nav__link caption">
-            <span class="caption-text">
-             Python API Documenation
-            </span>
-           </span>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/trtorch.html">
-            trtorch
-           </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../py_api/trtorch.html#functions">
-              Functions
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../py_api/trtorch.html#enums">
-              Enums
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../py_api/trtorch.html#submodules">
-              Submodules
-             </a>
-            </li>
-           </ul>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/logging.html">
-            trtorch.logging
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <span class="md-nav__link caption">
-            <span class="caption-text">
-             C++ API Documenation
-            </span>
-           </span>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html">
-            TRTorch C++ API
-           </a>
-           <ul class="md-nav__list">
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html#class-hierarchy">
-              Class Hierarchy
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html#file-hierarchy">
-              File Hierarchy
-             </a>
-            </li>
-            <li class="md-nav__item">
-             <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html#full-api">
-              Full API
-             </a>
-            </li>
-           </ul>
           </li>
          </ul>
         </nav>
@@ -605,6 +443,16 @@ version so there may be compilation errors if you try to use an older compiler.
         </li>
         <li>
          <p>
+          py: Python API
+         </p>
+        </li>
+        <li>
+         <p>
+          notebooks: Example applications built with TRTorch
+         </p>
+        </li>
+        <li>
+         <p>
           docs: Documentation
          </p>
         </li>
@@ -616,6 +464,11 @@ version so there may be compilation errors if you try to use an older compiler.
         <li>
          <p>
           third_party: BUILD files for dependency libraries
+         </p>
+        </li>
+        <li>
+         <p>
+          toolchains: Toolchains for different platforms
          </p>
         </li>
        </ul>
@@ -700,7 +553,7 @@ to it, then return the results.
   <footer class="md-footer">
    <div class="md-footer-nav">
     <nav class="md-footer-nav__inner md-grid">
-     <a class="md-flex md-footer-nav__link md-footer-nav__link--prev" href="../tutorials/trtorchc.html" rel="prev" title="trtorchc">
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--prev" href="../_cpp_api/define_macros_8h_1abe87b341f562fd1cf40b7672e4d759da.html" rel="prev" title="Define XSTR">
       <div class="md-flex__cell md-flex__cell--shrink">
        <i class="md-icon md-icon--arrow-back md-footer-nav__button">
        </i>
@@ -710,7 +563,7 @@ to it, then return the results.
         <span class="md-footer-nav__direction">
          Previous
         </span>
-        trtorchc
+        Define XSTR
        </span>
       </div>
      </a>
@@ -740,7 +593,7 @@ to it, then return the results.
       <a href="http://www.sphinx-doc.org/">
        Sphinx
       </a>
-      3.0.3.
+      3.1.2.
              and
       <a href="https://github.com/bashtage/sphinx-material/">
        Material for

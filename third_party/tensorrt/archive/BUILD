@@ -14,7 +14,7 @@ cc_library(
 
 cc_import(
     name = "nvinfer_lib",
-    shared_library = "lib/libnvinfer.so.7.0.0",
+    shared_library = "lib/libnvinfer.so",
     visibility = ["//visibility:private"],
 )
 
@@ -34,7 +34,7 @@ cc_library(
 
 cc_import(
     name = "nvparsers_lib",
-    shared_library = "lib/libnvparsers.so.7.0.0",
+    shared_library = "lib/libnvparsers.so",
     visibility = ["//visibility:private"],
 )
 
@@ -66,7 +66,7 @@ cc_library(
 
 cc_import(
     name = "nvonnxparser_lib",
-    shared_library = "lib/libnvonnxparser.so.7.0.0",
+    shared_library = "lib/libnvonnxparser.so",
     visibility = ["//visibility:private"],
 )
 
@@ -95,7 +95,7 @@ cc_library(
 
 cc_import(
     name = "nvonnxparser_runtime_lib",
-    shared_library = "lib/libnvonnxparser_runtime.so.7.0.0",
+    shared_library = "lib/libnvonnxparser_runtime.so",
     visibility = ["//visibility:public"],
 )
 
@@ -120,7 +120,7 @@ cc_library(
 
 cc_import(
     name = "nvcaffeparser_lib",
-    shared_library = "lib/libnvcaffe_parsers.so.7.0.0",
+    shared_library = "lib/libnvcaffe_parsers.so",
     visibility = ["//visibility:private"],
 )
 
@@ -145,7 +145,7 @@ cc_library(
 
 cc_import(
     name = "nvinferplugin_lib",
-    shared_library = "lib/libnvinfer_plugin.so.7.0.0",
+    shared_library = "lib/libnvinfer_plugin.so",
     visibility = ["//visibility:private"],
 )
 

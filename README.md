@@ -1,5 +1,7 @@
 # TRTorch
 
+[![Documentation](https://img.shields.io/badge/docs-master-brightgreen)](https://nvidia.github.io/TRTorch/)
+
 > Ahead of Time (AOT) compiling for PyTorch JIT
 
 TRTorch is a compiler for PyTorch/TorchScript, targeting NVIDIA GPUs via NVIDIA's TensorRT Deep Learning Optimizer and Runtime. Unlike PyTorch's Just-In-Time (JIT) compiler, TRTorch is an Ahead-of-Time (AOT) compiler, meaning that before you deploy your TorchScript code, you go through an explicit compile step to convert a standard TorchScript program into an module targeting a TensorRT engine. TRTorch operates as a PyTorch extention and compiles modules that integrate into the JIT runtime seamlessly. After compilation using the optimized graph should feel no different than running a TorchScript module. You also have access to TensorRT's suite of configurations at compile time, so you are able to specify operating precision (FP32/FP16/INT8) and other settings for your module.
@@ -61,18 +63,20 @@ torch.jit.save(trt_ts_module, "trt_torchscript_module.ts")
 | Platform | Support |
 | -------- | ------- |
 | Linux AMD64 / GPU   | **Supported** |
-| Linux aarch64 / GPU | **Planned/Possible with Native Compiation but untested** |
-| Linux aarch64 / DLA | **Planned/Possible with Native Compilation but untested** |
+| Linux aarch64 / GPU | **Native Compilation Supported on JetPack-4.4** |
+| Linux aarch64 / DLA | **Native Compilation Supported on JetPack-4.4 but untested** |
 | Windows / GPU       | - |
 | Linux ppc64le / GPU | - |
 
+> Note: Refer NVIDIA NGC container(https://ngc.nvidia.com/catalog/containers/nvidia:l4t-pytorch) for PyTorch libraries on JetPack.
+
 ### Dependencies
 
-- Bazel 3.2.0
-- Libtorch 1.5.0
+- Bazel 3.3.1
+- Libtorch 1.5.1
 - CUDA 10.2
-- cuDNN 7.6.5
-- TensorRT 7.0.0
+- cuDNN 7.6.5 (by default, cuDNN 8 supported with compatable PyTorch build)
+- TensorRT 7.0.0 (by default, TensorRT 7.1 supported with compatable PyTorch build)
 
 ## Prebuilt Binaries and Wheel files
 
@@ -168,6 +172,12 @@ bazel build //:libtrtorch --compilation_mode opt
 ``` shell
 bazel build //:libtrtorch --compilation_mode=dbg
 ```
+
+### Native compilation on NVIDIA Jetson AGX
+``` shell
+bazel build //:libtrtorch --distdir third_party/distdir/aarch64-linux-gnu
+```
+> Note: Please refer [installation](docs/tutorials/installation.html) instructions for Pre-requisites
 
 A tarball with the include files and library can then be found in bazel-bin
 

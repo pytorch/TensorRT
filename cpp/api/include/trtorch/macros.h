@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) NVIDIA Corporation.
+ * All rights reserved.
+ *
+ * This library is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
 #pragma once
 
 #if defined(__GNUC__)
@@ -14,7 +21,7 @@
 
 #define TRTORCH_MAJOR_VERSION 0
 #define TRTORCH_MINOR_VERSION 0
-#define TRTORCH_PATCH_VERSION 2
+#define TRTORCH_PATCH_VERSION 3
 #define TRTORCH_VERSION STR(TRTORCH_MAJOR_VERSION) \
                         "." STR(TRTORCH_MINOR_VERSION) \
                         "." STR(TRTORCH_PATCH_VERSION)
