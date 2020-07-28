@@ -1,10 +1,11 @@
 #include "core/util/prelude.h"
-#include "core/conversion/converters/Weights.h"
+#include "core/conversion/converters/converters.h"
 
 namespace trtorch {
 namespace core {
 namespace conversion {
 namespace converters {
+
 
 Weights::Weights() {
     this->num_input_maps = 0;
@@ -17,36 +18,20 @@ Weights::Weights() {
 Weights::Weights(ConversionCtx* ctx, float val) {
     this->num_input_maps = 1;
     this->num_output_maps = 1;
-
     this->data.type = nvinfer1::DataType::kFLOAT;
     float* buf = reinterpret_cast<float*>(malloc(1 * sizeof(float)));
     buf[0] = val;
     this->data.values = buf;
     this->data.count = 1;
     ctx->builder_resources.push_back(buf);
-
-    this->shape.nbDims = 0;
-    this->kernel_shape.nbDims = 0;
-}
-
-Weights::Weights(ConversionCtx* ctx, int32_t val) {
-    this->num_input_maps = 1;
-    this->num_output_maps = 1;
-
-    this->data.type = nvinfer1::DataType::kINT32;
-    int32_t* buf = reinterpret_cast<int32_t*>(malloc(1 * sizeof(int32_t)));
-    buf[0] = val;
-    this->data.values = buf;
-    this->data.count = 1;
-    ctx->builder_resources.push_back(buf);
-
-    this->shape.nbDims = 0;
-    this->kernel_shape.nbDims = 0;
+    this->kernel_shape.nbDims = 1;
+    this->kernel_shape.d[0] = 1;
 }
 
 Weights::Weights(ConversionCtx* ctx, at::Tensor t) {
     if (t.sizes().size() > nvinfer1::Dims::MAX_DIMS) {
-        TRTORCH_THROW_ERROR("The tensor requested to be converted to nvinfer1::Weights exceeds the max number of dimensions for TensorRT");
+        //TODO: Handle this with exceptions or whatever
+        LOG_INTERNAL_ERROR("The tensor requested to be converted to nvinfer1::Weights exceeds the max number of dimensions for TensorRT");
     }
     this->shape = util::toDims(t.sizes());
     if (t.sizes().size() >= 2) {
@@ -74,7 +59,9 @@ Weights::Weights(ConversionCtx* ctx, at::Tensor t) {
     t_cpu = t_cpu.contiguous();
     auto dtype_optional = util::toTRTDataType(t_cpu.dtype());
     if (!dtype_optional) {
-       TRTORCH_THROW_ERROR("The tensor requested to be converted to nvinfer1::Weights is of an unsupported type");
+        //TODO: Handle this with exceptions or whatever
+        //TODO: Implement handling for the Torch Types
+       LOG_INTERNAL_ERROR("The tensor requested to be converted to nvinfer1::Weights is of an unsupported type");
     }
 
     // Store the data in the conversion context so it remains until building is complete

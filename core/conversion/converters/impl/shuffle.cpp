@@ -17,7 +17,12 @@ static auto shuffle_registrations TRTORCH_UNUSED = RegisterNodeConversionPattern
       auto start_dim = args[1].unwrapToInt();
       auto end_dim = args[2].unwrapToInt();
       auto in_shape = util::toVec(in->getDimensions());
-      auto out_shape = torch::flatten(torch::rand(in_shape), start_dim, end_dim).sizes();
+      std::vector<int64_t> out_shape;
+      if (ctx->input_is_dynamic) {
+        out_shape = std::vector<int64_t>({in_shape[0], -1});
+      } else {
+        out_shape = torch::flatten(torch::rand(in_shape), start_dim, end_dim).sizes().vec();
+      }
 
       auto shuffle = ctx->net->addShuffle(*in);
       TRTORCH_CHECK(shuffle, "Unable to create shuffle layer from node: " << *n);
@@ -33,7 +38,12 @@ static auto shuffle_registrations TRTORCH_UNUSED = RegisterNodeConversionPattern
     [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
       auto in = args[0].ITensorOrFreeze(ctx);
       auto in_shape = util::toVec(in->getDimensions());
-      auto new_shape = torch::reshape(torch::rand(in_shape), args[1].unwrapToIntList().vec()).sizes();
+      std::vector<int64_t> new_shape;
+      if (ctx->input_is_dynamic) {
+        TRTORCH_THROW_ERROR("Resize is currently not support in dynamic input shape compilation");
+      } else {
+        new_shape = torch::reshape(torch::rand(in_shape), args[1].unwrapToIntList().vec()).sizes().vec();
+      }
 
       auto shuffle = ctx->net->addShuffle(*in);
       TRTORCH_CHECK(shuffle, "Unable to create shuffle layer from node: " << *n);
