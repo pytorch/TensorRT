@@ -36,13 +36,14 @@ auto select_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
             // IGatherLayer takes in input tensor, the indices, and the axis of input tensor to take indices from
             auto gather_layer = ctx->net->addGather(*in, *ind_tensor, axis);
             TRTORCH_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
+            gather_layer->setName(("Gather Layer " + util::node_info(n)).c_str());
             auto gather_out = gather_layer->getOutput(0);
 
             // IShuffleLayer removes redundant dimensions
             auto shuffle_layer = ctx->net->addShuffle(*gather_out);
             TRTORCH_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
             shuffle_layer->setReshapeDimensions(util::unpadDims(gather_out->getDimensions()));
-            shuffle_layer->setName(util::node_info(n).c_str());
+            shuffle_layer->setName(("Shuffle Layer " + util::node_info(n)).c_str());
             auto shuffle_out = shuffle_layer->getOutput(0);
 
             auto out = ctx->AssociateValueAndTensor(n->outputs()[0], shuffle_out);
