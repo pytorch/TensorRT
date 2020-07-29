@@ -25,6 +25,19 @@
 #define LOG_ERROR_OWN(l,s)           TRTORCH_LOG(l, core::util::logging::LogLevel::kERROR, s)
 #define LOG_INTERNAL_ERROR_OWN(l,s)  TRTORCH_LOG(l, core::util::logging::LogLevel::kINTERNAL_ERROR, s)
 
+#ifdef _MSC_VER
+
+#define EXPAND( x ) x
+
+#define LOG_GRAPH(...)          EXPAND(GET_MACRO(__VA_ARGS__, LOG_GRAPH_OWN, LOG_GRAPH_GLOBAL)(__VA_ARGS__))
+#define LOG_DEBUG(...)          EXPAND(GET_MACRO(__VA_ARGS__, LOG_DEBUG_OWN, LOG_DEBUG_GLOBAL)(__VA_ARGS__))
+#define LOG_INFO(...)           EXPAND(GET_MACRO(__VA_ARGS__, LOG_INFO_OWN, LOG_INFO_GLOBAL)(__VA_ARGS__))
+#define LOG_WARNING(...)        EXPAND(GET_MACRO(__VA_ARGS__, LOG_WARNING_OWN, LOG_WARNING_GLOBAL)(__VA_ARGS__))
+#define LOG_ERROR(...)          EXPAND(GET_MACRO(__VA_ARGS__, LOG_ERROR_OWN, LOG_ERROR_GLOBAL)(__VA_ARGS__))
+#define LOG_INTERNAL_ERROR(...) EXPAND(GET_MACRO(__VA_ARGS__, LOG_INTERNAL_ERROR_OWN, LOG_INTERNAL_ERROR_GLOBAL)(__VA_ARGS__))
+
+#else
+
 #define LOG_GRAPH(...)          GET_MACRO(__VA_ARGS__, LOG_GRAPH_OWN, LOG_GRAPH_GLOBAL)(__VA_ARGS__)
 #define LOG_DEBUG(...)          GET_MACRO(__VA_ARGS__, LOG_DEBUG_OWN, LOG_DEBUG_GLOBAL)(__VA_ARGS__)
 #define LOG_INFO(...)           GET_MACRO(__VA_ARGS__, LOG_INFO_OWN, LOG_INFO_GLOBAL)(__VA_ARGS__)
@@ -32,6 +45,7 @@
 #define LOG_ERROR(...)          GET_MACRO(__VA_ARGS__, LOG_ERROR_OWN, LOG_ERROR_GLOBAL)(__VA_ARGS__)
 #define LOG_INTERNAL_ERROR(...) GET_MACRO(__VA_ARGS__, LOG_INTERNAL_ERROR_OWN, LOG_INTERNAL_ERROR_GLOBAL)(__VA_ARGS__)
 
+#endif
 // ----------------------------------------------------------------------------
 // Error reporting macros
 // ----------------------------------------------------------------------------
