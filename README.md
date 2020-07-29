@@ -65,7 +65,7 @@ torch.jit.save(trt_ts_module, "trt_torchscript_module.ts")
 | Linux AMD64 / GPU   | **Supported** |
 | Linux aarch64 / GPU | **Native Compilation Supported on JetPack-4.4** |
 | Linux aarch64 / DLA | **Native Compilation Supported on JetPack-4.4 but untested** |
-| Windows / GPU       | - |
+| Windows / GPU       | **Unofficial Support** |
 | Linux ppc64le / GPU | - |
 
 > Note: Refer NVIDIA NGC container(https://ngc.nvidia.com/catalog/containers/nvidia:l4t-pytorch) for PyTorch libraries on JetPack.
