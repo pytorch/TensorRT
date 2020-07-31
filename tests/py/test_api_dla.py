@@ -39,7 +39,7 @@ class TestCompile(ModelTestCaseOnDLA):
 
         trt_mod = trtorch.compile(self.traced_model, extra_info)
         same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
-        self.assertTrue(same < 2e-3)
+        self.assertTrue(same < 2e-2)
 
     def test_compile_script(self):
         extra_info = {
@@ -55,13 +55,12 @@ class TestCompile(ModelTestCaseOnDLA):
 
         trt_mod = trtorch.compile(self.scripted_model, extra_info)
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
-        self.assertTrue(same < 2e-3)
+        self.assertTrue(same < 2e-2)
 
 
 def test_suite():
     suite = unittest.TestSuite()
-    #suite.addTest(TestCompile.parametrize(TestCompile, model=models.resnet18(pretrained=True)))
-    suite.addTest(TestCompile.parametrize(TestCompile, model=models.resnet50(pretrained=True)))
+    suite.addTest(TestCompile.parametrize(TestCompile, model=models.resnet18(pretrained=True)))
 
     return suite
 

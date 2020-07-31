@@ -47,8 +47,11 @@ nvinfer1::ILayer* add_elementwise(ConversionCtx* ctx, nvinfer1::ElementWiseOpera
              self = self_shuffle->getOutput(0);
         }
 
+        auto tensor_type = util::toATenDType(self->getType());
         auto scale = Weights(ctx, scalar);
-        auto scaled = ctx->net->addScaleNd(*other, nvinfer1::ScaleMode::kUNIFORM, {}, scale.data, {}, 0);
+        auto power =  Weights(ctx, at::ones({1}).to(tensor_type));
+        auto shift = Weights(ctx, at::zeros({1}).to(tensor_type));
+        auto scaled = ctx->net->addScaleNd(*other, nvinfer1::ScaleMode::kUNIFORM, shift.data, scale.data, power.data, 0);
         auto scaled_other = scaled->getOutput(0);
 
         // if (shape.size() < 4) {

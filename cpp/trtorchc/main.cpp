@@ -256,7 +256,7 @@ int main(int argc, char** argv) {
 
         if (gpu_id) {
             compile_settings.device.gpu_id = args::get(gpu_id);
-	    auto status = trtorch::set_device(compile_settings.device.gpu_id);
+            auto status = trtorch::set_device(compile_settings.device.gpu_id);
             if(status != 0) {
                 trtorch::logging::log(trtorch::logging::Level::kERROR, "Failed to set the gpu id. Return status: " + std::to_string(status));
                 return status;
