@@ -72,7 +72,6 @@ cc_import(
 
 cc_library(
     name = "nvinfer",
-    srcs = select({ ":windows": [ "lib/nvinfer.lib" ] }),
     deps = [
         "nvinfer_headers",
         "nvinfer_lib",
