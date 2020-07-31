@@ -28,8 +28,11 @@ nvinfer1::ITensor* add_bias(nvinfer1::ITensor* a, nvinfer1::ITensor* b, std::str
         auto shuffle = ctx->net->addShuffle(*b);
         TRTORCH_CHECK(shuffle, "Unable to create shuffle layer from node: " << *n);
         shuffle->setReshapeDimensions(util::toDimsPad(util::toVec(b_dim), a_dim.nbDims));
+        
         b = shuffle->getOutput(0);
     }
+
+    LOG_DEBUG(b_name << "'s shape: " << b->getDimensions());
 
     auto add = ctx->net->addElementWise(*a, *b, nvinfer1::ElementWiseOperation::kSUM);
     TRTORCH_CHECK(add, "Unable to create ElementWise layer from node: " << *n);
@@ -72,14 +75,14 @@ auto lstm_cell_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
             TRTORCH_CHECK(mm1, "Unable to create matrix multiplication node: " << *n);
             auto mm1_out = mm1->getOutput(0);
 
-            auto out1 = !args[4].IValue()->isNone() ? add_bias(mm1_out, args[4].ITensorOrFreeze(ctx), "b_ih", ctx, n) : mm1_out;
+            auto out1 = (args[4].isIValue() && args[4].IValue()->isNone()) ? mm1_out : add_bias(mm1_out, args[4].ITensorOrFreeze(ctx), "b_ih", ctx, n);
 
             // calculate second half of gates
             auto mm2 = ctx->net->addMatrixMultiply(*state[0], nvinfer1::MatrixOperation::kNONE, *w_hh, nvinfer1::MatrixOperation::kTRANSPOSE);
             TRTORCH_CHECK(mm2, "Unable to create matrix multiplication node: " << *n);
             auto mm2_out = mm2->getOutput(0);
 
-            auto out2 = !args[5].IValue()->isNone() ? add_bias(mm2_out, args[5].ITensorOrFreeze(ctx), "b_hh", ctx, n) : mm2_out;
+            auto out2 = (args[5].isIValue() && args[5].IValue()->isNone()) ? mm2_out : add_bias(mm2_out, args[5].ITensorOrFreeze(ctx), "b_hh", ctx, n);
 
             // gates
             auto add = ctx->net->addElementWise(*out1, *out2, nvinfer1::ElementWiseOperation::kSUM);
@@ -130,7 +133,7 @@ auto lstm_cell_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
             TRTORCH_CHECK(forget_cx, "Unable to create ElementWise layer from node: " << *n);
             auto in_cell = ctx->net->addElementWise(*ingate, *cellgate, nvinfer1::ElementWiseOperation::kPROD);
             TRTORCH_CHECK(in_cell, "Unable to create ElementWise layer from node: " << *n);
-            auto cy = ctx->net->addElementWise(*forget_cx->getOutput(0), *in_cell->getOutput(0), nvinfer1::ElementWiseOperation::kPROD);
+            auto cy = ctx->net->addElementWise(*forget_cx->getOutput(0), *in_cell->getOutput(0), nvinfer1::ElementWiseOperation::kSUM);
             TRTORCH_CHECK(cy, "Unable to create ElementWise layer from node: " << *n);
             auto cy_out = ctx->AssociateValueAndTensor(n->outputs()[1], cy->getOutput(0));
 
@@ -143,7 +146,7 @@ auto lstm_cell_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
 
             LOG_DEBUG("Output tensor [hy] shape: " << hy_out->getDimensions());
             LOG_DEBUG("Output tensor [cy] shape: " << cy_out->getDimensions());
-
+                        
             return true;
     }
   });
