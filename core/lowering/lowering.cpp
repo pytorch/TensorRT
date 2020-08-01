@@ -34,7 +34,7 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g) {
     passes::Conv2DToConvolution(g);
     passes::FuseAddMMBranches(g);
     torch::jit::EliminateCommonSubexpression(g);
-    torch::jit::UnrollLoops(g);
+    //torch::jit::UnrollLoops(g);
     torch::jit::EliminateCommonSubexpression(g);
     passes::UnpackAddMM(g);
     //passes::UnpackBatchNorm(g);

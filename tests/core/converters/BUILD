@@ -67,6 +67,10 @@ converter_test(
   name = "test_stack"
 )
 
+converter_test(
+  name = "test_loop"
+)
+
 test_suite(
   name = "test_converters",
   tests = [
@@ -83,6 +87,7 @@ test_suite(
     ":test_unary",
     ":test_interpolate",
     ":test_select",
-    ":test_stack"
+    ":test_stack",
+    ":test_loop"
   ]
 )
