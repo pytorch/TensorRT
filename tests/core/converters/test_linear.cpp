@@ -7,7 +7,7 @@
 TEST(Converters, ATenLinearNoBiasConvertsCorrectly) {
     const auto graph = R"IR(
       graph(%0 : Tensor,
-            %1 : Float(3, 2)):
+            %1 : Float(3:2, 2:1)):
         %2 : None = prim::Constant()
         %3 : Tensor = aten::linear(%0, %1, %2)
         return (%3))IR";
@@ -34,8 +34,8 @@ TEST(Converters, ATenLinearNoBiasConvertsCorrectly) {
 TEST(Converters, ATenLinearBiasConvertsCorrectly) {
     const auto graph = R"IR(
       graph(%0 : Tensor,
-            %1 : Float(2, 3),
-            %2 : Float(2)):
+            %1 : Float(2:3, 3:1),
+            %2 : Float(2:1)):
         %3 : Tensor = aten::linear(%0, %1, %2)
         return (%3))IR";
 

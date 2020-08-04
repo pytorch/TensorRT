@@ -108,18 +108,21 @@ TEST(Converters, ATenPermuteConvertsCorrectly) {
       return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-    torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, &*g);
 
-    auto in = at::randint(0, 5, {2, 3, 2, 3}, {at::kCUDA});
-    auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-    auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
+  auto in = at::randint(0, 5, {2, 3, 2, 3}, {at::kCUDA});
+  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
 
-    in = at::clone(in);
-    params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-    auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
-    auto trt = trt_results[0].reshape_as(jit_results[0]);
+  std::cout << "Running JIT" << std::endl;
+  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
 
-    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  std::cout << "Running TRT" << std::endl;
+  in = at::clone(in);
+  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
+  auto trt = trt_results[0].reshape_as(jit_results[0]);
+
+  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
 TEST(Converters, ATenPermute3DConvertsCorrectly) {
