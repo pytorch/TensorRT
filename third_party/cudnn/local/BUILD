@@ -8,6 +8,13 @@ config_setting(
     ],
 )
 
+config_setting(
+    name = "windows",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+)
+
 cc_library(
     name = "cudnn_headers",
     hdrs = ["include/cudnn.h"] + glob(["include/cudnn+.h"]),
@@ -19,6 +26,7 @@ cc_import(
     name = "cudnn_lib",
     shared_library = select({
         ":aarch64_linux": "lib/aarch64-linux-gnu/libcudnn.so",
+        ":windows": "bin/cudnn64_7.dll", #Need to configure specific version for windows
         "//conditions:default": "lib/x86_64-linux-gnu/libcudnn.so",
     }),
     visibility = ["//visibility:private"],

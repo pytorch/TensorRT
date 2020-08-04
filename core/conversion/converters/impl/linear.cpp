@@ -14,7 +14,7 @@ auto linear_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
         [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
             // PyTorch follows in: Nx*xIN, W: OUTxIN, B: OUT, out: Nx*xOUT
             // TensorRT inserts a flatten in when following conv
-            auto in = args[0].ITensor();
+            auto in = args[0].ITensorOrFreeze(ctx);
             auto shape = util::toVec(in->getDimensions());
 
             LOG_DEBUG("Input tensor shape: " << in->getDimensions());
