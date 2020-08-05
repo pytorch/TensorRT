@@ -42,4 +42,5 @@ Within the container, the notebooks themselves are located at `/workspace/TRTorc
 
 ## 2. Notebook list
 
-- [LeNet-example.ipynb](LeNet-example.ipynb): simple example on a LeNet network.
+- [lenet-getting-started.ipynb](lenet-getting-started.ipynb): simple example on a LeNet network.
+- [ssd-object-detection-demo.ipynb](ssd-object-detection-demo.ipynb): demo for compiling a pretrained SSD model using TRTorch.
