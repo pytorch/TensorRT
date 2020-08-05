@@ -8,7 +8,7 @@ namespace core {
 namespace conversion {
 
 GraphParams get_named_params(c10::ArrayRef<torch::jit::Value*> inputs,
-                             std::vector<at::Tensor> params) {
+                             std::vector<torch::jit::IValue> params) {
     GraphParams named_params;
     auto param_it = params.begin();
     for (auto in : inputs) {
@@ -18,10 +18,8 @@ GraphParams get_named_params(c10::ArrayRef<torch::jit::Value*> inputs,
             ++param_it;
         }
     }
-    //ASSERT(named_params.size() == params.size);
-    if (named_params.size() != params.size()) {
-        LOG_ERROR("Graph parameter parsing failed");
-    }
+
+    TRTORCH_CHECK(named_params.size() == params.size(), "Graph parameter parsing failed, mismatched number of static parameters and IValues")
     return std::move(named_params);
 }
 

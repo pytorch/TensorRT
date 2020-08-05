@@ -49,7 +49,7 @@ torch::jit::Module LowerModule(const torch::jit::script::Module& mod) {
     return mod_;
 }
 
-std::pair<std::shared_ptr<torch::jit::Graph>, std::vector<at::Tensor>> Lower(const torch::jit::script::Module& mod, std::string method_name) {
+std::pair<std::shared_ptr<torch::jit::Graph>, std::vector<torch::jit::IValue>> Lower(const torch::jit::script::Module& mod, std::string method_name) {
     auto lowered_mod = LowerModule(mod);
     auto g = lowered_mod.get_method(method_name).graph();
     LOG_GRAPH(*g);
@@ -63,12 +63,8 @@ std::pair<std::shared_ptr<torch::jit::Graph>, std::vector<at::Tensor>> Lower(con
     auto graph_and_ivalues = torch::jit::LowerGraph(*g, lowered_mod._ivalue());
     // Is this necessary?
     lowering::LowerBlock(g->block());
-    std::pair<std::shared_ptr<torch::jit::Graph>, std::vector<at::Tensor>> graph_and_parameters;
-    for (auto i : graph_and_ivalues.second) {
-        graph_and_parameters.second.push_back(i.toTensor());
-    }
-    graph_and_parameters.first = graph_and_ivalues.first;
-    return graph_and_parameters;
+
+    return graph_and_ivalues;
 }
 
 

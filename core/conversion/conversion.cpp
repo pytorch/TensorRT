@@ -165,10 +165,11 @@ void AddInputs(ConversionCtx* ctx,
     TRTORCH_CHECK(profile->isValid(), "Optimization profile is invalid, please check the input range provided (conversion.AddInputs)");
 
     ctx->cfg->addOptimizationProfile(profile);
-    // TODO: Enable in TRT 7.1
-    // if (ctx->op_precision == nvinfer1::DataType::kINT8) {
-    //     ctx->cfg->setCalibrationProfile(profile);
-    // }
+#if NV_TENSORRT_MAJOR > 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR >= 1)
+    if (ctx->op_precision == nvinfer1::DataType::kINT8) {
+        ctx->cfg->setCalibrationProfile(profile);
+    }
+#endif
 }
 
 void MarkOutputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> outputs) {
@@ -186,7 +187,7 @@ void MarkOutputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> outp
 
 void AddParamsToCtxValueMap(ConversionCtx* ctx, GraphParams& params) {
     for (auto p : params) {
-        ctx->evaluated_value_map[p.first] = torch::jit::IValue(p.second.clone());
+        ctx->evaluated_value_map[p.first] = std::move(p.second);
     }
 }
 

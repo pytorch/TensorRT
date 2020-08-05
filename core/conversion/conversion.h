@@ -30,9 +30,11 @@ struct ConversionInfo {
         : input_ranges(std::move(input_ranges)), engine_settings(BuilderSettings()) {}
 };
 
-using GraphParams = std::map<torch::jit::Value*, at::Tensor>;
+//TODO: REMOVE GRAPH AND PARAMS AND MOVE FULLY TO INLINED CONSTANTS
 
-GraphParams get_named_params(c10::ArrayRef<torch::jit::Value*> inputs, std::vector<at::Tensor> params);
+using GraphParams = std::map<torch::jit::Value*, torch::jit::IValue>;
+
+GraphParams get_named_params(c10::ArrayRef<torch::jit::Value*> inputs, std::vector<torch::jit::IValue> params);
 
 // Converts a already lowered block (blocks with no sub blocks) to
 // a serialized TensorRT engine that can be deserialized and run
