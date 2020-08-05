@@ -16,7 +16,9 @@ cc_library(
         "NodeEvaluatorRegistry.cpp",
         "prim.cpp",
         "aten.cpp",
-        "eval_macros.h"
+        "eval_macros.h",
+        "eval_util.h",
+        "eval_util.cpp"
     ],
     deps = [
         "//core/util:prelude",
