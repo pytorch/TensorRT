@@ -84,7 +84,7 @@ auto lstm_cell_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
 
             auto out2 = (args[5].isIValue() && args[5].IValue()->isNone()) ? mm2_out : add_bias(mm2_out, args[5].ITensorOrFreeze(ctx), "b_hh", ctx, n);
 
-            // gates
+            // get all 4 gates
             auto add = ctx->net->addElementWise(*out1, *out2, nvinfer1::ElementWiseOperation::kSUM);
             TRTORCH_CHECK(add, "Unable to create ElementWise layer from node: " << *n);
             auto add_out = add->getOutput(0);
@@ -135,14 +135,17 @@ auto lstm_cell_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
             TRTORCH_CHECK(in_cell, "Unable to create ElementWise layer from node: " << *n);
             auto cy = ctx->net->addElementWise(*forget_cx->getOutput(0), *in_cell->getOutput(0), nvinfer1::ElementWiseOperation::kSUM);
             TRTORCH_CHECK(cy, "Unable to create ElementWise layer from node: " << *n);
-            auto cy_out = ctx->AssociateValueAndTensor(n->outputs()[1], cy->getOutput(0));
+            auto cy_out = cy->getOutput(0);
 
             // compute hy
             auto cy_tanh = ctx->net->addActivation(*cy_out, nvinfer1::ActivationType::kTANH);
             TRTORCH_CHECK(cy_tanh, "Unable to create tanh activation layer from node: " << *n);
             auto hy = ctx->net->addElementWise(*outgate, *cy_tanh->getOutput(0), nvinfer1::ElementWiseOperation::kPROD);
             TRTORCH_CHECK(hy, "Unable to create ElementWise layer from node: " << *n);
-            auto hy_out = ctx->AssociateValueAndTensor(n->outputs()[0], hy->getOutput(0));
+            auto hy_out = hy->getOutput(0);
+
+            ctx->AssociateValueAndTensor(n->outputs()[0], hy_out);
+            ctx->AssociateValueAndTensor(n->outputs()[1], cy_out);
 
             LOG_DEBUG("Output tensor [hy] shape: " << hy_out->getDimensions());
             LOG_DEBUG("Output tensor [cy] shape: " << cy_out->getDimensions());
