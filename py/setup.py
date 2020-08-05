@@ -196,7 +196,7 @@ setup(
     long_description=long_description,
     ext_modules=ext_modules,
     install_requires=[
-        'torch==1.5.1',
+        'torch==1.6.0',
     ],
     setup_requires=[],
     cmdclass={
@@ -210,7 +210,7 @@ setup(
     license="BSD",
     packages=find_packages(),
     classifiers=[
-        "Development Status :: 3 - Alpha",
+        "Development Status :: 4 - Beta",
         "Environment :: GPU :: NVIDIA CUDA",
         "License :: OSI Approved :: BSD License",
         "Intended Audience :: Developers",
@@ -224,7 +224,7 @@ setup(
         "Topic :: Software Development",
         "Topic :: Software Development :: Libraries"
     ],
-    python_requires='>=3.5',
+    python_requires='>=3.6',
     include_package_data=True,
     package_data={
         'trtorch': ['lib/*.so'],
