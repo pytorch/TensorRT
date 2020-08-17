@@ -18,13 +18,14 @@ jobs:
         with:
           ref: ${{github.head_ref}}
       - name: Build python package
-        run: bash -c "cd py && python3 setup.py install"
+        run: bash -c "cp docker/WORKSPACE.docker WORKSPACE && cd py && python3 setup.py install"
       - name: Generate new docs
         run: bash -c "cd docsrc && make html"
       - uses: stefanzweifel/git-auto-commit-action@v4
         with:
         # Required
-          commit_message: docs: [Automated] Regenerating documenation from ${{github.head_ref}}
+          commit_message: >
+            docs: [Automated] Regenerating documenation from ${{github.head_ref}}
           commit_options: "--no-verify --signoff"
           file_pattern: docs/
           commit_user_name: TRTorch Github Bot
