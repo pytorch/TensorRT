@@ -21,8 +21,8 @@ jobs:
         run: docker login docker.pkg.github.com -u $GITHUB_ACTOR -p $GITHUB_TOKEN
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-       - name: Run image
-      run: docker run -it -d --name builder -v $GITHUB_WORKSPACE:/workspace -w /workspace docker.pkg.github.com/$GITHUB_REPOSITORY/docsgen:latest
+      - name: Run image
+        run: docker run -it -d --name builder -v $GITHUB_WORKSPACE:/workspace -w /workspace docker.pkg.github.com/$GITHUB_REPOSITORY/docsgen:latest
       - name: Build python package
         run: docker exec builder bash -c "cp docker/WORKSPACE.docker WORKSPACE && cd py && python3 setup.py install"
       - name: Generate new docs
