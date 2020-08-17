@@ -22,7 +22,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Run image
-        run: docker run -it -d --name builder -v $GITHUB_WORKSPACE:/workspace -w /workspace docker.pkg.github.com/trtorch/docsgen:latest
+        run: docker run -it -d --name builder -v $GITHUB_WORKSPACE:/workspace -w /workspace docker.pkg.github.com/trtorch/docgen:latest
       - name: Build python package
         run: docker exec builder bash -c "cp docker/WORKSPACE.docker WORKSPACE && cd py && python3 setup.py install"
       - name: Generate new docs
