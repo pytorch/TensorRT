@@ -12,7 +12,8 @@ on:
 
 jobs:
   build-docs:
-    runs-on: docker.pkg.github.com/nvidia/trtorch/docgen:0.0.3
+    runs-on: ubuntu-latest
+    container: docker.pkg.github.com/nvidia/trtorch/docgen:0.0.3
     steps:
       - uses: actions/checkout@v2
         with:
