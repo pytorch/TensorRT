@@ -7,8 +7,6 @@ name: Generate Docs
 on:
   push:
     branches: [ master ]
-  pull_request:
-    branches: [ master ]
 
 jobs:
   build-docs:
