@@ -18,6 +18,6 @@ Please delete options that are not relevant and/or add your own.
 - [ ] My code follows the style guidelines of this project
 - [ ] I have performed a self-review of my own code
 - [ ] I have commented my code, particularly in hard-to-understand areas and hacks
-- [ ] I have made corresponding changes to the documentation and have regenerated the documentation (`make html` in docsrc)
+- [ ] I have made corresponding changes to the documentation
 - [ ] I have added tests to verify my fix or my feature
 - [ ] New and existing unit tests pass locally with my changes
