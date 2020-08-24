@@ -6,4 +6,5 @@
 #include "core/util/build_info.h"
 #include "core/util/jit_util.h"
 #include "core/util/trt_util.h"
+#include "core/util/core_util.h"
 #include "core/util/Exception.h"

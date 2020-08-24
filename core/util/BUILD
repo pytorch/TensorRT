@@ -17,6 +17,7 @@ cc_library(
         ":build_info",
         ":jit_util",
         ":trt_util",
+        ":core_util",
         ":macros",
         ":exception"
     ]
@@ -84,6 +85,20 @@ cc_library(
     })
 )
 
+cc_library(
+    name = "core_util",
+    hdrs = [
+        "core_util.h",
+    ],
+    srcs = [
+        "core_util.cpp"
+    ],
+    deps = [
+	"@cuda//:cudart",
+        "//core/util/logging",
+        ":macros"
+    ]
+)
 
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 
@@ -96,6 +111,7 @@ pkg_tar(
         "//core/util:Exception.h",
         "//core/util:prelude.h",
         "//core/util:jit_util.h",
-        "//core/util:trt_util.h"
+        "//core/util:trt_util.h",
+        "//core/util:core_util.h"
     ],
 )

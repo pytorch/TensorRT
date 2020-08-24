@@ -20,6 +20,7 @@ struct TRTEngine : torch::CustomClassHolder {
     std::pair<uint64_t, uint64_t> num_io;
     EngineID id;
     std::string name;
+    std::string device_info;
     util::logging::TRTorchLogger logger;
 
     std::unordered_map<uint64_t, uint64_t> in_binding_map;
@@ -27,7 +28,8 @@ struct TRTEngine : torch::CustomClassHolder {
 
     ~TRTEngine();
     TRTEngine(std::string serialized_engine);
-    TRTEngine(std::string mod_name, std::string serialized_engine);
+    TRTEngine(std::vector<std::string> serialized_info);
+    TRTEngine(std::string mod_name, std::string serialized_engine, std::string device_info);
     TRTEngine& operator=(const TRTEngine& other);
     // TODO: Implement a call method
     //c10::List<at::Tensor> Run(c10::List<at::Tensor> inputs);

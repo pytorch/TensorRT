@@ -19,6 +19,7 @@ std::vector<trtorch::ExtraInfo::InputRange> toInputRangesDynamic(std::vector<std
 }
 
 TEST_P(ModuleTests, SerializedModuleIsStillCorrect) {
+    trtorch::set_device(0);
     std::vector<torch::jit::IValue> post_serialized_inputs_ivalues;
     std::vector<torch::jit::IValue> pre_serialized_inputs_ivalues;
     for (auto in_shape : input_shapes) {
@@ -45,6 +46,7 @@ TEST_P(ModuleTests, SerializedModuleIsStillCorrect) {
 }
 
 TEST_P(ModuleTests, SerializedDynamicModuleIsStillCorrect) {
+    trtorch::set_device(0);
     std::vector<torch::jit::IValue> post_serialized_inputs_ivalues;
     std::vector<torch::jit::IValue> pre_serialized_inputs_ivalues;
     for (auto in_shape : input_shapes) {
