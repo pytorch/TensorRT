@@ -58,7 +58,7 @@ Program Listing for File trtorch.h
            InputRange(c10::ArrayRef<int64_t> min, c10::ArrayRef<int64_t> opt, c10::ArrayRef<int64_t> max);
        };
    
-       class DataType {
+       class TRTORCH_API DataType {
        public:
            enum Value : int8_t {
                kFloat,

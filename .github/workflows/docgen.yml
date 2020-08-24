@@ -1,0 +1,37 @@
+# This is a basic workflow to help you get started with Actions
+
+name: Generate Docs
+
+# Controls when the action will run. Triggers the workflow on push or pull request
+# events but only for the master branch
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  build-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          ref: ${{github.head_ref}}
+      - name: Docker login
+        run: docker login docker.pkg.github.com -u $GITHUB_ACTOR -p $GITHUB_TOKEN
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+      - name: Run image
+        run: docker run -it -d --name builder -v $GITHUB_WORKSPACE:/workspace -w /workspace docker.pkg.github.com/nvidia/trtorch/docgen:latest
+      - name: Build python package
+        run: docker exec builder bash -c "cp docker/WORKSPACE.docker WORKSPACE && cd py && python3 setup.py install"
+      - name: Generate new docs
+        run: docker exec builder bash -c "cd docsrc && make html"
+      - uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+        # Required
+          commit_message: >
+            docs: [Automated] Regenerating documenation from ${{github.head_ref}}
+          commit_options: "--no-verify --signoff"
+          file_pattern: docs/
+          commit_user_name: TRTorch Github Bot
+          commit_user_email: trtorch.github.bot@nvidia.com
+          commit_author: TRTorch Github Bot <trtorch.github.bot@nvidia.com>
