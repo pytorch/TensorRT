@@ -35,7 +35,7 @@ git_repository(
 # CUDA should be installed on the system locally
 new_local_repository(
     name = "cuda",
-    path = "/usr/local/cuda-10.2/",
+    path = "/usr/local/cuda-11.0/",
     build_file = "@//third_party/cuda:BUILD",
 )
 
@@ -45,29 +45,21 @@ new_local_repository(
     build_file = "@//third_party/cublas:BUILD",
 )
 
-#############################################################################################################
-# Tarballs and fetched dependencies (default - use in cases when building from precompiled bin and tarballs)
-#############################################################################################################
-
-http_archive(
-    name = "libtorch",
-    build_file = "@//third_party/libtorch:BUILD",
-    strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/cu102/libtorch-cxx11-abi-shared-with-deps-1.6.0.zip"],
-    sha256 = "fded948bd2dbee625cee33ebbd4843a69496729389e0200a90fbb667cdaeeb69"
-)
-
-http_archive(
-    name = "libtorch_pre_cxx11_abi",
-    build_file = "@//third_party/libtorch:BUILD",
-    strip_prefix = "libtorch",
-    sha256 = "141bb229f4bbf905541096cf8705785e7b0c79e37ca1e5db9d372730b1b9abd7",
-    urls = ["https://download.pytorch.org/libtorch/cu102/libtorch-shared-with-deps-1.6.0.zip"],
-)
-
 ####################################################################################
 # Locally installed dependencies (use in cases of custom dependencies or aarch64)
 ####################################################################################
+
+new_local_repository(
+    name = "libtorch",
+    path = "/opt/conda/lib/python3.6/site-packages/torch",
+    build_file = "third_party/libtorch/BUILD"
+)
+
+new_local_repository(
+    name = "libtorch_pre_cxx11_abi",
+    path = "/opt/conda/lib/python3.6/site-packages/torch",
+    build_file = "third_party/libtorch/BUILD"
+)
 
 new_local_repository(
     name = "cudnn",
@@ -76,9 +68,9 @@ new_local_repository(
 )
 
 new_local_repository(
-   name = "tensorrt",
-   path = "/usr/",
-   build_file = "@//third_party/tensorrt/local:BUILD"
+    name = "tensorrt",
+    path = "/usr/",
+    build_file = "@//third_party/tensorrt/local:BUILD"
 )
 
 #########################################################################
