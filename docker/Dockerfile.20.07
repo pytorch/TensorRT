@@ -10,17 +10,17 @@ RUN ln -s /usr/bin/bazel-3.4.1 /usr/bin/bazel
 
 RUN pip install notebook
 
-COPY . /workspace/TRTorch
-RUN rm /workspace/TRTorch/WORKSPACE
-COPY ./docker/WORKSPACE.cu11.docker  /workspace/TRTorch/WORKSPACE
+COPY . /opt/trtorch
+RUN rm /opt/trtorch/WORKSPACE
+COPY ./docker/WORKSPACE.cu11.docker  /opt/trtorch/WORKSPACE
 
 # Workaround for bazel expecting both static and shared versions, we only use shared libraries inside container
 RUN cp /usr/lib/x86_64-linux-gnu/libnvinfer.so /usr/lib/x86_64-linux-gnu/libnvinfer_static.a
 
-WORKDIR /workspace/TRTorch
+WORKDIR /opt/trtorch
 RUN bazel build //:libtrtorch --compilation_mode opt
 
-WORKDIR /workspace/TRTorch/py
+WORKDIR /opt/trtorch/py
 
 # Locale is not set by default
 RUN apt-get update && apt-get install -y locales ninja-build && rm -rf /var/lib/apt/lists/* && locale-gen en_US.UTF-8
@@ -31,4 +31,6 @@ RUN python3 setup.py install --use-cxx11-abi
 
 RUN conda init bash
 
-WORKDIR /workspace/TRTorch/notebooks
+ENV LD_LIBRARY_PATH /opt/conda/lib/python3.6/site-packages/torch/lib:$LD_LIBRARY_PATh
+
+WORKDIR /opt/trtorch/notebooks
