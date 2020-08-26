@@ -46,33 +46,21 @@ std::vector<at::Tensor> RunCudaEngine(nvinfer1::IExecutionContext* ctx, std::pai
     return outputs;
 }
 
-namespace {
-c10::AliasAnalysisKind aliasAnalysisFromSchema() {
-  return c10::AliasAnalysisKind::FROM_SCHEMA;
+std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> engine) {
+    // Verify calling convention (right to left or left to right)
+    LOG_DEBUG("Attempting to run engine (ID: " << std::hex << engine->name << ")");
+
+    auto io = engine->num_io;
+    auto ctx = engine->exec_ctx;
+    auto outputs = RunCudaEngine(ctx, io, inputs);
+
+    return outputs;
 }
 
-// Switched to a global operator because op implementations need to be non-capturing lambdas in PYT 1.5.0+
-torch::jit::RegisterOperators jit_registry({
-    torch::jit::Operator(
-        "trt::execute_engine(Tensor[] inputs, __torch__.torch.classes.tensorrt.Engine engine) -> Tensor[]",
-        [](torch::jit::Stack& stack) -> int {
-            // Verify calling convention (right to left or left to right)
-            auto engine = torch::jit::pop(stack).toCustomClass<TRTEngine>();
-            LOG_DEBUG("Attempting to run engine (ID: " << std::hex << engine->name << ")");
+TORCH_LIBRARY(tensorrt, m) {
+  m.def("execute_engine", execute_engine);
+}
 
-            auto inputs = torch::jit::pop(stack).toTensorVector();
-
-            auto io = engine->num_io;
-
-            auto ctx = engine->exec_ctx;
-            auto outputs = RunCudaEngine(ctx, io, inputs);
-            torch::jit::push(stack, std::move(outputs));
-            return 0;
-        },
-        aliasAnalysisFromSchema())
-    });
-
-} // namespace
 } // namespace execution
 } // namespace core
 } // namespace trtorch

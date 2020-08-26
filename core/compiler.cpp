@@ -85,7 +85,7 @@ void AddEngineToGraph(torch::jit::script::Module mod, std::shared_ptr<torch::jit
     execute_node_inputs.push_back(engine_node->outputs()[0]);
 
     // Create the actual execution node trt::execute_engine using the assembled inputs
-    auto execute_node = g->create(c10::Symbol::fromQualString("trt::execute_engine"), torch::jit::ArrayRef<torch::jit::Value*>(execute_node_inputs), 1);
+    auto execute_node = g->create(c10::Symbol::fromQualString("tensorrt::execute_engine"), torch::jit::ArrayRef<torch::jit::Value*>(execute_node_inputs), 1);
     g->block()->appendNode(execute_node);
     execute_node->outputs()[0]->setType(c10::ListType::ofTensors());
 
