@@ -59,7 +59,7 @@
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
-  <link href="../py_api/trtorch.html" rel="next" title="trtorch"/>
+  <link href="ssd-object-detection-demo.html" rel="next" title="Object Detection with TRTorch (SSD)"/>
   <link href="../tutorials/trtorchc.html" rel="prev" title="trtorchc"/>
  </head>
  <body data-md-color-accent="light-green" data-md-color-primary="light-green" dir="ltr">
@@ -335,6 +335,11 @@
              </li>
             </ul>
            </nav>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="ssd-object-detection-demo.html">
+            Object Detection with TRTorch (SSD)
+           </a>
           </li>
           <li class="md-nav__item">
            <span class="md-nav__link caption">
@@ -746,7 +751,7 @@ div.rendered_html tbody tr:hover {
         </div>
        </div>
        <p>
-        <img alt="f18ebd7e0fd44fc7b6b2ceefa5fafbfe" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
+        <img alt="60aa051379df4da6b3e7ce9004f17a7e" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
        </p>
        <h1 id="notebooks-lenet-getting-started--page-root">
         TRTorch Getting Started - LeNet
@@ -897,7 +902,7 @@ class LeNet(nn.Module):
        <div class="nbinput nblast docutils container">
         <div class="prompt highlight-none notranslate">
          <div class="highlight">
-          <pre><span></span>[9]:
+          <pre><span></span>[3]:
 </pre>
          </div>
         </div>
@@ -950,7 +955,7 @@ def benchmark(model, input_shape=(1024, 1, 32, 32), dtype='fp32', nwarmup=50, nr
        <div class="nbinput docutils container">
         <div class="prompt highlight-none notranslate">
          <div class="highlight">
-          <pre><span></span>[10]:
+          <pre><span></span>[4]:
 </pre>
          </div>
         </div>
@@ -967,7 +972,7 @@ model.to("cuda").eval()
        <div class="nboutput nblast docutils container">
         <div class="prompt highlight-none notranslate">
          <div class="highlight">
-          <pre><span></span>[10]:
+          <pre><span></span>[4]:
 </pre>
          </div>
         </div>
@@ -992,7 +997,7 @@ LeNet(
        <div class="nbinput docutils container">
         <div class="prompt highlight-none notranslate">
          <div class="highlight">
-          <pre><span></span>[11]:
+          <pre><span></span>[5]:
 </pre>
          </div>
         </div>
@@ -1012,19 +1017,19 @@ LeNet(
           <pre>
 Warm up ...
 Start timing ...
-Iteration 1000/10000, ave batch time 0.93 ms
-Iteration 2000/10000, ave batch time 0.93 ms
-Iteration 3000/10000, ave batch time 0.93 ms
-Iteration 4000/10000, ave batch time 0.93 ms
-Iteration 5000/10000, ave batch time 0.93 ms
-Iteration 6000/10000, ave batch time 0.93 ms
-Iteration 7000/10000, ave batch time 0.93 ms
-Iteration 8000/10000, ave batch time 0.93 ms
-Iteration 9000/10000, ave batch time 0.93 ms
-Iteration 10000/10000, ave batch time 0.93 ms
+Iteration 1000/10000, ave batch time 0.58 ms
+Iteration 2000/10000, ave batch time 0.58 ms
+Iteration 3000/10000, ave batch time 0.58 ms
+Iteration 4000/10000, ave batch time 0.58 ms
+Iteration 5000/10000, ave batch time 0.58 ms
+Iteration 6000/10000, ave batch time 0.58 ms
+Iteration 7000/10000, ave batch time 0.58 ms
+Iteration 8000/10000, ave batch time 0.58 ms
+Iteration 9000/10000, ave batch time 0.58 ms
+Iteration 10000/10000, ave batch time 0.58 ms
 Input shape: torch.Size([1024, 1, 32, 32])
 Output features size: torch.Size([1024, 10])
-Average batch time: 0.93 ms
+Average batch time: 0.58 ms
 </pre>
          </div>
         </div>
@@ -1044,7 +1049,7 @@ Average batch time: 0.93 ms
        <div class="nbinput docutils container">
         <div class="prompt highlight-none notranslate">
          <div class="highlight">
-          <pre><span></span>[12]:
+          <pre><span></span>[6]:
 </pre>
          </div>
         </div>
@@ -1060,7 +1065,7 @@ traced_model
        <div class="nboutput nblast docutils container">
         <div class="prompt highlight-none notranslate">
          <div class="highlight">
-          <pre><span></span>[12]:
+          <pre><span></span>[6]:
 </pre>
          </div>
         </div>
@@ -1088,7 +1093,7 @@ LeNet(
        <div class="nbinput docutils container">
         <div class="prompt highlight-none notranslate">
          <div class="highlight">
-          <pre><span></span>[13]:
+          <pre><span></span>[7]:
 </pre>
          </div>
         </div>
@@ -1108,19 +1113,19 @@ LeNet(
           <pre>
 Warm up ...
 Start timing ...
-Iteration 1000/10000, ave batch time 0.68 ms
-Iteration 2000/10000, ave batch time 0.68 ms
-Iteration 3000/10000, ave batch time 0.68 ms
-Iteration 4000/10000, ave batch time 0.68 ms
-Iteration 5000/10000, ave batch time 0.68 ms
-Iteration 6000/10000, ave batch time 0.68 ms
-Iteration 7000/10000, ave batch time 0.68 ms
-Iteration 8000/10000, ave batch time 0.68 ms
-Iteration 9000/10000, ave batch time 0.68 ms
-Iteration 10000/10000, ave batch time 0.68 ms
+Iteration 1000/10000, ave batch time 0.58 ms
+Iteration 2000/10000, ave batch time 0.59 ms
+Iteration 3000/10000, ave batch time 0.59 ms
+Iteration 4000/10000, ave batch time 0.59 ms
+Iteration 5000/10000, ave batch time 0.59 ms
+Iteration 6000/10000, ave batch time 0.59 ms
+Iteration 7000/10000, ave batch time 0.59 ms
+Iteration 8000/10000, ave batch time 0.59 ms
+Iteration 9000/10000, ave batch time 0.59 ms
+Iteration 10000/10000, ave batch time 0.59 ms
 Input shape: torch.Size([1024, 1, 32, 32])
 Output features size: torch.Size([1024, 10])
-Average batch time: 0.68 ms
+Average batch time: 0.59 ms
 </pre>
          </div>
         </div>
@@ -1137,7 +1142,7 @@ Average batch time: 0.68 ms
        <div class="nbinput nblast docutils container">
         <div class="prompt highlight-none notranslate">
          <div class="highlight">
-          <pre><span></span>[14]:
+          <pre><span></span>[8]:
 </pre>
          </div>
         </div>
@@ -1154,7 +1159,7 @@ script_model = torch.jit.script(model)
        <div class="nbinput docutils container">
         <div class="prompt highlight-none notranslate">
          <div class="highlight">
-          <pre><span></span>[15]:
+          <pre><span></span>[9]:
 </pre>
          </div>
         </div>
@@ -1169,7 +1174,7 @@ script_model = torch.jit.script(model)
        <div class="nboutput nblast docutils container">
         <div class="prompt highlight-none notranslate">
          <div class="highlight">
-          <pre><span></span>[15]:
+          <pre><span></span>[9]:
 </pre>
          </div>
         </div>
@@ -1197,7 +1202,7 @@ RecursiveScriptModule(
        <div class="nbinput docutils container">
         <div class="prompt highlight-none notranslate">
          <div class="highlight">
-          <pre><span></span>[16]:
+          <pre><span></span>[10]:
 </pre>
          </div>
         </div>
@@ -1217,19 +1222,19 @@ RecursiveScriptModule(
           <pre>
 Warm up ...
 Start timing ...
-Iteration 1000/10000, ave batch time 0.68 ms
-Iteration 2000/10000, ave batch time 0.68 ms
-Iteration 3000/10000, ave batch time 0.68 ms
-Iteration 4000/10000, ave batch time 0.68 ms
-Iteration 5000/10000, ave batch time 0.68 ms
-Iteration 6000/10000, ave batch time 0.68 ms
-Iteration 7000/10000, ave batch time 0.68 ms
-Iteration 8000/10000, ave batch time 0.68 ms
-Iteration 9000/10000, ave batch time 0.68 ms
-Iteration 10000/10000, ave batch time 0.68 ms
+Iteration 1000/10000, ave batch time 0.59 ms
+Iteration 2000/10000, ave batch time 0.59 ms
+Iteration 3000/10000, ave batch time 0.59 ms
+Iteration 4000/10000, ave batch time 0.59 ms
+Iteration 5000/10000, ave batch time 0.59 ms
+Iteration 6000/10000, ave batch time 0.59 ms
+Iteration 7000/10000, ave batch time 0.59 ms
+Iteration 8000/10000, ave batch time 0.59 ms
+Iteration 9000/10000, ave batch time 0.59 ms
+Iteration 10000/10000, ave batch time 0.59 ms
 Input shape: torch.Size([1024, 1, 32, 32])
 Output features size: torch.Size([1024, 10])
-Average batch time: 0.68 ms
+Average batch time: 0.59 ms
 </pre>
          </div>
         </div>
@@ -1253,7 +1258,7 @@ Average batch time: 0.68 ms
        <div class="nbinput nblast docutils container">
         <div class="prompt highlight-none notranslate">
          <div class="highlight">
-          <pre><span></span>[17]:
+          <pre><span></span>[11]:
 </pre>
          </div>
         </div>
@@ -1262,12 +1267,13 @@ Average batch time: 0.68 ms
           <pre>
 <span></span>import trtorch
 
+# We use a batch-size of 1024, and half precision
 compile_settings = {
     "input_shapes": [
         {
-            "min" : [1, 1, 32, 32],
-            "opt" : [1, 1, 33, 33],
-            "max" : [1, 1, 34, 34],
+            "min" : [1024, 1, 32, 32],
+            "opt" : [1024, 1, 33, 33],
+            "max" : [1024, 1, 34, 34],
         }
     ],
     "op_precision": torch.half # Run with FP16
@@ -1275,7 +1281,7 @@ compile_settings = {
 
 trt_ts_module = trtorch.compile(traced_model, compile_settings)
 
-input_data = torch.randn((1, 1, 32, 32))
+input_data = torch.randn((1024, 1, 32, 32))
 input_data = input_data.half().to("cuda")
 
 input_data = input_data.half()
@@ -1288,14 +1294,14 @@ torch.jit.save(trt_ts_module, "trt_ts_module.ts")
        <div class="nbinput docutils container">
         <div class="prompt highlight-none notranslate">
          <div class="highlight">
-          <pre><span></span>[18]:
+          <pre><span></span>[12]:
 </pre>
          </div>
         </div>
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span>benchmark(trt_ts_module, dtype="fp16")
+<span></span>benchmark(trt_ts_module, input_shape=(1024, 1, 32, 32), dtype="fp16")
 </pre>
          </div>
         </div>
@@ -1308,19 +1314,19 @@ torch.jit.save(trt_ts_module, "trt_ts_module.ts")
           <pre>
 Warm up ...
 Start timing ...
-Iteration 1000/10000, ave batch time 0.24 ms
-Iteration 2000/10000, ave batch time 0.24 ms
-Iteration 3000/10000, ave batch time 0.24 ms
-Iteration 4000/10000, ave batch time 0.24 ms
-Iteration 5000/10000, ave batch time 0.24 ms
-Iteration 6000/10000, ave batch time 0.24 ms
-Iteration 7000/10000, ave batch time 0.23 ms
-Iteration 8000/10000, ave batch time 0.23 ms
-Iteration 9000/10000, ave batch time 0.23 ms
-Iteration 10000/10000, ave batch time 0.23 ms
+Iteration 1000/10000, ave batch time 0.41 ms
+Iteration 2000/10000, ave batch time 0.41 ms
+Iteration 3000/10000, ave batch time 0.41 ms
+Iteration 4000/10000, ave batch time 0.40 ms
+Iteration 5000/10000, ave batch time 0.40 ms
+Iteration 6000/10000, ave batch time 0.40 ms
+Iteration 7000/10000, ave batch time 0.40 ms
+Iteration 8000/10000, ave batch time 0.40 ms
+Iteration 9000/10000, ave batch time 0.40 ms
+Iteration 10000/10000, ave batch time 0.40 ms
 Input shape: torch.Size([1024, 1, 32, 32])
-Output features size: torch.Size([1, 10])
-Average batch time: 0.23 ms
+Output features size: torch.Size([1024, 10])
+Average batch time: 0.40 ms
 </pre>
          </div>
         </div>
@@ -1337,7 +1343,7 @@ Average batch time: 0.23 ms
        <div class="nbinput nblast docutils container">
         <div class="prompt highlight-none notranslate">
          <div class="highlight">
-          <pre><span></span>[19]:
+          <pre><span></span>[14]:
 </pre>
          </div>
         </div>
@@ -1346,12 +1352,13 @@ Average batch time: 0.23 ms
           <pre>
 <span></span>import trtorch
 
+# We use a batch-size of 1024, and half precision
 compile_settings = {
     "input_shapes": [
         {
-            "min" : [1, 1, 32, 32],
-            "opt" : [1, 1, 33, 33],
-            "max" : [1, 1, 34, 34],
+            "min" : [1024, 1, 32, 32],
+            "opt" : [1024, 1, 33, 33],
+            "max" : [1024, 1, 34, 34],
         }
     ],
     "op_precision": torch.half # Run with FP16
@@ -1359,7 +1366,7 @@ compile_settings = {
 
 trt_script_module = trtorch.compile(script_model, compile_settings)
 
-input_data = torch.randn((1, 1, 32, 32))
+input_data = torch.randn((1024, 1, 32, 32))
 input_data = input_data.half().to("cuda")
 
 input_data = input_data.half()
@@ -1372,14 +1379,14 @@ torch.jit.save(trt_script_module, "trt_script_module.ts")
        <div class="nbinput docutils container">
         <div class="prompt highlight-none notranslate">
          <div class="highlight">
-          <pre><span></span>[20]:
+          <pre><span></span>[15]:
 </pre>
          </div>
         </div>
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span>benchmark(trt_ts_module, dtype="fp16")
+<span></span>benchmark(trt_script_module, input_shape=(1024, 1, 32, 32), dtype="fp16")
 </pre>
          </div>
         </div>
@@ -1392,19 +1399,19 @@ torch.jit.save(trt_script_module, "trt_script_module.ts")
           <pre>
 Warm up ...
 Start timing ...
-Iteration 1000/10000, ave batch time 0.20 ms
-Iteration 2000/10000, ave batch time 0.20 ms
-Iteration 3000/10000, ave batch time 0.20 ms
-Iteration 4000/10000, ave batch time 0.21 ms
-Iteration 5000/10000, ave batch time 0.21 ms
-Iteration 6000/10000, ave batch time 0.21 ms
-Iteration 7000/10000, ave batch time 0.21 ms
-Iteration 8000/10000, ave batch time 0.21 ms
-Iteration 9000/10000, ave batch time 0.21 ms
-Iteration 10000/10000, ave batch time 0.21 ms
+Iteration 1000/10000, ave batch time 0.40 ms
+Iteration 2000/10000, ave batch time 0.40 ms
+Iteration 3000/10000, ave batch time 0.40 ms
+Iteration 4000/10000, ave batch time 0.40 ms
+Iteration 5000/10000, ave batch time 0.40 ms
+Iteration 6000/10000, ave batch time 0.40 ms
+Iteration 7000/10000, ave batch time 0.40 ms
+Iteration 8000/10000, ave batch time 0.40 ms
+Iteration 9000/10000, ave batch time 0.40 ms
+Iteration 10000/10000, ave batch time 0.40 ms
 Input shape: torch.Size([1024, 1, 32, 32])
-Output features size: torch.Size([1, 10])
-Average batch time: 0.21 ms
+Output features size: torch.Size([1024, 10])
+Average batch time: 0.40 ms
 </pre>
          </div>
         </div>
@@ -1431,21 +1438,6 @@ Average batch time: 0.21 ms
         </a>
         . Your involvement will help future development of TRTorch.
        </p>
-       <div class="nbinput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[ ]:
-</pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
-<span></span>
-</pre>
-         </div>
-        </div>
-       </div>
       </article>
      </div>
     </div>
@@ -1468,13 +1460,13 @@ Average batch time: 0.21 ms
        </span>
       </div>
      </a>
-     <a class="md-flex md-footer-nav__link md-footer-nav__link--next" href="../py_api/trtorch.html" rel="next" title="trtorch">
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--next" href="ssd-object-detection-demo.html" rel="next" title="Object Detection with TRTorch (SSD)">
       <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
        <span class="md-flex__ellipsis">
         <span class="md-footer-nav__direction">
          Next
         </span>
-        trtorch
+        Object Detection with TRTorch (SSD)
        </span>
       </div>
       <div class="md-flex__cell md-flex__cell--shrink">
