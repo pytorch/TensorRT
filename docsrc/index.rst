@@ -48,6 +48,7 @@ Notebooks
    :hidden:
 
    _notebooks/lenet-getting-started
+   _notebooks/ssd-object-detection-demo
 
 
 Python API Documenation
