@@ -1,5 +1,12 @@
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 
+config_setting(
+    name = "windows",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+)
+
 pkg_tar(
     name = "include_core",
     package_dir = "include/trtorch",
@@ -31,9 +38,10 @@ pkg_tar(
 pkg_tar(
     name = "lib",
     package_dir = "lib/",
-    srcs = [
-        "//cpp/api/lib:libtrtorch.so",
-    ],
+    srcs = select({
+        ":windows": ["//cpp/api/lib:trtorch.dll"],
+        "//conditions:default": ["//cpp/api/lib:libtrtorch.so"],
+    }),
     mode = "0755",
 )
 
@@ -57,8 +65,10 @@ pkg_tar(
     ],
     deps = [
         ":lib",
-        ":bin",
         ":include",
         ":include_core",
-    ],
+    ] + select({
+        ":windows": [],
+        "//conditions:default": [":bin"],
+    }),
 )

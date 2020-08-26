@@ -9,3 +9,13 @@ cc_binary(
     linkstatic = True,
     linkshared = True
 )
+
+cc_binary(
+    name = "trtorch.dll",
+    srcs = [],
+    deps = [
+        "//cpp/api:trtorch"
+    ],
+    linkstatic = True,
+    linkshared = True
+)
