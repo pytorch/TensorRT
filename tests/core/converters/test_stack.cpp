@@ -31,7 +31,7 @@ TEST(Converters, ATenStackPureTensorConvertsCorrectly) {
 TEST(Converters, ATenStackDiffTensorConvertsCorrectly) {
     const auto graph = R"IR(
       graph(%0 : Tensor,
-            %1 : Float(4, 4, 4)):
+            %1 : Float(4:16, 4:4, 4:1)):
         %2 : Tensor[] = prim::ListConstruct(%0, %1)
         %3 : int = prim::Constant[value=1]()
         %4 : Tensor = aten::stack(%2, %3)

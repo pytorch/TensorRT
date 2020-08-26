@@ -16,7 +16,7 @@ import subprocess
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
-__version__ = '0.0.3'
+__version__ = '0.1.0a0'
 
 CXX11_ABI = False
 
@@ -158,7 +158,8 @@ ext_modules = [
     cpp_extension.CUDAExtension('trtorch._C',
                                 ['trtorch/csrc/trtorch_py.cpp'],
                                 library_dirs=[
-                                    dir_path + '/trtorch/lib/'
+                                    (dir_path + '/trtorch/lib/'),
+                                    "/opt/conda/lib/python3.6/config-3.6m-x86_64-linux-gnu"
                                 ],
                                 libraries=[
                                     "trtorch"
@@ -176,7 +177,14 @@ ext_modules = [
                                     "-Wno-deprecated-declarations",
                                     "-Wl,--no-as-needed",
                                     "-ltrtorch",
-                                    "-Wl,-rpath,$ORIGIN/lib"
+                                    "-Wl,-rpath,$ORIGIN/lib",
+                                    "-lpthread",
+                                    "-ldl",
+                                    "-lutil",
+                                    "-lrt",
+                                    "-lm",
+                                    "-Xlinker",
+                                    "-export-dynamic"
                                 ] + (["-D_GLIBCXX_USE_CXX11_ABI=1"] if CXX11_ABI else ["-D_GLIBCXX_USE_CXX11_ABI=0"]),
                                 undef_macros=[ "NDEBUG" ]
                             )
@@ -196,7 +204,7 @@ setup(
     long_description=long_description,
     ext_modules=ext_modules,
     install_requires=[
-        'torch==1.5.1',
+        'torch==1.6.0',
     ],
     setup_requires=[],
     cmdclass={
@@ -210,7 +218,7 @@ setup(
     license="BSD",
     packages=find_packages(),
     classifiers=[
-        "Development Status :: 3 - Alpha",
+        "Development Status :: 4 - Beta",
         "Environment :: GPU :: NVIDIA CUDA",
         "License :: OSI Approved :: BSD License",
         "Intended Audience :: Developers",
@@ -224,7 +232,7 @@ setup(
         "Topic :: Software Development",
         "Topic :: Software Development :: Libraries"
     ],
-    python_requires='>=3.5',
+    python_requires='>=3.6',
     include_package_data=True,
     package_data={
         'trtorch': ['lib/*.so'],

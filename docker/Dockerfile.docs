@@ -3,8 +3,8 @@ FROM nvcr.io/nvidia/tensorrt:20.03-py3
 RUN curl https://bazel.build/bazel-release.pub.gpg | apt-key add -
 RUN echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" | tee /etc/apt/sources.list.d/bazel.list
 
-RUN apt update && apt install bazel-3.3.1
-RUN ln -s /usr/bin/bazel-3.3.1 /usr/bin/bazel
+RUN apt update && apt install bazel-3.4.1
+RUN ln -s /usr/bin/bazel-3.4.1 /usr/bin/bazel
 
 
 COPY ./py/requirements.txt requirements.txt

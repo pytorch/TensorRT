@@ -112,7 +112,7 @@ TEST(Converters, ATenHardTanhCustomRangeConvertsCorrectly) {
 TEST(Converters, ATenPReLUConvertsCorrectly) {
     const auto graph = R"IR(
       graph(%0 : Tensor,
-            %1 : Float(1)):
+            %1 : Float(1:1)):
         %3 : Tensor = aten::prelu(%0, %1)
         return (%3))IR";
 
@@ -135,7 +135,7 @@ TEST(Converters, ATenPReLUConvertsCorrectly) {
 TEST(Converters, ATenPReLUMultiChannelConvertsCorrectly) {
     const auto graph = R"IR(
       graph(%0 : Tensor,
-            %1 : Float(10)):
+            %1 : Float(10:1)):
         %3 : Tensor = aten::prelu(%0, %1)
         return (%3))IR";
 

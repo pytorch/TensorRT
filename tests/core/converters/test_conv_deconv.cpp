@@ -39,8 +39,8 @@ void conv_test_helper(std::string graph_ir) {
 TEST(Converters, ATenConvolutionConvertsCorrectly) {
     const auto graph = R"IR(
       graph(%0 : Tensor,
-            %1 : Float(8, 3, 5, 5),
-            %2 : Float(8)):
+            %1 : Float(8:45, 3:15, 5:5, 5:1),
+            %2 : Float(8:1)):
         %3 : int = prim::Constant[value=1]()
         %4 : int = prim::Constant[value=0]()
         %5 : int = prim::Constant[value=1]()
@@ -81,7 +81,7 @@ TEST(Converters, ATenConvolutionConvertsCorrectly) {
 TEST(Converters, ATenConvolutionNoBiasConvertsCorrectly) {
     const auto graph = R"IR(
       graph(%0 : Tensor,
-            %1 : Float(4, 1, 3, 3)):
+            %1 : Float(4:9, 1:9, 3:3, 3:1)):
         %2 : None = prim::Constant()
         %3 : int = prim::Constant[value=1]()
         %4 : int = prim::Constant[value=0]()
@@ -120,8 +120,8 @@ TEST(Converters, ATenConvolutionNoBiasConvertsCorrectly) {
 TEST(Converters, ATenConvolutionWithStrideConvertsCorrectly) {
     const auto graph = R"IR(
       graph(%0 : Tensor,
-            %1 : Float(4, 3, 3, 3),
-            %2 : Float(4)):
+            %1 : Float(4:27, 3:9, 3:3, 3:1),
+            %2 : Float(4:1)):
         %3 : int = prim::Constant[value=3]()
         %4 : int = prim::Constant[value=0]()
         %5 : int = prim::Constant[value=1]()
@@ -163,8 +163,8 @@ TEST(Converters, ATenConvolutionWithStrideConvertsCorrectly) {
 TEST(Converters, ATenConvolutionWithPaddingConvertsCorrectly) {
    const auto graph = R"IR(
       graph(%0 : Tensor,
-            %1 : Float(4, 3, 4, 4),
-            %2 : Float(4)):
+            %1 : Float(4:48, 3:16, 4:4, 4:1),
+            %2 : Float(4:1)):
         %3 : int = prim::Constant[value=1]()
         %4 : int = prim::Constant[value=2]()
         %5 : int = prim::Constant[value=1]()
@@ -206,8 +206,8 @@ TEST(Converters, ATenConvolutionWithPaddingConvertsCorrectly) {
 TEST(Converters, ATenConvTransposeConvertsCorrectly) {
     const auto graph = R"IR(
       graph(%0 : Tensor,
-            %1 : Float(8, 3, 3, 3),
-            %2 : Float(8)):
+            %1 : Float(8:27, 3:9, 3:3, 3:1),
+            %2 : Float(8:1)):
         %3 : int = prim::Constant[value=1]()
         %4 : int = prim::Constant[value=0]()
         %5 : int = prim::Constant[value=1]()
@@ -248,7 +248,7 @@ TEST(Converters, ATenConvTransposeConvertsCorrectly) {
 TEST(Converters, ATenConvTransposeNoBiasConvertsCorrectly) {
     const auto graph = R"IR(
       graph(%0 : Tensor,
-            %1 : Float(4, 1, 3, 3)):
+            %1 : Float(4:9, 1:9, 3:3, 3:1)):
         %2 : None = prim::Constant()
         %3 : int = prim::Constant[value=1]()
         %4 : int = prim::Constant[value=0]()
@@ -287,8 +287,8 @@ TEST(Converters, ATenConvTransposeNoBiasConvertsCorrectly) {
 TEST(Converters, ATenConvTransposeWithStrideConvertsCorrectly) {
     const auto graph = R"IR(
       graph(%0 : Tensor,
-            %1 : Float(4, 3, 3, 3),
-            %2 : Float(4)):
+            %1 : Float(4:27, 3:9, 3:3, 3:1),
+            %2 : Float(4:1)):
         %3 : int = prim::Constant[value=3]()
         %4 : int = prim::Constant[value=0]()
         %5 : int = prim::Constant[value=1]()
@@ -330,8 +330,8 @@ TEST(Converters, ATenConvTransposeWithStrideConvertsCorrectly) {
 TEST(Converters, ATenConvTransposeWithPaddingConvertsCorrectly) {
    const auto graph = R"IR(
       graph(%0 : Tensor,
-            %1 : Float(4, 3, 4, 4),
-            %2 : Float(4)):
+            %1 : Float(4:48, 3:16, 4:4, 4:1),
+            %2 : Float(4:1)):
         %3 : int = prim::Constant[value=1]()
         %4 : int = prim::Constant[value=2]()
         %5 : int = prim::Constant[value=1]()

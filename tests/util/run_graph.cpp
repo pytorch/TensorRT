@@ -5,7 +5,7 @@ namespace trtorch {
 namespace tests {
 namespace util {
 
-torch::jit::Stack CreateStack(std::vector<at::Tensor>&& list) {
+torch::jit::Stack CreateStack(std::vector<torch::jit::IValue>&& list) {
     return torch::jit::Stack(
         std::make_move_iterator(list.begin()),
         std::make_move_iterator(list.end()));
@@ -16,15 +16,15 @@ std::vector<at::Tensor> RunGraph(std::shared_ptr<torch::jit::Graph>& g,
                                  core::conversion::GraphParams& params,
                                  std::vector<at::Tensor> inputs) {
     LOG_DEBUG("Running JIT version");
-    std::vector<at::Tensor> inputs_;
+    std::vector<torch::jit::IValue> inputs_;
     for (auto in : inputs) {
-        inputs_.push_back(in.clone());
+        inputs_.push_back(torch::jit::IValue(in.clone()));
     }
 
     for (auto* in : g->inputs()) {
         const auto iter = params.find(in);
         if (iter != params.end()) {
-            inputs_.push_back(iter->second.clone());
+            inputs_.push_back(iter->second);
         }
     }
 

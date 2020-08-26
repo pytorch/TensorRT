@@ -7,7 +7,6 @@
 #include "torch/csrc/jit/passes/lower_graph.h"
 #include "torch/csrc/jit/passes/lower_tuples.h"
 #include "torch/csrc/jit/passes/peephole.h"
-#include "torch/csrc/jit/passes/quantization.h"
 
 #include "core/util/prelude.h"
 #include "core/lowering/lowering.h"
@@ -50,8 +49,7 @@ torch::jit::Module LowerModule(const torch::jit::script::Module& mod) {
     return mod_;
 }
 
-std::pair<std::shared_ptr<torch::jit::Graph>, std::vector<at::Tensor>> Lower(const torch::jit::script::Module& mod,
-                                                                            std::string method_name) {
+std::pair<std::shared_ptr<torch::jit::Graph>, std::vector<torch::jit::IValue>> Lower(const torch::jit::script::Module& mod, std::string method_name) {
     auto lowered_mod = LowerModule(mod);
     auto g = lowered_mod.get_method(method_name).graph();
     LOG_GRAPH(*g);
@@ -62,10 +60,11 @@ std::pair<std::shared_ptr<torch::jit::Graph>, std::vector<at::Tensor>> Lower(con
     lowering::LowerGraph(g);
     //=[torch::jit::FoldConvBatchNorm2d(lowered_mod);
     LOG_GRAPH("LibTorch Lowering");
-    auto graph_and_parameters = torch::jit::LowerGraph(*g, lowered_mod._ivalue());
+    auto graph_and_ivalues = torch::jit::LowerGraph(*g, lowered_mod._ivalue());
     // Is this necessary?
     lowering::LowerBlock(g->block());
-    return graph_and_parameters;
+
+    return graph_and_ivalues;
 }
 
 

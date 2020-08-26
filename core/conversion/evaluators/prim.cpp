@@ -1,7 +1,7 @@
 #include <limits>
 
 #include "torch/csrc/jit/ir/ir.h"
-#include "torch/csrc/jit/ir/constants.h"
+//#include "torch/csrc/jit/ir/constants.h"
 #include "ATen/core/functional.h"
 #include "ATen/core/ivalue.h"
 #include "ATen/core/List.h"
@@ -11,6 +11,7 @@
 
 #include "core/conversion/evaluators/evaluators.h"
 #include "core/conversion/evaluators/eval_macros.h"
+#include "core/conversion/evaluators/eval_util.h"
 
 namespace trtorch {
 namespace core {
@@ -25,7 +26,7 @@ auto prim_registrations = RegisterNodeEvaluators()
             if (n->output()->type()->kind() == at::FunctionType::Kind) {
                 return {};
             }
-            return torch::jit::toIValue(n->output());
+            return evaluators::toIValue(n->output());
         }
     }).evaluator({
         torch::jit::prim::NumToTensor,
