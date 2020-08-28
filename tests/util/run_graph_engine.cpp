@@ -3,7 +3,9 @@
 #include "c10/cuda/CUDAStream.h"
 #include "torch/csrc/jit/ir/ir.h"
 #include "torch/csrc/jit/ir/irparser.h"
+#include "torch/custom_class.h"
 #include "core/conversion/conversion.h"
+#include "core/execution/execution.h"
 #include "cuda_runtime_api.h"
 
 #include <vector>
@@ -28,7 +30,7 @@ std::vector<core::conversion::InputRange> toInputRangesDynamic(std::vector<at::T
         auto opt = core::util::toVec(i.sizes());
 
         std::vector<int64_t> min_range(opt);
-        std::vector<int64_t> max_range(opt); 
+        std::vector<int64_t> max_range(opt);
 
         min_range[1] = ceil(opt[1]/2.0);
         max_range[1] = 2*opt[1];
@@ -40,44 +42,9 @@ std::vector<core::conversion::InputRange> toInputRangesDynamic(std::vector<at::T
 }
 
 std::vector<at::Tensor> RunEngine(std::string& eng, std::vector<at::Tensor> inputs) {
-    auto rt = nvinfer1::createInferRuntime(core::util::logging::get_logger());
-    auto engine = rt->deserializeCudaEngine(eng.c_str(), eng.size());
-    auto ctx = engine->createExecutionContext();
-
-    std::vector<void*> gpu_handles;
-
-    std::vector<at::Tensor> contig_inputs{};
-    contig_inputs.reserve(inputs.size());
-    for (size_t i = 0; i < inputs.size(); i++) {
-        TRTORCH_CHECK(inputs[i].is_cuda(), "Expected input tensors to have device cuda, found device " << inputs[i].device());
-        auto expected_type = core::util::toATenDType(ctx->getEngine().getBindingDataType(i));
-        TRTORCH_CHECK(inputs[i].dtype() == expected_type, "Expected input tensors to have type " << expected_type << ", found type " << inputs[i].dtype());
-        auto dims = core::util::toDimsPad(inputs[i].sizes(), 1);
-        auto shape = core::util::toVec(dims);
-        contig_inputs.push_back(inputs[i].view(shape).contiguous());
-        LOG_DEBUG("In shape:" << shape);
-        ctx->setBindingDimensions(i, dims);
-        gpu_handles.push_back(contig_inputs.back().data_ptr());
-    }
-
-    TRTORCH_CHECK(ctx->allInputDimensionsSpecified(), "Not enough inputs provided (execution.RunCudaEngine)");
-
-    std::vector<at::Tensor> outputs;
-    for (int64_t o = inputs.size(); o < engine->getNbBindings(); o++) {
-        auto out_shape = ctx->getBindingDimensions(o);
-        LOG_DEBUG("Output: " << engine->getBindingName(o) << " out shape: " << out_shape);
-        auto dims = core::util::toVec(out_shape);
-        auto type = core::util::toATenDType(ctx->getEngine().getBindingDataType(o));
-        outputs.push_back(at::empty(dims, {at::kCUDA}).to(type).contiguous());
-        gpu_handles.push_back(outputs[outputs.size() - 1].data_ptr());
-    }
-
-    // Is this the right stream?
-    c10::cuda::CUDAStream stream = c10::cuda::getCurrentCUDAStream(inputs[0].device().index());
-
-    ctx->enqueueV2(gpu_handles.data(), stream, nullptr);
-
-    stream.synchronize();
+    LOG_DEBUG("Running TRT version");
+    auto engine_ptr = c10::make_intrusive<trtorch::core::execution::TRTEngine>("test_engine", eng);
+    auto outputs = trtorch::core::execution::execute_engine(inputs, engine_ptr);
     return outputs;
 }
 

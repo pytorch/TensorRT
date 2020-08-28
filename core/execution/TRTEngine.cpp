@@ -42,13 +42,20 @@ TRTEngine::TRTEngine(std::string mod_name, std::string serialized_engine)
     uint64_t outputs = 0;
 
     for (int64_t x = 0; x < cuda_engine->getNbBindings(); x++) {
+        std::string name = cuda_engine->getBindingName(x);
+        std::string idx_s = name.substr(name.find("_") + 1);
+        uint64_t idx = static_cast<uint64_t>(std::stoi(idx_s));
+
         if(cuda_engine->bindingIsInput(x)) {
             inputs++;
+            in_binding_map[x] = idx;
         } else {
             outputs++;
+            out_binding_map[x] = idx;
         }
     }
     num_io = std::make_pair(inputs, outputs);
+
 }
 
 TRTEngine& TRTEngine::operator=(const TRTEngine& other) {
