@@ -48,7 +48,8 @@ cc_library(
         "impl/unary.cpp",
         "impl/interpolate.cpp",
         "impl/select.cpp",
-        "impl/stack.cpp"
+        "impl/stack.cpp",
+        "impl/lstm_cell.cpp"
     ],
     deps = [
         "@tensorrt//:nvinfer",
