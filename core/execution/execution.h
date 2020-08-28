@@ -22,6 +22,9 @@ struct TRTEngine : torch::CustomClassHolder {
     std::string name;
     util::logging::TRTorchLogger logger;
 
+    std::unordered_map<uint64_t, uint64_t> in_binding_map;
+    std::unordered_map<uint64_t, uint64_t> out_binding_map;
+
     ~TRTEngine();
     TRTEngine(std::string serialized_engine);
     TRTEngine(std::string mod_name, std::string serialized_engine);
@@ -30,7 +33,7 @@ struct TRTEngine : torch::CustomClassHolder {
     //c10::List<at::Tensor> Run(c10::List<at::Tensor> inputs);
 };
 
-std::vector<at::Tensor> RunCudaEngine(nvinfer1::IExecutionContext* ctx, std::pair<uint64_t, uint64_t> io, std::vector<at::Tensor>& inputs);
+std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine);
 
 } // namespace execution
 } // namespace core

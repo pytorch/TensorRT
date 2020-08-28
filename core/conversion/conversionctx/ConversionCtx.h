@@ -42,6 +42,8 @@ struct ConversionCtx {
 
     ~ConversionCtx();
 
+    uint64_t num_inputs = 0;
+    uint64_t num_outputs = 0;
     bool input_is_dynamic = false;
     nvinfer1::IBuilder* builder;
     nvinfer1::INetworkDefinition* net;

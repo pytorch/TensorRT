@@ -143,11 +143,12 @@ void AddInputs(ConversionCtx* ctx,
     for (size_t i = 0; i < input_tensors.size(); i++) {
         auto in = input_tensors[i];
         auto dims = input_dims[i];
+        std::string name = std::string("input_") + std::to_string(ctx->num_inputs);
         LOG_INFO(ctx->logger,
                  "Adding Input " << in->debugName()  \
-                 << " (conversion.AddInputs)");
+                 << " named " << name << " in engine (conversion.AddInputs)");
         LOG_DEBUG(ctx->logger, "Input shape set to " << dims.input_shape);
-        auto trt_in = ctx->net->addInput(in->debugName().c_str(),
+        auto trt_in = ctx->net->addInput(name.c_str(),
                                          ctx->input_type, dims.input_shape);
         TRTORCH_CHECK(trt_in, "Failed to add input node: " << in->debugName() << " (conversion.AddInputs)");
 
@@ -160,6 +161,7 @@ void AddInputs(ConversionCtx* ctx,
         }
 
         ctx->value_tensor_map[in] = trt_in;
+        ctx->num_inputs += 1;
     }
 
     TRTORCH_CHECK(profile->isValid(), "Optimization profile is invalid, please check the input range provided (conversion.AddInputs)");
@@ -174,14 +176,17 @@ void AddInputs(ConversionCtx* ctx,
 
 void MarkOutputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> outputs) {
     for (auto out : outputs) {
+        std::string name = std::string("output_") + std::to_string(ctx->num_outputs);
         auto it = ctx->value_tensor_map.find(out);
         // Leaves the potential for unused outputs to be populated with nullptr "safely"
         TRTORCH_CHECK(it != ctx->value_tensor_map.end() && it->second,
                       "No corresponding output TRT Tensor found for TorchScript output: " << out->debugName());
         auto out_tensor = it->second;
+        out_tensor->setName(name.c_str());
         ctx->net->markOutput(*out_tensor);
         LOG_INFO(ctx->logger,
-                 "Marking Output " << out->debugName() << " (ctx.MarkOutput)");
+                 "Marking Output " << out->debugName() << " named " << name << " in engine (ctx.MarkOutput)");
+        ctx->num_outputs += 1;
     }
 }
 
