@@ -33,4 +33,5 @@ RUN conda init bash
 
 ENV LD_LIBRARY_PATH /opt/conda/lib/python3.6/site-packages/torch/lib:$LD_LIBRARY_PATh
 
-WORKDIR /opt/trtorch/notebooks
+WORKDIR /opt/trtorch/
+CMD /bin/bash

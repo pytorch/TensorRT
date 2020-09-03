@@ -39,7 +39,6 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
         LOG_DEBUG("Output shape: " << out_shape);
         auto dims = core::util::toVec(out_shape);
         auto type = util::toATenDType(compiled_engine->exec_ctx->getEngine().getBindingDataType(o));
-        std::cout << pyt_idx << std::endl;
         outputs[pyt_idx] = std::move(at::empty(dims, {at::kCUDA}).to(type).contiguous());
         gpu_handles.push_back(outputs[pyt_idx].data_ptr());
     }
