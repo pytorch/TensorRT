@@ -18,7 +18,7 @@ More Information / System Architecture:
 #include "trtorch/trtorch.h"
 
 ...
-auto compile_settings = trtorch::ExtraInfo(dims);
+auto compile_settings = trtorch::CompileSpec(dims);
 // FP16 execution
 compile_settings.op_precision = torch::kFloat;
 // Compile module
@@ -54,7 +54,7 @@ torch.jit.save(trt_ts_module, "trt_torchscript_module.ts")
 ```
 
 > Notes on running in lower precisions:
-> - Set precision with extra_info.op_precision
+> - Set precision with compile_spec.op_precision
 > - The module should be left in FP32 before compilation (FP16 can support half tensor models)
 > - In FP16 only input tensors should be converted to FP16, other precisions use FP32
 

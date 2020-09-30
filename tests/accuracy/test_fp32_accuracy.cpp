@@ -27,10 +27,10 @@ TEST_P(AccuracyTests, FP16AccuracyIsClose) {
     torch::Tensor jit_accuracy = (jit_correct / jit_total) * 100;
 
     std::vector<std::vector<int64_t>> input_shape = {{32, 3, 32, 32}};
-    auto extra_info = trtorch::ExtraInfo({input_shape});
-    extra_info.op_precision = torch::kF32;
+    auto compile_spec = trtorch::CompileSpec({input_shape});
+    compile_spec.op_precision = torch::kF32;
 
-    auto trt_mod = trtorch::CompileGraph(mod, extra_info);
+    auto trt_mod = trtorch::CompileGraph(mod, compile_spec);
 
     torch::Tensor trt_correct = torch::zeros({1}, {torch::kCUDA}), trt_total = torch::zeros({1}, {torch::kCUDA});
     for (auto batch : *eval_dataloader) {

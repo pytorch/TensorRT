@@ -26,20 +26,20 @@ class TestCompile(ModelTestCase):
         self.scripted_model = torch.jit.script(self.model)
 
     def test_compile_traced(self):
-        extra_info = {
+        compile_spec = {
             "input_shapes": [self.input.shape],
         }
 
-        trt_mod = trtorch.compile(self.traced_model, extra_info)
+        trt_mod = trtorch.compile(self.traced_model, compile_spec)
         same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
         self.assertTrue(same < 2e-3)
 
     def test_compile_script(self):
-        extra_info = {
+        compile_spec = {
             "input_shapes": [self.input.shape],
         }
 
-        trt_mod = trtorch.compile(self.scripted_model, extra_info)
+        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
         self.assertTrue(same < 2e-3)
 

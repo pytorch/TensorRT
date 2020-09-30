@@ -145,7 +145,7 @@ public:
     /**
      * @brief operator to cast to nvinfer1::IInt8Calibrator*
      *
-     * Convience function to convert to a IInt8Calibrator* to easily be assigned to the ptq_calibrator field in ExtraInfo
+     * Convience function to convert to a IInt8Calibrator* to easily be assigned to the ptq_calibrator field in CompileSpec
      *
      * @return nvinfer1::IInt8Calibrator*
      */
@@ -259,7 +259,7 @@ public:
     /**
      * @brief operator to cast to nvinfer1::IInt8Calibrator*
      *
-     * Convience function to convert to a IInt8Calibrator* to easily be assigned to the ptq_calibrator field in ExtraInfo
+     * Convience function to convert to a IInt8Calibrator* to easily be assigned to the ptq_calibrator field in CompileSpec
      *
      * @return nvinfer1::IInt8Calibrator*
      */

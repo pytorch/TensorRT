@@ -20,7 +20,7 @@
 
 #include "core/lowering/lowering.h"
 #include "core/conversion/conversion.h"
-#include "core/execution/execution.h"
+#include "core/runtime/runtime.h"
 
 namespace trtorch {
 namespace core {
@@ -42,7 +42,7 @@ c10::FunctionSchema GenerateGraphSchema(torch::jit::script::Module mod, std::str
 
 
 void AddEngineToGraph(torch::jit::script::Module mod, std::shared_ptr<torch::jit::Graph>& g, std::string& serialized_engine) {
-    auto engine_ptr = c10::make_intrusive<execution::TRTEngine>(mod._ivalue()->name(), serialized_engine);
+    auto engine_ptr = c10::make_intrusive<runtime::TRTEngine>(mod._ivalue()->name(), serialized_engine);
     // Get required metadata about the engine out
     auto num_io = engine_ptr->num_io;
     auto name = engine_ptr->name;
@@ -50,7 +50,7 @@ void AddEngineToGraph(torch::jit::script::Module mod, std::shared_ptr<torch::jit
     // Add the engine as an attribute of the module, this will let the engine be serialized and deserialized
     mod.register_attribute(
         name,
-        c10::getCustomClassType<c10::intrusive_ptr<execution::TRTEngine>>(),
+        c10::getCustomClassType<c10::intrusive_ptr<runtime::TRTEngine>>(),
         c10::IValue(std::move(engine_ptr)),
         false
     );
@@ -125,7 +125,7 @@ bool CheckMethodOperatorSupport(const torch::jit::script::Module& mod,
 
 std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod,
                                     std::string method_name,
-                                    ExtraInfo cfg) {
+                                    CompileSpec cfg) {
 
     // Go through Lowering to simplify graph and extract weight parameters
     auto graph_and_parameters = lowering::Lower(mod, method_name);
@@ -137,12 +137,12 @@ std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod,
 
     LOG_INFO(*g << "(CompileGraph)\n");
 
-    auto engine = ConvertBlockToEngine(g->block(), convert_cfg, named_params);
+    auto engine = conversion::ConvertBlockToEngine(g->block(), convert_cfg, named_params);
     return std::move(engine);
 }
 
 torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod,
-                                        ExtraInfo cfg) {
+                                        CompileSpec cfg) {
     // TODO: Should be doing a functional transform but need PR #31978
     // [jit] More robust mangling
     //torch::jit::script::Module new_mod = mod.clone();

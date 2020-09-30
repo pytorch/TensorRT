@@ -6,7 +6,7 @@
 #include "trtorch/trtorch.h"
 
 namespace trtorch {
-ExtraInfo::DataType::DataType(c10::ScalarType t) {
+CompileSpec::DataType::DataType(c10::ScalarType t) {
     TRTORCH_CHECK(t == at::kHalf || t == at::kFloat || t == at::kChar, "Data type is unsupported");
     switch (t) {
     case at::kHalf:
@@ -21,52 +21,52 @@ ExtraInfo::DataType::DataType(c10::ScalarType t) {
     }
 }
 
-ExtraInfo::DeviceType::DeviceType(c10::DeviceType t) {
+CompileSpec::DeviceType::DeviceType(c10::DeviceType t) {
     TRTORCH_CHECK(t == at::kCUDA, "Device type when specified using torch device enum must be torch::kCUDA");
     value = DeviceType::kGPU;
 }
 
-ExtraInfo::InputRange::InputRange(std::vector<int64_t> opt) {
+CompileSpec::InputRange::InputRange(std::vector<int64_t> opt) {
     this->opt = opt;
     this->min = opt;
     this->max = opt;
 }
 
-ExtraInfo::InputRange::InputRange(c10::IntArrayRef opt) {
+CompileSpec::InputRange::InputRange(c10::IntArrayRef opt) {
     this->opt = core::util::toVec(opt);
     this->min = core::util::toVec(opt);
     this->max = core::util::toVec(opt);
 }
 
-ExtraInfo::InputRange::InputRange(std::vector<int64_t> min, std::vector<int64_t> opt, std::vector<int64_t> max) {
+CompileSpec::InputRange::InputRange(std::vector<int64_t> min, std::vector<int64_t> opt, std::vector<int64_t> max) {
     this->opt = opt;
     this->min = min;
     this->max = max;
 }
 
-ExtraInfo::InputRange::InputRange(c10::IntArrayRef min, c10::IntArrayRef opt, c10::IntArrayRef max) {
+CompileSpec::InputRange::InputRange(c10::IntArrayRef min, c10::IntArrayRef opt, c10::IntArrayRef max) {
     this->opt = core::util::toVec(opt);
     this->min = core::util::toVec(min);
     this->max = core::util::toVec(max);
 }
 
-ExtraInfo::ExtraInfo(std::vector<c10::ArrayRef<int64_t>> fixed_sizes) {
+CompileSpec::CompileSpec(std::vector<c10::ArrayRef<int64_t>> fixed_sizes) {
     for (auto in : fixed_sizes) {
         input_ranges.push_back(InputRange(in));
     }
 }
 
-ExtraInfo::ExtraInfo(std::vector<std::vector<int64_t>> fixed_sizes) {
+CompileSpec::CompileSpec(std::vector<std::vector<int64_t>> fixed_sizes) {
     for (auto in : fixed_sizes) {
         input_ranges.push_back(InputRange(in));
     }
 }
 
-core::conversion::InputRange to_internal_input_range(ExtraInfo::InputRange i) {
+core::conversion::InputRange to_internal_input_range(CompileSpec::InputRange i) {
     return core::conversion::InputRange(i.min, i.opt, i.max);
 }
 
-std::vector<core::conversion::InputRange> to_vec_internal_input_ranges(std::vector<ExtraInfo::InputRange> external) {
+std::vector<core::conversion::InputRange> to_vec_internal_input_ranges(std::vector<CompileSpec::InputRange> external) {
     std::vector<core::conversion::InputRange> internal;
     for (auto range : external) {
         internal.push_back(to_internal_input_range(range));
@@ -74,17 +74,17 @@ std::vector<core::conversion::InputRange> to_vec_internal_input_ranges(std::vect
     return internal;
 }
 
-core::ExtraInfo to_internal_extra_info(ExtraInfo external) {
-    core::ExtraInfo internal(to_vec_internal_input_ranges(external.input_ranges));
+core::CompileSpec to_internal_compile_spec(CompileSpec external) {
+    core::CompileSpec internal(to_vec_internal_input_ranges(external.input_ranges));
 
     switch(external.op_precision) {
-    case ExtraInfo::DataType::kChar:
+    case CompileSpec::DataType::kChar:
         internal.convert_info.engine_settings.op_precision = nvinfer1::DataType::kINT8;
         break;
-    case ExtraInfo::DataType::kHalf:
+    case CompileSpec::DataType::kHalf:
         internal.convert_info.engine_settings.op_precision = nvinfer1::DataType::kHALF;
         break;
-    case ExtraInfo::DataType::kFloat:
+    case CompileSpec::DataType::kFloat:
     default:
         internal.convert_info.engine_settings.op_precision = nvinfer1::DataType::kFLOAT;
     }
@@ -96,22 +96,22 @@ core::ExtraInfo to_internal_extra_info(ExtraInfo external) {
     internal.convert_info.engine_settings.max_batch_size = external.max_batch_size;
 
     switch(external.device) {
-    case ExtraInfo::DeviceType::kDLA:
+    case CompileSpec::DeviceType::kDLA:
         internal.convert_info.engine_settings.device = nvinfer1::DeviceType::kDLA;
         break;
-    case ExtraInfo::DeviceType::kGPU:
+    case CompileSpec::DeviceType::kGPU:
     default:
         internal.convert_info.engine_settings.device = nvinfer1::DeviceType::kGPU;
     }
 
     switch(external.capability) {
-    case ExtraInfo::EngineCapability::kSAFE_GPU:
+    case CompileSpec::EngineCapability::kSAFE_GPU:
         internal.convert_info.engine_settings.capability = nvinfer1::EngineCapability::kSAFE_GPU;
         break;
-    case ExtraInfo::EngineCapability::kSAFE_DLA:
+    case CompileSpec::EngineCapability::kSAFE_DLA:
         internal.convert_info.engine_settings.capability = nvinfer1::EngineCapability::kSAFE_DLA;
         break;
-    case ExtraInfo::EngineCapability::kDEFAULT:
+    case CompileSpec::EngineCapability::kDEFAULT:
     default:
         internal.convert_info.engine_settings.capability = nvinfer1::EngineCapability::kDEFAULT;
 

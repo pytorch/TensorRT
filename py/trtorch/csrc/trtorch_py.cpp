@@ -1,5 +1,7 @@
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
+//TODO: Remove when we have access to PyTorch to_backend autoregistration
+#include "core/backend.h"
 #include "core/compiler.h"
 #include "core/conversion/conversion.h"
 #include "torch/torch.h"
@@ -73,13 +75,13 @@ nvinfer1::EngineCapability toTRTEngineCapability(EngineCapability value) {
   }
 }
 
-struct ExtraInfo {
+struct CompileSpec {
 
-  core::ExtraInfo toInternalExtraInfo() {
+  core::CompileSpec toInternalCompileSpec() {
     for (auto i : input_ranges) {
       internal_input_ranges.push_back(i.toInternalInputRange());
     }
-    auto info = core::ExtraInfo(internal_input_ranges);
+    auto info = core::CompileSpec(internal_input_ranges);
     info.convert_info.engine_settings.op_precision = toTRTDataType(op_precision);
     info.convert_info.engine_settings.refit = refit;
     info.convert_info.engine_settings.debug = debug;
@@ -109,15 +111,15 @@ struct ExtraInfo {
   uint64_t max_batch_size = 0;
 };
 
-torch::jit::Module CompileGraph(const torch::jit::Module& mod, ExtraInfo& info) {
+torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec& info) {
   py::gil_scoped_acquire gil;
-  auto trt_mod = core::CompileGraph(mod, info.toInternalExtraInfo());
+  auto trt_mod = core::CompileGraph(mod, info.toInternalCompileSpec());
   return trt_mod;
 }
 
-py::bytes ConvertGraphToTRTEngine(const torch::jit::Module& mod, const std::string& method_name, ExtraInfo& info) {
+py::bytes ConvertGraphToTRTEngine(const torch::jit::Module& mod, const std::string& method_name, CompileSpec& info) {
   py::gil_scoped_acquire gil;
-  auto trt_engine = core::ConvertGraphToTRTEngine(mod, method_name, info.toInternalExtraInfo());
+  auto trt_engine = core::ConvertGraphToTRTEngine(mod, method_name, info.toInternalCompileSpec());
   return py::bytes(trt_engine);
 }
 
@@ -189,20 +191,20 @@ PYBIND11_MODULE(_C, m) {
     .value("safe_dla", EngineCapability::kSAFE_DLA, "Use safety DLA kernels only")
     .value("default",  EngineCapability::kDEFAULT, "Use default behavior");
 
-  py::class_<ExtraInfo>(m, "ExtraInfo")
+  py::class_<CompileSpec>(m, "CompileSpec")
     .def(py::init<>())
-    .def_readwrite("input_ranges",         &ExtraInfo::input_ranges)
-    .def_readwrite("op_precision",         &ExtraInfo::op_precision)
-    .def_readwrite("refit",                &ExtraInfo::refit)
-    .def_readwrite("debug",                &ExtraInfo::debug)
-    .def_readwrite("strict_types",         &ExtraInfo::strict_types)
-    .def_readwrite("allow_gpu_fallback",   &ExtraInfo::allow_gpu_fallback)
-    .def_readwrite("device",               &ExtraInfo::device)
-    .def_readwrite("capability",           &ExtraInfo::capability)
-    .def_readwrite("num_min_timing_iters", &ExtraInfo::num_min_timing_iters)
-    .def_readwrite("num_avg_timing_iters", &ExtraInfo::num_avg_timing_iters)
-    .def_readwrite("workspace_size",       &ExtraInfo::workspace_size)
-    .def_readwrite("max_batch_size",       &ExtraInfo::max_batch_size);
+    .def_readwrite("input_ranges",         &CompileSpec::input_ranges)
+    .def_readwrite("op_precision",         &CompileSpec::op_precision)
+    .def_readwrite("refit",                &CompileSpec::refit)
+    .def_readwrite("debug",                &CompileSpec::debug)
+    .def_readwrite("strict_types",         &CompileSpec::strict_types)
+    .def_readwrite("allow_gpu_fallback",   &CompileSpec::allow_gpu_fallback)
+    .def_readwrite("device",               &CompileSpec::device)
+    .def_readwrite("capability",           &CompileSpec::capability)
+    .def_readwrite("num_min_timing_iters", &CompileSpec::num_min_timing_iters)
+    .def_readwrite("num_avg_timing_iters", &CompileSpec::num_avg_timing_iters)
+    .def_readwrite("workspace_size",       &CompileSpec::workspace_size)
+    .def_readwrite("max_batch_size",       &CompileSpec::max_batch_size);
 
   m.doc() = "TRTorch Internal C Bindings: Ahead of Time compilation for PyTorch JIT. A tool to convert PyTorch JIT to TensorRT";
   m.def("compile_graph",               &trtorch::pyapi::CompileGraph, "Ingest a PyTorch JIT module and convert supported subgraphs to TensorRT engines, returns a JIT module with the engines embedded");
@@ -225,7 +227,11 @@ PYBIND11_MODULE(_C, m) {
     .value("INFO", core::util::logging::LogLevel::kINFO)
     .value("DEBUG", core::util::logging::LogLevel::kDEBUG)
     .export_values();
+
+  //TODO: Remove when we have access to PyTorch autoregistration
+  //m.def("to_tensorrt", backend::GetTensorRTBackend().generateToBackendFn());
 }
 
-} // namespace py
+
+} // namespace pyapi
 } // namespace trtorch

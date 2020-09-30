@@ -56,8 +56,8 @@ int main(int argc, const char* argv[]) {
         dims.push_back(v);
     }
 
-    auto extra_info = trtorch::ExtraInfo(dims);
-    extra_info.workspace_size = 1 << 24;
+    auto compile_spec = trtorch::CompileSpec(dims);
+    compile_spec.workspace_size = 1 << 24;
 
     std::cout << "Checking operator support" << std::endl;
     if (!trtorch::CheckMethodOperatorSupport(mod, "forward")) {
@@ -66,7 +66,7 @@ int main(int argc, const char* argv[]) {
     }
 
     std::cout << "Compiling graph to save as TRT engine (/tmp/engine_converted_from_jit.trt)" << std::endl;
-    auto engine = trtorch::ConvertGraphToTRTEngine(mod, "forward", extra_info);
+    auto engine = trtorch::ConvertGraphToTRTEngine(mod, "forward", compile_spec);
     std::ofstream out("/tmp/engine_converted_from_jit.trt");
     out << engine;
     out.close();
@@ -89,7 +89,7 @@ int main(int argc, const char* argv[]) {
     }
 
     std::cout << "Compiling graph as module" << std::endl;
-    auto trt_mod = trtorch::CompileGraph(mod, extra_info);
+    auto trt_mod = trtorch::CompileGraph(mod, compile_spec);
     std::cout << "Running TRT module" << std::endl;
     torch::jit::IValue trt_results_ivalues = trt_mod.forward(trt_inputs_ivalues);
     std::vector<at::Tensor> trt_results;

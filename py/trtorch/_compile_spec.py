@@ -84,53 +84,53 @@ def _parse_device_type(device: Any) -> _types.DeviceType:
     else:
         raise TypeError("Device specification must be of type torch.device or trtorch.DeviceType, but got: " + str(type(device)))
 
-def _parse_extra_info(extra_info: Dict[str, Any]) -> trtorch._C.ExtraInfo:
-    info = trtorch._C.ExtraInfo()
-    if "input_shapes" not in extra_info:
+def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
+    info = trtorch._C.CompileSpec()
+    if "input_shapes" not in compile_spec:
         raise KeyError("Input shapes for inputs are required as a List, provided as either a static sizes or a range of three sizes (min, opt, max) as Dict")
 
-    info.input_ranges = _parse_input_ranges(extra_info["input_shapes"])
+    info.input_ranges = _parse_input_ranges(compile_spec["input_shapes"])
 
-    if "op_precision" in extra_info:
-        info.op_precision = _parse_op_precision(extra_info["op_precision"])
+    if "op_precision" in compile_spec:
+        info.op_precision = _parse_op_precision(compile_spec["op_precision"])
 
-    if "refit" in extra_info:
-        assert isinstance(extra_info["refit"], bool)
-        info.refit = extra_info["refit"]
+    if "refit" in compile_spec:
+        assert isinstance(compile_spec["refit"], bool)
+        info.refit = compile_spec["refit"]
 
-    if "debug" in extra_info:
-        assert isinstance(extra_info["debug"], bool)
-        info.debug = extra_info["debug"]
+    if "debug" in compile_spec:
+        assert isinstance(compile_spec["debug"], bool)
+        info.debug = compile_spec["debug"]
 
-    if "strict_types" in extra_info:
-        assert isinstance(extra_info["strict_types"], bool)
-        info.strict_types = extra_info["strict_types"]
+    if "strict_types" in compile_spec:
+        assert isinstance(compile_spec["strict_types"], bool)
+        info.strict_types = compile_spec["strict_types"]
 
-    if "allow_gpu_fallback" in extra_info:
-        assert isinstance(extra_info["allow_gpu_fallback"], bool)
-        info.allow_gpu_fallback = extra_info["allow_gpu_fallback"]
+    if "allow_gpu_fallback" in compile_spec:
+        assert isinstance(compile_spec["allow_gpu_fallback"], bool)
+        info.allow_gpu_fallback = compile_spec["allow_gpu_fallback"]
 
-    if "device" in extra_info:
-        info.device = _parse_device_type(extra_info["device"])
+    if "device" in compile_spec:
+        info.device = _parse_device_type(compile_spec["device"])
 
-    if "capability" in extra_info:
-        assert isinstance(extra_info["capability"], type.EngineCapability)
-        info.capability = extra_info["capability"]
+    if "capability" in compile_spec:
+        assert isinstance(compile_spec["capability"], type.EngineCapability)
+        info.capability = compile_spec["capability"]
 
-    if "num_min_timing_iters" in extra_info:
-        assert type(extra_info["num_min_timing_iters"]) is int
-        info.num_min_timing_iters = extra_info["num_min_timing_iters"]
+    if "num_min_timing_iters" in compile_spec:
+        assert type(compile_spec["num_min_timing_iters"]) is int
+        info.num_min_timing_iters = compile_spec["num_min_timing_iters"]
 
-    if "num_avg_timing_iters" in extra_info:
-        assert type(extra_info["num_avg_timing_iters"]) is int
-        info.num_avg_timing_iters = extra_info["num_avg_timing_iters"]
+    if "num_avg_timing_iters" in compile_spec:
+        assert type(compile_spec["num_avg_timing_iters"]) is int
+        info.num_avg_timing_iters = compile_spec["num_avg_timing_iters"]
 
-    if "workspace_size" in extra_info:
-        assert type(extra_info["workspace_size"]) is int
-        info.workspace_size = extra_info["workspace_size"]
+    if "workspace_size" in compile_spec:
+        assert type(compile_spec["workspace_size"]) is int
+        info.workspace_size = compile_spec["workspace_size"]
 
-    if "max_batch_size" in extra_info:
-        assert type(extra_info["max_batch_size"]) is int
-        info.max_batch_size = extra_info["max_batch_size"]
+    if "max_batch_size" in compile_spec:
+        assert type(compile_spec["max_batch_size"]) is int
+        info.max_batch_size = compile_spec["max_batch_size"]
 
     return info

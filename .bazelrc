@@ -29,6 +29,7 @@ build --cxxopt='-std=c++14'
 build:python --cxxopt="-D_GLIBCXX_USE_CXX11_ABI=0"
 build:python --linkopt="-D_GLIBCXX_USE_CXX11_ABI=0"
 build:python --define=abi=pre_cxx11_abi
+build:python --define=target_lang=python
 
 build:pre_cxx11_abi --cxxopt="-D_GLIBCXX_USE_CXX11_ABI=0"
 build:pre_cxx11_abi --linkopt="-D_GLIBCXX_USE_CXX11_ABI=0"
