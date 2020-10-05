@@ -1,3 +1,4 @@
+#include <torch/torch.h>
 #include "core/util/prelude.h"
 #include "core/conversion/converters/converters.h"
 
@@ -179,6 +180,50 @@ auto element_wise_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns(
 
                 mul->setName(util::node_info(n).c_str());
                 auto out = ctx->AssociateValueAndTensor(n->outputs()[0], mul->getOutput(0));
+
+                LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+                return true;
+             }
+         }).pattern({
+            "aten::pow.Tensor_Tensor(Tensor self, Tensor exponent) -> (Tensor)",
+            [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                // TODO: Remove with functionalization
+                auto self = args[0].ITensorOrFreeze(ctx);
+                auto exponent = args[1].ITensorOrFreeze(ctx);
+                auto pow = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPOW, self, exponent, util::node_info(n));
+                TRTORCH_CHECK(pow, "Unable to create Power layer from node: " << *n);
+
+                pow->setName(util::node_info(n).c_str());
+                auto out = ctx->AssociateValueAndTensor(n->outputs()[0], pow->getOutput(0));
+
+                LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+                return true;
+             }
+         }).pattern({
+            "aten::pow.Tensor_Scalar(Tensor self, Scalar exponent) -> (Tensor)",
+            [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                auto self = args[0].ITensorOrFreeze(ctx);
+                auto exponentScalar = args[1].unwrapToScalar().to<float>();
+                
+                // Calculate size of the input and define an exponent tensor of the same size
+                int volume = 1;
+                for (int i = 0; i < self->getDimensions().nbDims; i++) {
+                    volume = volume * (self->getDimensions().d[i]);
+                }
+                
+                // Create a torch tensor with constant exponent values
+                LOG_DEBUG("Broadcasting the exponent in power layer");
+                torch::Tensor exponentBlob = torch::full({volume}, exponentScalar);
+                
+                // Create a corresponding constant layer in TRT and get the layer output.
+                auto weights = converters::Weights(ctx, exponentBlob);
+                auto exponentTensor = ctx->net->addConstant(self->getDimensions(), weights.data)->getOutput(0);
+                
+                auto pow = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPOW, self, exponentTensor, util::node_info(n));
+                TRTORCH_CHECK(pow, "Unable to create Power layer from node: " << *n);
+
+                pow->setName(util::node_info(n).c_str());
+                auto out = ctx->AssociateValueAndTensor(n->outputs()[0], pow->getOutput(0));
 
                 LOG_DEBUG("Output tensor shape: " << out->getDimensions());
                 return true;
