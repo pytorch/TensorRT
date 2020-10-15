@@ -11,6 +11,7 @@ namespace core {
 namespace execution {
 
 using EngineID = int64_t;
+const std::string empty_string;
 
 struct TRTEngine : torch::CustomClassHolder {
     // Each engine needs it's own runtime object
@@ -29,7 +30,7 @@ struct TRTEngine : torch::CustomClassHolder {
     ~TRTEngine();
     TRTEngine(std::string serialized_engine);
     TRTEngine(std::vector<std::string> serialized_info);
-    TRTEngine(std::string mod_name, std::string serialized_engine, std::string device_info);
+    TRTEngine(std::string mod_name, std::string serialized_engine, std::string device_info = empty_string);
     TRTEngine& operator=(const TRTEngine& other);
     // TODO: Implement a call method
     //c10::List<at::Tensor> Run(c10::List<at::Tensor> inputs);

@@ -21,7 +21,7 @@ std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod,
 
 torch::jit::script::Module CompileGraph(const torch::jit::script::Module& module, ExtraInfo cfg);
 
-cudaError_t set_device(const int gpu_id);
+void set_device(const int gpu_id);
 
 } // namespace core
 } // namespace trtorch

@@ -440,9 +440,7 @@ TRTORCH_API std::string ConvertGraphToTRTEngine(const torch::jit::Module& module
  * @param gpu_id
  *
  * Sets gpu id using cudaSetDevice
- *
- * @return: cudaError_t return status
  */
-TRTORCH_API cudaError_t set_device(const int gpu_id);
+TRTORCH_API void set_device(const int gpu_id);
 
 } // namespace trtorch

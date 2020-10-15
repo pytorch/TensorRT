@@ -173,8 +173,8 @@ torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod,
     return new_mod;
 }
 
-cudaError_t set_device(const int gpu_id) {
-    return cudaSetDevice(gpu_id);
+void set_device(const int gpu_id) {
+    TRTORCH_ASSERT(cudaSetDevice(gpu_id) == cudaSuccess, "Unable to set CUDA device: " << gpu_id);
 }
 
 } // namespace core

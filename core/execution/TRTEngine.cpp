@@ -10,8 +10,6 @@ namespace trtorch {
 namespace core {
 namespace execution {
 
-const std::string empty_string;
-
 std::string slugify(std::string s) {
     std::replace(s.begin(), s.end(), '.', '_');
     return s;
@@ -36,7 +34,7 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
     new (this) TRTEngine(_name, engine_info, device_info);
 }
 
-TRTEngine::TRTEngine(std::string mod_name, std::string serialized_engine, std::string serialized_device_info = empty_string)
+TRTEngine::TRTEngine(std::string mod_name, std::string serialized_engine, std::string serialized_device_info)
     : logger(std::string("[") + mod_name + std::string("_engine] - "),
         util::logging::get_logger().get_reportable_severity(),
         util::logging::get_logger().get_is_colored_output_on()) {
