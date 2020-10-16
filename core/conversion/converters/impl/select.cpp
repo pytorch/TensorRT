@@ -89,8 +89,7 @@ auto select_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
             auto in = args[0].ITensor();
             auto axis  = args[1].unwrapToInt();
             torch::Tensor start = args[2].IValue()->toTensor().to(torch::kI32);
-            // TODO: Is there a better way to get data from 0-dim tensor ?
-            int startIdx = static_cast<int*>(start.data_ptr())[0];
+            int32_t startIdx = start.item().to<int32_t>();
             auto length = (int32_t) args[3].unwrapToInt();
 
             // index to access needs to be an at::Tensor
