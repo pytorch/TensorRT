@@ -16,8 +16,8 @@
 "component: evaluators":
   - core/conversion/evaluators/**/*
 
-"component: execution":
-  - core/execution/**/*
+"component: runtime":
+  - core/runtime/**/*
 
 "component: lowering":
   - core/lowering/**/*
@@ -32,4 +32,4 @@
 "documentation":
   - docs/**/*
   - docsrc/**/*
- 
+
