@@ -39,7 +39,7 @@ def compile(module: torch.jit.ScriptModule, compile_spec: Any) -> torch.jit.Scri
                     "debug": false, # enable debuggable engine
                     "strict_types": false, # kernels should strictly run in operating precision
                     "allow_gpu_fallback": false, # (DLA only) Allow layers unsupported on DLA to run on GPU
-                    "device": torch.device("cuda"), # Type of device to run engine on (for DLA use trtorch.DeviceType.DLA)
+                    "device_type": torch.device("cuda"), # Type of device to run engine on (for DLA use trtorch.DeviceType.DLA)
                     "capability": trtorch.EngineCapability.DEFAULT, # Restrict kernel selection to safe gpu kernels or safe dla kernels
                     "num_min_timing_iters": 2, # Number of minimization timing iterations used to select kernels
                     "num_avg_timing_iters": 1, # Number of averaging timing iterations used to select kernels
@@ -91,7 +91,7 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule, method_name: st
                     "debug": false, # enable debuggable engine
                     "strict_types": false, # kernels should strictly run in operating precision
                     "allow_gpu_fallback": false, # (DLA only) Allow layers unsupported on DLA to run on GPU
-                    "device": torch.device("cuda"), # Type of device to run engine on (for DLA use trtorch.DeviceType.DLA)
+                    "device_type": torch.device("cuda"), # Type of device to run engine on (for DLA use trtorch.DeviceType.DLA)
                     "capability": trtorch.EngineCapability.DEFAULT, # Restrict kernel selection to safe gpu kernels or safe dla kernels
                     "num_min_timing_iters": 2, # Number of minimization timing iterations used to select kernels
                     "num_avg_timing_iters": 1, # Number of averaging timing iterations used to select kernels

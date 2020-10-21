@@ -1,11 +1,12 @@
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
-//TODO: Remove when we have access to PyTorch to_backend autoregistration
-#include "core/backend.h"
+
+#include "tensorrt_classes.h"
 #include "core/compiler.h"
 #include "core/conversion/conversion.h"
 #include "torch/torch.h"
 #include "torch/script.h"
+#include "torch/custom_class.h"
 #include "torch/csrc/jit/python/pybind_utils.h"
 #include "Python.h"
 
@@ -13,103 +14,6 @@ namespace py = pybind11;
 
 namespace trtorch {
 namespace pyapi {
-
-struct InputRange {
-  std::vector<int64_t> min;
-  std::vector<int64_t> opt;
-  std::vector<int64_t> max;
-
-  core::conversion::InputRange toInternalInputRange() {
-    return core::conversion::InputRange(min, opt, max);
-  }
-};
-
-enum class DataType : int8_t {
-  kFloat,
-  kHalf,
-  kChar,
-};
-
-nvinfer1::DataType toTRTDataType(DataType value) {
-  switch (value) {
-  case DataType::kChar:
-    return nvinfer1::DataType::kINT8;
-  case DataType::kHalf:
-    return nvinfer1::DataType::kHALF;
-  case DataType::kFloat:
-  default:
-    return nvinfer1::DataType::kFLOAT;
-  }
-}
-
-enum DeviceType : int8_t {
-  kGPU,
-  kDLA,
-};
-
-nvinfer1::DeviceType toTRTDeviceType(DeviceType value) {
-  switch (value) {
-  case DeviceType::kDLA:
-    return nvinfer1::DeviceType::kDLA;
-  case DeviceType::kGPU:
-  default:
-    return nvinfer1::DeviceType::kGPU;
-  }
-}
-
-enum class EngineCapability : int8_t {
-    kDEFAULT,
-    kSAFE_GPU,
-    kSAFE_DLA,
-};
-
-nvinfer1::EngineCapability toTRTEngineCapability(EngineCapability value) {
-  switch (value) {
-  case EngineCapability::kSAFE_DLA:
-    return nvinfer1::EngineCapability::kSAFE_DLA;
-  case EngineCapability::kSAFE_GPU:
-    return nvinfer1::EngineCapability::kSAFE_GPU;
-  case EngineCapability::kDEFAULT:
-  default:
-    return nvinfer1::EngineCapability::kDEFAULT;
-  }
-}
-
-struct CompileSpec {
-
-  core::CompileSpec toInternalCompileSpec() {
-    for (auto i : input_ranges) {
-      internal_input_ranges.push_back(i.toInternalInputRange());
-    }
-    auto info = core::CompileSpec(internal_input_ranges);
-    info.convert_info.engine_settings.op_precision = toTRTDataType(op_precision);
-    info.convert_info.engine_settings.refit = refit;
-    info.convert_info.engine_settings.debug = debug;
-    info.convert_info.engine_settings.strict_types = strict_types;
-    info.convert_info.engine_settings.allow_gpu_fallback = allow_gpu_fallback;
-    info.convert_info.engine_settings.device = toTRTDeviceType(device);
-    info.convert_info.engine_settings.capability = toTRTEngineCapability(capability);
-    info.convert_info.engine_settings.num_min_timing_iters = num_min_timing_iters;
-    info.convert_info.engine_settings.num_avg_timing_iters = num_avg_timing_iters;
-    info.convert_info.engine_settings.workspace_size = workspace_size;
-    info.convert_info.engine_settings.max_batch_size = max_batch_size;
-    return info;
-  }
-
-  std::vector<InputRange> input_ranges;
-  std::vector<core::conversion::InputRange> internal_input_ranges;
-  DataType op_precision = DataType::kFloat;
-  bool refit = false;
-  bool debug = false;
-  bool strict_types = false;
-  bool allow_gpu_fallback = true;
-  DeviceType device = DeviceType::kGPU;
-  EngineCapability capability = EngineCapability::kDEFAULT;
-  uint64_t num_min_timing_iters = 2;
-  uint64_t num_avg_timing_iters = 1;
-  uint64_t workspace_size = 0;
-  uint64_t max_batch_size = 0;
-};
 
 torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec& info) {
   py::gil_scoped_acquire gil;
@@ -227,11 +131,7 @@ PYBIND11_MODULE(_C, m) {
     .value("INFO", core::util::logging::LogLevel::kINFO)
     .value("DEBUG", core::util::logging::LogLevel::kDEBUG)
     .export_values();
-
-  //TODO: Remove when we have access to PyTorch autoregistration
-  //m.def("to_tensorrt", backend::GetTensorRTBackend().generateToBackendFn());
 }
-
 
 } // namespace pyapi
 } // namespace trtorch
