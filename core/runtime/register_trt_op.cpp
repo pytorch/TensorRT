@@ -4,11 +4,11 @@
 #include "torch/csrc/jit/runtime/custom_operator.h"
 
 #include "core/util/prelude.h"
-#include "core/execution/execution.h"
+#include "core/runtime/runtime.h"
 
 namespace trtorch {
 namespace core {
-namespace execution {
+namespace runtime {
 
 std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine) {
     LOG_DEBUG("Attempting to run engine (ID: " << compiled_engine->name << ")");

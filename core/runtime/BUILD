@@ -8,9 +8,9 @@ config_setting(
 )
 
 cc_library(
-    name = "execution",
+    name = "runtime",
     hdrs = [
-        "execution.h",
+        "runtime.h",
     ],
     srcs = [
         "TRTEngine.cpp",
@@ -30,6 +30,6 @@ load("@rules_pkg//:pkg.bzl", "pkg_tar")
 
 pkg_tar(
     name = "include",
-    package_dir = "core/execution/",
-    srcs = ["execution.h"],
+    package_dir = "core/runtime/",
+    srcs = ["runtime.h"],
 )

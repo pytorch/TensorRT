@@ -27,12 +27,11 @@ The conversion phase is made up of three main components, a context to manage co
 a evaluator library which will execute operations that can be resolved at compile time and a converter
 library which maps an op from JIT to TensorRT.
 
-Execution
-^^^^^^^^^^^
+Compilation and Runtime
+^^^^^^^^^^^^^^^^^^^^^^^^
 :ref:`execution`
 
-The execution phase constructs a TorchScript program to run the converted TensorRT engine. It
+The final compilation phase constructs a TorchScript program to run the converted TensorRT engine. It
 takes a serialized engine and instantiates it within a engine manager, then the compiler will
 build out a JIT graph that references this engine and wraps it in a module to return to the user.
-When the user executes the module, the JIT program will look up the engine and pass the inputs
-to it, then return the results.
+When the user executes the module, the JIT program run in the JIT runtime extended by TRTorch with the data providied from the user.

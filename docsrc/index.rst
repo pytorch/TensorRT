@@ -38,10 +38,6 @@ Getting Started
    tutorials/trtorchc
    _notebooks/lenet
 
-Notebooks
-------------
-* :ref:`lenet`
-
 .. toctree::
    :caption: Notebooks
    :maxdepth: 1

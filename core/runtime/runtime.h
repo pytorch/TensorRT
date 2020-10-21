@@ -8,7 +8,7 @@
 
 namespace trtorch {
 namespace core {
-namespace execution {
+namespace runtime {
 
 using EngineID = int64_t;
 
@@ -35,6 +35,6 @@ struct TRTEngine : torch::CustomClassHolder {
 
 std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine);
 
-} // namespace execution
+} // namespace runtime
 } // namespace core
 } // namespace trtorch
