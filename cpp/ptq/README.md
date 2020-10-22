@@ -92,20 +92,20 @@ The calibrator factories create a calibrator that inherits from a `nvinfer1::IIn
 auto calibrator = trtorch::ptq::make_int8_calibrator<nvinfer1::IInt8MinMaxCalibrator>(std::move(calibration_dataloader), calibration_cache_file, true);
 ```
 
-Then all thats required to setup the module for INT8 calibration is to set the following compile settings in the `trtorch::ExtraInfo` struct and compiling the module:
+Then all thats required to setup the module for INT8 calibration is to set the following compile settings in the `trtorch::CompileSpec` struct and compiling the module:
 
 ```C++
     std::vector<std::vector<int64_t>> input_shape = {{32, 3, 32, 32}};
     /// Configure settings for compilation
-    auto extra_info = trtorch::ExtraInfo({input_shape});
+    auto compile_spec = trtorch::CompileSpec({input_shape});
     /// Set operating precision to INT8
-    extra_info.op_precision = torch::kI8;
+    compile_spec.op_precision = torch::kI8;
     /// Use the TensorRT Entropy Calibrator
-    extra_info.ptq_calibrator = calibrator;
+    compile_spec.ptq_calibrator = calibrator;
     /// Set a larger workspace (you may get better performace from doing so)
-    extra_info.workspace_size = 1 << 28;
+    compile_spec.workspace_size = 1 << 28;
 
-    auto trt_mod = trtorch::CompileGraph(mod, extra_info);
+    auto trt_mod = trtorch::CompileGraph(mod, compile_spec);
 ```
 
 If you have an existing Calibrator implementation for TensorRT you may directly set the `ptq_calibrator` field with a pointer to your calibrator and it will work as well.

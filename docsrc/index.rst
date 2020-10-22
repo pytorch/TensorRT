@@ -25,6 +25,7 @@ Getting Started
 * :ref:`getting_started`
 * :ref:`ptq`
 * :ref:`trtorchc`
+* :ref:`use_from_pytorch`
 
 
 .. toctree::
@@ -36,11 +37,8 @@ Getting Started
    tutorials/getting_started
    tutorials/ptq
    tutorials/trtorchc
+   tutorials/use_from_pytorch
    _notebooks/lenet
-
-Notebooks
-------------
-* :ref:`lenet`
 
 .. toctree::
    :caption: Notebooks

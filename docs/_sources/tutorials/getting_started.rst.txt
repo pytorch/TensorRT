@@ -305,7 +305,7 @@ With out module loaded, we can feed it into the TRTorch compiler. When we do so 
         mod.eval();
 
         auto in = torch::randn({1, 1, 32, 32}, {torch::kCUDA});
-        auto trt_mod = trtorch::CompileGraph(mod, std::vector<trtorch::ExtraInfo::InputRange>{{in.sizes()}});
+        auto trt_mod = trtorch::CompileGraph(mod, std::vector<trtorch::CompileSpec::InputRange>{{in.sizes()}});
         auto out = trt_mod.forward({in});
 
 Thats it! Now the graph runs primarily not with the JIT compiler but using TensorRT (though we execute the graph using the JIT runtime).
@@ -322,8 +322,8 @@ We can also set settings like operating precision to run in FP16.
         mod.eval();
 
         auto in = torch::randn({1, 1, 32, 32}, {torch::kCUDA}).to(torch::kHALF);
-        auto input_sizes = std::vector<trtorch::ExtraInfo::InputRange>({in.sizes()});
-        trtorch::ExtraInfo info(input_sizes);
+        auto input_sizes = std::vector<trtorch::CompileSpec::InputRange>({in.sizes()});
+        trtorch::CompileSpec info(input_sizes);
         info.op_precision = torch::kHALF;
         auto trt_mod = trtorch::CompileGraph(mod, info);
         auto out = trt_mod.forward({in});
@@ -370,8 +370,8 @@ If you want to save the engine produced by TRTorch to use in a TensorRT applicat
         mod.eval();
 
         auto in = torch::randn({1, 1, 32, 32}, {torch::kCUDA}).to(torch::kHALF);
-        auto input_sizes = std::vector<trtorch::ExtraInfo::InputRange>({in.sizes()});
-        trtorch::ExtraInfo info(input_sizes);
+        auto input_sizes = std::vector<trtorch::CompileSpec::InputRange>({in.sizes()});
+        trtorch::CompileSpec info(input_sizes);
         info.op_precision = torch::kHALF;
         auto trt_mod = trtorch::ConvertGraphToTRTEngine(mod, "forward", info);
         std::ofstream out("/tmp/engine_converted_from_jit.trt");

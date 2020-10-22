@@ -156,7 +156,12 @@ class CleanCommand(Command):
 
 ext_modules = [
     cpp_extension.CUDAExtension('trtorch._C',
-                                ['trtorch/csrc/trtorch_py.cpp'],
+                                [
+                                    'trtorch/csrc/trtorch_py.cpp',
+                                    'trtorch/csrc/tensorrt_backend.cpp',
+                                    'trtorch/csrc/tensorrt_classes.cpp',
+                                    'trtorch/csrc/register_tensorrt_classes.cpp',
+                                ],
                                 library_dirs=[
                                     (dir_path + '/trtorch/lib/'),
                                     "/opt/conda/lib/python3.6/config-3.6m-x86_64-linux-gnu"
@@ -165,6 +170,7 @@ ext_modules = [
                                     "trtorch"
                                 ],
                                 include_dirs=[
+                                    dir_path + "trtorch/csrc",
                                     dir_path + "/../",
                                     dir_path + "/../bazel-TRTorch/external/tensorrt/include",
                                 ],
@@ -190,7 +196,7 @@ ext_modules = [
                             )
 ]
 
-with open("README.md", "r") as fh:
+with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(

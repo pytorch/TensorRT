@@ -31,7 +31,7 @@ namespace trtorch {
  * Settings data structure for TRTorch compilation
  *
  */
-struct TRTORCH_API ExtraInfo {
+struct TRTORCH_API CompileSpec {
     /**
      * @brief A struct to hold an input range (used by TensorRT Optimization profile)
      *
@@ -132,10 +132,10 @@ struct TRTORCH_API ExtraInfo {
         kSAFE_DLA,
     };
 
-    ExtraInfo(std::vector<InputRange> input_ranges)
+    CompileSpec(std::vector<InputRange> input_ranges)
         : input_ranges(std::move(input_ranges)) {}
-    ExtraInfo(std::vector<std::vector<int64_t>> fixed_sizes);
-    ExtraInfo(std::vector<c10::ArrayRef<int64_t>> fixed_sizes);
+    CompileSpec(std::vector<std::vector<int64_t>> fixed_sizes);
+    CompileSpec(std::vector<c10::ArrayRef<int64_t>> fixed_sizes);
 
     // Defaults should reflect TensorRT defaults for BuilderConfig
 
@@ -236,27 +236,27 @@ TRTORCH_API bool CheckMethodOperatorSupport(const torch::jit::script::Module& mo
  * @brief Compile a TorchScript module for NVIDIA GPUs using TensorRT
  *
  * @param module: torch::jit::script::Module - Existing TorchScript module
- * @param info: trtorch::ExtraInfo - Compilation settings
+ * @param info: trtorch::CompileSpec - Compilation settings
  *
  * Takes a existing TorchScript module and a set of settings to configure the compiler
  * and will convert methods to JIT Graphs which call equivalent TensorRT engines
  *
  * Converts specifically the forward method of a TorchScript Module
  */
-TRTORCH_API torch::jit::script::Module CompileGraph(const torch::jit::script::Module& module, ExtraInfo info);
+TRTORCH_API torch::jit::script::Module CompileGraph(const torch::jit::script::Module& module, CompileSpec info);
 
 /**
  * @brief Compile a TorchScript method for NVIDIA GPUs using TensorRT
  *
  * @param module: torch::jit::script::Module - Existing TorchScript module
  * @param method_name: std::string - Name of method to compile
- * @param info: trtorch::ExtraInfo - Compilation settings
+ * @param info: trtorch::CompileSpec - Compilation settings
  *
  * Takes a existing TorchScript module and a set of settings to configure the compiler
  * and will convert selected method to a serialized TensorRT engine which can be run with
  * TensorRT
  */
-TRTORCH_API std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& module, std::string method_name, ExtraInfo info);
+TRTORCH_API std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& module, std::string method_name, CompileSpec info);
 
 namespace ptq {
 /**

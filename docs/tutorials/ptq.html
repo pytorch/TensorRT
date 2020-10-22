@@ -277,6 +277,11 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="use_from_pytorch.html">
+            Using TRTorch Directly From PyTorch
+           </a>
+          </li>
+          <li class="md-nav__item">
            <span class="md-nav__link caption">
             <span class="caption-text">
              Notebooks
@@ -648,7 +653,7 @@ defines the calibration algorithm used when calibrating. You can explicitly make
        <p>
         Then all thats required to setup the module for INT8 calibration is to set the following compile settings in the
         <cite>
-         trtorch::ExtraInfo
+         trtorch::CompileSpec
         </cite>
         struct and compiling the module:
        </p>
@@ -656,15 +661,15 @@ defines the calibration algorithm used when calibrating. You can explicitly make
         <div class="highlight">
          <pre><span></span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;&gt;</span> <span class="n">input_shape</span> <span class="o">=</span> <span class="p">{{</span><span class="mi">32</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">}};</span>
 <span class="c1">/// Configure settings for compilation</span>
-<span class="k">auto</span> <span class="n">extra_info</span> <span class="o">=</span> <span class="n">trtorch</span><span class="o">::</span><span class="n">ExtraInfo</span><span class="p">({</span><span class="n">input_shape</span><span class="p">});</span>
+<span class="k">auto</span> <span class="n">compile_spec</span> <span class="o">=</span> <span class="n">trtorch</span><span class="o">::</span><span class="n">CompileSpec</span><span class="p">({</span><span class="n">input_shape</span><span class="p">});</span>
 <span class="c1">/// Set operating precision to INT8</span>
-<span class="n">extra_info</span><span class="p">.</span><span class="n">op_precision</span> <span class="o">=</span> <span class="n">torch</span><span class="o">::</span><span class="n">kI8</span><span class="p">;</span>
+<span class="n">compile_spec</span><span class="p">.</span><span class="n">op_precision</span> <span class="o">=</span> <span class="n">torch</span><span class="o">::</span><span class="n">kI8</span><span class="p">;</span>
 <span class="c1">/// Use the TensorRT Entropy Calibrator</span>
-<span class="n">extra_info</span><span class="p">.</span><span class="n">ptq_calibrator</span> <span class="o">=</span> <span class="n">calibrator</span><span class="p">;</span>
+<span class="n">compile_spec</span><span class="p">.</span><span class="n">ptq_calibrator</span> <span class="o">=</span> <span class="n">calibrator</span><span class="p">;</span>
 <span class="c1">/// Set a larger workspace (you may get better performace from doing so)</span>
-<span class="n">extra_info</span><span class="p">.</span><span class="n">workspace_size</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">28</span><span class="p">;</span>
+<span class="n">compile_spec</span><span class="p">.</span><span class="n">workspace_size</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">28</span><span class="p">;</span>
 
-<span class="k">auto</span> <span class="n">trt_mod</span> <span class="o">=</span> <span class="n">trtorch</span><span class="o">::</span><span class="n">CompileGraph</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="n">extra_info</span><span class="p">);</span>
+<span class="k">auto</span> <span class="n">trt_mod</span> <span class="o">=</span> <span class="n">trtorch</span><span class="o">::</span><span class="n">CompileGraph</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="n">compile_spec</span><span class="p">);</span>
 </pre>
         </div>
        </div>

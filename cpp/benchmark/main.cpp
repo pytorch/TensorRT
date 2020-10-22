@@ -121,18 +121,18 @@ int main(int argc, const char* argv[]) {
     at::globalContext().setBenchmarkCuDNN(true);
 
 #ifdef TRT
-    auto extra_info = trtorch::ExtraInfo(dims);
-    extra_info.workspace_size = 1 << 20;
+    auto compile_spec = trtorch::CompileSpec(dims);
+    compile_spec.workspace_size = 1 << 20;
 
 #ifdef HALF
-    extra_info.op_precision = torch::kF16;
+    compile_spec.op_precision = torch::kF16;
 #endif
 
-    auto trt_mod = trtorch::CompileGraph(mod, extra_info);
+    auto trt_mod = trtorch::CompileGraph(mod, compile_spec);
 
 #ifdef SAVE_ENGINE
     std::cout << "Compiling graph to save as TRT engine (/tmp/engine_converted_from_jit.trt)" << std::endl;
-    auto engine = trtorch::ConvertGraphToTRTEngine(mod, "forward", extra_info);
+    auto engine = trtorch::ConvertGraphToTRTEngine(mod, "forward", compile_spec);
     std::ofstream out("/tmp/engine_converted_from_jit.trt");
     out << engine;
     out.close();

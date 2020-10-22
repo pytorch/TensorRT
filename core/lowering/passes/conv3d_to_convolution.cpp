@@ -15,7 +15,7 @@ void Conv3DToConvolution(std::shared_ptr<torch::jit::Graph>& graph) {
     std::string convolution_pattern = R"IR(
         graph(%x, %w, %b, %s, %p, %d, %g):
             %1 : bool = prim::Constant[value=0]()
-            %2 : int[] = prim::Constant[value=[0, 0]]()
+            %2 : int[] = prim::Constant[value=[0, 0, 0]]()
             %4 : Tensor = aten::_convolution(%x, %w, %b, %s, %p, %d, %1, %2, %g, %1, %1, %1)
             return (%4))IR";;
 

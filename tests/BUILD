@@ -17,6 +17,7 @@ test_suite(
 test_suite(
     name = "python_api_tests",
     tests = [
-        "//tests/py:test_api"
+        "//tests/py:test_api",
+        "//tests/py:test_to_backend_api"
     ]
 )
