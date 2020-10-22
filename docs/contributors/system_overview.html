@@ -238,6 +238,11 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/use_from_pytorch.html">
+            Using TRTorch Directly From PyTorch
+           </a>
+          </li>
+          <li class="md-nav__item">
            <span class="md-nav__link caption">
             <span class="caption-text">
              Notebooks
@@ -326,8 +331,8 @@
                     </a>
                    </li>
                    <li class="md-nav__item">
-                    <a class="md-nav__link" href="#execution">
-                     Execution
+                    <a class="md-nav__link" href="#compilation-and-runtime">
+                     Compilation and Runtime
                     </a>
                    </li>
                   </ul>
@@ -390,8 +395,8 @@
                  </a>
                 </li>
                 <li class="md-nav__item">
-                 <a class="md-nav__link" href="#execution">
-                  Execution
+                 <a class="md-nav__link" href="#compilation-and-runtime">
+                  Compilation and Runtime
                  </a>
                 </li>
                </ul>
@@ -530,25 +535,24 @@ The conversion phase is made up of three main components, a context to manage co
 a evaluator library which will execute operations that can be resolved at compile time and a converter
 library which maps an op from JIT to TensorRT.
        </p>
-       <h3 id="execution">
-        Execution
-        <a class="headerlink" href="#execution" title="Permalink to this headline">
+       <h3 id="compilation-and-runtime">
+        Compilation and Runtime
+        <a class="headerlink" href="#compilation-and-runtime" title="Permalink to this headline">
          ¶
         </a>
        </h3>
        <p>
-        <a class="reference internal" href="execution.html#execution">
+        <a class="reference internal" href="runtime.html#execution">
          <span class="std std-ref">
-          Execution Phase
+          Runtime Phase
          </span>
         </a>
        </p>
        <p>
-        The execution phase constructs a TorchScript program to run the converted TensorRT engine. It
+        The final compilation phase constructs a TorchScript program to run the converted TensorRT engine. It
 takes a serialized engine and instantiates it within a engine manager, then the compiler will
 build out a JIT graph that references this engine and wraps it in a module to return to the user.
-When the user executes the module, the JIT program will look up the engine and pass the inputs
-to it, then return the results.
+When the user executes the module, the JIT program run in the JIT runtime extended by TRTorch with the data providied from the user.
        </p>
       </article>
      </div>

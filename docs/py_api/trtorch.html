@@ -238,6 +238,11 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/use_from_pytorch.html">
+            Using TRTorch Directly From PyTorch
+           </a>
+          </li>
+          <li class="md-nav__item">
            <span class="md-nav__link caption">
             <span class="caption-text">
              Notebooks
@@ -437,7 +442,7 @@
          ,
          <em class="sig-param">
           <span class="n">
-           extra_info
+           compile_spec
           </span>
           <span class="p">
            :
@@ -491,7 +496,7 @@ and will convert methods to JIT Graphs which call equivalent TensorRT engines
             <li>
              <p>
               <strong>
-               extra_info
+               compile_spec
               </strong>
               (
               <em>
@@ -512,7 +517,7 @@ to the graph. All other keys are optional
              </p>
              <div class="highlight-py notranslate">
               <div class="highlight">
-               <pre><span></span><span class="n">ExtraInfo</span> <span class="o">=</span> <span class="p">{</span>
+               <pre><span></span><span class="n">compile_spec</span> <span class="o">=</span> <span class="p">{</span>
     <span class="s2">"input_shapes"</span><span class="p">:</span> <span class="p">[</span>
         <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span> <span class="c1"># Static input shape for input #1</span>
         <span class="p">{</span>
@@ -525,8 +530,8 @@ to the graph. All other keys are optional
     <span class="s2">"refit"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># enable refit</span>
     <span class="s2">"debug"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># enable debuggable engine</span>
     <span class="s2">"strict_types"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># kernels should strictly run in operating precision</span>
-    <span class="s2">"allow_gpu_fallback"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># (DLA only) Allow layers unsupported on DLA to run on GPU</span>
-    <span class="s2">"device"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">),</span> <span class="c1"># Type of device to run engine on (for DLA use trtorch.DeviceType.DLA)</span>
+    <span class="s2">"allow_gpu_fallback"</span><span class="p">:</span> <span class="n">true</span><span class="p">,</span> <span class="c1"># (DLA only) Allow layers unsupported on DLA to run on GPU</span>
+    <span class="s2">"device_type"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">),</span> <span class="c1"># Type of device to run engine on (for DLA use trtorch.DeviceType.DLA)</span>
     <span class="s2">"capability"</span><span class="p">:</span> <span class="n">trtorch</span><span class="o">.</span><span class="n">EngineCapability</span><span class="o">.</span><span class="n">DEFAULT</span><span class="p">,</span> <span class="c1"># Restrict kernel selection to safe gpu kernels or safe dla kernels</span>
     <span class="s2">"num_min_timing_iters"</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="c1"># Number of minimization timing iterations used to select kernels</span>
     <span class="s2">"num_avg_timing_iters"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="c1"># Number of averaging timing iterations used to select kernels</span>
@@ -600,7 +605,7 @@ to select device type.
          ,
          <em class="sig-param">
           <span class="n">
-           extra_info
+           compile_spec
           </span>
           <span class="p">
            :
@@ -662,7 +667,7 @@ to select device type.
             <li>
              <p>
               <strong>
-               extra_info
+               compile_spec
               </strong>
               (
               <em>
@@ -683,7 +688,7 @@ to the graph. All other keys are optional
              </p>
              <div class="highlight-py notranslate">
               <div class="highlight">
-               <pre><span></span><span class="n">ExtraInfo</span> <span class="o">=</span> <span class="p">{</span>
+               <pre><span></span><span class="n">CompileSpec</span> <span class="o">=</span> <span class="p">{</span>
     <span class="s2">"input_shapes"</span><span class="p">:</span> <span class="p">[</span>
         <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span> <span class="c1"># Static input shape for input #1</span>
         <span class="p">{</span>
@@ -693,11 +698,11 @@ to the graph. All other keys are optional
         <span class="p">}</span> <span class="c1"># Dynamic input shape for input #2</span>
     <span class="p">],</span>
     <span class="s2">"op_precision"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">,</span> <span class="c1"># Operating precision set to FP16</span>
-    <span class="s2">"refit"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># enable refit</span>
-    <span class="s2">"debug"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># enable debuggable engine</span>
-    <span class="s2">"strict_types"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># kernels should strictly run in operating precision</span>
-    <span class="s2">"allow_gpu_fallback"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># (DLA only) Allow layers unsupported on DLA to run on GPU</span>
-    <span class="s2">"device"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">),</span> <span class="c1"># Type of device to run engine on (for DLA use trtorch.DeviceType.DLA)</span>
+    <span class="s2">"refit"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="c1"># enable refit</span>
+    <span class="s2">"debug"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="c1"># enable debuggable engine</span>
+    <span class="s2">"strict_types"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="c1"># kernels should strictly run in operating precision</span>
+    <span class="s2">"allow_gpu_fallback"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="c1"># (DLA only) Allow layers unsupported on DLA to run on GPU</span>
+    <span class="s2">"device_type"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">),</span> <span class="c1"># Type of device to run engine on (for DLA use trtorch.DeviceType.DLA)</span>
     <span class="s2">"capability"</span><span class="p">:</span> <span class="n">trtorch</span><span class="o">.</span><span class="n">EngineCapability</span><span class="o">.</span><span class="n">DEFAULT</span><span class="p">,</span> <span class="c1"># Restrict kernel selection to safe gpu kernels or safe dla kernels</span>
     <span class="s2">"num_min_timing_iters"</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="c1"># Number of minimization timing iterations used to select kernels</span>
     <span class="s2">"num_avg_timing_iters"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="c1"># Number of averaging timing iterations used to select kernels</span>
@@ -841,30 +846,6 @@ that are not supported are printed out and the function returns false, else true
         </dd>
        </dl>
        <dl class="py function">
-        <dt id="trtorch.dump_build_info">
-         <code class="sig-prename descclassname">
-          trtorch.
-         </code>
-         <code class="sig-name descname">
-          dump_build_info
-         </code>
-         <span class="sig-paren">
-          (
-         </span>
-         <span class="sig-paren">
-          )
-         </span>
-         <a class="headerlink" href="#trtorch.dump_build_info" title="Permalink to this definition">
-          ¶
-         </a>
-        </dt>
-        <dd>
-         <p>
-          Prints build information about the TRTorch distribution to stdout
-         </p>
-        </dd>
-       </dl>
-       <dl class="py function">
         <dt id="trtorch.get_build_info">
          <code class="sig-prename descclassname">
           trtorch.
@@ -902,6 +883,158 @@ that are not supported are printed out and the function returns false, else true
           <dd class="field-even">
            <p>
             str
+           </p>
+          </dd>
+         </dl>
+        </dd>
+       </dl>
+       <dl class="py function">
+        <dt id="trtorch.dump_build_info">
+         <code class="sig-prename descclassname">
+          trtorch.
+         </code>
+         <code class="sig-name descname">
+          dump_build_info
+         </code>
+         <span class="sig-paren">
+          (
+         </span>
+         <span class="sig-paren">
+          )
+         </span>
+         <a class="headerlink" href="#trtorch.dump_build_info" title="Permalink to this definition">
+          ¶
+         </a>
+        </dt>
+        <dd>
+         <p>
+          Prints build information about the TRTorch distribution to stdout
+         </p>
+        </dd>
+       </dl>
+       <dl class="py function">
+        <dt id="trtorch.TensorRTCompileSpec">
+         <code class="sig-prename descclassname">
+          trtorch.
+         </code>
+         <code class="sig-name descname">
+          TensorRTCompileSpec
+         </code>
+         <span class="sig-paren">
+          (
+         </span>
+         <em class="sig-param">
+          <span class="n">
+           compile_spec
+          </span>
+          <span class="p">
+           :
+          </span>
+          <span class="n">
+           Dict
+           <span class="p">
+            [
+           </span>
+           str
+           <span class="p">
+            ,
+           </span>
+           Any
+           <span class="p">
+            ]
+           </span>
+          </span>
+         </em>
+         <span class="sig-paren">
+          )
+         </span>
+         <a class="headerlink" href="#trtorch.TensorRTCompileSpec" title="Permalink to this definition">
+          ¶
+         </a>
+        </dt>
+        <dd>
+         <p>
+          Utility to create a formated spec dictionary for using the PyTorch TensorRT backend
+         </p>
+         <dl class="field-list simple">
+          <dt class="field-odd">
+           Parameters
+          </dt>
+          <dd class="field-odd">
+           <p>
+            <strong>
+             compile_spec
+            </strong>
+            (
+            <em>
+             dict
+            </em>
+            ) –
+           </p>
+           <p>
+            Compilation settings including operating precision, target device, etc.
+One key is required which is
+            <code class="docutils literal notranslate">
+             <span class="pre">
+              input_shapes
+             </span>
+            </code>
+            , describing the input sizes or ranges for inputs
+to the graph. All other keys are optional. Entries for each method to be compiled.
+           </p>
+           <div class="highlight-py notranslate">
+            <div class="highlight">
+             <pre><span></span><span class="n">CompileSpec</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"forward"</span> <span class="p">:</span> <span class="n">trtorch</span><span class="o">.</span><span class="n">TensorRTCompileSpec</span><span class="p">({</span>
+        <span class="s2">"input_shapes"</span><span class="p">:</span> <span class="p">[</span>
+            <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span> <span class="c1"># Static input shape for input #1</span>
+            <span class="p">{</span>
+                <span class="s2">"min"</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span>
+                <span class="s2">"opt"</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">512</span><span class="p">,</span> <span class="mi">512</span><span class="p">),</span>
+                <span class="s2">"max"</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">1024</span><span class="p">,</span> <span class="mi">1024</span><span class="p">)</span>
+            <span class="p">}</span> <span class="c1"># Dynamic input shape for input #2</span>
+        <span class="p">],</span>
+        <span class="s2">"op_precision"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">,</span> <span class="c1"># Operating precision set to FP16</span>
+        <span class="s2">"refit"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="c1"># enable refit</span>
+        <span class="s2">"debug"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="c1"># enable debuggable engine</span>
+        <span class="s2">"strict_types"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="c1"># kernels should strictly run in operating precision</span>
+        <span class="s2">"allow_gpu_fallback"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="c1"># (DLA only) Allow layers unsupported on DLA to run on GPU</span>
+        <span class="s2">"device"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">),</span> <span class="c1"># Type of device to run engine on (for DLA use trtorch.DeviceType.DLA)</span>
+        <span class="s2">"capability"</span><span class="p">:</span> <span class="n">trtorch</span><span class="o">.</span><span class="n">EngineCapability</span><span class="o">.</span><span class="n">DEFAULT</span><span class="p">,</span> <span class="c1"># Restrict kernel selection to safe gpu kernels or safe dla kernels</span>
+        <span class="s2">"num_min_timing_iters"</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="c1"># Number of minimization timing iterations used to select kernels</span>
+        <span class="s2">"num_avg_timing_iters"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="c1"># Number of averaging timing iterations used to select kernels</span>
+        <span class="s2">"workspace_size"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="c1"># Maximum size of workspace given to TensorRT</span>
+        <span class="s2">"max_batch_size"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="c1"># Maximum batch size (must be &gt;= 1 to be set, 0 means not set)</span>
+    <span class="p">})</span>
+<span class="p">}</span>
+</pre>
+            </div>
+           </div>
+           <p>
+            Input Sizes can be specified as torch sizes, tuples or lists. Op precisions can be specified using
+torch datatypes or trtorch datatypes and you can use either torch devices or the trtorch device type enum
+to select device type.
+           </p>
+          </dd>
+          <dt class="field-even">
+           Returns
+          </dt>
+          <dd class="field-even">
+           <p>
+            List of methods and formated spec objects to be provided to
+            <code class="docutils literal notranslate">
+             <span class="pre">
+              torch._C._jit_to_tensorrt
+             </span>
+            </code>
+           </p>
+          </dd>
+          <dt class="field-odd">
+           Return type
+          </dt>
+          <dd class="field-odd">
+           <p>
+            torch.classes.tensorrt.CompileSpec
            </p>
           </dd>
          </dl>
