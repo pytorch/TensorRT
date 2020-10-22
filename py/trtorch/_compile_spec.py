@@ -162,10 +162,10 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]):
                             } # Dynamic input shape for input #2
                         ],
                         "op_precision": torch.half, # Operating precision set to FP16
-                        "refit": false, # enable refit
-                        "debug": false, # enable debuggable engine
-                        "strict_types": false, # kernels should strictly run in operating precision
-                        "allow_gpu_fallback": false, # (DLA only) Allow layers unsupported on DLA to run on GPU
+                        "refit": False, # enable refit
+                        "debug": False, # enable debuggable engine
+                        "strict_types": False, # kernels should strictly run in operating precision
+                        "allow_gpu_fallback": True, # (DLA only) Allow layers unsupported on DLA to run on GPU
                         "device": torch.device("cuda"), # Type of device to run engine on (for DLA use trtorch.DeviceType.DLA)
                         "capability": trtorch.EngineCapability.DEFAULT, # Restrict kernel selection to safe gpu kernels or safe dla kernels
                         "num_min_timing_iters": 2, # Number of minimization timing iterations used to select kernels
