@@ -1,9 +1,9 @@
 .. _execution:
 
-Execution Phase
+Runtime Phase
 ================
 
-The execution phase is responsible for constructing self standing TorchScript graphs with embedded TensorRT engines and serving as the runtime
+The Runtime phase is responsible for constructing self standing TorchScript graphs with embedded TensorRT engines and serving as the runtime
 when these engines are called. The main interface accepts a serialized TensorRT engine. The execution phase
 will deserialize and wrap this engine in a class which maintains a execution context for each engine
 and some metadata about its inputs and outputs and is compatable with the TorchScript interpreter so that

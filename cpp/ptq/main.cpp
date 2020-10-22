@@ -50,28 +50,28 @@ torch::jit::Module compile_int8_model(const std::string& data_dir, torch::jit::M
 
     std::vector<std::vector<int64_t>> input_shape = {{32, 3, 32, 32}};
     /// Configure settings for compilation
-    auto extra_info = trtorch::ExtraInfo({input_shape});
+    auto compile_spec = trtorch::CompileSpec({input_shape});
     /// Set operating precision to INT8
-    extra_info.op_precision = torch::kI8;
+    compile_spec.op_precision = torch::kI8;
     /// Use the TensorRT Entropy Calibrator
-    extra_info.ptq_calibrator = calibrator;
+    compile_spec.ptq_calibrator = calibrator;
     /// Set max batch size for the engine
-    extra_info.max_batch_size = 32;
+    compile_spec.max_batch_size = 32;
     /// Set a larger workspace
-    extra_info.workspace_size = 1 << 28;
+    compile_spec.workspace_size = 1 << 28;
 
     mod.eval();
 
 #ifdef SAVE_ENGINE
     std::cout << "Compiling graph to save as TRT engine (/tmp/engine_converted_from_jit.trt)" << std::endl;
-    auto engine = trtorch::ConvertGraphToTRTEngine(mod, "forward", extra_info);
+    auto engine = trtorch::ConvertGraphToTRTEngine(mod, "forward", compile_spec);
     std::ofstream out("/tmp/engine_converted_from_jit.trt");
     out << engine;
     out.close();
 #endif
 
     std::cout << "Compiling and quantizing module" << std::endl;
-    auto trt_mod = trtorch::CompileGraph(mod, extra_info);
+    auto trt_mod = trtorch::CompileGraph(mod, compile_spec);
     return std::move(trt_mod);
 }
 

@@ -7,6 +7,13 @@ config_setting(
     }
 )
 
+config_setting(
+    name = "python_core",
+    values = {
+        "define": "target_lang=python"
+    }
+)
+
 cc_library(
     name = "core",
     hdrs = [
@@ -17,7 +24,7 @@ cc_library(
     ],
     deps = [
         "//core/conversion",
-        "//core/execution",
+        "//core/runtime",
         "//core/lowering",
         "//core/util/logging",
         "@tensorrt//:nvinfer"
@@ -28,11 +35,13 @@ cc_library(
     alwayslink=True,
 )
 
-
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 
 pkg_tar(
     name = "include",
     package_dir = "core/",
-    srcs = ["compiler.h"],
+    srcs = [
+        "backend.h",
+        "compiler.h",
+    ],
 )

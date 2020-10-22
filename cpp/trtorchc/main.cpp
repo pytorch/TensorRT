@@ -66,7 +66,7 @@ std::vector<int64_t> parseSingleDim(std::string shape_str) {
     return {};
 }
 
-trtorch::ExtraInfo::InputRange parseDynamicDim(std::string shape_str) {
+trtorch::CompileSpec::InputRange parseDynamicDim(std::string shape_str) {
     shape_str = shape_str.substr(1, shape_str.size() - 2);
     std::vector<std::vector<int64_t>> shape;
     std::stringstream ss;
@@ -89,7 +89,7 @@ trtorch::ExtraInfo::InputRange parseDynamicDim(std::string shape_str) {
         exit(1);
     }
 
-    return trtorch::ExtraInfo::InputRange(shape[0], shape[1], shape[2]);
+    return trtorch::CompileSpec::InputRange(shape[0], shape[1], shape[2]);
 }
 
 std::string get_cwd() {
@@ -190,10 +190,10 @@ int main(int argc, char** argv) {
     }
 
 
-    std::vector<trtorch::ExtraInfo::InputRange> ranges;
+    std::vector<trtorch::CompileSpec::InputRange> ranges;
     for (const auto shapes : args::get(input_shapes)) {
         if (shapes.rfind("(", 0) == 0) {
-            ranges.push_back(trtorch::ExtraInfo::InputRange(parseSingleDim(shapes)));
+            ranges.push_back(trtorch::CompileSpec::InputRange(parseSingleDim(shapes)));
         } else if (shapes.rfind("[", 0) == 0) {
             ranges.push_back(parseDynamicDim(shapes));
         } else {
@@ -203,7 +203,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    auto compile_settings = trtorch::ExtraInfo(ranges);
+    auto compile_settings = trtorch::CompileSpec(ranges);
 
     if (build_debuggable_engine) {
         compile_settings.debug = true;
@@ -251,9 +251,9 @@ int main(int argc, char** argv) {
         auto device = args::get(device_type);
         std::transform(device.begin(), device.end(), device.begin(), [](unsigned char c){ return std::tolower(c); });
         if (device == "gpu") {
-            compile_settings.device = trtorch::ExtraInfo::DeviceType::kGPU;
+            compile_settings.device = trtorch::CompileSpec::DeviceType::kGPU;
         } else if (device == "dla") {
-            compile_settings.device = trtorch::ExtraInfo::DeviceType::kDLA;
+            compile_settings.device = trtorch::CompileSpec::DeviceType::kDLA;
         } else {
             trtorch::logging::log(trtorch::logging::Level::kERROR, "Invalid device type, options are [ gpu | dla ]");
             std::cerr << parser;
@@ -265,11 +265,11 @@ int main(int argc, char** argv) {
         auto capability = args::get(engine_capability);
         std::transform(capability.begin(), capability.end(), capability.begin(), [](unsigned char c){ return std::tolower(c); });
         if (capability == "default") {
-            compile_settings.capability = trtorch::ExtraInfo::EngineCapability::kDEFAULT;
+            compile_settings.capability = trtorch::CompileSpec::EngineCapability::kDEFAULT;
         } else if (capability == "safe_gpu") {
-            compile_settings.capability = trtorch::ExtraInfo::EngineCapability::kSAFE_GPU;
+            compile_settings.capability = trtorch::CompileSpec::EngineCapability::kSAFE_GPU;
         } else if (capability == "safe_dla") {
-            compile_settings.capability = trtorch::ExtraInfo::EngineCapability::kSAFE_DLA;
+            compile_settings.capability = trtorch::CompileSpec::EngineCapability::kSAFE_DLA;
         } else {
             trtorch::logging::log(trtorch::logging::Level::kERROR, "Invalid engine capability, options are [ default | safe_gpu | safe_dla ]");
             std::cerr << parser;
@@ -320,7 +320,7 @@ int main(int argc, char** argv) {
     } else {
         auto trt_mod = trtorch::CompileGraph(mod, compile_settings);
 
-        if (compile_settings.op_precision == trtorch::ExtraInfo::DataType::kFloat) {
+        if (compile_settings.op_precision == trtorch::CompileSpec::DataType::kFloat) {
             double threshold_val = 2e-5;
             if (threshold) {
                 threshold_val = args::get(threshold);

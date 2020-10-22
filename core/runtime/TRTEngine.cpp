@@ -4,11 +4,11 @@
 #include "torch/csrc/jit/frontend/function_schema_parser.h"
 
 #include "core/util/prelude.h"
-#include "core/execution/execution.h"
+#include "core/runtime/runtime.h"
 
 namespace trtorch {
 namespace core {
-namespace execution {
+namespace runtime {
 
 std::string slugify(std::string s) {
     std::replace(s.begin(), s.end(), '.', '_');
@@ -81,6 +81,7 @@ TRTEngine::~TRTEngine() {
 //     return c10::List<at::Tensor>(output_vec);
 // }
 
+namespace {
 static auto TRTORCH_UNUSED TRTEngineTSRegistrtion = torch::class_<TRTEngine>("tensorrt", "Engine")
     .def(torch::init<std::string>())
     // TODO: .def("__call__", &TRTEngine::Run)
@@ -94,7 +95,7 @@ static auto TRTORCH_UNUSED TRTEngineTSRegistrtion = torch::class_<TRTEngine>("te
             return c10::make_intrusive<TRTEngine>(std::move(seralized_engine));
         }
     );
-
-} // namespace execution
+} // namespace
+} // namespace runtime
 } // namespace core
 } // namespace trtorch
