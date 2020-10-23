@@ -1,6 +1,6 @@
-.. _exhale_struct_structtrtorch_1_1ExtraInfo_1_1InputRange:
+.. _exhale_struct_structtrtorch_1_1CompileSpec_1_1InputRange:
 
-Struct ExtraInfo::InputRange
+Struct CompileSpec::InputRange
 ============================
 
 - Defined in :ref:`file_cpp_api_include_trtorch_trtorch.h`
@@ -9,14 +9,14 @@ Struct ExtraInfo::InputRange
 Nested Relationships
 --------------------
 
-This struct is a nested type of :ref:`exhale_struct_structtrtorch_1_1ExtraInfo`.
+This struct is a nested type of :ref:`exhale_struct_structtrtorch_1_1CompileSpec`.
 
 
 Struct Documentation
 --------------------
 
 
-.. doxygenstruct:: trtorch::ExtraInfo::InputRange
+.. doxygenstruct:: trtorch::CompileSpec::InputRange
    :members:
    :protected-members:
    :undoc-members:

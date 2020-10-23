@@ -152,6 +152,9 @@
        <a href="https://nvidia.github.io/TRTorch/" title="master">
         master
        </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.1.0/" title="v0.1.0">
+        v0.1.0
+       </a>
        <a href="https://nvidia.github.io/TRTorch/v0.0.3/" title="v0.0.3">
         v0.0.3
        </a>
@@ -377,7 +380,7 @@
                  </a>
                 </li>
                 <li class="md-nav__item">
-                 <a class="md-nav__link" href="#What's-next">
+                 <a class="md-nav__link" href="#What’s-next">
                   What’s next
                  </a>
                 </li>
@@ -643,26 +646,26 @@ div.rendered_html tbody tr:hover {
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span># Copyright 2019 NVIDIA Corporation. All Rights Reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==============================================================================
+<span></span><span class="c1"># Copyright 2019 NVIDIA Corporation. All Rights Reserved.</span>
+<span class="c1">#</span>
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+<span class="c1"># ==============================================================================</span>
 </pre>
          </div>
         </div>
        </div>
        <p>
-        <img alt="a10f0c59978848efa0bf13681f0870e2" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
+        <img alt="61aaf6ebb66844fc9fab8c1dc1448500" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
        </p>
        <h1 id="notebooks-resnet50-example--page-root">
         TRTorch Getting Started - ResNet 50
@@ -750,7 +753,7 @@ perform best on the target GPU. TensorRT also has strong support for reduced ope
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span>!nvidia-smi
+<span></span><span class="o">!</span>nvidia-smi
 </pre>
          </div>
         </div>
@@ -812,13 +815,9 @@ Tue Aug 25 06:25:19 2020
          </div>
         </div>
        </div>
-       <blockquote>
-        <div>
-         <p>
-          ## 1. Requirements
-         </p>
-        </div>
-       </blockquote>
+       <p>
+        ## 1. Requirements
+       </p>
        <p>
         Follow the steps in
         <code class="docutils literal notranslate">
@@ -828,13 +827,9 @@ Tue Aug 25 06:25:19 2020
         </code>
         to prepare a Docker container, within which you can run this notebook.
        </p>
-       <blockquote>
-        <div>
-         <p>
-          ## 2. ResNet-50 Overview
-         </p>
-        </div>
-       </blockquote>
+       <p>
+        ## 2. ResNet-50 Overview
+       </p>
        <p>
         PyTorch has a model repository called the PyTorch Hub, which is a source for high quality implementations of common models. We can get our ResNet-50 model from there pretrained on ImageNet.
        </p>
@@ -864,9 +859,9 @@ Tue Aug 25 06:25:19 2020
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span>import torch
-resnet50_model = torch.hub.load('pytorch/vision:v0.6.0', 'resnet50', pretrained=True)
-resnet50_model.eval()
+<span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="n">resnet50_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">hub</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">'pytorch/vision:v0.6.0'</span><span class="p">,</span> <span class="s1">'resnet50'</span><span class="p">,</span> <span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">resnet50_model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
 </pre>
          </div>
         </div>
@@ -1073,7 +1068,7 @@ ResNet(
         </div>
        </div>
        <p>
-        All pre-trained models expect input images normalized in the same way, i.e. mini-batches of 3-channel RGB images of shape
+        All pre-trained models expect input images normalized in the same way, i.e. mini-batches of 3-channel RGB images of shape
         <code class="docutils literal notranslate">
          <span class="pre">
           (3
@@ -1169,13 +1164,13 @@ ResNet(
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span>!mkdir ./data
-!wget  -O ./data/img0.JPG "https://d17fnq9dkz9hgj.cloudfront.net/breed-uploads/2018/08/siberian-husky-detail.jpg?bust=1535566590&amp;width=630"
-!wget  -O ./data/img1.JPG "https://www.hakaimagazine.com/wp-content/uploads/header-gulf-birds.jpg"
-!wget  -O ./data/img2.JPG "https://www.artis.nl/media/filer_public_thumbnails/filer_public/00/f1/00f1b6db-fbed-4fef-9ab0-84e944ff11f8/chimpansee_amber_r_1920x1080.jpg__1920x1080_q85_subject_location-923%2C365_subsampling-2.jpg"
-!wget  -O ./data/img3.JPG "https://www.familyhandyman.com/wp-content/uploads/2018/09/How-to-Avoid-Snakes-Slithering-Up-Your-Toilet-shutterstock_780480850.jpg"
+<span></span><span class="o">!</span>mkdir ./data
+<span class="o">!</span>wget  -O ./data/img0.JPG <span class="s2">"https://d17fnq9dkz9hgj.cloudfront.net/breed-uploads/2018/08/siberian-husky-detail.jpg?bust=1535566590&amp;width=630"</span>
+<span class="o">!</span>wget  -O ./data/img1.JPG <span class="s2">"https://www.hakaimagazine.com/wp-content/uploads/header-gulf-birds.jpg"</span>
+<span class="o">!</span>wget  -O ./data/img2.JPG <span class="s2">"https://www.artis.nl/media/filer_public_thumbnails/filer_public/00/f1/00f1b6db-fbed-4fef-9ab0-84e944ff11f8/chimpansee_amber_r_1920x1080.jpg__1920x1080_q85_subject_location-923%2C365_subsampling-2.jpg"</span>
+<span class="o">!</span>wget  -O ./data/img3.JPG <span class="s2">"https://www.familyhandyman.com/wp-content/uploads/2018/09/How-to-Avoid-Snakes-Slithering-Up-Your-Toilet-shutterstock_780480850.jpg"</span>
 
-!wget  -O ./data/imagenet_class_index.json "https://s3.amazonaws.com/deep-learning-models/image-models/imagenet_class_index.json"
+<span class="o">!</span>wget  -O ./data/imagenet_class_index.json <span class="s2">"https://s3.amazonaws.com/deep-learning-models/image-models/imagenet_class_index.json"</span>
 </pre>
          </div>
         </div>
@@ -1256,7 +1251,7 @@ Saving to: ‘./data/imagenet_class_index.json’
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span>!pip install pillow matplotlib
+<span></span><span class="o">!</span>pip install pillow matplotlib
 </pre>
          </div>
         </div>
@@ -1293,25 +1288,25 @@ You should consider upgrading via the '/usr/bin/python -m pip install --upgrade 
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span>from PIL import Image
-from torchvision import transforms
-import matplotlib.pyplot as plt
+<span></span><span class="kn">from</span> <span class="nn">PIL</span> <span class="kn">import</span> <span class="n">Image</span>
+<span class="kn">from</span> <span class="nn">torchvision</span> <span class="kn">import</span> <span class="n">transforms</span>
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
 
-fig, axes = plt.subplots(nrows=2, ncols=2)
+<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">nrows</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">ncols</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
 
-for i in range(4):
-    img_path = './data/img%d.JPG'%i
-    img = Image.open(img_path)
-    preprocess = transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-])
-    input_tensor = preprocess(img)
-    plt.subplot(2,2,i+1)
-    plt.imshow(img)
-    plt.axis('off')
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">4</span><span class="p">):</span>
+    <span class="n">img_path</span> <span class="o">=</span> <span class="s1">'./data/img</span><span class="si">%d</span><span class="s1">.JPG'</span><span class="o">%</span><span class="k">i</span>
+    <span class="n">img</span> <span class="o">=</span> <span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">img_path</span><span class="p">)</span>
+    <span class="n">preprocess</span> <span class="o">=</span> <span class="n">transforms</span><span class="o">.</span><span class="n">Compose</span><span class="p">([</span>
+        <span class="n">transforms</span><span class="o">.</span><span class="n">Resize</span><span class="p">(</span><span class="mi">256</span><span class="p">),</span>
+        <span class="n">transforms</span><span class="o">.</span><span class="n">CenterCrop</span><span class="p">(</span><span class="mi">224</span><span class="p">),</span>
+        <span class="n">transforms</span><span class="o">.</span><span class="n">ToTensor</span><span class="p">(),</span>
+        <span class="n">transforms</span><span class="o">.</span><span class="n">Normalize</span><span class="p">(</span><span class="n">mean</span><span class="o">=</span><span class="p">[</span><span class="mf">0.485</span><span class="p">,</span> <span class="mf">0.456</span><span class="p">,</span> <span class="mf">0.406</span><span class="p">],</span> <span class="n">std</span><span class="o">=</span><span class="p">[</span><span class="mf">0.229</span><span class="p">,</span> <span class="mf">0.224</span><span class="p">,</span> <span class="mf">0.225</span><span class="p">]),</span>
+<span class="p">])</span>
+    <span class="n">input_tensor</span> <span class="o">=</span> <span class="n">preprocess</span><span class="p">(</span><span class="n">img</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">img</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s1">'off'</span><span class="p">)</span>
 </pre>
          </div>
         </div>
@@ -1333,12 +1328,12 @@ for i in range(4):
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span>import json
+<span></span><span class="kn">import</span> <span class="nn">json</span>
 
-with open("./data/imagenet_class_index.json") as json_file:
-    d = json.load(json_file)
+<span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"./data/imagenet_class_index.json"</span><span class="p">)</span> <span class="k">as</span> <span class="n">json_file</span><span class="p">:</span>
+    <span class="n">d</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">json_file</span><span class="p">)</span>
 
-print("Number of classes in ImageNet: {}".format(len(d)))
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Number of classes in ImageNet: </span><span class="si">{}</span><span class="s2">"</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">d</span><span class="p">)))</span>
 </pre>
          </div>
         </div>
@@ -1364,36 +1359,36 @@ Number of classes in ImageNet: 1000
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span>import numpy as np
+<span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 
-def rn50_preprocess():
-    preprocess = transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    ])
-    return preprocess
+<span class="k">def</span> <span class="nf">rn50_preprocess</span><span class="p">():</span>
+    <span class="n">preprocess</span> <span class="o">=</span> <span class="n">transforms</span><span class="o">.</span><span class="n">Compose</span><span class="p">([</span>
+        <span class="n">transforms</span><span class="o">.</span><span class="n">Resize</span><span class="p">(</span><span class="mi">256</span><span class="p">),</span>
+        <span class="n">transforms</span><span class="o">.</span><span class="n">CenterCrop</span><span class="p">(</span><span class="mi">224</span><span class="p">),</span>
+        <span class="n">transforms</span><span class="o">.</span><span class="n">ToTensor</span><span class="p">(),</span>
+        <span class="n">transforms</span><span class="o">.</span><span class="n">Normalize</span><span class="p">(</span><span class="n">mean</span><span class="o">=</span><span class="p">[</span><span class="mf">0.485</span><span class="p">,</span> <span class="mf">0.456</span><span class="p">,</span> <span class="mf">0.406</span><span class="p">],</span> <span class="n">std</span><span class="o">=</span><span class="p">[</span><span class="mf">0.229</span><span class="p">,</span> <span class="mf">0.224</span><span class="p">,</span> <span class="mf">0.225</span><span class="p">]),</span>
+    <span class="p">])</span>
+    <span class="k">return</span> <span class="n">preprocess</span>
 
-# decode the results into ([predicted class, description], probability)
-def predict(img_path, model):
-    img = Image.open(img_path)
-    preprocess = rn50_preprocess()
-    input_tensor = preprocess(img)
-    input_batch = input_tensor.unsqueeze(0) # create a mini-batch as expected by the model
+<span class="c1"># decode the results into ([predicted class, description], probability)</span>
+<span class="k">def</span> <span class="nf">predict</span><span class="p">(</span><span class="n">img_path</span><span class="p">,</span> <span class="n">model</span><span class="p">):</span>
+    <span class="n">img</span> <span class="o">=</span> <span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">img_path</span><span class="p">)</span>
+    <span class="n">preprocess</span> <span class="o">=</span> <span class="n">rn50_preprocess</span><span class="p">()</span>
+    <span class="n">input_tensor</span> <span class="o">=</span> <span class="n">preprocess</span><span class="p">(</span><span class="n">img</span><span class="p">)</span>
+    <span class="n">input_batch</span> <span class="o">=</span> <span class="n">input_tensor</span><span class="o">.</span><span class="n">unsqueeze</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> <span class="c1"># create a mini-batch as expected by the model</span>
 
-    # move the input and model to GPU for speed if available
-    if torch.cuda.is_available():
-        input_batch = input_batch.to('cuda')
-        model.to('cuda')
+    <span class="c1"># move the input and model to GPU for speed if available</span>
+    <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">is_available</span><span class="p">():</span>
+        <span class="n">input_batch</span> <span class="o">=</span> <span class="n">input_batch</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s1">'cuda'</span><span class="p">)</span>
+        <span class="n">model</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s1">'cuda'</span><span class="p">)</span>
 
-    with torch.no_grad():
-        output = model(input_batch)
-        # Tensor of shape 1000, with confidence scores over Imagenet's 1000 classes
-        sm_output = torch.nn.functional.softmax(output[0], dim=0)
+    <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+        <span class="n">output</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">input_batch</span><span class="p">)</span>
+        <span class="c1"># Tensor of shape 1000, with confidence scores over Imagenet's 1000 classes</span>
+        <span class="n">sm_output</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">functional</span><span class="o">.</span><span class="n">softmax</span><span class="p">(</span><span class="n">output</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
 
-    ind = torch.argmax(sm_output)
-    return d[str(ind.item())], sm_output[ind] #([predicted class, description], probability)
+    <span class="n">ind</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">argmax</span><span class="p">(</span><span class="n">sm_output</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">d</span><span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">ind</span><span class="o">.</span><span class="n">item</span><span class="p">())],</span> <span class="n">sm_output</span><span class="p">[</span><span class="n">ind</span><span class="p">]</span> <span class="c1">#([predicted class, description], probability)</span>
 </pre>
          </div>
         </div>
@@ -1408,17 +1403,17 @@ def predict(img_path, model):
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span>for i in range(4):
-    img_path = './data/img%d.JPG'%i
-    img = Image.open(img_path)
+<span></span><span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">4</span><span class="p">):</span>
+    <span class="n">img_path</span> <span class="o">=</span> <span class="s1">'./data/img</span><span class="si">%d</span><span class="s1">.JPG'</span><span class="o">%</span><span class="k">i</span>
+    <span class="n">img</span> <span class="o">=</span> <span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">img_path</span><span class="p">)</span>
 
-    pred, prob = predict(img_path, resnet50_model)
-    print('{} - Predicted: {}, Probablility: {}'.format(img_path, pred, prob))
+    <span class="n">pred</span><span class="p">,</span> <span class="n">prob</span> <span class="o">=</span> <span class="n">predict</span><span class="p">(</span><span class="n">img_path</span><span class="p">,</span> <span class="n">resnet50_model</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">'</span><span class="si">{}</span><span class="s1"> - Predicted: </span><span class="si">{}</span><span class="s1">, Probablility: </span><span class="si">{}</span><span class="s1">'</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">img_path</span><span class="p">,</span> <span class="n">pred</span><span class="p">,</span> <span class="n">prob</span><span class="p">))</span>
 
-    plt.subplot(2,2,i+1)
-    plt.imshow(img);
-    plt.axis('off');
-    plt.title(pred[1])
+    <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">img</span><span class="p">);</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s1">'off'</span><span class="p">);</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="n">pred</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
 </pre>
          </div>
         </div>
@@ -1463,38 +1458,38 @@ def predict(img_path, model):
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span>import time
-import numpy as np
+<span></span><span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 
-import torch.backends.cudnn as cudnn
-cudnn.benchmark = True
+<span class="kn">import</span> <span class="nn">torch.backends.cudnn</span> <span class="k">as</span> <span class="nn">cudnn</span>
+<span class="n">cudnn</span><span class="o">.</span><span class="n">benchmark</span> <span class="o">=</span> <span class="kc">True</span>
 
-def benchmark(model, input_shape=(1024, 1, 224, 224), dtype='fp32', nwarmup=50, nruns=10000):
-    input_data = torch.randn(input_shape)
-    input_data = input_data.to("cuda")
-    if dtype=='fp16':
-        input_data = input_data.half()
+<span class="k">def</span> <span class="nf">benchmark</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">input_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1024</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="s1">'fp32'</span><span class="p">,</span> <span class="n">nwarmup</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">nruns</span><span class="o">=</span><span class="mi">10000</span><span class="p">):</span>
+    <span class="n">input_data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">input_shape</span><span class="p">)</span>
+    <span class="n">input_data</span> <span class="o">=</span> <span class="n">input_data</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">dtype</span><span class="o">==</span><span class="s1">'fp16'</span><span class="p">:</span>
+        <span class="n">input_data</span> <span class="o">=</span> <span class="n">input_data</span><span class="o">.</span><span class="n">half</span><span class="p">()</span>
 
-    print("Warm up ...")
-    with torch.no_grad():
-        for _ in range(nwarmup):
-            features = model(input_data)
-    torch.cuda.synchronize()
-    print("Start timing ...")
-    timings = []
-    with torch.no_grad():
-        for i in range(1, nruns+1):
-            start_time = time.time()
-            features = model(input_data)
-            torch.cuda.synchronize()
-            end_time = time.time()
-            timings.append(end_time - start_time)
-            if i%100==0:
-                print('Iteration %d/%d, ave batch time %.2f ms'%(i, nruns, np.mean(timings)*1000))
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Warm up ..."</span><span class="p">)</span>
+    <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">nwarmup</span><span class="p">):</span>
+            <span class="n">features</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">input_data</span><span class="p">)</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">synchronize</span><span class="p">()</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Start timing ..."</span><span class="p">)</span>
+    <span class="n">timings</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">nruns</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+            <span class="n">start_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+            <span class="n">features</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">input_data</span><span class="p">)</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">synchronize</span><span class="p">()</span>
+            <span class="n">end_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+            <span class="n">timings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">end_time</span> <span class="o">-</span> <span class="n">start_time</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">i</span><span class="o">%</span><span class="k">100</span>==0:
+                <span class="nb">print</span><span class="p">(</span><span class="s1">'Iteration </span><span class="si">%d</span><span class="s1">/</span><span class="si">%d</span><span class="s1">, ave batch time </span><span class="si">%.2f</span><span class="s1"> ms'</span><span class="o">%</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">nruns</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">timings</span><span class="p">)</span><span class="o">*</span><span class="mi">1000</span><span class="p">))</span>
 
-    print("Input shape:", input_data.size())
-    print("Output features size:", features.size())
-    print('Average batch time: %.2f ms'%(np.mean(timings)*1000))
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Input shape:"</span><span class="p">,</span> <span class="n">input_data</span><span class="o">.</span><span class="n">size</span><span class="p">())</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Output features size:"</span><span class="p">,</span> <span class="n">features</span><span class="o">.</span><span class="n">size</span><span class="p">())</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">'Average batch time: </span><span class="si">%.2f</span><span class="s1"> ms'</span><span class="o">%</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">timings</span><span class="p">)</span><span class="o">*</span><span class="mi">1000</span><span class="p">))</span>
 </pre>
          </div>
         </div>
@@ -1509,9 +1504,9 @@ def benchmark(model, input_shape=(1024, 1, 224, 224), dtype='fp32', nwarmup=50, 
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span># Model benchmark without TRTorch/TensorRT
-model = resnet50_model.eval().to("cuda")
-benchmark(model, input_shape=(128, 3, 224, 224), nruns=1000)
+<span></span><span class="c1"># Model benchmark without TRTorch/TensorRT</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">resnet50_model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">)</span>
+<span class="n">benchmark</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">input_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">128</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span> <span class="n">nruns</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
 </pre>
          </div>
         </div>
@@ -1541,13 +1536,9 @@ Average batch time: 162.94 ms
          </div>
         </div>
        </div>
-       <blockquote>
-        <div>
-         <p>
-          ## 3. Creating TorchScript modules
-         </p>
-        </div>
-       </blockquote>
+       <p>
+        ## 3. Creating TorchScript modules
+       </p>
        <p>
         To compile with TRTorch, the model must first be in
         <strong>
@@ -1600,8 +1591,8 @@ Average batch time: 162.94 ms
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span>model = resnet50_model.eval().to("cuda")
-traced_model = torch.jit.trace(model, [torch.randn((128, 3, 224, 224)).to("cuda")])
+<span></span><span class="n">model</span> <span class="o">=</span> <span class="n">resnet50_model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">)</span>
+<span class="n">traced_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">128</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">))</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">)])</span>
 </pre>
          </div>
         </div>
@@ -1619,8 +1610,8 @@ traced_model = torch.jit.trace(model, [torch.randn((128, 3, 224, 224)).to("cuda"
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span># This is just an example, and not required for the purposes of this demo
-torch.jit.save(traced_model, "resnet_50_traced.jit.pt")
+<span></span><span class="c1"># This is just an example, and not required for the purposes of this demo</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">traced_model</span><span class="p">,</span> <span class="s2">"resnet_50_traced.jit.pt"</span><span class="p">)</span>
 </pre>
          </div>
         </div>
@@ -1635,8 +1626,8 @@ torch.jit.save(traced_model, "resnet_50_traced.jit.pt")
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span># Obtain the average time taken by a batch of input
-benchmark(traced_model, input_shape=(128, 3, 224, 224), nruns=1000)
+<span></span><span class="c1"># Obtain the average time taken by a batch of input</span>
+<span class="n">benchmark</span><span class="p">(</span><span class="n">traced_model</span><span class="p">,</span> <span class="n">input_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">128</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span> <span class="n">nruns</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
 </pre>
          </div>
         </div>
@@ -1666,13 +1657,9 @@ Average batch time: 162.96 ms
          </div>
         </div>
        </div>
-       <blockquote>
-        <div>
-         <p>
-          ## 4. Compiling with TRTorch
-         </p>
-        </div>
-       </blockquote>
+       <p>
+        ## 4. Compiling with TRTorch
+       </p>
        <p>
         TorchScript modules behave just like normal PyTorch modules and are intercompatible. From TorchScript we can now compile a TensorRT based module. This module will still be implemented in TorchScript but all the computation will be done in TensorRT.
        </p>
@@ -1698,15 +1685,15 @@ Average batch time: 162.96 ms
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span>import trtorch
+<span></span><span class="kn">import</span> <span class="nn">trtorch</span>
 
-# The compiled module will have precision as specified by "op_precision".
-# Here, it will have FP16 precision.
-trt_model_fp32 = trtorch.compile(traced_model, {
-    "input_shapes": [(128, 3, 224, 224)],
-    "op_precision": torch.float32, # Run with FP32
-    "workspace_size": 1 &lt;&lt; 20
-})
+<span class="c1"># The compiled module will have precision as specified by "op_precision".</span>
+<span class="c1"># Here, it will have FP16 precision.</span>
+<span class="n">trt_model_fp32</span> <span class="o">=</span> <span class="n">trtorch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">traced_model</span><span class="p">,</span> <span class="p">{</span>
+    <span class="s2">"input_shapes"</span><span class="p">:</span> <span class="p">[(</span><span class="mi">128</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)],</span>
+    <span class="s2">"op_precision"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">float32</span><span class="p">,</span> <span class="c1"># Run with FP32</span>
+    <span class="s2">"workspace_size"</span><span class="p">:</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">20</span>
+<span class="p">})</span>
 
 
 </pre>
@@ -1723,8 +1710,8 @@ trt_model_fp32 = trtorch.compile(traced_model, {
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span># Obtain the average time taken by a batch of input
-benchmark(trt_model_fp32, input_shape=(128, 3, 224, 224), nruns=1000)
+<span></span><span class="c1"># Obtain the average time taken by a batch of input</span>
+<span class="n">benchmark</span><span class="p">(</span><span class="n">trt_model_fp32</span><span class="p">,</span> <span class="n">input_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">128</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span> <span class="n">nruns</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
 </pre>
          </div>
         </div>
@@ -1770,15 +1757,15 @@ Average batch time: 117.41 ms
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span>import trtorch
+<span></span><span class="kn">import</span> <span class="nn">trtorch</span>
 
-# The compiled module will have precision as specified by "op_precision".
-# Here, it will have FP16 precision.
-trt_model = trtorch.compile(traced_model, {
-    "input_shapes": [(128, 3, 224, 224)],
-    "op_precision": torch.half, # Run with FP16
-    "workspace_size": 1 &lt;&lt; 20
-})
+<span class="c1"># The compiled module will have precision as specified by "op_precision".</span>
+<span class="c1"># Here, it will have FP16 precision.</span>
+<span class="n">trt_model</span> <span class="o">=</span> <span class="n">trtorch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">traced_model</span><span class="p">,</span> <span class="p">{</span>
+    <span class="s2">"input_shapes"</span><span class="p">:</span> <span class="p">[(</span><span class="mi">128</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)],</span>
+    <span class="s2">"op_precision"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">,</span> <span class="c1"># Run with FP16</span>
+    <span class="s2">"workspace_size"</span><span class="p">:</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">20</span>
+<span class="p">})</span>
 
 </pre>
          </div>
@@ -1794,8 +1781,8 @@ trt_model = trtorch.compile(traced_model, {
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span># Obtain the average time taken by a batch of input
-benchmark(trt_model, input_shape=(128, 3, 224, 224), dtype='fp16', nruns=1000)
+<span></span><span class="c1"># Obtain the average time taken by a batch of input</span>
+<span class="n">benchmark</span><span class="p">(</span><span class="n">trt_model</span><span class="p">,</span> <span class="n">input_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">128</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="s1">'fp16'</span><span class="p">,</span> <span class="n">nruns</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
 </pre>
          </div>
         </div>
@@ -1825,13 +1812,9 @@ Average batch time: 54.04 ms
          </div>
         </div>
        </div>
-       <blockquote>
-        <div>
-         <p>
-          ## 5. Conclusion
-         </p>
-        </div>
-       </blockquote>
+       <p>
+        ## 5. Conclusion
+       </p>
        <p>
         In this notebook, we have walked through the complete process of compiling TorchScript models with TRTorch for ResNet-50 model and test the performance impact of the optimization. With TRTorch, we observe a speedup of
         <strong>
@@ -1843,9 +1826,9 @@ Average batch time: 54.04 ms
         </strong>
         with FP16.
        </p>
-       <h3 id="What's-next">
+       <h3 id="What’s-next">
         What’s next
-        <a class="headerlink" href="#What's-next" title="Permalink to this headline">
+        <a class="headerlink" href="#What’s-next" title="Permalink to this headline">
          ¶
         </a>
        </h3>

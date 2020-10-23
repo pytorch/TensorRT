@@ -10,4 +10,4 @@ Function Documentation
 ----------------------
 
 
-.. doxygenfunction:: trtorch::CompileGraph(const torch::jit::Module&, ExtraInfo)
+.. doxygenfunction:: trtorch::CompileGraph(const torch::jit::Module&, CompileSpec)
