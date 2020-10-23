@@ -25,14 +25,12 @@ You can install the python package using
 
 .. code-block:: sh
 
-    # Python 3.5
-    pip3 install  https://github.com/NVIDIA/TRTorch/releases/download/v0.0.3/trtorch-0.0.3-cp35-cp35m-linux_x86_64.whl
     # Python 3.6
-    pip3 install  https://github.com/NVIDIA/TRTorch/releases/download/v0.0.3/trtorch-0.0.3-cp36-cp36m-linux_x86_64.whl
+    pip3 install  https://github.com/NVIDIA/TRTorch/releases/download/v0.1.0/trtorch-0.1.0-cp36-cp36m-linux_x86_64.whl
     # Python 3.7
-    pip3 install  https://github.com/NVIDIA/TRTorch/releases/download/v0.0.3/trtorch-0.0.3-cp37-cp37m-linux_x86_64.whl
+    pip3 install  https://github.com/NVIDIA/TRTorch/releases/download/v0.1.0/trtorch-0.1.0-cp37-cp37m-linux_x86_64.whl
     # Python 3.8
-    pip3 install  https://github.com/NVIDIA/TRTorch/releases/download/v0.0.3/trtorch-0.0.3-cp38-cp38-linux_x86_64.whl
+    pip3 install  https://github.com/NVIDIA/TRTorch/releases/download/v0.1.0/trtorch-0.1.0-cp38-cp38-linux_x86_64.whl
 
 .. _bin-dist:
 

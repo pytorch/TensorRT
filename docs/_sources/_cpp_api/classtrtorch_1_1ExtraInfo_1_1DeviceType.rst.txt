@@ -1,6 +1,6 @@
-.. _exhale_class_classtrtorch_1_1ExtraInfo_1_1DeviceType:
+.. _exhale_class_classtrtorch_1_1CompileSpec_1_1DeviceType:
 
-Class ExtraInfo::DeviceType
+Class CompileSpec::DeviceType
 ===========================
 
 - Defined in :ref:`file_cpp_api_include_trtorch_trtorch.h`
@@ -9,14 +9,14 @@ Class ExtraInfo::DeviceType
 Nested Relationships
 --------------------
 
-This class is a nested type of :ref:`exhale_struct_structtrtorch_1_1ExtraInfo`.
+This class is a nested type of :ref:`exhale_struct_structtrtorch_1_1CompileSpec`.
 
 
 Class Documentation
 -------------------
 
 
-.. doxygenclass:: trtorch::ExtraInfo::DeviceType
+.. doxygenclass:: trtorch::CompileSpec::DeviceType
    :members:
    :protected-members:
    :undoc-members:

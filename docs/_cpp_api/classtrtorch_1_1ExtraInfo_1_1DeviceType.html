@@ -36,7 +36,7 @@
   <script src="../_static/javascripts/modernizr.js">
   </script>
   <title>
-   Class ExtraInfo::DeviceType — TRTorch master documentation
+   Class CompileSpec::DeviceType — TRTorch master documentation
   </title>
   <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/pygments.css" rel="stylesheet" type="text/css"/>
@@ -59,8 +59,6 @@
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
-  <link href="classtrtorch_1_1ptq_1_1Int8CacheCalibrator.html" rel="next" title="Template Class Int8CacheCalibrator"/>
-  <link href="classtrtorch_1_1ExtraInfo_1_1DataType.html" rel="prev" title="Class ExtraInfo::DataType"/>
  </head>
  <body data-md-color-accent="light-green" data-md-color-primary="light-green" dir="ltr">
   <svg class="md-svg">
@@ -98,7 +96,7 @@
         TRTorch
        </span>
        <span class="md-header-nav__topic">
-        Class ExtraInfo::DeviceType
+        Class CompileSpec::DeviceType
        </span>
       </div>
      </div>
@@ -154,6 +152,9 @@
        <a href="https://nvidia.github.io/TRTorch/" title="master">
         master
        </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.1.0/" title="v0.1.0">
+        v0.1.0
+       </a>
        <a href="https://nvidia.github.io/TRTorch/v0.0.3/" title="v0.0.3">
         v0.0.3
        </a>
@@ -175,11 +176,6 @@
       <li class="md-tabs__item">
        <a class="md-tabs__link" href="../index.html">
         TRTorch master documentation
-       </a>
-      </li>
-      <li class="md-tabs__item">
-       <a class="md-tabs__link" href="trtorch_cpp.html">
-        TRTorch C++ API
        </a>
       </li>
      </ul>
@@ -240,6 +236,11 @@
           <li class="md-nav__item">
            <a class="md-nav__link" href="../tutorials/trtorchc.html">
             trtorchc
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/use_from_pytorch.html">
+            Using TRTorch Directly From PyTorch
            </a>
           </li>
           <li class="md-nav__item">
@@ -325,7 +326,7 @@
          <ul class="md-nav__list" data-md-scrollfix="">
           <li class="md-nav__item">
            <a class="md-nav__link" href="#cpp-api-classtrtorch-1-1extrainfo-1-1devicetype--page-root">
-            Class ExtraInfo::DeviceType
+            Class CompileSpec::DeviceType
            </a>
            <nav class="md-nav">
             <ul class="md-nav__list">
@@ -356,10 +357,10 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <span id="exhale-class-classtrtorch-1-1extrainfo-1-1devicetype">
+       <span id="exhale-class-classtrtorch-1-1compilespec-1-1devicetype">
        </span>
        <h1 id="cpp-api-classtrtorch-1-1extrainfo-1-1devicetype--page-root">
-        Class ExtraInfo::DeviceType
+        Class CompileSpec::DeviceType
         <a class="headerlink" href="#cpp-api-classtrtorch-1-1extrainfo-1-1devicetype--page-root" title="Permalink to this headline">
          ¶
         </a>
@@ -384,9 +385,9 @@
        </h2>
        <p>
         This class is a nested type of
-        <a class="reference internal" href="structtrtorch_1_1ExtraInfo.html#exhale-struct-structtrtorch-1-1extrainfo">
+        <a class="reference internal" href="structtrtorch_1_1ExtraInfo.html#exhale-struct-structtrtorch-1-1compilespec">
          <span class="std std-ref">
-          Struct ExtraInfo
+          Struct CompileSpec
          </span>
         </a>
         .
@@ -398,16 +399,16 @@
         </a>
        </h2>
        <dl class="cpp class">
-        <dt id="_CPPv4N7trtorch9ExtraInfo10DeviceTypeE">
-         <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DeviceType">
+        <dt id="_CPPv4N7trtorch11CompileSpec10DeviceTypeE">
+         <span class="target" id="classtrtorch_1_1CompileSpec_1_1DeviceType">
          </span>
          <em class="property">
           class
          </em>
          <code class="sig-prename descclassname">
           trtorch::
-          <a class="reference internal" href="structtrtorch_1_1ExtraInfo.html#_CPPv4N7trtorch9ExtraInfoE" title="trtorch::ExtraInfo">
-           ExtraInfo
+          <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpecE" title="trtorch::CompileSpec">
+           CompileSpec
           </a>
           <code class="sig-prename descclassname">
            ::
@@ -416,9 +417,6 @@
          <code class="sig-name descname">
           DeviceType
          </code>
-         <a class="headerlink" href="#_CPPv4N7trtorch9ExtraInfo10DeviceTypeE" title="Permalink to this definition">
-          ¶
-         </a>
          <br/>
         </dt>
         <dd>
@@ -427,7 +425,7 @@
          </p>
          <p>
           This class is compatable with c10::DeviceTypes (but will check for TRT support) but the only applicable value is at::kCUDA, which maps to
-          <a class="reference internal" href="structtrtorch_1_1ExtraInfo.html#classtrtorch_1_1ExtraInfo_1_1DeviceType_1a3c9473714c76e79ca7d8f02fc38e0bc9a2df1660a7ea56d4721cd8e169f9a1a8c">
+          <a class="reference internal" href="structtrtorch_1_1ExtraInfo.html#classtrtorch_1_1CompileSpec_1_1DeviceType_1aedfe193d27d2328f51aec7c0c3d8b802ae1ee87c402a5e67c5ef90c1037128d3c">
            <span class="std std-ref">
             DeviceType::kGPU
            </span>
@@ -435,7 +433,7 @@
          </p>
          <p>
           To use the
-          <a class="reference internal" href="structtrtorch_1_1ExtraInfo.html#classtrtorch_1_1ExtraInfo_1_1DataType">
+          <a class="reference internal" href="structtrtorch_1_1ExtraInfo.html#classtrtorch_1_1CompileSpec_1_1DataType">
            <span class="std std-ref">
             DataType
            </span>
@@ -444,7 +442,7 @@
          </p>
          <p>
           ex. trtorch::DeviceType type =
-          <a class="reference internal" href="structtrtorch_1_1ExtraInfo.html#classtrtorch_1_1ExtraInfo_1_1DeviceType_1a3c9473714c76e79ca7d8f02fc38e0bc9a2df1660a7ea56d4721cd8e169f9a1a8c">
+          <a class="reference internal" href="structtrtorch_1_1ExtraInfo.html#classtrtorch_1_1CompileSpec_1_1DeviceType_1aedfe193d27d2328f51aec7c0c3d8b802ae1ee87c402a5e67c5ef90c1037128d3c">
            <span class="std std-ref">
             DeviceType::kGPU
            </span>
@@ -456,8 +454,8 @@
            Public Types
           </p>
           <dl class="cpp enum">
-           <dt id="_CPPv4N7trtorch9ExtraInfo10DeviceType5ValueE">
-            <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DeviceType_1a3c9473714c76e79ca7d8f02fc38e0bc9">
+           <dt id="_CPPv4N7trtorch11CompileSpec10DeviceType5ValueE">
+            <span class="target" id="classtrtorch_1_1CompileSpec_1_1DeviceType_1aedfe193d27d2328f51aec7c0c3d8b802">
             </span>
             <em class="property">
              enum
@@ -465,15 +463,12 @@
             <code class="sig-name descname">
              Value
             </code>
-            <a class="headerlink" href="#_CPPv4N7trtorch9ExtraInfo10DeviceType5ValueE" title="Permalink to this definition">
-             ¶
-            </a>
             <br/>
            </dt>
            <dd>
             <p>
              Underlying enum class to support the
-             <a class="reference internal" href="structtrtorch_1_1ExtraInfo.html#classtrtorch_1_1ExtraInfo_1_1DeviceType">
+             <a class="reference internal" href="structtrtorch_1_1ExtraInfo.html#classtrtorch_1_1CompileSpec_1_1DeviceType">
               <span class="std std-ref">
                DeviceType
               </span>
@@ -482,7 +477,7 @@
             </p>
             <p>
              In the case that you need to use the
-             <a class="reference internal" href="structtrtorch_1_1ExtraInfo.html#classtrtorch_1_1ExtraInfo_1_1DeviceType">
+             <a class="reference internal" href="structtrtorch_1_1ExtraInfo.html#classtrtorch_1_1CompileSpec_1_1DeviceType">
               <span class="std std-ref">
                DeviceType
               </span>
@@ -491,7 +486,7 @@
             </p>
             <p>
              ex. trtorch::DeviceType type =
-             <a class="reference internal" href="structtrtorch_1_1ExtraInfo.html#classtrtorch_1_1ExtraInfo_1_1DeviceType_1a3c9473714c76e79ca7d8f02fc38e0bc9a2df1660a7ea56d4721cd8e169f9a1a8c">
+             <a class="reference internal" href="structtrtorch_1_1ExtraInfo.html#classtrtorch_1_1CompileSpec_1_1DeviceType_1aedfe193d27d2328f51aec7c0c3d8b802ae1ee87c402a5e67c5ef90c1037128d3c">
               <span class="std std-ref">
                DeviceType::kGPU
               </span>
@@ -504,8 +499,8 @@
              </em>
             </p>
             <dl class="cpp enumerator">
-             <dt id="_CPPv4N7trtorch9ExtraInfo10DeviceType5Value4kGPUE">
-              <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DeviceType_1a3c9473714c76e79ca7d8f02fc38e0bc9a2df1660a7ea56d4721cd8e169f9a1a8c">
+             <dt id="_CPPv4N7trtorch11CompileSpec10DeviceType5Value4kGPUE">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1DeviceType_1aedfe193d27d2328f51aec7c0c3d8b802ae1ee87c402a5e67c5ef90c1037128d3c">
               </span>
               <em class="property">
                enumerator
@@ -513,9 +508,6 @@
               <code class="sig-name descname">
                kGPU
               </code>
-              <a class="headerlink" href="#_CPPv4N7trtorch9ExtraInfo10DeviceType5Value4kGPUE" title="Permalink to this definition">
-               ¶
-              </a>
               <br/>
              </dt>
              <dd>
@@ -525,8 +517,8 @@
              </dd>
             </dl>
             <dl class="cpp enumerator">
-             <dt id="_CPPv4N7trtorch9ExtraInfo10DeviceType5Value4kDLAE">
-              <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DeviceType_1a3c9473714c76e79ca7d8f02fc38e0bc9a2ee6411cb96ad9a080b6c3f4ac0ab80f">
+             <dt id="_CPPv4N7trtorch11CompileSpec10DeviceType5Value4kDLAE">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1DeviceType_1aedfe193d27d2328f51aec7c0c3d8b802a87160162b928ae94ac2c199cc3e9dc4a">
               </span>
               <em class="property">
                enumerator
@@ -534,9 +526,6 @@
               <code class="sig-name descname">
                kDLA
               </code>
-              <a class="headerlink" href="#_CPPv4N7trtorch9ExtraInfo10DeviceType5Value4kDLAE" title="Permalink to this definition">
-               ¶
-              </a>
               <br/>
              </dt>
              <dd>
@@ -553,8 +542,8 @@
            Public Functions
           </p>
           <dl class="cpp function">
-           <dt id="_CPPv4N7trtorch9ExtraInfo10DeviceType10DeviceTypeEv">
-            <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DeviceType_1ad6c691ad7e3daa4a88630a66fa9afdda">
+           <dt id="_CPPv4N7trtorch11CompileSpec10DeviceType10DeviceTypeEv">
+            <span class="target" id="classtrtorch_1_1CompileSpec_1_1DeviceType_1a24b94d4158b7cf6fc806c42ddb3fc009">
             </span>
             <code class="sig-name descname">
              DeviceType
@@ -566,9 +555,6 @@
              )
             </span>
             = default
-            <a class="headerlink" href="#_CPPv4N7trtorch9ExtraInfo10DeviceType10DeviceTypeEv" title="Permalink to this definition">
-             ¶
-            </a>
             <br/>
            </dt>
            <dd>
@@ -578,8 +564,8 @@
            </dd>
           </dl>
           <dl class="cpp function">
-           <dt id="_CPPv4N7trtorch9ExtraInfo10DeviceType10DeviceTypeE5Value">
-            <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DeviceType_1ab93fce6bbcddb003e94caabb223bcf8d">
+           <dt id="_CPPv4N7trtorch11CompileSpec10DeviceType10DeviceTypeE5Value">
+            <span class="target" id="classtrtorch_1_1CompileSpec_1_1DeviceType_1a4fa7c905bf921fbd9352d7e0c5cf573d">
             </span>
             <em class="property">
              constexpr
@@ -590,7 +576,7 @@
             <span class="sig-paren">
              (
             </span>
-            <a class="reference internal" href="#_CPPv4N7trtorch9ExtraInfo10DeviceType5ValueE" title="trtorch::ExtraInfo::DeviceType::Value">
+            <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1DeviceType.html#_CPPv4N7trtorch11CompileSpec10DeviceType5ValueE" title="trtorch::CompileSpec::DeviceType::Value">
              Value
             </a>
             <em>
@@ -599,9 +585,6 @@
             <span class="sig-paren">
              )
             </span>
-            <a class="headerlink" href="#_CPPv4N7trtorch9ExtraInfo10DeviceType10DeviceTypeE5Value" title="Permalink to this definition">
-             ¶
-            </a>
             <br/>
            </dt>
            <dd>
@@ -611,8 +594,8 @@
            </dd>
           </dl>
           <dl class="cpp function">
-           <dt id="_CPPv4N7trtorch9ExtraInfo10DeviceType10DeviceTypeEN3c1010DeviceTypeE">
-            <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DeviceType_1aede9e2bc5d5c7a0e62d9b898a936416d">
+           <dt id="_CPPv4N7trtorch11CompileSpec10DeviceType10DeviceTypeEN3c1010DeviceTypeE">
+            <span class="target" id="classtrtorch_1_1CompileSpec_1_1DeviceType_1ab7888db6638238dfc11f1bda1f80ac26">
             </span>
             <code class="sig-name descname">
              DeviceType
@@ -627,9 +610,6 @@
             <span class="sig-paren">
              )
             </span>
-            <a class="headerlink" href="#_CPPv4N7trtorch9ExtraInfo10DeviceType10DeviceTypeEN3c1010DeviceTypeE" title="Permalink to this definition">
-             ¶
-            </a>
             <br/>
            </dt>
            <dd>
@@ -662,8 +642,8 @@
            </dd>
           </dl>
           <dl class="cpp function">
-           <dt id="_CPPv4NK7trtorch9ExtraInfo10DeviceTypecv5ValueEv">
-            <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DeviceType_1a9ea8f47c285eae863b3b040d873824d2">
+           <dt id="_CPPv4NK7trtorch11CompileSpec10DeviceTypecv5ValueEv">
+            <span class="target" id="classtrtorch_1_1CompileSpec_1_1DeviceType_1ad183ab0031845e5b43217ad57a2ead67">
             </span>
             <code class="sig-name descname">
              operator Value
@@ -677,9 +657,6 @@
             <em class="property">
              const
             </em>
-            <a class="headerlink" href="#_CPPv4NK7trtorch9ExtraInfo10DeviceTypecv5ValueEv" title="Permalink to this definition">
-             ¶
-            </a>
             <br/>
            </dt>
            <dd>
@@ -703,8 +680,8 @@
            </dd>
           </dl>
           <dl class="cpp function">
-           <dt id="_CPPv4N7trtorch9ExtraInfo10DeviceTypecvbEv">
-            <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DeviceType_1adfd0e60fedcb1bee2200687a2a0d3bc2">
+           <dt id="_CPPv4N7trtorch11CompileSpec10DeviceTypecvbEv">
+            <span class="target" id="classtrtorch_1_1CompileSpec_1_1DeviceType_1a6e21058556ed1f7fc244014fdee06262">
             </span>
             <code class="sig-name descname">
              operator bool
@@ -716,17 +693,14 @@
              )
             </span>
             = delete
-            <a class="headerlink" href="#_CPPv4N7trtorch9ExtraInfo10DeviceTypecvbEv" title="Permalink to this definition">
-             ¶
-            </a>
             <br/>
            </dt>
            <dd>
            </dd>
           </dl>
           <dl class="cpp function">
-           <dt id="_CPPv4NK7trtorch9ExtraInfo10DeviceTypeeqE10DeviceType">
-            <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DeviceType_1ac93424fcc161c67ebe273dc193bd15e2">
+           <dt id="_CPPv4NK7trtorch11CompileSpec10DeviceTypeeqE10DeviceType">
+            <span class="target" id="classtrtorch_1_1CompileSpec_1_1DeviceType_1a61ad607442b62074d5f2ec0df820ec61">
             </span>
             <em class="property">
              constexpr
@@ -738,7 +712,7 @@
             <span class="sig-paren">
              (
             </span>
-            <a class="reference internal" href="#_CPPv4N7trtorch9ExtraInfo10DeviceTypeE" title="trtorch::ExtraInfo::DeviceType">
+            <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1DeviceType.html#_CPPv4N7trtorch11CompileSpec10DeviceTypeE" title="trtorch::CompileSpec::DeviceType">
              DeviceType
             </a>
             <em>
@@ -750,15 +724,12 @@
             <em class="property">
              const
             </em>
-            <a class="headerlink" href="#_CPPv4NK7trtorch9ExtraInfo10DeviceTypeeqE10DeviceType" title="Permalink to this definition">
-             ¶
-            </a>
             <br/>
            </dt>
            <dd>
             <p>
              Comparison operator for
-             <a class="reference internal" href="structtrtorch_1_1ExtraInfo.html#classtrtorch_1_1ExtraInfo_1_1DeviceType">
+             <a class="reference internal" href="structtrtorch_1_1ExtraInfo.html#classtrtorch_1_1CompileSpec_1_1DeviceType">
               <span class="std std-ref">
                DeviceType
               </span>
@@ -811,8 +782,8 @@
            </dd>
           </dl>
           <dl class="cpp function">
-           <dt id="_CPPv4NK7trtorch9ExtraInfo10DeviceTypeneE10DeviceType">
-            <span class="target" id="classtrtorch_1_1ExtraInfo_1_1DeviceType_1a3c96b55a60e6c57c8609983e92cc708a">
+           <dt id="_CPPv4NK7trtorch11CompileSpec10DeviceTypeneE10DeviceType">
+            <span class="target" id="classtrtorch_1_1CompileSpec_1_1DeviceType_1a2ec9bfbd78938fc398316fec82b2f212">
             </span>
             <em class="property">
              constexpr
@@ -824,7 +795,7 @@
             <span class="sig-paren">
              (
             </span>
-            <a class="reference internal" href="#_CPPv4N7trtorch9ExtraInfo10DeviceTypeE" title="trtorch::ExtraInfo::DeviceType">
+            <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1DeviceType.html#_CPPv4N7trtorch11CompileSpec10DeviceTypeE" title="trtorch::CompileSpec::DeviceType">
              DeviceType
             </a>
             <em>
@@ -836,15 +807,12 @@
             <em class="property">
              const
             </em>
-            <a class="headerlink" href="#_CPPv4NK7trtorch9ExtraInfo10DeviceTypeneE10DeviceType" title="Permalink to this definition">
-             ¶
-            </a>
             <br/>
            </dt>
            <dd>
             <p>
              Comparison operator for
-             <a class="reference internal" href="structtrtorch_1_1ExtraInfo.html#classtrtorch_1_1ExtraInfo_1_1DeviceType">
+             <a class="reference internal" href="structtrtorch_1_1ExtraInfo.html#classtrtorch_1_1CompileSpec_1_1DeviceType">
               <span class="std std-ref">
                DeviceType
               </span>
@@ -907,34 +875,6 @@
   <footer class="md-footer">
    <div class="md-footer-nav">
     <nav class="md-footer-nav__inner md-grid">
-     <a class="md-flex md-footer-nav__link md-footer-nav__link--prev" href="classtrtorch_1_1ExtraInfo_1_1DataType.html" rel="prev" title="Class ExtraInfo::DataType">
-      <div class="md-flex__cell md-flex__cell--shrink">
-       <i class="md-icon md-icon--arrow-back md-footer-nav__button">
-       </i>
-      </div>
-      <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
-       <span class="md-flex__ellipsis">
-        <span class="md-footer-nav__direction">
-         Previous
-        </span>
-        Class ExtraInfo::DataType
-       </span>
-      </div>
-     </a>
-     <a class="md-flex md-footer-nav__link md-footer-nav__link--next" href="classtrtorch_1_1ptq_1_1Int8CacheCalibrator.html" rel="next" title="Template Class Int8CacheCalibrator">
-      <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
-       <span class="md-flex__ellipsis">
-        <span class="md-footer-nav__direction">
-         Next
-        </span>
-        Template Class Int8CacheCalibrator
-       </span>
-      </div>
-      <div class="md-flex__cell md-flex__cell--shrink">
-       <i class="md-icon md-icon--arrow-forward md-footer-nav__button">
-       </i>
-      </div>
-     </a>
     </nav>
    </div>
    <div class="md-footer-meta md-typeset">

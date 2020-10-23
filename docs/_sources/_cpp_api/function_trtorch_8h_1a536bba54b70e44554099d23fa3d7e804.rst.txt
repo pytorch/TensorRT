@@ -10,4 +10,4 @@ Function Documentation
 ----------------------
 
 
-.. doxygenfunction:: trtorch::ConvertGraphToTRTEngine(const torch::jit::Module&, std::string, ExtraInfo)
+.. doxygenfunction:: trtorch::ConvertGraphToTRTEngine(const torch::jit::Module&, std::string, CompileSpec)
