@@ -760,26 +760,26 @@ div.rendered_html tbody tr:hover {
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span><span class="c1"># Copyright 2020 NVIDIA Corporation. All Rights Reserved.</span>
-<span class="c1">#</span>
-<span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
-<span class="c1"># you may not use this file except in compliance with the License.</span>
-<span class="c1"># You may obtain a copy of the License at</span>
-<span class="c1">#</span>
-<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
-<span class="c1">#</span>
-<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
-<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
-<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
-<span class="c1"># See the License for the specific language governing permissions and</span>
-<span class="c1"># limitations under the License.</span>
-<span class="c1"># ==============================================================================</span>
+<span></span># Copyright 2020 NVIDIA Corporation. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
 </pre>
          </div>
         </div>
        </div>
        <p>
-        <img alt="4df93142a44b4347a0f35e00a63a78af" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
+        <img alt="ef0c7de4f1a34f1b951ddb695a4fee67" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
        </p>
        <h1 id="notebooks-ssd-object-detection-demo--page-root">
         Object Detection with TRTorch (SSD)
@@ -877,9 +877,13 @@ div.rendered_html tbody tr:hover {
         </li>
        </ol>
        <hr class="docutils"/>
-       <p>
-        ## 1. Requirements
-       </p>
+       <blockquote>
+        <div>
+         <p>
+          ## 1. Requirements
+         </p>
+        </div>
+       </blockquote>
        <p>
         Follow the steps in
         <code class="docutils literal notranslate">
@@ -902,18 +906,22 @@ div.rendered_html tbody tr:hover {
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span><span class="o">%%capture</span>
-<span class="o">%%</span><span class="n">bash</span>
-<span class="c1"># Known working versions</span>
-<span class="n">pip</span> <span class="n">install</span> <span class="n">numpy</span><span class="o">==</span><span class="mf">1.19</span> <span class="n">scipy</span><span class="o">==</span><span class="mf">1.5</span><span class="o">.</span><span class="mi">2</span> <span class="n">Pillow</span><span class="o">==</span><span class="mf">6.2</span><span class="o">.</span><span class="mi">0</span> <span class="n">scikit</span><span class="o">-</span><span class="n">image</span><span class="o">==</span><span class="mf">0.17</span><span class="o">.</span><span class="mi">2</span> <span class="n">matplotlib</span><span class="o">==</span><span class="mf">3.3</span><span class="o">.</span><span class="mi">0</span>
+<span></span>%%capture
+%%bash
+# Known working versions
+pip install numpy==1.19 scipy==1.5.2 Pillow==6.2.0 scikit-image==0.17.2 matplotlib==3.3.0
 </pre>
          </div>
         </div>
        </div>
        <hr class="docutils"/>
-       <p>
-        ## 2. SSD
-       </p>
+       <blockquote>
+        <div>
+         <p>
+          ## 2. SSD
+         </p>
+        </div>
+       </blockquote>
        <h3 id="Single-Shot-MultiBox-Detector-model-for-object-detection">
         Single Shot MultiBox Detector model for object detection
         <a class="headerlink" href="#Single-Shot-MultiBox-Detector-model-for-object-detection" title="Permalink to this headline">
@@ -922,8 +930,8 @@ div.rendered_html tbody tr:hover {
        </h3>
        <table>
         <colgroup>
-         <col style="width: 38%"/>
-         <col style="width: 62%"/>
+         <col style="width: 50%"/>
+         <col style="width: 50%"/>
         </colgroup>
         <thead>
          <tr class="row-odd">
@@ -943,12 +951,12 @@ div.rendered_html tbody tr:hover {
          <tr class="row-even">
           <td>
            <p>
-            <img alt="alt" src="https://pytorch.org/assets/images/ssd_diagram.png"/>
+            <img alt="alt" src="https://pytorch.org/assets/images/ssd.png"/>
            </p>
           </td>
           <td>
            <p>
-            <img alt="image1" src="https://pytorch.org/assets/images/ssd.png"/>
+            <img alt="alt" src="https://pytorch.org/assets/images/ssd.png"/>
            </p>
           </td>
          </tr>
@@ -1007,10 +1015,10 @@ div.rendered_html tbody tr:hover {
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span></span>import torch
 
-<span class="c1"># List of available models in PyTorch Hub from Nvidia/DeepLearningExamples</span>
-<span class="n">torch</span><span class="o">.</span><span class="n">hub</span><span class="o">.</span><span class="n">list</span><span class="p">(</span><span class="s1">'NVIDIA/DeepLearningExamples:torchhub'</span><span class="p">)</span>
+# List of available models in PyTorch Hub from Nvidia/DeepLearningExamples
+torch.hub.list('NVIDIA/DeepLearningExamples:torchhub')
 </pre>
          </div>
         </div>
@@ -1057,9 +1065,9 @@ Using cache found in /root/.cache/torch/hub/NVIDIA_DeepLearningExamples_torchhub
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span><span class="c1"># load SSD model pretrained on COCO from Torch Hub</span>
-<span class="n">precision</span> <span class="o">=</span> <span class="s1">'fp32'</span>
-<span class="n">ssd300</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">hub</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">'NVIDIA/DeepLearningExamples:torchhub'</span><span class="p">,</span> <span class="s1">'nvidia_ssd'</span><span class="p">,</span> <span class="n">model_math</span><span class="o">=</span><span class="n">precision</span><span class="p">);</span>
+<span></span># load SSD model pretrained on COCO from Torch Hub
+precision = 'fp32'
+ssd300 = torch.hub.load('NVIDIA/DeepLearningExamples:torchhub', 'nvidia_ssd', model_math=precision);
 </pre>
          </div>
         </div>
@@ -1103,23 +1111,23 @@ Using cache found in /root/.cache/torch/hub/NVIDIA_DeepLearningExamples_torchhub
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span><span class="c1"># Sample images from the COCO validation set</span>
-<span class="n">uris</span> <span class="o">=</span> <span class="p">[</span>
-    <span class="s1">'http://images.cocodataset.org/val2017/000000397133.jpg'</span><span class="p">,</span>
-    <span class="s1">'http://images.cocodataset.org/val2017/000000037777.jpg'</span><span class="p">,</span>
-    <span class="s1">'http://images.cocodataset.org/val2017/000000252219.jpg'</span>
-<span class="p">]</span>
+<span></span># Sample images from the COCO validation set
+uris = [
+    'http://images.cocodataset.org/val2017/000000397133.jpg',
+    'http://images.cocodataset.org/val2017/000000037777.jpg',
+    'http://images.cocodataset.org/val2017/000000252219.jpg'
+]
 
-<span class="c1"># For convenient and comprehensive formatting of input and output of the model, load a set of utility methods.</span>
-<span class="n">utils</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">hub</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">'NVIDIA/DeepLearningExamples:torchhub'</span><span class="p">,</span> <span class="s1">'nvidia_ssd_processing_utils'</span><span class="p">)</span>
+# For convenient and comprehensive formatting of input and output of the model, load a set of utility methods.
+utils = torch.hub.load('NVIDIA/DeepLearningExamples:torchhub', 'nvidia_ssd_processing_utils')
 
-<span class="c1"># Format images to comply with the network input</span>
-<span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">utils</span><span class="o">.</span><span class="n">prepare_input</span><span class="p">(</span><span class="n">uri</span><span class="p">)</span> <span class="k">for</span> <span class="n">uri</span> <span class="ow">in</span> <span class="n">uris</span><span class="p">]</span>
-<span class="n">tensor</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">prepare_tensor</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+# Format images to comply with the network input
+inputs = [utils.prepare_input(uri) for uri in uris]
+tensor = utils.prepare_tensor(inputs, False)
 
-<span class="c1"># The model was trained on COCO dataset, which we need to access in order to</span>
-<span class="c1"># translate class IDs into object names.</span>
-<span class="n">classes_to_labels</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">get_coco_object_dictionary</span><span class="p">()</span>
+# The model was trained on COCO dataset, which we need to access in order to
+# translate class IDs into object names.
+classes_to_labels = utils.get_coco_object_dictionary()
 </pre>
          </div>
         </div>
@@ -1157,15 +1165,15 @@ Downloading finished.
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span><span class="c1"># Next, we run object detection</span>
-<span class="n">model</span> <span class="o">=</span> <span class="n">ssd300</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">)</span>
-<span class="n">detections_batch</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">tensor</span><span class="p">)</span>
+<span></span># Next, we run object detection
+model = ssd300.eval().to("cuda")
+detections_batch = model(tensor)
 
-<span class="c1"># By default, raw output from SSD network per input image contains 8732 boxes with</span>
-<span class="c1"># localization and class probability distribution.</span>
-<span class="c1"># Let’s filter this output to only get reasonable detections (confidence&gt;40%) in a more comprehensive format.</span>
-<span class="n">results_per_input</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">decode_results</span><span class="p">(</span><span class="n">detections_batch</span><span class="p">)</span>
-<span class="n">best_results_per_input</span> <span class="o">=</span> <span class="p">[</span><span class="n">utils</span><span class="o">.</span><span class="n">pick_best</span><span class="p">(</span><span class="n">results</span><span class="p">,</span> <span class="mf">0.40</span><span class="p">)</span> <span class="k">for</span> <span class="n">results</span> <span class="ow">in</span> <span class="n">results_per_input</span><span class="p">]</span>
+# By default, raw output from SSD network per input image contains 8732 boxes with
+# localization and class probability distribution.
+# Let’s filter this output to only get reasonable detections (confidence&gt;40%) in a more comprehensive format.
+results_per_input = utils.decode_results(detections_batch)
+best_results_per_input = [utils.pick_best(results, 0.40) for results in results_per_input]
 </pre>
          </div>
         </div>
@@ -1186,25 +1194,25 @@ Downloading finished.
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span><span class="kn">from</span> <span class="nn">matplotlib</span> <span class="kn">import</span> <span class="n">pyplot</span> <span class="k">as</span> <span class="n">plt</span>
-<span class="kn">import</span> <span class="nn">matplotlib.patches</span> <span class="k">as</span> <span class="nn">patches</span>
+<span></span>from matplotlib import pyplot as plt
+import matplotlib.patches as patches
 
-<span class="c1"># The utility plots the images and predicted bounding boxes (with confidence scores).</span>
-<span class="k">def</span> <span class="nf">plot_results</span><span class="p">(</span><span class="n">best_results</span><span class="p">):</span>
-    <span class="k">for</span> <span class="n">image_idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">best_results</span><span class="p">)):</span>
-        <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
-        <span class="c1"># Show original, denormalized image...</span>
-        <span class="n">image</span> <span class="o">=</span> <span class="n">inputs</span><span class="p">[</span><span class="n">image_idx</span><span class="p">]</span> <span class="o">/</span> <span class="mi">2</span> <span class="o">+</span> <span class="mf">0.5</span>
-        <span class="n">ax</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">image</span><span class="p">)</span>
-        <span class="c1"># ...with detections</span>
-        <span class="n">bboxes</span><span class="p">,</span> <span class="n">classes</span><span class="p">,</span> <span class="n">confidences</span> <span class="o">=</span> <span class="n">best_results</span><span class="p">[</span><span class="n">image_idx</span><span class="p">]</span>
-        <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">bboxes</span><span class="p">)):</span>
-            <span class="n">left</span><span class="p">,</span> <span class="n">bot</span><span class="p">,</span> <span class="n">right</span><span class="p">,</span> <span class="n">top</span> <span class="o">=</span> <span class="n">bboxes</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
-            <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">h</span> <span class="o">=</span> <span class="p">[</span><span class="n">val</span> <span class="o">*</span> <span class="mi">300</span> <span class="k">for</span> <span class="n">val</span> <span class="ow">in</span> <span class="p">[</span><span class="n">left</span><span class="p">,</span> <span class="n">bot</span><span class="p">,</span> <span class="n">right</span> <span class="o">-</span> <span class="n">left</span><span class="p">,</span> <span class="n">top</span> <span class="o">-</span> <span class="n">bot</span><span class="p">]]</span>
-            <span class="n">rect</span> <span class="o">=</span> <span class="n">patches</span><span class="o">.</span><span class="n">Rectangle</span><span class="p">((</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">),</span> <span class="n">w</span><span class="p">,</span> <span class="n">h</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">edgecolor</span><span class="o">=</span><span class="s1">'r'</span><span class="p">,</span> <span class="n">facecolor</span><span class="o">=</span><span class="s1">'none'</span><span class="p">)</span>
-            <span class="n">ax</span><span class="o">.</span><span class="n">add_patch</span><span class="p">(</span><span class="n">rect</span><span class="p">)</span>
-            <span class="n">ax</span><span class="o">.</span><span class="n">text</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="s2">"</span><span class="si">{}</span><span class="s2"> </span><span class="si">{:.0f}</span><span class="s2">%"</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">classes_to_labels</span><span class="p">[</span><span class="n">classes</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span><span class="p">],</span> <span class="n">confidences</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="o">*</span><span class="mi">100</span><span class="p">),</span> <span class="n">bbox</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">facecolor</span><span class="o">=</span><span class="s1">'white'</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">))</span>
-    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+# The utility plots the images and predicted bounding boxes (with confidence scores).
+def plot_results(best_results):
+    for image_idx in range(len(best_results)):
+        fig, ax = plt.subplots(1)
+        # Show original, denormalized image...
+        image = inputs[image_idx] / 2 + 0.5
+        ax.imshow(image)
+        # ...with detections
+        bboxes, classes, confidences = best_results[image_idx]
+        for idx in range(len(bboxes)):
+            left, bot, right, top = bboxes[idx]
+            x, y, w, h = [val * 300 for val in [left, bot, right - left, top - bot]]
+            rect = patches.Rectangle((x, y), w, h, linewidth=1, edgecolor='r', facecolor='none')
+            ax.add_patch(rect)
+            ax.text(x, y, "{} {:.0f}%".format(classes_to_labels[classes[idx] - 1], confidences[idx]*100), bbox=dict(facecolor='white', alpha=0.5))
+    plt.show()
 
 </pre>
          </div>
@@ -1220,8 +1228,8 @@ Downloading finished.
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span><span class="c1"># Visualize results without TRTorch/TensorRT</span>
-<span class="n">plot_results</span><span class="p">(</span><span class="n">best_results_per_input</span><span class="p">)</span>
+<span></span># Visualize results without TRTorch/TensorRT
+plot_results(best_results_per_input)
 </pre>
          </div>
         </div>
@@ -1263,40 +1271,40 @@ Downloading finished.
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span><span class="kn">import</span> <span class="nn">time</span>
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span></span>import time
+import numpy as np
 
-<span class="kn">import</span> <span class="nn">torch.backends.cudnn</span> <span class="k">as</span> <span class="nn">cudnn</span>
-<span class="n">cudnn</span><span class="o">.</span><span class="n">benchmark</span> <span class="o">=</span> <span class="kc">True</span>
+import torch.backends.cudnn as cudnn
+cudnn.benchmark = True
 
-<span class="c1"># Helper function to benchmark the model</span>
-<span class="k">def</span> <span class="nf">benchmark</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">input_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1024</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="s1">'fp32'</span><span class="p">,</span> <span class="n">nwarmup</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">nruns</span><span class="o">=</span><span class="mi">1000</span><span class="p">):</span>
-    <span class="n">input_data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">input_shape</span><span class="p">)</span>
-    <span class="n">input_data</span> <span class="o">=</span> <span class="n">input_data</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">dtype</span><span class="o">==</span><span class="s1">'fp16'</span><span class="p">:</span>
-        <span class="n">input_data</span> <span class="o">=</span> <span class="n">input_data</span><span class="o">.</span><span class="n">half</span><span class="p">()</span>
+# Helper function to benchmark the model
+def benchmark(model, input_shape=(1024, 1, 32, 32), dtype='fp32', nwarmup=50, nruns=1000):
+    input_data = torch.randn(input_shape)
+    input_data = input_data.to("cuda")
+    if dtype=='fp16':
+        input_data = input_data.half()
 
-    <span class="nb">print</span><span class="p">(</span><span class="s2">"Warm up ..."</span><span class="p">)</span>
-    <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
-        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">nwarmup</span><span class="p">):</span>
-            <span class="n">features</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">input_data</span><span class="p">)</span>
-    <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">synchronize</span><span class="p">()</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">"Start timing ..."</span><span class="p">)</span>
-    <span class="n">timings</span> <span class="o">=</span> <span class="p">[]</span>
-    <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
-        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">nruns</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
-            <span class="n">start_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
-            <span class="n">pred_loc</span><span class="p">,</span> <span class="n">pred_label</span>  <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">input_data</span><span class="p">)</span>
-            <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">synchronize</span><span class="p">()</span>
-            <span class="n">end_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
-            <span class="n">timings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">end_time</span> <span class="o">-</span> <span class="n">start_time</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">i</span><span class="o">%</span><span class="k">100</span>==0:
-                <span class="nb">print</span><span class="p">(</span><span class="s1">'Iteration </span><span class="si">%d</span><span class="s1">/</span><span class="si">%d</span><span class="s1">, avg batch time </span><span class="si">%.2f</span><span class="s1"> ms'</span><span class="o">%</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">nruns</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">timings</span><span class="p">)</span><span class="o">*</span><span class="mi">1000</span><span class="p">))</span>
+    print("Warm up ...")
+    with torch.no_grad():
+        for _ in range(nwarmup):
+            features = model(input_data)
+    torch.cuda.synchronize()
+    print("Start timing ...")
+    timings = []
+    with torch.no_grad():
+        for i in range(1, nruns+1):
+            start_time = time.time()
+            pred_loc, pred_label  = model(input_data)
+            torch.cuda.synchronize()
+            end_time = time.time()
+            timings.append(end_time - start_time)
+            if i%100==0:
+                print('Iteration %d/%d, avg batch time %.2f ms'%(i, nruns, np.mean(timings)*1000))
 
-    <span class="nb">print</span><span class="p">(</span><span class="s2">"Input shape:"</span><span class="p">,</span> <span class="n">input_data</span><span class="o">.</span><span class="n">size</span><span class="p">())</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">"Output location prediction size:"</span><span class="p">,</span> <span class="n">pred_loc</span><span class="o">.</span><span class="n">size</span><span class="p">())</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">"Output label prediction size:"</span><span class="p">,</span> <span class="n">pred_label</span><span class="o">.</span><span class="n">size</span><span class="p">())</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s1">'Average batch time: </span><span class="si">%.2f</span><span class="s1"> ms'</span><span class="o">%</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">timings</span><span class="p">)</span><span class="o">*</span><span class="mi">1000</span><span class="p">))</span>
+    print("Input shape:", input_data.size())
+    print("Output location prediction size:", pred_loc.size())
+    print("Output label prediction size:", pred_label.size())
+    print('Average batch time: %.2f ms'%(np.mean(timings)*1000))
 
 </pre>
          </div>
@@ -1319,9 +1327,9 @@ Downloading finished.
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span><span class="c1"># Model benchmark without TRTorch/TensorRT</span>
-<span class="n">model</span> <span class="o">=</span> <span class="n">ssd300</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">)</span>
-<span class="n">benchmark</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">input_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">128</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">300</span><span class="p">),</span> <span class="n">nruns</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+<span></span># Model benchmark without TRTorch/TensorRT
+model = ssd300.eval().to("cuda")
+benchmark(model, input_shape=(128, 3, 300, 300), nruns=1000)
 </pre>
          </div>
         </div>
@@ -1353,9 +1361,13 @@ Average batch time: 362.99 ms
         </div>
        </div>
        <hr class="docutils"/>
-       <p>
-        ## 3. Creating TorchScript modules
-       </p>
+       <blockquote>
+        <div>
+         <p>
+          ## 3. Creating TorchScript modules
+         </p>
+        </div>
+       </blockquote>
        <p>
         To compile with TRTorch, the model must first be in
         <strong>
@@ -1385,8 +1397,8 @@ sees. - Scripting does an analysis of the Python code and generates TorchScript,
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span><span class="n">model</span> <span class="o">=</span> <span class="n">ssd300</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">)</span>
-<span class="n">traced_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">300</span><span class="p">,</span><span class="mi">300</span><span class="p">))</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">)])</span>
+<span></span>model = ssd300.eval().to("cuda")
+traced_model = torch.jit.trace(model, [torch.randn((1,3,300,300)).to("cuda")])
 </pre>
          </div>
         </div>
@@ -1404,8 +1416,8 @@ sees. - Scripting does an analysis of the Python code and generates TorchScript,
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span><span class="c1"># This is just an example, and not required for the purposes of this demo</span>
-<span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">traced_model</span><span class="p">,</span> <span class="s2">"ssd_300_traced.jit.pt"</span><span class="p">)</span>
+<span></span># This is just an example, and not required for the purposes of this demo
+torch.jit.save(traced_model, "ssd_300_traced.jit.pt")
 </pre>
          </div>
         </div>
@@ -1420,8 +1432,8 @@ sees. - Scripting does an analysis of the Python code and generates TorchScript,
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span><span class="c1"># Obtain the average time taken by a batch of input with Torchscript compiled modules</span>
-<span class="n">benchmark</span><span class="p">(</span><span class="n">traced_model</span><span class="p">,</span> <span class="n">input_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">128</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">300</span><span class="p">),</span> <span class="n">nruns</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+<span></span># Obtain the average time taken by a batch of input with Torchscript compiled modules
+benchmark(traced_model, input_shape=(128, 3, 300, 300), nruns=1000)
 </pre>
          </div>
         </div>
@@ -1453,9 +1465,13 @@ Average batch time: 363.08 ms
         </div>
        </div>
        <hr class="docutils"/>
-       <p>
-        ## 4. Compiling with TRTorch TorchScript modules behave just like normal PyTorch modules and are intercompatible. From TorchScript we can now compile a TensorRT based module. This module will still be implemented in TorchScript but all the computation will be done in TensorRT.
-       </p>
+       <blockquote>
+        <div>
+         <p>
+          ## 4. Compiling with TRTorch TorchScript modules behave just like normal PyTorch modules and are intercompatible. From TorchScript we can now compile a TensorRT based module. This module will still be implemented in TorchScript but all the computation will be done in TensorRT.
+         </p>
+        </div>
+       </blockquote>
        <div class="nbinput nblast docutils container">
         <div class="prompt highlight-none notranslate">
          <div class="highlight">
@@ -1466,23 +1482,27 @@ Average batch time: 363.08 ms
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span><span class="kn">import</span> <span class="nn">trtorch</span>
+<span></span>import trtorch
 
-<span class="c1"># The compiled module will have precision as specified by "op_precision".</span>
-<span class="c1"># Here, it will have FP16 precision.</span>
-<span class="n">trt_model</span> <span class="o">=</span> <span class="n">trtorch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">traced_model</span><span class="p">,</span> <span class="p">{</span>
-    <span class="s2">"input_shapes"</span><span class="p">:</span> <span class="p">[(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">300</span><span class="p">)],</span>
-    <span class="s2">"op_precision"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">,</span> <span class="c1"># Run with FP16</span>
-    <span class="s2">"workspace_size"</span><span class="p">:</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">20</span>
-<span class="p">})</span>
+# The compiled module will have precision as specified by "op_precision".
+# Here, it will have FP16 precision.
+trt_model = trtorch.compile(traced_model, {
+    "input_shapes": [(3, 3, 300, 300)],
+    "op_precision": torch.half, # Run with FP16
+    "workspace_size": 1 &lt;&lt; 20
+})
 </pre>
          </div>
         </div>
        </div>
        <hr class="docutils"/>
-       <p>
-        ## 5. Running Inference
-       </p>
+       <blockquote>
+        <div>
+         <p>
+          ## 5. Running Inference
+         </p>
+        </div>
+       </blockquote>
        <p>
         Next, we run object detection
        </p>
@@ -1496,14 +1516,14 @@ Average batch time: 363.08 ms
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span><span class="c1"># using a TRTorch module is exactly the same as how we usually do inference in PyTorch i.e. model(inputs)</span>
-<span class="n">detections_batch</span> <span class="o">=</span> <span class="n">trt_model</span><span class="p">(</span><span class="n">tensor</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">))</span> <span class="c1"># convert the input to half precision</span>
+<span></span># using a TRTorch module is exactly the same as how we usually do inference in PyTorch i.e. model(inputs)
+detections_batch = trt_model(tensor.to(torch.half)) # convert the input to half precision
 
-<span class="c1"># By default, raw output from SSD network per input image contains 8732 boxes with</span>
-<span class="c1"># localization and class probability distribution.</span>
-<span class="c1"># Let’s filter this output to only get reasonable detections (confidence&gt;40%) in a more comprehensive format.</span>
-<span class="n">results_per_input</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">decode_results</span><span class="p">(</span><span class="n">detections_batch</span><span class="p">)</span>
-<span class="n">best_results_per_input_trt</span> <span class="o">=</span> <span class="p">[</span><span class="n">utils</span><span class="o">.</span><span class="n">pick_best</span><span class="p">(</span><span class="n">results</span><span class="p">,</span> <span class="mf">0.40</span><span class="p">)</span> <span class="k">for</span> <span class="n">results</span> <span class="ow">in</span> <span class="n">results_per_input</span><span class="p">]</span>
+# By default, raw output from SSD network per input image contains 8732 boxes with
+# localization and class probability distribution.
+# Let’s filter this output to only get reasonable detections (confidence&gt;40%) in a more comprehensive format.
+results_per_input = utils.decode_results(detections_batch)
+best_results_per_input_trt = [utils.pick_best(results, 0.40) for results in results_per_input]
 </pre>
          </div>
         </div>
@@ -1521,8 +1541,8 @@ Average batch time: 363.08 ms
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span><span class="c1"># Visualize results with TRTorch/TensorRT</span>
-<span class="n">plot_results</span><span class="p">(</span><span class="n">best_results_per_input_trt</span><span class="p">)</span>
+<span></span># Visualize results with TRTorch/TensorRT
+plot_results(best_results_per_input_trt)
 </pre>
          </div>
         </div>
@@ -1571,16 +1591,16 @@ Average batch time: 363.08 ms
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span><span class="n">batch_size</span> <span class="o">=</span> <span class="mi">128</span>
+<span></span>batch_size = 128
 
-<span class="c1"># Recompiling with batch_size we use for evaluating performance</span>
-<span class="n">trt_model</span> <span class="o">=</span> <span class="n">trtorch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">traced_model</span><span class="p">,</span> <span class="p">{</span>
-    <span class="s2">"input_shapes"</span><span class="p">:</span> <span class="p">[(</span><span class="n">batch_size</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">300</span><span class="p">)],</span>
-    <span class="s2">"op_precision"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">,</span> <span class="c1"># Run with FP16</span>
-    <span class="s2">"workspace_size"</span><span class="p">:</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">20</span>
-<span class="p">})</span>
+# Recompiling with batch_size we use for evaluating performance
+trt_model = trtorch.compile(traced_model, {
+    "input_shapes": [(batch_size, 3, 300, 300)],
+    "op_precision": torch.half, # Run with FP16
+    "workspace_size": 1 &lt;&lt; 20
+})
 
-<span class="n">benchmark</span><span class="p">(</span><span class="n">trt_model</span><span class="p">,</span> <span class="n">input_shape</span><span class="o">=</span><span class="p">(</span><span class="n">batch_size</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">300</span><span class="p">),</span> <span class="n">nruns</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">"fp16"</span><span class="p">)</span>
+benchmark(trt_model, input_shape=(batch_size, 3, 300, 300), nruns=1000, dtype="fp16")
 </pre>
          </div>
         </div>
