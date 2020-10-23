@@ -41,7 +41,6 @@ pkg_tar(
     name = "include",
     package_dir = "core/",
     srcs = [
-        "backend.h",
         "compiler.h",
     ],
 )
