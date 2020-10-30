@@ -60,7 +60,8 @@ auto batch_norm_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().
       auto bias_weights = Weights(ctx, bias);
 
       auto power = Weights(ctx, at::ones_like(scale));
-      auto bn = ctx->net->addScaleNd(*input, nvinfer1::ScaleMode::kCHANNEL, bias_weights.data, scale_weights.data, power.data, 1);
+      auto bn = ctx->net->addScaleNd(
+          *input, nvinfer1::ScaleMode::kCHANNEL, bias_weights.data, scale_weights.data, power.data, 1);
       bn->setName(util::node_info(n).c_str());
       auto out_tensor = bn->getOutput(0);
 

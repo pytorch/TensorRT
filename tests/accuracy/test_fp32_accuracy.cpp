@@ -2,7 +2,7 @@
 #include "datasets/cifar10.h"
 #include "torch/torch.h"
 
-TEST_P(AccuracyTests, FP16AccuracyIsClose) {
+TEST_P(AccuracyTests, FP32AccuracyIsClose) {
   auto eval_dataset =
       datasets::CIFAR10("tests/accuracy/datasets/data/cifar-10-batches-bin/", datasets::CIFAR10::Mode::kTest)
           .use_subset(3200)
@@ -49,7 +49,7 @@ TEST_P(AccuracyTests, FP16AccuracyIsClose) {
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_accuracy, trt_accuracy, 3));
 }
 
-
-INSTANTIATE_TEST_SUITE_P(FP16AccuracyIsCloseSuite,
-                         AccuracyTests,
-                         testing::Values("tests/accuracy/resnet50_scripted.jit.pt"));
+INSTANTIATE_TEST_SUITE_P(
+    FP32AccuracyIsCloseSuite,
+    AccuracyTests,
+    testing::Values("tests/accuracy/resnet50_scripted.jit.pt"));

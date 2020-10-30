@@ -3,7 +3,7 @@
 #include "torch/torch.h"
 #include "trtorch/ptq.h"
 
-TEST_P(AccuracyTests, FP16AccuracyIsClose) {
+TEST_P(AccuracyTests, INT8AccuracyIsClose) {
   auto calibration_dataset =
       datasets::CIFAR10("tests/accuracy/datasets/data/cifar-10-batches-bin/", datasets::CIFAR10::Mode::kTest)
           .use_subset(320)
@@ -15,8 +15,7 @@ TEST_P(AccuracyTests, FP16AccuracyIsClose) {
   std::string calibration_cache_file = "/tmp/vgg16_TRT_ptq_calibration.cache";
 
   auto calibrator = trtorch::ptq::make_int8_calibrator(std::move(calibration_dataloader), calibration_cache_file, true);
-  // auto calibrator =
-  // trtorch::ptq::make_int8_cache_calibrator(calibration_cache_file);
+  // auto calibrator = trtorch::ptq::make_int8_cache_calibrator(calibration_cache_file);
 
   std::vector<std::vector<int64_t>> input_shape = {{32, 3, 32, 32}};
   // Configure settings for compilation
@@ -76,7 +75,7 @@ TEST_P(AccuracyTests, FP16AccuracyIsClose) {
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_accuracy, trt_accuracy, 3));
 }
 
-
-INSTANTIATE_TEST_SUITE_P(FP16AccuracyIsCloseSuite,
-                         AccuracyTests,
-                         testing::Values("tests/accuracy/resnet50_scripted.jit.pt"));
+INSTANTIATE_TEST_SUITE_P(
+    INT8AccuracyIsCloseSuite,
+    AccuracyTests,
+    testing::Values("tests/accuracy/resnet50_scripted.jit.pt"));

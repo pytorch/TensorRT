@@ -89,20 +89,20 @@ core::CompileSpec to_internal_compile_spec(CompileSpec external) {
       internal.convert_info.engine_settings.op_precision = nvinfer1::DataType::kFLOAT;
   }
 
-    internal.convert_info.engine_settings.refit = external.refit;
-    internal.convert_info.engine_settings.debug = external.debug;
-    internal.convert_info.engine_settings.strict_types = external.strict_types;
-    internal.convert_info.engine_settings.device.allow_gpu_fallback = external.device.allow_gpu_fallback;
-    internal.convert_info.engine_settings.max_batch_size = external.max_batch_size;
+  internal.convert_info.engine_settings.refit = external.refit;
+  internal.convert_info.engine_settings.debug = external.debug;
+  internal.convert_info.engine_settings.strict_types = external.strict_types;
+  internal.convert_info.engine_settings.device.allow_gpu_fallback = external.device.allow_gpu_fallback;
+  internal.convert_info.engine_settings.max_batch_size = external.max_batch_size;
 
-    switch(external.device.device_type) {
+  switch (external.device.device_type) {
     case CompileSpec::DeviceType::kDLA:
-        internal.convert_info.engine_settings.device.device_type = nvinfer1::DeviceType::kDLA;
-        break;
+      internal.convert_info.engine_settings.device.device_type = nvinfer1::DeviceType::kDLA;
+      break;
     case CompileSpec::DeviceType::kGPU:
     default:
-        internal.convert_info.engine_settings.device.device_type = nvinfer1::DeviceType::kGPU;
-    }
+      internal.convert_info.engine_settings.device.device_type = nvinfer1::DeviceType::kGPU;
+  }
 
   switch (external.capability) {
     case CompileSpec::EngineCapability::kSAFE_GPU:
@@ -116,11 +116,11 @@ core::CompileSpec to_internal_compile_spec(CompileSpec external) {
       internal.convert_info.engine_settings.capability = nvinfer1::EngineCapability::kDEFAULT;
   }
 
-    internal.convert_info.engine_settings.device.gpu_id = external.device.gpu_id;
-    internal.convert_info.engine_settings.device.dla_core = external.device.dla_core;
-    internal.convert_info.engine_settings.num_min_timing_iters = external.num_min_timing_iters;
-    internal.convert_info.engine_settings.num_avg_timing_iters = external.num_avg_timing_iters;
-    internal.convert_info.engine_settings.workspace_size = external.workspace_size;
+  internal.convert_info.engine_settings.device.gpu_id = external.device.gpu_id;
+  internal.convert_info.engine_settings.device.dla_core = external.device.dla_core;
+  internal.convert_info.engine_settings.num_min_timing_iters = external.num_min_timing_iters;
+  internal.convert_info.engine_settings.num_avg_timing_iters = external.num_avg_timing_iters;
+  internal.convert_info.engine_settings.workspace_size = external.workspace_size;
 
   if (internal.convert_info.engine_settings.op_precision == nvinfer1::DataType::kINT8) {
     internal.convert_info.engine_settings.calibrator = external.ptq_calibrator;

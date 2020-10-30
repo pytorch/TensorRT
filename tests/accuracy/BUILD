@@ -7,7 +7,7 @@ test_suite(
     name = "test_accuracy_aarch64",
     tests = [
         ":test_dla_int8_accuracy",
-	":test_dla_fp16_accuracy",
+        ":test_dla_fp16_accuracy",
         ":test_int8_accuracy",
         ":test_fp16_accuracy",
         ":test_fp32_accuracy",

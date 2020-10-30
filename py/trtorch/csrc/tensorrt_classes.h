@@ -48,36 +48,22 @@ enum DeviceType : int8_t {
 };
 
 struct Device : torch::CustomClassHolder {
-    DeviceType device_type;
-    int64_t gpu_id;
-    int64_t dla_core;
-    bool allow_gpu_fallback;
-    Device():
-            device_type(DeviceType::kGPU), // device_type
-            gpu_id(0),                     // gpu_id
-            dla_core(0),                   // dla_core
-            allow_gpu_fallback(false)       // allow_gpu_fallback
-    {}
+  DeviceType device_type;
+  int64_t gpu_id;
+  int64_t dla_core;
+  bool allow_gpu_fallback;
+  Device()
+      : device_type(DeviceType::kGPU), // device_type
+        gpu_id(0), // gpu_id
+        dla_core(0), // dla_core
+        allow_gpu_fallback(false) // allow_gpu_fallback
+  {}
 
-    core::conversion::Device toInternalDevice() {
-      return core::conversion::Device();
-    }
-
-    ADD_FIELD_GET_SET(device_type, DeviceType);
-    ADD_FIELD_GET_SET(gpu_id, int64_t);
-    ADD_FIELD_GET_SET(dla_core, int64_t);
-    ADD_FIELD_GET_SET(allow_gpu_fallback, bool);
+  ADD_FIELD_GET_SET(device_type, DeviceType);
+  ADD_FIELD_GET_SET(gpu_id, int64_t);
+  ADD_FIELD_GET_SET(dla_core, int64_t);
+  ADD_FIELD_GET_SET(allow_gpu_fallback, bool);
 };
-
-nvinfer1::DeviceType toTRTDeviceType(DeviceType value) {
-  switch (value) {
-  case DeviceType::kDLA:
-    return nvinfer1::DeviceType::kDLA;
-  case DeviceType::kGPU:
-  default:
-    return nvinfer1::DeviceType::kGPU;
-  }
-}
 
 std::string to_str(DeviceType value);
 nvinfer1::DeviceType toTRTDeviceType(DeviceType value);
@@ -117,6 +103,7 @@ struct CompileSpec : torch::CustomClassHolder {
   ADD_FIELD_GET_SET(num_avg_timing_iters, int64_t);
   ADD_FIELD_GET_SET(workspace_size, int64_t);
   ADD_FIELD_GET_SET(max_batch_size, int64_t);
+  ADD_FIELD_GET_SET(device, Device);
 
   std::vector<InputRange> input_ranges;
   DataType op_precision = DataType::kFloat;

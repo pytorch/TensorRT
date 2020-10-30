@@ -72,47 +72,50 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
       break;
     case nvinfer1::DataType::kFLOAT:
     default:
-        input_type = nvinfer1::DataType::kFLOAT;
-        break;
-    }
-    op_precision = settings.op_precision;
+      input_type = nvinfer1::DataType::kFLOAT;
+      break;
+  }
+  op_precision = settings.op_precision;
 
-    if (settings.refit) {
-        cfg->setFlag(nvinfer1::BuilderFlag::kREFIT);
-    }
+  if (settings.refit) {
+    cfg->setFlag(nvinfer1::BuilderFlag::kREFIT);
+  }
 
-    if (settings.debug) {
-        cfg->setFlag(nvinfer1::BuilderFlag::kDEBUG);
-    }
+  if (settings.debug) {
+    cfg->setFlag(nvinfer1::BuilderFlag::kDEBUG);
+  }
 
-    if (settings.strict_types) {
-        cfg->setFlag(nvinfer1::BuilderFlag::kSTRICT_TYPES);
-    }
+  if (settings.strict_types) {
+    cfg->setFlag(nvinfer1::BuilderFlag::kSTRICT_TYPES);
+  }
 
-    if (settings.device.allow_gpu_fallback) {
-        cfg->setFlag(nvinfer1::BuilderFlag::kGPU_FALLBACK);
-    }
+  if (settings.device.allow_gpu_fallback) {
+    cfg->setFlag(nvinfer1::BuilderFlag::kGPU_FALLBACK);
+  }
 
-    if (settings.max_batch_size != 0) {
-        builder->setMaxBatchSize(settings.max_batch_size);
-    }
+  if (settings.max_batch_size != 0) {
+    builder->setMaxBatchSize(settings.max_batch_size);
+  }
 
-    cfg->setMinTimingIterations(settings.num_min_timing_iters);
-    cfg->setAvgTimingIterations(settings.num_avg_timing_iters);
-    cfg->setMaxWorkspaceSize(settings.workspace_size);
-    cfg->setDefaultDeviceType(settings.device.device_type);
-    cfg->setEngineCapability(settings.capability);
+  cfg->setMinTimingIterations(settings.num_min_timing_iters);
+  cfg->setAvgTimingIterations(settings.num_avg_timing_iters);
+  cfg->setMaxWorkspaceSize(settings.workspace_size);
+  cfg->setDefaultDeviceType(settings.device.device_type);
+  cfg->setEngineCapability(settings.capability);
 
-    if (settings.device.gpu_id) {
-         TRTORCH_CHECK(cudaSetDevice(settings.device.gpu_id), "Unable to set gpu id: " << settings.device.gpu_id);
-    }
+  if (settings.device.gpu_id) {
+    TRTORCH_CHECK(cudaSetDevice(settings.device.gpu_id), "Unable to set gpu id: " << settings.device.gpu_id);
+  }
 
-    if (settings.device.device_type == nvinfer1::DeviceType::kDLA) {
-         auto nbDLACores = builder->getNbDLACores();
-         TRTORCH_CHECK(static_cast<int>(settings.device.dla_core) < nbDLACores, "Configured DLA Core ID: " << settings.device.dla_core << " not available. Total number of available DLA Cores: " << nbDLACores);
-         TRTORCH_CHECK(settings.op_precision !=  nvinfer1::DataType::kFLOAT, "DLA supports only fp16 or int8 precision");
-         cfg->setDLACore(settings.device.dla_core);
-    }
+  if (settings.device.device_type == nvinfer1::DeviceType::kDLA) {
+    auto nbDLACores = builder->getNbDLACores();
+    TRTORCH_CHECK(
+        static_cast<int>(settings.device.dla_core) < nbDLACores,
+        "Configured DLA Core ID: " << settings.device.dla_core
+                                   << " not available. Total number of available DLA Cores: " << nbDLACores);
+    TRTORCH_CHECK(settings.op_precision != nvinfer1::DataType::kFLOAT, "DLA supports only fp16 or int8 precision");
+    cfg->setDLACore(settings.device.dla_core);
+  }
 }
 
 ConversionCtx::~ConversionCtx() {

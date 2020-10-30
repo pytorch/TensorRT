@@ -41,8 +41,8 @@ void dump_build_info() {
 }
 
 void set_device(const int gpu_id) {
-    // Want to export a much simpler (non CUDA header dependent) API
-    core::set_device(gpu_id);
+  // Want to export a much simpler (non CUDA header dependent) API
+  core::set_device(gpu_id);
 }
 
 } // namespace trtorch

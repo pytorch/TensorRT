@@ -49,7 +49,7 @@ TEST_P(AccuracyTests, FP16AccuracyIsClose) {
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_accuracy, trt_accuracy, 3));
 }
 
-
-INSTANTIATE_TEST_SUITE_P(FP16AccuracyIsCloseSuite,
-                         AccuracyTests,
-                         testing::Values("tests/accuracy/resnet50_scripted.jit.pt"));
+INSTANTIATE_TEST_SUITE_P(
+    FP16AccuracyIsCloseSuite,
+    AccuracyTests,
+    testing::Values("tests/accuracy/resnet50_scripted.jit.pt"));
