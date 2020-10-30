@@ -9,7 +9,7 @@ cc_library(
         "include/trtorch/ptq.h"
     ],
     srcs = [
-        "src/extra_info.cpp",
+        "src/compile_spec.cpp",
         "src/logging.cpp",
         "src/trtorch.cpp",
         "src/ptq.cpp"

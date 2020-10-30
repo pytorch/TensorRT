@@ -5,7 +5,7 @@
 #include "torch/csrc/jit/ir/irparser.h"
 #include "torch/custom_class.h"
 #include "core/conversion/conversion.h"
-#include "core/execution/execution.h"
+#include "core/runtime/runtime.h"
 #include "cuda_runtime_api.h"
 
 #include <vector>
@@ -43,8 +43,8 @@ std::vector<core::conversion::InputRange> toInputRangesDynamic(std::vector<at::T
 
 std::vector<at::Tensor> RunEngine(std::string& eng, std::vector<at::Tensor> inputs) {
     LOG_DEBUG("Running TRT version");
-    auto engine_ptr = c10::make_intrusive<trtorch::core::execution::TRTEngine>("test_engine", eng);
-    auto outputs = trtorch::core::execution::execute_engine(inputs, engine_ptr);
+    auto engine_ptr = c10::make_intrusive<trtorch::core::runtime::TRTEngine>("test_engine", eng);
+    auto outputs = trtorch::core::runtime::execute_engine(inputs, engine_ptr);
     return outputs;
 }
 

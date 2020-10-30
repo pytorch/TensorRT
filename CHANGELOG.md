@@ -232,4 +232,74 @@ Signed-off-by: Naren Dasan <naren@narendasan.com>
 Signed-off-by: Naren Dasan <narens@nvidia.com>
 
 
+# v0.1.0 (2020-10-23)
+
+
+### Bug Fixes
+
+* added some fixes, trt/jit output still mismatches ([723ac1d](https://github.com/NVIDIA/TRTorch/commit/723ac1d))
+* added test cases to explicitly check hidden/cell state outputs ([d7c3164](https://github.com/NVIDIA/TRTorch/commit/d7c3164))
+* cleaned up logic, added case where bias doesn't exist for LSTM cell converter ([a3e1093](https://github.com/NVIDIA/TRTorch/commit/a3e1093))
+* **//core/conversion/evaluator:** Custom to IValue that handles int[] ([68c934a](https://github.com/NVIDIA/TRTorch/commit/68c934a))
+* **//docker:** Workaround only shared libraries being available in ([50c7eda](https://github.com/NVIDIA/TRTorch/commit/50c7eda))
+* **//py:** Fix long description section of setup.py ([efd2099](https://github.com/NVIDIA/TRTorch/commit/efd2099))
+* **//tests:** Add stride to complete tensors ([af5d28e](https://github.com/NVIDIA/TRTorch/commit/af5d28e))
+* **//tests/accuracy:** Fix int8 accuracy test for new PTQ api ([a53bea7](https://github.com/NVIDIA/TRTorch/commit/a53bea7))
+* **//tests/core/converters/activations:** Complete tensors in prelu test ([0e90f78](https://github.com/NVIDIA/TRTorch/commit/0e90f78))
+* **docsrc:** Update docsrc container for bazel 3.4.1 ([4eb53b5](https://github.com/NVIDIA/TRTorch/commit/4eb53b5))
+
+
+* fix(Windows)!: Fix dependency resolution for local builds ([858d8c3](https://github.com/NVIDIA/TRTorch/commit/858d8c3))
+* chore!: Update dependencies to PyTorch 1.6.0 ([8eda27d](https://github.com/NVIDIA/TRTorch/commit/8eda27d))
+* chore!: Bumping version numbers to 0.1.0 ([b84c90b](https://github.com/NVIDIA/TRTorch/commit/b84c90b))
+* refactor(//core)!: Introducing a binding convention that will address ([5a105c6](https://github.com/NVIDIA/TRTorch/commit/5a105c6))
+* refactor!: Renaming extra info to compile spec to be more consistent ([b8fa228](https://github.com/NVIDIA/TRTorch/commit/b8fa228))
+
+
+### Features
+
+* **//core/conversion/converters:** LSTMCell converter ([8c61248](https://github.com/NVIDIA/TRTorch/commit/8c61248))
+* **//core/conversion/var:** created ITensorOrFreeze() method, to replace functionality of Var::ITensor() ([2ccf8d0](https://github.com/NVIDIA/TRTorch/commit/2ccf8d0))
+* **//core/converters:** Add power layer conversion support and minor README edits ([a801506](https://github.com/NVIDIA/TRTorch/commit/a801506))
+* **//core/lowering:** Add functionalization pass to replace implace ([90a9ed6](https://github.com/NVIDIA/TRTorch/commit/90a9ed6)), closes [#30](https://github.com/NVIDIA/TRTorch/issues/30)
+* **//docker:** Adding CUDA11 based container for Ampere support ([970d775](https://github.com/NVIDIA/TRTorch/commit/970d775))
+* started working on lstm_cell converter ([546d790](https://github.com/NVIDIA/TRTorch/commit/546d790))
+* **//py:** Initial compiliant implementation of the to_backend api for ([59113cf](https://github.com/NVIDIA/TRTorch/commit/59113cf))
+* **//third_party/tensorrt:** Add back TensorRT static lib in a cross ([d3c2e7e](https://github.com/NVIDIA/TRTorch/commit/d3c2e7e))
+* **aten::prelu:** Basic prelu support ([8bc4369](https://github.com/NVIDIA/TRTorch/commit/8bc4369))
+* **aten::prelu:** Implement the multi-channel version of prelu and ([c066581](https://github.com/NVIDIA/TRTorch/commit/c066581))
+* finished logic for LSTM cell, now to test ([a88cfaf](https://github.com/NVIDIA/TRTorch/commit/a88cfaf))
+
+
+### BREAKING CHANGES
+
+* Users on Windows trying to use cuDNN 8 must manually
+configure third_party/cudnn/local/BUILD to use cuDNN 8.
+
+Signed-off-by: Naren Dasan <naren@narendasan.com>
+Signed-off-by: Naren Dasan <narens@nvidia.com>
+* Support for Python 3.5 is being dropped with this
+update
+
+Signed-off-by: Naren Dasan <naren@narendasan.com>
+Signed-off-by: Naren Dasan <narens@nvidia.com>
+* Version is being bumped to version 0.1.0a0 to target
+PyTorch 1.6.0
+
+Signed-off-by: Naren Dasan <naren@narendasan.com>
+Signed-off-by: Naren Dasan <narens@nvidia.com>
+* This changes the "ABI" of compiled TRTorch programs and
+the runtime and breaks backwards compatability between the runtime in
+0.1.0+ and programs compiled pre-0.1.0
+
+Signed-off-by: Naren Dasan <naren@narendasan.com>
+Signed-off-by: Naren Dasan <narens@nvidia.com>
+* This changes the top level api for setting the
+specification for compilation, a simple find and replace should allow
+users to port forward
+
+Signed-off-by: Naren Dasan <naren@narendasan.com>
+Signed-off-by: Naren Dasan <narens@nvidia.com>
+
+
 

@@ -9,6 +9,7 @@ import torch
 
 from trtorch._version import __version__
 from trtorch._compiler import *
+from trtorch._compile_spec import TensorRTCompileSpec
 from trtorch._types import *
 from trtorch import logging
 

@@ -1,6 +1,7 @@
 #include "accuracy_test.h"
 #include "datasets/cifar10.h"
 #include "torch/torch.h"
+#include "trtorch/ptq.h"
 
 TEST_P(AccuracyTests, FP16AccuracyIsClose) {
     auto calibration_dataset = datasets::CIFAR10("tests/accuracy/datasets/data/cifar-10-batches-bin/", datasets::CIFAR10::Mode::kTest)
@@ -20,15 +21,15 @@ TEST_P(AccuracyTests, FP16AccuracyIsClose) {
 
     std::vector<std::vector<int64_t>> input_shape = {{32, 3, 32, 32}};
     // Configure settings for compilation
-    auto extra_info = trtorch::ExtraInfo({input_shape});
+    auto compile_spec = trtorch::CompileSpec({input_shape});
     // Set operating precision to INT8
-    extra_info.op_precision = torch::kI8;
+    compile_spec.op_precision = torch::kI8;
     // Use the TensorRT Entropy Calibrator
-    extra_info.ptq_calibrator = calibrator;
+    compile_spec.ptq_calibrator = calibrator;
     // Set max batch size for the engine
-    extra_info.max_batch_size = 32;
+    compile_spec.max_batch_size = 32;
     // Set a larger workspace
-    extra_info.workspace_size = 1 << 28;
+    compile_spec.workspace_size = 1 << 28;
 
     mod.eval();
 
@@ -57,7 +58,7 @@ TEST_P(AccuracyTests, FP16AccuracyIsClose) {
     torch::Tensor jit_accuracy = (jit_correct / jit_total) * 100;
 
     // Compile Graph
-    auto trt_mod = trtorch::CompileGraph(mod, extra_info);
+    auto trt_mod = trtorch::CompileGraph(mod, compile_spec);
 
     // Check the INT8 accuracy in TRT
     torch::Tensor trt_correct = torch::zeros({1}, {torch::kCUDA}), trt_total = torch::zeros({1}, {torch::kCUDA});

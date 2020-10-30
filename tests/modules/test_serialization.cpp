@@ -1,7 +1,7 @@
 #include "module_test.h"
 
-std::vector<trtorch::ExtraInfo::InputRange> toInputRangesDynamic(std::vector<std::vector<int64_t>> opts) {
-    std::vector<trtorch::ExtraInfo::InputRange> a;
+std::vector<trtorch::CompileSpec::InputRange> toInputRangesDynamic(std::vector<std::vector<int64_t>> opts) {
+    std::vector<trtorch::CompileSpec::InputRange> a;
 
     for (auto opt : opts) {
         std::vector<int64_t> min_range(opt);
@@ -12,7 +12,7 @@ std::vector<trtorch::ExtraInfo::InputRange> toInputRangesDynamic(std::vector<std
         min_range[2] = ceil(opt[2]/2.0);
         max_range[2] = 2*opt[2];
 
-        a.push_back(trtorch::ExtraInfo::InputRange(min_range, opt, max_range));
+        a.push_back(trtorch::CompileSpec::InputRange(min_range, opt, max_range));
     }
 
     return std::move(a);

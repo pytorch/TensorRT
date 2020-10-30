@@ -17,9 +17,11 @@ Functions
 
 .. autofunction:: check_method_op_support
 
+.. autofunction:: get_build_info
+
 .. autofunction:: dump_build_info
 
-.. autofunction:: get_build_info
+.. autofunction:: TensorRTCompileSpec
 
 Enums
 -------
