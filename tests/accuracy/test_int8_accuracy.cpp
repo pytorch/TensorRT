@@ -1,6 +1,7 @@
 #include "accuracy_test.h"
 #include "datasets/cifar10.h"
 #include "torch/torch.h"
+#include "trtorch/ptq.h"
 
 TEST_P(AccuracyTests, FP16AccuracyIsClose) {
     auto calibration_dataset = datasets::CIFAR10("tests/accuracy/datasets/data/cifar-10-batches-bin/", datasets::CIFAR10::Mode::kTest)
