@@ -16,18 +16,18 @@ namespace logging {
  * Emum for setting message severity
  */
 enum Level {
-    /// Only print messages for internal errors
-    kINTERNAL_ERROR,
-    /// Print all internal errors and errors (default)
-    kERROR,
-    /// Print warnings and errors
-    kWARNING,
-    /// Print all info, warnings and errors
-    kINFO,
-    /// Print all debug info, info, warnings and errors
-    kDEBUG,
-    /// Print everything including the intermediate graphs of the lowering phase
-    kGRAPH,
+  /// Only print messages for internal errors
+  kINTERNAL_ERROR,
+  /// Print all internal errors and errors (default)
+  kERROR,
+  /// Print warnings and errors
+  kWARNING,
+  /// Print all info, warnings and errors
+  kINFO,
+  /// Print all debug info, info, warnings and errors
+  kDEBUG,
+  /// Print everything including the intermediate graphs of the lowering phase
+  kGRAPH,
 };
 
 // Are these ones necessary for the user?
@@ -35,14 +35,17 @@ TRTORCH_API std::string get_logging_prefix();
 TRTORCH_API void set_logging_prefix(std::string prefix);
 
 /**
- * @brief Sets the level that logging information needs to be to be added to the log
+ * @brief Sets the level that logging information needs to be to be added to the
+ * log
  *
- * @param lvl: trtorch::logging::Level - Level that messages need to be at or above to be added to the log
+ * @param lvl: trtorch::logging::Level - Level that messages need to be at or
+ * above to be added to the log
  */
 TRTORCH_API void set_reportable_log_level(Level lvl);
 
 /**
- * @brief Sets if logging prefix will be colored (helpful when debugging but not always supported by terminal)
+ * @brief Sets if logging prefix will be colored (helpful when debugging but not
+ * always supported by terminal)
  *
  * @param colored_output_on: bool - If the output will be colored or not
  */
