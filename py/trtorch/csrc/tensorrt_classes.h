@@ -2,16 +2,20 @@
 
 #include "core/compiler.h"
 #include "core/conversion/conversion.h"
-#include "torch/torch.h"
-#include "torch/script.h"
 #include "torch/custom_class.h"
+#include "torch/script.h"
+#include "torch/torch.h"
 
 namespace trtorch {
 namespace pyapi {
 
-#define ADD_FIELD_GET_SET(field_name, type)             \
-  void set_##field_name(type val) {field_name = val;}   \
-  type get_##field_name() {return field_name;}
+#define ADD_FIELD_GET_SET(field_name, type) \
+  void set_##field_name(type val) {         \
+    field_name = val;                       \
+  }                                         \
+  type get_##field_name() {                 \
+    return field_name;                      \
+  }
 
 struct InputRange : torch::CustomClassHolder {
   std::vector<int64_t> min;
@@ -28,7 +32,6 @@ struct InputRange : torch::CustomClassHolder {
 };
 
 std::string to_str(InputRange& value);
-
 
 enum class DataType : int8_t {
   kFloat,
@@ -48,21 +51,23 @@ std::string to_str(DeviceType value);
 nvinfer1::DeviceType toTRTDeviceType(DeviceType value);
 
 enum class EngineCapability : int8_t {
-    kDEFAULT,
-    kSAFE_GPU,
-    kSAFE_DLA,
+  kDEFAULT,
+  kSAFE_GPU,
+  kSAFE_DLA,
 };
 
 std::string to_str(EngineCapability value);
 nvinfer1::EngineCapability toTRTEngineCapability(EngineCapability value);
 
 // TODO: Make this error message more informative
-#define ADD_ENUM_GET_SET(field_name, type, max_val)                \
-  void set_##field_name(int64_t val) {                             \
-    TRTORCH_CHECK(val < max_val, "Invalid enum value for field");  \
-    field_name = static_cast<type>(val);                           \
-  }                                                                \
-  int64_t get_##field_name() {return static_cast<int64_t>(field_name);}
+#define ADD_ENUM_GET_SET(field_name, type, max_val)               \
+  void set_##field_name(int64_t val) {                            \
+    TRTORCH_CHECK(val < max_val, "Invalid enum value for field"); \
+    field_name = static_cast<type>(val);                          \
+  }                                                               \
+  int64_t get_##field_name() {                                    \
+    return static_cast<int64_t>(field_name);                      \
+  }
 
 struct CompileSpec : torch::CustomClassHolder {
   core::CompileSpec toInternalCompileSpec();

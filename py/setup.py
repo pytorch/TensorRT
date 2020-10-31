@@ -24,8 +24,10 @@ if "--use-cxx11-abi" in sys.argv:
     sys.argv.remove("--use-cxx11-abi")
     CXX11_ABI = True
 
+
 def which(program):
     import os
+
     def is_exe(fpath):
         return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
 
@@ -41,7 +43,9 @@ def which(program):
 
     return None
 
+
 BAZEL_EXE = which("bazel")
+
 
 def build_libtrtorch_pre_cxx11_abi(develop=True, use_dist_dir=True, cxx11_abi=False):
     cmd = [BAZEL_EXE, "build"]
@@ -72,6 +76,7 @@ def gen_version_file():
         print("creating version file")
         f.write("__version__ = \"" + __version__ + '\"')
 
+
 def copy_libtrtorch(multilinux=False):
     if not os.path.exists(dir_path + '/trtorch/lib'):
         os.makedirs(dir_path + '/trtorch/lib')
@@ -81,6 +86,7 @@ def copy_libtrtorch(multilinux=False):
         copyfile(dir_path + "/build/libtrtorch_build/libtrtorch.so", dir_path + '/trtorch/lib/libtrtorch.so')
     else:
         copyfile(dir_path + "/../bazel-bin/cpp/api/lib/libtrtorch.so", dir_path + '/trtorch/lib/libtrtorch.so')
+
 
 class DevelopCommand(develop):
     description = "Builds the package and symlinks it into the PYTHONPATH"
@@ -115,6 +121,7 @@ class InstallCommand(install):
         copy_libtrtorch()
         install.run(self)
 
+
 class BdistCommand(bdist_wheel):
     description = "Builds the package"
 
@@ -131,9 +138,12 @@ class BdistCommand(bdist_wheel):
         copy_libtrtorch()
         bdist_wheel.run(self)
 
+
 class CleanCommand(Command):
     """Custom clean command to tidy up the project root."""
-    PY_CLEAN_FILES = ['./build', './dist', './trtorch/__pycache__', './trtorch/lib', './*.pyc', './*.tgz', './*.egg-info']
+    PY_CLEAN_FILES = [
+        './build', './dist', './trtorch/__pycache__', './trtorch/lib', './*.pyc', './*.tgz', './*.egg-info'
+    ]
     description = "Command to tidy up the project root"
     user_options = []
 
@@ -154,97 +164,73 @@ class CleanCommand(Command):
                 print('Removing %s' % os.path.relpath(path))
                 rmtree(path)
 
+
 ext_modules = [
-    cpp_extension.CUDAExtension('trtorch._C',
-                                [
-                                    'trtorch/csrc/trtorch_py.cpp',
-                                    'trtorch/csrc/tensorrt_backend.cpp',
-                                    'trtorch/csrc/tensorrt_classes.cpp',
-                                    'trtorch/csrc/register_tensorrt_classes.cpp',
-                                ],
-                                library_dirs=[
-                                    (dir_path + '/trtorch/lib/'),
-                                    "/opt/conda/lib/python3.6/config-3.6m-x86_64-linux-gnu"
-                                ],
-                                libraries=[
-                                    "trtorch"
-                                ],
-                                include_dirs=[
-                                    dir_path + "trtorch/csrc",
-                                    dir_path + "/../",
-                                    dir_path + "/../bazel-TRTorch/external/tensorrt/include",
-                                ],
-                                extra_compile_args=[
-                                    "-Wno-deprecated",
-                                    "-Wno-deprecated-declarations",
-                                ] + (["-D_GLIBCXX_USE_CXX11_ABI=1"] if CXX11_ABI else ["-D_GLIBCXX_USE_CXX11_ABI=0"]),
-                                extra_link_args=[
-                                    "-Wno-deprecated",
-                                    "-Wno-deprecated-declarations",
-                                    "-Wl,--no-as-needed",
-                                    "-ltrtorch",
-                                    "-Wl,-rpath,$ORIGIN/lib",
-                                    "-lpthread",
-                                    "-ldl",
-                                    "-lutil",
-                                    "-lrt",
-                                    "-lm",
-                                    "-Xlinker",
-                                    "-export-dynamic"
-                                ] + (["-D_GLIBCXX_USE_CXX11_ABI=1"] if CXX11_ABI else ["-D_GLIBCXX_USE_CXX11_ABI=0"]),
-                                undef_macros=[ "NDEBUG" ]
-                            )
+    cpp_extension.CUDAExtension(
+        'trtorch._C', [
+            'trtorch/csrc/trtorch_py.cpp',
+            'trtorch/csrc/tensorrt_backend.cpp',
+            'trtorch/csrc/tensorrt_classes.cpp',
+            'trtorch/csrc/register_tensorrt_classes.cpp',
+        ],
+        library_dirs=[(dir_path + '/trtorch/lib/'), "/opt/conda/lib/python3.6/config-3.6m-x86_64-linux-gnu"],
+        libraries=["trtorch"],
+        include_dirs=[
+            dir_path + "trtorch/csrc",
+            dir_path + "/../",
+            dir_path + "/../bazel-TRTorch/external/tensorrt/include",
+        ],
+        extra_compile_args=[
+            "-Wno-deprecated",
+            "-Wno-deprecated-declarations",
+        ] + (["-D_GLIBCXX_USE_CXX11_ABI=1"] if CXX11_ABI else ["-D_GLIBCXX_USE_CXX11_ABI=0"]),
+        extra_link_args=[
+            "-Wno-deprecated", "-Wno-deprecated-declarations", "-Wl,--no-as-needed", "-ltrtorch",
+            "-Wl,-rpath,$ORIGIN/lib", "-lpthread", "-ldl", "-lutil", "-lrt", "-lm", "-Xlinker", "-export-dynamic"
+        ] + (["-D_GLIBCXX_USE_CXX11_ABI=1"] if CXX11_ABI else ["-D_GLIBCXX_USE_CXX11_ABI=0"]),
+        undef_macros=["NDEBUG"])
 ]
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
-setup(
-    name='trtorch',
-    version=__version__,
-    author='NVIDIA',
-    author_email='narens@nvidia.com',
-    url='https://nvidia.github.io/TRTorch',
-    description='A compiler backend for PyTorch JIT targeting NVIDIA GPUs',
-    long_description_content_type='text/markdown',
-    long_description=long_description,
-    ext_modules=ext_modules,
-    install_requires=[
-        'torch==1.6.0',
-    ],
-    setup_requires=[],
-    cmdclass={
-        'install': InstallCommand,
-        'clean': CleanCommand,
-        'develop': DevelopCommand,
-        'build_ext': cpp_extension.BuildExtension,
-        'bdist_wheel': BdistCommand,
-    },
-    zip_safe=False,
-    license="BSD",
-    packages=find_packages(),
-    classifiers=[
-        "Development Status :: 4 - Beta",
-        "Environment :: GPU :: NVIDIA CUDA",
-        "License :: OSI Approved :: BSD License",
-        "Intended Audience :: Developers",
-        "Intended Audience :: Science/Research",
-        "Operating System :: POSIX :: Linux",
-        "Programming Language :: C++",
-        "Programming Language :: Python",
-        "Programming Language :: Python :: Implementation :: CPython",
-        "Topic :: Scientific/Engineering",
-        "Topic :: Scientific/Engineering :: Artificial Intelligence",
-        "Topic :: Software Development",
-        "Topic :: Software Development :: Libraries"
-    ],
-    python_requires='>=3.6',
-    include_package_data=True,
-    package_data={
-        'trtorch': ['lib/*.so'],
-    },
-    exclude_package_data={
-        '': ['*.cpp', '*.h'],
-        'trtorch': ['csrc/*.cpp'],
-    }
-)
+setup(name='trtorch',
+      version=__version__,
+      author='NVIDIA',
+      author_email='narens@nvidia.com',
+      url='https://nvidia.github.io/TRTorch',
+      description='A compiler backend for PyTorch JIT targeting NVIDIA GPUs',
+      long_description_content_type='text/markdown',
+      long_description=long_description,
+      ext_modules=ext_modules,
+      install_requires=[
+          'torch==1.6.0',
+      ],
+      setup_requires=[],
+      cmdclass={
+          'install': InstallCommand,
+          'clean': CleanCommand,
+          'develop': DevelopCommand,
+          'build_ext': cpp_extension.BuildExtension,
+          'bdist_wheel': BdistCommand,
+      },
+      zip_safe=False,
+      license="BSD",
+      packages=find_packages(),
+      classifiers=[
+          "Development Status :: 4 - Beta", "Environment :: GPU :: NVIDIA CUDA",
+          "License :: OSI Approved :: BSD License", "Intended Audience :: Developers",
+          "Intended Audience :: Science/Research", "Operating System :: POSIX :: Linux", "Programming Language :: C++",
+          "Programming Language :: Python", "Programming Language :: Python :: Implementation :: CPython",
+          "Topic :: Scientific/Engineering", "Topic :: Scientific/Engineering :: Artificial Intelligence",
+          "Topic :: Software Development", "Topic :: Software Development :: Libraries"
+      ],
+      python_requires='>=3.6',
+      include_package_data=True,
+      package_data={
+          'trtorch': ['lib/*.so'],
+      },
+      exclude_package_data={
+          '': ['*.cpp', '*.h'],
+          'trtorch': ['csrc/*.cpp'],
+      })

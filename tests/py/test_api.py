@@ -5,7 +5,9 @@ import torchvision.models as models
 
 from model_test_case import ModelTestCase
 
+
 class TestCompile(ModelTestCase):
+
     def setUp(self):
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
         self.traced_model = torch.jit.trace(self.model, [self.input])
@@ -29,7 +31,9 @@ class TestCompile(ModelTestCase):
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
         self.assertTrue(same < 2e-3)
 
+
 class TestCheckMethodOpSupport(unittest.TestCase):
+
     def setUp(self):
         module = models.alexnet(pretrained=True).eval().to("cuda")
         self.module = torch.jit.trace(module, torch.ones((1, 3, 224, 224)).to("cuda"))
@@ -37,7 +41,9 @@ class TestCheckMethodOpSupport(unittest.TestCase):
     def test_check_support(self):
         self.assertTrue(trtorch.check_method_op_support(self.module, "forward"))
 
+
 class TestLoggingAPIs(unittest.TestCase):
+
     def test_logging_prefix(self):
         new_prefix = "TEST"
         trtorch.logging.set_logging_prefix(new_prefix)
@@ -55,6 +61,7 @@ class TestLoggingAPIs(unittest.TestCase):
         color = trtorch.logging.get_is_colored_output_on()
         self.assertTrue(color)
 
+
 def test_suite():
     suite = unittest.TestSuite()
     suite.addTest(TestCompile.parametrize(TestCompile, model=models.resnet18(pretrained=True)))
@@ -64,6 +71,7 @@ def test_suite():
     suite.addTest(unittest.makeSuite(TestLoggingAPIs))
 
     return suite
+
 
 suite = test_suite()
 
