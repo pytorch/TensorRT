@@ -1,5 +1,5 @@
-#include "core/util/prelude.h"
 #include "core/conversion/converters/converters.h"
+#include "core/util/prelude.h"
 #include "torch/csrc/jit/frontend/function_schema_parser.h"
 
 namespace trtorch {
@@ -44,85 +44,85 @@ namespace {
 using ConverterLUT = std::unordered_map<c10::OperatorName, OpConverter>;
 
 class NodeConverterRegistry {
-public:
-    bool RegisterConverter(torch::jit::FunctionSchema* signature, OpConverter& converter) {
-        LOG_DEBUG("Registering converter for " << canonical_schema_string(*signature));
-        auto name = signature->operator_name();
-        auto iter = converter_lut_.find(name);
-        if (iter != converter_lut_.end()) {
-            LOG_WARNING("Overriding already registered converter " << signature->name() << ", unexpected behavior may occur");
-        }
-        converter_lut_[name] = std::move(converter);
+ public:
+  bool RegisterConverter(torch::jit::FunctionSchema* signature, OpConverter& converter) {
+    LOG_DEBUG("Registering converter for " << canonical_schema_string(*signature));
+    auto name = signature->operator_name();
+    auto iter = converter_lut_.find(name);
+    if (iter != converter_lut_.end()) {
+      LOG_WARNING("Overriding already registered converter " << signature->name() << ", unexpected behavior may occur");
+    }
+    converter_lut_[name] = std::move(converter);
+    return true;
+  }
+
+  OpConverter GetConverter(const torch::jit::FunctionSchema* signature) {
+    auto name = signature->operator_name();
+    auto iter = converter_lut_.find(name);
+    if (iter == converter_lut_.end()) {
+      LOG_ERROR("Requested converter for " << signature->name() << ", but no such converter was found");
+      // ASK: Is there a better way than returning a nullptr?
+      return nullptr;
+    }
+    return iter->second;
+  }
+
+  bool Convertable(const torch::jit::Node* n) {
+    auto schema = n->maybeSchema();
+    if (schema) {
+      auto name = schema->operator_name();
+      auto iter = converter_lut_.find(name);
+      if (iter == converter_lut_.end()) {
+        return false;
+      } else {
         return true;
+      }
+    } else {
+      LOG_DEBUG("Unable to get schema for Node " << util::node_info(n) << " (NodeConverterRegistry.Convertable)");
+      return false;
     }
+  }
 
-    OpConverter GetConverter(const torch::jit::FunctionSchema* signature) {
-        auto name = signature->operator_name();
-        auto iter = converter_lut_.find(name);
-        if (iter == converter_lut_.end()) {
-            LOG_ERROR("Requested converter for " << signature->name() << ", but no such converter was found");
-            // ASK: Is there a better way than returning a nullptr?
-            return nullptr;
-        }
-        return iter->second;
-    }
-
-    bool Convertable(const torch::jit::Node* n) {
-        auto schema = n->maybeSchema();
-        if (schema) {
-            auto name = schema->operator_name();
-            auto iter = converter_lut_.find(name);
-            if (iter == converter_lut_.end()) {
-               return false;
-            } else {
-                return true;
-            }
-        } else {
-            LOG_DEBUG("Unable to get schema for Node " << util::node_info(n) \
-                      << " (NodeConverterRegistry.Convertable)");
-            return false;
-        }
-    }
-
-private:
-    ConverterLUT converter_lut_;
+ private:
+  ConverterLUT converter_lut_;
 };
 
 NodeConverterRegistry& get_converter_registry() {
-    static NodeConverterRegistry converter_registry;
-    return converter_registry;
+  static NodeConverterRegistry converter_registry;
+  return converter_registry;
 }
 } // namespace
 
 void register_node_converter(torch::jit::FunctionSchema* signature, OpConverter& converter) {
-    get_converter_registry().RegisterConverter(signature, converter);
+  get_converter_registry().RegisterConverter(signature, converter);
 }
 
 void register_node_converter(std::string signature, OpConverter& converter) {
-    auto schema = torch::jit::parseSchema(signature);
-    // TODO: CHECKING THIS IS A VALID SCHEMA AND QUITING IF NOT
-    register_node_converter(&schema, converter);
+  auto schema = torch::jit::parseSchema(signature);
+  // TODO: CHECKING THIS IS A VALID SCHEMA AND QUITING IF NOT
+  register_node_converter(&schema, converter);
 }
 
 void register_node_converter(ConversionPattern p) {
-    register_node_converter(p.signature, p.converter);
+  register_node_converter(p.signature, p.converter);
 }
 
 OpConverter get_node_converter_for(const torch::jit::FunctionSchema* signature) {
-    return get_converter_registry().GetConverter(signature);
+  return get_converter_registry().GetConverter(signature);
 }
 
 bool node_is_convertable(const torch::jit::Node* n) {
-    return get_converter_registry().Convertable(n);
+  return get_converter_registry().Convertable(n);
 }
 
 RegisterNodeConversionPatterns&& RegisterNodeConversionPatterns::pattern(ConversionPattern p) && {
-    register_node_converter(std::move(p));
-    return std::move(*this);
+  register_node_converter(std::move(p));
+  return std::move(*this);
 }
 
 RegisterNodeConversionPatterns::RegisterNodeConversionPatterns(RegisterNodeConversionPatterns&&) noexcept = default;
-RegisterNodeConversionPatterns& RegisterNodeConversionPatterns::RegisterNodeConversionPatterns::operator=(RegisterNodeConversionPatterns&&) noexcept = default;
+RegisterNodeConversionPatterns& RegisterNodeConversionPatterns::RegisterNodeConversionPatterns::operator=(
+    RegisterNodeConversionPatterns&&) noexcept = default;
 
 } // namespace converters
 } // namespace conversion

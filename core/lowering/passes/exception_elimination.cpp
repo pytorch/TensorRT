@@ -1,10 +1,10 @@
-#include "torch/csrc/jit/passes/guard_elimination.h"
 #include "torch/csrc/jit/ir/alias_analysis.h"
 #include "torch/csrc/jit/jit_log.h"
 #include "torch/csrc/jit/passes/constant_propagation.h"
+#include "torch/csrc/jit/passes/dead_code_elimination.h"
+#include "torch/csrc/jit/passes/guard_elimination.h"
 #include "torch/csrc/jit/passes/peephole.h"
 #include "torch/csrc/jit/runtime/graph_executor.h"
-#include "torch/csrc/jit/passes/dead_code_elimination.h"
 
 #include "core/util/prelude.h"
 
@@ -17,8 +17,7 @@ namespace passes {
 namespace {
 using namespace torch::jit;
 struct ExceptionOrPassPatternElimination {
-  ExceptionOrPassPatternElimination(std::shared_ptr<Graph> graph)
-    : graph_(std::move(graph)) {}
+  ExceptionOrPassPatternElimination(std::shared_ptr<Graph> graph) : graph_(std::move(graph)) {}
 
   void run() {
     findExceptionOrPassNodes(graph_->block());
@@ -26,7 +25,7 @@ struct ExceptionOrPassPatternElimination {
     LOG_GRAPH("Post exeception or pass elimination: " << *graph_);
   }
 
-private:
+ private:
   bool isExceptionOrPassNode(Node* n) {
     /// Check if this Node hosts a pattern like so:
     ///  = prim::If(%5958)
@@ -41,7 +40,8 @@ private:
     auto arm1 = n->blocks()[0];
     auto arm2 = n->blocks()[1];
     if (arm1->outputs().size() != 0 || arm2->outputs().size() != 0) {
-      // Make sure that the node doesn't actually produce any Value that are used by other nodes
+      // Make sure that the node doesn't actually produce any Value that are
+      // used by other nodes
       return false;
     }
 

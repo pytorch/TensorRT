@@ -1,6 +1,6 @@
 #include <bitset>
-#include "core/util/prelude.h"
 #include "core/conversion/converters/converters.h"
+#include "core/util/prelude.h"
 
 namespace trtorch {
 namespace core {
@@ -9,181 +9,176 @@ namespace converters {
 namespace impl {
 namespace {
 
+auto reduce_registrations TRTORCH_UNUSED =
+    RegisterNodeConversionPatterns()
+        .pattern({"aten::mean(Tensor self, *, ScalarType? dtype=None) -> (Tensor)",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    auto in_tensor = args[0].ITensorOrFreeze(ctx);
+                    auto in_dims = util::toVec(in_tensor->getDimensions());
+                    LOG_WARNING("Mean Converter disregards dtype");
 
+                    uint32_t axis_mask = (uint32_t)(((uint64_t)1 << in_dims.size()) - 1);
 
-auto reduce_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
-    .pattern({
-        "aten::mean(Tensor self, *, ScalarType? dtype=None) -> (Tensor)",
-        [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-            auto in_tensor = args[0].ITensorOrFreeze(ctx);
-            auto in_dims = util::toVec(in_tensor->getDimensions());
-            LOG_WARNING("Mean Converter disregards dtype");
+                    auto mean_layer =
+                        ctx->net->addReduce(*in_tensor, nvinfer1::ReduceOperation::kAVG, axis_mask, false);
 
-            uint32_t axis_mask = (uint32_t)(((uint64_t)1 << in_dims.size()) - 1);
+                    TRTORCH_CHECK(mean_layer, "Unable to create mean layer from node: " << *n);
 
-            auto mean_layer = ctx->net->addReduce(*in_tensor, nvinfer1::ReduceOperation::kAVG, axis_mask, false);
+                    mean_layer->setName(util::node_info(n).c_str());
+                    auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], mean_layer->getOutput(0));
 
-            TRTORCH_CHECK(mean_layer, "Unable to create mean layer from node: " << *n);
+                    LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+                    return true;
+                  }})
+        .pattern({"aten::mean.dim(Tensor self, int[] dim, bool keepdim=False, *, int? dtype=None) -> (Tensor)",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    auto in_tensor = args[0].ITensorOrFreeze(ctx);
+                    auto dims = args[1].unwrapToIntList();
+                    LOG_DEBUG("Dim to reduce:" << util::toDims(dims)); // Some abuse of toDim but just for debug info
 
-            mean_layer->setName(util::node_info(n).c_str());
-            auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], mean_layer->getOutput(0));
+                    uint32_t axis_mask = 0;
+                    for (size_t d = 0; d < dims.size(); d++) {
+                      axis_mask |= 1 << dims[d];
+                    }
+                    LOG_DEBUG("Axis Mask" << std::bitset<32>(axis_mask));
 
-            LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
-            return true;
-        }
-    }).pattern({
-        "aten::mean.dim(Tensor self, int[] dim, bool keepdim=False, *, int? dtype=None) -> (Tensor)",
-        [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-            auto in_tensor = args[0].ITensorOrFreeze(ctx);
-            auto dims = args[1].unwrapToIntList();
-            LOG_DEBUG("Dim to reduce:" << util::toDims(dims)); // Some abuse of toDim but just for debug info
+                    auto keepdim = args[2].unwrapToBool();
+                    LOG_DEBUG("Keep dims :" << keepdim);
 
-            uint32_t axis_mask = 0;
-            for (size_t d = 0; d < dims.size(); d++) {
-                axis_mask |= 1 << dims[d];
-            }
-            LOG_DEBUG("Axis Mask" << std::bitset<32>(axis_mask));
+                    LOG_WARNING("Mean converter disregards dtype");
+                    auto mean_layer =
+                        ctx->net->addReduce(*in_tensor, nvinfer1::ReduceOperation::kAVG, axis_mask, keepdim);
 
-            auto keepdim = args[2].unwrapToBool();
-            LOG_DEBUG("Keep dims :" << keepdim);
+                    TRTORCH_CHECK(mean_layer, "Unable to create mean layer from node: " << *n);
 
-            LOG_WARNING("Mean converter disregards dtype");
-            auto mean_layer = ctx->net->addReduce(*in_tensor, nvinfer1::ReduceOperation::kAVG, axis_mask, keepdim);
+                    mean_layer->setName(util::node_info(n).c_str());
+                    auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], mean_layer->getOutput(0));
 
-            TRTORCH_CHECK(mean_layer, "Unable to create mean layer from node: " << *n);
+                    LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+                    return true;
+                  }})
+        .pattern({"aten::sum(Tensor self, *, ScalarType? dtype=None) -> Tensor",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    auto in_tensor = args[0].ITensorOrFreeze(ctx);
+                    auto in_dims = util::toVec(in_tensor->getDimensions());
+                    LOG_WARNING("Sum Converter disregards dtype");
 
-            mean_layer->setName(util::node_info(n).c_str());
-            auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], mean_layer->getOutput(0));
+                    uint32_t axis_mask = (uint32_t)(((uint64_t)1 << in_dims.size()) - 1);
 
-            LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
-            return true;
-        }
-    }).pattern({
-        "aten::sum(Tensor self, *, ScalarType? dtype=None) -> Tensor",
-        [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-            auto in_tensor = args[0].ITensorOrFreeze(ctx);
-            auto in_dims = util::toVec(in_tensor->getDimensions());
-            LOG_WARNING("Sum Converter disregards dtype");
+                    auto sum_layer = ctx->net->addReduce(*in_tensor, nvinfer1::ReduceOperation::kSUM, axis_mask, false);
 
-            uint32_t axis_mask = (uint32_t)(((uint64_t)1 << in_dims.size()) - 1);
+                    TRTORCH_CHECK(sum_layer, "Unable to create sum layer from node: " << *n);
 
-            auto sum_layer = ctx->net->addReduce(*in_tensor, nvinfer1::ReduceOperation::kSUM, axis_mask, false);
+                    sum_layer->setName(util::node_info(n).c_str());
+                    auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], sum_layer->getOutput(0));
 
-            TRTORCH_CHECK(sum_layer, "Unable to create sum layer from node: " << *n);
+                    LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+                    return true;
+                  }})
+        .pattern(
+            {"aten::sum.dim_IntList(Tensor self, int[1] dim, bool keepdim=False, *, ScalarType? dtype=None) -> Tensor",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               auto in_tensor = args[0].ITensorOrFreeze(ctx);
+               auto dims = args[1].unwrapToIntList();
+               LOG_DEBUG("Dim to reduce:" << util::toDims(dims)); // Some abuse of toDim but just for debug info
 
-            sum_layer->setName(util::node_info(n).c_str());
-            auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], sum_layer->getOutput(0));
+               uint32_t axis_mask = 0;
+               for (size_t d = 0; d < dims.size(); d++) {
+                 axis_mask |= 1 << dims[d];
+               }
+               LOG_DEBUG("Axis Mask" << std::bitset<32>(axis_mask));
 
-            LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
-            return true;
-        }
-    }).pattern({
-        "aten::sum.dim_IntList(Tensor self, int[1] dim, bool keepdim=False, *, ScalarType? dtype=None) -> Tensor",
-        [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-            auto in_tensor = args[0].ITensorOrFreeze(ctx);
-            auto dims = args[1].unwrapToIntList();
-            LOG_DEBUG("Dim to reduce:" << util::toDims(dims)); // Some abuse of toDim but just for debug info
+               auto keepdim = args[2].unwrapToBool();
+               LOG_DEBUG("Keep dims :" << keepdim);
 
-            uint32_t axis_mask = 0;
-            for (size_t d = 0; d < dims.size(); d++) {
-                axis_mask |= 1 << dims[d];
-            }
-            LOG_DEBUG("Axis Mask" << std::bitset<32>(axis_mask));
+               LOG_WARNING("Sum converter disregards dtype");
+               auto sum_layer = ctx->net->addReduce(*in_tensor, nvinfer1::ReduceOperation::kSUM, axis_mask, keepdim);
 
-            auto keepdim = args[2].unwrapToBool();
-            LOG_DEBUG("Keep dims :" << keepdim);
+               TRTORCH_CHECK(sum_layer, "Unable to create sum layer from node: " << *n);
 
-            LOG_WARNING("Sum converter disregards dtype");
-            auto sum_layer = ctx->net->addReduce(*in_tensor, nvinfer1::ReduceOperation::kSUM, axis_mask, keepdim);
+               sum_layer->setName(util::node_info(n).c_str());
+               auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], sum_layer->getOutput(0));
 
-            TRTORCH_CHECK(sum_layer, "Unable to create sum layer from node: " << *n);
+               LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+               return true;
+             }})
+        .pattern({"aten::prod(Tensor self, *, ScalarType? dtype=None) -> Tensor",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    auto in_tensor = args[0].ITensorOrFreeze(ctx);
+                    auto in_dims = util::toVec(in_tensor->getDimensions());
+                    LOG_WARNING("Prod Converter disregards dtype");
 
-            sum_layer->setName(util::node_info(n).c_str());
-            auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], sum_layer->getOutput(0));
+                    uint32_t axis_mask = (uint32_t)(((uint64_t)1 << in_dims.size()) - 1);
 
-            LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
-            return true;
-        }
-    }).pattern({
-        "aten::prod(Tensor self, *, ScalarType? dtype=None) -> Tensor",
-        [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-            auto in_tensor = args[0].ITensorOrFreeze(ctx);
-            auto in_dims = util::toVec(in_tensor->getDimensions());
-            LOG_WARNING("Prod Converter disregards dtype");
+                    auto prod_layer =
+                        ctx->net->addReduce(*in_tensor, nvinfer1::ReduceOperation::kPROD, axis_mask, false);
 
-            uint32_t axis_mask = (uint32_t)(((uint64_t)1 << in_dims.size()) - 1);
+                    TRTORCH_CHECK(prod_layer, "Unable to create sum layer from node: " << *n);
 
-            auto prod_layer = ctx->net->addReduce(*in_tensor, nvinfer1::ReduceOperation::kPROD, axis_mask, false);
+                    prod_layer->setName(util::node_info(n).c_str());
+                    auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], prod_layer->getOutput(0));
 
-            TRTORCH_CHECK(prod_layer, "Unable to create sum layer from node: " << *n);
+                    LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+                    return true;
+                  }})
+        .pattern({"aten::prod.dim_int(Tensor self, int dim, bool keepdim=False, *, ScalarType? dtype=None) -> Tensor",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    auto in_tensor = args[0].ITensorOrFreeze(ctx);
+                    auto dim = args[1].unwrapToInt();
+                    LOG_DEBUG("Dim to reduce:" << dim); // Some abuse of toDim but just for debug info
 
-            prod_layer->setName(util::node_info(n).c_str());
-            auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], prod_layer->getOutput(0));
+                    uint32_t axis_mask = 1 << dim;
+                    LOG_DEBUG("Axis Mask" << std::bitset<32>(axis_mask));
 
-            LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
-            return true;
-        }
-    }).pattern({
-        "aten::prod.dim_int(Tensor self, int dim, bool keepdim=False, *, ScalarType? dtype=None) -> Tensor",
-        [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-            auto in_tensor = args[0].ITensorOrFreeze(ctx);
-            auto dim = args[1].unwrapToInt();
-            LOG_DEBUG("Dim to reduce:" << dim); // Some abuse of toDim but just for debug info
+                    auto keepdim = args[2].unwrapToBool();
+                    LOG_DEBUG("Keep dims :" << keepdim);
 
-            uint32_t axis_mask = 1 << dim;
-            LOG_DEBUG("Axis Mask" << std::bitset<32>(axis_mask));
+                    LOG_WARNING("Prod converter disregards dtype");
+                    auto prod_layer =
+                        ctx->net->addReduce(*in_tensor, nvinfer1::ReduceOperation::kPROD, axis_mask, keepdim);
 
-            auto keepdim = args[2].unwrapToBool();
-            LOG_DEBUG("Keep dims :" << keepdim);
+                    TRTORCH_CHECK(prod_layer, "Unable to create mean layer from node: " << *n);
 
-            LOG_WARNING("Prod converter disregards dtype");
-            auto prod_layer = ctx->net->addReduce(*in_tensor, nvinfer1::ReduceOperation::kPROD, axis_mask, keepdim);
+                    prod_layer->setName(util::node_info(n).c_str());
+                    auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], prod_layer->getOutput(0));
 
-            TRTORCH_CHECK(prod_layer, "Unable to create mean layer from node: " << *n);
+                    LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+                    return true;
+                  }})
+        .pattern({"aten::max(Tensor self) -> Tensor",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    auto in_tensor = args[0].ITensorOrFreeze(ctx);
+                    auto in_dims = util::toVec(in_tensor->getDimensions());
 
-            prod_layer->setName(util::node_info(n).c_str());
-            auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], prod_layer->getOutput(0));
+                    uint32_t axis_mask = (uint32_t)(((uint64_t)1 << in_dims.size()) - 1);
 
-            LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
-            return true;
-        }
-    }).pattern({
-        "aten::max(Tensor self) -> Tensor",
-        [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-            auto in_tensor = args[0].ITensorOrFreeze(ctx);
-            auto in_dims = util::toVec(in_tensor->getDimensions());
+                    auto max_layer = ctx->net->addReduce(*in_tensor, nvinfer1::ReduceOperation::kMAX, axis_mask, false);
 
-            uint32_t axis_mask = (uint32_t)(((uint64_t)1 << in_dims.size()) - 1);
+                    TRTORCH_CHECK(max_layer, "Unable to create max layer from node: " << *n);
 
-            auto max_layer = ctx->net->addReduce(*in_tensor, nvinfer1::ReduceOperation::kMAX, axis_mask, false);
+                    max_layer->setName(util::node_info(n).c_str());
+                    auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], max_layer->getOutput(0));
 
-            TRTORCH_CHECK(max_layer, "Unable to create max layer from node: " << *n);
+                    LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+                    return true;
+                  }})
+        .pattern(
+            {"aten::min(Tensor self) -> Tensor", [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               auto in_tensor = args[0].ITensorOrFreeze(ctx);
+               auto in_dims = util::toVec(in_tensor->getDimensions());
 
-            max_layer->setName(util::node_info(n).c_str());
-            auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], max_layer->getOutput(0));
+               uint32_t axis_mask = (uint32_t)(((uint64_t)1 << in_dims.size()) - 1);
 
-            LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
-            return true;
-        }
-    }).pattern({
-        "aten::min(Tensor self) -> Tensor",
-        [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-            auto in_tensor = args[0].ITensorOrFreeze(ctx);
-            auto in_dims = util::toVec(in_tensor->getDimensions());
+               auto min_layer = ctx->net->addReduce(*in_tensor, nvinfer1::ReduceOperation::kMIN, axis_mask, false);
 
-            uint32_t axis_mask = (uint32_t)(((uint64_t)1 << in_dims.size()) - 1);
+               TRTORCH_CHECK(min_layer, "Unable to create min layer from node: " << *n);
 
-            auto min_layer = ctx->net->addReduce(*in_tensor, nvinfer1::ReduceOperation::kMIN, axis_mask, false);
+               min_layer->setName(util::node_info(n).c_str());
+               auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], min_layer->getOutput(0));
 
-            TRTORCH_CHECK(min_layer, "Unable to create min layer from node: " << *n);
-
-            min_layer->setName(util::node_info(n).c_str());
-            auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], min_layer->getOutput(0));
-
-            LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
-            return true;
-        }
-    });
+               LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+               return true;
+             }});
 } // namespace
 } // namespace impl
 } // namespace converters

@@ -1,8 +1,8 @@
 #include <string>
-#include "gtest/gtest.h"
-#include "torch/csrc/jit/ir/irparser.h"
-#include "tests/util/util.h"
 #include "core/compiler.h"
+#include "gtest/gtest.h"
+#include "tests/util/util.h"
+#include "torch/csrc/jit/ir/irparser.h"
 
 // TODO: IR Parser doesnt work well with neg numbers
 TEST(Converters, ATenFlattenConvertsCorrectly) {
@@ -133,18 +133,18 @@ TEST(Converters, ATenPermute3DConvertsCorrectly) {
       return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-    torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, &*g);
 
-    auto in = at::randint(0, 5, {2, 2, 3}, {at::kCUDA});
-    auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-    auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
+  auto in = at::randint(0, 5, {2, 2, 3}, {at::kCUDA});
+  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
 
-    in = at::clone(in);
-    params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-    auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
-    auto trt = trt_results[0].reshape_as(jit_results[0]);
+  in = at::clone(in);
+  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
+  auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
 TEST(Converters, ATenPermute5DConvertsCorrectly) {
@@ -155,18 +155,18 @@ TEST(Converters, ATenPermute5DConvertsCorrectly) {
       return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-    torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, &*g);
 
-    auto in = at::randint(0, 5, {2, 2, 1, 2, 3}, {at::kCUDA});
-    auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-    auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
+  auto in = at::randint(0, 5, {2, 2, 1, 2, 3}, {at::kCUDA});
+  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
 
-    in = at::clone(in);
-    params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-    auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
-    auto trt = trt_results[0].reshape_as(jit_results[0]);
+  in = at::clone(in);
+  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
+  auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
 TEST(Converters, ATenFlattenConvertsCorrectlyWithDynamicInput) {
