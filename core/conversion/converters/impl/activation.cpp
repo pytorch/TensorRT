@@ -79,51 +79,52 @@ auto acthardtanh TRTORCH_UNUSED =
                     LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
                     return true;
                   }})
-        .pattern({"aten::prelu(Tensor self, Tensor weight) -> (Tensor)",
-                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    auto in = args[0].ITensor();
-                    auto slopes = args[1].unwrapToTensor();
+        .pattern(
+            {"aten::prelu(Tensor self, Tensor weight) -> (Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               auto in = args[0].ITensor();
+               auto slopes = args[1].unwrapToTensor();
 
-                    bool to_reshape = false;
-                    auto original_shape = in->getDimensions();
-                    if (slopes.numel() != 1 &&
-                        !util::broadcastable(
-                            in->getDimensions(),
-                            util::toDims(slopes.sizes()),
-                            /*multidirectional=*/false)) {
-                      if (util::volume(in->getDimensions()) == util::volume(util::toDims(slopes.sizes()))) {
-                        to_reshape = true;
-                        LOG_DEBUG(
-                            "Input shape is not broadcastable inserting shuffle layers to reshape to "
-                            << util::toDims(slopes.sizes()));
-                        auto in_shuffle = ctx->net->addShuffle(*in);
-                        TRTORCH_CHECK(in_shuffle, "Unable to create resize layer for aten::prelu input");
-                        in_shuffle->setReshapeDimensions(util::toDims(slopes.sizes()));
-                        in_shuffle->setName(
-                            std::string("[Reshape in to " + util::toStr(util::toDims(slopes.sizes())) + " for broadcasting]")
-                                .c_str());
-                        in = in_shuffle->getOutput(0);
-                      }
-                    }
+               bool to_reshape = false;
+               auto original_shape = in->getDimensions();
+               if (slopes.numel() != 1 &&
+                   !util::broadcastable(
+                       in->getDimensions(),
+                       util::toDims(slopes.sizes()),
+                       /*multidirectional=*/false)) {
+                 if (util::volume(in->getDimensions()) == util::volume(util::toDims(slopes.sizes()))) {
+                   to_reshape = true;
+                   LOG_DEBUG(
+                       "Input shape is not broadcastable inserting shuffle layers to reshape to "
+                       << util::toDims(slopes.sizes()));
+                   auto in_shuffle = ctx->net->addShuffle(*in);
+                   TRTORCH_CHECK(in_shuffle, "Unable to create resize layer for aten::prelu input");
+                   in_shuffle->setReshapeDimensions(util::toDims(slopes.sizes()));
+                   in_shuffle->setName(
+                       std::string("[Reshape in to " + util::toStr(util::toDims(slopes.sizes())) + " for broadcasting]")
+                           .c_str());
+                   in = in_shuffle->getOutput(0);
+                 }
+               }
 
-                    auto slope_tensor = tensor_to_const(ctx, slopes);
-                    auto new_layer = ctx->net->addParametricReLU(*in, *slope_tensor);
-                    new_layer->setName(util::node_info(n).c_str());
-                    auto out_tensor = new_layer->getOutput(0);
+               auto slope_tensor = tensor_to_const(ctx, slopes);
+               auto new_layer = ctx->net->addParametricReLU(*in, *slope_tensor);
+               new_layer->setName(util::node_info(n).c_str());
+               auto out_tensor = new_layer->getOutput(0);
 
-                    if (to_reshape) {
-                      auto out_shuffle = ctx->net->addShuffle(*out_tensor);
-                      TRTORCH_CHECK(out_shuffle, "Unable to create resize layer for aten::prelu output");
-                      out_shuffle->setReshapeDimensions(original_shape);
-                      out_shuffle->setName(
-                          (std::string("[Reshape back to ") + util::toStr(original_shape) + std::string("]")).c_str());
-                      out_tensor = out_shuffle->getOutput(0);
-                    }
+               if (to_reshape) {
+                 auto out_shuffle = ctx->net->addShuffle(*out_tensor);
+                 TRTORCH_CHECK(out_shuffle, "Unable to create resize layer for aten::prelu output");
+                 out_shuffle->setReshapeDimensions(original_shape);
+                 out_shuffle->setName(
+                     (std::string("[Reshape back to ") + util::toStr(original_shape) + std::string("]")).c_str());
+                 out_tensor = out_shuffle->getOutput(0);
+               }
 
-                    out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], out_tensor);
-                    LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
-                    return true;
-                  }});
+               out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], out_tensor);
+               LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+               return true;
+             }});
 
 } // namespace
 } // namespace impl

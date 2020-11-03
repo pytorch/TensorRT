@@ -8,14 +8,14 @@ import yapf
 VALID_PY_FILE_TYPES = [".py"]
 
 
-def lint(user, target_files, conf, change_file=True):
+def lint(user, target_files, conf, change_file=False):
     return yapf.FormatFiles(
         filenames=target_files,
         lines=None,
         style_config=conf,
         no_local_style=None,
         in_place=change_file,
-        print_diff=False,
+        print_diff=True,
         verify=True,
         parallel=True,
         verbose=True)
@@ -25,6 +25,7 @@ if __name__ == "__main__":
     BAZEL_ROOT = utils.find_bazel_root()
     STYLE_CONF_PATH = BAZEL_ROOT + "/.style.yapf"
     USER = BAZEL_ROOT.split('/')[2]
+    subprocess.run(["useradd", USER])
     projects = utils.CHECK_PROJECTS(sys.argv[1:])
     if "//..." in projects:
         projects = [p.replace(BAZEL_ROOT, "/")[:-1] for p in glob.glob(BAZEL_ROOT + '/*/')]
@@ -38,7 +39,5 @@ if __name__ == "__main__":
         if files != []:
             changed = lint(USER, files, STYLE_CONF_PATH)
             if changed:
-                print(
-                    "\033[93mWARNING:\033[0m This command modified your files with the recommended linting, you should review the changes before committing"
-                )
+                print("\033[91mERROR:\033[0m Some files do not conform to style guidelines")
                 sys.exit(1)
