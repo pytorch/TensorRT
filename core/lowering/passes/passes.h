@@ -19,7 +19,7 @@ void UnpackAddMM(std::shared_ptr<torch::jit::Graph>& graph);
 void UnpackBatchNorm(std::shared_ptr<torch::jit::Graph>& graph);
 void UnpackLogSoftmax(std::shared_ptr<torch::jit::Graph>& graph);
 
-} // namespace irfusers
+} // namespace passes
 } // namespace lowering
 } // namespace core
-} // trtorch
+} // namespace trtorch

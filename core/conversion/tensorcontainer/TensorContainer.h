@@ -11,15 +11,17 @@ namespace conversion {
 
 struct TensorContainer : torch::CustomClassHolder {
   nvinfer1::ITensor* tensor_;
-  TensorContainer(){}
+  TensorContainer() {}
 
-  void hold_tensor(nvinfer1::ITensor* tensor) {tensor_ = tensor;}
+  void hold_tensor(nvinfer1::ITensor* tensor) {
+    tensor_ = tensor;
+  }
 
   nvinfer1::ITensor* tensor() {
     return tensor_;
   }
 };
 
-} // conversion
-} // core
-} // trtorch
+} // namespace conversion
+} // namespace core
+} // namespace trtorch

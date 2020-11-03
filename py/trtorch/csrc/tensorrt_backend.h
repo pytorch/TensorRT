@@ -5,10 +5,10 @@
 namespace trtorch {
 namespace backend {
 
-class TensorRTBackend: public torch::jit::PyTorchBackendInterface {
-  public:
-    explicit TensorRTBackend() {}
-    virtual ~TensorRTBackend() = default;
+class TensorRTBackend : public torch::jit::PyTorchBackendInterface {
+ public:
+  explicit TensorRTBackend() {}
+  virtual ~TensorRTBackend() = default;
 
   c10::IValue preprocess(c10::IValue mod, c10::impl::GenericDict method_compile_spec) override;
   c10::impl::GenericDict compile(c10::IValue processed_mod, c10::impl::GenericDict method_compile_spec) override;

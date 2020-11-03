@@ -16,11 +16,11 @@ c10::IValue TensorRTBackend::preprocess(c10::IValue mod, c10::impl::GenericDict 
   mod_.eval();
   mod_ = core::lowering::LowerModule(mod_);
 
-  auto spec =
-      c10::impl::toTypedDict<std::string, at::IValue>(method_compile_spec);
+  auto spec = c10::impl::toTypedDict<std::string, at::IValue>(method_compile_spec);
 
   for (auto it = spec.begin(), end = spec.end(); it != end; ++it) {
-    TRTORCH_CHECK(core::CheckMethodOperatorSupport(mod.toModule(), it->key()),
+    TRTORCH_CHECK(
+        core::CheckMethodOperatorSupport(mod.toModule(), it->key()),
         "Method " << it->key() << "cannot be compiled by TRTorch");
   }
 
@@ -36,10 +36,10 @@ c10::IValue TensorRTBackend::preprocess(c10::IValue mod, c10::impl::GenericDict 
 
 c10::impl::GenericDict TensorRTBackend::compile(c10::IValue processed_mod, c10::impl::GenericDict method_compile_spec) {
   auto mod = processed_mod.toModule();
-  auto spec =
-      c10::impl::toTypedDict<std::string, at::IValue>(method_compile_spec);
+  auto spec = c10::impl::toTypedDict<std::string, at::IValue>(method_compile_spec);
 
-  auto handles = c10::impl::GenericDict(c10::StringType::get(), c10::getCustomClassType<c10::intrusive_ptr<core::runtime::TRTEngine>>());
+  auto handles = c10::impl::GenericDict(
+      c10::StringType::get(), c10::getCustomClassType<c10::intrusive_ptr<core::runtime::TRTEngine>>());
 
   for (auto it = spec.begin(), end = spec.end(); it != end; ++it) {
     const auto& method_name = it->key();
@@ -63,7 +63,6 @@ c10::impl::GenericDict TensorRTBackend::compile(c10::IValue processed_mod, c10::
 
   return c10::impl::toGenericDict(handles);
 }
-
 
 c10::impl::GenericList TensorRTBackend::execute(c10::IValue handle, c10::impl::GenericList inputs) {
   TRTORCH_ASSERT(inputs.size() > 0, "Trying to execute on empty list of arguments");

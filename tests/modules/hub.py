@@ -34,7 +34,7 @@ models = {
         "path": "both"
     },
     "resnext50_32x4d": {
-        "model":  models.resnext50_32x4d(pretrained=True),
+        "model": models.resnext50_32x4d(pretrained=True),
         "path": "both"
     },
     "wideresnet50_2": {
@@ -50,7 +50,7 @@ models = {
         "path": "both"
     },
     "resnet50": {
-        "model":torch.hub.load('pytorch/vision:v0.6.0', 'resnet50', pretrained=True),
+        "model": torch.hub.load('pytorch/vision:v0.6.0', 'resnet50', pretrained=True),
         "path": "both"
     },
     "fcn_resnet101": {
@@ -72,25 +72,26 @@ for n, m in models.items():
     print("Downloading {}".format(n))
     m["model"] = m["model"].eval().cuda()
     x = torch.ones((1, 3, 300, 300)).cuda()
-    if m["path"] == "both" or  m["path"] == "trace":
+    if m["path"] == "both" or m["path"] == "trace":
         trace_model = torch.jit.trace(m["model"], [x])
         torch.jit.save(trace_model, n + '_traced.jit.pt')
-    if m["path"] == "both" or  m["path"] == "script":
+    if m["path"] == "both" or m["path"] == "script":
         script_model = torch.jit.script(m["model"])
         torch.jit.save(script_model, n + '_scripted.jit.pt')
 
+
 # Sample Pool Model (for testing plugin serialization)
 class Pool(nn.Module):
+
     def __init__(self):
         super(Pool, self).__init__()
 
     def forward(self, x):
         return F.adaptive_avg_pool2d(x, (5, 5))
 
+
 model = Pool().eval().cuda()
 x = torch.ones([1, 3, 10, 10]).cuda()
 
 trace_model = torch.jit.trace(model, x)
 torch.jit.save(trace_model, "pooling_traced.jit.pt")
-
-

@@ -1,10 +1,10 @@
-#include "torch/csrc/jit/passes/guard_elimination.h"
 #include "torch/csrc/jit/ir/alias_analysis.h"
 #include "torch/csrc/jit/jit_log.h"
 #include "torch/csrc/jit/passes/constant_propagation.h"
+#include "torch/csrc/jit/passes/dead_code_elimination.h"
+#include "torch/csrc/jit/passes/guard_elimination.h"
 #include "torch/csrc/jit/passes/peephole.h"
 #include "torch/csrc/jit/runtime/graph_executor.h"
-#include "torch/csrc/jit/passes/dead_code_elimination.h"
 
 #include "core/util/prelude.h"
 
@@ -17,17 +17,17 @@ namespace passes {
 namespace {
 using namespace torch::jit;
 struct ToRemoval {
-  ToRemoval(std::shared_ptr<Graph> graph)
-    : graph_(std::move(graph)) {}
+  ToRemoval(std::shared_ptr<Graph> graph) : graph_(std::move(graph)) {}
 
   void run() {
     findTo(graph_->block());
     torch::jit::EliminateDeadCode(graph_);
-    LOG_DEBUG("RemoveTo - Note: Removing remaining aten::to operators, if type casts need to be preserved, add a pass before this pass is run");
+    LOG_DEBUG(
+        "RemoveTo - Note: Removing remaining aten::to operators, if type casts need to be preserved, add a pass before this pass is run");
     LOG_GRAPH("Post aten::to removal: " << *graph_);
   }
 
-private:
+ private:
   void findTo(Block* b) {
     for (auto it = b->nodes().begin(); it != b->nodes().end(); it++) {
       auto n = *it;

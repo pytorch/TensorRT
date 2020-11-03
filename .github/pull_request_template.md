@@ -15,7 +15,7 @@ Please delete options that are not relevant and/or add your own.
 
 # Checklist:
 
-- [ ] My code follows the style guidelines of this project
+- [ ] My code follows the style guidelines of this project (You can use the linters)
 - [ ] I have performed a self-review of my own code
 - [ ] I have commented my code, particularly in hard-to-understand areas and hacks
 - [ ] I have made corresponding changes to the documentation
