@@ -370,9 +370,9 @@
 
 <span class="cp">#pragma once</span>
 
+<span class="cp">#include</span> <span class="cpf">&lt;memory&gt;</span><span class="cp"></span>
 <span class="cp">#include</span> <span class="cpf">&lt;string&gt;</span><span class="cp"></span>
 <span class="cp">#include</span> <span class="cpf">&lt;vector&gt;</span><span class="cp"></span>
-<span class="cp">#include</span> <span class="cpf">&lt;memory&gt;</span><span class="cp"></span>
 
 <span class="c1">// Just include the .h?</span>
 <span class="cp">#ifndef DOXYGEN_SHOULD_SKIP_THIS</span>
@@ -388,106 +388,122 @@
 <span class="k">enum</span> <span class="k">class</span> <span class="nc">ScalarType</span> <span class="o">:</span> <span class="kt">int8_t</span><span class="p">;</span>
 <span class="k">template</span> <span class="o">&lt;</span><span class="n">class</span><span class="o">&gt;</span>
 <span class="k">class</span> <span class="nc">ArrayRef</span><span class="p">;</span>
-<span class="p">}</span>
+<span class="p">}</span> <span class="c1">// namespace c10</span>
 
 <span class="k">namespace</span> <span class="n">nvinfer1</span> <span class="p">{</span>
 <span class="k">class</span> <span class="nc">IInt8Calibrator</span><span class="p">;</span>
 <span class="p">}</span>
-<span class="cp">#endif </span><span class="c1">//DOXYGEN_SHOULD_SKIP_THIS</span>
+<span class="cp">#endif </span><span class="c1">// DOXYGEN_SHOULD_SKIP_THIS</span>
 
 <span class="cp">#include</span> <span class="cpf">"trtorch/macros.h"</span><span class="cp"></span>
 <span class="k">namespace</span> <span class="n">trtorch</span> <span class="p">{</span>
 <span class="k">struct</span> <span class="n">TRTORCH_API</span> <span class="n">CompileSpec</span> <span class="p">{</span>
-    <span class="k">struct</span> <span class="n">TRTORCH_API</span> <span class="n">InputRange</span> <span class="p">{</span>
-        <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">min</span><span class="p">;</span>
-        <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">opt</span><span class="p">;</span>
-        <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">max</span><span class="p">;</span>
-        <span class="n">InputRange</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">opt</span><span class="p">);</span>
-        <span class="n">InputRange</span><span class="p">(</span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">opt</span><span class="p">);</span>
-        <span class="n">InputRange</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">min</span><span class="p">,</span> <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">opt</span><span class="p">,</span> <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">max</span><span class="p">);</span>
-        <span class="n">InputRange</span><span class="p">(</span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">min</span><span class="p">,</span> <span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">opt</span><span class="p">,</span> <span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">max</span><span class="p">);</span>
+  <span class="k">struct</span> <span class="n">TRTORCH_API</span> <span class="n">InputRange</span> <span class="p">{</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">min</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">opt</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">max</span><span class="p">;</span>
+    <span class="n">InputRange</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">opt</span><span class="p">);</span>
+    <span class="n">InputRange</span><span class="p">(</span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">opt</span><span class="p">);</span>
+    <span class="n">InputRange</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">min</span><span class="p">,</span> <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">opt</span><span class="p">,</span> <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">max</span><span class="p">);</span>
+    <span class="n">InputRange</span><span class="p">(</span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">min</span><span class="p">,</span> <span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">opt</span><span class="p">,</span> <span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">max</span><span class="p">);</span>
+  <span class="p">};</span>
+
+  <span class="k">class</span> <span class="nc">TRTORCH_API</span> <span class="n">DataType</span> <span class="p">{</span>
+   <span class="k">public</span><span class="o">:</span>
+    <span class="k">enum</span> <span class="nl">Value</span> <span class="p">:</span> <span class="kt">int8_t</span> <span class="p">{</span>
+      <span class="n">kFloat</span><span class="p">,</span>
+      <span class="n">kHalf</span><span class="p">,</span>
+      <span class="n">kChar</span><span class="p">,</span>
     <span class="p">};</span>
 
-    <span class="k">class</span> <span class="nc">TRTORCH_API</span> <span class="n">DataType</span> <span class="p">{</span>
-    <span class="k">public</span><span class="o">:</span>
-        <span class="k">enum</span> <span class="nl">Value</span> <span class="p">:</span> <span class="kt">int8_t</span> <span class="p">{</span>
-            <span class="n">kFloat</span><span class="p">,</span>
-            <span class="n">kHalf</span><span class="p">,</span>
-            <span class="n">kChar</span><span class="p">,</span>
-        <span class="p">};</span>
+    <span class="n">DataType</span><span class="p">()</span> <span class="o">=</span> <span class="k">default</span><span class="p">;</span>
+    <span class="k">constexpr</span> <span class="nf">DataType</span><span class="p">(</span><span class="n">Value</span> <span class="n">t</span><span class="p">)</span> <span class="o">:</span> <span class="n">value</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="p">{}</span>
+    <span class="n">DataType</span><span class="p">(</span><span class="n">c10</span><span class="o">::</span><span class="n">ScalarType</span> <span class="n">t</span><span class="p">);</span>
+    <span class="k">operator</span> <span class="nf">Value</span><span class="p">()</span> <span class="k">const</span> <span class="p">{</span>
+      <span class="k">return</span> <span class="n">value</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">explicit</span> <span class="k">operator</span> <span class="nf">bool</span><span class="p">()</span> <span class="o">=</span> <span class="k">delete</span><span class="p">;</span>
+    <span class="k">constexpr</span> <span class="kt">bool</span> <span class="k">operator</span><span class="o">==</span><span class="p">(</span><span class="n">DataType</span> <span class="n">other</span><span class="p">)</span> <span class="k">const</span> <span class="p">{</span>
+      <span class="k">return</span> <span class="n">value</span> <span class="o">==</span> <span class="n">other</span><span class="p">.</span><span class="n">value</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">constexpr</span> <span class="kt">bool</span> <span class="k">operator</span><span class="o">==</span><span class="p">(</span><span class="n">DataType</span><span class="o">::</span><span class="n">Value</span> <span class="n">other</span><span class="p">)</span> <span class="k">const</span> <span class="p">{</span>
+      <span class="k">return</span> <span class="n">value</span> <span class="o">==</span> <span class="n">other</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">constexpr</span> <span class="kt">bool</span> <span class="k">operator</span><span class="o">!=</span><span class="p">(</span><span class="n">DataType</span> <span class="n">other</span><span class="p">)</span> <span class="k">const</span> <span class="p">{</span>
+      <span class="k">return</span> <span class="n">value</span> <span class="o">!=</span> <span class="n">other</span><span class="p">.</span><span class="n">value</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">constexpr</span> <span class="kt">bool</span> <span class="k">operator</span><span class="o">!=</span><span class="p">(</span><span class="n">DataType</span><span class="o">::</span><span class="n">Value</span> <span class="n">other</span><span class="p">)</span> <span class="k">const</span> <span class="p">{</span>
+      <span class="k">return</span> <span class="n">value</span> <span class="o">!=</span> <span class="n">other</span><span class="p">;</span>
+    <span class="p">}</span>
 
-        <span class="n">DataType</span><span class="p">()</span> <span class="o">=</span> <span class="k">default</span><span class="p">;</span>
-        <span class="k">constexpr</span> <span class="nf">DataType</span><span class="p">(</span><span class="n">Value</span> <span class="n">t</span><span class="p">)</span> <span class="o">:</span> <span class="n">value</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="p">{}</span>
-        <span class="n">DataType</span><span class="p">(</span><span class="n">c10</span><span class="o">::</span><span class="n">ScalarType</span> <span class="n">t</span><span class="p">);</span>
-        <span class="k">operator</span> <span class="nf">Value</span><span class="p">()</span> <span class="k">const</span>  <span class="p">{</span> <span class="k">return</span> <span class="n">value</span><span class="p">;</span> <span class="p">}</span>
-        <span class="k">explicit</span> <span class="k">operator</span> <span class="nf">bool</span><span class="p">()</span> <span class="o">=</span> <span class="k">delete</span><span class="p">;</span>
-        <span class="k">constexpr</span> <span class="kt">bool</span> <span class="k">operator</span><span class="o">==</span><span class="p">(</span><span class="n">DataType</span> <span class="n">other</span><span class="p">)</span> <span class="k">const</span> <span class="p">{</span> <span class="k">return</span> <span class="n">value</span> <span class="o">==</span> <span class="n">other</span><span class="p">.</span><span class="n">value</span><span class="p">;</span> <span class="p">}</span>
-        <span class="k">constexpr</span> <span class="kt">bool</span> <span class="k">operator</span><span class="o">==</span><span class="p">(</span><span class="n">DataType</span><span class="o">::</span><span class="n">Value</span> <span class="n">other</span><span class="p">)</span> <span class="k">const</span> <span class="p">{</span> <span class="k">return</span> <span class="n">value</span> <span class="o">==</span> <span class="n">other</span><span class="p">;</span> <span class="p">}</span>
-        <span class="k">constexpr</span> <span class="kt">bool</span> <span class="k">operator</span><span class="o">!=</span><span class="p">(</span><span class="n">DataType</span> <span class="n">other</span><span class="p">)</span> <span class="k">const</span> <span class="p">{</span> <span class="k">return</span> <span class="n">value</span> <span class="o">!=</span> <span class="n">other</span><span class="p">.</span><span class="n">value</span><span class="p">;</span> <span class="p">}</span>
-        <span class="k">constexpr</span> <span class="kt">bool</span> <span class="k">operator</span><span class="o">!=</span><span class="p">(</span><span class="n">DataType</span><span class="o">::</span><span class="n">Value</span> <span class="n">other</span><span class="p">)</span> <span class="k">const</span> <span class="p">{</span> <span class="k">return</span> <span class="n">value</span> <span class="o">!=</span> <span class="n">other</span><span class="p">;</span> <span class="p">}</span>
-    <span class="k">private</span><span class="o">:</span>
-        <span class="n">Value</span> <span class="n">value</span><span class="p">;</span>
+   <span class="k">private</span><span class="o">:</span>
+    <span class="n">Value</span> <span class="n">value</span><span class="p">;</span>
+  <span class="p">};</span>
+
+  <span class="k">class</span> <span class="nc">DeviceType</span> <span class="p">{</span>
+   <span class="k">public</span><span class="o">:</span>
+    <span class="k">enum</span> <span class="nl">Value</span> <span class="p">:</span> <span class="kt">int8_t</span> <span class="p">{</span>
+      <span class="n">kGPU</span><span class="p">,</span>
+      <span class="n">kDLA</span><span class="p">,</span>
     <span class="p">};</span>
 
-    <span class="k">class</span> <span class="nc">DeviceType</span> <span class="p">{</span>
-    <span class="k">public</span><span class="o">:</span>
-        <span class="k">enum</span> <span class="nl">Value</span> <span class="p">:</span> <span class="kt">int8_t</span> <span class="p">{</span>
-            <span class="n">kGPU</span><span class="p">,</span>
-            <span class="n">kDLA</span><span class="p">,</span>
-        <span class="p">};</span>
+    <span class="n">DeviceType</span><span class="p">()</span> <span class="o">=</span> <span class="k">default</span><span class="p">;</span>
+    <span class="k">constexpr</span> <span class="nf">DeviceType</span><span class="p">(</span><span class="n">Value</span> <span class="n">t</span><span class="p">)</span> <span class="o">:</span> <span class="n">value</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="p">{}</span>
+    <span class="n">DeviceType</span><span class="p">(</span><span class="n">c10</span><span class="o">::</span><span class="n">DeviceType</span> <span class="n">t</span><span class="p">);</span>
+    <span class="k">operator</span> <span class="nf">Value</span><span class="p">()</span> <span class="k">const</span> <span class="p">{</span>
+      <span class="k">return</span> <span class="n">value</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">explicit</span> <span class="k">operator</span> <span class="nf">bool</span><span class="p">()</span> <span class="o">=</span> <span class="k">delete</span><span class="p">;</span>
+    <span class="k">constexpr</span> <span class="kt">bool</span> <span class="k">operator</span><span class="o">==</span><span class="p">(</span><span class="n">DeviceType</span> <span class="n">other</span><span class="p">)</span> <span class="k">const</span> <span class="p">{</span>
+      <span class="k">return</span> <span class="n">value</span> <span class="o">==</span> <span class="n">other</span><span class="p">.</span><span class="n">value</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">constexpr</span> <span class="kt">bool</span> <span class="k">operator</span><span class="o">!=</span><span class="p">(</span><span class="n">DeviceType</span> <span class="n">other</span><span class="p">)</span> <span class="k">const</span> <span class="p">{</span>
+      <span class="k">return</span> <span class="n">value</span> <span class="o">!=</span> <span class="n">other</span><span class="p">.</span><span class="n">value</span><span class="p">;</span>
+    <span class="p">}</span>
 
-        <span class="n">DeviceType</span><span class="p">()</span> <span class="o">=</span> <span class="k">default</span><span class="p">;</span>
-        <span class="k">constexpr</span> <span class="nf">DeviceType</span><span class="p">(</span><span class="n">Value</span> <span class="n">t</span><span class="p">)</span> <span class="o">:</span> <span class="n">value</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="p">{}</span>
-        <span class="n">DeviceType</span><span class="p">(</span><span class="n">c10</span><span class="o">::</span><span class="n">DeviceType</span> <span class="n">t</span><span class="p">);</span>
-        <span class="k">operator</span> <span class="nf">Value</span><span class="p">()</span> <span class="k">const</span> <span class="p">{</span> <span class="k">return</span> <span class="n">value</span><span class="p">;</span> <span class="p">}</span>
-        <span class="k">explicit</span> <span class="k">operator</span> <span class="nf">bool</span><span class="p">()</span> <span class="o">=</span> <span class="k">delete</span><span class="p">;</span>
-        <span class="k">constexpr</span> <span class="kt">bool</span> <span class="k">operator</span><span class="o">==</span><span class="p">(</span><span class="n">DeviceType</span> <span class="n">other</span><span class="p">)</span> <span class="k">const</span> <span class="p">{</span> <span class="k">return</span> <span class="n">value</span> <span class="o">==</span> <span class="n">other</span><span class="p">.</span><span class="n">value</span><span class="p">;</span> <span class="p">}</span>
-        <span class="k">constexpr</span> <span class="kt">bool</span> <span class="k">operator</span><span class="o">!=</span><span class="p">(</span><span class="n">DeviceType</span> <span class="n">other</span><span class="p">)</span> <span class="k">const</span> <span class="p">{</span> <span class="k">return</span> <span class="n">value</span> <span class="o">!=</span> <span class="n">other</span><span class="p">.</span><span class="n">value</span><span class="p">;</span> <span class="p">}</span>
-    <span class="k">private</span><span class="o">:</span>
-        <span class="n">Value</span> <span class="n">value</span><span class="p">;</span>
-    <span class="p">};</span>
+   <span class="k">private</span><span class="o">:</span>
+    <span class="n">Value</span> <span class="n">value</span><span class="p">;</span>
+  <span class="p">};</span>
 
-    <span class="k">enum</span> <span class="k">class</span> <span class="nc">EngineCapability</span> <span class="o">:</span> <span class="kt">int8_t</span> <span class="p">{</span>
-        <span class="n">kDEFAULT</span><span class="p">,</span>
-        <span class="n">kSAFE_GPU</span><span class="p">,</span>
-        <span class="n">kSAFE_DLA</span><span class="p">,</span>
-    <span class="p">};</span>
+  <span class="k">enum</span> <span class="k">class</span> <span class="nc">EngineCapability</span> <span class="o">:</span> <span class="kt">int8_t</span> <span class="p">{</span>
+    <span class="n">kDEFAULT</span><span class="p">,</span>
+    <span class="n">kSAFE_GPU</span><span class="p">,</span>
+    <span class="n">kSAFE_DLA</span><span class="p">,</span>
+  <span class="p">};</span>
 
-    <span class="n">CompileSpec</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">InputRange</span><span class="o">&gt;</span> <span class="n">input_ranges</span><span class="p">)</span>
-        <span class="o">:</span> <span class="n">input_ranges</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">input_ranges</span><span class="p">))</span> <span class="p">{}</span>
-    <span class="n">CompileSpec</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;&gt;</span> <span class="n">fixed_sizes</span><span class="p">);</span>
-    <span class="n">CompileSpec</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;&gt;</span> <span class="n">fixed_sizes</span><span class="p">);</span>
+  <span class="n">CompileSpec</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">InputRange</span><span class="o">&gt;</span> <span class="n">input_ranges</span><span class="p">)</span> <span class="o">:</span> <span class="n">input_ranges</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">input_ranges</span><span class="p">))</span> <span class="p">{}</span>
+  <span class="n">CompileSpec</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;&gt;</span> <span class="n">fixed_sizes</span><span class="p">);</span>
+  <span class="n">CompileSpec</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;&gt;</span> <span class="n">fixed_sizes</span><span class="p">);</span>
 
-    <span class="c1">// Defaults should reflect TensorRT defaults for BuilderConfig</span>
+  <span class="c1">// Defaults should reflect TensorRT defaults for BuilderConfig</span>
 
-    <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">InputRange</span><span class="o">&gt;</span> <span class="n">input_ranges</span><span class="p">;</span>
+  <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">InputRange</span><span class="o">&gt;</span> <span class="n">input_ranges</span><span class="p">;</span>
 
-    <span class="n">DataType</span> <span class="n">op_precision</span> <span class="o">=</span> <span class="n">DataType</span><span class="o">::</span><span class="n">kFloat</span><span class="p">;</span>
+  <span class="n">DataType</span> <span class="n">op_precision</span> <span class="o">=</span> <span class="n">DataType</span><span class="o">::</span><span class="n">kFloat</span><span class="p">;</span>
 
-    <span class="kt">bool</span> <span class="n">refit</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
+  <span class="kt">bool</span> <span class="n">refit</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
 
-    <span class="kt">bool</span> <span class="n">debug</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
+  <span class="kt">bool</span> <span class="n">debug</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
 
-    <span class="kt">bool</span> <span class="n">strict_types</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
+  <span class="kt">bool</span> <span class="n">strict_types</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
 
-    <span class="kt">bool</span> <span class="n">allow_gpu_fallback</span> <span class="o">=</span> <span class="nb">true</span><span class="p">;</span>
+  <span class="kt">bool</span> <span class="n">allow_gpu_fallback</span> <span class="o">=</span> <span class="nb">true</span><span class="p">;</span>
 
-    <span class="n">DeviceType</span> <span class="n">device</span> <span class="o">=</span> <span class="n">DeviceType</span><span class="o">::</span><span class="n">kGPU</span><span class="p">;</span>
+  <span class="n">DeviceType</span> <span class="n">device</span> <span class="o">=</span> <span class="n">DeviceType</span><span class="o">::</span><span class="n">kGPU</span><span class="p">;</span>
 
-    <span class="n">EngineCapability</span> <span class="n">capability</span> <span class="o">=</span> <span class="n">EngineCapability</span><span class="o">::</span><span class="n">kDEFAULT</span><span class="p">;</span>
+  <span class="n">EngineCapability</span> <span class="n">capability</span> <span class="o">=</span> <span class="n">EngineCapability</span><span class="o">::</span><span class="n">kDEFAULT</span><span class="p">;</span>
 
-    <span class="kt">uint64_t</span> <span class="n">num_min_timing_iters</span> <span class="o">=</span> <span class="mi">2</span><span class="p">;</span>
-    <span class="kt">uint64_t</span> <span class="n">num_avg_timing_iters</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+  <span class="kt">uint64_t</span> <span class="n">num_min_timing_iters</span> <span class="o">=</span> <span class="mi">2</span><span class="p">;</span>
+  <span class="kt">uint64_t</span> <span class="n">num_avg_timing_iters</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
 
-    <span class="kt">uint64_t</span> <span class="n">workspace_size</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+  <span class="kt">uint64_t</span> <span class="n">workspace_size</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
 
-    <span class="kt">uint64_t</span> <span class="n">max_batch_size</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+  <span class="kt">uint64_t</span> <span class="n">max_batch_size</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
 
-    <span class="n">nvinfer1</span><span class="o">::</span><span class="n">IInt8Calibrator</span><span class="o">*</span> <span class="n">ptq_calibrator</span> <span class="o">=</span> <span class="k">nullptr</span><span class="p">;</span>
+  <span class="n">nvinfer1</span><span class="o">::</span><span class="n">IInt8Calibrator</span><span class="o">*</span> <span class="n">ptq_calibrator</span> <span class="o">=</span> <span class="k">nullptr</span><span class="p">;</span>
 <span class="p">};</span>
 
 <span class="n">TRTORCH_API</span> <span class="n">std</span><span class="o">::</span><span class="n">string</span> <span class="n">get_build_info</span><span class="p">();</span>
-
 
 <span class="n">TRTORCH_API</span> <span class="kt">void</span> <span class="nf">dump_build_info</span><span class="p">();</span>
 
@@ -495,7 +511,10 @@
 
 <span class="n">TRTORCH_API</span> <span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Module</span> <span class="n">CompileGraph</span><span class="p">(</span><span class="k">const</span> <span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Module</span><span class="o">&amp;</span> <span class="k">module</span><span class="p">,</span> <span class="n">CompileSpec</span> <span class="n">info</span><span class="p">);</span>
 
-<span class="n">TRTORCH_API</span> <span class="n">std</span><span class="o">::</span><span class="n">string</span> <span class="n">ConvertGraphToTRTEngine</span><span class="p">(</span><span class="k">const</span> <span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Module</span><span class="o">&amp;</span> <span class="k">module</span><span class="p">,</span> <span class="n">std</span><span class="o">::</span><span class="n">string</span> <span class="n">method_name</span><span class="p">,</span> <span class="n">CompileSpec</span> <span class="n">info</span><span class="p">);</span>
+<span class="n">TRTORCH_API</span> <span class="n">std</span><span class="o">::</span><span class="n">string</span> <span class="n">ConvertGraphToTRTEngine</span><span class="p">(</span>
+    <span class="k">const</span> <span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Module</span><span class="o">&amp;</span> <span class="k">module</span><span class="p">,</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">string</span> <span class="n">method_name</span><span class="p">,</span>
+    <span class="n">CompileSpec</span> <span class="n">info</span><span class="p">);</span>
 <span class="p">}</span> <span class="c1">// namespace trtorch</span>
 </pre>
         </div>
