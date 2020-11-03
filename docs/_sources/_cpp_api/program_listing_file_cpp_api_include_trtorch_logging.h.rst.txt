@@ -25,12 +25,12 @@ Program Listing for File logging.h
    namespace trtorch {
    namespace logging {
    enum Level {
-       kINTERNAL_ERROR,
-       kERROR,
-       kWARNING,
-       kINFO,
-       kDEBUG,
-       kGRAPH,
+     kINTERNAL_ERROR,
+     kERROR,
+     kWARNING,
+     kINFO,
+     kDEBUG,
+     kGRAPH,
    };
    
    // Are these ones necessary for the user?

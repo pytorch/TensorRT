@@ -1,6 +1,6 @@
-#include "torch/torch.h"
-#include "core/util/prelude.h"
 #include "core/conversion/converters/converters.h"
+#include "core/util/prelude.h"
+#include "torch/torch.h"
 
 namespace trtorch {
 namespace core {
@@ -9,8 +9,7 @@ namespace converters {
 namespace impl {
 namespace {
 
-auto batch_norm_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
-  .pattern({
+auto batch_norm_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().pattern({
     R"SIG(aten::batch_norm(Tensor input, Tensor? gamma, Tensor? beta,
                             Tensor? mean, Tensor? var,
                             bool training, float momentum, float eps, bool cudnn_enabled) -> (Tensor))SIG",
@@ -36,7 +35,6 @@ auto batch_norm_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
 
       auto eps = args[7].unwrapToDouble(1e-5f);
 
-
       LOG_DEBUG("momentum disregarded");
       LOG_DEBUG("training disregarded");
       LOG_DEBUG("cudnn disregarded");
@@ -45,7 +43,9 @@ auto batch_norm_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
       if (should_unpack) {
         // expand spatial dims from 1D to 2D
         auto new_shape = util::toDimsPad(util::toVec(orig_shape), 4);
-        LOG_DEBUG("Input shape is less than 4D got: " << orig_shape << ", inserting shuffle layer to reshape to 4D tensor shape: " << new_shape);
+        LOG_DEBUG(
+            "Input shape is less than 4D got: "
+            << orig_shape << ", inserting shuffle layer to reshape to 4D tensor shape: " << new_shape);
         auto in_shuffle = ctx->net->addShuffle(*input);
         in_shuffle->setReshapeDimensions(new_shape);
         in_shuffle->setName(std::string("[Reshape input to " + util::toStr(new_shape) + ']').c_str());
@@ -58,7 +58,8 @@ auto batch_norm_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
       auto scale_weights = Weights(ctx, scale);
       auto bias_weights = Weights(ctx, bias);
 
-      auto bn = ctx->net->addScaleNd(*input, nvinfer1::ScaleMode::kCHANNEL, bias_weights.data, scale_weights.data, {}, 1);
+      auto bn =
+          ctx->net->addScaleNd(*input, nvinfer1::ScaleMode::kCHANNEL, bias_weights.data, scale_weights.data, {}, 1);
       bn->setName(util::node_info(n).c_str());
       auto out_tensor = bn->getOutput(0);
 
@@ -72,9 +73,7 @@ auto batch_norm_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
 
       ctx->AssociateValueAndTensor(n->outputs()[0], out_tensor);
       return true;
-    }
-  });
-
+    }});
 
 } // namespace
 } // namespace impl

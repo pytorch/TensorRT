@@ -22,8 +22,14 @@ PARSER.add_argument('--lr', default=0.1, type=float, help="Initial learning rate
 PARSER.add_argument('--drop-ratio', default=0., type=float, help="Dropout ratio")
 PARSER.add_argument('--momentum', default=0.9, type=float, help="Momentum")
 PARSER.add_argument('--weight-decay', default=5e-4, type=float, help="Weight decay")
-PARSER.add_argument('--ckpt-dir', default="/tmp/vgg16_ckpts", type=str, help="Path to save checkpoints (saved every 10 epochs)")
-PARSER.add_argument('--start-from', default=0, type=int, help="Epoch to resume from (requires a checkpoin in the providied checkpoi")
+PARSER.add_argument('--ckpt-dir',
+                    default="/tmp/vgg16_ckpts",
+                    type=str,
+                    help="Path to save checkpoints (saved every 10 epochs)")
+PARSER.add_argument('--start-from',
+                    default=0,
+                    type=int,
+                    help="Epoch to resume from (requires a checkpoin in the providied checkpoi")
 PARSER.add_argument('--seed', type=int, help='Seed value for rng')
 PARSER.add_argument('--tensorboard', type=str, default='/tmp/vgg16_logs', help='Location for tensorboard info')
 
@@ -54,26 +60,32 @@ def main():
     if not os.path.isdir(args.ckpt_dir):
         os.makedirs(args.ckpt_dir)
 
-    training_dataset = datasets.CIFAR10(root='./data', train=True,
-                                        download=True, transform=transforms.Compose([
+    training_dataset = datasets.CIFAR10(root='./data',
+                                        train=True,
+                                        download=True,
+                                        transform=transforms.Compose([
                                             transforms.RandomCrop(32, padding=4),
                                             transforms.RandomHorizontalFlip(),
                                             transforms.ToTensor(),
-                                            transforms.Normalize((0.4914, 0.4822, 0.4465),
-                                                                 (0.2023, 0.1994, 0.2010)),
+                                            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
                                         ]))
-    training_dataloader = torch.utils.data.DataLoader(training_dataset, batch_size=args.batch_size,
-                                                      shuffle=True, num_workers=2)
+    training_dataloader = torch.utils.data.DataLoader(training_dataset,
+                                                      batch_size=args.batch_size,
+                                                      shuffle=True,
+                                                      num_workers=2)
 
-    testing_dataset = datasets.CIFAR10(root='./data', train=False, download=True,
+    testing_dataset = datasets.CIFAR10(root='./data',
+                                       train=False,
+                                       download=True,
                                        transform=transforms.Compose([
-                                            transforms.ToTensor(),
-                                            transforms.Normalize((0.4914, 0.4822, 0.4465),
-                                                                 (0.2023, 0.1994, 0.2010)),
-                                        ]))
+                                           transforms.ToTensor(),
+                                           transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+                                       ]))
 
-    testing_dataloader = torch.utils.data.DataLoader(testing_dataset, batch_size=args.batch_size,
-                                                     shuffle=False, num_workers=2)
+    testing_dataloader = torch.utils.data.DataLoader(testing_dataset,
+                                                     batch_size=args.batch_size,
+                                                     shuffle=False,
+                                                     num_workers=2)
 
     num_classes = len(classes)
 
@@ -95,7 +107,7 @@ def main():
     if args.start_from != 0:
         ckpt_file = args.ckpt_dir + '/ckpt_epoch' + str(args.start_from) + '.pth'
         print('Loading from checkpoint {}'.format(ckpt_file))
-        assert(os.path.isfile(ckpt_file))
+        assert (os.path.isfile(ckpt_file))
         ckpt = torch.load(ckpt_file)
         model.load_state_dict(ckpt["model_state_dict"])
         opt.load_state_dict(ckpt["opt_state_dict"])
@@ -113,13 +125,16 @@ def main():
         print("Test Loss: {:.5f} Test Acc: {:.2f}%".format(test_loss, 100 * test_acc))
 
         if epoch % 10 == 9:
-            save_checkpoint({
-                'epoch': epoch + 1,
-                'model_state_dict': model.state_dict(),
-                'acc': test_acc,
-                'opt_state_dict' : opt.state_dict(),
-                'state': state
-            }, ckpt_dir=args.ckpt_dir)
+            save_checkpoint(
+                {
+                    'epoch': epoch + 1,
+                    'model_state_dict': model.state_dict(),
+                    'acc': test_acc,
+                    'opt_state_dict': opt.state_dict(),
+                    'state': state
+                },
+                ckpt_dir=args.ckpt_dir)
+
 
 def train(model, dataloader, crit, opt, epoch):
     global writer
@@ -139,6 +154,7 @@ def train(model, dataloader, crit, opt, epoch):
             writer.close()
             print("Batch: [%5d | %5d] loss: %.3f" % (batch + 1, len(dataloader), running_loss / 100))
             running_loss = 0.0
+
 
 def test(model, dataloader, crit, epoch):
     global writer
@@ -180,14 +196,16 @@ def save_checkpoint(state, ckpt_dir='checkpoint'):
     filepath = os.path.join(ckpt_dir, filename)
     torch.save(state, filepath)
 
+
 def adjust_lr(optimizer, epoch):
     global state
-    new_lr = state["lr"] * (0.5 ** (epoch // 40)) if state["lr"] > 1e-7 else state["lr"]
+    new_lr = state["lr"] * (0.5**(epoch // 40)) if state["lr"] > 1e-7 else state["lr"]
     if new_lr != state["lr"]:
         state["lr"] = new_lr
         print("Updating learning rate: {}".format(state["lr"]))
         for param_group in optimizer.param_groups:
             param_group["lr"] = state["lr"]
+
 
 def add_pr_curve_tensorboard(class_index, test_probs, test_preds, global_step=0):
     global classes
@@ -198,11 +216,9 @@ def add_pr_curve_tensorboard(class_index, test_probs, test_preds, global_step=0)
     tensorboard_preds = test_preds == class_index
     tensorboard_probs = test_probs[:, class_index]
 
-    writer.add_pr_curve(classes[class_index],
-                        tensorboard_preds,
-                        tensorboard_probs,
-                        global_step=global_step)
+    writer.add_pr_curve(classes[class_index], tensorboard_preds, tensorboard_probs, global_step=global_step)
     writer.close()
+
 
 if __name__ == "__main__":
     main()

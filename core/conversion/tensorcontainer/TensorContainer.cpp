@@ -6,9 +6,8 @@ namespace conversion {
 namespace {
 
 static auto tensor_container =
-  torch::class_<TensorContainer>("_trtorch_eval_ivalue_types", "TensorContainer")
-      .def(torch::init<>());
+    torch::class_<TensorContainer>("_trtorch_eval_ivalue_types", "TensorContainer").def(torch::init<>());
 } // namespace
-} // conversion
-} // core
-} // trtorch
+} // namespace conversion
+} // namespace core
+} // namespace trtorch

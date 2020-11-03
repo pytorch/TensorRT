@@ -1,14 +1,14 @@
-#include "ATen/core/ivalue.h"
 #include "ATen/core/List.h"
-#include "core/util/prelude.h"
 #include "ATen/core/functional.h"
+#include "ATen/core/ivalue.h"
+#include "core/util/prelude.h"
 
 namespace trtorch {
 namespace core {
 namespace conversion {
 namespace evaluators {
 
-//TODO: Switch back to PyTorch canonical implimentation
+// TODO: Switch back to PyTorch canonical implimentation
 c10::optional<torch::jit::IValue> toIValue(const torch::jit::Value* v) {
   if (v->node()->kind() != torch::jit::prim::Constant || v->type()->cast<c10::FunctionType>()) {
     return c10::nullopt;
@@ -20,12 +20,10 @@ c10::optional<torch::jit::IValue> toIValue(const torch::jit::Value* v) {
   } else if (type->isSubtypeOf(c10::BoolType::get())) {
     return (bool)node->i(c10::attr::value);
   } else if (
-    type->isSubtypeOf(c10::NumberType::get()) &&
-     node->kindOf(c10::attr::value) == torch::jit::AttributeKind::i) {
+      type->isSubtypeOf(c10::NumberType::get()) && node->kindOf(c10::attr::value) == torch::jit::AttributeKind::i) {
     return node->i(c10::attr::value);
   } else if (
-    type->isSubtypeOf(c10::NumberType::get()) &&
-    node->kindOf(c10::attr::value) == torch::jit::AttributeKind::f) {
+      type->isSubtypeOf(c10::NumberType::get()) && node->kindOf(c10::attr::value) == torch::jit::AttributeKind::f) {
     return node->f(c10::attr::value);
   } else if (type->isSubtypeOf(c10::ListType::ofInts())) {
     try {
@@ -66,21 +64,15 @@ c10::optional<torch::jit::IValue> toIValue(const torch::jit::Value* v) {
       const auto& ival = node->ival(c10::attr::value);
       return ival;
     }
-  } else if (
-      type->cast<c10::ListType>() &&
-      node->kindOf(c10::attr::value) == torch::jit::AttributeKind::ival) {
+  } else if (type->cast<c10::ListType>() && node->kindOf(c10::attr::value) == torch::jit::AttributeKind::ival) {
     const auto& list = node->ival(c10::attr::value);
     TRTORCH_ASSERT(list.isList(), "Is not a list");
     return list;
-  } else if (
-      type->cast<c10::DictType>() &&
-      node->kindOf(c10::attr::value) == torch::jit::AttributeKind::ival) {
+  } else if (type->cast<c10::DictType>() && node->kindOf(c10::attr::value) == torch::jit::AttributeKind::ival) {
     const auto& dict = node->ival(c10::attr::value);
     TRTORCH_ASSERT(dict.isGenericDict(), "Is not a dict");
     return dict;
-  } else if (
-      type->cast<c10::TupleType>() &&
-      node->kindOf(c10::attr::value) == torch::jit::AttributeKind::ival) {
+  } else if (type->cast<c10::TupleType>() && node->kindOf(c10::attr::value) == torch::jit::AttributeKind::ival) {
     const auto& tup = node->ival(c10::attr::value);
     TRTORCH_ASSERT(tup.isTuple(), "Is not a tuple");
     return tup;

@@ -56,11 +56,13 @@ def compile(module: torch.jit.ScriptModule, compile_spec: Any) -> torch.jit.Scri
     """
 
     if isinstance(module, torch.jit.ScriptFunction):
-        raise TypeError("torch.jit.ScriptFunction currently is not directly supported, wrap the function in a module to compile")
+        raise TypeError(
+            "torch.jit.ScriptFunction currently is not directly supported, wrap the function in a module to compile")
 
     compiled_cpp_mod = trtorch._C.compile_graph(module._c, _parse_compile_spec(compile_spec))
     compiled_module = torch.jit._recursive.wrap_cpp_module(compiled_cpp_mod)
     return compiled_module
+
 
 def convert_method_to_trt_engine(module: torch.jit.ScriptModule, method_name: str, compile_spec: Any) -> str:
     """Convert a TorchScript module method to a serialized TensorRT engine
@@ -107,9 +109,11 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule, method_name: st
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
     """
     if isinstance(module, torch.jit.ScriptFunction):
-        raise TypeError("torch.jit.ScriptFunctions currently are not directly supported, wrap the function in a module to compile")
+        raise TypeError(
+            "torch.jit.ScriptFunctions currently are not directly supported, wrap the function in a module to compile")
 
     return trtorch._C.convert_graph_to_trt_engine(module._c, method_name, _parse_compile_spec(compile_spec))
+
 
 def check_method_op_support(module: torch.jit.ScriptModule, method_name: str) -> bool:
     """Checks to see if a method is fully supported by TRTorch
@@ -127,10 +131,12 @@ def check_method_op_support(module: torch.jit.ScriptModule, method_name: str) ->
     """
     return trtorch._C.check_method_op_support(module._c, method_name)
 
+
 def dump_build_info():
     """Prints build information about the TRTorch distribution to stdout
     """
     print(get_build_info())
+
 
 def get_build_info() -> str:
     """Returns a string containing the build information of TRTorch distribution
@@ -141,4 +147,3 @@ def get_build_info() -> str:
     build_info = trtorch._C.get_build_info()
     build_info = "TRTorch Version: " + str(__version__) + '\n' + build_info
     return build_info
-
