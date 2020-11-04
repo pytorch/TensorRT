@@ -335,43 +335,42 @@ struct TRTORCH_API CompileSpec {
    */
   bool strict_types = false;
 
-    /*
-     * Setting data structure for Target device
+  /*
+   * Setting data structure for Target device
+   */
+  struct Device {
+    /**
+     * @brief Setting data structure for device
+     * This struct will hold Target device related parameters such as device_type, gpu_id, dla_core
      */
-    struct Device {
-      /**
-       * @brief Setting data structure for device
-       * This struct will hold Target device related parameters such as device_type, gpu_id, dla_core
-       */
-      DeviceType device_type;
-
-      /*
-       * Target gpu id
-       */
-      int64_t gpu_id;
-
-      /*
-       * When using DLA core on NVIDIA AGX platforms gpu_id should be set as Xavier device
-       */
-      int64_t dla_core;
-
-      /**
-       * (Only used when targeting DLA (device))
-       * Lets engine run layers on GPU if they are not supported on DLA
-       */
-      bool allow_gpu_fallback;
-
-      /**
-       * Constructor for Device structure
-       */
-      Device() : device_type(DeviceType::kGPU), gpu_id(0), dla_core(0), allow_gpu_fallback(false) {}
-    };
+    DeviceType device_type;
 
     /*
-     * Target Device
+     * Target gpu id
      */
-    Device device;
+    int64_t gpu_id;
 
+    /*
+     * When using DLA core on NVIDIA AGX platforms gpu_id should be set as Xavier device
+     */
+    int64_t dla_core;
+
+    /**
+     * (Only used when targeting DLA (device))
+     * Lets engine run layers on GPU if they are not supported on DLA
+     */
+    bool allow_gpu_fallback;
+
+    /**
+     * Constructor for Device structure
+     */
+    Device() : device_type(DeviceType::kGPU), gpu_id(0), dla_core(0), allow_gpu_fallback(false) {}
+  };
+
+  /*
+   * Target Device
+   */
+  Device device;
 
   /**
    * Sets the restrictions for the engine (CUDA Safety)

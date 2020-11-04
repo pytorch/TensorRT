@@ -54,16 +54,17 @@ bool MaxPoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& ar
       LOG_WARNING("DLA Pooling stride is limited to 2D, will run on GPU");
     }
   }
-new_layer->setStrideNd(stride);
+  new_layer->setStrideNd(stride);
 
-auto padding_mode = ceil_mode ? nvinfer1::PaddingMode::kEXPLICIT_ROUND_UP : nvinfer1::PaddingMode::kEXPLICIT_ROUND_DOWN;
-new_layer->setPaddingMode(padding_mode);
+  auto padding_mode =
+      ceil_mode ? nvinfer1::PaddingMode::kEXPLICIT_ROUND_UP : nvinfer1::PaddingMode::kEXPLICIT_ROUND_DOWN;
+  new_layer->setPaddingMode(padding_mode);
 
-new_layer->setName(util::node_info(n).c_str());
-auto out_tensor = ctx -> AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
+  new_layer->setName(util::node_info(n).c_str());
+  auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
 
-LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
-return true;
+  LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+  return true;
 } // namespace
 
 bool AvgPoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& args) {
@@ -104,21 +105,22 @@ bool AvgPoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& ar
       LOG_WARNING("DLA Pooling stride is limited to 2D, will run on GPU");
     }
   }
-new_layer->setStrideNd(stride);
+  new_layer->setStrideNd(stride);
 
-auto padding_mode = ceil_mode ? nvinfer1::PaddingMode::kEXPLICIT_ROUND_UP : nvinfer1::PaddingMode::kEXPLICIT_ROUND_DOWN;
-new_layer->setPaddingMode(padding_mode);
-new_layer->setAverageCountExcludesPadding(!count_inlcude_pad);
+  auto padding_mode =
+      ceil_mode ? nvinfer1::PaddingMode::kEXPLICIT_ROUND_UP : nvinfer1::PaddingMode::kEXPLICIT_ROUND_DOWN;
+  new_layer->setPaddingMode(padding_mode);
+  new_layer->setAverageCountExcludesPadding(!count_inlcude_pad);
 
-if (!(args[6].IValue()->isNone())) {
-  LOG_WARNING("Divisor override is now handled by Avg Pooling Converter");
-}
+  if (!(args[6].IValue()->isNone())) {
+    LOG_WARNING("Divisor override is now handled by Avg Pooling Converter");
+  }
 
-new_layer->setName(util::node_info(n).c_str());
-auto out_tensor = ctx -> AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
+  new_layer->setName(util::node_info(n).c_str());
+  auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
 
-LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
-return true;
+  LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+  return true;
 } // namespace impl
 
 auto pooling_registrations TRTORCH_UNUSED =
@@ -347,9 +349,9 @@ auto pooling_registrations TRTORCH_UNUSED =
 
                return true;
              }});
+} // namespace
+} // namespace impl
 } // namespace converters
 } // namespace conversion
-} // namespace core
-} // namespace trtorch
 } // namespace core
 } // namespace trtorch
