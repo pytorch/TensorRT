@@ -4,6 +4,7 @@ import glob
 import utils
 import subprocess
 import yapf
+import pwd
 
 VALID_PY_FILE_TYPES = [".py"]
 
@@ -24,7 +25,7 @@ def lint(user, target_files, conf, change_file=True):
 if __name__ == "__main__":
     BAZEL_ROOT = utils.find_bazel_root()
     STYLE_CONF_PATH = BAZEL_ROOT + "/.style.yapf"
-    USER = BAZEL_ROOT.split('/')[2]
+    USER = pwd.getpwuid(os.getuid())[0]
     projects = utils.CHECK_PROJECTS(sys.argv[1:])
     if "//..." in projects:
         projects = [p.replace(BAZEL_ROOT, "/")[:-1] for p in glob.glob(BAZEL_ROOT + '/*/')]
