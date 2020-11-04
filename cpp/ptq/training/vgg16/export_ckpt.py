@@ -10,6 +10,7 @@ import torchvision.datasets as datasets
 
 from vgg16 import vgg16
 
+
 def test(model, dataloader, crit):
     global writer
     global classes
@@ -34,6 +35,7 @@ def test(model, dataloader, crit):
     test_preds = torch.cat(class_preds)
     return loss / total, correct / total
 
+
 PARSER = argparse.ArgumentParser(description="Export trained VGG")
 PARSER.add_argument('ckpt', type=str, help="Path to saved checkpoint")
 
@@ -48,7 +50,7 @@ if torch.cuda.device_count() > 1:
     from collections import OrderedDict
     new_state_dict = OrderedDict()
     for k, v in weights.items():
-        name = k[7:] # remove `module.`
+        name = k[7:]  # remove `module.`
         new_state_dict[name] = v
     weights = new_state_dict
 
@@ -60,14 +62,15 @@ model.load_state_dict(weights)
 jit_model = torch.jit.trace(model, torch.rand([32, 3, 32, 32]).to("cuda"))
 jit_model.eval()
 
-testing_dataset = datasets.CIFAR10(root='./data', train=False, download=True,
-                                    transform=transforms.Compose([
-                                    transforms.ToTensor(),
-                                    transforms.Normalize((0.4914, 0.4822, 0.4465),
-                                                         (0.2023, 0.1994, 0.2010))]))
+testing_dataset = datasets.CIFAR10(root='./data',
+                                   train=False,
+                                   download=True,
+                                   transform=transforms.Compose([
+                                       transforms.ToTensor(),
+                                       transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+                                   ]))
 
-testing_dataloader = torch.utils.data.DataLoader(testing_dataset, batch_size=32,
-                                                 shuffle=False, num_workers=2)
+testing_dataloader = torch.utils.data.DataLoader(testing_dataset, batch_size=32, shuffle=False, num_workers=2)
 
 crit = torch.nn.CrossEntropyLoss()
 

@@ -3,7 +3,9 @@ import trtorch
 import torch
 import torchvision.models as models
 
+
 class ModelTestCase(unittest.TestCase):
+
     def __init__(self, methodName='runTest', model=None):
         super(ModelTestCase, self).__init__(methodName)
         self.model = model

@@ -24,7 +24,6 @@ author = 'NVIDIA Corporation'
 # The full version, including alpha/beta/rc tags
 release = 'master'
 
-
 # -- General configuration ---------------------------------------------------
 
 # Add any Sphinx extension module names here, as strings. They can be
@@ -50,7 +49,6 @@ templates_path = ['_templates']
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = ['_build', '_tmp', 'Thumbs.db', '.DS_Store']
 
-
 # -- Options for HTML output -------------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
@@ -64,30 +62,26 @@ html_theme = 'sphinx_material'
 html_static_path = ['_static']
 
 # Setup the breathe extension
-breathe_projects = {
-    "TRTorch": "./_tmp/xml"
-}
+breathe_projects = {"TRTorch": "./_tmp/xml"}
 breathe_default_project = "TRTorch"
 
 # Setup the exhale extension
 exhale_args = {
     # These arguments are required
-    "containmentFolder":     "./_cpp_api",
-    "rootFileName":          "trtorch_cpp.rst",
-    "rootFileTitle":         "TRTorch C++ API",
-    "doxygenStripFromPath":  "..",
+    "containmentFolder": "./_cpp_api",
+    "rootFileName": "trtorch_cpp.rst",
+    "rootFileTitle": "TRTorch C++ API",
+    "doxygenStripFromPath": "..",
     # Suggested optional arguments
-    "createTreeView":        True,
+    "createTreeView": True,
     # TIP: if using the sphinx-bootstrap-theme, you need
     # "treeViewIsBootstrap": True,
     "exhaleExecutesDoxygen": True,
-    "exhaleDoxygenStdin":    "INPUT = ../cpp/api/include"
+    "exhaleDoxygenStdin": "INPUT = ../cpp/api/include"
 }
 
 html_show_sourcelink = True
-html_sidebars = {
-    "**": ["logo-text.html", "globaltoc.html", "localtoc.html", "searchbox.html"]
-}
+html_sidebars = {"**": ["logo-text.html", "globaltoc.html", "localtoc.html", "searchbox.html"]}
 
 extensions.append("sphinx_material")
 html_theme_path = sphinx_material.html_theme_path()
@@ -131,11 +125,9 @@ html_theme_options = {
     }
 }
 
-
 # Tell sphinx what the primary language being documented is.
 primary_domain = 'cpp'
 cpp_id_attributes = ["TRTORCH_API"]
-
 
 # Tell sphinx what the pygments highlight language should be.
 highlight_language = 'cpp'

@@ -12,7 +12,22 @@ We use the PyTorch Slack for communication about core development, integration w
 
 ### Coding Guidelines
 
-- We generally follow the coding guidelines used in PyTorch, right now this is not strictly enforced, but match the style used in the code already
+- We generally follow the coding guidelines used in PyTorch
+
+    - Use the built in linting tools to ensure that your code matches the style guidelines
+      ```sh
+      # C++ Linting (After installing clang-format)
+      # Print non-conforming sections of code
+      bazel run //tools/linter:cpp_linter_diff -- //...
+      # Modify code to conform with style guidelines
+      bazel run //tools/linter:cpp_linter -- //...
+
+      # Python Linting
+      # Print non-conforming sections of code
+      bazel run //tools/linter:py_linter_diff -- //...
+      # Modify code to conform with style guidelines
+      bazel run //tools/linter:py_linter -- //...
+      ```
 
 - Avoid introducing unnecessary complexity into existing code so that maintainability and readability are preserved
 

@@ -139,3 +139,12 @@ pip3_import(
 load("@py_test_deps//:requirements.bzl", "pip_install")
 pip_install()
 
+pip3_import(
+   name = "pylinter_deps",
+   requirements = "//tools/linter:requirements.txt",
+)
+
+load("@pylinter_deps//:requirements.bzl", "pip_install")
+pip_install()
+
+

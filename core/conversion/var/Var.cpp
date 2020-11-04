@@ -1,7 +1,7 @@
 #include <sstream>
 
-#include "core/util/prelude.h"
 #include "core/conversion/var/Var.h"
+#include "core/util/prelude.h"
 
 namespace trtorch {
 namespace core {
@@ -12,47 +12,45 @@ Var::Var() {
   type_ = Type::kNone;
 }
 
-Var::Var(const torch::jit::IValue* p)
-  : type_(Type::kIValue) {
+Var::Var(const torch::jit::IValue* p) : type_(Type::kIValue) {
   ptr_.ivalue = p;
 }
 
-Var::Var(nvinfer1::ITensor* p)
-  : type_(Type::kITensor) {
+Var::Var(nvinfer1::ITensor* p) : type_(Type::kITensor) {
   ptr_.tensor = p;
 }
 
 Var::Var(const Var& a) {
-  switch(a.type_) {
-  case Type::kITensor:
-    ptr_.tensor = a.ptr_.tensor;
-    type_ = Type::kITensor;
-    break;
-  case Type::kIValue:
-    ptr_.ivalue = a.ptr_.ivalue;
-    type_ = Type::kIValue;
-    break;
-  case Type::kNone:
-  default:
-    ptr_.none = a.ptr_.none;
-    type_ = Type::kNone;
+  switch (a.type_) {
+    case Type::kITensor:
+      ptr_.tensor = a.ptr_.tensor;
+      type_ = Type::kITensor;
+      break;
+    case Type::kIValue:
+      ptr_.ivalue = a.ptr_.ivalue;
+      type_ = Type::kIValue;
+      break;
+    case Type::kNone:
+    default:
+      ptr_.none = a.ptr_.none;
+      type_ = Type::kNone;
   }
 }
 
 Var& Var::operator=(const Var& a) {
-  switch(a.type_) {
-  case Type::kITensor:
-    ptr_.tensor = a.ptr_.tensor;
-    type_ = Type::kITensor;
-    break;
-  case Type::kIValue:
-    ptr_.ivalue = a.ptr_.ivalue;
-    type_ = Type::kIValue;
-    break;
-  case Type::kNone:
-  default:
-    ptr_.none = a.ptr_.none;
-    type_ = Type::kNone;
+  switch (a.type_) {
+    case Type::kITensor:
+      ptr_.tensor = a.ptr_.tensor;
+      type_ = Type::kITensor;
+      break;
+    case Type::kIValue:
+      ptr_.ivalue = a.ptr_.ivalue;
+      type_ = Type::kIValue;
+      break;
+    case Type::kNone:
+    default:
+      ptr_.none = a.ptr_.none;
+      type_ = Type::kNone;
   }
   return (*this);
 }
@@ -74,16 +72,16 @@ Var::Type Var::type() const {
 }
 
 std::string Var::type_name() const {
-  switch(type_) {
-  case Type::kITensor:
-    return "nvinfer1::ITensor";
-    break;
-  case Type::kIValue:
-    return "c10::IValue";
-    break;
-  case Type::kNone:
-  default:
-    return "None";
+  switch (type_) {
+    case Type::kITensor:
+      return "nvinfer1::ITensor";
+      break;
+    case Type::kIValue:
+      return "c10::IValue";
+      break;
+    case Type::kNone:
+    default:
+      return "None";
   }
 }
 
@@ -91,8 +89,10 @@ nvinfer1::ITensor* Var::ITensorOrFreeze(ConversionCtx* ctx) {
   if (isIValue()) {
     LOG_DEBUG(ctx->logger, "Found IValue containing object of type " << *(ptr_.ivalue->type()));
   }
-  TRTORCH_CHECK(isITensor() || (isIValue() && ptr_.ivalue->isTensor()), "Requested either IValue containing a Tensor, or ITensor, however Var type is " << type_name());
-  
+  TRTORCH_CHECK(
+      isITensor() || (isIValue() && ptr_.ivalue->isTensor()),
+      "Requested either IValue containing a Tensor, or ITensor, however Var type is " << type_name());
+
   nvinfer1::ITensor* out;
 
   if (isIValue()) {

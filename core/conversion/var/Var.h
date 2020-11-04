@@ -1,24 +1,20 @@
 #pragma once
 
-#include <string>
 #include <map>
+#include <string>
 
-#include "torch/csrc/jit/ir/ir.h"
 #include "core/conversion/conversionctx/ConversionCtx.h"
 #include "core/conversion/converters/Weights.h"
 #include "core/util/prelude.h"
+#include "torch/csrc/jit/ir/ir.h"
 
 namespace trtorch {
 namespace core {
 namespace conversion {
 
 class Var : torch::CustomClassHolder {
-public:
-  enum Type {
-    kITensor,
-    kIValue,
-    kNone
-  };
+ public:
+  enum Type { kITensor, kIValue, kNone };
 
   Var();
   Var(const torch::jit::IValue* p);
@@ -30,7 +26,8 @@ public:
   const torch::jit::IValue* IValue() const;
   nvinfer1::ITensor* ITensor() const;
 
-  //TODO: Can we consolidate this in a way that prevents requesting invalid types
+  // TODO: Can we consolidate this in a way that prevents requesting invalid
+  // types
   at::Tensor unwrapToTensor(at::Tensor default_val);
   at::Tensor unwrapToTensor();
   int64_t unwrapToInt(int64_t default_val);
@@ -51,9 +48,9 @@ public:
   c10::List<at::Tensor> unwrapToTensorList();
   nvinfer1::ITensor* ITensorOrFreeze(ConversionCtx* ctx);
 
-  template<typename T>
+  template <typename T>
   T unwrapTo(T default_val);
-  template<typename T>
+  template <typename T>
   T unwrapTo();
 
   bool isIValue() const;
@@ -61,7 +58,8 @@ public:
   bool isNone() const;
   Var::Type type() const;
   std::string type_name() const;
-private:
+
+ private:
   union VarContainer {
     const torch::jit::IValue* ivalue;
     nvinfer1::ITensor* tensor;

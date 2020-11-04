@@ -4,6 +4,7 @@ from trtorch._C import _get_logging_prefix, _set_logging_prefix, \
                         _get_is_colored_output_on,  _set_is_colored_output_on, \
                         _log, LogLevel
 
+
 class Level(Enum):
     """Enum to set the minimum required logging level to print a message to stdout
     """
@@ -26,6 +27,7 @@ class Level(Enum):
         if external == Level.Debug:
             return LogLevel.DEBUG
 
+
 def get_logging_prefix() -> str:
     """Get the prefix set for logging messages
 
@@ -33,6 +35,7 @@ def get_logging_prefix() -> str:
         str: Prefix used for logger
     """
     return _get_logging_prefix()
+
 
 def set_logging_prefix(prefix: str):
     """Set the prefix used when logging messages
@@ -42,6 +45,7 @@ def set_logging_prefix(prefix: str):
     """
     _set_logging_prefix(prefix)
 
+
 def get_reportable_log_level() -> Level:
     """Get the level required for a message to be printed in the log
 
@@ -49,6 +53,7 @@ def get_reportable_log_level() -> Level:
         trtorch.logging.Level: The enum representing the level required to print
     """
     return Level(_get_reportable_log_level())
+
 
 def set_reportable_log_level(level: Level):
     """Set the level required for a message to be printed to the log
@@ -58,6 +63,7 @@ def set_reportable_log_level(level: Level):
     """
     _set_reportable_log_level(Level._to_internal_level(level))
 
+
 def get_is_colored_output_on() -> bool:
     """Get if colored output is enabled for logging
 
@@ -66,6 +72,7 @@ def get_is_colored_output_on() -> bool:
     """
     return _get_is_colored_output_on()
 
+
 def set_is_colored_output_on(colored_output_on: bool):
     """Enable or disable color in the log output
 
@@ -73,6 +80,7 @@ def set_is_colored_output_on(colored_output_on: bool):
         colored_output_on (bool): If colored output should be enabled or not
     """
     _set_is_colored_output_on(colored_output_on)
+
 
 def log(level: Level, msg: str):
     """Add a new message to the log
