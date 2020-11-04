@@ -3,6 +3,7 @@ import sys
 import glob
 import subprocess
 import utils
+import pwd
 
 VALID_CPP_FILE_TYPES = [".cpp", ".cc", ".c", ".cu", ".hpp", ".h", ".cuh"]
 
@@ -23,7 +24,7 @@ def lint(user, target_files, change_file=True):
 
 if __name__ == "__main__":
     BAZEL_ROOT = utils.find_bazel_root()
-    USER = BAZEL_ROOT.split('/')[2]
+    USER = pwd.getpwuid(os.getuid())[0]
     projects = utils.CHECK_PROJECTS(sys.argv[1:])
     if "//..." in projects:
         projects = [p.replace(BAZEL_ROOT, "/")[:-1] for p in glob.glob(BAZEL_ROOT + '/*/')]
