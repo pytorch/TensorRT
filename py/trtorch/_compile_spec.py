@@ -122,6 +122,7 @@ def _parse_device(device_info: Dict[str, Any]) -> trtorch._C.Device:
 
     return info
 
+
 def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
     info = trtorch._C.CompileSpec()
     if "input_shapes" not in compile_spec:
@@ -152,7 +153,6 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
 
     if "device" in compile_spec:
         info.device = _parse_device(compile_spec["device"])
-
 
     if "capability" in compile_spec:
         assert isinstance(compile_spec["capability"], _types.EngineCapability)

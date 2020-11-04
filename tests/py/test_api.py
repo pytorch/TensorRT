@@ -21,7 +21,7 @@ class TestCompile(ModelTestCase):
                 "gpu_id": 0,
                 "dla_core": 0,
                 "allow_gpu_fallback": False
-                }
+            }
         }
 
         trt_mod = trtorch.compile(self.traced_model, compile_spec)
@@ -36,7 +36,7 @@ class TestCompile(ModelTestCase):
                 "gpu_id": 0,
                 "dla_core": 0,
                 "allow_gpu_fallback": False
-                }
+            }
         }
 
         trt_mod = trtorch.compile(self.scripted_model, compile_spec)
