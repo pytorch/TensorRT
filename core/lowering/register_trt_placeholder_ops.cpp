@@ -12,8 +12,8 @@ RegisterOperators trt_placeholder_ops_reg({
     /// to a TRT constant Tensor
     Operator(
         "trt::const(Tensor val) -> Tensor",
-        [](Stack& stack) {
-          return 0; // noop
+        [](Stack* stack) {
+            
         },
         aliasAnalysisFromSchema()),
 });

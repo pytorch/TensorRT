@@ -77,7 +77,7 @@ void resize_layer_size(
 auto interpolate_registrations TRTORCH_UNUSED =
     RegisterNodeConversionPatterns()
         .pattern(
-            {"aten::upsample_nearest1d(Tensor self, int[1] output_size, float? scales=None) -> (Tensor)",
+            {"aten::upsample_nearest1d.vec(Tensor input, int[]? output_size, float[]? scale_factors) -> (Tensor)",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                auto in = args[0].ITensor();
                auto in_shape = util::toVec(in->getDimensions());

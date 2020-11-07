@@ -14,7 +14,7 @@ auto conv_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().patter
                                  Tensor? bias, int[] stride, int[] padding,
                                  int[] dilation, bool transposed,
                                  int[] output_padding, int groups, bool benchmark,
-                                 bool deterministic, bool cudnn_enabled) -> (Tensor))SIG",
+                                 bool deterministic, bool cudnn_enabled, bool allow_tf32) -> (Tensor))SIG",
     [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
       auto in = args[0].ITensor(); // assumes non-static input Tensor
 
