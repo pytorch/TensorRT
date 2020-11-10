@@ -90,7 +90,7 @@ def _parse_device_type(device: Any) -> _types.DeviceType:
         return device
     elif isinstance(device, str):
         if device == "gpu" or device == "GPU":
-            return _types.DeviceType.gpu
+                                return _types.DeviceType.gpu
         elif device == "dla" or device == "DLA":
             return _types.DeviceType.dla
         else:

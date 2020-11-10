@@ -44,7 +44,7 @@ c10::FunctionSchema GenerateGraphSchema(
 
 void AddEngineToGraph(
     torch::jit::script::Module mod,
-    std::shared_ptr<torch::jit::Graph>& g,
+              std::shared_ptr<torch::jit::Graph>& g,
     std::string& serialized_engine) {
   auto engine_ptr = c10::make_intrusive<runtime::TRTEngine>(mod._ivalue()->name(), serialized_engine);
   // Get required metadata about the engine out
@@ -54,18 +54,18 @@ void AddEngineToGraph(
   // Add the engine as an attribute of the module, this will let the engine be
   // serialized and deserialized
   mod.register_attribute(
-      name,
-      c10::getCustomClassType<c10::intrusive_ptr<runtime::TRTEngine>>(),
-      c10::IValue(std::move(engine_ptr)),
+        name,
+         c10::getCustomClassType<c10::intrusive_ptr<runtime::TRTEngine>>(),
+              c10::IValue(std::move(engine_ptr)),
       false);
 
   // Add the module as an input into the graph
-  auto self = g->addInput("self_1");
+      auto self = g->addInput("self_1");
   self->setType(mod.type());
 
   // Start by retriveing the engine from the module attribute list
   auto engine_node = g->createGetAttr(self, name);
-  g->block()->appendNode(engine_node);
+          g->block()->appendNode(engine_node);
 
   // Add inputs to the graph corresponding to the number of input tensors
   // expected by the engine Also store those inputs in a vector so that they can
