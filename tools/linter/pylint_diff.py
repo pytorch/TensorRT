@@ -24,6 +24,11 @@ def lint(user, target_files, conf, change_file=False):
 
 if __name__ == "__main__":
     BAZEL_ROOT = utils.find_bazel_root()
+    color = True
+    if "--no-color" in sys.argv:
+        sys.argv.remove("--no-color")
+        color = False
+
     STYLE_CONF_PATH = BAZEL_ROOT + "/.style.yapf"
     USER = pwd.getpwuid(os.getuid())[0]
     subprocess.run(["useradd", USER])
@@ -40,5 +45,8 @@ if __name__ == "__main__":
         if files != []:
             changed = lint(USER, files, STYLE_CONF_PATH)
             if changed:
-                print("\033[91mERROR:\033[0m Some files do not conform to style guidelines")
+                if color:
+                    print("\033[91mERROR:\033[0m Some files do not conform to style guidelines")
+                else:
+                    print("ERROR: Some files do not conform to style guidelines")
                 sys.exit(1)
