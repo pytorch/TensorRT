@@ -6,7 +6,7 @@ import subprocess
 token = os.environ['GITHUB_TOKEN']
 gh = Github(token)
 
-event_file_path = os.environ['GITHUB_EVENT_PATH']
+event_file_path = "/GITHUB_EVENT.json"
 with open(event_file_path, 'r') as f:
     j = f.read()
     event = json.load(j)
