@@ -16,7 +16,7 @@ repo = gh.get_repo(repo_name)
 pr = repo.get_pull(pr_number)
 commit = repo.get_commit(pr.base.sha)
 
-output = subprocess.run(["python3", "tools/linter/pylint_diff.py", "//..."], stdout=subprocess.PIPE)
+output = subprocess.run(["python3", "tools/linter/pylint_diff.py", "--no-color", "//..."], stdout=subprocess.PIPE)
 
 comment = '''Code conforms to Python style guidelines'''
 approval = 'APPROVE'
