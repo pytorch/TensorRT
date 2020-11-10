@@ -8,8 +8,7 @@ gh = Github(token)
 
 event_file_path = "/GITHUB_EVENT.json"
 with open(event_file_path, 'r') as f:
-    j = f.read()
-    event = json.load(j)
+    event = json.load(f)
 
 repo_name = event["repository"]["full_name"]
 pr_number = event["number"]
