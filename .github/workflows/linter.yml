@@ -16,11 +16,11 @@ jobs:
       - name: Run image
         run: |
           docker run -it -d --name cpplinter -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GITHUB_WORKSPACE:/workspace -v $GITHUB_EVENT_PATH:/GITHUB_EVENT.json -w /workspace docker.pkg.github.com/nvidia/trtorch/docgen:latest
-          docker exec cpplinter bash -c "cp docker/WORKSPACE.docker WORKSPACE"
+          docker exec cpplinter bash -c "cp /workspace/docker/WORKSPACE.docker /workspace/WORKSPACE"
       - name: Install dependencies
         run: docker exec cpplinter bash -c "pip3 install -r /workspace/.github/scripts/requirements.txt"
       - name: Lint C++
-        run: docker exec cpplinter bash -c "python3 /workspace/.github/scripts/run_cpp_linter.py"
+        run: docker exec cpplinter bash -c "cd /workspace && python3 /workspace/.github/scripts/run_cpp_linter.py"
 
   py-linting:
     name: Python Linting
@@ -33,9 +33,9 @@ jobs:
       - name: Run image
         run: |
           docker run -it -d --name pylinter -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GITHUB_WORKSPACE:/workspace -v $GITHUB_EVENT_PATH:/GITHUB_EVENT.json -w /workspace docker.pkg.github.com/nvidia/trtorch/docgen:latest
-          docker exec pylinter bash -c "cp docker/WORKSPACE.docker WORKSPACE"
+          docker exec pylinter bash -c "cp /workspace/docker/WORKSPACE.docker /workspace/WORKSPACE"
       - name: Install dependencies
         run: |
           docker exec pylinter bash -c "pip3 install -r /workspace/.github/scripts/requirements.txt"
       - name: Lint Python
-        run: docker exec pylinter bash -c "python3 /workspace/.github/scripts/run_cpp_linter.py"
+        run: docker exec pylinter bash -c "cd /workspace && python3 /workspace/.github/scripts/run_cpp_linter.py"
