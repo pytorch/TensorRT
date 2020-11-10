@@ -16,9 +16,7 @@ jobs:
         stale-issue-message: 'This issue has not seen activity for 30 days, Remove stale label or comment or this will be closed in 5 days'
         stale-pr-message: 'This PR has not seen activity for 30 days, Remove stale label or comment or this will be closed in 5 days'
         stale-issue-label: 'No Activity'
-        exempt-issue-labels: 
-          - 'WIP'
-          - 'feature request'
+        exempt-issue-labels: ['WIP', 'feature request']
         stale-pr-label: 'No Activity'
         exempt-pr-labels: 'WIP'
         days-before-stale: 30
