@@ -14,7 +14,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Run image
-        run: docker run -it -d --name cpplinter -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GITHUB_WORKSPACE:/workspace -v $GITHUB_EVENT_PATH:/GITHUB_EVENT.json -w /workspace docker.pkg.github.com/nvidia/trtorch/docgen:latest
+        run: |
+          docker run -it -d --name cpplinter -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GITHUB_WORKSPACE:/workspace -v $GITHUB_EVENT_PATH:/GITHUB_EVENT.json -w /workspace docker.pkg.github.com/nvidia/trtorch/docgen:latest
+          docker exec cpplinter bash -c "cp docker/WORKSPACE.docker WORKSPACE"
       - name: Install dependencies
         run: docker exec cpplinter bash -c "pip3 install -r /workspace/.github/scripts/requirements.txt"
       - name: Lint C++
@@ -29,10 +31,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Run image
-        run: docker run -it -d --name pylinter -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GITHUB_WORKSPACE:/workspace -v $GITHUB_EVENT_PATH:/GITHUB_EVENT.json -w /workspace docker.pkg.github.com/nvidia/trtorch/docgen:latest
+        run: |
+          docker run -it -d --name pylinter -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GITHUB_WORKSPACE:/workspace -v $GITHUB_EVENT_PATH:/GITHUB_EVENT.json -w /workspace docker.pkg.github.com/nvidia/trtorch/docgen:latest
+          docker exec pylinter bash -c "cp docker/WORKSPACE.docker WORKSPACE"
       - name: Install dependencies
         run: |
           docker exec pylinter bash -c "pip3 install -r /workspace/.github/scripts/requirements.txt"
-          docker exec pylinter bash -c "pip3 install -r /workspace/tools/linter/requirements.txt"
-      - name: Lint C++
+      - name: Lint Python
         run: docker exec pylinter bash -c "python3 /workspace/.github/scripts/run_cpp_linter.py"
