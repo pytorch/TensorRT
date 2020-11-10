@@ -120,25 +120,25 @@ auto select_registrations TRTORCH_UNUSED =
 
                     return true;
                   }})
-        .pattern({
-        "aten::embedding(Tensor weight, Tensor indices, int padding_idx=-1, bool scale_grad_by_freq=False, bool sparse=False) -> (Tensor)",
-        [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-            auto embeddingTensor = args[0].ITensorOrFreeze(ctx);
-            auto indicesTensor  = args[1].ITensor();
-            // Set datatype for indices tensor to INT32
-            indicesTensor->setType(nvinfer1::DataType::kINT32);
-            
-            // IGatherLayer takes in input tensor, the indices, and the axis of input tensor to take indices from
-            auto gather_layer = ctx->net->addGather(*embeddingTensor, *indicesTensor, 0);
-            TRTORCH_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
-            auto gather_out = gather_layer->getOutput(0);
+        .pattern(
+            {"aten::embedding(Tensor weight, Tensor indices, int padding_idx=-1, bool scale_grad_by_freq=False, bool sparse=False) -> (Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               auto embeddingTensor = args[0].ITensorOrFreeze(ctx);
+               auto indicesTensor = args[1].ITensor();
+               // Set datatype for indices tensor to INT32
+               indicesTensor->setType(nvinfer1::DataType::kINT32);
 
-            auto out = ctx->AssociateValueAndTensor(n->outputs()[0], gather_out);
+               // IGatherLayer takes in input tensor, the indices, and the axis of input tensor to take indices from
+               auto gather_layer = ctx->net->addGather(*embeddingTensor, *indicesTensor, 0);
+               TRTORCH_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
+               auto gather_out = gather_layer->getOutput(0);
 
-            LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], gather_out);
 
-            return true;
-        }});
+               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+
+               return true;
+             }});
 
 } // namespace
 } // namespace impl
