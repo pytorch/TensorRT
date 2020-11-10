@@ -47,5 +47,6 @@ jobs:
       - name: Install dependencies
         run: |
           docker exec pylinter bash -c "pip3 install -r /workspace/.github/scripts/requirements.txt"
+          docker exec pylinter bash -c "pip3 install -r /workspace/tools/linter/requirements.txt"
       - name: Lint Python
         run: docker exec pylinter bash -c "cd /workspace && python3 /workspace/.github/scripts/run_cpp_linter.py"
