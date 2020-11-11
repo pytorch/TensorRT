@@ -38,6 +38,16 @@ TEST(Converters, ATenAddConvertsCorrectly) {
   pointwise_test_helper(graph, false);
 }
 
+TEST(Converters, ATenAddWithScalarConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor):
+        %2 : int = prim::Constant[value=1]()
+        %scalar : float = prim::Constant[value=2.4]()
+        %3 : Tensor = aten::add(%0, %scalar, %2)
+        return (%3))IR";
+  pointwise_test_helper(graph, true);
+}
+
 // TEST(Converters, ATenAddWithScaleConvertsCorrectly) {
 //     const auto graph = R"IR(
 //       graph(%0 : Tensor, %1 : Tensor):
