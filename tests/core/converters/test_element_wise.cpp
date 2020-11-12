@@ -7,6 +7,7 @@
 void pointwise_test_helper(
     std::string graph_ir,
     bool singleInput,
+    bool dynamicInput = false,
     std::vector<int64_t> shape1 = {5},
     std::vector<int64_t> shape2 = {5}) {
   auto g = std::make_shared<torch::jit::Graph>();
@@ -28,7 +29,12 @@ void pointwise_test_helper(
   }
 
   params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, trt_inputs);
+  std::vector<at::Tensor> trt_results;
+  if (dynamicInput) {
+    trt_results = trtorch::tests::util::RunGraphEngineDynamic(g, params, trt_inputs);
+  } else {
+    trt_results = trtorch::tests::util::RunGraphEngine(g, params, trt_inputs);
+  }
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
@@ -40,8 +46,10 @@ TEST(Converters, ATenAddConvertsCorrectly) {
         %3 : Tensor = aten::add(%0, %1, %2)
         return (%3))IR";
   pointwise_test_helper(graph, false);
-  pointwise_test_helper(graph, false, {3, 4}, {4});
-  pointwise_test_helper(graph, false, {4}, {3, 4});
+  pointwise_test_helper(graph, false, false, {3, 4}, {4});
+  pointwise_test_helper(graph, false, false, {4}, {3, 4});
+  pointwise_test_helper(graph, false, true, {3, 4}, {4});
+  pointwise_test_helper(graph, false, true, {4}, {3, 4});
 }
 
 TEST(Converters, ATenSubConvertsCorrectly) {
@@ -51,8 +59,10 @@ TEST(Converters, ATenSubConvertsCorrectly) {
         %3 : Tensor = aten::sub(%0, %1, %2)
         return (%3))IR";
   pointwise_test_helper(graph, false);
-  pointwise_test_helper(graph, false, {3, 4}, {4});
-  pointwise_test_helper(graph, false, {4}, {3, 4});
+  pointwise_test_helper(graph, false, false, {3, 4}, {4});
+  pointwise_test_helper(graph, false, false, {4}, {3, 4});
+  pointwise_test_helper(graph, false, true, {3, 4}, {4});
+  pointwise_test_helper(graph, false, true, {4}, {3, 4});
 }
 
 TEST(Converters, ATenMulConvertsCorrectly) {
@@ -61,8 +71,10 @@ TEST(Converters, ATenMulConvertsCorrectly) {
         %2 : Tensor = aten::mul(%0, %1)
         return (%2))IR";
   pointwise_test_helper(graph, false);
-  pointwise_test_helper(graph, false, {3, 4}, {4});
-  pointwise_test_helper(graph, false, {4}, {3, 4});
+  pointwise_test_helper(graph, false, false, {3, 4}, {4});
+  pointwise_test_helper(graph, false, false, {4}, {3, 4});
+  pointwise_test_helper(graph, false, true, {3, 4}, {4});
+  pointwise_test_helper(graph, false, true, {4}, {3, 4});
 }
 
 TEST(Converters, ATenDivConvertsCorrectly) {
@@ -71,8 +83,10 @@ TEST(Converters, ATenDivConvertsCorrectly) {
         %2 : Tensor = aten::div(%0, %1)
         return (%2))IR";
   pointwise_test_helper(graph, false);
-  pointwise_test_helper(graph, false, {3, 4}, {4});
-  pointwise_test_helper(graph, false, {4}, {3, 4});
+  pointwise_test_helper(graph, false, false, {3, 4}, {4});
+  pointwise_test_helper(graph, false, false, {4}, {3, 4});
+  pointwise_test_helper(graph, false, true, {3, 4}, {4});
+  pointwise_test_helper(graph, false, true, {4}, {3, 4});
 }
 
 TEST(Converters, ATenPowTensorConvertsCorrectly) {
@@ -81,8 +95,10 @@ TEST(Converters, ATenPowTensorConvertsCorrectly) {
           %3 : Tensor = aten::pow(%x.1, %x2.1)
           return (%3))IR";
   pointwise_test_helper(graph, false);
-  pointwise_test_helper(graph, false, {3, 4}, {4});
-  pointwise_test_helper(graph, false, {4}, {3, 4});
+  pointwise_test_helper(graph, false, false, {3, 4}, {4});
+  pointwise_test_helper(graph, false, false, {4}, {3, 4});
+  pointwise_test_helper(graph, false, true, {3, 4}, {4});
+  pointwise_test_helper(graph, false, true, {4}, {3, 4});
 }
 
 TEST(Converters, ATenPowScalarConvertsCorrectly) {
