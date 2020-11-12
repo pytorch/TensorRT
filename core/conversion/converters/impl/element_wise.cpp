@@ -43,13 +43,13 @@ nvinfer1::ILayer* add_elementwise(
       auto otherDynamicShape =
           ctx->net->addElementWise(*selfShape, *otherDynamicShapeMask, nvinfer1::ElementWiseOperation::kPROD)
               ->getOutput(0);
-      auto targetOhterShape =
+      auto targetOtherShape =
           ctx->net->addElementWise(*otherDynamicShape, *otherStaticShapeMask, nvinfer1::ElementWiseOperation::kSUM)
               ->getOutput(0);
 
       auto otherShuffle = ctx->net->addShuffle(*other);
       otherShuffle->setName(std::string("Reshape other tensor to have the same nDim as self for " + name).c_str());
-      otherShuffle->setInput(1, *targetOhterShape);
+      otherShuffle->setInput(1, *targetOtherShape);
       other = otherShuffle->getOutput(0);
     } else {
       // other is with static shape, expand dimension to make tow tensor have the same number of dimension
