@@ -127,22 +127,6 @@ auto element_wise_registrations TRTORCH_UNUSED =
                return true;
              }})
         .pattern(
-            {"aten::add.Scalar(Tensor self, Scalar other, Scalar alpha=1) -> (Tensor)",
-             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-               // Should implement self + alpha * other
-               auto self = args[0].ITensorOrFreeze(ctx);
-               auto otherScalar = args[2].unwrapToScalar().to<float>() * args[1].unwrapToScalar().to<float>();
-               auto other = tensor_to_const(ctx, torch::tensor({otherScalar}));
-
-               auto add = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUM, self, other, util::node_info(n));
-               TRTORCH_CHECK(add, "Unable to create add layer from node: " << *n);
-
-               add->setName(util::node_info(n).c_str());
-               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], add->getOutput(0));
-               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
-               return true;
-             }})
-        .pattern(
             {"aten::sub.Tensor(Tensor self, Tensor other, Scalar alpha=1) -> "
              "Tensor",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {

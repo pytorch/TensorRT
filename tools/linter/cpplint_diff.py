@@ -7,16 +7,12 @@ import utils
 VALID_CPP_FILE_TYPES = [".cpp", ".cc", ".c", ".cu", ".hpp", ".h", ".cuh"]
 
 
-def lint(target_files, color=True):
+def lint(target_files):
     failure = False
     for f in target_files:
         with open("/tmp/changes.txt", "w") as changes:
             subprocess.run(['clang-format', f], stdout=changes)
-        args = ["git", "diff", "-u", "--exit-code"]
-        if color:
-            args += ['--color']
-        args += [f, "/tmp/changes.txt"]
-        output = subprocess.run(args)
+        output = subprocess.run(["git", "diff", "-u", "--color", f, "/tmp/changes.txt"])
         if output.returncode != 0:
             failure = True
     return failure
@@ -24,11 +20,6 @@ def lint(target_files, color=True):
 
 if __name__ == "__main__":
     BAZEL_ROOT = utils.find_bazel_root()
-    color = True
-    if "--no-color" in sys.argv:
-        sys.argv.remove("--no-color")
-        color = False
-
     projects = utils.CHECK_PROJECTS(sys.argv[1:])
     if "//..." in projects:
         projects = [p.replace(BAZEL_ROOT, "/")[:-1] for p in glob.glob(BAZEL_ROOT + '/*/')]
@@ -41,11 +32,7 @@ if __name__ == "__main__":
         path = BAZEL_ROOT + '/' + p[2:]
         files = utils.glob_files(path, VALID_CPP_FILE_TYPES)
         if files != []:
-            if lint(files, color):
-                failure = True
+            failure = lint(files)
     if failure:
-        if color:
-            print("\033[91mERROR:\033[0m Some files do not conform to style guidelines")
-        else:
-            print("ERROR: Some files do not conform to style guidelines")
+        print("\033[91mERROR:\033[0m Some files do not conform to style guidelines")
         sys.exit(1)
