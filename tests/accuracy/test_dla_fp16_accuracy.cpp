@@ -57,4 +57,4 @@ TEST_P(AccuracyTests, DLAFP16AccuracyIsClose) {
 INSTANTIATE_TEST_SUITE_P(
     DLAFP16AccuracyIsCloseSuite,
     AccuracyTests,
-    testing::Values("tests/accuracy/resnet50_scripted.jit.pt"));
+    testing::Values("tests/accuracy/vgg16_cifar10.jit.pt"));
