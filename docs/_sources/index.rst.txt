@@ -26,6 +26,7 @@ Getting Started
 * :ref:`ptq`
 * :ref:`trtorchc`
 * :ref:`use_from_pytorch`
+* :ref:`runtime`
 
 
 .. toctree::
@@ -38,6 +39,7 @@ Getting Started
    tutorials/ptq
    tutorials/trtorchc
    tutorials/use_from_pytorch
+   tutorials/runtime
    _notebooks/lenet
 
 .. toctree::
