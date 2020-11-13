@@ -119,6 +119,40 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     LOG_DEBUG("Output tensor shape: " << out->getDimensions());
                     return true;
                   }})
+        .pattern({"aten::add.Scalar(Tensor self, Scalar other, Scalar alpha=1) -> (Tensor)",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    // Should implement self + alpha * other
+                    auto self = args[0].ITensorOrFreeze(ctx);
+                    auto otherScalar = args[1].unwrapToScalar().to<float>();
+                    auto scalar = args[2].unwrapToScalar().to<float>();
+                    
+                    // Calculate size of the input and broadcast other scalar to
+                    // the same size
+                    int volume = 1;
+                    for (int i = 0; i < self->getDimensions().nbDims; i++) {
+                      volume = volume * (self->getDimensions().d[i]);
+                    }
+
+                    // Create a torch tensor with constant exponent values
+                    LOG_DEBUG("Broadcasting the other scalar in add layer");
+                    torch::Tensor otherBlob = torch::full({volume}, otherScalar);
+
+                    // Create a corresponding constant layer in TRT and get the layer
+                    // output.
+                    auto weights = converters::Weights(ctx, otherBlob);
+                    auto otherTensor = ctx->net->addConstant(self->getDimensions(), weights.data)->getOutput(0);
+                    
+                    auto add = add_elementwise(
+                        ctx, nvinfer1::ElementWiseOperation::kSUM, self, otherTensor, util::node_info(n), scalar);
+
+                    TRTORCH_CHECK(add, "Unable to create add layer from node: " << *n);
+
+                    add->setName(util::node_info(n).c_str());
+                    auto out = ctx->AssociateValueAndTensor(n->outputs()[0], add->getOutput(0));
+
+                    LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+                    return true;
+                  }})
         .pattern({"aten::sub.Tensor(Tensor self, Tensor other, Scalar alpha=1) -> Tensor",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                     // Should implement self - alpha * other

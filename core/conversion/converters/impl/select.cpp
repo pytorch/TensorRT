@@ -119,7 +119,60 @@ auto select_registrations TRTORCH_UNUSED =
                     LOG_DEBUG("Output tensor shape: " << out->getDimensions());
 
                     return true;
-                  }});
+                  }})
+        .pattern(
+            {"aten::embedding(Tensor weight, Tensor indices, int padding_idx=-1, bool scale_grad_by_freq=False, bool sparse=False) -> (Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               auto embeddingTensor = args[0].ITensorOrFreeze(ctx);
+               auto indicesTensor = args[1].ITensor();
+               // Set datatype for indices tensor to INT32
+               indicesTensor->setType(nvinfer1::DataType::kINT32);
+
+               // IGatherLayer takes in input tensor, the indices, and the axis of input tensor to take indices from
+               auto gather_layer = ctx->net->addGather(*embeddingTensor, *indicesTensor, 0);
+               TRTORCH_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
+               auto gather_out = gather_layer->getOutput(0);
+
+               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], gather_out);
+
+               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+
+               return true;
+             }})
+        .pattern(
+            {"aten::slice.Tensor(Tensor(a) self, int dim=0, int start=0, int end=9223372036854775807, int step=1) -> Tensor(a)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               auto in = args[0].ITensor();
+               auto axis = args[1].unwrapToInt();
+               auto maxDim = static_cast<int64_t>(in->getDimensions().d[axis]);
+               // Handle case when given tensor index is negative
+               auto startIdx = args[2].unwrapToInt();
+               auto start = (startIdx < 0) ? (maxDim + startIdx) : startIdx;
+               // Bound the end index to input tensor dimensions at specified axis
+               auto endIdx = std::min(args[3].unwrapToInt(), maxDim);
+               auto end = (endIdx < 0) ? (maxDim + endIdx) : endIdx;
+               auto step = args[4].unwrapToInt();
+
+               // indices to be accessed need to be an at::Tensor
+               at::Tensor indices = torch::arange(start, end, step).to(torch::kI32);
+               auto weights = Weights(ctx, indices);
+
+               // IConstantLayer to convert indices from Weights to ITensor
+               auto const_layer = ctx->net->addConstant(weights.shape, weights.data);
+               TRTORCH_CHECK(const_layer, "Unable to create constant layer from node: " << *n);
+               auto const_out = const_layer->getOutput(0);
+
+               // IGatherLayer takes in input tensor, the indices, and the axis of input tensor to take indices from
+               auto gather_layer = ctx->net->addGather(*in, *const_out, axis);
+               TRTORCH_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
+               auto gather_out = gather_layer->getOutput(0);
+
+               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], gather_out);
+
+               LOG_DEBUG("Slice layer output shape: " << out->getDimensions());
+
+               return true;
+             }});
 
 } // namespace
 } // namespace impl

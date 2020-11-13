@@ -5,7 +5,7 @@ import subprocess
 
 BLACKLISTED_BAZEL_TARGETS = [
     "//experiments", "//tools", "//docker",  "//third_party", "//bazel-bin", "//bazel-genfiles",
-    "//bazel-out", "//bazel-TRTorch", "//bazel-testlogs"
+    "//bazel-out", "//bazel-TRTorch", "//bazel-workspace", "//bazel-testlogs"
 ]
 
 

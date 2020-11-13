@@ -40,7 +40,10 @@ pkg_tar(
     package_dir = "lib/",
     srcs = select({
         ":windows": ["//cpp/api/lib:trtorch.dll"],
-        "//conditions:default": ["//cpp/api/lib:libtrtorch.so"],
+        "//conditions:default": [
+            "//cpp/api/lib:libtrtorch.so",
+            "//cpp/api/lib:libtrtorchrt.so",
+        ],
     }),
     mode = "0755",
 )
