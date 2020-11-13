@@ -26,6 +26,7 @@ Getting Started
 * :ref:`ptq`
 * :ref:`trtorchc`
 * :ref:`use_from_pytorch`
+* :ref:`using_dla`
 
 
 .. toctree::
