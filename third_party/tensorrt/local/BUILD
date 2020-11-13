@@ -61,6 +61,16 @@ cc_library(
 )
 
 cc_import(
+    name = "nvinfer_static_lib",
+    static_library = select({
+	":aarch64_linux": "lib/aarch64-linux-gnu/libnvinfer_static.a",
+	":windows": "lib/nvinfer.lib",
+	"//conditions:default": "lib/x86_64-linux-gnu/libnvinfer_static.a",
+    }),
+    visibility = ["//visibility:private"],
+)
+
+cc_import(
     name = "nvinfer_lib",
     shared_library = select({
         ":aarch64_linux": "lib/aarch64-linux-gnu/libnvinfer.so",
