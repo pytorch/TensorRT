@@ -48,8 +48,8 @@ TEST(Converters, ATenAddConvertsCorrectly) {
   pointwise_test_helper(graph, false);
   pointwise_test_helper(graph, false, false, {3, 4}, {4});
   pointwise_test_helper(graph, false, false, {4}, {3, 4});
-  pointwise_test_helper(graph, false, true, {3, 4}, {4});
-  pointwise_test_helper(graph, false, true, {4}, {3, 4});
+  pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3});
+  pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3});
 }
 
 TEST(Converters, ATenSubConvertsCorrectly) {
@@ -61,8 +61,8 @@ TEST(Converters, ATenSubConvertsCorrectly) {
   pointwise_test_helper(graph, false);
   pointwise_test_helper(graph, false, false, {3, 4}, {4});
   pointwise_test_helper(graph, false, false, {4}, {3, 4});
-  pointwise_test_helper(graph, false, true, {3, 4}, {4});
-  pointwise_test_helper(graph, false, true, {4}, {3, 4});
+  pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3});
+  pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3});
 }
 
 TEST(Converters, ATenMulConvertsCorrectly) {
@@ -73,8 +73,8 @@ TEST(Converters, ATenMulConvertsCorrectly) {
   pointwise_test_helper(graph, false);
   pointwise_test_helper(graph, false, false, {3, 4}, {4});
   pointwise_test_helper(graph, false, false, {4}, {3, 4});
-  pointwise_test_helper(graph, false, true, {3, 4}, {4});
-  pointwise_test_helper(graph, false, true, {4}, {3, 4});
+  pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3});
+  pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3});
 }
 
 TEST(Converters, ATenDivConvertsCorrectly) {
@@ -85,8 +85,8 @@ TEST(Converters, ATenDivConvertsCorrectly) {
   pointwise_test_helper(graph, false);
   pointwise_test_helper(graph, false, false, {3, 4}, {4});
   pointwise_test_helper(graph, false, false, {4}, {3, 4});
-  pointwise_test_helper(graph, false, true, {3, 4}, {4});
-  pointwise_test_helper(graph, false, true, {4}, {3, 4});
+  pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3});
+  pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3});
 }
 
 TEST(Converters, ATenPowTensorConvertsCorrectly) {
@@ -97,8 +97,8 @@ TEST(Converters, ATenPowTensorConvertsCorrectly) {
   pointwise_test_helper(graph, false);
   pointwise_test_helper(graph, false, false, {3, 4}, {4});
   pointwise_test_helper(graph, false, false, {4}, {3, 4});
-  pointwise_test_helper(graph, false, true, {3, 4}, {4});
-  pointwise_test_helper(graph, false, true, {4}, {3, 4});
+  pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3});
+  pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3});
 }
 
 TEST(Converters, ATenPowScalarConvertsCorrectly) {
