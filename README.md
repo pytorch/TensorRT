@@ -71,12 +71,13 @@ torch.jit.save(trt_ts_module, "trt_torchscript_module.ts")
 > Note: Refer NVIDIA NGC container(https://ngc.nvidia.com/catalog/containers/nvidia:l4t-pytorch) for PyTorch libraries on JetPack.
 
 ### Dependencies
+These are the following dependencies used to verify the testcases. TRTorch can work with other versions, but the tests are not guaranteed to pass.
 
-- Bazel 3.3.1
-- Libtorch 1.5.1
-- CUDA 10.2
-- cuDNN 7.6.5 (by default, cuDNN 8 supported with compatable PyTorch build)
-- TensorRT 7.0.0 (by default, TensorRT 7.1 supported with compatable PyTorch build)
+- Bazel 3.7.0
+- Libtorch 1.7.0 (built with CUDA 11.0)
+- CUDA 11.0
+- cuDNN 8
+- TensorRT 7.1.3.4
 
 ## Prebuilt Binaries and Wheel files
 

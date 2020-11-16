@@ -50,7 +50,7 @@ TEST(Converters, ATenConvolutionConvertsCorrectly) {
         %9 : int[] = prim::ListConstruct(%4, %4)
         %10 : int[] = prim::ListConstruct(%5, %5)
         %11 : int[] = prim::ListConstruct(%6, %6)
-        %12 : Tensor = aten::_convolution(%0, %1, %2, %8, %9, %10, %7, %11, %3, %7, %7, %7)
+        %12 : Tensor = aten::_convolution(%0, %1, %2, %8, %9, %10, %7, %11, %3, %7, %7, %7, %7)
         return (%12))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
@@ -92,7 +92,7 @@ TEST(Converters, ATenConvolutionNoBiasConvertsCorrectly) {
         %9 : int[] = prim::ListConstruct(%4, %4)
         %10 : int[] = prim::ListConstruct(%5, %5)
         %11 : int[] = prim::ListConstruct(%6, %6)
-        %12 : Tensor = aten::_convolution(%0, %1, %2, %8, %9, %10, %7, %11, %3, %7, %7, %7)
+        %12 : Tensor = aten::_convolution(%0, %1, %2, %8, %9, %10, %7, %11, %3, %7, %7, %7, %7)
         return (%12))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
@@ -131,7 +131,7 @@ TEST(Converters, ATenConvolutionWithStrideConvertsCorrectly) {
         %10 : int[] = prim::ListConstruct(%5, %5)
         %11 : int[] = prim::ListConstruct(%6, %6)
         %12 : int = prim::Constant[value=1]()
-        %13 : Tensor = aten::_convolution(%0, %1, %2, %8, %9, %10, %7, %11, %12, %7, %7, %7)
+        %13 : Tensor = aten::_convolution(%0, %1, %2, %8, %9, %10, %7, %11, %12, %7, %7, %7, %7)
         return (%13))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
@@ -174,7 +174,7 @@ TEST(Converters, ATenConvolutionWithPaddingConvertsCorrectly) {
         %10 : int[] = prim::ListConstruct(%5, %5)
         %11 : int[] = prim::ListConstruct(%6, %6)
         %12 : int = prim::Constant[value=1]()
-        %13 : Tensor = aten::_convolution(%0, %1, %2, %8, %9, %10, %7, %11, %12, %7, %7, %7)
+        %13 : Tensor = aten::_convolution(%0, %1, %2, %8, %9, %10, %7, %11, %12, %7, %7, %7, %7)
         return (%13))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
@@ -216,7 +216,7 @@ TEST(Converters, ATenConvolution3dConvertsCorrectly) {
         %op : int[] = prim::ListConstruct(%opv, %opv, %opv)
         %g : int = prim::Constant[value=1]()
         %fb : bool = prim::Constant[value=0]()
-        %out : Tensor = aten::_convolution(%0, %1, %2, %s, %p, %s, %transposed, %op, %g, %fb, %fb, %fb)
+        %out : Tensor = aten::_convolution(%0, %1, %2, %s, %p, %s, %transposed, %op, %g, %fb, %fb, %fb, %fb)
         return (%out))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
@@ -258,7 +258,7 @@ TEST(Converters, ATenConvolution3dNoBiasConvertsCorrectly) {
         %op : int[] = prim::ListConstruct(%opv, %opv, %opv)
         %g : int = prim::Constant[value=1]()
         %fb : bool = prim::Constant[value=0]()
-        %out : Tensor = aten::_convolution(%0, %1, %bias, %s, %p, %s, %transposed, %op, %g, %fb, %fb, %fb)
+        %out : Tensor = aten::_convolution(%0, %1, %bias, %s, %p, %s, %transposed, %op, %g, %fb, %fb, %fb, %fb)
         return (%out))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
@@ -296,7 +296,7 @@ TEST(Converters, ATenConvolution3dWithPaddingConvertsCorrectly) {
         %op : int[] = prim::ListConstruct(%opv, %opv, %opv)
         %g : int = prim::Constant[value=1]()
         %fb : bool = prim::Constant[value=0]()
-        %out : Tensor = aten::_convolution(%0, %1, %2, %s, %p, %s, %transposed, %op, %g, %fb, %fb, %fb)
+        %out : Tensor = aten::_convolution(%0, %1, %2, %s, %p, %s, %transposed, %op, %g, %fb, %fb, %fb, %fb)
         return (%out))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
@@ -338,7 +338,7 @@ TEST(Converters, ATenConvolution3dWithStrideDilationConvertsCorrectly) {
         %op : int[] = prim::ListConstruct(%opv, %opv, %opv)
         %g : int = prim::Constant[value=1]()
         %fb : bool = prim::Constant[value=0]()
-        %out : Tensor = aten::_convolution(%0, %1, %2, %s, %p, %s, %transposed, %op, %g, %fb, %fb, %fb)
+        %out : Tensor = aten::_convolution(%0, %1, %2, %s, %p, %s, %transposed, %op, %g, %fb, %fb, %fb, %fb)
         return (%out))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
@@ -380,7 +380,7 @@ TEST(Converters, ATenConvTransposeConvertsCorrectly) {
         %9 : int[] = prim::ListConstruct(%4, %4)
         %10 : int[] = prim::ListConstruct(%5, %5)
         %11 : int[] = prim::ListConstruct(%6, %6)
-        %12 : Tensor = aten::_convolution(%0, %1, %2, %8, %9, %10, %7, %11, %3, %7, %7, %7)
+        %12 : Tensor = aten::_convolution(%0, %1, %2, %8, %9, %10, %7, %11, %3, %7, %7, %7, %7)
         return (%12))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
@@ -422,7 +422,7 @@ TEST(Converters, ATenConvTransposeNoBiasConvertsCorrectly) {
         %9 : int[] = prim::ListConstruct(%4, %4)
         %10 : int[] = prim::ListConstruct(%5, %5)
         %11 : int[] = prim::ListConstruct(%6, %6)
-        %12 : Tensor = aten::_convolution(%0, %1, %2, %8, %9, %10, %7, %11, %3, %7, %7, %7)
+        %12 : Tensor = aten::_convolution(%0, %1, %2, %8, %9, %10, %7, %11, %3, %7, %7, %7, %7)
         return (%12))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
@@ -461,7 +461,7 @@ TEST(Converters, ATenConvTransposeWithStrideConvertsCorrectly) {
         %10 : int[] = prim::ListConstruct(%5, %5)
         %11 : int[] = prim::ListConstruct(%6, %6)
         %12 : int = prim::Constant[value=1]()
-        %13 : Tensor = aten::_convolution(%0, %1, %2, %8, %9, %10, %7, %11, %12, %7, %7, %7)
+        %13 : Tensor = aten::_convolution(%0, %1, %2, %8, %9, %10, %7, %11, %12, %7, %7, %7, %7)
         return (%13))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
@@ -504,7 +504,7 @@ TEST(Converters, ATenConvTransposeWithPaddingConvertsCorrectly) {
         %10 : int[] = prim::ListConstruct(%5, %5)
         %11 : int[] = prim::ListConstruct(%6, %6)
         %12 : int = prim::Constant[value=1]()
-        %13 : Tensor = aten::_convolution(%0, %1, %2, %8, %9, %10, %7, %11, %12, %7, %7, %7)
+        %13 : Tensor = aten::_convolution(%0, %1, %2, %8, %9, %10, %7, %11, %12, %7, %7, %7, %7)
         return (%13))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();

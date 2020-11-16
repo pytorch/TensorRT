@@ -11,7 +11,7 @@ GraphParams get_named_params(c10::ArrayRef<torch::jit::Value*> inputs, std::vect
   GraphParams named_params;
   auto param_it = params.begin();
   for (auto in : inputs) {
-    if (in->type() != c10::TensorType::get() && in->isCompleteTensor() && param_it != params.end()) {
+    if (in->type() != c10::TensorType::get() && param_it != params.end()) {
       named_params[in] = *param_it;
       ++param_it;
     }
