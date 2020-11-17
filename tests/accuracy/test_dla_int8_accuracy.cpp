@@ -29,7 +29,7 @@ TEST_P(AccuracyTests, DLAINT8AccuracyIsClose) {
   // Set a larger workspace
   compile_spec.workspace_size = 1 << 28;
 
-  compile_spec.device.device_type = trtorch::CompileSpec::DeviceType::kDLA;
+  compile_spec.device.device_type = trtorch::CompileSpec::Device::DeviceType::kDLA;
   compile_spec.device.gpu_id = 0;
   compile_spec.device.dla_core = 1;
   compile_spec.device.allow_gpu_fallback = true;

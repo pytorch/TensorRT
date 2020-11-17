@@ -307,9 +307,9 @@ int main(int argc, char** argv) {
       }
 
       if (device == "gpu") {
-        compile_settings.device.device_type = trtorch::CompileSpec::DeviceType::kGPU;
+        compile_settings.device.device_type = trtorch::CompileSpec::Device::DeviceType::kGPU;
       } else if (device == "dla") {
-        compile_settings.device.device_type = trtorch::CompileSpec::DeviceType::kDLA;
+        compile_settings.device.device_type = trtorch::CompileSpec::Device::DeviceType::kDLA;
         if (dla_core) {
           compile_settings.device.dla_core = args::get(dla_core);
         }

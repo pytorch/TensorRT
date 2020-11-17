@@ -28,7 +28,7 @@ TEST_P(AccuracyTests, DLAFP16AccuracyIsClose) {
   std::vector<std::vector<int64_t>> input_shape = {{32, 3, 32, 32}};
   auto compile_spec = trtorch::CompileSpec({input_shape});
   compile_spec.op_precision = torch::kF16;
-  compile_spec.device.device_type = trtorch::CompileSpec::DeviceType::kDLA;
+  compile_spec.device.device_type = trtorch::CompileSpec::Device::DeviceType::kDLA;
   compile_spec.device.gpu_id = 0;
   compile_spec.device.dla_core = 1;
   compile_spec.device.allow_gpu_fallback = true;

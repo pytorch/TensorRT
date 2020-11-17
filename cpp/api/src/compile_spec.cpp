@@ -21,7 +21,7 @@ CompileSpec::DataType::DataType(c10::ScalarType t) {
   }
 }
 
-CompileSpec::DeviceType::DeviceType(c10::DeviceType t) {
+CompileSpec::Device::DeviceType::DeviceType(c10::DeviceType t) {
   TRTORCH_CHECK(t == at::kCUDA, "Device type when specified using torch device enum must be torch::kCUDA");
   value = DeviceType::kGPU;
 }
@@ -96,10 +96,10 @@ core::CompileSpec to_internal_compile_spec(CompileSpec external) {
   internal.convert_info.engine_settings.max_batch_size = external.max_batch_size;
 
   switch (external.device.device_type) {
-    case CompileSpec::DeviceType::kDLA:
+    case CompileSpec::Device::DeviceType::kDLA:
       internal.convert_info.engine_settings.device.device_type = nvinfer1::DeviceType::kDLA;
       break;
-    case CompileSpec::DeviceType::kGPU:
+    case CompileSpec::Device::DeviceType::kGPU:
     default:
       internal.convert_info.engine_settings.device.device_type = nvinfer1::DeviceType::kGPU;
   }

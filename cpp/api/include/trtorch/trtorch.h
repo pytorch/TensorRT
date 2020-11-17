@@ -188,86 +188,6 @@ struct TRTORCH_API CompileSpec {
   };
 
   /**
-   * Supported Device Types that can be used with TensorRT engines
-   *
-   * This class is compatable with c10::DeviceTypes (but will check for TRT
-   * support) but the only applicable value is at::kCUDA, which maps to
-   * DeviceType::kGPU
-   *
-   * To use the DataType class itself, interface using the enum vs. normal
-   * instatination
-   *
-   * ex. trtorch::DeviceType type = DeviceType::kGPU;
-   */
-  class DeviceType {
-   public:
-    /**
-     * Underlying enum class to support the DeviceType Class
-     *
-     * In the case that you need to use the DeviceType class itself, interface
-     * using this enum vs. normal instatination
-     *
-     * ex. trtorch::DeviceType type = DeviceType::kGPU;
-     */
-    enum Value : int8_t {
-      /// Target GPU to run engine
-      kGPU,
-      /// Target DLA to run engine
-      kDLA,
-    };
-
-    /**
-     * @brief Construct a new Device Type object
-     *
-     */
-    DeviceType() = default;
-    /**
-     * @brief Construct a new Device Type object from internal enum
-     *
-     */
-    constexpr DeviceType(Value t) : value(t) {}
-    /**
-     * @brief Construct a new Device Type object from torch device enums
-     * Note: The only valid value is torch::kCUDA (torch::kCPU is not supported)
-     *
-     * @param t
-     */
-    DeviceType(c10::DeviceType t);
-    /**
-     * @brief Get the internal value from the Device object
-     *
-     * @return Value
-     */
-    operator Value() const {
-      return value;
-    }
-    explicit operator bool() = delete;
-    /**
-     * @brief Comparison operator for DeviceType
-     *
-     * @param other
-     * @return true
-     * @return false
-     */
-    constexpr bool operator==(DeviceType other) const {
-      return value == other.value;
-    }
-    /**
-     * @brief Comparison operator for DeviceType
-     *
-     * @param other
-     * @return true
-     * @return false
-     */
-    constexpr bool operator!=(DeviceType other) const {
-      return value != other.value;
-    }
-
-   private:
-    Value value;
-  };
-
-  /**
    * Emum for selecting engine capability
    */
   enum class EngineCapability : int8_t {
@@ -339,6 +259,86 @@ struct TRTORCH_API CompileSpec {
    * Setting data structure for Target device
    */
   struct Device {
+    /**
+     * Supported Device Types that can be used with TensorRT engines
+     *
+     * This class is compatable with c10::DeviceTypes (but will check for TRT
+     * support) but the only applicable value is at::kCUDA, which maps to
+     * DeviceType::kGPU
+     *
+     * To use the DataType class itself, interface using the enum vs. normal
+     * instatination
+     *
+     * ex. trtorch::DeviceType type = DeviceType::kGPU;
+     */
+    class DeviceType {
+     public:
+      /**
+       * Underlying enum class to support the DeviceType Class
+       *
+       * In the case that you need to use the DeviceType class itself, interface
+       * using this enum vs. normal instatination
+       *
+       * ex. trtorch::DeviceType type = DeviceType::kGPU;
+       */
+      enum Value : int8_t {
+        /// Target GPU to run engine
+        kGPU,
+        /// Target DLA to run engine
+        kDLA,
+      };
+
+      /**
+       * @brief Construct a new Device Type object
+       *
+       */
+      DeviceType() = default;
+      /**
+       * @brief Construct a new Device Type object from internal enum
+       *
+       */
+      constexpr DeviceType(Value t) : value(t) {}
+      /**
+       * @brief Construct a new Device Type object from torch device enums
+       * Note: The only valid value is torch::kCUDA (torch::kCPU is not supported)
+       *
+       * @param t
+       */
+      DeviceType(c10::DeviceType t);
+      /**
+       * @brief Get the internal value from the Device object
+       *
+       * @return Value
+       */
+      operator Value() const {
+        return value;
+      }
+      explicit operator bool() = delete;
+      /**
+       * @brief Comparison operator for DeviceType
+       *
+       * @param other
+       * @return true
+       * @return false
+       */
+      constexpr bool operator==(DeviceType other) const {
+        return value == other.value;
+      }
+      /**
+       * @brief Comparison operator for DeviceType
+       *
+       * @param other
+       * @return true
+       * @return false
+       */
+      constexpr bool operator!=(DeviceType other) const {
+        return value != other.value;
+      }
+
+     private:
+      Value value;
+    };
+
     /**
      * @brief Setting data structure for device
      * This struct will hold Target device related parameters such as device_type, gpu_id, dla_core
