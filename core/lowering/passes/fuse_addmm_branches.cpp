@@ -44,21 +44,18 @@ struct AddMMBranchFusion {
     auto arm2 = n->blocks()[1];
 
     auto arm1_start = arm1->nodes().begin();
-    if ((*arm1_start)->kind().toQualString() != std::string("aten::addmm") &&
-        (*(++arm1_start))->kind() != prim::Return) {
-      // Make sure that block0 is solely just the aten::addmm op and the return
-      return false;
-    }
-
     auto arm2_start = arm2->nodes().begin();
-    if ((*arm2_start)->kind().toQualString() != std::string("aten::matmul") &&
+
+    if ((*arm1_start)->kind().toQualString() == std::string("aten::addmm") &&
+        (*(++arm1_start))->kind() == prim::Return &&
+        (*arm2_start)->kind().toQualString() == std::string("aten::matmul") &&
         (*(++arm2_start))->kind().toQualString() != std::string("aten::add_") &&
-        (*(++arm2_start))->kind() != prim::Return) {
-      // Make sure that block1 is solely the return
-      return false;
+        (*(++arm2_start))->kind() == prim::Return) {
+      // Make sure that block0 is solely just the aten::addmm op and block1 is matmul + add
+      return true;
     }
 
-    return true;
+    return false;
   }
 
   void findAddMMVariantsNodes(Block* b) {
