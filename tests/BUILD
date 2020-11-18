@@ -15,6 +15,22 @@ test_suite(
 )
 
 test_suite(
+   name = "aarch64_tests",
+   tests = [
+       "//tests/core/converters:test_converters",
+       "//tests/modules:test_modules_aarch64"
+   ],
+)
+
+test_suite(
+   name = "required_and_optional_aarch64_tests",
+   tests = [
+       ":aarch64_tests",
+       "//tests/accuracy:test_accuracy_aarch64"
+   ]
+)
+
+test_suite(
     name = "python_api_tests",
     tests = [
         "//tests/py:test_api",

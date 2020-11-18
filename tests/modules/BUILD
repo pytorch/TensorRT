@@ -22,6 +22,16 @@ test_suite(
     ]
 )
 
+test_suite(
+   name = "test_modules_aarch64",
+   tests = [
+       ":test_modules_as_engines",
+       ":test_compiled_modules",
+       ":test_multiple_registered_engines",
+       ":test_serialization"
+   ]
+)
+
 cc_test(
     name = "test_serialization",
     srcs = ["test_serialization.cpp"],
