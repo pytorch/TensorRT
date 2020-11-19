@@ -30,6 +30,10 @@ bool MaxPoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& ar
   auto padding = util::toDims(args[3].unwrapToIntList());
   LOG_DEBUG("padding: " << padding);
   auto stride = util::toDims(args[2].unwrapToIntList());
+  if (args[2].unwrapToIntList().size() == 0) {
+    LOG_DEBUG("Stride not providied, using kernel_size as stride");
+    stride = util::toDims(args[1].unwrapToIntList());
+  }
   LOG_DEBUG("stride: " << stride);
 
   auto dilation = util::toDims(args[4].unwrapToIntList());
@@ -88,6 +92,10 @@ bool AvgPoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& ar
   auto padding = util::toDims(args[3].unwrapToIntList());
   LOG_DEBUG("padding: " << padding);
   auto stride = util::toDims(args[2].unwrapToIntList());
+  if (args[2].unwrapToIntList().size() == 0) {
+    LOG_DEBUG("Stride not providied, using kernel_size as stride");
+    stride = util::toDims(args[1].unwrapToIntList());
+  }
   LOG_DEBUG("stride: " << stride);
 
   bool ceil_mode = args[4].unwrapToBool();
