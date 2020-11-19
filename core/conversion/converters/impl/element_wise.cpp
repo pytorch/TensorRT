@@ -124,7 +124,7 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     auto self = args[0].ITensorOrFreeze(ctx);
                     auto otherScalar = args[1].unwrapToScalar().to<float>();
                     auto scalar = args[2].unwrapToScalar().to<float>();
-                    
+
                     // Calculate size of the input and broadcast other scalar to
                     // the same size
                     int volume = 1;
@@ -140,7 +140,7 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     // output.
                     auto weights = converters::Weights(ctx, otherBlob);
                     auto otherTensor = ctx->net->addConstant(self->getDimensions(), weights.data)->getOutput(0);
-                    
+
                     auto add = add_elementwise(
                         ctx, nvinfer1::ElementWiseOperation::kSUM, self, otherTensor, util::node_info(n), scalar);
 
