@@ -28,11 +28,13 @@ Classes
 
 - :ref:`exhale_struct_structtrtorch_1_1CompileSpec`
 
+- :ref:`exhale_struct_structtrtorch_1_1CompileSpec_1_1Device`
+
 - :ref:`exhale_struct_structtrtorch_1_1CompileSpec_1_1InputRange`
 
 - :ref:`exhale_class_classtrtorch_1_1CompileSpec_1_1DataType`
 
-- :ref:`exhale_class_classtrtorch_1_1CompileSpec_1_1DeviceType`
+- :ref:`exhale_class_classtrtorch_1_1CompileSpec_1_1Device_1_1DeviceType`
 
 
 Functions
@@ -48,3 +50,5 @@ Functions
 - :ref:`exhale_function_trtorch_8h_1a726f6e7091b6b7be45b5a4275b2ffb10`
 
 - :ref:`exhale_function_trtorch_8h_1a2cf17d43ba9117b3b4d652744b4f0447`
+
+- :ref:`exhale_function_trtorch_8h_1a589ea96d16e2df44146ad0919424e00e`
