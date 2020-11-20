@@ -17,7 +17,8 @@ auto batch_norm_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().
       auto input = args[0].ITensor(); // assumes non-static input Tensor
       auto orig_shape = input->getDimensions();
       auto shape = util::toVec(orig_shape);
-      auto options = torch::TensorOptions().dtype(torch::kFloat32);
+      auto tensor_type = util::toATenDType(input->getType());
+      auto options = torch::TensorOptions().dtype(tensor_type);
 
       torch::Tensor gamma, beta, mean, var;
 
@@ -58,8 +59,9 @@ auto batch_norm_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().
       auto scale_weights = Weights(ctx, scale);
       auto bias_weights = Weights(ctx, bias);
 
-      auto bn =
-          ctx->net->addScaleNd(*input, nvinfer1::ScaleMode::kCHANNEL, bias_weights.data, scale_weights.data, {}, 1);
+      auto power = Weights(ctx, at::ones_like(scale));
+      auto bn = ctx->net->addScaleNd(
+          *input, nvinfer1::ScaleMode::kCHANNEL, bias_weights.data, scale_weights.data, power.data, 1);
       bn->setName(util::node_info(n).c_str());
       auto out_tensor = bn->getOutput(0);
 

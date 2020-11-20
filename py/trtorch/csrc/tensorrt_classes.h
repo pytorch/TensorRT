@@ -47,6 +47,24 @@ enum DeviceType : int8_t {
   kDLA,
 };
 
+struct Device : torch::CustomClassHolder {
+  DeviceType device_type;
+  int64_t gpu_id;
+  int64_t dla_core;
+  bool allow_gpu_fallback;
+  Device()
+      : device_type(DeviceType::kGPU), // device_type
+        gpu_id(0), // gpu_id
+        dla_core(0), // dla_core
+        allow_gpu_fallback(false) // allow_gpu_fallback
+  {}
+
+  ADD_FIELD_GET_SET(device_type, DeviceType);
+  ADD_FIELD_GET_SET(gpu_id, int64_t);
+  ADD_FIELD_GET_SET(dla_core, int64_t);
+  ADD_FIELD_GET_SET(allow_gpu_fallback, bool);
+};
+
 std::string to_str(DeviceType value);
 nvinfer1::DeviceType toTRTDeviceType(DeviceType value);
 
@@ -80,21 +98,19 @@ struct CompileSpec : torch::CustomClassHolder {
   ADD_FIELD_GET_SET(refit, bool);
   ADD_FIELD_GET_SET(debug, bool);
   ADD_FIELD_GET_SET(strict_types, bool);
-  ADD_FIELD_GET_SET(allow_gpu_fallback, bool);
-  ADD_ENUM_GET_SET(device, DeviceType, 2);
   ADD_ENUM_GET_SET(capability, EngineCapability, 3);
   ADD_FIELD_GET_SET(num_min_timing_iters, int64_t);
   ADD_FIELD_GET_SET(num_avg_timing_iters, int64_t);
   ADD_FIELD_GET_SET(workspace_size, int64_t);
   ADD_FIELD_GET_SET(max_batch_size, int64_t);
+  ADD_FIELD_GET_SET(device, Device);
 
   std::vector<InputRange> input_ranges;
   DataType op_precision = DataType::kFloat;
   bool refit = false;
   bool debug = false;
   bool strict_types = false;
-  bool allow_gpu_fallback = true;
-  DeviceType device = DeviceType::kGPU;
+  Device device;
   EngineCapability capability = EngineCapability::kDEFAULT;
   int64_t num_min_timing_iters = 2;
   int64_t num_avg_timing_iters = 1;

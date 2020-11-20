@@ -102,8 +102,11 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
   info.convert_info.engine_settings.refit = refit;
   info.convert_info.engine_settings.debug = debug;
   info.convert_info.engine_settings.strict_types = strict_types;
-  info.convert_info.engine_settings.allow_gpu_fallback = allow_gpu_fallback;
-  info.convert_info.engine_settings.device = toTRTDeviceType(device);
+  info.convert_info.engine_settings.device.device_type = toTRTDeviceType(device.device_type);
+  info.convert_info.engine_settings.device.gpu_id = device.gpu_id;
+  info.convert_info.engine_settings.device.dla_core = device.dla_core;
+  info.convert_info.engine_settings.device.allow_gpu_fallback = device.allow_gpu_fallback;
+
   info.convert_info.engine_settings.capability = toTRTEngineCapability(capability);
   TRTORCH_CHECK(num_min_timing_iters >= 0, "num_min_timing_iters must be 0 or greater");
   info.convert_info.engine_settings.num_min_timing_iters = num_min_timing_iters;
@@ -128,8 +131,10 @@ std::string CompileSpec::stringify() {
   ss << "     \"Refit\": " << refit << std::endl;
   ss << "     \"Debug\": " << debug << std::endl;
   ss << "     \"Strict Types\": " << strict_types << std::endl;
-  ss << "     \"Allow GPU Fallback\": " << allow_gpu_fallback << std::endl;
-  ss << "     \"Device\": " << to_str(capability) << std::endl;
+  ss << "     \"Device Type: " << to_str(device.device_type) << std::endl;
+  ss << "     \"GPU ID: " << device.gpu_id << std::endl;
+  ss << "     \"DLA Core: " << device.dla_core << std::endl;
+  ss << "     \"Allow GPU Fallback\": " << device.allow_gpu_fallback << std::endl;
   ss << "     \"Engine Capability\": " << to_str(capability) << std::endl;
   ss << "     \"Num Min Timing Iters\": " << num_min_timing_iters << std::endl;
   ss << "     \"Num Avg Timing Iters\": " << num_avg_timing_iters << std::endl;

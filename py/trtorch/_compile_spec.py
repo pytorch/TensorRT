@@ -100,6 +100,29 @@ def _parse_device_type(device: Any) -> _types.DeviceType:
                         str(type(device)))
 
 
+def _parse_device(device_info: Dict[str, Any]) -> trtorch._C.Device:
+    info = trtorch._C.Device()
+    if "device_type" not in device_info:
+        raise KeyError("Device type is required parameter")
+    else:
+        assert isinstance(device_info["device_type"], _types.DeviceType)
+        info.device_type = _parse_device_type(device_info["device_type"])
+
+    if "gpu_id" in device_info:
+        assert isinstance(device_info["gpu_id"], int)
+        info.gpu_id = device_info["gpu_id"]
+
+    if "dla_core" in device_info:
+        assert isinstance(device_info["dla_core"], int)
+        info.dla_core = device_info["dla_core"]
+
+    if "allow_gpu_fallback" in device_info:
+        assert isinstance(device_info["allow_gpu_fallback"], bool)
+        info.allow_gpu_fallback = device_info["allow_gpu_fallback"]
+
+    return info
+
+
 def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
     info = trtorch._C.CompileSpec()
     if "input_shapes" not in compile_spec:
@@ -128,8 +151,8 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
         assert isinstance(compile_spec["allow_gpu_fallback"], bool)
         info.allow_gpu_fallback = compile_spec["allow_gpu_fallback"]
 
-    if "device_type" in compile_spec:
-        info.device = _parse_device_type(compile_spec["device_type"])
+    if "device" in compile_spec:
+        info.device = _parse_device(compile_spec["device"])
 
     if "capability" in compile_spec:
         assert isinstance(compile_spec["capability"], _types.EngineCapability)
@@ -175,12 +198,16 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]):
                                 "max": (1, 3, 1024, 1024)
                             } # Dynamic input shape for input #2
                         ],
+                        "device": {
+                        "device_type": torch.device("cuda"), # Type of device to run engine on (for DLA use trtorch.DeviceType.DLA)
+                        "gpu_id": 0, # Target gpu id to run engine (Use Xavier as gpu id for DLA)
+                        "dla_core": 0, # (DLA only) Target dla core id to run engine
+                        "allow_gpu_fallback": false, # (DLA only) Allow layers unsupported on DLA to run on GPU
+                        },
                         "op_precision": torch.half, # Operating precision set to FP16
                         "refit": False, # enable refit
                         "debug": False, # enable debuggable engine
                         "strict_types": False, # kernels should strictly run in operating precision
-                        "allow_gpu_fallback": True, # (DLA only) Allow layers unsupported on DLA to run on GPU
-                        "device": torch.device("cuda"), # Type of device to run engine on (for DLA use trtorch.DeviceType.DLA)
                         "capability": trtorch.EngineCapability.DEFAULT, # Restrict kernel selection to safe gpu kernels or safe dla kernels
                         "num_min_timing_iters": 2, # Number of minimization timing iterations used to select kernels
                         "num_avg_timing_iters": 1, # Number of averaging timing iterations used to select kernels
@@ -208,13 +235,19 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]):
         ir.set_max(i.max)
         backend_spec.append_input_range(ir)
 
+    for i in parsed_spec.device:
+        ir = torch.classes.tensorrt.Device()
+        ir.set_device_type(i.device_type)
+        ir.set_gpu_id(i.gpu_id)
+        ir.set_dla_core(i.dla_core)
+        ir.set_allow_gpu_fallback(i.allow_gpu_fallback)
+        backend_spec.set_device(ir)
+
     backend_spec.set_op_precision(int(parsed_spec.op_precision))
     backend_spec.set_refit(parsed_spec.refit)
     backend_spec.set_debug(parsed_spec.debug)
     backend_spec.set_refit(parsed_spec.refit)
     backend_spec.set_strict_types(parsed_spec.strict_types)
-    backend_spec.set_allow_gpu_fallback(parsed_spec.allow_gpu_fallback)
-    backend_spec.set_device(int(parsed_spec.device))
     backend_spec.set_capability(int(parsed_spec.capability))
     backend_spec.set_num_min_timing_iters(parsed_spec.num_min_timing_iters)
     backend_spec.set_num_avg_timing_iters(parsed_spec.num_avg_timing_iters)

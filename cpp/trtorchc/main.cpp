@@ -173,6 +173,10 @@ int main(int argc, char** argv) {
       "type",
       "The type of device the engine should be built for [ gpu | dla ] (default: gpu)",
       {'d', "device-type"});
+  args::ValueFlag<int> gpu_id(parser, "gpu_id", "GPU id if running on multi-GPU platform (defaults to 0)", {"gpu-id"});
+  args::ValueFlag<int> dla_core(
+      parser, "dla_core", "DLACore id if running on available DLA (defaults to 0)", {"dla-core"});
+
   args::ValueFlag<std::string> engine_capability(
       parser,
       "capability",
@@ -220,10 +224,6 @@ int main(int argc, char** argv) {
     std::cerr << e.what() << std::endl;
     std::cerr << parser;
     return 1;
-  } catch (args::ValidationError e) {
-    std::cerr << e.what() << std::endl;
-    std::cerr << parser;
-    return 1;
   }
 
   if (verbose) {
@@ -260,7 +260,7 @@ int main(int argc, char** argv) {
   }
 
   if (allow_gpu_fallback) {
-    compile_settings.allow_gpu_fallback = true;
+    compile_settings.device.allow_gpu_fallback = true;
   }
 
   std::string calibration_cache_file_path = "";
@@ -296,19 +296,28 @@ int main(int argc, char** argv) {
       std::cerr << parser;
       return 1;
     }
-  }
 
-  if (device_type) {
-    auto device = args::get(device_type);
-    std::transform(device.begin(), device.end(), device.begin(), [](unsigned char c) { return std::tolower(c); });
-    if (device == "gpu") {
-      compile_settings.device = trtorch::CompileSpec::DeviceType::kGPU;
-    } else if (device == "dla") {
-      compile_settings.device = trtorch::CompileSpec::DeviceType::kDLA;
-    } else {
-      trtorch::logging::log(trtorch::logging::Level::kERROR, "Invalid device type, options are [ gpu | dla ]");
-      std::cerr << parser;
-      return 1;
+    if (device_type) {
+      auto device = args::get(device_type);
+      std::transform(device.begin(), device.end(), device.begin(), [](unsigned char c) { return std::tolower(c); });
+
+      if (gpu_id) {
+        compile_settings.device.gpu_id = args::get(gpu_id);
+        trtorch::set_device(compile_settings.device.gpu_id);
+      }
+
+      if (device == "gpu") {
+        compile_settings.device.device_type = trtorch::CompileSpec::Device::DeviceType::kGPU;
+      } else if (device == "dla") {
+        compile_settings.device.device_type = trtorch::CompileSpec::Device::DeviceType::kDLA;
+        if (dla_core) {
+          compile_settings.device.dla_core = args::get(dla_core);
+        }
+      } else {
+        trtorch::logging::log(trtorch::logging::Level::kERROR, "Invalid device type, options are [ gpu | dla ]");
+        std::cerr << parser;
+        return 1;
+      }
     }
   }
 

@@ -3,7 +3,7 @@
 #include "torch/torch.h"
 #include "trtorch/ptq.h"
 
-TEST_P(AccuracyTests, INT8AccuracyIsClose) {
+TEST_P(AccuracyTests, DLAINT8AccuracyIsClose) {
   auto calibration_dataset =
       datasets::CIFAR10("tests/accuracy/datasets/data/cifar-10-batches-bin/", datasets::CIFAR10::Mode::kTest)
           .use_subset(320)
@@ -28,6 +28,11 @@ TEST_P(AccuracyTests, INT8AccuracyIsClose) {
   compile_spec.max_batch_size = 32;
   // Set a larger workspace
   compile_spec.workspace_size = 1 << 28;
+
+  compile_spec.device.device_type = trtorch::CompileSpec::Device::DeviceType::kDLA;
+  compile_spec.device.gpu_id = 0;
+  compile_spec.device.dla_core = 1;
+  compile_spec.device.allow_gpu_fallback = true;
 
   mod.eval();
 
@@ -76,6 +81,6 @@ TEST_P(AccuracyTests, INT8AccuracyIsClose) {
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    INT8AccuracyIsCloseSuite,
+    DLAINT8AccuracyIsCloseSuite,
     AccuracyTests,
     testing::Values("tests/accuracy/vgg16_cifar10.jit.pt"));
