@@ -33,7 +33,7 @@ struct ToRemoval {
       auto n = *it;
       if (n->kind() == c10::Symbol::fromQualString("aten::to")) {
         LOG_GRAPH("Found that node " << *n << "  is an to node (RemoveTo)" << std::endl);
-        n->outputs()[0]->replaceAllUsesWith(n->inputs()[1]);
+        n->outputs()[0]->replaceAllUsesWith(n->inputs()[0]);
         it.destroyCurrent();
       }
     }
