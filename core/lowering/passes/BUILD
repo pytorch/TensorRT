@@ -24,6 +24,7 @@ cc_library(
         "unpack_addmm.cpp",
         "unpack_batch_norm.cpp",
         "unpack_log_softmax.cpp",
+        "alias_op_mapping.cpp"
     ],
     deps = [
         "//core/util:prelude",
