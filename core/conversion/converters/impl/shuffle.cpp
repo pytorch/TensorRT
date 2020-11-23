@@ -18,8 +18,10 @@ static auto shuffle_registrations TRTORCH_UNUSED =
                     auto end_dim = args[2].unwrapToInt();
                     auto in_shape = util::toVec(in->getDimensions());
                     std::vector<int64_t> out_shape;
-                    if (ctx->input_is_dynamic) {
+                    if (ctx->input_is_dynamic && in_shape[0] != -1) {
                       out_shape = std::vector<int64_t>({in_shape[0], -1});
+                    } else if (ctx->input_is_dynamic && in_shape[0] == -1) {
+                      out_shape = std::vector<int64_t>({-1, -1 * std::accumulate(std::begin(in_shape), std::end(in_shape), 1, std::multiplies<int64_t>())});
                     } else {
                       out_shape = torch::flatten(torch::rand(in_shape), start_dim, end_dim).sizes().vec();
                     }
