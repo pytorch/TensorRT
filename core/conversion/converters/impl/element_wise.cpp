@@ -70,227 +70,225 @@ nvinfer1::ILayer* add_elementwise(
 
 auto element_wise_registrations TRTORCH_UNUSED =
     RegisterNodeConversionPatterns()
-        .pattern(
-            {"aten::add.Tensor(Tensor self, Tensor other, Scalar alpha=1) -> "
-             "Tensor",
-             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-               // Should implement self + alpha * other
-               auto self = args[0].ITensorOrFreeze(ctx);
-               auto other = args[1].ITensorOrFreeze(ctx);
-               auto scalar = args[2].unwrapToScalar().to<float>();
+        .pattern({"aten::add.Tensor(Tensor self, Tensor other, Scalar alpha=1) -> "
+                  "Tensor",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    // Should implement self + alpha * other
+                    auto self = args[0].ITensorOrFreeze(ctx);
+                    auto other = args[1].ITensorOrFreeze(ctx);
+                    auto scalar = args[2].unwrapToScalar().to<float>();
 
-               if (1 != scalar) {
-                 auto scaleW = Weights(ctx, scalar);
-                 auto unuse = Weights();
-                 // IScaleLayer assert shift, scale and power to have
-                 // the same dtype
-                 auto scaleLayer =
-                     ctx->net->addScale(*other, nvinfer1::ScaleMode::kUNIFORM, unuse.data, scaleW.data, unuse.data);
-                 TRTORCH_CHECK(scaleLayer, "Unable to create scale layer from node: " << *n);
-                 other = scaleLayer->getOutput(0);
-               }
+                    if (1 != scalar) {
+                      auto scaleW = Weights(ctx, scalar);
+                      auto unuse = Weights();
+                      // IScaleLayer assert shift, scale and power to have
+                      // the same dtype
+                      auto scaleLayer = ctx->net->addScale(
+                          *other, nvinfer1::ScaleMode::kUNIFORM, unuse.data, scaleW.data, unuse.data);
+                      TRTORCH_CHECK(scaleLayer, "Unable to create scale layer from node: " << *n);
+                      other = scaleLayer->getOutput(0);
+                    }
 
-               auto add = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUM, self, other, util::node_info(n));
-               TRTORCH_CHECK(add, "Unable to create add layer from node: " << *n);
+                    auto add =
+                        add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUM, self, other, util::node_info(n));
+                    TRTORCH_CHECK(add, "Unable to create add layer from node: " << *n);
 
-               add->setName(util::node_info(n).c_str());
-               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], add->getOutput(0));
-               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
-               return true;
-             }})
-        .pattern(
-            {"aten::add_.Tensor(Tensor(a!) self, Tensor other, *, Scalar "
-             "alpha=1) -> (Tensor(a!))",
-             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-               // Should implement self + alpha * other
-               auto self = args[0].ITensorOrFreeze(ctx);
-               auto other = args[1].ITensorOrFreeze(ctx);
-               auto scalar = args[2].unwrapToScalar().to<float>();
+                    add->setName(util::node_info(n).c_str());
+                    auto out = ctx->AssociateValueAndTensor(n->outputs()[0], add->getOutput(0));
+                    LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+                    return true;
+                  }})
+        .pattern({"aten::add_.Tensor(Tensor(a!) self, Tensor other, *, Scalar "
+                  "alpha=1) -> (Tensor(a!))",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    // Should implement self + alpha * other
+                    auto self = args[0].ITensorOrFreeze(ctx);
+                    auto other = args[1].ITensorOrFreeze(ctx);
+                    auto scalar = args[2].unwrapToScalar().to<float>();
 
-               if (1 != scalar) {
-                 auto scaleW = Weights(ctx, scalar);
-                 auto unuse = Weights();
-                 // IScaleLayer assert shift, scale and power to have
-                 // the same dtype
-                 auto scaleLayer =
-                     ctx->net->addScale(*other, nvinfer1::ScaleMode::kUNIFORM, unuse.data, scaleW.data, unuse.data);
-                 TRTORCH_CHECK(scaleLayer, "Unable to create scale layer from node: " << *n);
-                 other = scaleLayer->getOutput(0);
-               }
+                    if (1 != scalar) {
+                      auto scaleW = Weights(ctx, scalar);
+                      auto unuse = Weights();
+                      // IScaleLayer assert shift, scale and power to have
+                      // the same dtype
+                      auto scaleLayer = ctx->net->addScale(
+                          *other, nvinfer1::ScaleMode::kUNIFORM, unuse.data, scaleW.data, unuse.data);
+                      TRTORCH_CHECK(scaleLayer, "Unable to create scale layer from node: " << *n);
+                      other = scaleLayer->getOutput(0);
+                    }
 
-               auto add = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUM, self, other, util::node_info(n));
-               TRTORCH_CHECK(add, "Unable to create add layer from node: " << *n);
+                    auto add =
+                        add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUM, self, other, util::node_info(n));
+                    TRTORCH_CHECK(add, "Unable to create add layer from node: " << *n);
 
-               add->setName(util::node_info(n).c_str());
-               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], add->getOutput(0));
-               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
-               return true;
-             }})
-        .pattern(
-            {"aten::add.Scalar(Tensor self, Scalar other, Scalar alpha=1) -> (Tensor)",
-             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-               // Should implement self + alpha * other
-               auto self = args[0].ITensorOrFreeze(ctx);
-               auto otherScalar = args[2].unwrapToScalar().to<float>() * args[1].unwrapToScalar().to<float>();
-               auto other = tensor_to_const(ctx, torch::tensor({otherScalar}));
+                    add->setName(util::node_info(n).c_str());
+                    auto out = ctx->AssociateValueAndTensor(n->outputs()[0], add->getOutput(0));
+                    LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+                    return true;
+                  }})
+        .pattern({"aten::add.Scalar(Tensor self, Scalar other, Scalar alpha=1) -> (Tensor)",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    // Should implement self + alpha * other
+                    auto self = args[0].ITensorOrFreeze(ctx);
+                    auto otherScalar = args[2].unwrapToScalar().to<float>() * args[1].unwrapToScalar().to<float>();
+                    auto other = tensor_to_const(ctx, torch::tensor({otherScalar}));
 
-               auto add = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUM, self, other, util::node_info(n));
-               TRTORCH_CHECK(add, "Unable to create add layer from node: " << *n);
+                    auto add =
+                        add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUM, self, other, util::node_info(n));
+                    TRTORCH_CHECK(add, "Unable to create add layer from node: " << *n);
 
-               add->setName(util::node_info(n).c_str());
-               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], add->getOutput(0));
-               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
-               return true;
-             }})
-        .pattern(
-            {"aten::sub.Tensor(Tensor self, Tensor other, Scalar alpha=1) -> "
-             "Tensor",
-             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-               // Should implement self - alpha * other
-               auto self = args[0].ITensorOrFreeze(ctx);
-               auto scalar = args[2].unwrapToScalar().to<float>();
-               auto other = args[1].ITensorOrFreeze(ctx);
+                    add->setName(util::node_info(n).c_str());
+                    auto out = ctx->AssociateValueAndTensor(n->outputs()[0], add->getOutput(0));
+                    LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+                    return true;
+                  }})
+        .pattern({"aten::sub.Tensor(Tensor self, Tensor other, Scalar alpha=1) -> "
+                  "Tensor",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    // Should implement self - alpha * other
+                    auto self = args[0].ITensorOrFreeze(ctx);
+                    auto scalar = args[2].unwrapToScalar().to<float>();
+                    auto other = args[1].ITensorOrFreeze(ctx);
 
-               if (1 != scalar) {
-                 auto scaleW = Weights(ctx, scalar);
-                 auto unuse = Weights();
-                 // IScaleLayer assert shift, scale and power to have
-                 // the same dtype
-                 auto scaleLayer =
-                     ctx->net->addScale(*other, nvinfer1::ScaleMode::kUNIFORM, unuse.data, scaleW.data, unuse.data);
-                 TRTORCH_CHECK(scaleLayer, "Unable to create scale layer from node: " << *n);
-                 other = scaleLayer->getOutput(0);
-               }
+                    if (1 != scalar) {
+                      auto scaleW = Weights(ctx, scalar);
+                      auto unuse = Weights();
+                      // IScaleLayer assert shift, scale and power to have
+                      // the same dtype
+                      auto scaleLayer = ctx->net->addScale(
+                          *other, nvinfer1::ScaleMode::kUNIFORM, unuse.data, scaleW.data, unuse.data);
+                      TRTORCH_CHECK(scaleLayer, "Unable to create scale layer from node: " << *n);
+                      other = scaleLayer->getOutput(0);
+                    }
 
-               auto sub = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUB, self, other, util::node_info(n));
-               TRTORCH_CHECK(sub, "Unable to create sub layer from node: " << *n);
+                    auto sub =
+                        add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUB, self, other, util::node_info(n));
+                    TRTORCH_CHECK(sub, "Unable to create sub layer from node: " << *n);
 
-               sub->setName(util::node_info(n).c_str());
-               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], sub->getOutput(0));
-               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
-               return true;
-             }})
-        .pattern(
-            {"aten::sub_.Tensor(Tensor(a!) self, Tensor other, *, Scalar "
-             "alpha=1) -> (Tensor(a!))",
-             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-               // Should implement self - alpha * other
-               auto self = args[0].ITensorOrFreeze(ctx);
-               auto scalar = args[2].unwrapToScalar().to<float>();
-               auto other = args[1].ITensorOrFreeze(ctx);
+                    sub->setName(util::node_info(n).c_str());
+                    auto out = ctx->AssociateValueAndTensor(n->outputs()[0], sub->getOutput(0));
+                    LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+                    return true;
+                  }})
+        .pattern({"aten::sub_.Tensor(Tensor(a!) self, Tensor other, *, Scalar "
+                  "alpha=1) -> (Tensor(a!))",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    // Should implement self - alpha * other
+                    auto self = args[0].ITensorOrFreeze(ctx);
+                    auto scalar = args[2].unwrapToScalar().to<float>();
+                    auto other = args[1].ITensorOrFreeze(ctx);
 
-               if (1 != scalar) {
-                 auto scaleW = Weights(ctx, scalar);
-                 auto unuse = Weights();
-                 // IScaleLayer assert shift, scale and power to have
-                 // the same dtype
-                 auto scaleLayer =
-                     ctx->net->addScale(*other, nvinfer1::ScaleMode::kUNIFORM, unuse.data, scaleW.data, unuse.data);
-                 TRTORCH_CHECK(scaleLayer, "Unable to create scale layer from node: " << *n);
-                 other = scaleLayer->getOutput(0);
-               }
+                    if (1 != scalar) {
+                      auto scaleW = Weights(ctx, scalar);
+                      auto unuse = Weights();
+                      // IScaleLayer assert shift, scale and power to have
+                      // the same dtype
+                      auto scaleLayer = ctx->net->addScale(
+                          *other, nvinfer1::ScaleMode::kUNIFORM, unuse.data, scaleW.data, unuse.data);
+                      TRTORCH_CHECK(scaleLayer, "Unable to create scale layer from node: " << *n);
+                      other = scaleLayer->getOutput(0);
+                    }
 
-               auto sub = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUB, self, other, util::node_info(n));
-               TRTORCH_CHECK(sub, "Unable to create sub layer from node: " << *n);
+                    auto sub =
+                        add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUB, self, other, util::node_info(n));
+                    TRTORCH_CHECK(sub, "Unable to create sub layer from node: " << *n);
 
-               sub->setName(util::node_info(n).c_str());
-               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], sub->getOutput(0));
-               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
-               return true;
-             }})
-        .pattern(
-            {"aten::div.Tensor(Tensor self, Tensor other) -> Tensor",
-             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-               // Should implement self / other
-               auto self = args[0].ITensorOrFreeze(ctx);
-               auto other = args[1].ITensorOrFreeze(ctx);
-               auto div = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, util::node_info(n));
+                    sub->setName(util::node_info(n).c_str());
+                    auto out = ctx->AssociateValueAndTensor(n->outputs()[0], sub->getOutput(0));
+                    LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+                    return true;
+                  }})
+        .pattern({"aten::div.Tensor(Tensor self, Tensor other) -> Tensor",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    // Should implement self / other
+                    auto self = args[0].ITensorOrFreeze(ctx);
+                    auto other = args[1].ITensorOrFreeze(ctx);
+                    auto div =
+                        add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, util::node_info(n));
 
-               TRTORCH_CHECK(div, "Unable to create div layer from node: " << *n);
+                    TRTORCH_CHECK(div, "Unable to create div layer from node: " << *n);
 
-               div->setName(util::node_info(n).c_str());
-               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], div->getOutput(0));
+                    div->setName(util::node_info(n).c_str());
+                    auto out = ctx->AssociateValueAndTensor(n->outputs()[0], div->getOutput(0));
 
-               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
-               return true;
-             }})
-        .pattern(
-            {"aten::div_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)",
-             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-               // TODO: Remove with functionalization
-               auto self = args[0].ITensorOrFreeze(ctx);
-               auto other = args[1].ITensorOrFreeze(ctx);
-               auto div = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, util::node_info(n));
+                    LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+                    return true;
+                  }})
+        .pattern({"aten::div_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    // TODO: Remove with functionalization
+                    auto self = args[0].ITensorOrFreeze(ctx);
+                    auto other = args[1].ITensorOrFreeze(ctx);
+                    auto div =
+                        add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, util::node_info(n));
 
-               TRTORCH_CHECK(div, "Unable to create div layer from node: " << *n);
+                    TRTORCH_CHECK(div, "Unable to create div layer from node: " << *n);
 
-               div->setName(util::node_info(n).c_str());
-               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], div->getOutput(0));
+                    div->setName(util::node_info(n).c_str());
+                    auto out = ctx->AssociateValueAndTensor(n->outputs()[0], div->getOutput(0));
 
-               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
-               return true;
-             }})
-        .pattern(
-            {"aten::mul.Tensor(Tensor self, Tensor other) -> Tensor",
-             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-               // Should implement self * other
-               auto self = args[0].ITensorOrFreeze(ctx);
-               auto other = args[1].ITensorOrFreeze(ctx);
-               auto mul = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPROD, self, other, util::node_info(n));
-               TRTORCH_CHECK(mul, "Unable to create mul layer from node: " << *n);
+                    LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+                    return true;
+                  }})
+        .pattern({"aten::mul.Tensor(Tensor self, Tensor other) -> Tensor",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    // Should implement self * other
+                    auto self = args[0].ITensorOrFreeze(ctx);
+                    auto other = args[1].ITensorOrFreeze(ctx);
+                    auto mul =
+                        add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPROD, self, other, util::node_info(n));
+                    TRTORCH_CHECK(mul, "Unable to create mul layer from node: " << *n);
 
-               mul->setName(util::node_info(n).c_str());
-               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], mul->getOutput(0));
-               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
-               return true;
-             }})
-        .pattern(
-            {"aten::mul_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)",
-             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-               // TODO: Remove with functionalization
-               auto self = args[0].ITensorOrFreeze(ctx);
-               auto other = args[1].ITensorOrFreeze(ctx);
-               auto mul = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPROD, self, other, util::node_info(n));
-               TRTORCH_CHECK(mul, "Unable to create mul layer from node: " << *n);
+                    mul->setName(util::node_info(n).c_str());
+                    auto out = ctx->AssociateValueAndTensor(n->outputs()[0], mul->getOutput(0));
+                    LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+                    return true;
+                  }})
+        .pattern({"aten::mul_.Tensor(Tensor(a!) self, Tensor other) -> Tensor(a!)",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    // TODO: Remove with functionalization
+                    auto self = args[0].ITensorOrFreeze(ctx);
+                    auto other = args[1].ITensorOrFreeze(ctx);
+                    auto mul =
+                        add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPROD, self, other, util::node_info(n));
+                    TRTORCH_CHECK(mul, "Unable to create mul layer from node: " << *n);
 
-               mul->setName(util::node_info(n).c_str());
-               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], mul->getOutput(0));
-               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
-               return true;
-             }})
-        .pattern(
-            {"aten::pow.Tensor_Tensor(Tensor self, Tensor exponent) -> (Tensor)",
-             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-               // TODO: Remove with functionalization
-               auto self = args[0].ITensorOrFreeze(ctx);
-               auto exponent = args[1].ITensorOrFreeze(ctx);
-               auto pow =
-                   add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPOW, self, exponent, util::node_info(n));
-               TRTORCH_CHECK(pow, "Unable to create Power layer from node: " << *n);
+                    mul->setName(util::node_info(n).c_str());
+                    auto out = ctx->AssociateValueAndTensor(n->outputs()[0], mul->getOutput(0));
+                    LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+                    return true;
+                  }})
+        .pattern({"aten::pow.Tensor_Tensor(Tensor self, Tensor exponent) -> (Tensor)",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    // TODO: Remove with functionalization
+                    auto self = args[0].ITensorOrFreeze(ctx);
+                    auto exponent = args[1].ITensorOrFreeze(ctx);
+                    auto pow =
+                        add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPOW, self, exponent, util::node_info(n));
+                    TRTORCH_CHECK(pow, "Unable to create Power layer from node: " << *n);
 
-               pow->setName(util::node_info(n).c_str());
-               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], pow->getOutput(0));
+                    pow->setName(util::node_info(n).c_str());
+                    auto out = ctx->AssociateValueAndTensor(n->outputs()[0], pow->getOutput(0));
 
-               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
-               return true;
-             }})
-        .pattern(
-            {"aten::pow.Tensor_Scalar(Tensor self, Scalar exponent) -> (Tensor)",
-             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-               // TODO: Remove with functionalization
-               auto self = args[0].ITensorOrFreeze(ctx);
-               auto exponentScalar = args[1].unwrapToScalar().to<float>();
-               auto exponent = tensor_to_const(ctx, torch::tensor({exponentScalar}));
-               auto pow =
-                   add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPOW, self, exponent, util::node_info(n));
-               TRTORCH_CHECK(pow, "Unable to create Power layer from node: " << *n);
+                    LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+                    return true;
+                  }})
+        .pattern({"aten::pow.Tensor_Scalar(Tensor self, Scalar exponent) -> (Tensor)",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    // TODO: Remove with functionalization
+                    auto self = args[0].ITensorOrFreeze(ctx);
+                    auto exponentScalar = args[1].unwrapToScalar().to<float>();
+                    auto exponent = tensor_to_const(ctx, torch::tensor({exponentScalar}));
+                    auto pow =
+                        add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPOW, self, exponent, util::node_info(n));
+                    TRTORCH_CHECK(pow, "Unable to create Power layer from node: " << *n);
 
-               pow->setName(util::node_info(n).c_str());
-               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], pow->getOutput(0));
+                    pow->setName(util::node_info(n).c_str());
+                    auto out = ctx->AssociateValueAndTensor(n->outputs()[0], pow->getOutput(0));
 
-               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
-               return true;
-             }});
+                    LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+                    return true;
+                  }});
 
 } // namespace
 } // namespace impl
