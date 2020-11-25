@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include <cuda_runtime.h>
 #include <memory>
 #include <string>
 #include <vector>
@@ -187,86 +188,6 @@ struct TRTORCH_API CompileSpec {
   };
 
   /**
-   * Supported Device Types that can be used with TensorRT engines
-   *
-   * This class is compatable with c10::DeviceTypes (but will check for TRT
-   * support) but the only applicable value is at::kCUDA, which maps to
-   * DeviceType::kGPU
-   *
-   * To use the DataType class itself, interface using the enum vs. normal
-   * instatination
-   *
-   * ex. trtorch::DeviceType type = DeviceType::kGPU;
-   */
-  class DeviceType {
-   public:
-    /**
-     * Underlying enum class to support the DeviceType Class
-     *
-     * In the case that you need to use the DeviceType class itself, interface
-     * using this enum vs. normal instatination
-     *
-     * ex. trtorch::DeviceType type = DeviceType::kGPU;
-     */
-    enum Value : int8_t {
-      /// Target GPU to run engine
-      kGPU,
-      /// Target DLA to run engine
-      kDLA,
-    };
-
-    /**
-     * @brief Construct a new Device Type object
-     *
-     */
-    DeviceType() = default;
-    /**
-     * @brief Construct a new Device Type object from internal enum
-     *
-     */
-    constexpr DeviceType(Value t) : value(t) {}
-    /**
-     * @brief Construct a new Device Type object from torch device enums
-     * Note: The only valid value is torch::kCUDA (torch::kCPU is not supported)
-     *
-     * @param t
-     */
-    DeviceType(c10::DeviceType t);
-    /**
-     * @brief Get the internal value from the Device object
-     *
-     * @return Value
-     */
-    operator Value() const {
-      return value;
-    }
-    explicit operator bool() = delete;
-    /**
-     * @brief Comparison operator for DeviceType
-     *
-     * @param other
-     * @return true
-     * @return false
-     */
-    constexpr bool operator==(DeviceType other) const {
-      return value == other.value;
-    }
-    /**
-     * @brief Comparison operator for DeviceType
-     *
-     * @param other
-     * @return true
-     * @return false
-     */
-    constexpr bool operator!=(DeviceType other) const {
-      return value != other.value;
-    }
-
-   private:
-    Value value;
-  };
-
-  /**
    * Emum for selecting engine capability
    */
   enum class EngineCapability : int8_t {
@@ -334,16 +255,122 @@ struct TRTORCH_API CompileSpec {
    */
   bool strict_types = false;
 
-  /**
-   * (Only used when targeting DLA (device))
-   * Lets engine run layers on GPU if they are not supported on DLA
+  /*
+   * Setting data structure for Target device
    */
-  bool allow_gpu_fallback = true;
+  struct Device {
+    /**
+     * Supported Device Types that can be used with TensorRT engines
+     *
+     * This class is compatable with c10::DeviceTypes (but will check for TRT
+     * support) but the only applicable value is at::kCUDA, which maps to
+     * DeviceType::kGPU
+     *
+     * To use the DataType class itself, interface using the enum vs. normal
+     * instatination
+     *
+     * ex. trtorch::DeviceType type = DeviceType::kGPU;
+     */
+    class DeviceType {
+     public:
+      /**
+       * Underlying enum class to support the DeviceType Class
+       *
+       * In the case that you need to use the DeviceType class itself, interface
+       * using this enum vs. normal instatination
+       *
+       * ex. trtorch::DeviceType type = DeviceType::kGPU;
+       */
+      enum Value : int8_t {
+        /// Target GPU to run engine
+        kGPU,
+        /// Target DLA to run engine
+        kDLA,
+      };
 
-  /**
-   * Target device type
+      /**
+       * @brief Construct a new Device Type object
+       *
+       */
+      DeviceType() = default;
+      /**
+       * @brief Construct a new Device Type object from internal enum
+       *
+       */
+      constexpr DeviceType(Value t) : value(t) {}
+      /**
+       * @brief Construct a new Device Type object from torch device enums
+       * Note: The only valid value is torch::kCUDA (torch::kCPU is not supported)
+       *
+       * @param t
+       */
+      DeviceType(c10::DeviceType t);
+      /**
+       * @brief Get the internal value from the Device object
+       *
+       * @return Value
+       */
+      operator Value() const {
+        return value;
+      }
+      explicit operator bool() = delete;
+      /**
+       * @brief Comparison operator for DeviceType
+       *
+       * @param other
+       * @return true
+       * @return false
+       */
+      constexpr bool operator==(DeviceType other) const {
+        return value == other.value;
+      }
+      /**
+       * @brief Comparison operator for DeviceType
+       *
+       * @param other
+       * @return true
+       * @return false
+       */
+      constexpr bool operator!=(DeviceType other) const {
+        return value != other.value;
+      }
+
+     private:
+      Value value;
+    };
+
+    /**
+     * @brief Setting data structure for device
+     * This struct will hold Target device related parameters such as device_type, gpu_id, dla_core
+     */
+    DeviceType device_type;
+
+    /*
+     * Target gpu id
+     */
+    int64_t gpu_id;
+
+    /*
+     * When using DLA core on NVIDIA AGX platforms gpu_id should be set as Xavier device
+     */
+    int64_t dla_core;
+
+    /**
+     * (Only used when targeting DLA (device))
+     * Lets engine run layers on GPU if they are not supported on DLA
+     */
+    bool allow_gpu_fallback;
+
+    /**
+     * Constructor for Device structure
+     */
+    Device() : device_type(DeviceType::kGPU), gpu_id(0), dla_core(0), allow_gpu_fallback(false) {}
+  };
+
+  /*
+   * Target Device
    */
-  DeviceType device = DeviceType::kGPU;
+  Device device;
 
   /**
    * Sets the restrictions for the engine (CUDA Safety)
@@ -439,4 +466,13 @@ TRTORCH_API std::string ConvertGraphToTRTEngine(
     const torch::jit::Module& module,
     std::string method_name,
     CompileSpec info);
+/**
+ * @brief Set gpu device id
+ *
+ * @param gpu_id
+ *
+ * Sets gpu id using cudaSetDevice
+ */
+TRTORCH_API void set_device(const int gpu_id);
+
 } // namespace trtorch

@@ -17,7 +17,7 @@ config_setting(
 
 cc_library(
     name = "cudnn_headers",
-    hdrs = ["include/cudnn.h"] + glob(["include/cudnn+.h"]),
+    hdrs = ["include/cudnn.h"] + glob(["include/cudnn+.h", "include/cudnn_*.h"]),
     includes = ["include/"],
     visibility = ["//visibility:private"],
 )

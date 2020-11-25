@@ -249,6 +249,11 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/using_dla.html">
+            DLA
+           </a>
+          </li>
+          <li class="md-nav__item">
            <span class="md-nav__link caption">
             <span class="caption-text">
              Notebooks
@@ -375,6 +380,7 @@
 
 <span class="cp">#pragma once</span>
 
+<span class="cp">#include</span> <span class="cpf">&lt;cuda_runtime.h&gt;</span><span class="cp"></span>
 <span class="cp">#include</span> <span class="cpf">&lt;memory&gt;</span><span class="cp"></span>
 <span class="cp">#include</span> <span class="cpf">&lt;string&gt;</span><span class="cp"></span>
 <span class="cp">#include</span> <span class="cpf">&lt;vector&gt;</span><span class="cp"></span>
@@ -445,31 +451,6 @@
     <span class="n">Value</span> <span class="n">value</span><span class="p">;</span>
   <span class="p">};</span>
 
-  <span class="k">class</span> <span class="nc">DeviceType</span> <span class="p">{</span>
-   <span class="k">public</span><span class="o">:</span>
-    <span class="k">enum</span> <span class="nc">Value</span> <span class="o">:</span> <span class="kt">int8_t</span> <span class="p">{</span>
-      <span class="n">kGPU</span><span class="p">,</span>
-      <span class="n">kDLA</span><span class="p">,</span>
-    <span class="p">};</span>
-
-    <span class="n">DeviceType</span><span class="p">()</span> <span class="o">=</span> <span class="k">default</span><span class="p">;</span>
-    <span class="k">constexpr</span> <span class="nf">DeviceType</span><span class="p">(</span><span class="n">Value</span> <span class="n">t</span><span class="p">)</span> <span class="o">:</span> <span class="n">value</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="p">{}</span>
-    <span class="n">DeviceType</span><span class="p">(</span><span class="n">c10</span><span class="o">::</span><span class="n">DeviceType</span> <span class="n">t</span><span class="p">);</span>
-    <span class="k">operator</span> <span class="nf">Value</span><span class="p">()</span> <span class="k">const</span> <span class="p">{</span>
-      <span class="k">return</span> <span class="n">value</span><span class="p">;</span>
-    <span class="p">}</span>
-    <span class="k">explicit</span> <span class="k">operator</span> <span class="kt">bool</span><span class="p">()</span> <span class="o">=</span> <span class="k">delete</span><span class="p">;</span>
-    <span class="k">constexpr</span> <span class="kt">bool</span> <span class="k">operator</span><span class="o">==</span><span class="p">(</span><span class="n">DeviceType</span> <span class="n">other</span><span class="p">)</span> <span class="k">const</span> <span class="p">{</span>
-      <span class="k">return</span> <span class="n">value</span> <span class="o">==</span> <span class="n">other</span><span class="p">.</span><span class="n">value</span><span class="p">;</span>
-    <span class="p">}</span>
-    <span class="k">constexpr</span> <span class="kt">bool</span> <span class="k">operator</span><span class="o">!=</span><span class="p">(</span><span class="n">DeviceType</span> <span class="n">other</span><span class="p">)</span> <span class="k">const</span> <span class="p">{</span>
-      <span class="k">return</span> <span class="n">value</span> <span class="o">!=</span> <span class="n">other</span><span class="p">.</span><span class="n">value</span><span class="p">;</span>
-    <span class="p">}</span>
-
-   <span class="k">private</span><span class="o">:</span>
-    <span class="n">Value</span> <span class="n">value</span><span class="p">;</span>
-  <span class="p">};</span>
-
   <span class="k">enum</span> <span class="k">class</span> <span class="nc">EngineCapability</span> <span class="o">:</span> <span class="kt">int8_t</span> <span class="p">{</span>
     <span class="n">kDEFAULT</span><span class="p">,</span>
     <span class="n">kSAFE_GPU</span><span class="p">,</span>
@@ -492,9 +473,56 @@
 
   <span class="kt">bool</span> <span class="n">strict_types</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
 
-  <span class="kt">bool</span> <span class="n">allow_gpu_fallback</span> <span class="o">=</span> <span class="nb">true</span><span class="p">;</span>
+  <span class="cm">/*</span>
+<span class="cm">   * Setting data structure for Target device</span>
+<span class="cm">   */</span>
+  <span class="k">struct</span> <span class="nc">Device</span> <span class="p">{</span>
+    <span class="k">class</span> <span class="nc">DeviceType</span> <span class="p">{</span>
+     <span class="k">public</span><span class="o">:</span>
+      <span class="k">enum</span> <span class="nc">Value</span> <span class="o">:</span> <span class="kt">int8_t</span> <span class="p">{</span>
+        <span class="n">kGPU</span><span class="p">,</span>
+        <span class="n">kDLA</span><span class="p">,</span>
+      <span class="p">};</span>
 
-  <span class="n">DeviceType</span> <span class="n">device</span> <span class="o">=</span> <span class="n">DeviceType</span><span class="o">::</span><span class="n">kGPU</span><span class="p">;</span>
+      <span class="n">DeviceType</span><span class="p">()</span> <span class="o">=</span> <span class="k">default</span><span class="p">;</span>
+      <span class="k">constexpr</span> <span class="nf">DeviceType</span><span class="p">(</span><span class="n">Value</span> <span class="n">t</span><span class="p">)</span> <span class="o">:</span> <span class="n">value</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="p">{}</span>
+      <span class="n">DeviceType</span><span class="p">(</span><span class="n">c10</span><span class="o">::</span><span class="n">DeviceType</span> <span class="n">t</span><span class="p">);</span>
+      <span class="k">operator</span> <span class="nf">Value</span><span class="p">()</span> <span class="k">const</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="n">value</span><span class="p">;</span>
+      <span class="p">}</span>
+      <span class="k">explicit</span> <span class="k">operator</span> <span class="kt">bool</span><span class="p">()</span> <span class="o">=</span> <span class="k">delete</span><span class="p">;</span>
+      <span class="k">constexpr</span> <span class="kt">bool</span> <span class="k">operator</span><span class="o">==</span><span class="p">(</span><span class="n">DeviceType</span> <span class="n">other</span><span class="p">)</span> <span class="k">const</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="n">value</span> <span class="o">==</span> <span class="n">other</span><span class="p">.</span><span class="n">value</span><span class="p">;</span>
+      <span class="p">}</span>
+      <span class="k">constexpr</span> <span class="kt">bool</span> <span class="k">operator</span><span class="o">!=</span><span class="p">(</span><span class="n">DeviceType</span> <span class="n">other</span><span class="p">)</span> <span class="k">const</span> <span class="p">{</span>
+        <span class="k">return</span> <span class="n">value</span> <span class="o">!=</span> <span class="n">other</span><span class="p">.</span><span class="n">value</span><span class="p">;</span>
+      <span class="p">}</span>
+
+     <span class="k">private</span><span class="o">:</span>
+      <span class="n">Value</span> <span class="n">value</span><span class="p">;</span>
+    <span class="p">};</span>
+
+    <span class="n">DeviceType</span> <span class="n">device_type</span><span class="p">;</span>
+
+    <span class="cm">/*</span>
+<span class="cm">     * Target gpu id</span>
+<span class="cm">     */</span>
+    <span class="kt">int64_t</span> <span class="n">gpu_id</span><span class="p">;</span>
+
+    <span class="cm">/*</span>
+<span class="cm">     * When using DLA core on NVIDIA AGX platforms gpu_id should be set as Xavier device</span>
+<span class="cm">     */</span>
+    <span class="kt">int64_t</span> <span class="n">dla_core</span><span class="p">;</span>
+
+    <span class="kt">bool</span> <span class="n">allow_gpu_fallback</span><span class="p">;</span>
+
+    <span class="n">Device</span><span class="p">()</span> <span class="o">:</span> <span class="n">device_type</span><span class="p">(</span><span class="n">DeviceType</span><span class="o">::</span><span class="n">kGPU</span><span class="p">),</span> <span class="n">gpu_id</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="n">dla_core</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="n">allow_gpu_fallback</span><span class="p">(</span><span class="nb">false</span><span class="p">)</span> <span class="p">{}</span>
+  <span class="p">};</span>
+
+  <span class="cm">/*</span>
+<span class="cm">   * Target Device</span>
+<span class="cm">   */</span>
+  <span class="n">Device</span> <span class="n">device</span><span class="p">;</span>
 
   <span class="n">EngineCapability</span> <span class="n">capability</span> <span class="o">=</span> <span class="n">EngineCapability</span><span class="o">::</span><span class="n">kDEFAULT</span><span class="p">;</span>
 
@@ -520,6 +548,8 @@
     <span class="k">const</span> <span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Module</span><span class="o">&amp;</span> <span class="k">module</span><span class="p">,</span>
     <span class="n">std</span><span class="o">::</span><span class="n">string</span> <span class="n">method_name</span><span class="p">,</span>
     <span class="n">CompileSpec</span> <span class="n">info</span><span class="p">);</span>
+<span class="n">TRTORCH_API</span> <span class="kt">void</span> <span class="n">set_device</span><span class="p">(</span><span class="k">const</span> <span class="kt">int</span> <span class="n">gpu_id</span><span class="p">);</span>
+
 <span class="p">}</span> <span class="c1">// namespace trtorch</span>
 </pre>
         </div>

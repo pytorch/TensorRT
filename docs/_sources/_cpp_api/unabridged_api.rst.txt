@@ -33,6 +33,11 @@ Classes and Structs
 .. toctree::
    :maxdepth: 5
 
+   structtrtorch_1_1CompileSpec_1_1Device.rst
+
+.. toctree::
+   :maxdepth: 5
+
    structtrtorch_1_1CompileSpec_1_1InputRange.rst
 
 .. toctree::
@@ -43,7 +48,7 @@ Classes and Structs
 .. toctree::
    :maxdepth: 5
 
-   classtrtorch_1_1CompileSpec_1_1DeviceType.rst
+   classtrtorch_1_1CompileSpec_1_1Device_1_1DeviceType.rst
 
 .. toctree::
    :maxdepth: 5
@@ -137,6 +142,11 @@ Functions
    :maxdepth: 5
 
    function_ptq_8h_1a4422781719d7befedb364cacd91c6247.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   function_trtorch_8h_1a589ea96d16e2df44146ad0919424e00e.rst
 
 Defines
 *******

@@ -86,8 +86,8 @@ PYBIND11_MODULE(_C, m) {
       .export_values();
 
   py::enum_<DeviceType>(m, "DeviceType", "Enum to specify device kinds to build TensorRT engines for")
-      .value("gpu", DeviceType::kGPU, "Specify using GPU to execute TensorRT Engine")
-      .value("dla", DeviceType::kDLA, "Specify using DLA to execute TensorRT Engine (Jetson Only)")
+      .value("GPU", DeviceType::kGPU, "Specify using GPU to execute TensorRT Engine")
+      .value("DLA", DeviceType::kDLA, "Specify using DLA to execute TensorRT Engine (Jetson Only)")
       .export_values();
 
   py::enum_<EngineCapability>(
@@ -105,13 +105,19 @@ PYBIND11_MODULE(_C, m) {
       .def_readwrite("refit", &CompileSpec::refit)
       .def_readwrite("debug", &CompileSpec::debug)
       .def_readwrite("strict_types", &CompileSpec::strict_types)
-      .def_readwrite("allow_gpu_fallback", &CompileSpec::allow_gpu_fallback)
       .def_readwrite("device", &CompileSpec::device)
       .def_readwrite("capability", &CompileSpec::capability)
       .def_readwrite("num_min_timing_iters", &CompileSpec::num_min_timing_iters)
       .def_readwrite("num_avg_timing_iters", &CompileSpec::num_avg_timing_iters)
       .def_readwrite("workspace_size", &CompileSpec::workspace_size)
       .def_readwrite("max_batch_size", &CompileSpec::max_batch_size);
+
+  py::class_<Device>(m, "Device")
+      .def(py::init<>())
+      .def_readwrite("device_type", &Device::device_type)
+      .def_readwrite("gpu_id", &Device::gpu_id)
+      .def_readwrite("dla_core", &Device::dla_core)
+      .def_readwrite("allow_gpu_fallback", &Device::allow_gpu_fallback);
 
   m.doc() =
       "TRTorch Internal C Bindings: Ahead of Time compilation for PyTorch JIT. A tool to convert PyTorch JIT to TensorRT";

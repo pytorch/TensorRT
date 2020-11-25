@@ -30,6 +30,10 @@ bool MaxPoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& ar
   auto padding = util::toDims(args[3].unwrapToIntList());
   LOG_DEBUG("padding: " << padding);
   auto stride = util::toDims(args[2].unwrapToIntList());
+  if (args[2].unwrapToIntList().size() == 0) {
+    LOG_DEBUG("Stride not providied, using kernel_size as stride");
+    stride = util::toDims(args[1].unwrapToIntList());
+  }
   LOG_DEBUG("stride: " << stride);
 
   auto dilation = util::toDims(args[4].unwrapToIntList());
@@ -47,8 +51,8 @@ bool MaxPoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& ar
 
   new_layer->setName(util::node_info(n).c_str());
   new_layer->setPaddingNd(padding);
-  if (stride.nbDims != 2 && ctx->settings.device == nvinfer1::DeviceType::kDLA) {
-    if (!ctx->settings.allow_gpu_fallback) {
+  if (stride.nbDims != 2 && ctx->settings.device.device_type == nvinfer1::DeviceType::kDLA) {
+    if (!ctx->settings.device.allow_gpu_fallback) {
       TRTORCH_THROW_ERROR("DLA Pooling stride is limited to 2D, allow GPU fallback");
     } else {
       LOG_WARNING("DLA Pooling stride is limited to 2D, will run on GPU");
@@ -65,7 +69,7 @@ bool MaxPoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& ar
 
   LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
   return true;
-}
+} // namespace
 
 bool AvgPoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& args) {
   auto in = args[0].ITensorOrFreeze(ctx);
@@ -88,6 +92,10 @@ bool AvgPoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& ar
   auto padding = util::toDims(args[3].unwrapToIntList());
   LOG_DEBUG("padding: " << padding);
   auto stride = util::toDims(args[2].unwrapToIntList());
+  if (args[2].unwrapToIntList().size() == 0) {
+    LOG_DEBUG("Stride not providied, using kernel_size as stride");
+    stride = util::toDims(args[1].unwrapToIntList());
+  }
   LOG_DEBUG("stride: " << stride);
 
   bool ceil_mode = args[4].unwrapToBool();
@@ -98,8 +106,8 @@ bool AvgPoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& ar
 
   new_layer->setName(util::node_info(n).c_str());
   new_layer->setPaddingNd(padding);
-  if (stride.nbDims != 2 && ctx->settings.device == nvinfer1::DeviceType::kDLA) {
-    if (!ctx->settings.allow_gpu_fallback) {
+  if (stride.nbDims != 2 && ctx->settings.device.device_type == nvinfer1::DeviceType::kDLA) {
+    if (!ctx->settings.device.allow_gpu_fallback) {
       TRTORCH_THROW_ERROR("DLA Pooling stride is limited to 2D, allow GPU fallback");
     } else {
       LOG_WARNING("DLA Pooling stride is limited to 2D, will run on GPU");
@@ -121,7 +129,7 @@ bool AvgPoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& ar
 
   LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
   return true;
-}
+} // namespace impl
 
 auto pooling_registrations TRTORCH_UNUSED =
     RegisterNodeConversionPatterns()
@@ -172,8 +180,8 @@ auto pooling_registrations TRTORCH_UNUSED =
 
                new_layer->setName(util::node_info(n).c_str());
                new_layer->setPaddingNd(padding);
-               if (stride.nbDims != 2 && ctx->settings.device == nvinfer1::DeviceType::kDLA) {
-                 if (!ctx->settings.allow_gpu_fallback) {
+               if (stride.nbDims != 2 && ctx->settings.device.device_type == nvinfer1::DeviceType::kDLA) {
+                 if (!ctx->settings.device.allow_gpu_fallback) {
                    TRTORCH_THROW_ERROR("DLA Pooling stride is limited to 2D, allow GPU fallback");
                  } else {
                    LOG_WARNING("DLA Pooling stride is limited to 2D, will run on GPU");
@@ -232,8 +240,8 @@ auto pooling_registrations TRTORCH_UNUSED =
                new_layer->setName(util::node_info(n).c_str());
                new_layer->setPaddingNd(padding);
 
-               if (stride.nbDims != 2 && ctx->settings.device == nvinfer1::DeviceType::kDLA) {
-                 if (!ctx->settings.allow_gpu_fallback) {
+               if (stride.nbDims != 2 && ctx->settings.device.device_type == nvinfer1::DeviceType::kDLA) {
+                 if (!ctx->settings.device.allow_gpu_fallback) {
                    TRTORCH_THROW_ERROR("DLA Pooling stride is limited to 2D, allow GPU fallback");
                  } else {
                    LOG_WARNING("DLA Pooling stride is limited to 2D, will run on GPU");

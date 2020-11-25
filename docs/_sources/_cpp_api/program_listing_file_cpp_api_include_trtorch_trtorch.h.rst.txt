@@ -20,6 +20,7 @@ Program Listing for File trtorch.h
    
    #pragma once
    
+   #include <cuda_runtime.h>
    #include <memory>
    #include <string>
    #include <vector>
@@ -90,31 +91,6 @@ Program Listing for File trtorch.h
        Value value;
      };
    
-     class DeviceType {
-      public:
-       enum Value : int8_t {
-         kGPU,
-         kDLA,
-       };
-   
-       DeviceType() = default;
-       constexpr DeviceType(Value t) : value(t) {}
-       DeviceType(c10::DeviceType t);
-       operator Value() const {
-         return value;
-       }
-       explicit operator bool() = delete;
-       constexpr bool operator==(DeviceType other) const {
-         return value == other.value;
-       }
-       constexpr bool operator!=(DeviceType other) const {
-         return value != other.value;
-       }
-   
-      private:
-       Value value;
-     };
-   
      enum class EngineCapability : int8_t {
        kDEFAULT,
        kSAFE_GPU,
@@ -137,9 +113,56 @@ Program Listing for File trtorch.h
    
      bool strict_types = false;
    
-     bool allow_gpu_fallback = true;
+     /*
+      * Setting data structure for Target device
+      */
+     struct Device {
+       class DeviceType {
+        public:
+         enum Value : int8_t {
+           kGPU,
+           kDLA,
+         };
    
-     DeviceType device = DeviceType::kGPU;
+         DeviceType() = default;
+         constexpr DeviceType(Value t) : value(t) {}
+         DeviceType(c10::DeviceType t);
+         operator Value() const {
+           return value;
+         }
+         explicit operator bool() = delete;
+         constexpr bool operator==(DeviceType other) const {
+           return value == other.value;
+         }
+         constexpr bool operator!=(DeviceType other) const {
+           return value != other.value;
+         }
+   
+        private:
+         Value value;
+       };
+   
+       DeviceType device_type;
+   
+       /*
+        * Target gpu id
+        */
+       int64_t gpu_id;
+   
+       /*
+        * When using DLA core on NVIDIA AGX platforms gpu_id should be set as Xavier device
+        */
+       int64_t dla_core;
+   
+       bool allow_gpu_fallback;
+   
+       Device() : device_type(DeviceType::kGPU), gpu_id(0), dla_core(0), allow_gpu_fallback(false) {}
+     };
+   
+     /*
+      * Target Device
+      */
+     Device device;
    
      EngineCapability capability = EngineCapability::kDEFAULT;
    
@@ -165,4 +188,6 @@ Program Listing for File trtorch.h
        const torch::jit::Module& module,
        std::string method_name,
        CompileSpec info);
+   TRTORCH_API void set_device(const int gpu_id);
+   
    } // namespace trtorch
