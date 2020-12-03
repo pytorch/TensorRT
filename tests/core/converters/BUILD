@@ -83,6 +83,10 @@ converter_test(
   name = "test_squeeze"
 )
 
+converter_test(
+  name = "test_detach"
+)
+
 test_suite(
   name = "test_converters",
   tests = [
@@ -103,6 +107,7 @@ test_suite(
     ":test_lstm_cell",
     ":test_topk",
     ":test_unsqueeze",
-    ":test_squeeze"
+    ":test_squeeze",
+    ":test_detach"
   ]
 )

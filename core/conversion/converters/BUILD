@@ -52,7 +52,8 @@ cc_library(
         "impl/lstm_cell.cpp",
         "impl/topk.cpp",
         "impl/unsqueeze.cpp",
-        "impl/squeeze.cpp"
+        "impl/squeeze.cpp",
+        "impl/detach.cpp"
     ],
     deps = [
         "@tensorrt//:nvinfer",
