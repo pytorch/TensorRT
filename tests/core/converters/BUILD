@@ -71,6 +71,10 @@ converter_test(
   name = "test_lstm_cell"
 )
 
+converter_test(
+  name = "test_topk"
+)
+
 test_suite(
   name = "test_converters",
   tests = [
@@ -88,6 +92,7 @@ test_suite(
     ":test_interpolate",
     ":test_select",
     ":test_stack",
-    ":test_lstm_cell"
+    ":test_lstm_cell",
+    ":test_topk"
   ]
 )
