@@ -50,7 +50,9 @@ cc_library(
         "impl/select.cpp",
         "impl/stack.cpp",
         "impl/lstm_cell.cpp",
-        "impl/topk.cpp"
+        "impl/topk.cpp",
+        "impl/unsqueeze.cpp",
+        "impl/squeeze.cpp"
     ],
     deps = [
         "@tensorrt//:nvinfer",

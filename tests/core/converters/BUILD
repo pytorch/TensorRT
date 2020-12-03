@@ -75,6 +75,14 @@ converter_test(
   name = "test_topk"
 )
 
+converter_test(
+  name = "test_unsqueeze"
+)
+
+converter_test(
+  name = "test_squeeze"
+)
+
 test_suite(
   name = "test_converters",
   tests = [
@@ -93,6 +101,8 @@ test_suite(
     ":test_select",
     ":test_stack",
     ":test_lstm_cell",
-    ":test_topk"
+    ":test_topk",
+    ":test_unsqueeze",
+    ":test_squeeze"
   ]
 )
