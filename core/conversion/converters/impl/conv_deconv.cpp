@@ -39,7 +39,9 @@ auto conv_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().patter
           bias = Weights(ctx, torch::zeros(args[1].unwrapToTensor().sizes()[1] * groups));
         }
 
-        auto deconv = ctx->net->addDeconvolutionNd(*in, w.num_input_maps * groups, w.kernel_shape, w.data, bias.data);
+        // shape of deconvolution's weight: [in, out/groups, ...]
+        auto deconv = ctx->net->addDeconvolutionNd(
+            *in, args[1].unwrapToTensor().sizes()[1] * groups, w.kernel_shape, w.data, bias.data);
         TRTORCH_CHECK(deconv, "Unable to create deconvolution layer from node: " << *n);
 
         deconv->setStrideNd(stride);
@@ -62,7 +64,9 @@ auto conv_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().patter
           bias = Weights(ctx, torch::zeros(args[1].unwrapToTensor().sizes()[0]));
         }
 
-        auto conv = ctx->net->addConvolutionNd(*in, w.num_output_maps, w.kernel_shape, w.data, bias.data);
+        // shape of convolution's weight: [out, in/groups, ...]
+        auto conv =
+            ctx->net->addConvolutionNd(*in, args[1].unwrapToTensor().sizes()[0], w.kernel_shape, w.data, bias.data);
         TRTORCH_CHECK(conv, "Unable to create convolution layer from node: " << *n);
 
         conv->setStrideNd(stride);
