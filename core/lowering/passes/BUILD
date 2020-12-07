@@ -41,4 +41,3 @@ pkg_tar(
     package_dir = "core/lowering/passes/",
     srcs = ["passes.h"],
 )
-
