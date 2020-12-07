@@ -18,7 +18,6 @@ void RemoveTo(std::shared_ptr<torch::jit::Graph> graph);
 void UnpackAddMM(std::shared_ptr<torch::jit::Graph>& graph);
 void UnpackBatchNorm(std::shared_ptr<torch::jit::Graph>& graph);
 void UnpackLogSoftmax(std::shared_ptr<torch::jit::Graph>& graph);
-void AliasOpMapping(std::shared_ptr<torch::jit::Graph>& graph);
 
 } // namespace passes
 } // namespace lowering
