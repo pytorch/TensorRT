@@ -10,16 +10,15 @@ VALID_PY_FILE_TYPES = [".py"]
 
 
 def lint(user, target_files, conf, change_file=True):
-    return yapf.FormatFiles(
-        filenames=target_files,
-        lines=None,
-        style_config=conf,
-        no_local_style=None,
-        in_place=change_file,
-        print_diff=False,
-        verify=True,
-        parallel=True,
-        verbose=True)
+    return yapf.FormatFiles(filenames=target_files,
+                            lines=None,
+                            style_config=conf,
+                            no_local_style=None,
+                            in_place=change_file,
+                            print_diff=False,
+                            verify=True,
+                            parallel=True,
+                            verbose=True)
 
 
 if __name__ == "__main__":
