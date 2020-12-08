@@ -22,14 +22,15 @@ auto topk_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().patter
        auto dim = args[2].unwrapToInt();
        auto largest = args[3].unwrapToBool();
        auto sorted = args[4].unwrapToBool();
- 
+
        auto selfDim = util::toVec(self->getDimensions());
 
-       //reduceAxes	The reduction dimensions. The bit in position i of bitmask reduceAxes corresponds to explicit dimension i of the result.
-       //E.g., the least significant bit corresponds to the first explicit dimension and the next to least significant bit corresponds to the second explicit dimension.
+       // reduceAxes	The reduction dimensions. The bit in position i of bitmask reduceAxes corresponds to explicit
+       // dimension i of the result. E.g., the least significant bit corresponds to the first explicit dimension and the
+       // next to least significant bit corresponds to the second explicit dimension.
 
        if (dim < 0) {
-           dim = selfDim.size() + dim;
+         dim = selfDim.size() + dim;
        }
 
        uint32_t shiftDim = 1 << dim;

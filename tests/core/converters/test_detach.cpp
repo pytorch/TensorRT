@@ -4,8 +4,6 @@
 #include "tests/util/util.h"
 #include "torch/csrc/jit/ir/irparser.h"
 
-
-
 TEST(Converters, ATenDetachConvertsCorrectly) {
   const auto graph = R"IR(
       graph(%0 : Tensor):
