@@ -71,7 +71,6 @@ http_archive(
     name = "cudnn",
     urls = ["https://developer.nvidia.com/compute/machine-learning/cudnn/secure/8.0.5/11.0_20201106/cudnn-11.0-linux-x64-v8.0.5.39.tgz",],
     build_file = "@//third_party/cudnn/archive:BUILD",
-    sha256 = "600267f2caaed2fd58eb214ba669d8ea35f396a7d19b94822e6b36f9f7088c20",
     strip_prefix = "cuda"
 )
 
@@ -79,9 +78,9 @@ http_archive(
     name = "tensorrt",
     urls = ["https://developer.nvidia.com/compute/machine-learning/tensorrt/secure/7.2.1/tars/TensorRT-7.2.1.6.Ubuntu-18.04.x86_64-gnu.cuda-11.0.cudnn8.0.tar.gz",],
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    sha256 = "c7d73b2585b18aae68b740249efa8c8ba5ae852abe9a023720595432a8eb4efd",
     strip_prefix = "TensorRT-7.2.1.6"
 )
+
 
 ####################################################################################
 # Locally installed dependencies (use in cases of custom dependencies or aarch64)
