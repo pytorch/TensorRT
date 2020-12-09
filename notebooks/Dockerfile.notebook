@@ -7,8 +7,8 @@ RUN apt update && apt install bazel-3.4.1
 RUN ln -s /usr/bin/bazel-3.4.1 /usr/bin/bazel
 
 RUN pip install pillow==4.3.0
-RUN pip install torch==1.5.1
-RUN pip install torchvision==0.6.1
+RUN pip install torch==1.6.0
+RUN pip install torchvision==0.7.0
 RUN pip install notebook
 
 COPY . /workspace/TRTorch
