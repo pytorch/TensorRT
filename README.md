@@ -77,7 +77,7 @@ These are the following dependencies used to verify the testcases. TRTorch can w
 - Libtorch 1.7.0 (built with CUDA 11.0)
 - CUDA 11.0
 - cuDNN 8
-- TensorRT 7.1.3.4
+- TensorRT 7.2.1.6
 
 ## Prebuilt Binaries and Wheel files
 
