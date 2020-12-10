@@ -53,6 +53,7 @@ http_archive(
     name = "libtorch",
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
+    sha256 = "656db919c00e99dac81bc21598845ba9231e57cbc8e1570bea017dfb9298236d",
     urls = ["https://download.pytorch.org/libtorch/cu110/libtorch-cxx11-abi-shared-with-deps-1.7.0%2Bcu110.zip"],
 )
 
@@ -60,6 +61,7 @@ http_archive(
     name = "libtorch_pre_cxx11_abi",
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
+    sha256 = "b3976f3294a6c20be4807191042d1e74162a41fb1bed0919f637afc3517d76be",
     urls = ["https://download.pytorch.org/libtorch/cu110/libtorch-shared-with-deps-1.7.0%2Bcu110.zip"],
 )
 
@@ -71,6 +73,7 @@ http_archive(
     name = "cudnn",
     urls = ["https://developer.nvidia.com/compute/machine-learning/cudnn/secure/8.0.5/11.0_20201106/cudnn-11.0-linux-x64-v8.0.5.39.tgz",],
     build_file = "@//third_party/cudnn/archive:BUILD",
+    sha256 = "4e16ee7895deb4a8b1c194b812ba49586ef7d26902051401d3717511898a9b73",
     strip_prefix = "cuda"
 )
 
@@ -78,6 +81,7 @@ http_archive(
     name = "tensorrt",
     urls = ["https://developer.nvidia.com/compute/machine-learning/tensorrt/secure/7.2.1/tars/TensorRT-7.2.1.6.Ubuntu-18.04.x86_64-gnu.cuda-11.0.cudnn8.0.tar.gz",],
     build_file = "@//third_party/tensorrt/archive:BUILD",
+    sha256 = "818622c7bccfdb0fff362cdd65dc42af4502dcb24e045eb911a4132e8d40a66c",
     strip_prefix = "TensorRT-7.2.1.6"
 )
 
