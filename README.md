@@ -74,7 +74,7 @@ torch.jit.save(trt_ts_module, "trt_torchscript_module.ts")
 These are the following dependencies used to verify the testcases. TRTorch can work with other versions, but the tests are not guaranteed to pass.
 
 - Bazel 3.7.0
-- Libtorch 1.7.0 (built with CUDA 11.0)
+- Libtorch 1.7.1 (built with CUDA 11.0)
 - CUDA 11.0
 - cuDNN 8
 - TensorRT 7.2.1.6
