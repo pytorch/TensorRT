@@ -52,6 +52,30 @@ TEST(Converters, ATenAddConvertsCorrectly) {
   pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3});
 }
 
+TEST(Converters, ATenAddWithAlphaConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor, %1 : Tensor):
+        %2 : float = prim::Constant[value=3.2]()
+        %3 : Tensor = aten::add(%0, %1, %2)
+        return (%3))IR";
+  pointwise_test_helper(graph, false);
+  pointwise_test_helper(graph, false, false, {3, 4}, {4});
+  pointwise_test_helper(graph, false, false, {4}, {3, 4});
+  pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3});
+  pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3});
+}
+
+TEST(Converters, ATenAddImplicitWithAlphaConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor, %1 : Tensor):
+        %2 : float = prim::Constant[value=7.6]()
+        %3 : Tensor = aten::add_(%0, %1, %2)
+        return (%3))IR";
+  pointwise_test_helper(graph, false);
+  pointwise_test_helper(graph, false, false, {3, 4}, {4});
+  pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3});
+}
+
 TEST(Converters, ATenSubConvertsCorrectly) {
   const auto graph = R"IR(
       graph(%0 : Tensor, %1 : Tensor):
