@@ -2,7 +2,7 @@
 name: "✨ Feature request"
 about: Suggest an idea for this project
 title: "✨[Feature] An idea about a new feature in TRTorch"
-labels: enhancement
+labels: feature request
 assignees: narendasan
 
 ---
