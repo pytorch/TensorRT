@@ -229,6 +229,7 @@ const std::unordered_map<at::ScalarType, nvinfer1::DataType>& get_at_trt_type_ma
       {at::kHalf, nvinfer1::DataType::kHALF},
       {at::kInt, nvinfer1::DataType::kINT32},
       {at::kChar, nvinfer1::DataType::kINT8},
+      {at::kBool, nvinfer1::DataType::kBOOL},
   };
   return at_trt_type_map;
 }
@@ -239,6 +240,7 @@ const std::unordered_map<nvinfer1::DataType, at::ScalarType>& get_trt_at_type_ma
       {nvinfer1::DataType::kHALF, at::kHalf},
       {nvinfer1::DataType::kINT32, at::kInt},
       {nvinfer1::DataType::kINT8, at::kChar},
+      {nvinfer1::DataType::kBOOL, at::kBool},
   };
   return trt_at_type_map;
 }
@@ -249,7 +251,9 @@ const std::unordered_map<nvinfer1::DataType, at::ScalarType>& get_trt_aten_type_
 }
 
 at::ScalarType toATenDType(nvinfer1::DataType t) {
-  return get_trt_aten_type_map().at(t);
+  auto trt_aten_type_map = get_trt_aten_type_map();
+  TRTORCH_CHECK(trt_aten_type_map.find(t) != trt_aten_type_map.end(), "Unsupported TensorRT datatype");
+  return trt_aten_type_map.at(t);
 }
 
 const std::unordered_map<at::ScalarType, nvinfer1::DataType>& get_aten_trt_type_map() {
@@ -257,7 +261,9 @@ const std::unordered_map<at::ScalarType, nvinfer1::DataType>& get_aten_trt_type_
 }
 
 nvinfer1::DataType toTRTDataType(at::ScalarType t) {
-  return get_aten_trt_type_map().at(t);
+  auto aten_trt_type_map = get_aten_trt_type_map();
+  TRTORCH_CHECK(aten_trt_type_map.find(t) != aten_trt_type_map.end(), "Unsupported Aten datatype");
+  return aten_trt_type_map.at(t);
 }
 
 c10::optional<nvinfer1::DataType> toTRTDataType(caffe2::TypeMeta dtype) {
