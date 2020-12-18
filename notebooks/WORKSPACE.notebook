@@ -35,7 +35,7 @@ git_repository(
 # CUDA should be installed on the system locally
 new_local_repository(
     name = "cuda",
-    path = "/usr/local/cuda-10.2/",
+    path = "/usr/local/cuda/",
     build_file = "@//third_party/cuda:BUILD",
 )
 
@@ -53,16 +53,16 @@ http_archive(
     name = "libtorch",
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/cu102/libtorch-cxx11-abi-shared-with-deps-1.6.0.zip"],
-    sha256 = "fded948bd2dbee625cee33ebbd4843a69496729389e0200a90fbb667cdaeeb69"
+    sha256 = "117f6dd65b7267839197397edd0b10fd2900b0f291e3e54b0b800caefc31bcb6",
+    urls = ["https://download.pytorch.org/libtorch/cu110/libtorch-cxx11-abi-shared-with-deps-1.7.1%2Bcu110.zip"],
 )
 
 http_archive(
     name = "libtorch_pre_cxx11_abi",
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
-    sha256 = "141bb229f4bbf905541096cf8705785e7b0c79e37ca1e5db9d372730b1b9abd7",
-    urls = ["https://download.pytorch.org/libtorch/cu102/libtorch-shared-with-deps-1.6.0.zip"],
+    sha256 = "c77f926afd55d7e860ec9c7abc992c25be77c89771c3ec6fcc13ea42f07d46df",
+    urls = ["https://download.pytorch.org/libtorch/cu110/libtorch-shared-with-deps-1.7.1%2Bcu110.zip"],
 )
 
 ####################################################################################
