@@ -79,13 +79,14 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     auto scalar = args[2].unwrapToScalar().to<float>();
 
                     if (1 != scalar) {
-                      auto scaleW = Weights(ctx, scalar);
-                      auto unuse = Weights();
-                      // IScaleLayer assert shift, scale and power to have
-                      // the same dtype
-                      auto scaleLayer = ctx->net->addScale(
-                          *other, nvinfer1::ScaleMode::kUNIFORM, unuse.data, scaleW.data, unuse.data);
-                      TRTORCH_CHECK(scaleLayer, "Unable to create scale layer from node: " << *n);
+                      auto alphaTensor = tensor_to_const(ctx, torch::tensor({scalar}));
+                      auto scaleLayer = add_elementwise(
+                          ctx,
+                          nvinfer1::ElementWiseOperation::kPROD,
+                          other,
+                          alphaTensor,
+                          util::node_info(n) + std::string("_AlphaMultiplier"));
+                      TRTORCH_CHECK(scaleLayer, "Unable to create alpha*input layer from node: " << *n);
                       other = scaleLayer->getOutput(0);
                     }
 
@@ -107,13 +108,14 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     auto scalar = args[2].unwrapToScalar().to<float>();
 
                     if (1 != scalar) {
-                      auto scaleW = Weights(ctx, scalar);
-                      auto unuse = Weights();
-                      // IScaleLayer assert shift, scale and power to have
-                      // the same dtype
-                      auto scaleLayer = ctx->net->addScale(
-                          *other, nvinfer1::ScaleMode::kUNIFORM, unuse.data, scaleW.data, unuse.data);
-                      TRTORCH_CHECK(scaleLayer, "Unable to create scale layer from node: " << *n);
+                      auto alphaTensor = tensor_to_const(ctx, torch::tensor({scalar}));
+                      auto scaleLayer = add_elementwise(
+                          ctx,
+                          nvinfer1::ElementWiseOperation::kPROD,
+                          other,
+                          alphaTensor,
+                          util::node_info(n) + std::string("_AlphaMultiplier"));
+                      TRTORCH_CHECK(scaleLayer, "Unable to create alpha*input layer from node: " << *n);
                       other = scaleLayer->getOutput(0);
                     }
 

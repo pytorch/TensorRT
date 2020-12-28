@@ -37,3 +37,4 @@ bdist
 py/trtorch/_version.py
 py/wheelhouse
 py/.eggs
+notebooks/.ipynb_checkpoints/

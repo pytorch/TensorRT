@@ -16,7 +16,7 @@ void Conv2DToConvolution(std::shared_ptr<torch::jit::Graph>& graph) {
         graph(%x, %w, %b, %s, %p, %d, %g):
             %1 : bool = prim::Constant[value=0]()
             %2 : int[] = prim::Constant[value=[0, 0]]()
-            %4 : Tensor = aten::_convolution(%x, %w, %b, %s, %p, %d, %1, %2, %g, %1, %1, %1)
+            %4 : Tensor = aten::_convolution(%x, %w, %b, %s, %p, %d, %1, %2, %g, %1, %1, %1, %1)
             return (%4))IR";
   ;
 

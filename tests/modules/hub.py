@@ -46,15 +46,15 @@ models = {
         "path": "both"
     },
     "resnet18": {
-        "model": torch.hub.load('pytorch/vision:v0.6.0', 'resnet18', pretrained=True),
+        "model": torch.hub.load('pytorch/vision:v0.8.2', 'resnet18', pretrained=True),
         "path": "both"
     },
     "resnet50": {
-        "model": torch.hub.load('pytorch/vision:v0.6.0', 'resnet50', pretrained=True),
+        "model": torch.hub.load('pytorch/vision:v0.8.2', 'resnet50', pretrained=True),
         "path": "both"
     },
     "fcn_resnet101": {
-        "model": torch.hub.load('pytorch/vision:v0.6.0', 'fcn_resnet101', pretrained=True),
+        "model": torch.hub.load('pytorch/vision:v0.8.2', 'fcn_resnet101', pretrained=True),
         "path": "script"
     },
     "ssd": {
