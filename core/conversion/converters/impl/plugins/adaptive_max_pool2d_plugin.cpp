@@ -243,9 +243,9 @@ int AdaptiveMaxPool2dPlugin::enqueue(
 
   at::Tensor output;
   at::Tensor indices;
-  
+
   if (mode_ == "adaptive_max_pool2d") {
-    std::tie(output, indices) = at::adaptive_avg_pool2d(input, {size_[0], size_[1]});
+    std::tie(output, indices) = at::adaptive_max_pool2d(input, {size_[0], size_[1]});
   }
 
   cudaMemcpyAsync(
