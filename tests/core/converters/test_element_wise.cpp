@@ -208,6 +208,27 @@ TEST(Converters, ATenRsubWithScalarConvertsCorrectly) {
   pointwise_test_helper(graph, true, false, {4, 3, 3, 3});
 }
 
+TEST(Converters, ATenTrueDivideConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor, %1 : Tensor):
+        %2 : Tensor = aten::true_divide(%0, %1)
+        return (%2))IR";
+  pointwise_test_helper(graph, false);
+  pointwise_test_helper(graph, false, false, {3, 4}, {4});
+  pointwise_test_helper(graph, false, false, {4}, {3, 4});
+  pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3});
+  pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3});
+}
+
+TEST(Converters, ATenTrueDivideWithScalarConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor):
+        %scalar : float = prim::Constant[value=2.4]()
+        %1 : Tensor = aten::true_divide(%0, %scalar)
+        return (%1))IR";
+  pointwise_test_helper(graph, true);
+}
+
 TEST(Converters, ATenGreaterThanConvertsCorrectly) {
   const auto graph = R"IR(
       graph(%0 : Tensor, %1 : Tensor):
