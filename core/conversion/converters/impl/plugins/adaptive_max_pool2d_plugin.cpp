@@ -100,8 +100,10 @@ nvinfer1::DimsExprs AdaptiveMaxPool2dPlugin::getOutputDimensions(
   return output;
 }
 
-nvinfer1::DataType AdaptiveMaxPool2dPlugin::getOutputDataType(int index, const nvinfer1::DataType* inputTypes, int nbInputs)
-    const {
+nvinfer1::DataType AdaptiveMaxPool2dPlugin::getOutputDataType(
+    int index,
+    const nvinfer1::DataType* inputTypes,
+    int nbInputs) const {
   // return DataType::kFLOAT;
   if (index == 0) {
     return nvinfer1::DataType::kFLOAT;
@@ -123,7 +125,6 @@ int AdaptiveMaxPool2dPlugin::initialize() {
   // c10::kFloat = FLOAT32
   tensor_options_ = tensor_options_.dtype(c10::kFloat);
   index_tensor_options_ = index_tensor_options_.dtype(c10::kLong);
-  
 
   return 0;
 }
@@ -200,8 +201,10 @@ int AdaptiveMaxPool2dPlugin::enqueue(
     cudaStream_t stream) {
 #if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1)
   at::Tensor input = at::from_blob((void*)inputs[0], util::toVec(inputDesc->dims), [](void*) {}, tensor_options_);
-  at::Tensor output = at::from_blob(outputs[0], util::volume(outputDesc->dims), [](void*) {}, tensor_options_);
-  at::Tensor indices = at::from_blob(outputs[1], util::volume(outputDesc->dims), [](void*) {}, index_tensor_options_);
+  at::Tensor output = at::from_blob(
+      outputs[0], util::volume(outputDesc->dims), [](void*) {}, tensor_options_);
+  at::Tensor indices = at::from_blob(
+      outputs[1], util::volume(outputDesc->dims), [](void*) {}, index_tensor_options_);
 
   at::cuda::CUDAStream torch_stream = at::cuda::getStreamFromPool();
   at::cuda::CUDAStreamGuard torch_guard(torch_stream);
@@ -212,7 +215,7 @@ int AdaptiveMaxPool2dPlugin::enqueue(
 
   cudaStreamWaitEvent(torch_stream.stream(), event, 0);
 
-   if (mode_ == "adaptive_max_pool2d") {
+  if (mode_ == "adaptive_max_pool2d") {
     at::adaptive_max_pool2d_out(output, indices, input, {size_[0], size_[1]});
   }
 

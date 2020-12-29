@@ -1,7 +1,7 @@
 #include "core/conversion/converters/converters.h"
 #include "core/util/prelude.h"
-#include "plugins/interpolate_plugin.h"
 #include "plugins/adaptive_max_pool2d_plugin.h"
+#include "plugins/interpolate_plugin.h"
 
 namespace trtorch {
 namespace core {
@@ -387,7 +387,8 @@ auto pooling_registrations TRTORCH_UNUSED =
                  LOG_WARNING(
                      "Adaptive max pooling layer will be run through ATen (on CPU), via not TensorRT, performace will suffer. Consider switching either to static input shape or moving to non adaptive pooling");
 #endif
-                 LOG_WARNING("Since TensorRT doesn't support int64_t datatype, the indices output is not correct value");
+                 LOG_WARNING(
+                     "Since TensorRT doesn't support int64_t datatype, the indices output is not correct value");
                  auto out_shape = in_shape;
                  std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
 
@@ -408,9 +409,10 @@ auto pooling_registrations TRTORCH_UNUSED =
 
                  LOG_DEBUG("Output tensor1 shape: " << layer_output->getDimensions());
                  LOG_DEBUG("Output tensor2 shape: " << layer_output2->getDimensions());
-                
+
                } else {
-                 LOG_WARNING("Since TensorRT doesn't support indices output for max pooling, none dynamic input of adpative max pool2d is partially supported, indices output is random value");
+                 LOG_WARNING(
+                     "Since TensorRT doesn't support indices output for max pooling, none dynamic input of adpative max pool2d is partially supported, indices output is random value");
                  std::vector<int64_t> stride(out_size.size());
                  for (size_t i = 0; i < out_size.size(); i++) {
                    stride[(stride.size() - 1) - i] =
