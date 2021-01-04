@@ -35,7 +35,7 @@ git_repository(
 # CUDA should be installed on the system locally
 new_local_repository(
     name = "cuda",
-    path = "/usr/local/cuda-11.0/",
+    path = "/usr/local/cuda/",
     build_file = "@//third_party/cuda:BUILD",
 )
 
