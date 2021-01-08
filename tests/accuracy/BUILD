@@ -4,7 +4,7 @@ filegroup(
 )
 
 test_suite(
-    name = "test_accuracy_aarch64",
+    name = "aarch64_accuracy_tests",
     tests = [
         ":test_dla_int8_accuracy",
         ":test_dla_fp16_accuracy",
@@ -15,7 +15,7 @@ test_suite(
 )
 
 test_suite(
-    name = "test_accuracy",
+    name = "accuracy_tests",
     tests = [
         ":test_int8_accuracy",
         ":test_fp16_accuracy",

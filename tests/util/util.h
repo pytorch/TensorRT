@@ -43,6 +43,11 @@ torch::jit::IValue RunModuleForward(torch::jit::Module& mod, std::vector<torch::
 // Convert the forward module to a TRT engine and return results
 std::vector<at::Tensor> RunModuleForwardAsEngine(torch::jit::Module& mod, std::vector<at::Tensor> inputs);
 
+// Runs evaluatable graphs through the compiler evaluator library and returns results
+std::vector<torch::jit::IValue> EvaluateGraph(const torch::jit::Block* b, std::vector<torch::jit::IValue> inputs);
+
+// Runs evaluatable graphs through the JIT interpreter and returns results
+std::vector<torch::jit::IValue> EvaluateGraphJIT(std::shared_ptr<torch::jit::Graph>& g, std::vector<torch::jit::IValue> inputs);
 } // namespace util
 } // namespace tests
 } // namespace trtorch
