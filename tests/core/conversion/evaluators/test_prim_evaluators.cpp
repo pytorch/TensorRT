@@ -4,7 +4,7 @@
 #include "tests/util/util.h"
 #include "torch/csrc/jit/ir/irparser.h"
 
-TEST(Evaluators, PrimConstantConvertsCorrectly) {
+TEST(Evaluators, PrimConstantEvaluatesCorrectly) {
   const auto graph = R"IR(
       graph():
         %0 : int = prim::Constant[value=1]()
