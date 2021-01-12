@@ -42,7 +42,11 @@ bool OpSupported(const torch::jit::Node* n);
 
 bool VerifyConverterSupportForBlock(const torch::jit::Block* b);
 
-c10::optional<torch::jit::IValue> EvaluateNode(ConversionCtx* ctx, const torch::jit::Node* n, int level = 0, int limit = 10);
+c10::optional<torch::jit::IValue> EvaluateNode(
+    ConversionCtx* ctx,
+    const torch::jit::Node* n,
+    int level = 0,
+    int limit = 10);
 
 } // namespace conversion
 } // namespace core

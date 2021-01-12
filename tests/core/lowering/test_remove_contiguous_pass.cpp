@@ -1,8 +1,8 @@
 #include <string>
-#include "gtest/gtest.h"
-#include "tests/util/util.h"
 #include "core/compiler.h"
 #include "core/lowering/passes/passes.h"
+#include "gtest/gtest.h"
+#include "tests/util/util.h"
 #include "torch/csrc/jit/ir/irparser.h"
 #include "torch/csrc/jit/ir/subgraph_matcher.h"
 

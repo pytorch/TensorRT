@@ -18,11 +18,7 @@ bool OpSupported(const torch::jit::Node* n) {
   return evaluators::shouldEvalAtConversionTime(n) || converters::node_is_convertable(n);
 }
 
-c10::optional<torch::jit::IValue> EvaluateNode(
-    ConversionCtx* ctx,
-    const torch::jit::Node* n,
-    int level,
-    int limit) {
+c10::optional<torch::jit::IValue> EvaluateNode(ConversionCtx* ctx, const torch::jit::Node* n, int level, int limit) {
   // Check to see if you can just go through and eval all of these AOT (saves
   // the recursion) Also probably a better way to deal with the two error cases;
   TRTORCH_CHECK(
