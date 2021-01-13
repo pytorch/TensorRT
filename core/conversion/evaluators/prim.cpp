@@ -32,6 +32,12 @@ auto prim_registrations =
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                       return at::scalar_to_tensor(args.at(n->output(0)).IValue()->toScalar());
                     }})
+        .evaluator({torch::jit::prim::ListUnpack,
+                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+                      // Outputs is an IValue which has list of tensors which can be found in ctx->evaluated_value_map
+                      const torch::jit::IValue* outputs = args.at(n->input()).IValue();
+                      return *std::move(outputs);
+                    }})
         .evaluator({torch::jit::prim::ListConstruct,
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                       const auto num_inputs = n->inputs().size();
