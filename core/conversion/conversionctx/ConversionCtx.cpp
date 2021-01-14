@@ -2,6 +2,9 @@
 #include <sstream>
 #include <utility>
 
+#include "NvInferPlugin.h"
+#include "NvInferPluginUtils.h"
+
 #include "core/conversion/conversionctx/ConversionCtx.h"
 
 namespace trtorch {
@@ -45,6 +48,25 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
           "[TRTorch Conversion Context] - ",
           util::logging::get_logger().get_reportable_severity(),
           util::logging::get_logger().get_is_colored_output_on()) {
+    // Get list of all available plugin creators
+
+    initLibNvInferPlugins(&logger, "");
+
+    int numCreators = 0;
+    auto tmpList = getPluginRegistry()->getPluginCreatorList(&numCreators);
+    for (int k = 0; k < numCreators; ++k)
+    {
+        if (!tmpList[k])
+        {
+            std::cout << "Plugin Creator for plugin " << k << " is a nullptr." << std::endl;
+            continue;
+        }
+        std::string pluginName = tmpList[k]->getPluginName();
+        mPluginRegistry[pluginName] = tmpList[k];
+        LOG_DEBUG("Register plugin: " << pluginName);
+    }
+    LOG_DEBUG("Number of plugin: " << mPluginRegistry.size());
+
   // TODO: Support FP16 and FP32 from JIT information
   builder = nvinfer1::createInferBuilder(logger);
   net = builder->createNetworkV2(1U << static_cast<uint32_t>(nvinfer1::NetworkDefinitionCreationFlag::kEXPLICIT_BATCH));

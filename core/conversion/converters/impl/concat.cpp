@@ -19,10 +19,7 @@ auto cat_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
               std::vector<nvinfer1::ITensor*> tensors;
               for (auto t : ts) {
                 if (t.isTensor()) {
-                  auto torch_tensor = t.toTensor();
-                  auto t_weights = Weights(ctx, torch_tensor);
-                  auto const_layer = ctx->net->addConstant(t_weights.shape, t_weights.data);
-                  tensors.push_back(const_layer->getOutput(0));
+                  tensors.push_back(tensor_to_const(ctx, t.toTensor()));
                 } else {
                   auto cont = t.toCustomClass<TensorContainer>();
                   tensors.push_back(cont->tensor());
