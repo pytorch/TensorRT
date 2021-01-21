@@ -180,22 +180,7 @@ void MarkOutputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> outp
     if (it == ctx->value_tensor_map.end()) {
       if (ctx->evaluated_value_map.find(out) != ctx->evaluated_value_map.end()) {
         auto out_ivalue = ctx->evaluated_value_map[out];
-        if (out_ivalue.isList()) {
-          auto output_list = out_ivalue.toList();
-          LOG_DEBUG("One of the outputs is a TensorList. output_list size: " << output_list.size());
-
-          for (int i = 0; i < output_list.size(); i++) {
-            std::string name = std::string("output_") + std::to_string(ctx->num_outputs);
-            auto output_container = output_list.get(i).toCustomClass<TensorContainer>();
-            nvinfer1::ITensor* out_tensor = output_container.get()->tensor();
-            out_tensor->setName(name.c_str());
-            ctx->net->markOutput(*out_tensor);
-            LOG_INFO(
-                ctx->logger,
-                "Marking Output " << out->debugName() << " named " << name << " in engine (ctx.MarkOutput)");
-            ctx->num_outputs += 1;
-          }
-        } else if (out_ivalue.isCustomClass()) {
+        if (out_ivalue.isCustomClass()) {
           std::string name = std::string("output_") + std::to_string(ctx->num_outputs);
           auto output_container = out_ivalue.toCustomClass<TensorContainer>();
           nvinfer1::ITensor* out_tensor = output_container.get()->tensor();
@@ -374,8 +359,8 @@ void ConvertBlockToNetDef(
             auto eval_list = eval.value().toTuple();
             TRTORCH_CHECK(
                 eval_list->elements().size() == n->outputs().size(),
-                "Size of evaluated results: " << eval_list->elements().size() << " and node outputs size: " << n->outputs().size()
-                                              << " must match.");
+                "Size of evaluated results: " << eval_list->elements().size()
+                                              << " and node outputs size: " << n->outputs().size() << " must match.");
             for (int i = 0; i < eval_list->elements().size(); i++) {
               auto eval_output = eval_list.get()->elements()[i];
               LOG_DEBUG(
@@ -384,8 +369,7 @@ void ConvertBlockToNetDef(
               ctx->AssociateValueAndIValue(n->output(i), eval_output);
             }
           } else {
-              TRTORCH_THROW_ERROR(
-                  "Unsupported return type for evaluated node");
+            TRTORCH_THROW_ERROR("Unsupported return type for evaluated node");
           }
         } else if (!eval.value().isTensor()) {
           LOG_DEBUG(ctx->logger, "Found the value to be: " << eval.value());
