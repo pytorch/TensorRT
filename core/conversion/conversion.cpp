@@ -370,19 +370,22 @@ void ConvertBlockToNetDef(
       auto eval = EvaluateNode(ctx, n);
       if (eval) {
         if (n->outputs().size() > 1) { // For ListUnpack scenario
-          if (eval.value().isList()) {
-            LOG_DEBUG(
-                ctx->logger,
-                "Found the evaluated value to be a list" << eval.value() << " for node: " << util::node_info(n));
-            auto eval_list = eval.value().toList();
+          if (eval.value().isTuple()) {
+            auto eval_list = eval.value().toTuple();
             TRTORCH_CHECK(
-                eval_list.size() == n->outputs().size(),
-                "Size of evaluated results: " << eval_list.size() << " and node outputs size: " << n->outputs().size()
+                eval_list->elements().size() == n->outputs().size(),
+                "Size of evaluated results: " << eval_list->elements().size() << " and node outputs size: " << n->outputs().size()
                                               << " must match.");
-            for (int i = 0; i < eval_list.size(); i++) {
-              auto eval_output = eval_list.get(i);
+            for (int i = 0; i < eval_list->elements().size(); i++) {
+              auto eval_output = eval_list.get()->elements()[i];
+              LOG_DEBUG(
+                  ctx->logger,
+                  "Found the evaluated value(s) to be " << eval_output << " for node: " << util::node_info(n));
               ctx->AssociateValueAndIValue(n->output(i), eval_output);
             }
+          } else {
+              TRTORCH_THROW_ERROR(
+                  "Unsupported return type for evaluated node");
           }
         } else if (!eval.value().isTensor()) {
           LOG_DEBUG(ctx->logger, "Found the value to be: " << eval.value());

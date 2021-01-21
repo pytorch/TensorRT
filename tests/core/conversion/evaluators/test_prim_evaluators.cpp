@@ -18,3 +18,22 @@ TEST(Evaluators, PrimConstantEvaluatesCorrectly) {
 
   ASSERT_TRUE(jit_results[0] == trt_results[0]);
 }
+
+TEST(Evaluators, PrimListUnpackEvaluatesCorrectly) {
+  const auto graph = R"IR(
+      graph():
+        %1 : int = prim::Constant[value=3]()
+        %2 : int = prim::Constant[value=4]()
+        %lc : int[] = prim::ListConstruct(%1, %2)
+        %lu.1 : int, %lu.2 : int = prim::ListUnpack(%lc)
+        return (%lu.1, %lu.2))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, &*g);
+
+  auto jit_results = trtorch::tests::util::EvaluateGraphJIT(g, {});
+  auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {});
+
+  ASSERT_TRUE(jit_results[0] == trt_results[0]);
+  ASSERT_TRUE(jit_results[1] == trt_results[1]);
+}

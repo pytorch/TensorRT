@@ -36,7 +36,8 @@ auto prim_registrations =
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                       // Outputs is an IValue which has list of tensors which can be found in ctx->evaluated_value_map
                       const torch::jit::IValue* outputs = args.at(n->input()).IValue();
-                      return *std::move(outputs);
+                      auto outputVec = outputs->toList().vec();
+                      return std::move(c10::ivalue::Tuple::create(outputVec));
                     }})
         .evaluator({torch::jit::prim::ListConstruct,
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
