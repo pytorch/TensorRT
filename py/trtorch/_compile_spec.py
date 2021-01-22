@@ -147,10 +147,6 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
         assert isinstance(compile_spec["strict_types"], bool)
         info.strict_types = compile_spec["strict_types"]
 
-    if "allow_gpu_fallback" in compile_spec:
-        assert isinstance(compile_spec["allow_gpu_fallback"], bool)
-        info.allow_gpu_fallback = compile_spec["allow_gpu_fallback"]
-
     if "device" in compile_spec:
         info.device = _parse_device(compile_spec["device"])
 
@@ -177,7 +173,7 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
     return info
 
 
-def TensorRTCompileSpec(compile_spec: Dict[str, Any]):
+def TensorRTCompileSpec(compile_spec: Dict[str, Any]) -> torch.classes.tensorrt.CompileSpec:
     """
     Utility to create a formated spec dictionary for using the PyTorch TensorRT backend
 
@@ -235,14 +231,13 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]):
         ir.set_max(i.max)
         backend_spec.append_input_range(ir)
 
-    for i in parsed_spec.device:
-        ir = torch.classes.tensorrt.Device()
-        ir.set_device_type(i.device_type)
-        ir.set_gpu_id(i.gpu_id)
-        ir.set_dla_core(i.dla_core)
-        ir.set_allow_gpu_fallback(i.allow_gpu_fallback)
-        backend_spec.set_device(ir)
+    d = torch.classes.tensorrt.Device()
+    d.set_device_type(int(parsed_spec.device.device_type))
+    d.set_gpu_id(parsed_spec.device.gpu_id)
+    d.set_dla_core(parsed_spec.device.dla_core)
+    d.set_allow_gpu_fallback(parsed_spec.device.allow_gpu_fallback)
 
+    backend_spec.set_device(d)
     backend_spec.set_op_precision(int(parsed_spec.op_precision))
     backend_spec.set_refit(parsed_spec.refit)
     backend_spec.set_debug(parsed_spec.debug)

@@ -17,6 +17,16 @@ namespace pyapi {
     return field_name;                      \
   }
 
+// TODO: Make this error message more informative
+#define ADD_ENUM_GET_SET(field_name, type, max_val)               \
+  void set_##field_name(int64_t val) {                            \
+    TRTORCH_CHECK(val < max_val, "Invalid enum value for field"); \
+    field_name = static_cast<type>(val);                          \
+  }                                                               \
+  int64_t get_##field_name() {                                    \
+    return static_cast<int64_t>(field_name);                      \
+  }
+
 struct InputRange : torch::CustomClassHolder {
   std::vector<int64_t> min;
   std::vector<int64_t> opt;
@@ -59,7 +69,7 @@ struct Device : torch::CustomClassHolder {
         allow_gpu_fallback(false) // allow_gpu_fallback
   {}
 
-  ADD_FIELD_GET_SET(device_type, DeviceType);
+  ADD_ENUM_GET_SET(device_type, DeviceType, 1);
   ADD_FIELD_GET_SET(gpu_id, int64_t);
   ADD_FIELD_GET_SET(dla_core, int64_t);
   ADD_FIELD_GET_SET(allow_gpu_fallback, bool);
@@ -77,16 +87,6 @@ enum class EngineCapability : int8_t {
 std::string to_str(EngineCapability value);
 nvinfer1::EngineCapability toTRTEngineCapability(EngineCapability value);
 
-// TODO: Make this error message more informative
-#define ADD_ENUM_GET_SET(field_name, type, max_val)               \
-  void set_##field_name(int64_t val) {                            \
-    TRTORCH_CHECK(val < max_val, "Invalid enum value for field"); \
-    field_name = static_cast<type>(val);                          \
-  }                                                               \
-  int64_t get_##field_name() {                                    \
-    return static_cast<int64_t>(field_name);                      \
-  }
-
 struct CompileSpec : torch::CustomClassHolder {
   core::CompileSpec toInternalCompileSpec();
   std::string stringify();
@@ -94,11 +94,15 @@ struct CompileSpec : torch::CustomClassHolder {
     input_ranges.push_back(*ir);
   }
 
-  ADD_ENUM_GET_SET(op_precision, DataType, 3);
+  void setDeviceIntrusive(const c10::intrusive_ptr<Device>& d) {
+    device = *d;
+  }
+
+  ADD_ENUM_GET_SET(op_precision, DataType, 2);
   ADD_FIELD_GET_SET(refit, bool);
   ADD_FIELD_GET_SET(debug, bool);
   ADD_FIELD_GET_SET(strict_types, bool);
-  ADD_ENUM_GET_SET(capability, EngineCapability, 3);
+  ADD_ENUM_GET_SET(capability, EngineCapability, 2);
   ADD_FIELD_GET_SET(num_min_timing_iters, int64_t);
   ADD_FIELD_GET_SET(num_avg_timing_iters, int64_t);
   ADD_FIELD_GET_SET(workspace_size, int64_t);
