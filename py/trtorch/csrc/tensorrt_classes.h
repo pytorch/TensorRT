@@ -18,13 +18,13 @@ namespace pyapi {
   }
 
 // TODO: Make this error message more informative
-#define ADD_ENUM_GET_SET(field_name, type, max_val)               \
-  void set_##field_name(int64_t val) {                            \
-    TRTORCH_CHECK(val < max_val, "Invalid enum value for field"); \
-    field_name = static_cast<type>(val);                          \
-  }                                                               \
-  int64_t get_##field_name() {                                    \
-    return static_cast<int64_t>(field_name);                      \
+#define ADD_ENUM_GET_SET(field_name, type, max_val)                            \
+  void set_##field_name(int64_t val) {                                         \
+    TRTORCH_CHECK(val >= 0 && val <= max_val, "Invalid enum value for field"); \
+    field_name = static_cast<type>(val);                                       \
+  }                                                                            \
+  int64_t get_##field_name() {                                                 \
+    return static_cast<int64_t>(field_name);                                   \
   }
 
 struct InputRange : torch::CustomClassHolder {
