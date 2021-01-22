@@ -50,7 +50,8 @@ struct BNDimCheckRemoval {
 
     auto arm1_start = arm1->nodes().begin();
 
-    if ((*arm1_start)->kind() != c10::Symbol::fromQualString("aten::format") && (*(++arm1_start))->kind() != prim::RaiseException && (*(++arm1_start))->kind() != prim::Return) {
+    if ((*arm1_start)->kind() != c10::Symbol::fromQualString("aten::format") &&
+        (*(++arm1_start))->kind() != prim::RaiseException && (*(++arm1_start))->kind() != prim::Return) {
       // Make sure that block0 is solely just the exception and the return
       return false;
     }
