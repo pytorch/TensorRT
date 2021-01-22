@@ -7,6 +7,9 @@
 #include "core/conversion/var/Var.h"
 #include "core/util/prelude.h"
 
+#include "c10/util/intrusive_ptr.h"
+#include "core/conversion/tensorcontainer/TensorContainer.h"
+
 namespace trtorch {
 namespace core {
 namespace conversion {
@@ -173,18 +176,32 @@ void AddInputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> inputs
 
 void MarkOutputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> outputs) {
   for (auto out : outputs) {
-    std::string name = std::string("output_") + std::to_string(ctx->num_outputs);
     auto it = ctx->value_tensor_map.find(out);
-    // Leaves the potential for unused outputs to be populated with nullptr
-    // "safely"
-    TRTORCH_CHECK(
-        it != ctx->value_tensor_map.end() && it->second,
-        "No corresponding output TRT Tensor found for TorchScript output: " << out->debugName());
-    auto out_tensor = it->second;
-    out_tensor->setName(name.c_str());
-    ctx->net->markOutput(*out_tensor);
-    LOG_INFO(ctx->logger, "Marking Output " << out->debugName() << " named " << name << " in engine (ctx.MarkOutput)");
-    ctx->num_outputs += 1;
+    if (it == ctx->value_tensor_map.end()) {
+      if (ctx->evaluated_value_map.find(out) != ctx->evaluated_value_map.end()) {
+        auto out_ivalue = ctx->evaluated_value_map[out];
+        if (out_ivalue.isCustomClass()) {
+          std::string name = std::string("output_") + std::to_string(ctx->num_outputs);
+          auto output_container = out_ivalue.toCustomClass<TensorContainer>();
+          nvinfer1::ITensor* out_tensor = output_container.get()->tensor();
+          out_tensor->setName(name.c_str());
+          ctx->net->markOutput(*out_tensor);
+          LOG_INFO(
+              ctx->logger, "Marking Output " << out->debugName() << " named " << name << " in engine (ctx.MarkOutput)");
+          ctx->num_outputs += 1;
+        } else {
+          TRTORCH_THROW_ERROR("Unknown output type. Only a single tensor or a TensorList type is supported.");
+        }
+      }
+    } else {
+      std::string name = std::string("output_") + std::to_string(ctx->num_outputs);
+      auto out_tensor = it->second;
+      out_tensor->setName(name.c_str());
+      ctx->net->markOutput(*out_tensor);
+      LOG_INFO(
+          ctx->logger, "Marking Output " << out->debugName() << " named " << name << " in engine (ctx.MarkOutput)");
+      ctx->num_outputs += 1;
+    }
   }
 }
 
@@ -337,12 +354,30 @@ void ConvertBlockToNetDef(
     } else if (to_eval) {
       auto eval = EvaluateNode(ctx, n);
       if (eval) {
-        if (!eval.value().isTensor()) {
+        if (n->outputs().size() > 1) { // For ListUnpack scenario
+          if (eval.value().isTuple()) {
+            auto eval_list = eval.value().toTuple();
+            TRTORCH_CHECK(
+                eval_list->elements().size() == n->outputs().size(),
+                "Size of evaluated results: " << eval_list->elements().size()
+                                              << " and node outputs size: " << n->outputs().size() << " must match.");
+            for (int i = 0; i < eval_list->elements().size(); i++) {
+              auto eval_output = eval_list.get()->elements()[i];
+              LOG_DEBUG(
+                  ctx->logger,
+                  "Found the evaluated value(s) to be " << eval_output << " for node: " << util::node_info(n));
+              ctx->AssociateValueAndIValue(n->output(i), eval_output);
+            }
+          } else {
+            TRTORCH_THROW_ERROR("Unsupported return type for evaluated node");
+          }
+        } else if (!eval.value().isTensor()) {
           LOG_DEBUG(ctx->logger, "Found the value to be: " << eval.value());
+          ctx->AssociateValueAndIValue(n->output(0), eval.value());
         } else {
           LOG_DEBUG(ctx->logger, "Found the value to be a tensor (shape " << eval.value().toTensor().sizes() << ')');
+          ctx->AssociateValueAndIValue(n->output(0), eval.value());
         }
-        ctx->AssociateValueAndIValue(n->output(0), eval.value());
       }
     } else if (!ignored) {
       // Should error out if something fails
