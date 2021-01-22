@@ -42,6 +42,7 @@ at the documentation for the TRTorch ``TensorRTCompileSpec`` API.
                 "device": {
                     "device_type": trtorch.DeviceType.GPU,
                     "gpu_id": 0,
+                    "dla_core": 0,
                     "allow_gpu_fallback": True
                 },
                 "capability": trtorch.EngineCapability.default,

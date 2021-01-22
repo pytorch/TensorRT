@@ -195,10 +195,10 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]) -> torch.classes.tensorrt.
                             } # Dynamic input shape for input #2
                         ],
                         "device": {
-                        "device_type": torch.device("cuda"), # Type of device to run engine on (for DLA use trtorch.DeviceType.DLA)
-                        "gpu_id": 0, # Target gpu id to run engine (Use Xavier as gpu id for DLA)
-                        "dla_core": 0, # (DLA only) Target dla core id to run engine
-                        "allow_gpu_fallback": false, # (DLA only) Allow layers unsupported on DLA to run on GPU
+                            "device_type": torch.device("cuda"), # Type of device to run engine on (for DLA use trtorch.DeviceType.DLA)
+                            "gpu_id": 0, # Target gpu id to run engine (Use Xavier as gpu id for DLA)
+                            "dla_core": 0, # (DLA only) Target dla core id to run engine
+                            "allow_gpu_fallback": false, # (DLA only) Allow layers unsupported on DLA to run on GPU
                         },
                         "op_precision": torch.half, # Operating precision set to FP16
                         "refit": False, # enable refit

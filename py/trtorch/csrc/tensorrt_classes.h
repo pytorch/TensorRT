@@ -69,7 +69,7 @@ struct Device : torch::CustomClassHolder {
         allow_gpu_fallback(false) // allow_gpu_fallback
   {}
 
-  ADD_ENUM_GET_SET(device_type, DeviceType, 1);
+  ADD_ENUM_GET_SET(device_type, DeviceType, static_cast<int64_t>(DeviceType::kDLA));
   ADD_FIELD_GET_SET(gpu_id, int64_t);
   ADD_FIELD_GET_SET(dla_core, int64_t);
   ADD_FIELD_GET_SET(allow_gpu_fallback, bool);
@@ -98,11 +98,11 @@ struct CompileSpec : torch::CustomClassHolder {
     device = *d;
   }
 
-  ADD_ENUM_GET_SET(op_precision, DataType, 2);
+  ADD_ENUM_GET_SET(op_precision, DataType, static_cast<int64_t>(DataType::kChar));
   ADD_FIELD_GET_SET(refit, bool);
   ADD_FIELD_GET_SET(debug, bool);
   ADD_FIELD_GET_SET(strict_types, bool);
-  ADD_ENUM_GET_SET(capability, EngineCapability, 2);
+  ADD_ENUM_GET_SET(capability, EngineCapability, static_cast<int64_t>(EngineCapability::kSAFE_DLA));
   ADD_FIELD_GET_SET(num_min_timing_iters, int64_t);
   ADD_FIELD_GET_SET(num_avg_timing_iters, int64_t);
   ADD_FIELD_GET_SET(workspace_size, int64_t);
