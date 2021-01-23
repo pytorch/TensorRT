@@ -22,7 +22,7 @@ struct BNDimCheckRemoval {
   void run() {
     findBNDimCheckNodes(graph_->block());
     torch::jit::EliminateDeadCode(graph_);
-    LOG_GRAPH("Post aten::addmm branch fusion: " << *graph_);
+    LOG_GRAPH("Post batch norm dim check removal: " << *graph_);
   }
 
  private:
