@@ -17,7 +17,8 @@ py_test(
     ] + select({
 	":aarch64_linux": [
 		"test_api_dla.py"
-	]
+	],
+    "//conditions:default" : []
     }),
     deps = [
         requirement("torchvision")
