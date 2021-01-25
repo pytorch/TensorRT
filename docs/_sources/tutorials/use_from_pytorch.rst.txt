@@ -14,7 +14,7 @@ Start by loading ``trtorch`` into your application.
     import trtorch
 
 
-Then given a TorchScript module, you can lower it to TensorRT using the ``torch._C._jit_to_tensorrt`` API.
+Then given a TorchScript module, you can compile it with TensorRT using the ``torch._C._jit_to_backend("tensorrt", ...)`` API.
 
 .. code-block:: python
 
@@ -32,31 +32,36 @@ at the documentation for the TRTorch ``TensorRTCompileSpec`` API.
 .. code-block:: python
 
     spec = {
-        "forward": trtorch.TensorRTCompileSpec({
-            "input_shapes": [[1, 3, 300, 300]],
-            "op_precision": torch.half,
-            "refit": False,
-            "debug": False,
-            "strict_types": False,
-            "allow_gpu_fallback": True,
-            "device_type": "gpu",
-            "capability": trtorch.EngineCapability.default,
-            "num_min_timing_iters": 2,
-            "num_avg_timing_iters": 1,
-            "max_batch_size": 0,
-        })
-    }
+        "forward":
+            trtorch.TensorRTCompileSpec({
+                "input_shapes": [[1, 3, 300, 300]],
+                "op_precision": torch.half,
+                "refit": False,
+                "debug": False,
+                "strict_types": False,
+                "device": {
+                    "device_type": trtorch.DeviceType.GPU,
+                    "gpu_id": 0,
+                    "dla_core": 0,
+                    "allow_gpu_fallback": True
+                },
+                "capability": trtorch.EngineCapability.default,
+                "num_min_timing_iters": 2,
+                "num_avg_timing_iters": 1,
+                "max_batch_size": 0,
+            })
+        }
 
-Now to compile with TRTorch, provide the target module objects and the spec dictionary to ``torch._C._jit_to_tensorrt``
+Now to compile with TRTorch, provide the target module objects and the spec dictionary to ``torch._C._jit_to_backend("tensorrt", ...)``
 
 .. code-block:: python
 
-    trt_model = torch._C._jit_to_tensorrt(script_model._c, spec)
+    trt_model = torch._C._jit_to_backend("tensorrt", script_model, spec)
 
 To run explicitly call the function of the method you want to run (vs. how you can just call on the module itself in standard PyTorch)
 
 .. code-block:: python
 
-    input = torch.randn((1, 3, 300, 300).to("cuda").to(torch.half)
+    input = torch.randn((1, 3, 300, 300)).to("cuda").to(torch.half)
     print(trt_model.forward(input))
 
