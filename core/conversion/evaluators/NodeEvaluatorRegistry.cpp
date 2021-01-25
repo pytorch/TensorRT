@@ -59,7 +59,7 @@ class NodeEvaluatorRegistry {
         TRTORCH_CHECK(
             schema,
             "Evaluator for " << node_kind.toQualString()
-                             << "only runs on certain schemas, but schema for node is not retrievable");
+                             << " only runs on certain schemas, but schema for node is not retrievable");
         if (!FindInVec(eval_reg.options.valid_schemas, schema->operator_name())) {
           return nullptr;
         }
