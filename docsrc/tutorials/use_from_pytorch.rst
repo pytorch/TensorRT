@@ -14,7 +14,7 @@ Start by loading ``trtorch`` into your application.
     import trtorch
 
 
-Then given a TorchScript module, you can lower it to TensorRT using the ``torch._C._jit_to_tensorrt`` API.
+Then given a TorchScript module, you can compile it with TensorRT using the ``torch._C._jit_to_backend("tensorrt", ...)`` API.
 
 .. code-block:: python
 
@@ -52,7 +52,7 @@ at the documentation for the TRTorch ``TensorRTCompileSpec`` API.
             })
         }
 
-Now to compile with TRTorch, provide the target module objects and the spec dictionary to ``torch._C._jit_to_tensorrt``
+Now to compile with TRTorch, provide the target module objects and the spec dictionary to ``torch._C._jit_to_backend("tensorrt", ...)``
 
 .. code-block:: python
 
