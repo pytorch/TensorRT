@@ -58,7 +58,9 @@ bool add_split(ConversionCtx* ctx, const torch::jit::Node* n, args& args, bool s
   }
 
   auto split_output_ivalue = std::move(torch::jit::IValue(list));
-  auto out = ctx->AssociateValueAndIValue(n->outputs()[0], split_output_ivalue);
+  ctx->AssociateValueAndIValue(n->outputs()[0], split_output_ivalue);
+
+  return true;
 }
 
 auto select_registrations TRTORCH_UNUSED =

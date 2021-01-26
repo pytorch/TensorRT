@@ -361,7 +361,7 @@ void ConvertBlockToNetDef(
                 eval_list->elements().size() == n->outputs().size(),
                 "Size of evaluated results: " << eval_list->elements().size()
                                               << " and node outputs size: " << n->outputs().size() << " must match.");
-            for (int i = 0; i < eval_list->elements().size(); i++) {
+            for (size_t i = 0; i < eval_list->elements().size(); i++) {
               auto eval_output = eval_list.get()->elements()[i];
               LOG_DEBUG(
                   ctx->logger,

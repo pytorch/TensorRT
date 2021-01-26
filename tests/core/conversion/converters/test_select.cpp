@@ -228,7 +228,7 @@ TEST(Converters, ATenSplitSizesInScriptingConvertsCorrectly) {
   auto trt_in = at::clone(in);
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
-  for (int i = 0; i < jit_results.size(); i++) {
+  for (size_t i = 0; i < jit_results.size(); i++) {
     auto trt = trt_results[i].reshape(jit_results[i].sizes());
     ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[i], trt, 2e-6));
   }
@@ -256,7 +256,7 @@ TEST(Converters, ATenSplitSizesinTracingConvertsCorrectly) {
   auto trt_in = at::clone(in);
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
-  for (int i = 0; i < jit_results.size(); i++) {
+  for (size_t i = 0; i < jit_results.size(); i++) {
     auto trt = trt_results[i].reshape(jit_results[i].sizes());
     ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[i], trt, 2e-6));
   }
@@ -283,7 +283,7 @@ TEST(Converters, ATenSplitFixedConvertsCorrectly) {
   auto trt_in = at::clone(in);
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
-  for (int i = 0; i < jit_results.size(); i++) {
+  for (size_t i = 0; i < jit_results.size(); i++) {
     auto trt = trt_results[i].reshape(jit_results[i].sizes());
     ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[i], trt, 2e-6));
   }
