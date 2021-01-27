@@ -140,14 +140,14 @@ class InterpolatePluginCreator : public nvinfer1::IPluginCreator {
   nvinfer1::IPluginV2* createPlugin(const char* name, const nvinfer1::PluginFieldCollection* fc) override;
 
   InterpolatePlugin* createPlugin(
-    const char* name,
-    std::vector<int64_t> in_shape,
-    std::vector<int64_t> out_shape,
-    std::vector<int64_t> size,
-    std::vector<double> scales,
-    std::string mode,
-    bool align_corners,
-    bool use_scales);
+      const char* name,
+      std::vector<int64_t> in_shape,
+      std::vector<int64_t> out_shape,
+      std::vector<int64_t> size,
+      std::vector<double> scales,
+      std::string mode,
+      bool align_corners,
+      bool use_scales);
 
   nvinfer1::IPluginV2* deserializePlugin(const char* name, const void* serialData, size_t serialLength) override;
 

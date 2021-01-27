@@ -21,27 +21,36 @@ InterpolatePlugin::InterpolatePlugin(
     std::string mode,
     bool align_corners,
     bool use_scales)
-    : in_shape_(in_shape), out_shape_(out_shape), size_(size), scales_(scales), mode_(mode), align_corners_(align_corners), use_scales_(use_scales) {
-      if (use_scales) {
-        TRTORCH_ASSERT(mode_ != "adaptive_pool2d", "use_scales is not valid for adaptive_pool2d");
-        TRTORCH_ASSERT(scales_.size() != 0, "Attempted to use interpolate plugin without providing scales while use_scales=true");
-        at::Tensor input = at::randint(1, 10, in_shape, {at::kCUDA});
-        at::Tensor output;
+    : in_shape_(in_shape),
+      out_shape_(out_shape),
+      size_(size),
+      scales_(scales),
+      mode_(mode),
+      align_corners_(align_corners),
+      use_scales_(use_scales) {
+  if (use_scales) {
+    TRTORCH_ASSERT(mode_ != "adaptive_pool2d", "use_scales is not valid for adaptive_pool2d");
+    TRTORCH_ASSERT(
+        scales_.size() != 0, "Attempted to use interpolate plugin without providing scales while use_scales=true");
+    at::Tensor input = at::randint(1, 10, in_shape, {at::kCUDA});
+    at::Tensor output;
 
-        if (mode_ == "linear") {
-          output = at::upsample_linear1d(input, c10::nullopt, align_corners_, scales_[0]);
-        } else if (mode_ == "bilinear") {
-          output = at::upsample_bilinear2d(input, c10::nullopt, align_corners_, scales_);
-          std::cout << output.sizes() << std::endl;
-        } else if (mode_ == "trilinear") {
-          output = at::upsample_trilinear3d(input, c10::nullopt, align_corners_, scales_);
-        }
-
-        out_shape_ = output.sizes().vec();
-      } else {
-        TRTORCH_ASSERT((size_.size() != 0 && out_shape_.size() != 0), "Attempted to use interpolate plugin without providing output size while use_scales=false");
-      }
+    if (mode_ == "linear") {
+      output = at::upsample_linear1d(input, c10::nullopt, align_corners_, scales_[0]);
+    } else if (mode_ == "bilinear") {
+      output = at::upsample_bilinear2d(input, c10::nullopt, align_corners_, scales_);
+      std::cout << output.sizes() << std::endl;
+    } else if (mode_ == "trilinear") {
+      output = at::upsample_trilinear3d(input, c10::nullopt, align_corners_, scales_);
     }
+
+    out_shape_ = output.sizes().vec();
+  } else {
+    TRTORCH_ASSERT(
+        (size_.size() != 0 && out_shape_.size() != 0),
+        "Attempted to use interpolate plugin without providing output size while use_scales=false");
+  }
+}
 
 InterpolatePlugin::InterpolatePlugin(const char* data, size_t length) {
   std::istringstream data_stream(std::string(data, length));
@@ -125,26 +134,29 @@ nvinfer1::DimsExprs InterpolatePlugin::getOutputDimensions(
     nvinfer1::IExprBuilder& exprBuilder) {
   nvinfer1::DimsExprs output(inputs[0]);
 
-  // TODO: This should enable the case of using this plugin with dynamic shape, scale factor and align corners == true to cover
-  // the different implementations between PyTorch and TRT. However TRT currently does not support doubles
-  // for ExprBuilder constants. Once that is possible enable this code and remove the code in the constructor
-  // if (use_scales_) {
+  // TODO: This should enable the case of using this plugin with dynamic shape, scale factor and align corners == true
+  // to cover the different implementations between PyTorch and TRT. However TRT currently does not support doubles for
+  // ExprBuilder constants. Once that is possible enable this code and remove the code in the constructor if
+  // (use_scales_) {
   //   auto input_dimsexprs = inputs[0];
   //   output.d[0] = exprBuilder.operation(DimensionOperation::kMAX, *input_dimsexprs.d[0], *exprBuilder.constant(0));
   //   if (mode_ == "linear") {
-  //     output.d[1] = exprBuilder.operation(DimensionOperation::kPROD, *input_dimsexprs.d[1], *exprBuilder.constant(scales_[1]));
+  //     output.d[1] = exprBuilder.operation(DimensionOperation::kPROD, *input_dimsexprs.d[1],
+  //     *exprBuilder.constant(scales_[1]));
   //   } else if (mode_ == "bilinear") {
-  //     output.d[1] = exprBuilder.operation(DimensionOperation::kPROD, *input_dimsexprs.d[1], *exprBuilder.constant(scales_[1]));
-  //     output.d[2] = exprBuilder.operation(DimensionOperation::kPROD, *input_dimsexprs.d[2], *exprBuilder.constant(scales_[2]));
+  //     output.d[1] = exprBuilder.operation(DimensionOperation::kPROD, *input_dimsexprs.d[1],
+  //     *exprBuilder.constant(scales_[1])); output.d[2] = exprBuilder.operation(DimensionOperation::kPROD,
+  //     *input_dimsexprs.d[2], *exprBuilder.constant(scales_[2]));
   //   } else if (mode_ == "trilinear") {
-  //     output.d[1] = exprBuilder.operation(DimensionOperation::kPROD, *input_dimsexprs.d[1], *exprBuilder.constant(scales_[1]));
-  //     output.d[2] = exprBuilder.operation(DimensionOperation::kPROD, *input_dimsexprs.d[2], *exprBuilder.constant(scales_[2]));
-  //     output.d[3] = exprBuilder.operation(DimensionOperation::kPROD, *input_dimsexprs.d[3], *exprBuilder.constant(scales_[3]));
+  //     output.d[1] = exprBuilder.operation(DimensionOperation::kPROD, *input_dimsexprs.d[1],
+  //     *exprBuilder.constant(scales_[1])); output.d[2] = exprBuilder.operation(DimensionOperation::kPROD,
+  //     *input_dimsexprs.d[2], *exprBuilder.constant(scales_[2])); output.d[3] =
+  //     exprBuilder.operation(DimensionOperation::kPROD, *input_dimsexprs.d[3], *exprBuilder.constant(scales_[3]));
   //   }
   // } else {
-    for (unsigned int i = 0; i < out_shape_.size(); i++) {
-      output.d[i] = exprBuilder.constant(out_shape_[i]);
-    }
+  for (unsigned int i = 0; i < out_shape_.size(); i++) {
+    output.d[i] = exprBuilder.constant(out_shape_[i]);
+  }
   //}
 
   return output;
@@ -295,7 +307,6 @@ int InterpolatePlugin::enqueue(
       cudaMemcpyDeviceToHost,
       stream);
   cudaStreamSynchronize(stream);
-
 
   at::Tensor input = at::from_blob((void*)input_blob, util::toVec(inputDesc->dims), tensor_options_);
   at::Tensor output;
