@@ -17,9 +17,8 @@ AdaptiveMaxPool2dPlugin::AdaptiveMaxPool2dPlugin(
     std::vector<int64_t> in_shape,
     std::vector<int64_t> out_shape,
     std::vector<int64_t> size,
-    std::string mode,
-    bool align_corners)
-    : in_shape_(in_shape), out_shape_(out_shape), size_(size), mode_(mode), align_corners_(align_corners) {}
+    std::string mode)
+    : in_shape_(in_shape), out_shape_(out_shape), size_(size), mode_(mode){}
 
 AdaptiveMaxPool2dPlugin::AdaptiveMaxPool2dPlugin(const char* data, size_t length) {
   std::istringstream data_stream(std::string(data, length));
@@ -46,11 +45,6 @@ AdaptiveMaxPool2dPlugin::AdaptiveMaxPool2dPlugin(const char* data, size_t length
     torch::IValue value;
     input_archive.read("mode", value);
     mode_ = value.toStringRef();
-  }
-  {
-    torch::IValue value;
-    input_archive.read("align_corners", value);
-    align_corners_ = value.toBool();
   }
 }
 
@@ -83,7 +77,7 @@ const char* AdaptiveMaxPool2dPlugin::getPluginNamespace() const {
 }
 
 nvinfer1::IPluginV2DynamicExt* AdaptiveMaxPool2dPlugin::clone() const {
-  return new AdaptiveMaxPool2dPlugin(in_shape_, out_shape_, size_, mode_, align_corners_);
+  return new AdaptiveMaxPool2dPlugin(in_shape_, out_shape_, size_, mode_);
 }
 
 nvinfer1::DimsExprs AdaptiveMaxPool2dPlugin::getOutputDimensions(
@@ -143,7 +137,6 @@ std::string AdaptiveMaxPool2dPlugin::serializeToString() const {
   output_archive.write("out_shape", torch::IValue(out_shape_));
   output_archive.write("size", torch::IValue(size_));
   output_archive.write("mode", torch::IValue(mode_));
-  output_archive.write("align_corners", torch::IValue(align_corners_));
 
   std::ostringstream data_str;
   output_archive.save_to(data_str);
@@ -161,8 +154,8 @@ bool AdaptiveMaxPool2dPlugin::supportsFormatCombination(
     int nbInputs,
     int nbOutputs) {
   TRTORCH_ASSERT(0 <= pos && pos <= 2, "There should be exactly 3 connections to the plugin - 1 input, 2 output");
-  TRTORCH_ASSERT(nbInputs == 1, "Expected a single tensor as input to interpolate plugin");
-  TRTORCH_ASSERT(nbOutputs == 2, "Expected two tensors as output to interpolate plugin");
+  TRTORCH_ASSERT(nbInputs == 1, "Expected a single tensor as input to adaptive_max_pool2d plugin");
+  TRTORCH_ASSERT(nbOutputs == 2, "Expected two tensors as output to adaptive_max_pool2d plugin");
 
   const PluginTensorDesc& in = inOut[0];
 
@@ -289,10 +282,9 @@ AdaptiveMaxPool2dPlugin* AdaptiveMaxPool2dPluginCreator::createPlugin(
     std::vector<int64_t> in_shape,
     std::vector<int64_t> out_shape,
     std::vector<int64_t> size,
-    std::string mode,
-    bool align_corners) {
+    std::string mode) {
   name_ = name;
-  return new AdaptiveMaxPool2dPlugin(in_shape, out_shape, size, mode, align_corners);
+  return new AdaptiveMaxPool2dPlugin(in_shape, out_shape, size, mode);
 }
 
 nvinfer1::IPluginV2* AdaptiveMaxPool2dPluginCreator::deserializePlugin(
