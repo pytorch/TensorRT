@@ -33,7 +33,6 @@ class AdaptiveMaxPool2dPlugin : public nvinfer1::IPluginV2DynamicExt {
   std::vector<int64_t> out_shape_;
   std::vector<int64_t> size_;
   std::string mode_;
-  bool align_corners_;
 
  protected:
   // To prevent compiler warnings
@@ -50,8 +49,7 @@ class AdaptiveMaxPool2dPlugin : public nvinfer1::IPluginV2DynamicExt {
       std::vector<int64_t> in_shape,
       std::vector<int64_t> out_shape,
       std::vector<int64_t> size,
-      std::string mode,
-      bool align_corners);
+      std::string mode);
 
   AdaptiveMaxPool2dPlugin(const char* data, size_t length);
 
@@ -141,8 +139,7 @@ class AdaptiveMaxPool2dPluginCreator : public nvinfer1::IPluginCreator {
       std::vector<int64_t> in_shape,
       std::vector<int64_t> out_shape,
       std::vector<int64_t> size,
-      std::string mode,
-      bool align_corners);
+      std::string mode);
 
   nvinfer1::IPluginV2* deserializePlugin(const char* name, const void* serialData, size_t serialLength) override;
 

@@ -1,4 +1,4 @@
-load("//tests/core/converters:converter_test.bzl", "converter_test")
+load("//tests/core/conversion/converters:converter_test.bzl", "converter_test")
 
 config_setting(
     name = "use_pre_cxx11_abi",
@@ -88,7 +88,7 @@ converter_test(
 )
 
 test_suite(
-  name = "test_converters",
+  name = "converter_tests",
   tests = [
     ":test_activation",
     ":test_batch_norm",

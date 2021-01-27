@@ -1,8 +1,8 @@
 test_suite(
     name = "tests",
     tests = [
-        "//tests/core/converters:test_converters",
-        "//tests/modules:test_modules"
+        "//tests/core:core_tests",
+        "//tests/modules:module_tests"
     ],
 )
 
@@ -10,23 +10,23 @@ test_suite(
     name = "required_and_optional_tests",
     tests = [
         ":tests",
-        "//tests/accuracy:test_accuracy"
+        "//tests/accuracy:accuracy_tests"
     ]
 )
 
 test_suite(
    name = "aarch64_tests",
    tests = [
-       "//tests/core/converters:test_converters",
-       "//tests/modules:test_modules_aarch64"
+        "//tests/core:core_tests",
+        "//tests/modules:aarch64_module_tests"
    ],
 )
 
 test_suite(
    name = "required_and_optional_aarch64_tests",
    tests = [
-       ":aarch64_tests",
-       "//tests/accuracy:test_accuracy_aarch64"
+        ":aarch64_tests",
+        "//tests/accuracy:aarch64_accuracy_tests"
    ]
 )
 

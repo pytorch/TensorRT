@@ -13,7 +13,7 @@ filegroup(
 )
 
 test_suite(
-    name = "test_modules",
+    name = "module_tests",
     tests = [
         ":test_modules_as_engines",
         ":test_compiled_modules",
@@ -23,7 +23,7 @@ test_suite(
 )
 
 test_suite(
-   name = "test_modules_aarch64",
+   name = "aarch64_module_tests",
    tests = [
        ":test_modules_as_engines",
        ":test_compiled_modules",
