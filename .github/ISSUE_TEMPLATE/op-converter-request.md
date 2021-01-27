@@ -2,7 +2,7 @@
 name: "↔ Op Converter Request"
 about: Submit a proposal/request to support a new PyTorch operator in TRTorch
 title: "↔ [Converter] Add support for my_op in TRTorch"
-labels: 'component: converters, enhancement'
+labels: 'component: converters, feature request'
 assignees: ''
 
 ---

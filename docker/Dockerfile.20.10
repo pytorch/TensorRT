@@ -1,12 +1,12 @@
-FROM nvcr.io/nvidia/pytorch:20.07-py3
+FROM nvcr.io/nvidia/pytorch:20.10-py3
 
 RUN apt-get update && apt-get install -y curl gnupg  && rm -rf /var/lib/apt/lists/*
 
 RUN curl https://bazel.build/bazel-release.pub.gpg | apt-key add - && \
     echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" | tee /etc/apt/sources.list.d/bazel.list
 
-RUN apt-get update && apt-get install -y bazel-3.4.1 && rm -rf /var/lib/apt/lists/*
-RUN ln -s /usr/bin/bazel-3.4.1 /usr/bin/bazel
+RUN apt-get update && apt-get install -y bazel-3.7.1 && rm -rf /var/lib/apt/lists/*
+RUN ln -s /usr/bin/bazel-3.7.1 /usr/bin/bazel
 
 RUN pip install notebook
 
@@ -21,6 +21,9 @@ WORKDIR /opt/trtorch
 RUN bazel build //:libtrtorch --compilation_mode opt
 
 WORKDIR /opt/trtorch/py
+
+RUN pip install ipywidgets
+RUN jupyter nbextension enable --py widgetsnbextension
 
 # Locale is not set by default
 RUN apt-get update && apt-get install -y locales ninja-build && rm -rf /var/lib/apt/lists/* && locale-gen en_US.UTF-8

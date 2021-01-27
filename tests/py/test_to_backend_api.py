@@ -19,8 +19,12 @@ class TestToBackendLowering(ModelTestCase):
                     "refit": False,
                     "debug": False,
                     "strict_types": False,
-                    "allow_gpu_fallback": True,
-                    "device_type": "gpu",
+                    "device": {
+                        "device_type": trtorch.DeviceType.GPU,
+                        "gpu_id": 0,
+                        "dla_core": 0,
+                        "allow_gpu_fallback": True
+                    },
                     "capability": trtorch.EngineCapability.default,
                     "num_min_timing_iters": 2,
                     "num_avg_timing_iters": 1,
@@ -29,14 +33,14 @@ class TestToBackendLowering(ModelTestCase):
         }
 
     def test_to_backend_lowering(self):
-        trt_mod = torch._C._jit_to_tensorrt(self.scripted_model._c, {"forward": self.spec})
+        trt_mod = torch._C._jit_to_backend("tensorrt", self.scripted_model, self.spec)
         same = (trt_mod.forward(self.input) - self.scripted_model(self.input)).abs().max()
         self.assertTrue(same < 2e-3)
 
 
 def test_suite():
     suite = unittest.TestSuite()
-    suite.addTest(TestToBackendLowering.parametrize(TestToBackendLowering, model=models.mobilenet_v2(pretrained=True)))
+    suite.addTest(TestToBackendLowering.parametrize(TestToBackendLowering, model=models.resnet18(pretrained=True)))
 
     return suite
 

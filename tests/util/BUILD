@@ -13,10 +13,11 @@ cc_library(
         "util.h",
     ],
     srcs = [
-        "util.cpp",
+        "evaluate_graph.cpp",
         "run_graph.cpp",
         "run_graph_engine.cpp",
-        "run_forward.cpp"
+        "run_forward.cpp",
+        "util.cpp",
     ],
     deps = [
         "//core/conversion",

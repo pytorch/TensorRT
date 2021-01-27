@@ -1,10 +1,11 @@
-#include "NvInfer.h"
-#include "core/conversion/converters/converters.h"
-#include "core/util/prelude.h"
-#include "torch/torch.h"
-
 #include <ATen/ATen.h>
 #include <vector>
+#include "NvInfer.h"
+#include "c10/util/intrusive_ptr.h"
+#include "core/conversion/converters/converters.h"
+#include "core/conversion/tensorcontainer/TensorContainer.h"
+#include "core/util/prelude.h"
+#include "torch/torch.h"
 
 namespace trtorch {
 namespace core {
@@ -12,6 +13,55 @@ namespace conversion {
 namespace converters {
 namespace impl {
 namespace {
+
+bool add_split(ConversionCtx* ctx, const torch::jit::Node* n, args& args, bool split_list) {
+  auto in = args[0].ITensor();
+  auto axis = args[2].unwrapToInt();
+  auto inDimSize = in->getDimensions().d[axis];
+  auto numOutputs = 1;
+  std::vector<int64_t> sizes;
+
+  if (split_list) {
+    sizes = args[1].unwrapToIntList().vec();
+    numOutputs = sizes.size();
+  } else {
+    auto split_size = args[1].unwrapToInt();
+    numOutputs = inDimSize / split_size;
+    if (numOutputs == 1) {
+      sizes.push_back(split_size);
+    } else {
+      sizes = std::vector<int64_t>(numOutputs, 1);
+    }
+  }
+
+  LOG_DEBUG("Number of split outputs: " << numOutputs);
+
+  c10::ListTypePtr lt = n->output()->type()->expect<c10::ListType>();
+  c10::TypePtr elementType = lt->getElementType();
+  auto list = c10::impl::GenericList(elementType);
+  list.reserve(numOutputs);
+
+  int start_idx = 0;
+  for (int i = 0; i < numOutputs; i++) {
+    at::Tensor indices = torch::arange(start_idx, start_idx + sizes[i], 1).to(torch::kI32);
+    auto indicesTensor = tensor_to_const(ctx, indices);
+
+    auto gather_layer = ctx->net->addGather(*in, *indicesTensor, axis);
+    auto gather_out = gather_layer->getOutput(0);
+
+    auto tensor_holder = TensorContainer();
+    tensor_holder.hold_tensor(gather_out);
+    auto ival = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
+    list.emplace_back(ival);
+
+    start_idx = start_idx + sizes[i];
+  }
+
+  auto split_output_ivalue = std::move(torch::jit::IValue(list));
+  ctx->AssociateValueAndIValue(n->outputs()[0], split_output_ivalue);
+
+  return true;
+}
 
 auto select_registrations TRTORCH_UNUSED =
     RegisterNodeConversionPatterns()
@@ -172,7 +222,25 @@ auto select_registrations TRTORCH_UNUSED =
                LOG_DEBUG("Slice layer output shape: " << out->getDimensions());
 
                return true;
-             }});
+             }})
+        .pattern({"aten::split(Tensor self, int[] split_sizes, int dim=0) -> (Tensor[])",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    add_split(ctx, n, args, true);
+                    LOG_DEBUG("Converted split op into a list of IValues");
+                    return true;
+                  }})
+        .pattern({"aten::split.Tensor(Tensor(a) self, int split_size, int dim=0) -> (Tensor[])",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    add_split(ctx, n, args, false);
+                    LOG_DEBUG("Converted split op into a list of IValues");
+                    return true;
+                  }})
+        .pattern({"aten::split_with_sizes(Tensor(a) self, int[] split_sizes, int dim=0) -> (Tensor[])",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    add_split(ctx, n, args, true);
+                    LOG_DEBUG("Converted split op into a list of IValues");
+                    return true;
+                  }});
 
 } // namespace
 } // namespace impl

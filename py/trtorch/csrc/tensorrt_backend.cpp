@@ -46,7 +46,7 @@ c10::impl::GenericDict TensorRTBackend::compile(c10::IValue processed_mod, c10::
     auto method = mod.get_method(method_name);
     auto g = method.graph();
 
-    auto raw_spec = it->value().toGenericDict().at(it->key()).toCustomClass<trtorch::pyapi::CompileSpec>();
+    auto raw_spec = it->value().toCustomClass<trtorch::pyapi::CompileSpec>();
     LOG_DEBUG(raw_spec->stringify());
     auto cfg = raw_spec->toInternalCompileSpec();
     auto convert_cfg = std::move(cfg.convert_info);
