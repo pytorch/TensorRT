@@ -317,7 +317,14 @@ auto pooling_registrations TRTORCH_UNUSED =
 
                  auto creator = new plugins::InterpolatePluginCreator();
                  auto plugin = creator->createPlugin(
-                     "adaptive_pool2d", in_shape, out_shape, out_size, std::string("adaptive_pool2d"), false);
+                     "adaptive_pool2d",
+                     in_shape,
+                     out_shape,
+                     out_size,
+                     {},
+                     std::string("adaptive_pool2d"),
+                     false,
+                     false);
 
                  auto pooling_layer =
                      ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(&in), 1, *plugin);

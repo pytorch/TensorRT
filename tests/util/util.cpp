@@ -16,7 +16,7 @@ bool checkRtol(const at::Tensor& diff, const std::vector<at::Tensor> inputs, flo
 }
 
 bool almostEqual(const at::Tensor& a, const at::Tensor& b, float threshold) {
-  LOG_DEBUG(a << std::endl << b << std::endl);
+  LOG_GRAPH(a << std::endl << b << std::endl);
   auto a_float = a.toType(at::kFloat);
   auto b_float = b.toType(at::kFloat);
   return checkRtol(a_float - b_float, {a_float, b_float}, threshold);

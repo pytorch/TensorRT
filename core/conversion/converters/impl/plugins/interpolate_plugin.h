@@ -31,8 +31,10 @@ class InterpolatePlugin : public nvinfer1::IPluginV2DynamicExt {
   std::vector<int64_t> in_shape_;
   std::vector<int64_t> out_shape_;
   std::vector<int64_t> size_;
+  std::vector<double> scales_;
   std::string mode_;
   bool align_corners_;
+  bool use_scales_;
 
  protected:
   // To prevent compiler warnings
@@ -49,8 +51,10 @@ class InterpolatePlugin : public nvinfer1::IPluginV2DynamicExt {
       std::vector<int64_t> in_shape,
       std::vector<int64_t> out_shape,
       std::vector<int64_t> size,
+      std::vector<double> scales,
       std::string mode,
-      bool align_corners);
+      bool align_corners,
+      bool use_scales);
 
   InterpolatePlugin(const char* data, size_t length);
 
@@ -140,8 +144,10 @@ class InterpolatePluginCreator : public nvinfer1::IPluginCreator {
       std::vector<int64_t> in_shape,
       std::vector<int64_t> out_shape,
       std::vector<int64_t> size,
+      std::vector<double> scales,
       std::string mode,
-      bool align_corners);
+      bool align_corners,
+      bool use_scales);
 
   nvinfer1::IPluginV2* deserializePlugin(const char* name, const void* serialData, size_t serialLength) override;
 
