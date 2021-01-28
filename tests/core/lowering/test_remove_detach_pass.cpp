@@ -10,16 +10,16 @@ TEST(LoweringPasses, RemoveDetachCorrectly) {
   std::string source_graph = R"IR(
     graph(%input):
       %2 = aten::detach(%input)
-      %3 = foo::bar(%2)
+      %3 = aten::sin(%2)
       return (%3))IR";
   std::string target_graph = R"IR(
     graph(%input):
-      %3 = foo::bar(%input)
+      %3 = aten::sin(%input)
       return (%3))IR";
 
   auto sg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(source_graph, &*sg);
-  trtorch::core::lowering::passes::RemoveContiguous(sg);
+  trtorch::core::lowering::passes::RemoveTo(sg);
 
   auto tg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(target_graph, &*tg);
