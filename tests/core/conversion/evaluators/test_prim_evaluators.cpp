@@ -37,3 +37,19 @@ TEST(Evaluators, PrimListUnpackEvaluatesCorrectly) {
   ASSERT_TRUE(jit_results[0] == trt_results[0]);
   ASSERT_TRUE(jit_results[1] == trt_results[1]);
 }
+
+TEST(Evaluators, NumToTensorEvaluatesCorrectly) {
+  const auto graph = R"IR(
+      graph():
+        %1 : int = prim::Constant[value=3]()
+        %lu.1 : Tensor = prim::NumToTensor(%1)
+        return (%lu.1))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, &*g);
+
+  auto jit_results = trtorch::tests::util::EvaluateGraphJIT(g, {});
+  auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {});
+
+  ASSERT_TRUE(jit_results[0] == trt_results[0]);
+}

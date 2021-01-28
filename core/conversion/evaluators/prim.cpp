@@ -30,7 +30,7 @@ auto prim_registrations =
                     }})
         .evaluator({torch::jit::prim::NumToTensor,
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-                      return at::scalar_to_tensor(args.at(n->output(0)).IValue()->toScalar());
+                      return at::scalar_to_tensor(args.at(n->input(0)).IValue()->toScalar());
                     }})
         .evaluator({torch::jit::prim::ListUnpack,
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
