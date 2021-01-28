@@ -26,12 +26,17 @@ static auto softmax_registrations TRTORCH_UNUSED = RegisterNodeConversionPattern
        }
 
        int64_t dim = args[1].IValue()->toInt();
+       LOG_DEBUG("Softmax original dim " << dim);
+       if (dim == -1) {
+         dim = shape.size() - 1;
+       }
+       LOG_DEBUG("Softmax converted dim " << dim);
        auto softmax = ctx->net->addSoftMax(*in);
 
        TRTORCH_CHECK(softmax, "Unable to create softmax layer from node: " << *n);
        LOG_DEBUG("Disregarding dtype argument");
 
-       if (shape.size() > 3) {
+       if (shape.size() > 1) {
          softmax->setAxes(1 << (dim));
        } else {
          // When there is no batch dimension
