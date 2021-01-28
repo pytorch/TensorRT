@@ -101,6 +101,15 @@ TEST(Converters, ATenMulConvertsCorrectly) {
   pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3});
 }
 
+TEST(Converters, ATenMulWithScalarConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor):
+        %scalar : float = prim::Constant[value=2.4]()
+        %1 : Tensor = aten::mul(%0, %scalar)
+        return (%1))IR";
+  pointwise_test_helper(graph, true);
+}
+
 TEST(Converters, ATenDivConvertsCorrectly) {
   const auto graph = R"IR(
       graph(%0 : Tensor, %1 : Tensor):
