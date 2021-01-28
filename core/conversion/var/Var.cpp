@@ -94,9 +94,16 @@ nvinfer1::ITensor* Var::ITensorOrFreeze(ConversionCtx* ctx) {
       "Requested either IValue containing a Tensor, or ITensor, however Var type is " << type_name());
 
   nvinfer1::ITensor* out;
-
+  auto weights = converters::Weights();
   if (isIValue()) {
-    auto weights = converters::Weights(ctx, ptr_.ivalue->toTensor());
+    auto tensor = ptr_.ivalue->toTensor();
+    if (tensor.scalar_type() == at::kLong) {
+      weights = converters::Weights(ctx, tensor.toType(at::kInt));
+    } else if (tensor.scalar_type() == at::kDouble) {
+      weights = converters::Weights(ctx, tensor.toType(at::kFloat));
+    } else {
+      weights = converters::Weights(ctx, tensor);
+    }
 
     auto const_layer = ctx->net->addConstant(weights.shape, weights.data);
     TRTORCH_CHECK(const_layer, "Unable to freeze tensor into constant layer");
