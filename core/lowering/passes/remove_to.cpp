@@ -21,6 +21,7 @@ struct ToRemoval {
 
   void run() {
     findTo(graph_->block());
+    findDetach(graph_->block());
     torch::jit::EliminateDeadCode(graph_);
     LOG_DEBUG(
         "RemoveTo - Note: Removing remaining aten::to operators, if type casts need to be preserved, add a pass before this pass is run");
@@ -33,6 +34,17 @@ struct ToRemoval {
       auto n = *it;
       if (n->kind() == c10::Symbol::fromQualString("aten::to")) {
         LOG_GRAPH("Found that node " << *n << "  is an to node (RemoveTo)" << std::endl);
+        n->outputs()[0]->replaceAllUsesWith(n->inputs()[0]);
+        it.destroyCurrent();
+      }
+    }
+  }
+
+  void findDetach(Block* b) {
+    for (auto it = b->nodes().begin(); it != b->nodes().end(); it++) {
+      auto n = *it;
+      if (n->kind() == c10::Symbol::fromQualString("aten::detach")) {
+        LOG_GRAPH("Found that node " << *n << "  is an detach node (RemoveTo)" << std::endl);
         n->outputs()[0]->replaceAllUsesWith(n->inputs()[0]);
         it.destroyCurrent();
       }
