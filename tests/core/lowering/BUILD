@@ -19,11 +19,16 @@ lowering_test(
   name = "test_remove_detach_pass",
 )
 
+lowering_test(
+  name = "test_element_wise_pass",
+)
+
 test_suite(
     name = "lowering_tests",
     tests = [
         ":test_remove_contiguous_pass",
         ":test_remove_to",
-        ":test_remove_detach_pass"
+        ":test_remove_detach_pass",
+        ":test_element_wise_pass"
     ]
 )
