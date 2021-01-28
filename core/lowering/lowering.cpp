@@ -48,6 +48,7 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g) {
   // passes::UnpackBatchNorm(g);
   passes::UnpackLogSoftmax(g);
   passes::RemoveTo(g);
+  passes::ElementWisePass(g);
   torch::jit::EliminateDeadCode(g);
   LOG_GRAPH(*g);
 }

@@ -25,6 +25,7 @@ cc_library(
         "unpack_addmm.cpp",
         "unpack_batch_norm.cpp",
         "unpack_log_softmax.cpp",
+        "element_wise_pass.cpp"
     ],
     deps = [
         "//core/util:prelude",
