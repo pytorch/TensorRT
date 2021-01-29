@@ -22,7 +22,7 @@ auto squeeze_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().pat
 
        auto selfDim = util::toVec(self->getDimensions());
        if (dim < 0) {
-           dim = selfDim.size() + dim;
+         dim = selfDim.size() + dim;
        }
 
        auto shuffle_layer = ctx->net->addShuffle(*self);

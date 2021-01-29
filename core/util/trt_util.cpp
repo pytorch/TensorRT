@@ -204,11 +204,9 @@ nvinfer1::Dims squeezeDims(const nvinfer1::Dims& d, int pos) {
       if (i <= d.nbDims) {
         dims.d[j] = d.d[i];
       }
-      
     }
     i++;
     j++;
-    
   }
 
   dims.nbDims = d.nbDims - 1;
