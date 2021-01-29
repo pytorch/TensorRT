@@ -1,9 +1,9 @@
 #include <string>
-#include "torch/torch.h"
 #include "core/compiler.h"
 #include "gtest/gtest.h"
 #include "tests/util/util.h"
 #include "torch/csrc/jit/ir/irparser.h"
+#include "torch/torch.h"
 
 TEST(Evaluators, ATenIsFloatingPointEvaluatesTrueCorrectly) {
   const auto graph = R"IR(
