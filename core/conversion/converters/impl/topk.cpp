@@ -21,8 +21,8 @@ auto topk_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().patter
        auto k = args[1].unwrapToInt();
        auto dim = args[2].unwrapToInt();
        auto largest = args[3].unwrapToBool();
-       auto sorted = args[4].unwrapToBool();
- 
+       // auto sorted = args[4].unwrapToBool(); # Currently unused
+
        auto selfDim = util::toVec(self->getDimensions());
 
        //reduceAxes	The reduction dimensions. The bit in position i of bitmask reduceAxes corresponds to explicit dimension i of the result.
