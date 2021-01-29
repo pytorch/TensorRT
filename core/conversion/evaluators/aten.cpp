@@ -490,7 +490,7 @@ auto aten_registrations TRTORCH_UNUSED =
                       } else {
                         auto tensor = tensor_var.unwrapToTensor();
                         auto t = tensor.item();
-                        return (int) t.to<int>();
+                        return (int)t.to<int>();
                       }
                     },
                     EvalOptions().validSchemas({

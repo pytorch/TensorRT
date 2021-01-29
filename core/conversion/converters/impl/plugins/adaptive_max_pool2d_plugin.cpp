@@ -18,7 +18,7 @@ AdaptiveMaxPool2dPlugin::AdaptiveMaxPool2dPlugin(
     std::vector<int64_t> out_shape,
     std::vector<int64_t> size,
     std::string mode)
-    : in_shape_(in_shape), out_shape_(out_shape), size_(size), mode_(mode){}
+    : in_shape_(in_shape), out_shape_(out_shape), size_(size), mode_(mode) {}
 
 AdaptiveMaxPool2dPlugin::AdaptiveMaxPool2dPlugin(const char* data, size_t length) {
   std::istringstream data_stream(std::string(data, length));
