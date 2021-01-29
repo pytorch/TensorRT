@@ -260,6 +260,70 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     LOG_DEBUG("Output tensor shape: " << out->getDimensions());
                     return true;
                   }})
+        .pattern({"aten::ne.Tensor(Tensor self, Tensor other) -> (Tensor)",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    // TODO: Remove with functionalization
+                    auto self = args[0].ITensorOrFreeze(ctx);
+                    auto other = args[1].ITensorOrFreeze(ctx);
+                    auto equal = add_elementwise(
+                        ctx,
+                        nvinfer1::ElementWiseOperation::kEQUAL,
+                        self,
+                        other,
+                        util::node_info(n) + std::string("is_equal"));
+                    TRTORCH_CHECK(equal, "Unable to create elementwise equal layer from node: " << *n);
+                    // XOR with ones negates and produces not_equal result
+                    auto options = torch::TensorOptions().dtype(torch::kFloat32);
+                    auto ones = at::full({1}, 1, {options});
+                    auto ones_tensor = tensor_to_const(ctx, ones);
+                    nvinfer1::IIdentityLayer* cast_layer = ctx->net->addIdentity(*ones_tensor);
+                    cast_layer->setOutputType(0, nvinfer1::DataType::kBOOL);
+
+                    auto sub = add_elementwise(
+                        ctx,
+                        nvinfer1::ElementWiseOperation::kXOR,
+                        cast_layer->getOutput(0),
+                        equal->getOutput(0),
+                        util::node_info(n));
+                    TRTORCH_CHECK(sub, "Unable to create ne (not equal) layer from node: " << *n);
+
+                    sub->setName(util::node_info(n).c_str());
+                    auto out = ctx->AssociateValueAndTensor(n->outputs()[0], sub->getOutput(0));
+                    LOG_DEBUG("Not equal layer output tensor shape: " << out->getDimensions());
+                    return true;
+                  }})
+        .pattern({"aten::ne.Scalar(Tensor self, Scalar other) -> (Tensor)",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    auto self = args[0].ITensorOrFreeze(ctx);
+                    auto scalar = args[1].unwrapToScalar().to<float>();
+                    auto scalar_tensor = tensor_to_const(ctx, torch::tensor({scalar}));
+                    auto equal = add_elementwise(
+                        ctx,
+                        nvinfer1::ElementWiseOperation::kEQUAL,
+                        self,
+                        scalar_tensor,
+                        util::node_info(n) + std::string("is_equal"));
+                    TRTORCH_CHECK(equal, "Unable to create elementwise equal layer from node: " << *n);
+                    // XOR with ones negates and produces not_equal result
+                    auto options = torch::TensorOptions().dtype(torch::kFloat32);
+                    auto ones = at::full({1}, 1, {options});
+                    auto ones_tensor = tensor_to_const(ctx, ones);
+                    nvinfer1::IIdentityLayer* cast_layer = ctx->net->addIdentity(*ones_tensor);
+                    cast_layer->setOutputType(0, nvinfer1::DataType::kBOOL);
+
+                    auto sub = add_elementwise(
+                        ctx,
+                        nvinfer1::ElementWiseOperation::kXOR,
+                        cast_layer->getOutput(0),
+                        equal->getOutput(0),
+                        util::node_info(n));
+                    TRTORCH_CHECK(sub, "Unable to create ne (not equal) layer from node: " << *n);
+
+                    sub->setName(util::node_info(n).c_str());
+                    auto out = ctx->AssociateValueAndTensor(n->outputs()[0], sub->getOutput(0));
+                    LOG_DEBUG("Not equal layer output tensor shape: " << out->getDimensions());
+                    return true;
+                  }})
         .pattern({"aten::pow.Tensor_Tensor(Tensor self, Tensor exponent) -> (Tensor)",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                     // TODO: Remove with functionalization
