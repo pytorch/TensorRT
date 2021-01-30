@@ -164,7 +164,6 @@ TEST(Converters, ATenNeScalarConvertsCorrectly) {
   pointwise_test_helper(graph, true);
 }
 
-
 TEST(Converters, ATenFloorDivideConvertsCorrectly) {
   const auto graph = R"IR(
       graph(%0 : Tensor, %1 : Tensor):
@@ -176,7 +175,6 @@ TEST(Converters, ATenFloorDivideConvertsCorrectly) {
   pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3});
   pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3});
 }
-
 
 TEST(Converters, ATenFloorDivideWithScalarConvertsCorrectly) {
   const auto graph = R"IR(
