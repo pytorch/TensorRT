@@ -426,7 +426,8 @@ auto aten_registrations TRTORCH_UNUSED =
                       }
                     },
                     EvalOptions().validSchemas({
-                        "aten::div.Scalar(Scalar a, Scalar b) -> (float)",
+                        "aten::div.float(float a, float b) -> (float)",
+                        "aten::div.int(int a, int b) -> (int)",
                     })})
         .evaluator({c10::Symbol::fromQualString("aten::floordiv"),
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
