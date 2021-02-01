@@ -71,6 +71,14 @@ converter_test(
   name = "test_lstm_cell"
 )
 
+converter_test(
+  name = "test_unsqueeze"
+)
+
+converter_test(
+  name = "test_squeeze"
+)
+
 test_suite(
   name = "converter_tests",
   tests = [
@@ -88,6 +96,8 @@ test_suite(
     ":test_interpolate",
     ":test_select",
     ":test_stack",
-    ":test_lstm_cell"
+    ":test_lstm_cell",
+    ":test_unsqueeze",
+    ":test_squeeze"
   ]
 )
