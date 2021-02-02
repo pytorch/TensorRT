@@ -89,7 +89,7 @@ TEST(Converters, ATenAddWithScalarConvertsCorrectly) {
 TEST(Converters, ATenSubConvertsCorrectly) {
   const auto graph = R"IR(
       graph(%0 : Tensor, %1 : Tensor):
-        %2 : int = prim::Constant[value=1]()
+        %2 : int = prim::Constant[value=2.3]()
         %3 : Tensor = aten::sub(%0, %1, %2)
         return (%3))IR";
   pointwise_test_helper(graph, false);
@@ -215,6 +215,8 @@ TEST(Converters, ATenRsubWithTensorConvertsCorrectly) {
         %2 : int = prim::Constant[value=2]()
         %3 : Tensor = aten::rsub(%0, %1, %2)
         return (%3))IR";
+  pointwise_test_helper(graph, false, false, {3, 4}, {4});
+  pointwise_test_helper(graph, false, false, {4}, {3, 4});
   pointwise_test_helper(graph, false, true, {4, 3, 3, 3}, {4, 3, 3, 3});
 }
 
