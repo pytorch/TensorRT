@@ -11,9 +11,14 @@ evaluator_test(
   name = "test_prim_evaluators",
 )
 
+evaluator_test(
+  name = "test_aten_evaluators",
+)
+
 test_suite(
     name = "evaluator_tests",
     tests = [
-        ":test_prim_evaluators"
+        ":test_prim_evaluators",
+        ":test_aten_evaluators"
     ]
 )
