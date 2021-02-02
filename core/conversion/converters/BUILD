@@ -42,6 +42,7 @@ cc_library(
         "impl/expand.cpp",
         "impl/linear.cpp",
         "impl/matrix_multiply.cpp",
+        "impl/normalize.cpp",
         "impl/pooling.cpp",
         "impl/reduce.cpp",
         "impl/shuffle.cpp",

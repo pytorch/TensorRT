@@ -64,6 +64,10 @@ converter_test(
 )
 
 converter_test(
+  name = "test_normalize"
+)
+
+converter_test(
   name = "test_select"
 )
 
@@ -103,6 +107,7 @@ test_suite(
     ":test_softmax",
     ":test_unary",
     ":test_interpolate",
+    ":test_normalize",
     ":test_select",
     ":test_stack",
     ":test_lstm_cell",
