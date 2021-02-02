@@ -39,6 +39,7 @@ cc_library(
         "impl/constant.cpp",
         "impl/conv_deconv.cpp",
         "impl/element_wise.cpp",
+        "impl/expand.cpp",
         "impl/linear.cpp",
         "impl/matrix_multiply.cpp",
         "impl/pooling.cpp",

@@ -28,6 +28,10 @@ converter_test(
 )
 
 converter_test(
+  name = "test_expand"
+)
+
+converter_test(
   name = "test_linear"
 )
 
@@ -86,6 +90,7 @@ test_suite(
     ":test_batch_norm",
     ":test_conv_deconv",
     ":test_element_wise",
+    ":test_expand",
     ":test_linear",
     ":test_matrix_multiply",
     ":test_pooling",
