@@ -138,6 +138,20 @@ auto acthardtanh TRTORCH_UNUSED =
                     out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], out_tensor);
                     LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
                     return true;
+                  }})
+        .pattern({"aten::leaky_relu_(Tensor(a!) self, Scalar negative_slope=0.01) -> Tensor(a!)",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    auto self = args[0].ITensorOrFreeze(ctx);
+                    auto negative_slopeScalar = args[1].unwrapToScalar().to<float>();
+
+                    auto new_layer = ctx->net->addActivation(*self, nvinfer1::ActivationType::kLEAKY_RELU);
+                    new_layer->setAlpha(negative_slopeScalar);
+
+                    new_layer->setName(util::node_info(n).c_str());
+                    auto out_tensor = new_layer->getOutput(0);
+                    out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], out_tensor);
+                    LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+                    return true;
                   }});
 
 } // namespace
