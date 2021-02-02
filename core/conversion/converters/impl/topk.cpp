@@ -21,7 +21,8 @@ auto topk_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().patter
        auto k = args[1].unwrapToInt();
        auto dim = args[2].unwrapToInt();
        auto largest = args[3].unwrapToBool();
-       LOG_DEBUG("Note: sorted argument is not used in TensorRT for aten::topk, results will depend on the value of largest");
+       LOG_DEBUG(
+           "Note: sorted argument is not used in TensorRT for aten::topk, results will depend on the value of largest");
        // auto sorted = args[4].unwrapToBool(); # Currently unused
 
        auto selfDim = util::toVec(self->getDimensions());
