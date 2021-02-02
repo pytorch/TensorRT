@@ -262,7 +262,6 @@ auto element_wise_registrations TRTORCH_UNUSED =
                   }})
         .pattern({"aten::ne.Tensor(Tensor self, Tensor other) -> (Tensor)",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    // TODO: Remove with functionalization
                     auto self = args[0].ITensorOrFreeze(ctx);
                     auto other = args[1].ITensorOrFreeze(ctx);
                     auto equal = add_elementwise(
@@ -326,7 +325,6 @@ auto element_wise_registrations TRTORCH_UNUSED =
                   }})
         .pattern({"aten::pow.Tensor_Tensor(Tensor self, Tensor exponent) -> (Tensor)",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    // TODO: Remove with functionalization
                     auto self = args[0].ITensorOrFreeze(ctx);
                     auto exponent = args[1].ITensorOrFreeze(ctx);
                     auto pow =
@@ -341,7 +339,6 @@ auto element_wise_registrations TRTORCH_UNUSED =
                   }})
         .pattern({"aten::pow.Tensor_Scalar(Tensor self, Scalar exponent) -> (Tensor)",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    // TODO: Remove with functionalization
                     auto self = args[0].ITensorOrFreeze(ctx);
                     auto exponentScalar = args[1].unwrapToScalar().to<float>();
                     auto exponent = tensor_to_const(ctx, torch::tensor({exponentScalar}));
@@ -357,7 +354,6 @@ auto element_wise_registrations TRTORCH_UNUSED =
                   }})
         .pattern({"aten::gt.Tensor(Tensor self, Tensor other) -> (Tensor)",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    // TODO: Remove with functionalization
                     auto self = args[0].ITensorOrFreeze(ctx);
                     auto other = args[1].ITensorOrFreeze(ctx);
                     auto gt =
@@ -371,7 +367,6 @@ auto element_wise_registrations TRTORCH_UNUSED =
                   }})
         .pattern({"aten::gt.Scalar(Tensor self, Scalar other) -> (Tensor)",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    // TODO: Remove with functionalization
                     auto self = args[0].ITensorOrFreeze(ctx);
                     auto otherScalar = args[1].unwrapToScalar().to<float>();
                     auto other = tensor_to_const(ctx, torch::tensor({otherScalar}));
@@ -386,7 +381,6 @@ auto element_wise_registrations TRTORCH_UNUSED =
                   }})
         .pattern({"aten::lt.Tensor(Tensor self, Tensor other) -> (Tensor)",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    // TODO: Remove with functionalization
                     auto self = args[0].ITensorOrFreeze(ctx);
                     auto other = args[1].ITensorOrFreeze(ctx);
                     auto lt =
@@ -400,7 +394,6 @@ auto element_wise_registrations TRTORCH_UNUSED =
                   }})
         .pattern({"aten::lt.Scalar(Tensor self, Scalar other) -> (Tensor)",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    // TODO: Remove with functionalization
                     auto self = args[0].ITensorOrFreeze(ctx);
                     auto otherScalar = args[1].unwrapToScalar().to<float>();
                     auto other = tensor_to_const(ctx, torch::tensor({otherScalar}));
@@ -415,7 +408,6 @@ auto element_wise_registrations TRTORCH_UNUSED =
                   }})
         .pattern({"aten::eq.Tensor(Tensor self, Tensor other) -> (Tensor)",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    // TODO: Remove with functionalization
                     auto self = args[0].ITensorOrFreeze(ctx);
                     auto other = args[1].ITensorOrFreeze(ctx);
                     auto eq =
@@ -429,7 +421,6 @@ auto element_wise_registrations TRTORCH_UNUSED =
                   }})
         .pattern({"aten::eq.Scalar(Tensor self, Scalar other) -> (Tensor)",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    // TODO: Remove with functionalization
                     auto self = args[0].ITensorOrFreeze(ctx);
                     auto otherScalar = args[1].unwrapToScalar().to<float>();
                     auto other = tensor_to_const(ctx, torch::tensor({otherScalar}));
@@ -444,7 +435,6 @@ auto element_wise_registrations TRTORCH_UNUSED =
                   }})
         .pattern({"aten::ge.Tensor(Tensor self, Tensor other) -> (Tensor)",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    // TODO: Remove with functionalization
                     auto self = args[0].ITensorOrFreeze(ctx);
                     auto other = args[1].ITensorOrFreeze(ctx);
 
@@ -468,7 +458,6 @@ auto element_wise_registrations TRTORCH_UNUSED =
                   }})
         .pattern({"aten::ge.Scalar(Tensor self, Scalar other) -> (Tensor)",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    // TODO: Remove with functionalization
                     auto self = args[0].ITensorOrFreeze(ctx);
                     auto otherScalar = args[1].unwrapToScalar().to<float>();
                     auto other = tensor_to_const(ctx, torch::tensor({otherScalar}));
@@ -493,7 +482,6 @@ auto element_wise_registrations TRTORCH_UNUSED =
                   }})
         .pattern({"aten::le.Tensor(Tensor self, Tensor other) -> (Tensor)",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    // TODO: Remove with functionalization
                     auto self = args[0].ITensorOrFreeze(ctx);
                     auto other = args[1].ITensorOrFreeze(ctx);
 
@@ -517,7 +505,6 @@ auto element_wise_registrations TRTORCH_UNUSED =
                   }})
         .pattern({"aten::le.Scalar(Tensor self, Scalar other) -> (Tensor)",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    // TODO: Remove with functionalization
                     auto self = args[0].ITensorOrFreeze(ctx);
                     auto otherScalar = args[1].unwrapToScalar().to<float>();
                     auto other = tensor_to_const(ctx, torch::tensor({otherScalar}));
