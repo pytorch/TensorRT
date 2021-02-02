@@ -171,6 +171,35 @@ TEST(Converters, ATenNeScalarConvertsCorrectly) {
             return (%3))IR";
   pointwise_test_helper(graph, true, false, {3, 4, 2});
   ;
+
+TEST(Converters, ATenClampMinConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%x.1 : Tensor):
+            %2 : int = prim::Constant[value=-2]()
+            %3 : None = prim::Constant()
+            %4 : Tensor = aten::clamp(%x.1, %2, %3)
+            return (%4))IR";
+  pointwise_test_helper(graph, true);
+}
+
+TEST(Converters, ATenClampMaxConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%x.1 : Tensor):
+            %2 : int = prim::Constant[value=3]()
+            %3 : None = prim::Constant()
+            %4 : Tensor = aten::clamp(%x.1, %3, %2)
+            return (%4))IR";
+  pointwise_test_helper(graph, true);
+}
+
+TEST(Converters, ATenClampMinMaxConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%x.1 : Tensor):
+            %2 : int = prim::Constant[value=3]()
+            %3 : int = prim::Constant[value=-2]()
+            %4 : Tensor = aten::clamp(%x.1, %3, %2)
+            return (%4))IR";
+  pointwise_test_helper(graph, true);
 }
 
 TEST(Converters, ATenGreaterThanConvertsCorrectly) {

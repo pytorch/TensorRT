@@ -144,6 +144,41 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     LOG_DEBUG("Output tensor shape: " << out->getDimensions());
                     return true;
                   }})
+        .pattern({"aten::clamp(Tensor self, Scalar? min=None, Scalar? max=None) -> (Tensor)",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    // Compute min(max(min_threshold, input), max_threshold)
+                    auto self = args[0].ITensorOrFreeze(ctx);
+                    auto clamp_layer_out = self;
+                    if (args[1].isIValue() && args[1].IValue()->isScalar()) {
+                      auto minScalar = args[1].unwrapToScalar().to<float>();
+                      auto minTensor = tensor_to_const(ctx, torch::tensor({minScalar}));
+                      auto max_layer = add_elementwise(
+                          ctx,
+                          nvinfer1::ElementWiseOperation::kMAX,
+                          clamp_layer_out,
+                          minTensor,
+                          util::node_info(n) + std::string("_max"));
+                      TRTORCH_CHECK(max_layer, "Unable to create elementwise max layer for node: " << *n);
+                      clamp_layer_out = max_layer->getOutput(0);
+                    }
+
+                    if (args[2].isIValue() && args[2].IValue()->isScalar()) {
+                      auto maxScalar = args[2].unwrapToScalar().to<float>();
+                      auto maxTensor = tensor_to_const(ctx, torch::tensor({maxScalar}));
+                      auto min_layer = add_elementwise(
+                          ctx,
+                          nvinfer1::ElementWiseOperation::kMIN,
+                          clamp_layer_out,
+                          maxTensor,
+                          util::node_info(n) + std::string("_min"));
+                      TRTORCH_CHECK(min_layer, "Unable to create elementwise min layer for node: " << *n);
+                      clamp_layer_out = min_layer->getOutput(0);
+                    }
+
+                    auto out = ctx->AssociateValueAndTensor(n->outputs()[0], clamp_layer_out);
+                    LOG_DEBUG("Clamp layer output tensor shape: " << clamp_layer_out->getDimensions());
+                    return true;
+                  }})
         .pattern({"aten::sub.Tensor(Tensor self, Tensor other, Scalar alpha=1) -> "
                   "Tensor",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
