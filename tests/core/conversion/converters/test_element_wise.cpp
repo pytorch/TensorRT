@@ -123,6 +123,15 @@ TEST(Converters, ATenDivConvertsCorrectly) {
   pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3});
 }
 
+TEST(Converters, ATenDivWithScalarConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor):
+        %scalar : float = prim::Constant[value=2.4]()
+        %1 : Tensor = aten::div(%0, %scalar)
+        return (%1))IR";
+  pointwise_test_helper(graph, true);
+}
+
 TEST(Converters, ATenPowTensorConvertsCorrectly) {
   const auto graph = R"IR(
        graph(%x.1 : Tensor, %x2.1 : Tensor):
@@ -161,7 +170,6 @@ TEST(Converters, ATenNeScalarConvertsCorrectly) {
             %3 : Tensor = aten::ne(%x.1, %2)
             return (%3))IR";
   pointwise_test_helper(graph, true, false, {3, 4, 2});
-  pointwise_test_helper(graph, true);
 }
 
 TEST(Converters, ATenFloorDivideConvertsCorrectly) {
@@ -228,4 +236,119 @@ TEST(Converters, ATenRsubWithScalarConvertsCorrectly) {
         %3 : Tensor = aten::rsub(%0, %scalar, %2)
         return (%3))IR";
   pointwise_test_helper(graph, true, false, {4, 3, 3, 3});
+}
+
+TEST(Converters, ATenClampMinConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%x.1 : Tensor):
+            %2 : int = prim::Constant[value=-2]()
+            %3 : None = prim::Constant()
+            %4 : Tensor = aten::clamp(%x.1, %2, %3)
+            return (%4))IR";
+  pointwise_test_helper(graph, true);
+}
+
+TEST(Converters, ATenClampMaxConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%x.1 : Tensor):
+            %2 : int = prim::Constant[value=3]()
+            %3 : None = prim::Constant()
+            %4 : Tensor = aten::clamp(%x.1, %3, %2)
+            return (%4))IR";
+  pointwise_test_helper(graph, true);
+}
+
+TEST(Converters, ATenClampMinMaxConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%x.1 : Tensor):
+            %2 : int = prim::Constant[value=3]()
+            %3 : int = prim::Constant[value=-2]()
+            %4 : Tensor = aten::clamp(%x.1, %3, %2)
+            return (%4))IR";
+  pointwise_test_helper(graph, true);
+}
+
+TEST(Converters, ATenGreaterThanConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor, %1 : Tensor):
+        %2 : Tensor = aten::gt(%0, %1)
+        return (%2))IR";
+  pointwise_test_helper(graph, false, false, {5, 5}, {5, 5});
+}
+
+TEST(Converters, ATenGreaterThanScalarConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor):
+        %scalar : float = prim::Constant[value=3]()
+        %2 : Tensor = aten::gt(%0, %scalar)
+        return (%2))IR";
+  pointwise_test_helper(graph, true, false, {5, 5});
+}
+
+TEST(Converters, ATenLessThanConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor, %1 : Tensor):
+        %2 : Tensor = aten::lt(%0, %1)
+        return (%2))IR";
+  pointwise_test_helper(graph, false, false, {5, 5}, {5, 5});
+}
+
+TEST(Converters, ATenLessThanScalarConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor):
+        %scalar : float = prim::Constant[value=3]()
+        %2 : Tensor = aten::lt(%0, %scalar)
+        return (%2))IR";
+  pointwise_test_helper(graph, true, false, {5, 5});
+}
+
+TEST(Converters, ATenEqualConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor, %1 : Tensor):
+        %2 : Tensor = aten::eq(%0, %1)
+        return (%2))IR";
+  pointwise_test_helper(graph, false, false, {5, 5}, {5, 5});
+}
+
+TEST(Converters, ATenEqualScalarConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor):
+        %scalar : float = prim::Constant[value=3]()
+        %2 : Tensor = aten::eq(%0, %scalar)
+        return (%2))IR";
+  pointwise_test_helper(graph, true, false, {5, 5});
+}
+
+TEST(Converters, ATenGEConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor, %1 : Tensor):
+        %2 : Tensor = aten::ge(%0, %1)
+        return (%2))IR";
+  pointwise_test_helper(graph, false, false, {5, 5}, {5, 5});
+}
+
+TEST(Converters, ATenGEScalarConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor):
+        %scalar : float = prim::Constant[value=3]()
+        %2 : Tensor = aten::ge(%0, %scalar)
+        return (%2))IR";
+  pointwise_test_helper(graph, true, false, {5, 5});
+}
+
+TEST(Converters, ATenLEConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor, %1 : Tensor):
+        %2 : Tensor = aten::le(%0, %1)
+        return (%2))IR";
+  pointwise_test_helper(graph, false, false, {5, 5}, {5, 5});
+}
+
+TEST(Converters, ATenLEScalarConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor):
+        %scalar : float = prim::Constant[value=3]()
+        %2 : Tensor = aten::le(%0, %scalar)
+        return (%2))IR";
+  pointwise_test_helper(graph, true, false, {5, 5});
 }

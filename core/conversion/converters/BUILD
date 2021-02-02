@@ -39,6 +39,7 @@ cc_library(
         "impl/constant.cpp",
         "impl/conv_deconv.cpp",
         "impl/element_wise.cpp",
+        "impl/expand.cpp",
         "impl/linear.cpp",
         "impl/matrix_multiply.cpp",
         "impl/pooling.cpp",
@@ -48,8 +49,11 @@ cc_library(
         "impl/unary.cpp",
         "impl/interpolate.cpp",
         "impl/select.cpp",
+        "impl/squeeze.cpp",
         "impl/stack.cpp",
-        "impl/lstm_cell.cpp"
+        "impl/lstm_cell.cpp",
+        "impl/unsqueeze.cpp",
+        "impl/topk.cpp",
     ],
     deps = [
         "@tensorrt//:nvinfer",

@@ -28,6 +28,10 @@ converter_test(
 )
 
 converter_test(
+  name = "test_expand"
+)
+
+converter_test(
   name = "test_linear"
 )
 
@@ -68,7 +72,19 @@ converter_test(
 )
 
 converter_test(
+  name = "test_topk"
+)
+
+converter_test(
   name = "test_lstm_cell"
+)
+
+converter_test(
+  name = "test_unsqueeze"
+)
+
+converter_test(
+  name = "test_squeeze"
 )
 
 test_suite(
@@ -78,6 +94,7 @@ test_suite(
     ":test_batch_norm",
     ":test_conv_deconv",
     ":test_element_wise",
+    ":test_expand",
     ":test_linear",
     ":test_matrix_multiply",
     ":test_pooling",
@@ -88,6 +105,9 @@ test_suite(
     ":test_interpolate",
     ":test_select",
     ":test_stack",
-    ":test_lstm_cell"
+    ":test_lstm_cell",
+    ":test_unsqueeze",
+    ":test_squeeze",
+    ":test_topk",
   ]
 )

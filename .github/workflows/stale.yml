@@ -13,11 +13,11 @@ jobs:
     - uses: actions/stale@v1
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
-        stale-issue-message: 'This issue has not seen activity for 30 days, Remove stale label or comment or this will be closed in 5 days'
-        stale-pr-message: 'This PR has not seen activity for 30 days, Remove stale label or comment or this will be closed in 5 days'
+        stale-issue-message: 'This issue has not seen activity for 90 days, Remove stale label or comment or this will be closed in 10 days'
+        stale-pr-message: 'This PR has not seen activity for 90 days, Remove stale label or comment or this will be closed in 10 days'
         stale-issue-label: 'No Activity'
         exempt-issue-labels: 'feature request'
         stale-pr-label: 'No Activity'
         exempt-pr-labels: 'WIP'
-        days-before-stale: 30
-        days-before-close: 5
+        days-before-stale: 90
+        days-before-close: 10
