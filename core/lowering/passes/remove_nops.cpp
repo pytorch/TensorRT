@@ -29,7 +29,6 @@ struct NOPRemoval {
   }
 
  private:
-
   void removeNode(Block* b, std::string op) {
     for (auto it = b->nodes().begin(); it != b->nodes().end(); it++) {
       auto n = *it;
