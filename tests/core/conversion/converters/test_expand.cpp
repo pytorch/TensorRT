@@ -290,7 +290,6 @@ TEST(Converters, ATenExpandAsConvertsCorrectlyWithDynamicInput) {
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
-
 TEST(Converters, ATenRepeatConvertsCorrectly) {
   const auto graph = R"IR(
     graph(%x.1 : Tensor):
