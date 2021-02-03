@@ -20,8 +20,8 @@ struct NOPRemoval {
   NOPRemoval(std::shared_ptr<Graph> graph) : graph_(std::move(graph)) {}
 
   void run() {
-    removeTo(graph_->block());
-    removeDetach(graph_->block());
+    removeNode(graph_->block(), "aten::to");
+    removeNode(graph_->block(), "aten::detach");
     torch::jit::EliminateDeadCode(graph_);
     LOG_DEBUG(
         "RemoveNOPs - Note: Removing remaining aten::to operators (in addition to other ops that have no meaning in TRT), if type casts need to be preserved, add a pass before this pass is run");
@@ -29,22 +29,12 @@ struct NOPRemoval {
   }
 
  private:
-  void removeTo(Block* b) {
-    for (auto it = b->nodes().begin(); it != b->nodes().end(); it++) {
-      auto n = *it;
-      if (n->kind() == c10::Symbol::fromQualString("aten::to")) {
-        LOG_GRAPH("Found that node " << *n << "  is an to node (RemoveNOPs)" << std::endl);
-        n->outputs()[0]->replaceAllUsesWith(n->inputs()[0]);
-        it.destroyCurrent();
-      }
-    }
-  }
 
-  void removeDetach(Block* b) {
+  void removeNode(Block* b, std::string op) {
     for (auto it = b->nodes().begin(); it != b->nodes().end(); it++) {
       auto n = *it;
-      if (n->kind() == c10::Symbol::fromQualString("aten::detach")) {
-        LOG_GRAPH("Found that node " << *n << "  is an detach node (RemoveNOPs)" << std::endl);
+      if (n->kind() == c10::Symbol::fromQualString(op)) {
+        LOG_GRAPH("Found that node " << *n << "  is an " << op << " node (RemoveNOPs)" << std::endl);
         n->outputs()[0]->replaceAllUsesWith(n->inputs()[0]);
         it.destroyCurrent();
       }
