@@ -176,7 +176,7 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     }
 
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], clamp_layer_out);
-                    LOG_DEBUG("Clamp layer output tensor shape: " << clamp_layer_out->getDimensions());
+                    LOG_DEBUG("Clamp layer output tensor shape: " << out->getDimensions());
                     return true;
                   }})
         .pattern({"aten::sub.Tensor(Tensor self, Tensor other, Scalar alpha=1) -> "
