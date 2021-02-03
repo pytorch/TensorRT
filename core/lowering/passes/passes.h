@@ -15,7 +15,7 @@ void EliminateExceptionOrPassPattern(std::shared_ptr<torch::jit::Graph> graph);
 void RemoveBNDimCheck(std::shared_ptr<torch::jit::Graph> graph);
 void RemoveContiguous(std::shared_ptr<torch::jit::Graph>& graph);
 void RemoveDropout(std::shared_ptr<torch::jit::Graph>& graph);
-void RemoveTo(std::shared_ptr<torch::jit::Graph> graph);
+void RemoveNOPs(std::shared_ptr<torch::jit::Graph> graph);
 void UnpackAddMM(std::shared_ptr<torch::jit::Graph>& graph);
 void UnpackBatchNorm(std::shared_ptr<torch::jit::Graph>& graph);
 void UnpackLogSoftmax(std::shared_ptr<torch::jit::Graph>& graph);
