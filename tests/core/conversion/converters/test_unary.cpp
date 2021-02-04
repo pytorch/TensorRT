@@ -22,8 +22,9 @@ std::string gen_test_graph(const std::string& unary) {
     torch::jit::parseIR(graph, &*g);                                                      \
                                                                                           \
     float offset = 0;                                                                     \
-    if (strcmp(#name, "Acosh") == 0) offset += 1;   /*input larger than 1 for acosh*/     \
-    auto in = at::empty({10}, {at::kCUDA}).uniform_(0+offset, 0.5+offset);                \
+    if (strcmp(#name, "Acosh") == 0)                                                      \
+      offset += 1; /*input larger than 1 for acosh*/                                      \
+    auto in = at::empty({10}, {at::kCUDA}).uniform_(0 + offset, 0.5 + offset);            \
     auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});           \
     auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});                   \
                                                                                           \
