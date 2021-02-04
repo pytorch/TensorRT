@@ -26,9 +26,6 @@ static auto softmax_registrations TRTORCH_UNUSED = RegisterNodeConversionPattern
        }
 
        int64_t dim = args[1].IValue()->toInt();
-       if (dim == -1) {
-         dim = shape.size() - 1;
-       }
        auto softmax = ctx->net->addSoftMax(*in);
 
        TRTORCH_CHECK(softmax, "Unable to create softmax layer from node: " << *n);
