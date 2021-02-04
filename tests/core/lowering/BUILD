@@ -20,7 +20,7 @@ lowering_test(
 )
 
 lowering_test(
-  name = "test_element_wise_pass",
+  name = "test_operator_aliasing_pass",
 )
 
 test_suite(
@@ -29,6 +29,6 @@ test_suite(
         ":test_remove_contiguous_pass",
         ":test_remove_to",
         ":test_remove_detach_pass",
-        ":test_element_wise_pass"
+        ":test_operator_aliasing_pass"
     ]
 )

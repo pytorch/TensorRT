@@ -7,7 +7,7 @@ namespace core {
 namespace lowering {
 namespace passes {
 
-void ElementWisePass(std::shared_ptr<torch::jit::Graph>& graph) {
+void AliasOperators(std::shared_ptr<torch::jit::Graph>& graph) {
   std::string true_divide_pattern = R"IR(
         graph(%s, %o):
             %1 : Tensor = aten::true_divide(%s, %o)
