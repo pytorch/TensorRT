@@ -80,20 +80,20 @@ auto reduce_registrations TRTORCH_UNUSED =
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                auto in_tensor = args[0].ITensorOrFreeze(ctx);
                auto dims = args[1].unwrapToIntList();
-               c10::List<int64_t> dims_copy;
+               c10::List<int64_t> calculated_dims;
                auto in_dims = util::toVec(in_tensor->getDimensions());
                LOG_DEBUG("InDims " << in_dims); // Some abuse of toDim but just for debug info
                LOG_DEBUG("Dim to reduce(original):" << util::toDims(dims)); // Some abuse of toDim but just for debug info
                for (int i = 0; i < dims.size(); i++) {
                  auto dim_val = dims[i] == -1 ? (in_dims.size() - 1) : dims[i];
-                 dims_copy.push_back(dim_val);
+                 calculated_dims.push_back(dim_val);
                }
-               
-               LOG_DEBUG("Dim to reduce(converted):" << util::toDims(dims_copy)); // Some abuse of toDim but just for debug info
+
+               LOG_DEBUG("Dim to reduce(converted):" << util::toDims(calculated_dims)); // Some abuse of toDim but just for debug info
 
                uint32_t axis_mask = 0;
-               for (size_t d = 0; d < dims_copy.size(); d++) {
-                 axis_mask |= 1 << dims_copy[d];
+               for (size_t d = 0; d < calculated_dims.size(); d++) {
+                 axis_mask |= 1 << calculated_dims[d];
                }
                LOG_DEBUG("Axis Mask" << std::bitset<32>(axis_mask));
 
