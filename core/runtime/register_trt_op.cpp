@@ -48,7 +48,16 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     gpu_handles.push_back(outputs[pyt_idx].data_ptr());
   }
 
-  c10::cuda::CUDAStream stream = c10::cuda::getCurrentCUDAStream(inputs[0].device().index());
+  LOG_DEBUG("Initializing CUDA stream");
+  c10::cuda::CUDAStream stream = at::cuda::getStreamFromPool();
+  if (inputs.size() > 0) {
+    stream = c10::cuda::getCurrentCUDAStream(inputs[0].device().index());
+  } else if (outputs.size() > 0) {
+    stream = c10::cuda::getCurrentCUDAStream(outputs[0].device().index());
+  } else {
+    TRTORCH_THROW_ERROR("Invalid graph. No inputs and outputs found.");
+  }
+  LOG_DEBUG("Executing TensorRT engine");
   compiled_engine->exec_ctx->enqueueV2(gpu_handles.data(), stream, nullptr);
 
   return outputs;
