@@ -254,7 +254,8 @@ int InterpolatePlugin::enqueue(
     cudaStream_t stream) {
 #if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1)
   at::Tensor input = at::from_blob((void*)inputs[0], util::toVec(inputDesc->dims), [](void*) {}, tensor_options_);
-  at::Tensor output = at::from_blob(outputs[0], util::volume(outputDesc->dims), [](void*) {}, tensor_options_);
+  at::Tensor output = at::from_blob(
+      outputs[0], util::volume(outputDesc->dims), [](void*) {}, tensor_options_);
 
   at::cuda::CUDAStream torch_stream = at::cuda::getStreamFromPool();
   at::cuda::CUDAStreamGuard torch_guard(torch_stream);
