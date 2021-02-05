@@ -16,23 +16,24 @@ namespace lowering {
 namespace passes {
 namespace {
 using namespace torch::jit;
-struct ToRemoval {
-  ToRemoval(std::shared_ptr<Graph> graph) : graph_(std::move(graph)) {}
+struct NOPRemoval {
+  NOPRemoval(std::shared_ptr<Graph> graph) : graph_(std::move(graph)) {}
 
   void run() {
-    findTo(graph_->block());
+    removeNode(graph_->block(), "aten::to");
+    removeNode(graph_->block(), "aten::detach");
     torch::jit::EliminateDeadCode(graph_);
     LOG_DEBUG(
-        "RemoveTo - Note: Removing remaining aten::to operators, if type casts need to be preserved, add a pass before this pass is run");
+        "RemoveNOPs - Note: Removing remaining aten::to operators (in addition to other ops that have no meaning in TRT), if type casts need to be preserved, add a pass before this pass is run");
     LOG_GRAPH("Post aten::to removal: " << *graph_);
   }
 
  private:
-  void findTo(Block* b) {
+  void removeNode(Block* b, std::string op) {
     for (auto it = b->nodes().begin(); it != b->nodes().end(); it++) {
       auto n = *it;
-      if (n->kind() == c10::Symbol::fromQualString("aten::to")) {
-        LOG_GRAPH("Found that node " << *n << "  is an to node (RemoveTo)" << std::endl);
+      if (n->kind() == c10::Symbol::fromQualString(op)) {
+        LOG_GRAPH("Found that node " << *n << "  is an " << op << " node (RemoveNOPs)" << std::endl);
         n->outputs()[0]->replaceAllUsesWith(n->inputs()[0]);
         it.destroyCurrent();
       }
@@ -43,8 +44,8 @@ struct ToRemoval {
 };
 } // namespace
 
-void RemoveTo(std::shared_ptr<Graph> graph) {
-  ToRemoval tr(std::move(graph));
+void RemoveNOPs(std::shared_ptr<Graph> graph) {
+  NOPRemoval tr(std::move(graph));
   tr.run();
 }
 

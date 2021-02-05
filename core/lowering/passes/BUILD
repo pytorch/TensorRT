@@ -21,7 +21,7 @@ cc_library(
         "remove_bn_dim_check.cpp",
         "remove_contiguous.cpp",
         "remove_dropout.cpp",
-        "remove_to.cpp",
+        "remove_nops.cpp",
         "unpack_addmm.cpp",
         "unpack_batch_norm.cpp",
         "unpack_log_softmax.cpp",
@@ -41,4 +41,3 @@ pkg_tar(
     package_dir = "core/lowering/passes/",
     srcs = ["passes.h"],
 )
-
