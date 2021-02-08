@@ -27,8 +27,8 @@ static auto softmax_registrations TRTORCH_UNUSED = RegisterNodeConversionPattern
 
        int64_t dim = args[1].IValue()->toInt();
        LOG_DEBUG("Softmax original dim " << dim);
-       if (dim == -1) {
-         dim = shape.size() - 1;
+       if (dim < 0) {
+         dim = shape.size() + dim;
        }
        LOG_DEBUG("Softmax converted dim " << dim);
        auto softmax = ctx->net->addSoftMax(*in);
