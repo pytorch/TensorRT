@@ -85,8 +85,8 @@ auto reduce_registrations TRTORCH_UNUSED =
                LOG_DEBUG("InDims " << in_dims); // Some abuse of toDim but just for debug info
                LOG_DEBUG(
                    "Dim to reduce(original):" << util::toDims(dims)); // Some abuse of toDim but just for debug info
-               for (int i = 0; i < dims.size(); i++) {
-                 auto dim_val = dims[i] == -1 ? (in_dims.size() - 1) : dims[i];
+               for (size_t i = 0; i < dims.size(); i++) {
+                 auto dim_val = dims[i] < 0 ? (in_dims.size() + dims[i]) : dims[i];
                  calculated_dims.push_back(dim_val);
                }
 
