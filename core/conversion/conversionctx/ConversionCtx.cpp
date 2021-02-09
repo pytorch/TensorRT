@@ -12,6 +12,7 @@ namespace conversion {
 std::ostream& operator<<(std::ostream& os, const BuilderSettings& s) {
     os << "Settings requested for TensorRT engine:"                                        \
        << "\n    Operating Precision: " << s.op_precision                                  \
+       << "\n    TF32 Floating Point Computation Enabled: " << !s.disable_tf32             \
        << "\n    Make Refittable Engine: " << s.refit                                      \
        << "\n    Debuggable Engine: " << s.debug                                           \
        << "\n    Strict Types: " << s.strict_types                                         \
@@ -76,6 +77,10 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
       break;
   }
   op_precision = settings.op_precision;
+
+  if (settings.disable_tf32) {
+    cfg->clearFlag(nvinfer1::BuilderFlag::kTF32);
+  }
 
   if (settings.refit) {
     cfg->setFlag(nvinfer1::BuilderFlag::kREFIT);

@@ -240,6 +240,15 @@ struct TRTORCH_API CompileSpec {
   DataType op_precision = DataType::kFloat;
 
   /**
+   * Prevent Float32 layers from using TF32 data format
+   *
+   * TF32 computes inner products by rounding the inputs to 10-bit mantissas
+   * before multiplying, but accumulates the sum using 23-bit mantissas.
+   * This is the behavior of FP32 layers by default.
+   */
+  bool disable_tf32 = false;
+
+  /**
    * Build a refitable engine
    */
   bool refit = false;
