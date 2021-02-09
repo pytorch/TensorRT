@@ -107,6 +107,8 @@ Program Listing for File trtorch.h
    
      DataType op_precision = DataType::kFloat;
    
+     bool disable_tf32 = false;
+   
      bool refit = false;
    
      bool debug = false;
