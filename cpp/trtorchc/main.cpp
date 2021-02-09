@@ -163,6 +163,12 @@ int main(int argc, char** argv) {
       "(Only used when targeting DLA (device-type)) Lets engine run layers on GPU if they are not supported on DLA",
       {"allow-gpu-fallback"});
 
+  args::Flag disable_tf32(
+      parser,
+      "disable-tf32",
+      "Prevent Float32 layers from using the TF32 data format",
+      {"disable-tf32"});
+
   args::ValueFlag<std::string> op_precision(
       parser,
       "precision",
@@ -261,6 +267,10 @@ int main(int argc, char** argv) {
 
   if (allow_gpu_fallback) {
     compile_settings.device.allow_gpu_fallback = true;
+  }
+
+  if (disable_tf32) {
+    compile_settings.disable_tf32 = true;
   }
 
   std::string calibration_cache_file_path = "";

@@ -99,6 +99,7 @@ struct CompileSpec : torch::CustomClassHolder {
   }
 
   ADD_ENUM_GET_SET(op_precision, DataType, static_cast<int64_t>(DataType::kChar));
+  ADD_FIELD_GET_SET(disable_tf32, bool);
   ADD_FIELD_GET_SET(refit, bool);
   ADD_FIELD_GET_SET(debug, bool);
   ADD_FIELD_GET_SET(strict_types, bool);
@@ -111,6 +112,7 @@ struct CompileSpec : torch::CustomClassHolder {
 
   std::vector<InputRange> input_ranges;
   DataType op_precision = DataType::kFloat;
+  bool disable_tf32 = false;
   bool refit = false;
   bool debug = false;
   bool strict_types = false;
