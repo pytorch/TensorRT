@@ -54,12 +54,12 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
 
   switch (settings.op_precision) {
     case nvinfer1::DataType::kHALF:
-      TRTORCH_CHECK(builder->platformHasFastFp16(), "Requested inference in FP16 but platform does support FP16");
+      TRTORCH_CHECK(builder->platformHasFastFp16(), "Requested inference in FP16 but platform does not support FP16");
       cfg->setFlag(nvinfer1::BuilderFlag::kFP16);
       input_type = nvinfer1::DataType::kHALF;
       break;
     case nvinfer1::DataType::kINT8:
-      TRTORCH_CHECK(builder->platformHasFastInt8(), "Requested inference in INT8 but platform does support INT8");
+      TRTORCH_CHECK(builder->platformHasFastInt8(), "Requested inference in INT8 but platform does not support INT8");
       cfg->setFlag(nvinfer1::BuilderFlag::kINT8);
       if (!settings.strict_types) {
         cfg->setFlag(nvinfer1::BuilderFlag::kFP16);
