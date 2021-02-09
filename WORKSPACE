@@ -108,17 +108,17 @@ http_archive(
 #    build_file = "third_party/libtorch/BUILD"
 #)
 
-#new_local_repository(
-#    name = "cudnn",
-#    path = "/usr/",
-#    build_file = "@//third_party/cudnn/local:BUILD"
-#)
+new_local_repository(
+   name = "cudnn",
+   path = "/usr/",
+   build_file = "@//third_party/cudnn/local:BUILD"
+)
 
-#new_local_repository(
-#   name = "tensorrt",
-#   path = "/usr/",
-#   build_file = "@//third_party/tensorrt/local:BUILD"
-#)
+new_local_repository(
+  name = "tensorrt",
+  path = "/usr/",
+  build_file = "@//third_party/tensorrt/local:BUILD"
+)
 
 #########################################################################
 # Testing Dependencies (optional - comment out on aarch64)
