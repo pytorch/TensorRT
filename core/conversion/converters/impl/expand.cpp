@@ -1,7 +1,6 @@
 #include "NvInfer.h"
 #include "core/conversion/converters/converters.h"
 #include "core/conversion/tensorcontainer/TensorContainer.h"
-#include "core/util/converter_util.h"
 #include "core/util/prelude.h"
 #include "core/util/trt_util.h"
 #include "torch/torch.h"
@@ -16,25 +15,12 @@ namespace converters {
 namespace impl {
 namespace {
 
-void addSliceInput(nvinfer1::Dims& dims, int idx, ConversionCtx* ctx, nvinfer1::ISliceLayer* slice) {
-  int32_t rank = static_cast<int32_t>(dims.nbDims);
-  int32_t* tmp = new int32_t[rank];
-  for (int i = 0; i < rank; i++)
-    tmp[i] = dims.d[i];
-  const nvinfer1::Dims d{1, {rank}};
-  const nvinfer1::Weights w{nvinfer1::DataType::kINT32, tmp, rank};
-  auto t = ctx->net->addConstant(d, w)->getOutput(0);
-  slice->setInput(idx, *t);
-}
-
 nvinfer1::ITensor* concat(int max_rank, int old_rank, ConversionCtx* ctx, nvinfer1::ITensor* tensor) {
   if (max_rank - old_rank > 0) {
-    int32_t* tmp = new int32_t[max_rank - old_rank];
-    for (int i = 0; i < (max_rank - old_rank); i++)
-      tmp[i] = 1;
-    auto max_rank_tensor = util::arrToTensor(tmp, max_rank - old_rank, ctx);
+    torch::Tensor thOne = torch::tensor(std::vector<int32_t>(max_rank - old_rank, 1), torch::kInt32);
+    auto one_tensor = tensor_to_const(ctx, thOne);
     auto in_shape_tensor = ctx->net->addShape(*tensor)->getOutput(0);
-    nvinfer1::ITensor* const args[2] = {max_rank_tensor, in_shape_tensor};
+    nvinfer1::ITensor* const args[2] = {one_tensor, in_shape_tensor};
     return ctx->net->addConcatenation(args, 2)->getOutput(0);
   } else { // max_rank - old_rank == 0
     return ctx->net->addShape(*tensor)->getOutput(0);
@@ -166,7 +152,6 @@ bool add_expand_dynamic(
 
   // Dimensions are right alignment. Eg: an input of [3, 1] and max_rank = 4, the result of concat is [1, 1, 3, 1]
   auto new_input_shape_tensor = concat(max_rank, input_rank, ctx, in);
-  // LOG_DEBUG("Expand layer output tensor shape: " << new_output_shape_tensor->getDimensions());
   auto new_output_shape_tensor = expandedDimsTensor;
 
   // Add a reshape layer to expand dims
@@ -176,6 +161,8 @@ bool add_expand_dynamic(
   // Start the slicing from beginning of tensor since this is an expand layer
   std::vector<int64_t> start_vec(max_rank, 0);
   nvinfer1::Dims starts_dim = util::toDims(c10::IntArrayRef(start_vec));
+  at::Tensor thStart = torch::tensor(util::toVec(starts_dim), torch::kInt32);
+  auto starts = tensor_to_const(ctx, thStart);
 
   // compute sizes = max(x,y).
   auto sizes =
@@ -186,18 +173,17 @@ bool add_expand_dynamic(
 
   // Compute (x > 1 ? 1 : 0) for x in newDims, assuming positive x, using only TensorRT operations.
   // min(1, sub(input_shape, 1))
-  int32_t* one_vector_tmp = new int32_t[1];
-  one_vector_tmp[0] = 1;
-  auto one_vector = util::arrToTensor(one_vector_tmp, 1, ctx);
-  auto x_sub_one = ctx->net->addElementWise(*new_input_shape_tensor, *one_vector, nvinfer1::ElementWiseOperation::kSUB)
+  torch::Tensor thOne = torch::tensor({1}, torch::kInt32);
+  auto one_tensor = tensor_to_const(ctx, thOne);
+  auto x_sub_one = ctx->net->addElementWise(*new_input_shape_tensor, *one_tensor, nvinfer1::ElementWiseOperation::kSUB)
                        ->getOutput(0);
-  auto strides = ctx->net->addElementWise(*one_vector, *x_sub_one, nvinfer1::ElementWiseOperation::kMIN)->getOutput(0);
+  auto strides = ctx->net->addElementWise(*one_tensor, *x_sub_one, nvinfer1::ElementWiseOperation::kMIN)->getOutput(0);
   nvinfer1::Dims strides_dim{-1, {}};
   strides_dim.nbDims = max_rank;
 
-  // Slice layer does the expansion in TRT. Desired output size is specified by expandedDimsTensor
+  // Slice layer does the expansion in TRT. Desired output size is specified by sizes input at index 2.
   auto slice = ctx->net->addSlice(*shuffle->getOutput(0), starts_dim, sizes_dim, strides_dim);
-  addSliceInput(starts_dim, 1, ctx, slice);
+  slice->setInput(1, *starts);
   slice->setInput(2, *sizes);
   slice->setInput(3, *strides);
 
@@ -219,11 +205,8 @@ auto expand_registrations TRTORCH_UNUSED =
                auto expandedDims = util::toDims(expanded_size);
                LOG_DEBUG("(expand layer) Expand input from " << input_dims << " to " << expandedDims);
                if (ctx->input_is_dynamic) {
-                 int expanded_size_rank = static_cast<int>(expanded_size.size());
-                 int32_t* tmp = new int32_t[expanded_size_rank];
-                 for (int i = 0; i < expanded_size_rank; i++)
-                   tmp[i] = expanded_size[i];
-                 auto expandedDimsTensor = util::arrToTensor(tmp, expanded_size_rank, ctx);
+                 at::Tensor thExpanded_size = torch::tensor(expanded_size.vec(), torch::kInt32);
+                 auto expandedDimsTensor = tensor_to_const(ctx, thExpanded_size);
                  return add_expand_dynamic(ctx, n, in, expandedDimsTensor, expandedDims, true);
                } else {
                  return add_expand(ctx, n, in, expandedDims);
