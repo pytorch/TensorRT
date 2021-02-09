@@ -84,23 +84,6 @@ cc_library(
     })
 )
 
-cc_library(
-    name = "converter_util",
-    hdrs = [
-        "converter_util.h",
-    ],
-    srcs = [
-        "converter_util.cpp"
-    ],
-    deps = [
-        "//core/conversion/conversionctx"
-    ]+ select({
-        ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default":  ["@libtorch//:libtorch"],
-    }),
-)
-
-
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 
 pkg_tar(
@@ -112,7 +95,6 @@ pkg_tar(
         "//core/util:Exception.h",
         "//core/util:prelude.h",
         "//core/util:jit_util.h",
-        "//core/util:trt_util.h",
-        "//core/util:converter_util.h"
+        "//core/util:trt_util.h"
     ],
 )
