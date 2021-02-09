@@ -721,6 +721,7 @@ to the graph. All other keys are optional
         <span class="s2">"allow_gpu_fallback"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># (DLA only) Allow layers unsupported on DLA to run on GPU</span>
     <span class="p">},</span>
     <span class="s2">"op_precision"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">,</span> <span class="c1"># Operating precision set to FP16</span>
+    <span class="s2">"disable_tf32"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="c1"># Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas</span>
     <span class="s2">"refit"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># enable refit</span>
     <span class="s2">"debug"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># enable debuggable engine</span>
     <span class="s2">"strict_types"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># kernels should strictly run in operating precision</span>
@@ -969,7 +970,7 @@ that are not supported are printed out and the function returns false, else true
          <span class="sig-paren">
           )
          </span>
-         → &lt;torch._C.ScriptClass object at 0x7f1a30a16a08&gt;
+         → &lt;torch._C.ScriptClass object at 0x7f927f22e228&gt;
          <a class="headerlink" href="#trtorch.TensorRTCompileSpec" title="Permalink to this definition">
           ¶
          </a>
@@ -1023,6 +1024,7 @@ to the graph. All other keys are optional. Entries for each method to be compile
             <span class="s2">"allow_gpu_fallback"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># (DLA only) Allow layers unsupported on DLA to run on GPU</span>
         <span class="p">},</span>
         <span class="s2">"op_precision"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">,</span> <span class="c1"># Operating precision set to FP16</span>
+        <span class="s2">"disable_tf32"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="c1"># Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas</span>
         <span class="s2">"refit"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="c1"># enable refit</span>
         <span class="s2">"debug"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="c1"># enable debuggable engine</span>
         <span class="s2">"strict_types"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="c1"># kernels should strictly run in operating precision</span>

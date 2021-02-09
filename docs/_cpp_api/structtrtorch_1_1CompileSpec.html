@@ -794,6 +794,29 @@
            </dd>
           </dl>
           <dl class="cpp var">
+           <dt id="_CPPv4N7trtorch11CompileSpec12disable_tf32E">
+            <span class="target" id="structtrtorch_1_1CompileSpec_1a0daef036d4cbdac49dda3c9cd284a661">
+            </span>
+            bool
+            <code class="sig-name descname">
+             disable_tf32
+            </code>
+            = false
+            <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec12disable_tf32E" title="Permalink to this definition">
+             ¶
+            </a>
+            <br/>
+           </dt>
+           <dd>
+            <p>
+             Prevent Float32 layers from using TF32 data format
+            </p>
+            <p>
+             TF32 computes inner products by rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas. This is the behavior of FP32 layers by default.
+            </p>
+           </dd>
+          </dl>
+          <dl class="cpp var">
            <dt id="_CPPv4N7trtorch11CompileSpec5refitE">
             <span class="target" id="structtrtorch_1_1CompileSpec_1a637f91d7d5b05ad01d7f4a38ab1e4f46">
             </span>
