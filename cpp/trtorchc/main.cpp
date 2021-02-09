@@ -164,10 +164,7 @@ int main(int argc, char** argv) {
       {"allow-gpu-fallback"});
 
   args::Flag disable_tf32(
-      parser,
-      "disable-tf32",
-      "Prevent Float32 layers from using the TF32 data format",
-      {"disable-tf32"});
+      parser, "disable-tf32", "Prevent Float32 layers from using the TF32 data format", {"disable-tf32"});
 
   args::ValueFlag<std::string> op_precision(
       parser,
