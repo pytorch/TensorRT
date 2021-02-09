@@ -57,13 +57,13 @@ http_archive(
     urls = ["https://download.pytorch.org/libtorch/cu110/libtorch-cxx11-abi-shared-with-deps-1.7.1%2Bcu110.zip"],
 )
 
-#http_archive(
-#    name = "libtorch_pre_cxx11_abi",
-#    build_file = "@//third_party/libtorch:BUILD",
-#    strip_prefix = "libtorch",
-#    sha256 = "c77f926afd55d7e860ec9c7abc992c25be77c89771c3ec6fcc13ea42f07d46df",
-#    urls = ["https://download.pytorch.org/libtorch/cu110/libtorch-shared-with-deps-1.7.1%2Bcu110.zip"],
-#)
+http_archive(
+    name = "libtorch_pre_cxx11_abi",
+    build_file = "@//third_party/libtorch:BUILD",
+    strip_prefix = "libtorch",
+    sha256 = "c77f926afd55d7e860ec9c7abc992c25be77c89771c3ec6fcc13ea42f07d46df",
+    urls = ["https://download.pytorch.org/libtorch/cu110/libtorch-shared-with-deps-1.7.1%2Bcu110.zip"],
+)
 
 # Download these tarballs manually from the NVIDIA website
 # Either place them in the distdir directory in third_party and use the --distdir flag
