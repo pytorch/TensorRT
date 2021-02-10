@@ -111,7 +111,7 @@ bool add_expand_dynamic(
     bool is_expand_layer) {
   auto input_dims = in->getDimensions();
   auto input_rank = in->getDimensions().nbDims;
-  auto output_rank = expandedDimsTensor->getDimensions().d[0];
+  auto output_rank = expandedDims.nbDims;
   TRTORCH_CHECK(
       input_rank <= output_rank,
       "Number of dimensions of the desired expansion must be greater than or equal to the number of input dimensions");
