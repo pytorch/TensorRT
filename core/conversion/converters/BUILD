@@ -35,6 +35,7 @@ cc_library(
         "NodeConverterRegistry.cpp",
         "impl/activation.cpp",
         "impl/batch_norm.cpp",
+        "impl/cast.cpp",
         "impl/concat.cpp",
         "impl/constant.cpp",
         "impl/conv_deconv.cpp",

@@ -16,6 +16,10 @@ converter_test(
 )
 
 converter_test(
+  name = "test_cast"
+)
+
+converter_test(
   name = "test_concat"
 )
 
@@ -92,6 +96,7 @@ test_suite(
   tests = [
     ":test_activation",
     ":test_batch_norm",
+    ":test_cast",
     ":test_conv_deconv",
     ":test_element_wise",
     ":test_expand",

@@ -18,6 +18,7 @@ cc_library(
         "exception_elimination.cpp",
         "fuse_addmm_branches.cpp",
         "fuse_flatten_linear.cpp",
+        "reduce_to.cpp",
         "remove_bn_dim_check.cpp",
         "remove_contiguous.cpp",
         "remove_dropout.cpp",

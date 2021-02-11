@@ -20,12 +20,10 @@ struct NOPRemoval {
   NOPRemoval(std::shared_ptr<Graph> graph) : graph_(std::move(graph)) {}
 
   void run() {
-    removeNode(graph_->block(), "aten::to");
     removeNode(graph_->block(), "aten::detach");
     torch::jit::EliminateDeadCode(graph_);
-    LOG_DEBUG(
-        "RemoveNOPs - Note: Removing remaining aten::to operators (in addition to other ops that have no meaning in TRT), if type casts need to be preserved, add a pass before this pass is run");
-    LOG_GRAPH("Post aten::to removal: " << *graph_);
+    LOG_DEBUG("RemoveNOPs - Note: Removing detach operators as they have no meaning in TRT");
+    LOG_GRAPH("Post aten::detach removal: " << *graph_);
   }
 
  private:
