@@ -36,6 +36,9 @@ class NodeEvaluatorRegistry {
           "Attempting to override already registered evaluator " << node_kind.toQualString()
                                                                  << ", merge implementations instead");
     }
+    for (auto const& e : eval_reg.options.supported_variants) {
+      registered_evaluator_schemas_.insert(e);
+    }
     evaluator_lut_[node_kind] = std::move(eval_reg);
   }
 
@@ -76,6 +79,12 @@ class NodeEvaluatorRegistry {
     return evaluator;
   }
 
+  std::vector<std::string> GetRegisteredEvaluatorList() {
+    std::vector<std::string> evaluator_list;
+    std::copy(registered_evaluator_schemas_.begin(), registered_evaluator_schemas_.end(), std::back_inserter(evaluator_list));
+    return evaluator_list;
+  }
+
   bool EvalAtConversionTime(const torch::jit::Node* n) {
     auto evaluator = FindEvaluator(n);
     if (evaluator == nullptr) {
@@ -87,6 +96,7 @@ class NodeEvaluatorRegistry {
 
  private:
   EvaluatorLUT evaluator_lut_;
+  std::set<std::string> registered_evaluator_schemas_;
 };
 
 NodeEvaluatorRegistry& get_evaluator_registry() {
@@ -97,6 +107,10 @@ NodeEvaluatorRegistry& get_evaluator_registry() {
 
 bool shouldEvalAtConversionTime(const torch::jit::Node* n) {
   return get_evaluator_registry().EvalAtConversionTime(n);
+}
+
+std::vector<std::string> getEvaluatorList() {
+  return get_evaluator_registry().GetRegisteredEvaluatorList();
 }
 
 c10::optional<torch::jit::IValue> EvalNode(const torch::jit::Node* n, kwargs& args) {

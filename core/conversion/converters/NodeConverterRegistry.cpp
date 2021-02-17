@@ -47,6 +47,7 @@ class NodeConverterRegistry {
  public:
   bool RegisterConverter(torch::jit::FunctionSchema* signature, OpConverter& converter) {
     LOG_DEBUG("Registering converter for " << canonical_schema_string(*signature));
+    registered_converter_schemas_.insert(c10::toString(*signature));
     auto name = signature->operator_name();
     auto iter = converter_lut_.find(name);
     if (iter != converter_lut_.end()) {
@@ -83,8 +84,15 @@ class NodeConverterRegistry {
     }
   }
 
+  std::vector<std::string> GetRegisteredConverterList() {
+    std::vector<std::string> converter_list;
+    std::copy(registered_converter_schemas_.begin(), registered_converter_schemas_.end(), std::back_inserter(converter_list));
+    return converter_list;
+  }
+
  private:
   ConverterLUT converter_lut_;
+  std::set<std::string> registered_converter_schemas_;
 };
 
 NodeConverterRegistry& get_converter_registry() {
@@ -113,6 +121,10 @@ OpConverter get_node_converter_for(const torch::jit::FunctionSchema* signature) 
 
 bool node_is_convertable(const torch::jit::Node* n) {
   return get_converter_registry().Convertable(n);
+}
+
+std::vector<std::string> get_converter_list() {
+  return get_converter_registry().GetRegisteredConverterList();
 }
 
 RegisterNodeConversionPatterns&& RegisterNodeConversionPatterns::pattern(ConversionPattern p) && {
