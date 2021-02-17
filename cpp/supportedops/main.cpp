@@ -13,6 +13,8 @@ int main(int argc, const char* argv[]) {
   std::stringstream ss;
 
   ss << R"TITLE(
+.. _supported_ops:
+
 =================================
 Operators Supported
 =================================
