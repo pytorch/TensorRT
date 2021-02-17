@@ -93,6 +93,15 @@ Contributor Documentation
 Indices
 ----------------
 
+* :ref:`supported_operators`
+
+.. toctree::
+   :caption: Indices
+   :maxdepth: 1
+   :hidden:
+
+   indices/supported_ops
+
 * :ref:`genindex`
 * :ref:`search`
 
