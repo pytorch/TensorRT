@@ -66,14 +66,17 @@ from torch.utils import cpp_extension
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
+# library_dirs should point to the libtrtorch.so, include_dirs should point to the dir that include the headers
+# 1) download the latest package from https://github.com/NVIDIA/TRTorch/releases/
+# 2) Extract the file from downloaded package, we will get the "trtorch" directory
+# 3) Set trtorch_path to that directory
+trtorch_path = os.path.abspath("trtorch")
+
 ext_modules = [
     cpp_extension.CUDAExtension('elu_converter', ['elu_converter.cpp'],
-                                library_dirs=[(
-                                        dir_path + "/../../bazel-bin/cpp/api/lib/"
-                                )],
+                                library_dirs=[(trtorch_path + "/lib/")],
                                 libraries=["trtorch"],
-                                include_dirs=[dir_path + "/../../"]
-                                )
+                                include_dirs=[trtorch_path + "/include/trtorch/"])
 ]
 
 setup(
@@ -83,7 +86,9 @@ setup(
 )
 ```
 Make sure to include the path for header files in `include_dirs` and the path 
-for dependent libraries in `library_dirs`. You could also add other compilation 
+for dependent libraries in `library_dirs`. Generally speaking, you should download 
+the latest package from [here](https://github.com/NVIDIA/TRTorch/releases), extract
+the files, and the set the `trtorch_path` to it. You could also add other compilation 
 flags in cpp_extension if you need. Then, run above python scripts as:
 ```shell
 python3 setup.py install --user
@@ -140,20 +145,20 @@ if __name__ == "__main__":
 Run this script, we can get the Tensor before and after ELU operator.
 ### Example Output
 ```bash
-graph(%self : __torch__.Elu,
-      %x.1 : Tensor):
-  %2 : __torch__.torch.nn.modules.activation.ELU = prim::GetAttr[name="elu"](%self)
-  %4 : Tensor = prim::CallMethod[name="forward"](%2, %x.1) # elu_converter_test.py:13:15
-  return (%4)
-
-tensor([[ 1.3482,  1.9848, -1.0818, -1.3252,  0.2470,  0.7011,  0.3174, -1.8349,
-          0.3024, -0.0453, -0.0681, -1.7377,  1.5909,  0.2549, -0.3029,  0.2583,
-          0.0242,  2.0748, -0.5454,  0.7137,  1.6688,  0.7108, -0.8681,  0.2486,
-         -1.3981,  1.0241,  1.2413,  0.2725,  1.4265,  0.9329,  0.4020, -2.6813]])
-tensor([[ 1.3486,  1.9844, -0.6611, -0.7344,  0.2471,  0.7012,  0.3174, -0.8403,
-          0.3025, -0.0443, -0.0659, -0.8242,  1.5908,  0.2549, -0.2615,  0.2583,
-          0.0242,  2.0742, -0.4204,  0.7139,  1.6689,  0.7109, -0.5801,  0.2485,
-         -0.7529,  1.0244,  1.2412,  0.2725,  1.4268,  0.9331,  0.4021, -0.9316]],
+PyTorch output: 
+ tensor([[ 0.8804,  2.4355, -0.7920, -0.2070, -0.5352,  0.4775,  1.3604, -0.3350,
+         -0.1802, -0.7563, -0.1758,  0.4067,  1.2510, -0.7100, -0.6221, -0.7207,
+         -0.1118,  0.9966,  1.6396, -0.1367, -0.5742,  0.5859,  0.8511,  0.6572,
+         -0.3481,  0.5933, -0.0488, -0.4287, -0.4102, -0.7402,  0.7515, -0.7710]],
        device='cuda:0', dtype=torch.float16)
+TRTorch output: 
+ tensor([[ 0.8804,  2.4355, -0.7920, -0.2070, -0.5356,  0.4775,  1.3604, -0.3347,
+         -0.1802, -0.7563, -0.1758,  0.4067,  1.2510, -0.7100, -0.6221, -0.7207,
+         -0.1117,  0.9966,  1.6396, -0.1368, -0.5747,  0.5859,  0.8511,  0.6572,
+         -0.3484,  0.5933, -0.0486, -0.4285, -0.4102, -0.7402,  0.7515, -0.7710]],
+       device='cuda:0', dtype=torch.float16)
+Maximum differnce between TRTorch and PyTorch: 
+ tensor(0.0005, device='cuda:0', dtype=torch.float16)
+
 
 ```
