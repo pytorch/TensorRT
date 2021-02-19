@@ -1,10 +1,10 @@
 #include "core/conversion/converters/converters.h"
 #include "core/conversion/evaluators/evaluators.h"
 
-#include <string>
-#include <sstream>
-#include <vector>
 #include <iostream>
+#include <sstream>
+#include <string>
+#include <vector>
 
 int main(int argc, const char* argv[]) {
   std::vector<std::string> converters = trtorch::core::conversion::converters::get_converter_list();
