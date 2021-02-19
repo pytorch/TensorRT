@@ -39,6 +39,7 @@ class RegisterNodeConversionPatterns {
 
 bool node_is_convertable(const torch::jit::Node* n);
 OpConverter get_node_converter_for(const torch::jit::FunctionSchema* signature);
+std::vector<std::string> get_converter_list();
 
 } // namespace converters
 } // namespace conversion
