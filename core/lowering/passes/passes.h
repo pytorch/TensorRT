@@ -20,6 +20,7 @@ void UnpackAddMM(std::shared_ptr<torch::jit::Graph>& graph);
 void UnpackBatchNorm(std::shared_ptr<torch::jit::Graph>& graph);
 void UnpackLogSoftmax(std::shared_ptr<torch::jit::Graph>& graph);
 void AliasOperators(std::shared_ptr<torch::jit::Graph>& graph);
+void SiluToSigmoidMultipication(std::shared_ptr<torch::jit::Graph>& graph);
 
 } // namespace passes
 } // namespace lowering
