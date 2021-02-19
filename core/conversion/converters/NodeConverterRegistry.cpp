@@ -86,7 +86,8 @@ class NodeConverterRegistry {
 
   std::vector<std::string> GetRegisteredConverterList() {
     std::vector<std::string> converter_list;
-    std::copy(registered_converter_schemas_.begin(), registered_converter_schemas_.end(), std::back_inserter(converter_list));
+    std::copy(
+        registered_converter_schemas_.begin(), registered_converter_schemas_.end(), std::back_inserter(converter_list));
     return converter_list;
   }
 

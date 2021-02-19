@@ -81,7 +81,8 @@ class NodeEvaluatorRegistry {
 
   std::vector<std::string> GetRegisteredEvaluatorList() {
     std::vector<std::string> evaluator_list;
-    std::copy(registered_evaluator_schemas_.begin(), registered_evaluator_schemas_.end(), std::back_inserter(evaluator_list));
+    std::copy(
+        registered_evaluator_schemas_.begin(), registered_evaluator_schemas_.end(), std::back_inserter(evaluator_list));
     return evaluator_list;
   }
 
