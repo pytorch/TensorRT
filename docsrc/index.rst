@@ -92,8 +92,9 @@ Contributor Documentation
 
 Indices
 ----------------
-
-* :ref:`supported_operators`
+* :ref:`supported_ops`
+* :ref:`genindex`
+* :ref:`search`
 
 .. toctree::
    :caption: Indices
@@ -101,8 +102,5 @@ Indices
    :hidden:
 
    indices/supported_ops
-
-* :ref:`genindex`
-* :ref:`search`
 
 
