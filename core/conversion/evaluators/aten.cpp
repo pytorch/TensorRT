@@ -127,8 +127,6 @@ auto aten_registrations TRTORCH_UNUSED =
                       }
 
                       auto out_tensor = torch::zeros(args.at(n->input(0)).unwrapToIntList().vec(), options);
-                      std::cout << out_tensor << std::endl;
-                      std::cout << out_tensor.sizes() << std::endl;
                       return out_tensor;
                     }})
         .evaluator({c10::Symbol::fromQualString("aten::slice"),
