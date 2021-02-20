@@ -436,7 +436,8 @@ std::set<std::string> GetUnsupportedOpsInBlock(const torch::jit::Block* b) {
 std::set<std::string> ConvertableOpsInBlock(const torch::jit::Block* b) {
   std::set<std::string> convertable_ops;
   for (const auto n : b->nodes()) {
-    if (n->kind() == torch::jit::prim::Loop || n->kind() == torch::jit::prim::If || converters::node_is_convertable(n)) {
+    if (n->kind() == torch::jit::prim::Loop || n->kind() == torch::jit::prim::If ||
+        converters::node_is_convertable(n)) {
       if (n->blocks().size() > 0) {
         for (const auto sub_b : n->blocks()) {
           auto sub_b_convertable_ops = ConvertableOpsInBlock(sub_b);
@@ -446,8 +447,7 @@ std::set<std::string> ConvertableOpsInBlock(const torch::jit::Block* b) {
       if (converters::node_is_convertable(n)) {
         auto schema = n->maybeSchema();
         TRTORCH_CHECK(
-            schema,
-            "Unable to get schema for Node " << util::node_info(n) << " (conversion.CheckForConvertableOps)");
+            schema, "Unable to get schema for Node " << util::node_info(n) << " (conversion.CheckForConvertableOps)");
         std::stringstream ss;
         ss << *schema;
         convertable_ops.insert(ss.str());
@@ -476,10 +476,12 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b) {
 
   if (ConvertableOpsInBlock(b).size() == 0) {
     std::stringstream unsupported_msg;
-    unsupported_msg << "Method requested cannot be compiled by TRTorch.\nThere is no work to be done since the resulting compiled program will contain an engine that is empty."
-                    << std::endl;
-    unsupported_msg << "This may be because there are no operators that can be added to the TensorRT graph or all operators have a resolved compile time value."
-                    << std::endl;
+    unsupported_msg
+        << "Method requested cannot be compiled by TRTorch.\nThere is no work to be done since the resulting compiled program will contain an engine that is empty."
+        << std::endl;
+    unsupported_msg
+        << "This may be because there are no operators that can be added to the TensorRT graph or all operators have a resolved compile time value."
+        << std::endl;
     LOG_ERROR(unsupported_msg.str());
     return false;
   }
