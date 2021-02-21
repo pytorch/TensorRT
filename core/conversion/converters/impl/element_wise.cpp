@@ -164,12 +164,20 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     // Compute min(max(min_threshold, input), max_threshold)
                     auto self = args[0].ITensorOrFreeze(ctx);
                     auto clamp_layer_out = self;
-                    if (args[1].isIValue() && args[1].IValue()->isScalar()) {
+
+                    if (args[1].isIValue() && args[1].IValue()->isScalar() && args[2].isIValue() &&
+                        args[2].IValue()->isScalar()) {
+                      auto alpha = args[1].unwrapToScalar().to<float>();
+                      auto beta = args[2].unwrapToScalar().to<float>();
+                      auto clip_layer = ctx->net->addActivation(*self, nvinfer1::ActivationType::kCLIP);
+                      TRTORCH_CHECK(clip_layer, "Unable to create clip layer for node: " << *n);
+                      clip_layer->setAlpha(alpha);
+                      clip_layer->setBeta(beta);
+                      clamp_layer_out = clip_layer->getOutput(0);
+                    } else if (args[1].isIValue() && args[1].IValue()->isScalar()) {
                       auto limit = args[1].unwrapToScalar().to<float>();
                       clamp_layer_out = clamp_util(ctx, n, self, limit, nvinfer1::ElementWiseOperation::kMAX, "_max");
-                    }
-
-                    if (args[2].isIValue() && args[2].IValue()->isScalar()) {
+                    } else if (args[2].isIValue() && args[2].IValue()->isScalar()) {
                       auto limit = args[2].unwrapToScalar().to<float>();
                       clamp_layer_out = clamp_util(ctx, n, self, limit, nvinfer1::ElementWiseOperation::kMIN, "_min");
                     }
