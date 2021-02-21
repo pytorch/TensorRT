@@ -17,6 +17,7 @@ cc_library(
     ],
     deps = [
         "@tensorrt//:nvinfer",
+        "@tensorrt//:nvinferplugin",
         "//core/util:prelude",
         #"//core/plugins:trtorch_plugins",
     ] + select({

@@ -1,5 +1,9 @@
 #include <iostream>
 #include <sstream>
+
+#include "NvInferPlugin.h"
+#include "NvInferPluginUtils.h"
+
 #include <utility>
 // #include "core/plugins/plugin_prelude.h"
 #include "core/conversion/conversionctx/ConversionCtx.h"

@@ -42,24 +42,25 @@ convert(tanh, kTANH);
 
 auto acthardtanh TRTORCH_UNUSED =
     RegisterNodeConversionPatterns()
-        .pattern({"aten::hardtanh(Tensor self, Scalar min_val=-1, Scalar max_val=1) -> (Tensor)",
-                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    auto in = args[0].ITensorOrFreeze(ctx);
-                    auto min = args[1].unwrapToDouble();
-                    auto max = args[2].unwrapToDouble();
+        .pattern(
+            {"aten::hardtanh(Tensor self, Scalar min_val=-1, Scalar max_val=1) -> (Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               auto in = args[0].ITensorOrFreeze(ctx);
+               auto min = args[1].unwrapToDouble();
+               auto max = args[2].unwrapToDouble();
 
-                    auto new_layer = ctx->net->addActivation(*in, nvinfer1::ActivationType::kCLIP);
-                    TRTORCH_CHECK(new_layer, "Unable to create layer for aten::hardtanh");
+               auto new_layer = ctx->net->addActivation(*in, nvinfer1::ActivationType::kCLIP);
+               TRTORCH_CHECK(new_layer, "Unable to create layer for aten::hardtanh");
 
-                    new_layer->setAlpha(min);
-                    new_layer->setBeta(max);
+               new_layer->setAlpha(min);
+               new_layer->setBeta(max);
 
-                    new_layer->setName(util::node_info(n).c_str());
-                    auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
+               new_layer->setName(util::node_info(n).c_str());
+               auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
 
-                    LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
-                    return true;
-                  }})
+               LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+               return true;
+             }})
         .pattern({// TODO: Remove after functionalization
                   "aten::hardtanh_(Tensor(a!) self, Scalar min_val=-1, Scalar max_val=1) -> (Tensor(a!))",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
@@ -125,34 +126,35 @@ auto acthardtanh TRTORCH_UNUSED =
                LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
                return true;
              }})
-        .pattern({"aten::leaky_relu(Tensor self, Scalar negative_slope=0.01) -> (Tensor)",
-                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    auto self = args[0].ITensorOrFreeze(ctx);
-                    auto negative_slopeScalar = args[1].unwrapToScalar().to<float>();
+        .pattern(
+            {"aten::leaky_relu(Tensor self, Scalar negative_slope=0.01) -> (Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               auto self = args[0].ITensorOrFreeze(ctx);
+               auto negative_slopeScalar = args[1].unwrapToScalar().to<float>();
 
-                    auto new_layer = ctx->net->addActivation(*self, nvinfer1::ActivationType::kLEAKY_RELU);
-                    new_layer->setAlpha(negative_slopeScalar);
+               auto new_layer = ctx->net->addActivation(*self, nvinfer1::ActivationType::kLEAKY_RELU);
+               new_layer->setAlpha(negative_slopeScalar);
 
-                    new_layer->setName(util::node_info(n).c_str());
-                    auto out_tensor = new_layer->getOutput(0);
-                    out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], out_tensor);
-                    LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
-                    return true;
-                  }})
-        .pattern({"aten::leaky_relu_(Tensor(a!) self, Scalar negative_slope=0.01) -> Tensor(a!)",
-                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    auto self = args[0].ITensorOrFreeze(ctx);
-                    auto negative_slopeScalar = args[1].unwrapToScalar().to<float>();
+               new_layer->setName(util::node_info(n).c_str());
+               auto out_tensor = new_layer->getOutput(0);
+               out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], out_tensor);
+               LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+               return true;
+             }})
+        .pattern(
+            {"aten::leaky_relu_(Tensor(a!) self, Scalar negative_slope=0.01) -> Tensor(a!)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               auto self = args[0].ITensorOrFreeze(ctx);
+               auto negative_slopeScalar = args[1].unwrapToScalar().to<float>();
 
-                    auto new_layer = ctx->net->addActivation(*self, nvinfer1::ActivationType::kLEAKY_RELU);
-                    new_layer->setAlpha(negative_slopeScalar);
-
-                    new_layer->setName(util::node_info(n).c_str());
-                    auto out_tensor = new_layer->getOutput(0);
-                    out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], out_tensor);
-                    LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
-                    return true;
-                  }})
+               auto new_layer = ctx->net->addActivation(*self, nvinfer1::ActivationType::kLEAKY_RELU);
+               new_layer->setAlpha(negative_slopeScalar);
+               new_layer->setName(util::node_info(n).c_str());
+               auto out_tensor = new_layer->getOutput(0);
+               out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], out_tensor);
+               LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+               return true;
+             }})
         .pattern({"aten::elu(Tensor self, Scalar alpha=1, Scalar scale=1, Scalar input_scale=1) -> (Tensor)",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                     auto in = args[0].ITensorOrFreeze(ctx);
@@ -167,7 +169,33 @@ auto acthardtanh TRTORCH_UNUSED =
                     auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
                     LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
                     return true;
-                  }});
+             }})
+        .pattern(
+            {"aten::gelu(Tensor self) -> (Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               auto in = args[0].ITensorOrFreeze(ctx);
+               nvinfer1::DataType type = in->getType();
+               TRTORCH_CHECK(
+                   type == nvinfer1::DataType::kFLOAT || type == nvinfer1::DataType::kHALF,
+                   "gelu only supports kFLOAT and kHALF");
+               std::string pluginName = "CustomGeluPluginDynamic";
+               nvinfer1::PluginFieldCollection fc;
+               std::vector<nvinfer1::PluginField> f;
+               int type_id = 0; // Integer encoding the DataType (0: FP32, 1: FP16)
+               if (type == nvinfer1::DataType::kHALF)
+                 type_id = 1;
+               f.emplace_back(nvinfer1::PluginField("type_id", &type_id, nvinfer1::PluginFieldType::kINT32, 1));
+               fc.nbFields = f.size();
+               fc.fields = f.data();
+               nvinfer1::IPluginV2* pluginV2 = ctx->mPluginRegistry.at(pluginName)->createPlugin("gelu", &fc);
+               TRTORCH_CHECK(pluginV2, "Unable to create gelu plugin from TensorRT plugin registry" << *n);
+               auto new_layer = ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(&in), 1, *pluginV2);
+               new_layer->setName("gelu");
+               auto out_tensor = new_layer->getOutput(0);
+               out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], out_tensor);
+               LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+               return true;
+             }});
 
 } // namespace
 } // namespace impl
