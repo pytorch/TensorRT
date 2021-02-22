@@ -8,7 +8,7 @@ dir_path = os.path.dirname(os.path.realpath(__file__))
 # 1) download the latest package from https://github.com/NVIDIA/TRTorch/releases/
 # 2) Extract the file from downloaded package, we will get the "trtorch" directory
 # 3) Set trtorch_path to that directory
-trtorch_path = os.path.abspath("trtorch")
+trtorch_path = os.path.abspath("/home/bowa/Downloads/trtorch")
 
 ext_modules = [
     cpp_extension.CUDAExtension('elu_converter', ['elu_converter.cpp'],

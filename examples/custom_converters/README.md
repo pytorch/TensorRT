@@ -22,36 +22,29 @@ Once we are clear about these rules and writing patterns, we can create a sepera
 #include "core/conversion/converters/converters.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
-namespace core {
-namespace conversion {
-namespace converters {
-namespace impl {
-namespace {
+namespace my_custom_converters {
 
-auto acthardtanh TRTORCH_UNUSED = RegisterNodeConversionPatterns().pattern(
+auto actelu = trtorch::core::conversion::converters::RegisterNodeConversionPatterns().pattern(
     {"aten::elu(Tensor self, Scalar alpha=1, Scalar scale=1, Scalar input_scale=1) -> (Tensor)",
-     [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+     [](trtorch::core::conversion::ConversionCtx* ctx,
+        const torch::jit::Node* n,
+        trtorch::core::conversion::converters::args& args) -> bool {
        auto in = args[0].ITensorOrFreeze(ctx);
        auto alpha = args[1].unwrapToDouble();
 
        auto new_layer = ctx->net->addActivation(*in, nvinfer1::ActivationType::kELU);
-       TRTORCH_CHECK(new_layer, "Unable to create layer for aten::elu");
+       if (!(new_layer)) {
+         std::cerr << "Unable to create layer for aten::elu" << std::endl;
+       }
 
        new_layer->setAlpha(alpha);
-       new_layer->setName(util::node_info(n).c_str());
-       auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
+       new_layer->setName(trtorch::core::util::node_info(n).c_str());
+       ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
 
-       LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
        return true;
      }});
 
-} // namespace
-} // namespace impl
-} // namespace converters
-} // namespace conversion
-} // namespace core
-} // namespace trtorch
+} // namespace my_custom_converters
 ```
 
 ## Generate `.so` library
@@ -155,23 +148,4 @@ if __name__ == "__main__":
     main()
 
 ```
-Run this script, we can get the Tensor before and after ELU operator.
-### Example Output
-```bash
-PyTorch output: 
- tensor([[ 0.8804,  2.4355, -0.7920, -0.2070, -0.5352,  0.4775,  1.3604, -0.3350,
-         -0.1802, -0.7563, -0.1758,  0.4067,  1.2510, -0.7100, -0.6221, -0.7207,
-         -0.1118,  0.9966,  1.6396, -0.1367, -0.5742,  0.5859,  0.8511,  0.6572,
-         -0.3481,  0.5933, -0.0488, -0.4287, -0.4102, -0.7402,  0.7515, -0.7710]],
-       device='cuda:0', dtype=torch.float16)
-TRTorch output: 
- tensor([[ 0.8804,  2.4355, -0.7920, -0.2070, -0.5356,  0.4775,  1.3604, -0.3347,
-         -0.1802, -0.7563, -0.1758,  0.4067,  1.2510, -0.7100, -0.6221, -0.7207,
-         -0.1117,  0.9966,  1.6396, -0.1368, -0.5747,  0.5859,  0.8511,  0.6572,
-         -0.3484,  0.5933, -0.0486, -0.4285, -0.4102, -0.7402,  0.7515, -0.7710]],
-       device='cuda:0', dtype=torch.float16)
-Maximum differnce between TRTorch and PyTorch: 
- tensor(0.0005, device='cuda:0', dtype=torch.float16)
-
-
-```
+Run this script, we can get the different outputs from PyTorch and TRTorch. 
