@@ -11,7 +11,7 @@ dir_path = os.path.dirname(os.path.realpath(__file__))
 trtorch_path = os.path.abspath("/home/bowa/Downloads/trtorch")
 
 ext_modules = [
-    cpp_extension.CUDAExtension('elu_converter', ['elu_converter.cpp'],
+    cpp_extension.CUDAExtension('elu_converter', ['./csrc/elu_converter.cpp'],
                                 library_dirs=[(trtorch_path + "/lib/")],
                                 libraries=["trtorch"],
                                 include_dirs=[trtorch_path + "/include/trtorch/"])

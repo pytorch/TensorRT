@@ -66,7 +66,7 @@ dir_path = os.path.dirname(os.path.realpath(__file__))
 trtorch_path = os.path.abspath("trtorch")
 
 ext_modules = [
-    cpp_extension.CUDAExtension('elu_converter', ['elu_converter.cpp'],
+    cpp_extension.CUDAExtension('elu_converter', ['./csrc/elu_converter.cpp'],
                                 library_dirs=[(trtorch_path + "/lib/")],
                                 libraries=["trtorch"],
                                 include_dirs=[trtorch_path + "/include/trtorch/"])
@@ -100,7 +100,7 @@ import torch
 import trtorch
 
 # After "python3 setup install", you should find this .so file under generated "build" directory
-torch.ops.load_library('./build/lib.linux-x86_64-3.6/elu_converter.cpython-36m-x86_64-linux-gnu.so')
+torch.ops.load_library('./elu_converter/build/lib.linux-x86_64-3.6/elu_converter.cpython-36m-x86_64-linux-gnu.so')
 
 
 class Elu(torch.nn.Module):

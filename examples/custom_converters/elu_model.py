@@ -2,7 +2,7 @@ import torch
 import trtorch
 
 # After "python3 setup install", you should find this .so file under generated "build" directory
-torch.ops.load_library('./build/lib.linux-x86_64-3.6/elu_converter.cpython-36m-x86_64-linux-gnu.so')
+torch.ops.load_library('./elu_converter/build/lib.linux-x86_64-3.6/elu_converter.cpython-36m-x86_64-linux-gnu.so')
 
 
 class Elu(torch.nn.Module):
