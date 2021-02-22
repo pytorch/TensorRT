@@ -25,6 +25,23 @@ py_test(
     ]
 )
 
+# Following multi_gpu test is only targeted for multi-gpu configurations. It is not included in the test suite by default.
+py_test(
+    name = "test_api_multi_gpu",
+    srcs = [
+        "test_api_multi_gpu.py",
+        "model_test_case.py"
+    ] + select({
+	":aarch64_linux": [
+		"test_api_dla.py"
+	],
+    "//conditions:default" : []
+    }),
+    deps = [
+        requirement("torchvision")
+    ]
+)
+
 py_test(
     name = "test_to_backend_api",
     srcs = [
