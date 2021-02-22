@@ -23,6 +23,10 @@ lowering_test(
   name = "test_operator_aliasing_pass",
 )
 
+lowering_test(
+  name = "test_silu_to_sigmoid_multiplication",
+)
+
 test_suite(
     name = "lowering_tests",
     tests = [
