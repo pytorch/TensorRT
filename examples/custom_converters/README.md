@@ -12,6 +12,13 @@ Converter for aten::elu requested, but no such converter was found.
 If you need a converter for this operator, you can try implementing one yourself
 or request a converter: https://www.github.com/NVIDIA/TRTorch/issues
 
+Note that ELU converter is now supported in our library. If you want to get above
+error and run the example in this document, you can either:
+1. get the source code, go to root directory, then run: <br />
+  `git apply ./examples/custom_converters/elu_converter/disable_core_elu.patch`
+2. If you are using a pre-downloaded release of TRTorch, you need to make sure that 
+it doesn't support elu operator in default. (TRTorch <= v0.1.0)
+   
 ## Writing Converter in C++
 We can register a converter for this operator in our application. You can find more 
 information on all the details of writing converters in the contributors documentation
