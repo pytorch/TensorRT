@@ -15,7 +15,7 @@ class Elu(torch.nn.Module):
         return self.elu(x)
 
 
-def MaxDiff(pytorch_out, trtorch_out):
+def cal_max_diff(pytorch_out, trtorch_out):
     diff = torch.sub(pytorch_out, trtorch_out)
     abs_diff = torch.abs(diff)
     max_diff = torch.max(abs_diff)
@@ -43,7 +43,7 @@ def main():
     trtorch_out = trt_ts_module(input_data)
     print('PyTorch output: \n', pytorch_out[0, :, :, 0])
     print('TRTorch output: \n', trtorch_out[0, :, :, 0])
-    MaxDiff(pytorch_out, trtorch_out)
+    cal_max_diff(pytorch_out, trtorch_out)
 
 
 if __name__ == "__main__":
