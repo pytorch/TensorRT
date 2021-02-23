@@ -196,94 +196,91 @@ bool add_expand_dynamic(
 
 auto expand_registrations TRTORCH_UNUSED =
     RegisterNodeConversionPatterns()
-        .pattern(
-            {"aten::expand(Tensor(a) self, int[] size, *, bool implicit=False) -> (Tensor(a))",
-             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-               auto in = args[0].ITensor();
-               auto input_dims = in->getDimensions();
-               auto expanded_size = args[1].unwrapToIntList();
-               auto expandedDims = util::toDims(expanded_size);
-               LOG_DEBUG("(expand layer) Expand input from " << input_dims << " to " << expandedDims);
-               if (ctx->input_is_dynamic) {
-                 at::Tensor thExpanded_size = torch::tensor(expanded_size.vec(), torch::kInt32);
-                 auto expandedDimsTensor = tensor_to_const(ctx, thExpanded_size);
-                 return add_expand_dynamic(ctx, n, in, expandedDimsTensor, expandedDims, true);
-               } else {
-                 return add_expand(ctx, n, in, expandedDims);
-               }
-             }})
-        .pattern(
-            {"aten::expand_as(Tensor(a) self, Tensor other) -> (Tensor(a))",
-             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-               auto in = args[0].ITensor();
-               auto input_dims = in->getDimensions();
-               auto targetTensor = args[1].ITensor();
-               auto targetDims = targetTensor->getDimensions();
-               LOG_DEBUG("(expand_as layer) Expand input from " << input_dims << " to " << targetDims);
-               if (ctx->input_is_dynamic) {
-                 return add_expand_dynamic(
-                     ctx, n, in, ctx->net->addShape(*targetTensor)->getOutput(0), targetDims, false);
-               } else {
-                 return add_expand(ctx, n, in, targetDims);
-               }
-             }})
-        .pattern(
-            {"aten::repeat(Tensor self, int[] repeats) -> (Tensor)",
-             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-               auto in = args[0].ITensor();
-               auto input_dims = in->getDimensions();
-               auto repeats = args[1].unwrapToIntList().vec();
-               int repeats_rank = repeats.size();
-               TRTORCH_CHECK(
-                   repeats_rank >= input_dims.nbDims,
-                   "Number of repeat dimensions cannot be smaller than number of input dimensions");
-               auto num_expand_dims = repeats_rank - input_dims.nbDims;
+        .pattern({"aten::expand(Tensor(a) self, int[] size, *, bool implicit=False) -> (Tensor(a))",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    auto in = args[0].ITensor();
+                    auto input_dims = in->getDimensions();
+                    auto expanded_size = args[1].unwrapToIntList();
+                    auto expandedDims = util::toDims(expanded_size);
+                    LOG_DEBUG("(expand layer) Expand input from " << input_dims << " to " << expandedDims);
+                    if (ctx->input_is_dynamic) {
+                      at::Tensor thExpanded_size = torch::tensor(expanded_size.vec(), torch::kInt32);
+                      auto expandedDimsTensor = tensor_to_const(ctx, thExpanded_size);
+                      return add_expand_dynamic(ctx, n, in, expandedDimsTensor, expandedDims, true);
+                    } else {
+                      return add_expand(ctx, n, in, expandedDims);
+                    }
+                  }})
+        .pattern({"aten::expand_as(Tensor(a) self, Tensor other) -> (Tensor(a))",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    auto in = args[0].ITensor();
+                    auto input_dims = in->getDimensions();
+                    auto targetTensor = args[1].ITensor();
+                    auto targetDims = targetTensor->getDimensions();
+                    LOG_DEBUG("(expand_as layer) Expand input from " << input_dims << " to " << targetDims);
+                    if (ctx->input_is_dynamic) {
+                      return add_expand_dynamic(
+                          ctx, n, in, ctx->net->addShape(*targetTensor)->getOutput(0), targetDims, false);
+                    } else {
+                      return add_expand(ctx, n, in, targetDims);
+                    }
+                  }})
+        .pattern({"aten::repeat(Tensor self, int[] repeats) -> (Tensor)",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    auto in = args[0].ITensor();
+                    auto input_dims = in->getDimensions();
+                    auto repeats = args[1].unwrapToIntList().vec();
+                    int repeats_rank = repeats.size();
+                    TRTORCH_CHECK(
+                        repeats_rank >= input_dims.nbDims,
+                        "Number of repeat dimensions cannot be smaller than number of input dimensions");
+                    auto num_expand_dims = repeats_rank - input_dims.nbDims;
 
-               if (ctx->input_is_dynamic) {
-                 int input_rank = input_dims.nbDims;
-                 int output_rank = repeats_rank;
-                 auto new_input_shape_tensor = concat(output_rank, input_rank, ctx, in);
+                    if (ctx->input_is_dynamic) {
+                      int input_rank = input_dims.nbDims;
+                      int output_rank = repeats_rank;
+                      auto new_input_shape_tensor = concat(output_rank, input_rank, ctx, in);
 
-                 // Add a reshape layer to expand dims
-                 auto shuffle = ctx->net->addShuffle(*in);
-                 shuffle->setInput(1, *new_input_shape_tensor);
-                 in = shuffle->getOutput(0);
-               } else {
-                 if (num_expand_dims > 0) {
-                   nvinfer1::Dims reshape_dims;
-                   reshape_dims.nbDims = repeats.size();
-                   for (int i = 0; i < num_expand_dims; i++) {
-                     reshape_dims.d[i] = 1;
-                   }
-                   for (int i = 0; i < input_dims.nbDims; i++) {
-                     reshape_dims.d[num_expand_dims + i] = input_dims.d[i];
-                   }
-                   // Add a reshape layer to expand dims
-                   auto reshape_layer = ctx->net->addShuffle(*in);
-                   reshape_layer->setReshapeDimensions(reshape_dims);
-                   in = reshape_layer->getOutput(0);
-                   LOG_DEBUG("Input reshaped to : " << in->getDimensions() << " from " << input_dims);
-                 }
-                 LOG_DEBUG("Repeats: " << repeats);
-               }
+                      // Add a reshape layer to expand dims
+                      auto shuffle = ctx->net->addShuffle(*in);
+                      shuffle->setInput(1, *new_input_shape_tensor);
+                      in = shuffle->getOutput(0);
+                    } else {
+                      if (num_expand_dims > 0) {
+                        nvinfer1::Dims reshape_dims;
+                        reshape_dims.nbDims = repeats.size();
+                        for (int i = 0; i < num_expand_dims; i++) {
+                          reshape_dims.d[i] = 1;
+                        }
+                        for (int i = 0; i < input_dims.nbDims; i++) {
+                          reshape_dims.d[num_expand_dims + i] = input_dims.d[i];
+                        }
+                        // Add a reshape layer to expand dims
+                        auto reshape_layer = ctx->net->addShuffle(*in);
+                        reshape_layer->setReshapeDimensions(reshape_dims);
+                        in = reshape_layer->getOutput(0);
+                        LOG_DEBUG("Input reshaped to : " << in->getDimensions() << " from " << input_dims);
+                      }
+                      LOG_DEBUG("Repeats: " << repeats);
+                    }
 
-               // Concat across all repeat axes.
-               // TODO: Implementation might not be performant. Explore other strategies to improve performance.
-               for (int i = repeats.size() - 1; i >= 0; --i) {
-                 std::vector<nvinfer1::ITensor*> tensors_vec;
-                 for (int j = 0; j < repeats[i]; j++) {
-                   tensors_vec.push_back(in);
-                 }
-                 auto concat_layer = ctx->net->addConcatenation(tensors_vec.data(), tensors_vec.size());
-                 concat_layer->setAxis(i);
-                 in = concat_layer->getOutput(0);
-               }
+                    // Concat across all repeat axes.
+                    // TODO: Implementation might not be performant. Explore other strategies to improve performance.
+                    for (int i = repeats.size() - 1; i >= 0; --i) {
+                      std::vector<nvinfer1::ITensor*> tensors_vec;
+                      for (int j = 0; j < repeats[i]; j++) {
+                        tensors_vec.push_back(in);
+                      }
+                      auto concat_layer = ctx->net->addConcatenation(tensors_vec.data(), tensors_vec.size());
+                      concat_layer->setAxis(i);
+                      in = concat_layer->getOutput(0);
+                    }
 
-               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], in);
+                    auto out = ctx->AssociateValueAndTensor(n->outputs()[0], in);
 
-               LOG_DEBUG("Repeat layer output tensor shape: " << out->getDimensions());
-               return true;
-             }});
+                    LOG_DEBUG("Repeat layer output tensor shape: " << out->getDimensions());
+                    return true;
+                  }});
 
 } // namespace
 } // namespace impl
