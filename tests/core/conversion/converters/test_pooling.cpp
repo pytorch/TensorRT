@@ -402,7 +402,7 @@ TEST(Converters, ATenAdaptiveAvgPool2DConvertsCorrectlyWithDynamicInput) {
 
   auto trt_in = at::clone(in);
   params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngineDynamic(g, params, {trt_in});
+  auto trt_results = trtorch::tests::util::RunGraphEngineDynamic(g, params, {trt_in}, false);
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
