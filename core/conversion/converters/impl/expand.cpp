@@ -281,7 +281,7 @@ auto expand_registrations TRTORCH_UNUSED =
 
                auto out = ctx->AssociateValueAndTensor(n->outputs()[0], in);
 
-               LOG_DEBUG("Repeat layer output tensor shape: " << in->getDimensions());
+               LOG_DEBUG("Repeat layer output tensor shape: " << out->getDimensions());
                return true;
              }});
 
