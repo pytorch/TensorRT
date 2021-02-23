@@ -48,7 +48,8 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
           util::logging::get_logger().get_is_colored_output_on()) {
   // TODO: Support FP16 and FP32 from JIT information
   if (settings.device.gpu_id) {
-    TRTORCH_CHECK(cudaSetDevice(settings.device.gpu_id) == cudaSuccess, "Unable to set gpu id: " << settings.device.gpu_id);
+    TRTORCH_CHECK(
+        cudaSetDevice(settings.device.gpu_id) == cudaSuccess, "Unable to set gpu id: " << settings.device.gpu_id);
   }
 
   builder = nvinfer1::createInferBuilder(logger);
