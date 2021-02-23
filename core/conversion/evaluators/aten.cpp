@@ -120,6 +120,7 @@ auto aten_registrations TRTORCH_UNUSED =
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                       auto options = torch::TensorOptions().layout(torch::kStrided).device(torch::kCUDA);
 
+                      // Input 1 here is the dtype
                       if (!args.at(n->input(1)).isNone() && !args.at(n->input(1)).IValue()->isNone()) {
                         options = options.dtype(c10::ScalarType(args.at(n->input(1)).unwrapToInt()));
                       }
