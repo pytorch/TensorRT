@@ -5,12 +5,11 @@ import torchvision.models as models
 
 from model_test_case import ModelTestCase
 
-
+gpu_id = 1
 class TestCompile(ModelTestCase):
 
     def setUp(self):
-        self.gpu_id = 1
-        trtorch.set_device(self.gpu_id)
+        self.gpu_id = gpu_id
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
         self.traced_model = torch.jit.trace(self.model, [self.input])
         self.scripted_model = torch.jit.script(self.model)
@@ -88,7 +87,8 @@ def test_suite():
 
     return suite
 
-
+# Setting it up here so that all CUDA allocations are done on correct device
+trtorch.set_device(gpu_id)
 suite = test_suite()
 
 runner = unittest.TextTestRunner()

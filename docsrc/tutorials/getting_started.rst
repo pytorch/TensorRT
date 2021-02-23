@@ -201,6 +201,7 @@ to load in a deployment application. In order to load a TensorRT/TorchScript mod
 
     ...
 
+    trtorch.set_device(0) # Set CUDA device (in case of multi-gpu configuration). Defaults to 0
     script_model.eval() # torch module needs to be in eval (not training) mode
 
     compile_settings = {
@@ -226,6 +227,7 @@ to load in a deployment application. In order to load a TensorRT/TorchScript mod
     import torch
     import trtorch
 
+    trtorch.set_device(0) # Set correct CUDA gpu device
     trt_ts_module = torch.jit.load("trt_ts_module.ts")
     input_data = input_data.to('cuda').half()
     result = trt_ts_module(input_data)
