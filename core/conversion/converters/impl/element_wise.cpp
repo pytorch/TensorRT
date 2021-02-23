@@ -374,8 +374,8 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     auto self = args[0].ITensorOrFreeze(ctx);
                     auto otherScalar = args[1].unwrapToScalar().to<float>();
                     auto other = tensor_to_const(ctx, torch::tensor({otherScalar}));
-                    auto mul = add_elementwise(
-                        ctx, nvinfer1::ElementWiseOperation::kPROD, self, other, util::node_info(n));
+                    auto mul =
+                        add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPROD, self, other, util::node_info(n));
                     TRTORCH_CHECK(mul, "Unable to create mul layer from node: " << *n);
 
                     mul->setName(util::node_info(n).c_str());
