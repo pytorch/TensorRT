@@ -87,6 +87,10 @@ converter_test(
   name = "test_squeeze"
 )
 
+converter_test(
+  name = "test_type_as"
+)
+
 test_suite(
   name = "converter_tests",
   tests = [
@@ -109,5 +113,6 @@ test_suite(
     ":test_unsqueeze",
     ":test_squeeze",
     ":test_topk",
+    ":test_type_as"
   ]
 )
