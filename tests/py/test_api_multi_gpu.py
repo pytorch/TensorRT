@@ -55,7 +55,7 @@ def test_suite():
 
 if not torch.cuda.device_count() > 1:
     raise ValueError("This test case is applicable for multi-gpu configurations only")
-        
+
 # Setting it up here so that all CUDA allocations are done on correct device
 trtorch.set_device(gpu_id)
 suite = test_suite()
