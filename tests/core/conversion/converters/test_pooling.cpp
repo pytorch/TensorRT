@@ -18,7 +18,7 @@ TEST(Converters, ATenMaxPool1DConvertsCorrectly) {
         return (%10))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(-5, 5, {1, 1, 10}, at::kCUDA);
   auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
@@ -45,7 +45,7 @@ TEST(Converters, ATenMaxPool2DConvertsCorrectly) {
         return (%10))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   // PyTorch MaxPool needs a 3D input
   auto in = at::randint(-5, 5, {1, 10, 10}, at::kCUDA);
@@ -73,7 +73,7 @@ TEST(Converters, ATenMaxPool3DConvertsCorrectly) {
         return (%10))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   // PyTorch MaxPool needs a 3D input
   auto in = at::randint(-5, 5, {1, 3, 10, 10, 10}, at::kCUDA);
@@ -103,7 +103,7 @@ TEST(Converters, ATenAvgPool1DConvertsCorrectly) {
         return (%10))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   // PyTorch AvgPool needs a 3D input
   auto in = at::randint(-5, 5, {1, 1, 10}, at::kCUDA);
@@ -132,7 +132,7 @@ TEST(Converters, ATenAvgPool1DCeilConvertsCorrectly) {
         return (%10))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   // PyTorch AvgPool needs a 3D input
   auto in = at::randint(-5, 5, {1, 1, 4}, at::kCUDA);
@@ -161,7 +161,7 @@ TEST(Converters, ATenAvgPool1DNoCountPadConvertsCorrectly) {
         return (%10))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   // PyTorch AvgPool needs a 3D input
   auto in = at::randint(-5, 5, {1, 1, 4}, at::kCUDA);
@@ -191,7 +191,7 @@ TEST(Converters, ATenAvgPool2DConvertsCorrectly) {
         return (%10))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   // PyTorch AvgPool needs a 3D input
   auto in = at::randint(-5, 5, {1, 4, 4}, at::kCUDA);
@@ -221,7 +221,7 @@ TEST(Converters, ATenAvgPool2DCeilConvertsCorrectly) {
         return (%10))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   // PyTorch AvgPool needs a 3D input
   auto in = at::randint(-5, 5, {1, 4, 4}, at::kCUDA);
@@ -251,7 +251,7 @@ TEST(Converters, ATenAvgPool2DNoCountPadConvertsCorrectly) {
         return (%10))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   // PyTorch AvgPool needs a 3D input
   auto in = at::randint(-5, 5, {1, 4, 4}, at::kCUDA);
@@ -281,7 +281,7 @@ TEST(Converters, ATenAvgPool3DConvertsCorrectly) {
         return (%10))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   // PyTorch AvgPool needs a 3D input
   auto in = at::randint(-5, 5, {1, 3, 4, 4, 4}, at::kCUDA);
@@ -311,7 +311,7 @@ TEST(Converters, ATenAvgPool3DCeilConvertsCorrectly) {
         return (%10))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   // PyTorch AvgPool needs a 3D input
   auto in = at::randint(-5, 5, {1, 3, 4, 4, 4}, at::kCUDA);
@@ -341,7 +341,7 @@ TEST(Converters, ATenAvgPool3DNoCountPadConvertsCorrectly) {
         return (%10))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   // PyTorch AvgPool needs a 3D input
   auto in = at::randint(-5, 5, {1, 3, 4, 4, 4}, at::kCUDA);
@@ -365,7 +365,7 @@ TEST(Converters, ATenAdaptiveAvgPool2DConvertsCorrectly) {
         return (%10))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   // PyTorch MaxPool needs a 3D input
   auto in = at::randint(-5, 5, {1, 12, 16}, at::kCUDA);
@@ -391,7 +391,7 @@ TEST(Converters, ATenAdaptiveAvgPool2DConvertsCorrectlyWithDynamicInput) {
         return (%10))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   // PyTorch MaxPool needs a 3D input
   auto in = at::randint(-5, 5, {10, 18, 36}, at::kCUDA);

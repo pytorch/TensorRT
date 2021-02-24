@@ -11,7 +11,7 @@ TEST(Evaluators, PrimConstantEvaluatesCorrectly) {
         return (%0))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto jit_results = trtorch::tests::util::EvaluateGraphJIT(g, {});
   auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {});
@@ -29,7 +29,7 @@ TEST(Evaluators, PrimListUnpackEvaluatesCorrectly) {
         return (%lu.1, %lu.2))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto jit_results = trtorch::tests::util::EvaluateGraphJIT(g, {});
   auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {});
@@ -46,7 +46,7 @@ TEST(Evaluators, NumToTensorEvaluatesCorrectly) {
         return (%lu.1))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto jit_results = trtorch::tests::util::EvaluateGraphJIT(g, {});
   auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {});
