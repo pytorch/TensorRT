@@ -11,7 +11,7 @@ namespace converters {
 namespace impl {
 namespace {
 
-auto expand_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().pattern(
+auto type_as_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().pattern(
     {"aten::type_as(Tensor self, Tensor other) -> (Tensor)",
      [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
        auto in = args[0].ITensor();
