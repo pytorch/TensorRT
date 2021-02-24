@@ -61,7 +61,7 @@ std::string gen_keepdim_graph(const std::string& op) {
 
 void test_body(const std::string& graph, at::Tensor& in) {
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});

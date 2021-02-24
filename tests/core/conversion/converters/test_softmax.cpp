@@ -13,7 +13,7 @@ TEST(Converters, ATenSoftmax1DConvertsCorrectly) {
         return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(0, 5, {5}, {at::kCUDA});
   auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
@@ -36,7 +36,7 @@ TEST(Converters, ATenSoftmaxNDConvertsCorrectlySub3DIndex) {
         return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(0, 5, {1, 2, 2, 2, 2}, {at::kCUDA});
 
@@ -60,7 +60,7 @@ TEST(Converters, ATenSoftmaxNDConvertsCorrectlyAbove3DIndex) {
         return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(0, 5, {1, 2, 2, 2, 2}, {at::kCUDA});
 
@@ -86,7 +86,7 @@ TEST(Converters, ATenSoftmaxNDConvertsCorrectlyNegtiveOneIndex) {
         return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(0, 5, {1, 2, 2, 2, 2}, {at::kCUDA});
 
@@ -112,7 +112,7 @@ TEST(Converters, ATenSoftmaxNDConvertsCorrectlyNegtiveIndex) {
         return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(0, 5, {1, 2, 2, 2, 2}, {at::kCUDA});
 
