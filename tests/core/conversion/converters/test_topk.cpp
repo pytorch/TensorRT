@@ -15,7 +15,7 @@ TEST(Converters, ATenTopKConvertsCorrectly) {
         return (%5, %6))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::rand({10, 10, 100}, {at::kCUDA});
 

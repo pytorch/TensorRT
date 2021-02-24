@@ -14,7 +14,7 @@ TEST(Converters, ATenFlattenConvertsCorrectly) {
       return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(0, 5, {2, 3}, {at::kCUDA});
   auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
@@ -38,7 +38,7 @@ TEST(Converters, ATenFlattenOtherDimsConvertsCorrectly) {
       return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(0, 5, {2, 3, 3}, {at::kCUDA});
   auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
@@ -62,7 +62,7 @@ TEST(Converters, ATenReshapeConvertsCorrectly) {
       return (%4))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(0, 5, {2, 3}, {at::kCUDA});
   auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
@@ -86,7 +86,7 @@ TEST(Converters, ATenViewConvertsCorrectly) {
       return (%4))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(0, 5, {2, 3}, {at::kCUDA});
   auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
@@ -108,7 +108,7 @@ TEST(Converters, ATenPermuteConvertsCorrectly) {
       return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(0, 5, {2, 3, 2, 3}, {at::kCUDA});
   auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
@@ -133,7 +133,7 @@ TEST(Converters, ATenPermute3DConvertsCorrectly) {
       return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(0, 5, {2, 2, 3}, {at::kCUDA});
   auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
@@ -155,7 +155,7 @@ TEST(Converters, ATenPermute5DConvertsCorrectly) {
       return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(0, 5, {2, 2, 1, 2, 3}, {at::kCUDA});
   auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
@@ -178,7 +178,7 @@ TEST(Converters, ATenFlattenConvertsCorrectlyWithDynamicInput) {
       return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(0, 5, {2, 3}, {at::kCUDA});
   auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
@@ -201,7 +201,7 @@ TEST(Converters, ATenFlattenConvertsCorrectlyWithDynamicBatch) {
       return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(0, 5, {2, 3}, {at::kCUDA});
   auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});

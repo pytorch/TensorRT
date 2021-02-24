@@ -12,7 +12,7 @@
 
 void conv_test_helper(std::string graph_ir) {
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph_ir, &*g);
+  torch::jit::parseIR(graph_ir, g.get());
 
   auto in = at::randint(1, 10, {1, 3, 10, 10}, {at::kCUDA});
   auto w = at::randint(1, 10, {8, 3, 5, 5}, {at::kCUDA});
@@ -54,7 +54,7 @@ TEST(Converters, ATenConvolutionConvertsCorrectly) {
         return (%12))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {1, 3, 10, 10}, {at::kCUDA});
   auto w = at::randint(1, 10, {8, 3, 5, 5}, {at::kCUDA});
@@ -96,7 +96,7 @@ TEST(Converters, ATenConvolutionNoBiasConvertsCorrectly) {
         return (%12))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 2, {1, 1, 3, 3}, {at::kCUDA});
   auto w = at::randint(1, 2, {4, 1, 2, 2}, {at::kCUDA});
@@ -135,7 +135,7 @@ TEST(Converters, ATenConvolutionWithStrideConvertsCorrectly) {
         return (%13))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {1, 3, 9, 9}, {at::kCUDA});
   auto w = at::randint(1, 10, {4, 3, 3, 3}, {at::kCUDA});
@@ -178,7 +178,7 @@ TEST(Converters, ATenConvolutionWithPaddingConvertsCorrectly) {
         return (%13))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {1, 3, 4, 4}, {at::kCUDA});
   auto w = at::randint(1, 10, {4, 3, 2, 2}, {at::kCUDA});
@@ -220,7 +220,7 @@ TEST(Converters, ATenConvolution3dConvertsCorrectly) {
         return (%out))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {1, 3, 5, 5, 5}, {at::kCUDA});
   auto w = at::randint(1, 10, {32, 3, 3, 3, 3}, {at::kCUDA});
@@ -262,7 +262,7 @@ TEST(Converters, ATenConvolution3dNoBiasConvertsCorrectly) {
         return (%out))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 2, {1, 3, 5, 5, 5}, {at::kCUDA});
   auto w = at::randint(1, 2, {32, 3, 3, 3, 3}, {at::kCUDA});
@@ -300,7 +300,7 @@ TEST(Converters, ATenConvolution3dWithPaddingConvertsCorrectly) {
         return (%out))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {1, 3, 5, 5, 5}, {at::kCUDA});
   auto w = at::randint(1, 10, {32, 3, 3, 3, 3}, {at::kCUDA});
@@ -342,7 +342,7 @@ TEST(Converters, ATenConvolution3dWithStrideDilationConvertsCorrectly) {
         return (%out))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {1, 3, 5, 5, 5}, {at::kCUDA});
   auto w = at::randint(1, 10, {32, 3, 3, 3, 3}, {at::kCUDA});
@@ -384,7 +384,7 @@ TEST(Converters, ATenConvTransposeConvertsCorrectly) {
         return (%12))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 3, {1, 8, 5, 5}, {at::kCUDA});
   auto w = at::randint(1, 3, {8, 3, 3, 3}, {at::kCUDA});
@@ -426,7 +426,7 @@ TEST(Converters, ATenConvTransposeNoBiasConvertsCorrectly) {
         return (%12))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 2, {1, 4, 3, 3}, {at::kCUDA});
   auto w = at::randint(1, 2, {4, 1, 2, 2}, {at::kCUDA});
@@ -465,7 +465,7 @@ TEST(Converters, ATenConvTransposeWithStrideConvertsCorrectly) {
         return (%13))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {1, 4, 9, 9}, {at::kCUDA});
   auto w = at::randint(1, 10, {4, 3, 3, 3}, {at::kCUDA});
@@ -508,7 +508,7 @@ TEST(Converters, ATenConvTransposeWithPaddingConvertsCorrectly) {
         return (%13))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {1, 4, 4, 4}, {at::kCUDA});
   auto w = at::randint(1, 10, {4, 3, 2, 2}, {at::kCUDA});
@@ -551,7 +551,7 @@ TEST(Converters, ATenConvolutionWithGroupConvertsCorrectly) {
         return (%13))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {1, 4, 4, 4}, {at::kCUDA});
   auto w = at::randint(1, 10, {8, 1, 2, 2}, {at::kCUDA});
@@ -594,7 +594,7 @@ TEST(Converters, ATenConvTransposeWithGroupConvertsCorrectly) {
         return (%13))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {1, 8, 5, 5}, {at::kCUDA});
   auto w = at::randint(1, 10, {8, 4, 3, 3}, {at::kCUDA});
