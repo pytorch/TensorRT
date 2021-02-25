@@ -148,7 +148,9 @@ std::string ConversionCtx::SerializeEngine() {
   auto engine = builder->buildEngineWithConfig(*net, *cfg);
   auto serialized_engine = engine->serialize();
   engine->destroy();
-  return std::string((const char*)serialized_engine->data(), serialized_engine->size());
+  auto engine_str = std::string((const char*)serialized_engine->data(), serialized_engine->size());
+  serialized_engine->destroy();
+  return engine_str;
 }
 
 bool ConversionCtx::CheckLayerAddition(const torch::jit::Node* n) {
