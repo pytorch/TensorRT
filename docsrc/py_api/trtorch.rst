@@ -11,6 +11,8 @@ trtorch
 Functions
 ------------
 
+.. autofunction:: set_device
+
 .. autofunction:: compile
 
 .. autofunction:: convert_method_to_trt_engine
