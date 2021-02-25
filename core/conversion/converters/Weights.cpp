@@ -80,9 +80,29 @@ Weights::Weights(ConversionCtx* ctx, at::Tensor t) {
 
   // Store the data in the conversion context so it remains until building is
   // complete
-  void* buf = malloc(t_cpu.numel() * sizeof(float));
+
+  void* buf;
+
+  if (dtype_optional.value() == nvinfer1::DataType::kFLOAT) {
+    buf = malloc(t_cpu.numel() * sizeof(float));
+    memcpy(buf, t_cpu.data_ptr(), t_cpu.numel() * sizeof(float));
+  } else if (dtype_optional.value() == nvinfer1::DataType::kHALF) {
+    buf = malloc(t_cpu.numel() * (sizeof(float) / 2));
+    memcpy(buf, t_cpu.data_ptr(), t_cpu.numel() * (sizeof(float) / 2));
+  } else if (dtype_optional.value() == nvinfer1::DataType::kINT8) {
+    buf = malloc(t_cpu.numel() * sizeof(char));
+    memcpy(buf, t_cpu.data_ptr(), t_cpu.numel() * sizeof(char));
+  } else if (dtype_optional.value() == nvinfer1::DataType::kINT32) {
+    buf = malloc(t_cpu.numel() * sizeof(int));
+    memcpy(buf, t_cpu.data_ptr(), t_cpu.numel() * sizeof(int));
+  } else if (dtype_optional.value() == nvinfer1::DataType::kBOOL) {
+    buf = malloc(t_cpu.numel() * sizeof(bool));
+    memcpy(buf, t_cpu.data_ptr(), t_cpu.numel() * sizeof(bool));
+  } else {
+    TRTORCH_THROW_ERROR("Found unsupported data type for tensor to weight conversion");
+  }
+
   ctx->builder_resources.push_back(buf);
-  memcpy(buf, t_cpu.data_ptr(), t_cpu.numel() * sizeof(float));
 
   this->data.type = dtype_optional.value();
   this->data.count = t_cpu.numel();
