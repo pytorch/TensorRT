@@ -81,7 +81,7 @@ Weights::Weights(ConversionCtx* ctx, at::Tensor t) {
   // Store the data in the conversion context so it remains until building is
   // complete
 
-  void* buf;
+  void* buf = nullptr;
 
   if (dtype_optional.value() == nvinfer1::DataType::kFLOAT) {
     buf = malloc(t_cpu.numel() * sizeof(float));
