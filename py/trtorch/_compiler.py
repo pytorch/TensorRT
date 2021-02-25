@@ -157,5 +157,6 @@ def get_build_info() -> str:
     build_info = "TRTorch Version: " + str(__version__) + '\n' + build_info
     return build_info
 
+
 def set_device(gpu_id):
     trtorch._C.set_device(gpu_id)
