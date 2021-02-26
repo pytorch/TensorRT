@@ -24,6 +24,13 @@ build_py38() {
     #auditwheel repair --plat manylinux2014_x86_64
 }
 
+build_py39() {
+    /opt/python/cp39-cp39/bin/python -m pip install -r requirements.txt
+    /opt/python/cp39-cp39/bin/python setup.py bdist_wheel
+    #auditwheel repair --plat manylinux2014_x86_64
+}
+
 build_py36
 build_py37
 build_py38
+build_py39
