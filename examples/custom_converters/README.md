@@ -64,13 +64,13 @@ import os
 from setuptools import setup, Extension
 from torch.utils import cpp_extension
 
-dir_path = os.path.dirname(os.path.realpath(__file__))
 
 # library_dirs should point to the libtrtorch.so, include_dirs should point to the dir that include the headers
 # 1) download the latest package from https://github.com/NVIDIA/TRTorch/releases/
 # 2) Extract the file from downloaded package, we will get the "trtorch" directory
 # 3) Set trtorch_path to that directory
-trtorch_path = os.path.abspath("trtorch")
+trtorch_path = <PATH TO TRTORCH>
+
 
 ext_modules = [
     cpp_extension.CUDAExtension('elu_converter', ['./csrc/elu_converter.cpp'],
@@ -120,7 +120,7 @@ class Elu(torch.nn.Module):
         return self.elu(x)
 
 
-def MaxDiff(pytorch_out, trtorch_out):
+def cal_max_diff(pytorch_out, trtorch_out):
     diff = torch.sub(pytorch_out, trtorch_out)
     abs_diff = torch.abs(diff)
     max_diff = torch.max(abs_diff)
@@ -148,7 +148,7 @@ def main():
     trtorch_out = trt_ts_module(input_data)
     print('PyTorch output: \n', pytorch_out[0, :, :, 0])
     print('TRTorch output: \n', trtorch_out[0, :, :, 0])
-    MaxDiff(pytorch_out, trtorch_out)
+    cal_max_diff(pytorch_out, trtorch_out)
 
 
 if __name__ == "__main__":
