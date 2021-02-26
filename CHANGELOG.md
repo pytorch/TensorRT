@@ -562,7 +562,7 @@ Signed-off-by: Naren Dasan <narens@nvidia.com>
 
 
 
-#  (2021-02-25)
+#  0.2.0 (2021-02-25)
 
 
 * refactor!: Update bazel and trt versions ([0618b6b](https://github.com/NVIDIA/TRTorch/commit/0618b6b))
