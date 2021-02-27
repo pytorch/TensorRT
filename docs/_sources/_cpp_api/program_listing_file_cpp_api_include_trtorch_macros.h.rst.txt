@@ -32,7 +32,7 @@ Program Listing for File macros.h
    #define STR(x) XSTR(x)
    
    #define TRTORCH_MAJOR_VERSION 0
-   #define TRTORCH_MINOR_VERSION 2
+   #define TRTORCH_MINOR_VERSION 3
    #define TRTORCH_PATCH_VERSION 0
    #define TRTORCH_VERSION      \
      STR(TRTORCH_MAJOR_VERSION) \
