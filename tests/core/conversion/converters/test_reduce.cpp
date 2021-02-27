@@ -209,3 +209,55 @@ TEST(Converters, ATenProdKeepDimsConvertsCorrectly) {
   auto in = at::randint(-5, 5, {4, 4}, at::kCUDA);
   test_body(graph, in);
 }
+
+TEST(Converters, ATenMeanDimNegOneIndexConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%0 : Tensor):
+      %1 : int = prim::Constant[value=-1]()
+      %2 : int[] = prim::ListConstruct(%1)
+      %3 : bool = prim::Constant[value=0]()
+      %4 : None = prim::Constant()
+      %5 : Tensor = aten::mean(%0, %2, %3, %4)
+      return (%5))IR";
+  auto in = at::randint(-5, 5, {4, 4, 4}, at::kCUDA);
+  test_body(graph, in);
+}
+
+TEST(Converters, ATenMeanDimNegOneIndexKeepDimsConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%0 : Tensor):
+      %1 : int = prim::Constant[value=-1]()
+      %2 : int[] = prim::ListConstruct(%1)
+      %3 : bool = prim::Constant[value=1]()
+      %4 : None = prim::Constant()
+      %5 : Tensor = aten::mean(%0, %2, %3, %4)
+      return (%5))IR";
+  auto in = at::randint(-5, 5, {4, 4, 4}, at::kCUDA);
+  test_body(graph, in);
+}
+
+TEST(Converters, ATenMeanDimNegIndexConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%0 : Tensor):
+      %1 : int = prim::Constant[value=-2]()
+      %2 : int[] = prim::ListConstruct(%1)
+      %3 : bool = prim::Constant[value=0]()
+      %4 : None = prim::Constant()
+      %5 : Tensor = aten::mean(%0, %2, %3, %4)
+      return (%5))IR";
+  auto in = at::randint(-5, 5, {4, 4, 4}, at::kCUDA);
+  test_body(graph, in);
+}
+
+TEST(Converters, ATenMeanDimNegIndexKeepDimsConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%0 : Tensor):
+      %1 : int = prim::Constant[value=-2]()
+      %2 : int[] = prim::ListConstruct(%1)
+      %3 : bool = prim::Constant[value=1]()
+      %4 : None = prim::Constant()
+      %5 : Tensor = aten::mean(%0, %2, %3, %4)
+      return (%5))IR";
+  auto in = at::randint(-5, 5, {4, 4, 4}, at::kCUDA);
+  test_body(graph, in);
+}
