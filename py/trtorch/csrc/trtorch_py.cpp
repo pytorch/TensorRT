@@ -2,8 +2,9 @@
 #include "pybind11/stl.h"
 
 #include "Python.h"
-#include "core/compiler.h"
+// #include "core/compiler.h"
 #include "core/conversion/conversion.h"
+#include "trtorch.h"
 #include "NvInfer.h"
 #include "tensorrt_classes.h"
 #include "torch/csrc/jit/python/pybind_utils.h"
@@ -250,6 +251,7 @@ PYBIND11_MODULE(_C, m) {
       .def(py::init<>())
       .def_readwrite("input_ranges", &CompileSpec::input_ranges)
       .def_readwrite("op_precision", &CompileSpec::op_precision)
+      .def_readwrite("ptq_calibrator", &CompileSpec::ptq_calibrator)
       .def_readwrite("refit", &CompileSpec::refit)
       .def_readwrite("disable_tf32", &CompileSpec::disable_tf32)
       .def_readwrite("debug", &CompileSpec::debug)

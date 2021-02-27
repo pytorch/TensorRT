@@ -135,6 +135,10 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
     if "op_precision" in compile_spec:
         info.op_precision = _parse_op_precision(compile_spec["op_precision"])
 
+    if "calibrator" in compile_spec:
+        print("========INT8 CALIBRATOR SET============")
+        info.ptq_calibrator = compile_spec["calibrator"]
+
     if "disable_tf32" in compile_spec:
         assert isinstance(compile_spec["disable_tf32"], bool)
         info.disable_tf32 = compile_spec["disable_tf32"]
