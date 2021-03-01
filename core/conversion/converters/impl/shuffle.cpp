@@ -106,6 +106,8 @@ static auto shuffle_registrations TRTORCH_UNUSED =
                     for (size_t i = 0; i < ndims; i++) {
                       new_order.push_back(i);
                     }
+                    dim0 = dim0 < 0 ? (dim0 + ndims) : dim0;
+                    dim1 = dim1 < 0 ? (dim1 + ndims) : dim1;
                     auto tmp = dim0;
                     new_order[dim0] = new_order[dim1];
                     new_order[dim1] = tmp;
