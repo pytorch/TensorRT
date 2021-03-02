@@ -14,6 +14,7 @@
 #include "torch/csrc/jit/passes/graph_fuser.h"
 #include "torch/csrc/jit/passes/lower_graph.h"
 #include "torch/csrc/jit/passes/pass_manager.h"
+#include "torch/csrc/jit/passes/shape_analysis.h"
 #include "torch/custom_class.h"
 
 #include "core/compiler.h"
@@ -22,6 +23,7 @@
 #include "core/conversion/conversion.h"
 #include "core/lowering/lowering.h"
 #include "core/runtime/runtime.h"
+#include "core/partitioning/partitioning.h"
 
 namespace trtorch {
 namespace core {
@@ -52,6 +54,7 @@ void AddEngineToGraph(
   auto num_io = engine_ptr->num_io;
   auto name = engine_ptr->name;
 
+  //..
   // Add the engine as an attribute of the module, this will let the engine be
   // serialized and deserialized
   mod.register_attribute(
@@ -126,6 +129,8 @@ void AddEngineToGraph(
   return;
 }
 
+
+
 bool CheckMethodOperatorSupport(const torch::jit::script::Module& mod, std::string method_name) {
   // Go through Lowering to simplify graph and extract weight parameters
   auto graph_and_parameters = lowering::Lower(mod, method_name);
@@ -142,6 +147,17 @@ std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::
 
   auto convert_cfg = std::move(cfg.convert_info);
   auto g = graph_and_parameters.first;
+
+  printf("*********************************************\n");
+  auto segmented_blocks = partitioning::segment_graph(g);
+  for (auto &seg :segmented_blocks) {
+    LOG_INFO(*seg.g_ << "(Seg Graph)\n");
+//    printf("segmented nodes No.: %d\n", seg.nodes.size());
+//    for (auto &val : seg.inputs) {
+//      printf("input: %s  ", val->debugNameBase().c_str());
+//    }    printf("\n");
+  }
+  printf("|||||||||||||||||||||||||||||||||||||||||||||\n");
   auto params = graph_and_parameters.second;
   auto named_params = conversion::get_named_params(g->inputs(), params);
 
@@ -150,6 +166,51 @@ std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::
   auto engine = conversion::ConvertBlockToEngine(g->block(), convert_cfg, named_params);
   return std::move(engine);
 }
+
+//torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod, CompileSpec cfg) {
+//  // TODO: Should be doing a functional transform but need PR #31978
+//  // [jit] More robust mangling
+//  // torch::jit::script::Module new_mod = mod.clone();
+//  torch::jit::script::Module new_mod(mod._ivalue()->name() + "_trt");
+//  std::vector<std::shared_ptr<torch::jit::Graph>> graphs;
+//  for (const torch::jit::script::Method& method : mod.get_methods()) {
+//    // Don't convert hidden methods
+//    if (method.name().rfind("_", 0)) {
+//      auto engine = ConvertGraphToTRTEngine(mod, method.name(), cfg);
+//      auto new_g = std::make_shared<torch::jit::Graph>();
+//      AddEngineToGraph(new_mod, new_g, engine);
+//      auto new_method = new_mod._ivalue()->compilation_unit()->create_function(method.name(), new_g);
+//      auto schema = GenerateGraphSchema(new_mod, new_method->name(), new_g);
+//      new_mod.type()->addMethod(new_method);
+//      new_method->setSchema(schema);
+//    }
+//  }
+//
+//  return new_mod;
+//}
+
+void AddTorchSegmentToGraph(std::shared_ptr<torch::jit::Graph>& g, partitioning::SegmentedBlock &seg) {
+  std::unordered_map<torch::jit::Value*, torch::jit::Value*> output_input_map;
+  for (size_t i = 0; i < g->outputs().size(); ++i) {
+    auto prev_output = g->outputs()[i];
+    auto next_input = seg.inputs()[i];
+    output_input_map[next_input] = prev_output;
+  }
+
+  torch::jit::Node *node;
+  for (const auto n : seg.nodes()) {
+    node = partitioning::cloneNode(n, g, output_input_map);
+  }
+  for (size_t i = 0; i < g->outputs().size(); ++i) {
+    g->eraseOutput(i);
+  }
+  for (auto &value : node->outputs()) {
+    g->registerOutput(value);
+  }
+  LOG_INFO(*g << "(addTorch)\n");
+  return;
+}
+
 
 torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod, CompileSpec cfg) {
   // TODO: Should be doing a functional transform but need PR #31978
@@ -160,9 +221,30 @@ torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod, C
   for (const torch::jit::script::Method& method : mod.get_methods()) {
     // Don't convert hidden methods
     if (method.name().rfind("_", 0)) {
-      auto engine = ConvertGraphToTRTEngine(mod, method.name(), cfg);
       auto new_g = std::make_shared<torch::jit::Graph>();
-      AddEngineToGraph(new_mod, new_g, engine);
+      auto graph_and_parameters = lowering::Lower(mod, method.name());
+
+      auto g = graph_and_parameters.first;
+      auto params = graph_and_parameters.second;
+      auto named_params = conversion::get_named_params(g->inputs(), params);
+      auto convert_cfg = std::move(cfg.convert_info);
+      LOG_INFO(*g << "(CompileGraph)\n");
+
+
+      // segment the graph and convert segmented TensorRT block
+      auto segmented_blocks = partitioning::segment_graph(g);
+      for (auto &seg_block : segmented_blocks) {
+        LOG_INFO(*seg_block.g_ << "(MiniGraph)\n");
+
+        if (seg_block.target == partitioning::SegmentedBlock::kTensorRT) {
+          auto engine = conversion::ConvertBlockToEngine(seg_block.block(), convert_cfg, named_params);
+          AddEngineToGraph(new_mod, new_g, engine);
+          LOG_INFO(*new_g << "(new global graph)\n");
+        } else {
+          AddTorchSegmentToGraph(new_g, seg_block);
+        }
+      }
+
       auto new_method = new_mod._ivalue()->compilation_unit()->create_function(method.name(), new_g);
       auto schema = GenerateGraphSchema(new_mod, new_method->name(), new_g);
       new_mod.type()->addMethod(new_method);
