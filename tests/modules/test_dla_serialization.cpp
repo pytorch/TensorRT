@@ -23,12 +23,20 @@ TEST_P(ModuleTests, SerializedModuleIsStillCorrect) {
   std::vector<torch::jit::IValue> post_serialized_inputs_ivalues;
   std::vector<torch::jit::IValue> pre_serialized_inputs_ivalues;
   for (auto in_shape : input_shapes) {
-    auto in = at::randint(5, in_shape, {at::kCUDA});
+    auto in = at::randint(5, in_shape, {at::kCUDA}).to(torch::kF16);
     post_serialized_inputs_ivalues.push_back(in.clone());
     pre_serialized_inputs_ivalues.push_back(in.clone());
   }
 
-  auto pre_serialized_mod = trtorch::CompileGraph(mod, input_shapes);
+  auto compile_spec = trtorch::CompileSpec(toInputRangesDynamic(input_shapes));
+  compile_spec.op_precision = torch::kF16;
+  compile_spec.device.device_type = trtorch::CompileSpec::Device::DeviceType::kDLA;
+  compile_spec.device.gpu_id = 0;
+  compile_spec.device.dla_core = 1;
+  compile_spec.device.allow_gpu_fallback = true;
+  compile_spec.workspace_size = 1 << 28;
+
+  auto pre_serialized_mod = trtorch::CompileGraph(mod, compile_spec);
   torch::jit::IValue pre_serialized_results_ivalues =
       trtorch::tests::util::RunModuleForward(pre_serialized_mod, pre_serialized_inputs_ivalues);
   std::vector<at::Tensor> pre_serialized_results;
@@ -53,12 +61,20 @@ TEST_P(ModuleTests, SerializedDynamicModuleIsStillCorrect) {
   std::vector<torch::jit::IValue> post_serialized_inputs_ivalues;
   std::vector<torch::jit::IValue> pre_serialized_inputs_ivalues;
   for (auto in_shape : input_shapes) {
-    auto in = at::randint(5, in_shape, {at::kCUDA});
+    auto in = at::randint(5, in_shape, {at::kCUDA}).to(torch::kF16);
     post_serialized_inputs_ivalues.push_back(in.clone());
     pre_serialized_inputs_ivalues.push_back(in.clone());
   }
 
-  auto pre_serialized_mod = trtorch::CompileGraph(mod, toInputRangesDynamic(input_shapes));
+  auto compile_spec = trtorch::CompileSpec(toInputRangesDynamic(input_shapes));
+  compile_spec.op_precision = torch::kF16;
+  compile_spec.device.device_type = trtorch::CompileSpec::Device::DeviceType::kDLA;
+  compile_spec.device.gpu_id = 0;
+  compile_spec.device.dla_core = 1;
+  compile_spec.device.allow_gpu_fallback = true;
+  compile_spec.workspace_size = 1 << 28;
+
+  auto pre_serialized_mod = trtorch::CompileGraph(mod, compile_spec);
   torch::jit::IValue pre_serialized_results_ivalues =
       trtorch::tests::util::RunModuleForward(pre_serialized_mod, pre_serialized_inputs_ivalues);
   std::vector<at::Tensor> pre_serialized_results;

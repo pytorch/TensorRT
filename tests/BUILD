@@ -3,6 +3,7 @@ test_suite(
     tests = [
         "//tests/core:core_tests",
         "//tests/modules:module_tests"
+        "//tests/api:test_apis"
     ],
 )
 

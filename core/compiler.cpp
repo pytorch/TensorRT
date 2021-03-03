@@ -1,3 +1,4 @@
+#include <cuda_runtime.h>
 #include <iostream>
 #include <memory>
 #include <sstream>
@@ -46,8 +47,9 @@ c10::FunctionSchema GenerateGraphSchema(
 void AddEngineToGraph(
     torch::jit::script::Module mod,
     std::shared_ptr<torch::jit::Graph>& g,
-    std::string& serialized_engine) {
-  auto engine_ptr = c10::make_intrusive<runtime::TRTEngine>(mod._ivalue()->name(), serialized_engine);
+    std::string& engine,
+    runtime::CudaDevice& device_info) {
+  auto engine_ptr = c10::make_intrusive<runtime::TRTEngine>(mod._ivalue()->name(), engine, device_info);
   // Get required metadata about the engine out
   auto num_io = engine_ptr->num_io;
   auto name = engine_ptr->name;
@@ -157,12 +159,16 @@ torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod, C
   // torch::jit::script::Module new_mod = mod.clone();
   torch::jit::script::Module new_mod(mod._ivalue()->name() + "_trt");
   std::vector<std::shared_ptr<torch::jit::Graph>> graphs;
+
   for (const torch::jit::script::Method& method : mod.get_methods()) {
     // Don't convert hidden methods
     if (method.name().rfind("_", 0)) {
       auto engine = ConvertGraphToTRTEngine(mod, method.name(), cfg);
       auto new_g = std::make_shared<torch::jit::Graph>();
-      AddEngineToGraph(new_mod, new_g, engine);
+      
+      auto device_spec = cfg.convert_info.engine_settings.device;
+      auto cuda_device = runtime::get_device_info(device_spec.gpu_id, device_spec.device_type);
+      AddEngineToGraph(new_mod, new_g, engine, cuda_device);
       auto new_method = new_mod._ivalue()->compilation_unit()->create_function(method.name(), new_g);
       auto schema = GenerateGraphSchema(new_mod, new_method->name(), new_g);
       new_mod.type()->addMethod(new_method);
@@ -174,7 +180,7 @@ torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod, C
 }
 
 void set_device(const int gpu_id) {
-  TRTORCH_ASSERT(cudaSetDevice(gpu_id) == cudaSuccess, "Unable to set CUDA device: " << gpu_id);
+  TRTORCH_CHECK((cudaSetDevice(gpu_id) == cudaSuccess), "Unable to set CUDA device: " << gpu_id);
 }
 
 } // namespace core

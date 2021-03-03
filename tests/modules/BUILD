@@ -28,13 +28,25 @@ test_suite(
        ":test_modules_as_engines",
        ":test_compiled_modules",
        ":test_multiple_registered_engines",
-       ":test_serialization"
+       ":test_serialization",
+       ":test_dla_serialization"
    ]
 )
 
 cc_test(
     name = "test_serialization",
     srcs = ["test_serialization.cpp"],
+    deps = [
+        ":module_test",
+    ],
+    data = [
+        ":jit_models"
+    ]
+)
+
+cc_test(
+    name = "test_dla_serialization",
+    srcs = ["test_dla_serialization.cpp"],
     deps = [
         ":module_test",
     ],

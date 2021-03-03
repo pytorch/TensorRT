@@ -12,6 +12,7 @@ namespace runtime {
 
 std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine) {
   LOG_DEBUG("Attempting to run engine (ID: " << compiled_engine->name << ")");
+  LOG_DEBUG("Check device_info : " << compiled_engine->device_info.device_name);
   std::vector<void*> gpu_handles;
 
   std::vector<at::Tensor> contig_inputs{};
