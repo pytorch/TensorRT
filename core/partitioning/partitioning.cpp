@@ -80,9 +80,6 @@ std::vector<nvinfer1::Dims> registerSegmentInOutShape(SegmentedBlock &seg_block,
   }
   auto jit_results_tensor = jit_results_ivalues.toTensor();
   auto output_sizes = jit_results_tensor.sizes();
-  for (auto &i : output_sizes) {
-    printf("%d\n", i);
-  }
 
   std::vector<nvinfer1::Dims> output_shape;
   output_shape.push_back(util::toDims(output_sizes));
