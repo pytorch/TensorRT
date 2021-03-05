@@ -5,6 +5,7 @@
 #include "core/conversion/conversion.h"
 #include "torch/csrc/jit/ir/ir.h"
 
+
 namespace trtorch {
 namespace core {
 namespace partitioning {
@@ -20,6 +21,8 @@ struct SegmentedBlock {
   };
 
   SegmentedBlock(SegmentedBlockTarget blk_target) : target(blk_target), g_(std::make_shared<torch::jit::Graph>()) {}
+
+  SegmentedBlock(SegmentedBlockTarget blk_target, std::shared_ptr<torch::jit::Graph> g) : target(blk_target), g_(g) {}
 
   void appendNode(torch::jit::Node* n) {
     last_node = cloneNode(n, g_, old_to_new_);
@@ -43,9 +46,17 @@ struct SegmentedBlock {
     return g_->nodes();
   }
 
+  void register_inshape(std::vector<nvinfer1::Dims>& in_shape) {
+    in_shape_ = in_shape;
+  }
+
+  void register_outshape(std::vector<nvinfer1::Dims>& out_shape) {
+    out_shape_ = out_shape;
+  }
+
   SegmentedBlockTarget target;
-  nvinfer1::Dims in_shape;
-  nvinfer1::Dims out_shape;
+  std::vector<nvinfer1::Dims> in_shape_;
+  std::vector<nvinfer1::Dims> out_shape_;
 //  std::vector<torch::jit::Value*> inputs_;
 //  std::vector<torch::jit::Value*> outputs_;
   std::shared_ptr<torch::jit::Graph> g_;
@@ -55,7 +66,7 @@ struct SegmentedBlock {
 
 };
 
-std::vector<SegmentedBlock> segment_graph(std::shared_ptr<torch::jit::Graph> g);
+std::vector<SegmentedBlock> segment_graph(std::shared_ptr<torch::jit::Graph> g, std::vector<conversion::InputRange>& input_ranges);
 
 }
 }

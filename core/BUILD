@@ -26,6 +26,7 @@ cc_library(
         "//core/conversion",
         "//core/runtime",
         "//core/lowering",
+        "//core/partitioning",
         "//core/util/logging",
         "@tensorrt//:nvinfer"
     ] + select({
