@@ -295,7 +295,7 @@ nvinfer1::DataType toTRTDataType(at::ScalarType t) {
 }
 
 c10::optional<nvinfer1::DataType> toTRTDataType(caffe2::TypeMeta dtype) {
-  if (auto t = c10::tryTypeMetaToScalarType(dtype)) {
+  if (auto t = c10::optTypeMetaToScalarType(dtype)) {
     return toTRTDataType(t.value());
   } else {
     return {};
