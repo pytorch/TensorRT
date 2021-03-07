@@ -179,7 +179,6 @@ ext_modules = [
             dir_path + "trtorch/csrc",
             dir_path + "/../",
             dir_path + "/../bazel-TRTorch/external/tensorrt/include",
-            dir_path + "/../cpp/api/include/trtorch",
         ],
         extra_compile_args=[
             "-Wno-deprecated",
