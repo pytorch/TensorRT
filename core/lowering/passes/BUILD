@@ -25,7 +25,8 @@ cc_library(
         "unpack_addmm.cpp",
         "unpack_batch_norm.cpp",
         "unpack_log_softmax.cpp",
-        "op_aliasing.cpp"
+        "op_aliasing.cpp",
+        "silu_to_sigmoid_multiplication.cpp"
     ],
     deps = [
         "//core/util:prelude",

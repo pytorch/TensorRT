@@ -84,7 +84,6 @@ cc_library(
     })
 )
 
-
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 
 pkg_tar(

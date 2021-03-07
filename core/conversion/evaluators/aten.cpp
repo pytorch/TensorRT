@@ -118,10 +118,12 @@ auto aten_registrations TRTORCH_UNUSED =
                     // aten::zeros(int[] size, *, int? dtype=None, int? layout=None,
                     // Device? device=None, bool? pin_memory=None) -> (Tensor)
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-                      auto options = torch::TensorOptions()
-                                         .dtype(c10::ScalarType(args.at(n->output(1)).unwrapToInt()))
-                                         .layout(torch::kStrided)
-                                         .device(torch::kCUDA);
+                      auto options = torch::TensorOptions().layout(torch::kStrided).device(torch::kCUDA);
+
+                      // Input 1 here is the dtype
+                      if (!args.at(n->input(1)).isNone() && !args.at(n->input(1)).IValue()->isNone()) {
+                        options = options.dtype(c10::ScalarType(args.at(n->input(1)).unwrapToInt()));
+                      }
 
                       auto out_tensor = torch::zeros(args.at(n->input(0)).unwrapToIntList().vec(), options);
                       return out_tensor;

@@ -111,6 +111,10 @@ class pyIInt8LegacyCalibrator : public pyCalibratorTrampoline<IInt8LegacyCalibra
   }
 };
 
+void set_device(const int device_id) {
+  core::set_device(device_id);
+}
+
 torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec& info) {
   py::gil_scoped_acquire gil;
   auto trt_mod = core::CompileGraph(mod, info.toInternalCompileSpec());
@@ -278,6 +282,7 @@ PYBIND11_MODULE(_C, m) {
   m.def("_get_is_colored_output_on", &logging::get_is_colored_output_on, "Get if the logging output will be colored");
   m.def("_set_is_colored_output_on", &logging::set_is_colored_output_on, "Set if the logging output should be colored");
   m.def("_log", &logging::log, "Add a message to the logger");
+  m.def("set_device", &trtorch::pyapi::set_device, "Set CUDA device id");
 
   py::enum_<core::util::logging::LogLevel>(m, "LogLevel", py::arithmetic())
       .value("INTERNAL_ERROR", core::util::logging::LogLevel::kINTERNAL_ERROR)
