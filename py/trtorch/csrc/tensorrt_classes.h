@@ -109,9 +109,10 @@ struct CompileSpec : torch::CustomClassHolder {
   ADD_FIELD_GET_SET(workspace_size, int64_t);
   ADD_FIELD_GET_SET(max_batch_size, int64_t);
   ADD_FIELD_GET_SET(device, Device);
+  ADD_FIELD_GET_SET(ptq_calibrator, nvinfer1::IInt8Calibrator*);
 
   std::vector<InputRange> input_ranges;
-  // nvinfer1::IInt8Calibrator ptq_calibrator;
+  nvinfer1::IInt8Calibrator* ptq_calibrator = nullptr;
   DataType op_precision = DataType::kFloat;
   bool disable_tf32 = false;
   bool refit = false;

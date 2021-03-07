@@ -172,7 +172,6 @@ ext_modules = [
             'trtorch/csrc/tensorrt_backend.cpp',
             'trtorch/csrc/tensorrt_classes.cpp',
             'trtorch/csrc/register_tensorrt_classes.cpp',
-            # 'trtorch/csrc/pyInt8.cpp',
         ],
         library_dirs=[(dir_path + '/trtorch/lib/'), "/opt/conda/lib/python3.6/config-3.6m-x86_64-linux-gnu"],
         libraries=["trtorch"],
