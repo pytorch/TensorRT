@@ -4,8 +4,6 @@
 #include "Python.h"
 #include "core/compiler.h"
 #include "core/conversion/conversion.h"
-// #include "trtorch.h"
-// #include "NvInfer.h"
 #include "tensorrt_classes.h"
 #include "torch/csrc/jit/python/pybind_utils.h"
 #include "torch/custom_class.h"
