@@ -20,18 +20,27 @@ struct SegmentedBlock {
     kTensorRT,
   };
 
-  SegmentedBlock(SegmentedBlockTarget blk_target) : target(blk_target), g_(std::make_shared<torch::jit::Graph>()) {}
+  SegmentedBlock(SegmentedBlockTarget blk_target) : target_(blk_target), g_(std::make_shared<torch::jit::Graph>()) {}
 
-  SegmentedBlock(SegmentedBlockTarget blk_target, std::shared_ptr<torch::jit::Graph> g) : target(blk_target), g_(g) {}
+  SegmentedBlock(SegmentedBlockTarget blk_target, std::shared_ptr<torch::jit::Graph> g) : target_(blk_target), g_(g) {}
 
-  void appendNode(torch::jit::Node* n) {
-    last_node = cloneNode(n, g_, old_to_new_);
+  enum SegmentedBlockTarget target() {
+    return target_;
   }
 
-  void registerOutput() {
-    for (auto &value : last_node->outputs()) {
-      g_->registerOutput(value);
+  void appendNode(torch::jit::Node* n) {
+    cloneNode(n, g_, old_to_new_);
+  }
+
+  void registerInputs() {
+    for (auto &value : g_->inputs()) {
+      inputs_.push_back(old_to_new_[value]);
     }
+  }
+
+  void registerOutput(torch::jit::Value* raw_input) {
+    outputs_.push_back(raw_input);
+    g_->registerOutput(old_to_new_[raw_input]);
   }
 
   torch::jit::Block* block() {
@@ -40,6 +49,22 @@ struct SegmentedBlock {
 
   c10::ArrayRef<torch::jit::Value*> inputs() {
     return g_->inputs();
+  }
+
+  c10::ArrayRef<torch::jit::Value*> outputs() {
+    return g_->outputs();
+  }
+
+  const std::vector<torch::jit::Value*> &raw_inputs() const {
+    return inputs_;
+  }
+
+  const std::vector<torch::jit::Value*> &raw_outputs() const {
+    return outputs_;
+  }
+
+  bool contain_raw_input(torch::jit::Value* input) {
+    return old_to_new_.count(input);
   }
 
   torch::jit::graph_node_list nodes() {
@@ -54,14 +79,31 @@ struct SegmentedBlock {
     out_shape_ = out_shape;
   }
 
-  SegmentedBlockTarget target;
+  const std::vector<nvinfer1::Dims>& in_shape() const {
+    return in_shape_;
+  }
+
+  const std::vector<nvinfer1::Dims>& out_shape() const {
+    return out_shape_;
+  }
+
+  const std::shared_ptr<torch::jit::Graph>& g() const {
+    return g_;
+  }
+
+  void update_graph(std::shared_ptr<torch::jit::Graph> new_g) {
+    g_ = new_g;
+  }
+
+ private:
+  SegmentedBlockTarget target_;
   std::vector<nvinfer1::Dims> in_shape_;
   std::vector<nvinfer1::Dims> out_shape_;
-//  std::vector<torch::jit::Value*> inputs_;
-//  std::vector<torch::jit::Value*> outputs_;
+  std::vector<torch::jit::Value*> inputs_;
+  std::vector<torch::jit::Value*> outputs_;
   std::shared_ptr<torch::jit::Graph> g_;
   std::string trt_engine;
-  torch::jit::Node* last_node;
+  //last node on original global graph
   std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_;
 
 };

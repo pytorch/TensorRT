@@ -180,27 +180,34 @@ std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::
 
 
 
-void AddSegmentedBlockToGraph(std::shared_ptr<torch::jit::Graph>& g, partitioning::SegmentedBlock &seg) {
-  std::unordered_map<torch::jit::Value*, torch::jit::Value*> output_input_map;
+void AddSegmentedBlockToGraph(std::shared_ptr<torch::jit::Graph>& g, partitioning::SegmentedBlock &seg,
+                              std::unordered_map<torch::jit::Value*, torch::jit::Value*> &old_to_new_g) {
+  //old_to_new_g contains: original_graph value => new graph value, mini_graph value -> new graph value, new graph value -> mini_graph value
   size_t input_idx = 0;
-  if (seg.target == partitioning::SegmentedBlock::kTensorRT && g->inputs().size() > 0) {
+  if (seg.target() == partitioning::SegmentedBlock::kTensorRT && g->inputs().size() > 0) {
     if (g->inputs()[0]->type()->str().find("__torch__") == std::string::npos) {
       auto self = g->insertInput(0, "self_1");
       self->setType(seg.inputs()[0]->type());
     }
-    output_input_map[seg.inputs()[input_idx++]] = g->inputs()[0];
+    old_to_new_g[seg.inputs()[input_idx++]] = g->inputs()[0];
   }
 
-  for (size_t i = 0; i < g->outputs().size(); ++i) {
-    auto prev_output = g->outputs()[i];
-    auto next_input = seg.inputs()[input_idx++];
-    output_input_map[next_input] = prev_output;
+  for (auto &raw_input : seg.raw_inputs()) {
+    if (old_to_new_g.count(raw_input)) {
+      old_to_new_g[seg.inputs()[input_idx++]] = old_to_new_g[raw_input];
+    }
   }
 
   torch::jit::Node *node;
   for (const auto n : seg.nodes()) {
-    node = partitioning::cloneNode(n, g, output_input_map);
+    node = partitioning::cloneNode(n, g, old_to_new_g);
   }
+
+  // original graph value => new global graph value
+  for (size_t i = 0; i < seg.raw_outputs().size(); ++i) {
+    old_to_new_g[seg.raw_outputs()[i]] = old_to_new_g[seg.outputs()[i]];
+  }
+
   for (size_t i = 0; i < g->outputs().size(); ++i) {
     g->eraseOutput(i);
   }
@@ -248,20 +255,29 @@ torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod, C
       // segment the graph and convert segmented TensorRT block
       auto segmented_blocks = partitioning::segment_graph(g, convert_cfg.input_ranges);
 
-      int trt_engine_id = 0;
       for (auto &seg_block : segmented_blocks) {
-//        LOG_INFO(*seg_block.g_ << "SegmentedBlockGraph");
-        if (seg_block.target == partitioning::SegmentedBlock::kTensorRT) {
-          std::vector<int64_t> input_range = util::toVec(seg_block.in_shape_[0]);
-          convert_cfg.input_ranges[0] = conversion::InputRange(input_range);
+        LOG_INFO(*seg_block.g() << "SegmentedBlockGraph");
+      }
+
+      int trt_engine_id = 0;
+      std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_g;
+      for (auto &seg_block : segmented_blocks) {
+        if (seg_block.target() == partitioning::SegmentedBlock::kTensorRT) {
+          std::vector<conversion::InputRange> input_ranges;
+          for (auto &shape : seg_block.in_shape()) {
+            input_ranges.push_back(conversion::InputRange(util::toVec(shape)));
+          }
+          convert_cfg.input_ranges = input_ranges;
           auto engine = conversion::ConvertBlockToEngine(seg_block.block(), convert_cfg, named_params);
           auto temp_g = std::make_shared<torch::jit::Graph>();
           AddEngineToGraph(new_mod, temp_g, engine, trt_engine_id++);
 //          printf("type: %s\n", temp_g->inputs()[0]->type()->str().c_str());
-          auto temp_seg_block = partitioning::SegmentedBlock(partitioning::SegmentedBlock::kTensorRT, temp_g);
-          AddSegmentedBlockToGraph(new_g, temp_seg_block);
+//          auto temp_seg_block = partitioning::SegmentedBlock(partitioning::SegmentedBlock::kTensorRT, temp_g);
+//          AddSegmentedBlockToGraph(new_g, temp_seg_block);
+          seg_block.update_graph(temp_g);
+          AddSegmentedBlockToGraph(new_g, seg_block, old_to_new_g);
         } else {
-          AddSegmentedBlockToGraph(new_g, seg_block);
+          AddSegmentedBlockToGraph(new_g, seg_block, old_to_new_g);
         }
       }
 
