@@ -164,7 +164,6 @@ std::vector<SegmentedBlock> segment_graph(std::shared_ptr<torch::jit::Graph> g, 
     }
   }
 
-  printf("before register input\n");
   registerSegmentsInputsOutputs(segmented_blocks, g);
 
   std::vector<nvinfer1::Dims> graph_inputs_shape = extractNvinfer1Dims(input_ranges);
@@ -175,13 +174,6 @@ std::vector<SegmentedBlock> segment_graph(std::shared_ptr<torch::jit::Graph> g, 
   }
 
   for (auto &seg_block : segmented_blocks) {
-    LOG_INFO(*seg_block.g() << "In partitioning\n");
-  }
-
-  printf("before register shapes\n");
-
-  for (auto &seg_block : segmented_blocks) {
-    printf("h\n");
     registerSegmentInOutShape(seg_block, input_shape_map);
   }
 

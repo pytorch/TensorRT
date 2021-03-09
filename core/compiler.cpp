@@ -200,7 +200,7 @@ void AddSegmentedBlockToGraph(std::shared_ptr<torch::jit::Graph>& g, partitionin
 
   torch::jit::Node *node;
   for (const auto n : seg.nodes()) {
-    node = partitioning::cloneNode(n, g, old_to_new_g);
+    partitioning::cloneNode(n, g, old_to_new_g);
   }
 
   // original graph value => new global graph value
@@ -208,29 +208,9 @@ void AddSegmentedBlockToGraph(std::shared_ptr<torch::jit::Graph>& g, partitionin
     old_to_new_g[seg.raw_outputs()[i]] = old_to_new_g[seg.outputs()[i]];
   }
 
-  for (size_t i = 0; i < g->outputs().size(); ++i) {
-    g->eraseOutput(i);
-  }
-  for (auto &value : node->outputs()) {
-    g->registerOutput(value);
-  }
   LOG_INFO(*g << "(AddSegmentedBlockToGraph)\n");
   return;
 }
-
-//void print_type_dim(c10::TypePtr type) {
-//  printf("type: %s\n", type->str().c_str());
-//  auto tensor_type = type->cast<torch::jit::TensorType>();
-//  auto optional_vec = tensor_type->sizes().sizes().value();
-//  if (!tensor_type->isComplete()) {
-//    printf("Not complete type\n");
-//    return;
-//  }
-//  printf("dimension: %d\n", optional_vec.size());
-//  for (int i = 0; i < optional_vec.size(); ++i) {
-//    printf("dim(%d) : %d\n", i, optional_vec[i].value());
-//  }
-//}
 
 
 torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod, CompileSpec cfg) {
@@ -255,10 +235,6 @@ torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod, C
       // segment the graph and convert segmented TensorRT block
       auto segmented_blocks = partitioning::segment_graph(g, convert_cfg.input_ranges);
 
-      for (auto &seg_block : segmented_blocks) {
-        LOG_INFO(*seg_block.g() << "SegmentedBlockGraph");
-      }
-
       int trt_engine_id = 0;
       std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_g;
       for (auto &seg_block : segmented_blocks) {
@@ -271,15 +247,18 @@ torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod, C
           auto engine = conversion::ConvertBlockToEngine(seg_block.block(), convert_cfg, named_params);
           auto temp_g = std::make_shared<torch::jit::Graph>();
           AddEngineToGraph(new_mod, temp_g, engine, trt_engine_id++);
-//          printf("type: %s\n", temp_g->inputs()[0]->type()->str().c_str());
-//          auto temp_seg_block = partitioning::SegmentedBlock(partitioning::SegmentedBlock::kTensorRT, temp_g);
-//          AddSegmentedBlockToGraph(new_g, temp_seg_block);
           seg_block.update_graph(temp_g);
           AddSegmentedBlockToGraph(new_g, seg_block, old_to_new_g);
         } else {
           AddSegmentedBlockToGraph(new_g, seg_block, old_to_new_g);
         }
       }
+
+      for (auto &output : g->outputs()) {
+        new_g->registerOutput(old_to_new_g[output]);
+      }
+
+      LOG_INFO(*new_g << "(After CompileGraph)\n");
 
       auto new_method = new_mod._ivalue()->compilation_unit()->create_function(method.name(), new_g);
       auto schema = GenerateGraphSchema(new_mod, new_method->name(), new_g);
