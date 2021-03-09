@@ -6,7 +6,11 @@ import trtorch._C
 from trtorch._compile_spec import _parse_compile_spec
 from trtorch._version import __version__
 from types import FunctionType
-import tensorrt as trt
+
+ENTROPY_CALIBRATION = trtorch._C.CalibrationAlgo.ENTROPY_CALIBRATION
+ENTROPY_CALIBRATION_2 = trtorch._C.CalibrationAlgo.ENTROPY_CALIBRATION_2
+LEGACY_CALIBRATION = trtorch._C.CalibrationAlgo.LEGACY_CALIBRATION
+MINMAX_CALIBRATION = trtorch._C.CalibrationAlgo.MINMAX_CALIBRATION
 
 def get_cache_mode_batch(self):
     return None
@@ -49,13 +53,13 @@ def make_int8_calibrator(dataloader, cache_file, use_cache, algo_type):
                        'write_calibration_cache' : write_calibration_cache}
 
     # Using type metaclass to construct calibrator class based on algorithm type
-    if algo_type == trtorch._C.CalibrationAlgo.ENTROPY_CALIBRATION:
+    if algo_type == ENTROPY_CALIBRATION:
         return type('DataLoaderCalibrator', (trtorch._C.IInt8EntropyCalibrator,), attribute_mapping)()
-    elif algo_type == trtorch._C.CalibrationAlgo.ENTROPY_CALIBRATION_2:
+    elif algo_type == ENTROPY_CALIBRATION_2:
         return type('DataLoaderCalibrator', (trtorch._C.IInt8MinMaxCalibrator,), attribute_mapping)()
-    elif algo_type == trtorch._C.CalibrationAlgo.LEGACY_CALIBRATION:
+    elif algo_type == LEGACY_CALIBRATION:
         return type('DataLoaderCalibrator', (trtorch._C.IInt8LegacyCalibrator,), attribute_mapping)()
-    elif algo_type == trtorch._C.CalibrationAlgo.MINMAX_CALIBRATION:
+    elif algo_type == MINMAX_CALIBRATION:
         return type('DataLoaderCalibrator', (trtorch._C.IInt8MinMaxCalibrator,), attribute_mapping)()
     else:
         return ValueError("Invalid calibration algorithm type. Please select among ENTROPY_CALIBRATION, ENTROPY_CALIBRATION, LEGACY_CALIBRATION or MINMAX_CALIBRATION");

@@ -9,7 +9,8 @@
 #include "torch/custom_class.h"
 #include "torch/script.h"
 #include "torch/torch.h"
-#include "utils.h"
+#include "util.h"
+
 using namespace nvinfer1;
 using namespace pybind11::literals;
 namespace py = pybind11;
@@ -29,7 +30,7 @@ class pyCalibratorTrampoline : public Derived {
   bool getBatch(void* bindings[], const char* names[], int nbBindings) noexcept override {
     py::gil_scoped_acquire gil{};
 
-    py::function pyGetBatch = tensorrt::utils::getOverload(static_cast<Derived*>(this), "get_batch");
+    py::function pyGetBatch = trtorch::util::getOverload(static_cast<Derived*>(this), "get_batch");
     std::vector<const char*> namesVec(names, names + nbBindings);
     py::object result = pyGetBatch(namesVec);
     // Copy over into the other data structure.
@@ -44,7 +45,7 @@ class pyCalibratorTrampoline : public Derived {
     py::gil_scoped_acquire gil{};
 
     py::function pyReadCalibrationCache =
-        tensorrt::utils::getOverload(static_cast<Derived*>(this), "read_calibration_cache");
+        trtorch::util::getOverload(static_cast<Derived*>(this), "read_calibration_cache");
     py::buffer cache = pyReadCalibrationCache();
     if (!cache.is_none()) {
       py::buffer_info info = cache.request();
@@ -58,21 +59,9 @@ class pyCalibratorTrampoline : public Derived {
     py::gil_scoped_acquire gil{};
 
     py::function pyWriteCalibrationCache =
-        tensorrt::utils::getOverload(static_cast<Derived*>(this), "write_calibration_cache");
+        trtorch::util::getOverload(static_cast<Derived*>(this), "write_calibration_cache");
 
-#if PYBIND11_VERSION_MAJOR < 2 || PYBIND11_VERSION_MAJOR == 2 && PYBIND11_VERSION_MINOR < 6
-    py::buffer_info info{
-        const_cast<void*>(ptr), /* Pointer to buffer */
-        sizeof(uint8_t), /* Size of one scalar */
-        py::format_descriptor<uint8_t>::format(), /* Python struct-style format descriptor */
-        1, /* Number of dimensions */
-        {length}, /* Buffer dimensions */
-        { sizeof(uint8_t) } /* Strides (in bytes) for each index */
-    };
-    py::memoryview cache{info};
-#else
     py::memoryview cache{py::memoryview::from_buffer(static_cast<const uint8_t*>(ptr), {length}, {sizeof(uint8_t)})};
-#endif
     pyWriteCalibrationCache(cache);
   }
 };

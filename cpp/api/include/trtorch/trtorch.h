@@ -34,7 +34,7 @@ class IInt8Calibrator;
 }
 #endif // DOXYGEN_SHOULD_SKIP_THIS
 
-#include "trtorch/macros.h" // 
+#include "trtorch/macros.h"
 namespace trtorch {
 /**
  * Settings data structure for TRTorch compilation
