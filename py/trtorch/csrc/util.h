@@ -7,6 +7,7 @@
 #include "core/util/logging/TRTorchLogger.h"
 
 namespace trtorch {
+namespace pyapi {
 namespace util {
 
 namespace py = pybind11;
@@ -28,4 +29,5 @@ py::function getOverload(const T* self, const std::string& overloadName) {
 }
 
 } // namespace util
+} // namespace pyapi
 } // namespace trtorch

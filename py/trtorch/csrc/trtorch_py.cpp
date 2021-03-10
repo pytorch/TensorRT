@@ -30,7 +30,7 @@ class pyCalibratorTrampoline : public Derived {
   bool getBatch(void* bindings[], const char* names[], int nbBindings) noexcept override {
     py::gil_scoped_acquire gil{};
 
-    py::function pyGetBatch = trtorch::util::getOverload(static_cast<Derived*>(this), "get_batch");
+    py::function pyGetBatch = trtorch::pyapi::util::getOverload(static_cast<Derived*>(this), "get_batch");
     std::vector<const char*> namesVec(names, names + nbBindings);
     py::object result = pyGetBatch(namesVec);
     // Copy over into the other data structure.
@@ -45,7 +45,7 @@ class pyCalibratorTrampoline : public Derived {
     py::gil_scoped_acquire gil{};
 
     py::function pyReadCalibrationCache =
-        trtorch::util::getOverload(static_cast<Derived*>(this), "read_calibration_cache");
+        trtorch::pyapi::util::getOverload(static_cast<Derived*>(this), "read_calibration_cache");
     py::buffer cache = pyReadCalibrationCache();
     if (!cache.is_none()) {
       py::buffer_info info = cache.request();
@@ -59,7 +59,7 @@ class pyCalibratorTrampoline : public Derived {
     py::gil_scoped_acquire gil{};
 
     py::function pyWriteCalibrationCache =
-        trtorch::util::getOverload(static_cast<Derived*>(this), "write_calibration_cache");
+        trtorch::pyapi::util::getOverload(static_cast<Derived*>(this), "write_calibration_cache");
 
     py::memoryview cache{py::memoryview::from_buffer(static_cast<const uint8_t*>(ptr), {length}, {sizeof(uint8_t)})};
     pyWriteCalibrationCache(cache);
