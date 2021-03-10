@@ -124,10 +124,6 @@ void registerSegmentsInputsOutputs(std::vector<SegmentedBlock> &segmented_blocks
     }
   }
 
-//  for (auto &graph_input : g->inputs()) {
-//    input_values.erase(graph_input);
-//  }
-
   for (auto &graph_output : g->outputs()) {
     input_values.insert(graph_output);
   }
