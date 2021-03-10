@@ -62,6 +62,14 @@ void registerSegmentInOutShape(SegmentedBlock &seg_block, std::unordered_map<tor
   // create a module to run the graph
   auto g = seg_block.g();
   auto copy_g = g->copy();
+  if (seg_block.raw_outputs().size() > 1) {
+    auto new_output_node = copy_g->appendNode(copy_g->createTuple(copy_g->outputs()));
+    for (int idx = copy_g->outputs().size() - 1; idx >= 0; --idx) {
+      copy_g->eraseOutput(idx);
+    }
+    copy_g->registerOutput(new_output_node->outputs()[0]);
+  }
+
   torch::jit::script::Module cur_mod(c10::QualifiedName("module"));
 
   auto self = copy_g->insertInput(0, "self_1");
@@ -140,25 +148,45 @@ void registerSegmentsInputsOutputs(std::vector<SegmentedBlock> &segmented_blocks
   return;
 }
 
-std::vector<SegmentedBlock> segment_graph(std::shared_ptr<torch::jit::Graph> g, std::vector<conversion::InputRange>& input_ranges) {
+void merge_nodes(std::vector<torch::jit::Node*> &pytorch_nodes, std::vector<torch::jit::Node*> &tensorrt_nodes,
+                 std::vector<SegmentedBlock> &segmented_blocks, size_t min_block_size) {
+  if (!tensorrt_nodes.empty()) {
+    if (tensorrt_nodes.size() < min_block_size) {
+      pytorch_nodes.insert(pytorch_nodes.end(), tensorrt_nodes.begin(), tensorrt_nodes.end());
+    } else {
+      if (!pytorch_nodes.empty()) segmented_blocks.emplace_back(SegmentedBlock::kTorch, pytorch_nodes);
+      segmented_blocks.emplace_back(SegmentedBlock::kTensorRT, tensorrt_nodes);
+      pytorch_nodes.clear();
+    }
+    tensorrt_nodes.clear();
+  }
+}
+
+std::vector<SegmentedBlock> segment_graph(std::shared_ptr<torch::jit::Graph> g,
+                                          std::vector<conversion::InputRange>& input_ranges,
+                                          const conversion::TorchFallback &fallback_info) {
+  auto min_block_size = fallback_info.min_block_size;
+  std::unordered_set<std::string> forced_fallback_operators(fallback_info.forced_fallback_operators.begin(), fallback_info.forced_fallback_operators.end());
   std::vector<SegmentedBlock> segmented_blocks;
 
   auto nodes = g->block()->nodes();
 
   // segment the nodes
+  std::vector<torch::jit::Node*> tensorrt_nodes, pytorch_nodes;
+
   for (const auto n : nodes) {
     if (n->kind() == torch::jit::prim::Constant) continue;
+    std::string node_string(n->kind().toQualString());
 
-    auto block_target = conversion::OpSupported(n) ? SegmentedBlock::kTensorRT : SegmentedBlock::kTorch;
-
-    if (segmented_blocks.empty() || block_target != segmented_blocks.back().target()) {
-      SegmentedBlock cur_block(block_target);
-      cur_block.appendNode(n);
-      segmented_blocks.push_back(cur_block);
+    if (conversion::OpSupported(n) && !forced_fallback_operators.count(node_string)) {
+      tensorrt_nodes.push_back(n);
     } else {
-        segmented_blocks.back().appendNode(n);
+      merge_nodes(pytorch_nodes, tensorrt_nodes, segmented_blocks, min_block_size);
+      pytorch_nodes.push_back(n);
     }
   }
+  merge_nodes(pytorch_nodes, tensorrt_nodes, segmented_blocks, min_block_size);
+  if (!pytorch_nodes.empty()) segmented_blocks.emplace_back(SegmentedBlock::kTorch, pytorch_nodes);
 
   registerSegmentsInputsOutputs(segmented_blocks, g);
 

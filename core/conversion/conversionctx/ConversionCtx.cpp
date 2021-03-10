@@ -39,7 +39,13 @@ std::ostream& operator<<(std::ostream& os, const BuilderSettings& s) {
 
     os << "\n    Torch Fallback: " << s.torch_fallback.enabled;
     if (s.torch_fallback.enabled) {
-      os << "\n    Fallback min block size: " << s.torch_fallback.min_block_size;
+      os << "\n    Fallback Min Block Size: " << s.torch_fallback.min_block_size;
+      if (!s.torch_fallback.forced_fallback_operators.empty()) {
+        os << "\n    Forced Fallback Operators:";
+        for (auto it = s.torch_fallback.forced_fallback_operators.begin(); it != s.torch_fallback.forced_fallback_operators.end(); ++it) {
+          os << " " << *it;
+        }
+      }
     }
     return os;
 }

@@ -184,7 +184,7 @@ void AddSegmentedBlockToGraph(std::shared_ptr<torch::jit::Graph>& g, partitionin
     old_to_new_g[seg.raw_outputs()[i]] = old_to_new_g[seg.outputs()[i]];
   }
 
-  LOG_INFO(*g << "(AddSegmentedBlockToGraph)\n");
+//  LOG_INFO(*g << "(AddSegmentedBlockToGraph)\n");
   return;
 }
 
@@ -208,7 +208,10 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
 
 
       // segment the graph and convert segmented TensorRT block
-      auto segmented_blocks = partitioning::segment_graph(g, convert_cfg.input_ranges);
+      auto segmented_blocks = partitioning::segment_graph(g, convert_cfg.input_ranges, convert_cfg.engine_settings.torch_fallback);
+      if (segmented_blocks.size() == 1 && segmented_blocks[0].target() == partitioning::SegmentedBlock::kTorch) {
+        return mod;
+      }
 
       int trt_engine_id = 0;
       std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_g;
@@ -233,7 +236,7 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
         new_g->registerOutput(old_to_new_g[output]);
       }
 
-      LOG_INFO(*new_g << "(After CompileGraph)\n");
+      LOG_INFO(*new_g << "(StitchSegmentedGraph)\n");
 
       auto new_method = new_mod._ivalue()->compilation_unit()->create_function(method.name(), new_g);
       auto schema = GenerateGraphSchema(new_mod, new_method->name(), new_g);

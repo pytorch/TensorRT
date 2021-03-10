@@ -20,7 +20,16 @@ struct SegmentedBlock {
     kTensorRT,
   };
 
+  SegmentedBlock() = default;
+
   SegmentedBlock(SegmentedBlockTarget blk_target) : target_(blk_target), g_(std::make_shared<torch::jit::Graph>()) {}
+
+  SegmentedBlock(SegmentedBlockTarget blk_target, const std::vector<torch::jit::Node*> &nodes) :
+        target_(blk_target), g_(std::make_shared<torch::jit::Graph>()) {
+    for (auto &node : nodes) {
+      appendNode(node);
+    }
+  }
 
   SegmentedBlock(SegmentedBlockTarget blk_target, std::shared_ptr<torch::jit::Graph> g) : target_(blk_target), g_(g) {}
 
@@ -40,6 +49,7 @@ struct SegmentedBlock {
 
   void registerOutput(torch::jit::Value* raw_input) {
     outputs_.push_back(raw_input);
+
     g_->registerOutput(old_to_new_[raw_input]);
   }
 
@@ -108,8 +118,9 @@ struct SegmentedBlock {
 
 };
 
-std::vector<SegmentedBlock> segment_graph(std::shared_ptr<torch::jit::Graph> g, std::vector<conversion::InputRange>& input_ranges);
-
+std::vector<SegmentedBlock> segment_graph(std::shared_ptr<torch::jit::Graph> g,
+                                          std::vector<conversion::InputRange>& input_ranges,
+                                          const conversion::TorchFallback &fallback_info);
 }
 }
 }
