@@ -124,6 +124,12 @@ PYBIND11_MODULE(_C, m) {
       .def_readwrite("dla_core", &Device::dla_core)
       .def_readwrite("allow_gpu_fallback", &Device::allow_gpu_fallback);
 
+  py::class_<TorchFallback>(m, "TorchFallback")
+      .def(py::init<>())
+      .def_readwrite("enabled", &TorchFallback::enabled)
+      .def_readwrite("min_block_size", &TorchFallback::min_block_size)
+      .def_readwrite("forced_fallback_operators", &TorchFallback::forced_fallback_operators);
+
   m.doc() =
       "TRTorch Internal C Bindings: Ahead of Time compilation for PyTorch JIT. A tool to convert PyTorch JIT to TensorRT";
   m.def(

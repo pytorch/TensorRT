@@ -107,6 +107,9 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
   info.convert_info.engine_settings.device.gpu_id = device.gpu_id;
   info.convert_info.engine_settings.device.dla_core = device.dla_core;
   info.convert_info.engine_settings.device.allow_gpu_fallback = device.allow_gpu_fallback;
+  info.convert_info.engine_settings.torch_fallback.enabled = torch_fallback.enabled;
+  info.convert_info.engine_settings.torch_fallback.min_block_size = torch_fallback.min_block_size;
+  info.convert_info.engine_settings.torch_fallback.forced_fallback_operators = torch_fallback.forced_fallback_operators;
 
   info.convert_info.engine_settings.capability = toTRTEngineCapability(capability);
   TRTORCH_CHECK(num_min_timing_iters >= 0, "num_min_timing_iters must be 0 or greater");
