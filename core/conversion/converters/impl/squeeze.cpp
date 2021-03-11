@@ -25,6 +25,15 @@ auto squeeze_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().pat
          dim = selfDim.size() + dim;
        }
 
+       if (selfDim[dim] != 1) {
+         auto identity = ctx->net->addIdentity(*self);
+         auto out = ctx->AssociateValueAndTensor(n->outputs()[0], identity->getOutput(0));
+
+         LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+
+         return true;
+       }
+
        auto shuffle_layer = ctx->net->addShuffle(*self);
        TRTORCH_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
        shuffle_layer->setReshapeDimensions(util::squeezeDims(self->getDimensions(), dim));
