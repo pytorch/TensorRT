@@ -11,8 +11,7 @@
 #include "torch/torch.h"
 #include "util.h"
 
-using namespace nvinfer1;
-using namespace pybind11::literals;
+// using namespace nvinfer1;
 namespace py = pybind11;
 
 namespace trtorch {
@@ -66,35 +65,38 @@ class pyCalibratorTrampoline : public Derived {
   }
 };
 
-class pyIInt8Calibrator : public pyCalibratorTrampoline<IInt8Calibrator> {
+class pyIInt8Calibrator : public pyCalibratorTrampoline<nvinfer1::IInt8Calibrator> {
  public:
-  using Derived = pyCalibratorTrampoline<IInt8Calibrator>;
+  using Derived = pyCalibratorTrampoline<nvinfer1::IInt8Calibrator>;
   using Derived::Derived;
 
-  CalibrationAlgoType getAlgorithm() noexcept override {
-    PYBIND11_OVERLOAD_PURE_NAME(CalibrationAlgoType, IInt8Calibrator, "get_algorithm", getAlgorithm);
+  nvinfer1::CalibrationAlgoType getAlgorithm() noexcept override {
+    PYBIND11_OVERLOAD_PURE_NAME(
+        nvinfer1::CalibrationAlgoType, nvinfer1::IInt8Calibrator, "get_algorithm", getAlgorithm);
   }
 };
 
-class pyIInt8LegacyCalibrator : public pyCalibratorTrampoline<IInt8LegacyCalibrator> {
+class pyIInt8LegacyCalibrator : public pyCalibratorTrampoline<nvinfer1::IInt8LegacyCalibrator> {
  public:
-  using Derived = pyCalibratorTrampoline<IInt8LegacyCalibrator>;
+  using Derived = pyCalibratorTrampoline<nvinfer1::IInt8LegacyCalibrator>;
   using Derived::Derived;
 
   double getQuantile() const noexcept override {
-    PYBIND11_OVERLOAD_PURE_NAME(double, IInt8LegacyCalibrator, "get_quantile", getQuantile);
+    PYBIND11_OVERLOAD_PURE_NAME(double, nvinfer1::IInt8LegacyCalibrator, "get_quantile", getQuantile);
   }
 
   double getRegressionCutoff() const noexcept override {
-    PYBIND11_OVERLOAD_PURE_NAME(double, IInt8LegacyCalibrator, "get_regression_cutoff", getRegressionCutoff);
+    PYBIND11_OVERLOAD_PURE_NAME(double, nvinfer1::IInt8LegacyCalibrator, "get_regression_cutoff", getRegressionCutoff);
   }
 
   const void* readHistogramCache(std::size_t& length) noexcept override {
-    PYBIND11_OVERLOAD_PURE_NAME(const void*, IInt8LegacyCalibrator, "read_histogram_cache", readHistogramCache, length);
+    PYBIND11_OVERLOAD_PURE_NAME(
+        const void*, nvinfer1::IInt8LegacyCalibrator, "read_histogram_cache", readHistogramCache, length);
   }
 
   void writeHistogramCache(const void* ptr, std::size_t length) noexcept override {
-    PYBIND11_OVERLOAD_PURE_NAME(void, IInt8LegacyCalibrator, "write_histogram_cache", writeHistogramCache, ptr, length);
+    PYBIND11_OVERLOAD_PURE_NAME(
+        void, nvinfer1::IInt8LegacyCalibrator, "write_histogram_cache", writeHistogramCache, ptr, length);
   }
 };
 
@@ -185,40 +187,50 @@ PYBIND11_MODULE(_C, m) {
       .value("safe_dla", EngineCapability::kSAFE_DLA, "Use safety DLA kernels only")
       .value("default", EngineCapability::kDEFAULT, "Use default behavior");
 
-  py::enum_<CalibrationAlgoType>(m, "CalibrationAlgo", py::module_local(), "Type of calibration algorithm")
-      .value("LEGACY_CALIBRATION", CalibrationAlgoType::kLEGACY_CALIBRATION)
-      .value("ENTROPY_CALIBRATION", CalibrationAlgoType::kENTROPY_CALIBRATION)
-      .value("ENTROPY_CALIBRATION_2", CalibrationAlgoType::kENTROPY_CALIBRATION_2)
-      .value("MINMAX_CALIBRATION", CalibrationAlgoType::kMINMAX_CALIBRATION);
+  py::enum_<nvinfer1::CalibrationAlgoType>(m, "CalibrationAlgo", py::module_local(), "Type of calibration algorithm")
+      .value("LEGACY_CALIBRATION", nvinfer1::CalibrationAlgoType::kLEGACY_CALIBRATION)
+      .value("ENTROPY_CALIBRATION", nvinfer1::CalibrationAlgoType::kENTROPY_CALIBRATION)
+      .value("ENTROPY_CALIBRATION_2", nvinfer1::CalibrationAlgoType::kENTROPY_CALIBRATION_2)
+      .value("MINMAX_CALIBRATION", nvinfer1::CalibrationAlgoType::kMINMAX_CALIBRATION);
 
-  py::class_<IInt8Calibrator, pyIInt8Calibrator>(m, "IInt8Calibrator", py::module_local(), "Int8 Calibrator base class")
+  py::class_<nvinfer1::IInt8Calibrator, pyIInt8Calibrator>(
+      m, "IInt8Calibrator", py::module_local(), "Int8 Calibrator base class")
       .def(py::init_alias<>()) // Always initialize trampoline class.
-      .def("get_batch_size", &IInt8Calibrator::getBatchSize, "Get batch size")
-      .def("get_algorithm", &IInt8Calibrator::getAlgorithm, "Get algorithm");
+      .def("get_batch_size", &nvinfer1::IInt8Calibrator::getBatchSize, "Get batch size")
+      .def("get_algorithm", &nvinfer1::IInt8Calibrator::getAlgorithm, "Get algorithm");
 
-  py::class_<IInt8LegacyCalibrator, IInt8Calibrator, pyIInt8LegacyCalibrator>(
+  py::class_<nvinfer1::IInt8LegacyCalibrator, nvinfer1::IInt8Calibrator, pyIInt8LegacyCalibrator>(
       m, "IInt8LegacyCalibrator", py::module_local(), "Int8 Legacy Calibrator class")
       .def(py::init_alias<>()) // Always initialize trampoline class.
-      .def("get_batch_size", &IInt8LegacyCalibrator::getBatchSize, "Get batch size")
-      .def("get_algorithm", &IInt8LegacyCalibrator::getAlgorithm, "Get algorithm");
+      .def("get_batch_size", &nvinfer1::IInt8LegacyCalibrator::getBatchSize, "Get batch size")
+      .def("get_algorithm", &nvinfer1::IInt8LegacyCalibrator::getAlgorithm, "Get algorithm");
 
-  py::class_<IInt8EntropyCalibrator, IInt8Calibrator, pyCalibratorTrampoline<IInt8EntropyCalibrator>>(
+  py::class_<
+      nvinfer1::IInt8EntropyCalibrator,
+      nvinfer1::IInt8Calibrator,
+      pyCalibratorTrampoline<nvinfer1::IInt8EntropyCalibrator>>(
       m, "IInt8EntropyCalibrator", py::module_local(), "Int8 Entropy Calibrator class")
       .def(py::init_alias<>()) // Always initialize trampoline class.
-      .def("get_batch_size", &IInt8EntropyCalibrator::getBatchSize, "Get batch size")
-      .def("get_algorithm", &IInt8EntropyCalibrator::getAlgorithm, "Get algorithm");
+      .def("get_batch_size", &nvinfer1::IInt8EntropyCalibrator::getBatchSize, "Get batch size")
+      .def("get_algorithm", &nvinfer1::IInt8EntropyCalibrator::getAlgorithm, "Get algorithm");
 
-  py::class_<IInt8EntropyCalibrator2, IInt8Calibrator, pyCalibratorTrampoline<IInt8EntropyCalibrator2>>(
+  py::class_<
+      nvinfer1::IInt8EntropyCalibrator2,
+      nvinfer1::IInt8Calibrator,
+      pyCalibratorTrampoline<nvinfer1::IInt8EntropyCalibrator2>>(
       m, "IInt8EntropyCalibrator2", py::module_local(), "Int8 Entropy Calibrator2 class")
       .def(py::init_alias<>()) // Always initialize trampoline class.
-      .def("get_batch_size", &IInt8EntropyCalibrator2::getBatchSize, "Get batch size")
-      .def("get_algorithm", &IInt8EntropyCalibrator2::getAlgorithm, "Get algorithm");
+      .def("get_batch_size", &nvinfer1::IInt8EntropyCalibrator2::getBatchSize, "Get batch size")
+      .def("get_algorithm", &nvinfer1::IInt8EntropyCalibrator2::getAlgorithm, "Get algorithm");
 
-  py::class_<IInt8MinMaxCalibrator, IInt8Calibrator, pyCalibratorTrampoline<IInt8MinMaxCalibrator>>(
+  py::class_<
+      nvinfer1::IInt8MinMaxCalibrator,
+      nvinfer1::IInt8Calibrator,
+      pyCalibratorTrampoline<nvinfer1::IInt8MinMaxCalibrator>>(
       m, "IInt8MinMaxCalibrator", py::module_local(), "Int8 MinMax Calibrator class")
       .def(py::init_alias<>()) // Always initialize trampoline class.
-      .def("get_batch_size", &IInt8MinMaxCalibrator::getBatchSize, "Get batch size")
-      .def("get_algorithm", &IInt8MinMaxCalibrator::getAlgorithm, "Get algorithm");
+      .def("get_batch_size", &nvinfer1::IInt8MinMaxCalibrator::getBatchSize, "Get batch size")
+      .def("get_algorithm", &nvinfer1::IInt8MinMaxCalibrator::getAlgorithm, "Get algorithm");
 
   py::class_<CompileSpec>(m, "CompileSpec")
       .def(py::init<>())

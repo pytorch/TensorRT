@@ -4,7 +4,7 @@
 #include <functional>
 #include <iostream>
 #include <string>
-#include "core/util/logging/TRTorchLogger.h"
+#include "core/util/prelude.h"
 
 namespace trtorch {
 namespace pyapi {
@@ -21,9 +21,7 @@ py::function getOverload(const T* self, const std::string& overloadName) {
   if (!overload) {
     std::string msg{"Method: " + overloadName +
                     " was not overriden. Please provide an implementation for this method."};
-    // std::cerr << "Method: " << overloadName << " was not overriden. Please provide an implementation for this
-    // method.";
-    core::util::logging::get_logger().log(core::util::logging::LogLevel::kERROR, msg);
+    LOG_ERROR(msg);
   }
   return overload;
 }

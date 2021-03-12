@@ -5,6 +5,7 @@ import os
 import trtorch._C
 from trtorch._compile_spec import _parse_compile_spec
 from trtorch._version import __version__
+from trtorch.logging import *
 from types import FunctionType
 from enum import Enum
 
@@ -24,42 +25,57 @@ def get_batch_size(self):
 def get_batch(self, names):
     if self.current_batch_idx + self.batch_size > self.data_loader.dataset.data.shape[0]:
         return None
+
+    if self.current_batch_idx % 100 == 0:
+        log(Level.Debug, "Calibration samples processed: {}".format(self.current_batch_idx))
+
     batch = self.dataset_iterator.next()
     self.current_batch_idx += self.batch_size
-    print("Calibrating batch: ", self.current_batch_idx)
     # Treat the first element as input and others as targets.
     if isinstance(batch, list):
-        batch = batch[0].to(torch.device('cuda:0'))
+        batch = batch[0].to(self.device)
     return [batch.data_ptr()]
 
 def read_calibration_cache(self):
-    if self.use_cache:
+    if self.cache_file and self.use_cache:
         if os.path.exists(self.cache_file):
             with open(self.cache_file, "rb") as f:
                 return f.read()
 
 def write_calibration_cache(self, cache):
-    with open(self.cache_file, "wb") as f:
-        f.write(cache)
+    if self.cache_file:
+        with open(self.cache_file, "wb") as f:
+            f.write(cache)
 
 class DataLoaderCalibrator(object):
-    def __init__(self, dataloader, cache_file, use_cache, algo_type):
-        self.algo_type = algo_type
-        if use_cache:
-            if os.path.isfile(cache_file):
-                print("Using existing cache file for calibration ", cache_file)
+    def __init__(self, dataloader, **kwargs):
+        self.algo_type = kwargs.get("algo_type", trtorch.ptq.CalibrationAlgo.ENTROPY_CALIBRATION_2)
+        self.cache_file = kwargs.get("cache_file", None)
+        self.use_cache = kwargs.get("use_cache", False)
+        self.device = kwargs.get("device", torch.device("cuda:0"))
+
+        if not isinstance(dataloader, torch.utils.data.DataLoader):
+            log(Level.Error, "Dataloader : {} is not a valid instance of torch.utils.data.DataLoader".format(dataloader))
+
+        if not self.cache_file:
+            if self.use_cache:
+                log(Level.Debug, "Using existing cache_file {} for calibration".format(self.cache_file))
             else:
-                raise ValueError("use_cache flag is True but cache file not found.")
+                log(Level.Debug, "Overwriting existing calibration cache file.")
+        else:
+            if self.use_cache:
+                log(Level.Error, "Input cache file is None but use_cache is set to True in INT8 mode.")
 
         # Define attributes and member functions for the calibrator class
         self.attribute_mapping={'data_loader' : dataloader,
                                'current_batch_idx' : 0,
                                'batch_size' : dataloader.batch_size,
                                'dataset_iterator' : iter(dataloader),
-                               'cache_file' : cache_file,
-                               'use_cache' : use_cache,
+                               'cache_file' : self.cache_file,
+                               'device' : self.device,
+                               'use_cache' : self.use_cache,
                                'get_batch_size' : get_batch_size,
-                               'get_batch': get_cache_mode_batch if use_cache else get_batch,
+                               'get_batch': get_cache_mode_batch if self.use_cache else get_batch,
                                'read_calibration_cache' : read_calibration_cache,
                                'write_calibration_cache' : write_calibration_cache}
 
@@ -74,19 +90,21 @@ class DataLoaderCalibrator(object):
         elif self.algo_type == CalibrationAlgo.MINMAX_CALIBRATION:
             return type('DataLoaderCalibrator', (trtorch._C.IInt8MinMaxCalibrator,), self.attribute_mapping)()
         else:
-            return ValueError("Invalid calibration algorithm type. Please select among ENTROPY_CALIBRATION, ENTROPY_CALIBRATION, LEGACY_CALIBRATION or MINMAX_CALIBRATION");
+            log(Level.Error, "Invalid calibration algorithm type. Please select among ENTROPY_CALIBRATION, ENTROPY_CALIBRATION, LEGACY_CALIBRATION or MINMAX_CALIBRATION");
 
 class CacheCalibrator(object):
-    def __init__(self, cache_file, algo_type):
-        self.algo_type = algo_type
-        if os.path.isfile(cache_file):
-            print("Using cache file for calibration ", cache_file)
+    def __init__(self, cache_file, **kwargs):
+        self.cache_file = cache_file
+        self.algo_type = kwargs.get("algo_type", trtorch.ptq.CalibrationAlgo.ENTROPY_CALIBRATION_2)
+
+        if os.path.isfile(self.cache_file):
+            log(Level.Debug, "Using existing cache_file {} for calibration".format(self.cache_file))
         else:
-            raise ValueError("Calibration cache file not found at ", cache_file)
+            log(Level.Error, "Invalid calibration cache file.")
 
         # Define attributes and member functions for the calibrator class
         self.attribute_mapping={'use_cache' : True,
-                                'cache_file' : cache_file,
+                                'cache_file' : self.cache_file,
                                 'get_batch_size' : get_batch_size,
                                 'get_batch': get_cache_mode_batch,
                                 'read_calibration_cache' : read_calibration_cache,
@@ -103,4 +121,4 @@ class CacheCalibrator(object):
         elif self.algo_type == CalibrationAlgo.MINMAX_CALIBRATION:
             return type('DataLoaderCalibrator', (trtorch._C.IInt8MinMaxCalibrator,), self.attribute_mapping)()
         else:
-            return ValueError("Invalid calibration algorithm type. Please select among ENTROPY_CALIBRATION, ENTROPY_CALIBRATION, LEGACY_CALIBRATION or MINMAX_CALIBRATION");
+            log(Level.Error, "Invalid calibration algorithm type. Please select among ENTROPY_CALIBRATION, ENTROPY_CALIBRATION, LEGACY_CALIBRATION or MINMAX_CALIBRATION");
