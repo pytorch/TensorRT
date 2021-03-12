@@ -85,8 +85,7 @@ TEST(Converters, ATenHardTanhConvertsCorrectly) {
   params = trtorch::core::conversion::get_named_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0],
-  trt_results[0], 2e-6));
+  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
 TEST(Converters, ATenHardTanhCustomRangeConvertsCorrectly) {
