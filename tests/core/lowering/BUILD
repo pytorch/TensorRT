@@ -8,6 +8,10 @@ config_setting(
 )
 
 lowering_test(
+  name = "test_linear_to_addmm",
+)
+
+lowering_test(
   name = "test_remove_contiguous_pass",
 )
 
@@ -30,6 +34,7 @@ lowering_test(
 test_suite(
     name = "lowering_tests",
     tests = [
+        ":test_linear_to_addmm",
         ":test_remove_contiguous_pass",
         ":test_remove_to",
         ":test_remove_detach_pass",
