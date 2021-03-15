@@ -27,7 +27,7 @@ class TestAccuracy(ModelTestCase):
                                                               shuffle=False,
                                                               num_workers=1)
         self.calibrator = trtorch.ptq.DataLoaderCalibrator(self.testing_dataloader,
-                                                           cache_file=None,
+                                                           cache_file='./calibration.cache',
                                                            use_cache=False,
                                                            algo_type=trtorch.ptq.CalibrationAlgo.ENTROPY_CALIBRATION_2,
                                                            device=torch.device('cuda:0'))
@@ -63,7 +63,7 @@ class TestAccuracy(ModelTestCase):
         compile_spec = {
             "input_shapes": [[1, 3, 32, 32]],
             "op_precision": torch.int8,
-            "calibrator": self.calibrator(),
+            "calibrator": self.calibrator,
             "device": {
                 "device_type": trtorch.DeviceType.GPU,
                 "gpu_id": 0,

@@ -51,51 +51,64 @@ def write_calibration_cache(self, cache):
 
 
 class DataLoaderCalibrator(object):
+    """
+    Constructs a calibrator class in TensorRT and uses pytorch dataloader to load/preproces
+    data which is passed during calibration.
+    Args:
+        dataloader: an instance of pytorch dataloader which iterates through a given dataset.
+        algo_type: choice of calibration algorithm.
+        cache_file: path to cache file.
+        use_cache: flag which enables usage of pre-existing cache.
+        device: device on which calibration data is copied to.
+    """
 
-    def __init__(self, dataloader, **kwargs):
-        self.algo_type = kwargs.get("algo_type", trtorch.ptq.CalibrationAlgo.ENTROPY_CALIBRATION_2)
-        self.cache_file = kwargs.get("cache_file", None)
-        self.use_cache = kwargs.get("use_cache", False)
-        self.device = kwargs.get("device", torch.device("cuda:0"))
+    def __init__(self, **kwargs):
+        pass
+
+    def __new__(cls, *args, **kwargs):
+        dataloader = args[0]
+        algo_type = kwargs.get("algo_type", trtorch.ptq.CalibrationAlgo.ENTROPY_CALIBRATION_2)
+        cache_file = kwargs.get("cache_file", None)
+        use_cache = kwargs.get("use_cache", False)
+        device = kwargs.get("device", torch.device("cuda:0"))
 
         if not isinstance(dataloader, torch.utils.data.DataLoader):
             log(Level.Error,
                 "Dataloader : {} is not a valid instance of torch.utils.data.DataLoader".format(dataloader))
 
-        if not self.cache_file:
-            if self.use_cache:
-                log(Level.Debug, "Using existing cache_file {} for calibration".format(self.cache_file))
+        if not cache_file:
+            if use_cache:
+                log(Level.Debug, "Using existing cache_file {} for calibration".format(cache_file))
             else:
                 log(Level.Debug, "Overwriting existing calibration cache file.")
         else:
-            if self.use_cache:
+            if use_cache:
                 log(Level.Error, "Input cache file is None but use_cache is set to True in INT8 mode.")
 
         # Define attributes and member functions for the calibrator class
-        self.attribute_mapping = {
+        attribute_mapping = {
             'data_loader': dataloader,
             'current_batch_idx': 0,
             'batch_size': dataloader.batch_size,
             'dataset_iterator': iter(dataloader),
-            'cache_file': self.cache_file,
-            'device': self.device,
-            'use_cache': self.use_cache,
+            'cache_file': cache_file,
+            'device': device,
+            'use_cache': use_cache,
             'get_batch_size': get_batch_size,
-            'get_batch': get_cache_mode_batch if self.use_cache else get_batch,
+            'get_batch': get_cache_mode_batch if use_cache else get_batch,
             'read_calibration_cache': read_calibration_cache,
             'write_calibration_cache': write_calibration_cache
         }
 
-    def __call__(self):
         # Using type metaclass to construct calibrator class based on algorithm type
-        if self.algo_type == CalibrationAlgo.ENTROPY_CALIBRATION:
-            return type('DataLoaderCalibrator', (trtorch._C.IInt8EntropyCalibrator,), self.attribute_mapping)()
-        elif self.algo_type == CalibrationAlgo.ENTROPY_CALIBRATION_2:
-            return type('DataLoaderCalibrator', (trtorch._C.IInt8MinMaxCalibrator,), self.attribute_mapping)()
-        elif self.algo_type == CalibrationAlgo.LEGACY_CALIBRATION:
-            return type('DataLoaderCalibrator', (trtorch._C.IInt8LegacyCalibrator,), self.attribute_mapping)()
-        elif self.algo_type == CalibrationAlgo.MINMAX_CALIBRATION:
-            return type('DataLoaderCalibrator', (trtorch._C.IInt8MinMaxCalibrator,), self.attribute_mapping)()
+        if algo_type == CalibrationAlgo.ENTROPY_CALIBRATION:
+            return type('DataLoaderCalibrator', (trtorch._C.IInt8EntropyCalibrator,), attribute_mapping)()
+        elif algo_type == CalibrationAlgo.ENTROPY_CALIBRATION_2:
+            return type('DataLoaderCalibrator', (trtorch._C.IInt8MinMaxCalibrator,), attribute_mapping)()
+        elif algo_type == CalibrationAlgo.LEGACY_CALIBRATION:
+            return type('DataLoaderCalibrator', (trtorch._C.IInt8LegacyCalibrator,), attribute_mapping)()
+        elif algo_type == CalibrationAlgo.MINMAX_CALIBRATION:
+            return type('DataLoaderCalibrator', (trtorch._C.IInt8MinMaxCalibrator,), attribute_mapping)()
         else:
             log(
                 Level.Error,
@@ -104,36 +117,43 @@ class DataLoaderCalibrator(object):
 
 
 class CacheCalibrator(object):
+    """
+    Constructs a calibrator class in TensorRT which directly uses pre-existing cache file for calibration.
+    Args:
+        cache_file: path to cache file.
+        algo_type: choice of calibration algorithm.
+    """
 
-    def __init__(self, cache_file, **kwargs):
-        self.cache_file = cache_file
-        self.algo_type = kwargs.get("algo_type", trtorch.ptq.CalibrationAlgo.ENTROPY_CALIBRATION_2)
+    def __init__(self, **kwargs):
+        pass
 
-        if os.path.isfile(self.cache_file):
-            log(Level.Debug, "Using existing cache_file {} for calibration".format(self.cache_file))
+    def __new__(cls, *args, **kwargs):
+        cache_file = args[0]
+        algo_type = kwargs.get("algo_type", trtorch.ptq.CalibrationAlgo.ENTROPY_CALIBRATION_2)
+
+        if os.path.isfile(cache_file):
+            log(Level.Debug, "Using existing cache_file {} for calibration".format(cache_file))
         else:
             log(Level.Error, "Invalid calibration cache file.")
 
         # Define attributes and member functions for the calibrator class
-        self.attribute_mapping = {
+        attribute_mapping = {
             'use_cache': True,
-            'cache_file': self.cache_file,
+            'cache_file': cache_file,
             'get_batch_size': get_batch_size,
             'get_batch': get_cache_mode_batch,
             'read_calibration_cache': read_calibration_cache,
             'write_calibration_cache': write_calibration_cache
         }
-
-    def __call__(self):
         # Using type metaclass to construct calibrator class based on algorithm type
-        if self.algo_type == CalibrationAlgo.ENTROPY_CALIBRATION:
-            return type('DataLoaderCalibrator', (trtorch._C.IInt8EntropyCalibrator,), self.attribute_mapping)()
-        elif self.algo_type == CalibrationAlgo.ENTROPY_CALIBRATION_2:
-            return type('DataLoaderCalibrator', (trtorch._C.IInt8MinMaxCalibrator,), self.attribute_mapping)()
-        elif self.algo_type == CalibrationAlgo.LEGACY_CALIBRATION:
-            return type('DataLoaderCalibrator', (trtorch._C.IInt8LegacyCalibrator,), self.attribute_mapping)()
-        elif self.algo_type == CalibrationAlgo.MINMAX_CALIBRATION:
-            return type('DataLoaderCalibrator', (trtorch._C.IInt8MinMaxCalibrator,), self.attribute_mapping)()
+        if algo_type == CalibrationAlgo.ENTROPY_CALIBRATION:
+            return type('DataLoaderCalibrator', (trtorch._C.IInt8EntropyCalibrator,), attribute_mapping)()
+        elif algo_type == CalibrationAlgo.ENTROPY_CALIBRATION_2:
+            return type('DataLoaderCalibrator', (trtorch._C.IInt8MinMaxCalibrator,), attribute_mapping)()
+        elif algo_type == CalibrationAlgo.LEGACY_CALIBRATION:
+            return type('DataLoaderCalibrator', (trtorch._C.IInt8LegacyCalibrator,), attribute_mapping)()
+        elif algo_type == CalibrationAlgo.MINMAX_CALIBRATION:
+            return type('DataLoaderCalibrator', (trtorch._C.IInt8MinMaxCalibrator,), attribute_mapping)()
         else:
             log(
                 Level.Error,
