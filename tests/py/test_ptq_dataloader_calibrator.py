@@ -69,7 +69,6 @@ class TestAccuracy(ModelTestCase):
                 "gpu_id": 0,
                 "dla_core": 0,
                 "allow_gpu_fallback": False,
-                "disable_tf32": False
             }
         }
 
