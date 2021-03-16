@@ -38,11 +38,11 @@ class TestAccuracy(ModelTestCase):
         loss = 0.0
         class_probs = []
         class_preds = []
-
+        device = torch.device('cuda:0')
         with torch.no_grad():
             idx = 0
             for data, labels in testing_dataloader:
-                data, labels = data.cuda(), labels.cuda(async=True)
+                data, labels = data.to(device), labels.to(device)
                 out = model(data)
                 preds = torch.max(out, 1)[1]
                 class_probs.append([F.softmax(i, dim=0) for i in out])

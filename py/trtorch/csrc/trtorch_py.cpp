@@ -11,7 +11,6 @@
 #include "torch/torch.h"
 #include "util.h"
 
-// using namespace nvinfer1;
 namespace py = pybind11;
 
 namespace trtorch {
