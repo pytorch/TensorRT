@@ -10,7 +10,9 @@ import torchvision
 import torchvision.transforms as transforms
 from model_test_case import ModelTestCase
 
+
 class TRTEntropyCalibrator(trt.IInt8EntropyCalibrator2):
+
     def __init__(self, dataloader, **kwargs):
         trt.IInt8EntropyCalibrator2.__init__(self)
 
@@ -40,7 +42,6 @@ class TRTEntropyCalibrator(trt.IInt8EntropyCalibrator2):
             batch = batch[0].to(self.device)
         return [batch.data_ptr()]
 
-
     def read_calibration_cache(self):
         # If there is a cache, use it instead of calibrating again. Otherwise, implicitly return None.
         if self.use_cache:
@@ -51,6 +52,7 @@ class TRTEntropyCalibrator(trt.IInt8EntropyCalibrator2):
         if self.cache_file:
             with open(self.cache_file, "wb") as f:
                 f.write(cache)
+
 
 class TestAccuracy(ModelTestCase):
 
