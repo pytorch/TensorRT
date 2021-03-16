@@ -257,5 +257,6 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]) -> torch.classes.tensorrt.
     backend_spec.set_num_avg_timing_iters(parsed_spec.num_avg_timing_iters)
     backend_spec.set_workspace_size(parsed_spec.workspace_size)
     backend_spec.set_max_batch_size(parsed_spec.max_batch_size)
+    backend_spec._set_ptq_calibrator(parsed_spec._get_calibrator_handle())
 
     return backend_spec

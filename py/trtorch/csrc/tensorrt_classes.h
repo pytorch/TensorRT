@@ -94,8 +94,16 @@ struct CompileSpec : torch::CustomClassHolder {
     input_ranges.push_back(*ir);
   }
 
+  int64_t getPTQCalibratorHandle() {
+    return (int64_t)ptq_calibrator;
+  }
+
   void setDeviceIntrusive(const c10::intrusive_ptr<Device>& d) {
     device = *d;
+  }
+
+  void setPTQCalibratorViaHandle(int64_t handle) {
+    ptq_calibrator = (nvinfer1::IInt8Calibrator*)handle;
   }
 
   ADD_ENUM_GET_SET(op_precision, DataType, static_cast<int64_t>(DataType::kChar));
