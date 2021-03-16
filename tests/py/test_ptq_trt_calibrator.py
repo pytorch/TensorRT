@@ -1,4 +1,5 @@
 import unittest
+import os
 import trtorch
 from trtorch.logging import *
 import torch
@@ -7,9 +8,49 @@ import torch.nn as nn
 from torch.nn import functional as F
 import torchvision
 import torchvision.transforms as transforms
-from trtorch.ptq import get_batch_size, get_batch, read_calibration_cache, write_calibration_cache
 from model_test_case import ModelTestCase
 
+class TRTEntropyCalibrator(trt.IInt8EntropyCalibrator2):
+    def __init__(self, dataloader, **kwargs):
+        trt.IInt8EntropyCalibrator2.__init__(self)
+
+        self.cache_file = kwargs.get("cache_file", None)
+        self.use_cache = kwargs.get("use_cache", False)
+        self.device = kwargs.get("device", torch.device("cuda:0"))
+
+        self.dataloader = dataloader
+        self.dataset_iterator = iter(dataloader)
+        self.batch_size = dataloader.batch_size
+        self.current_batch_idx = 0
+
+    def get_batch_size(self):
+        return 1
+
+    # TensorRT passes along the names of the engine bindings to the get_batch function.
+    # You don't necessarily have to use them, but they can be useful to understand the order of
+    # the inputs. The bindings list is expected to have the same ordering as 'names'.
+    def get_batch(self, names):
+        if self.current_batch_idx + self.batch_size > self.dataloader.dataset.data.shape[0]:
+            return None
+
+        batch = self.dataset_iterator.next()
+        self.current_batch_idx += self.batch_size
+        # Treat the first element as input and others as targets.
+        if isinstance(batch, list):
+            batch = batch[0].to(self.device)
+        return [batch.data_ptr()]
+
+
+    def read_calibration_cache(self):
+        # If there is a cache, use it instead of calibrating again. Otherwise, implicitly return None.
+        if self.use_cache:
+            with open(self.cache_file, "rb") as f:
+                return f.read()
+
+    def write_calibration_cache(self, cache):
+        if self.cache_file:
+            with open(self.cache_file, "wb") as f:
+                f.write(cache)
 
 class TestAccuracy(ModelTestCase):
 
@@ -29,23 +70,7 @@ class TestAccuracy(ModelTestCase):
                                                               shuffle=False,
                                                               num_workers=1)
         # Test cases can assume using GPU id: 0
-        self.device = torch.device('cuda:0')
-        # Define attributes and member functions for the calibrator class
-        self.attribute_mapping = {
-            'data_loader': self.testing_dataloader,
-            'current_batch_idx': 0,
-            'batch_size': self.testing_dataloader.batch_size,
-            'dataset_iterator': iter(self.testing_dataloader),
-            'cache_file': None,
-            'device': self.device,
-            'use_cache': False,
-            'get_batch_size': get_batch_size,
-            'get_batch': get_batch,
-            'read_calibration_cache': read_calibration_cache,
-            'write_calibration_cache': write_calibration_cache
-        }
-
-        self.calibrator = type('DataLoaderCalibrator', (trt.IInt8EntropyCalibrator,), self.attribute_mapping)()
+        self.calibrator = TRTEntropyCalibrator(self.testing_dataloader)
 
     def compute_accuracy(self, testing_dataloader, model):
         total = 0
@@ -53,11 +78,11 @@ class TestAccuracy(ModelTestCase):
         loss = 0.0
         class_probs = []
         class_preds = []
-
+        device = torch.device('cuda:0')
         with torch.no_grad():
             idx = 0
             for data, labels in testing_dataloader:
-                data, labels = data.cuda(), labels.cuda(async=True)
+                data, labels = data.to(device), labels.to(device)
                 out = model(data)
                 preds = torch.max(out, 1)[1]
                 class_probs.append([F.softmax(i, dim=0) for i in out])
