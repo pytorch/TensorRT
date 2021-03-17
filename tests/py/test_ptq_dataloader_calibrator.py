@@ -69,7 +69,6 @@ class TestAccuracy(ModelTestCase):
                 "gpu_id": 0,
                 "dla_core": 0,
                 "allow_gpu_fallback": False,
-                "disable_tf32": False
             }
         }
 
@@ -82,6 +81,8 @@ class TestAccuracy(ModelTestCase):
 
 def test_suite():
     suite = unittest.TestSuite()
+    # You need a pre-trained VGG cifar10 model to run this test. Please follow instructions at
+    # https://github.com/NVIDIA/TRTorch/tree/master/cpp/ptq/training/vgg16 to export this model.
     suite.addTest(TestAccuracy.parametrize(TestAccuracy, model=torch.jit.load('./trained_vgg16.jit.pt')))
 
     return suite

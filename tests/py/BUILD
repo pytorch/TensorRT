@@ -73,3 +73,23 @@ py_test(
         requirement("torchvision")
     ]
 )
+
+py_test(
+    name = "test_ptq_to_backend",
+    srcs = [
+        "test_ptq_to_backend.py",
+        "model_test_case.py"
+    ]
+    deps = [
+        requirement("torchvision")
+    ]
+)
+
+test_suite(
+    name = "py_calibrator_tests",
+    tests = [
+        ":test_ptq_to_backend",
+        ":test_ptq_trt_calibrator",
+        ":test_ptq_dataloader_calibrator"
+    ],
+)

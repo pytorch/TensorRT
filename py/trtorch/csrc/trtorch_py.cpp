@@ -233,6 +233,7 @@ PYBIND11_MODULE(_C, m) {
 
   py::class_<CompileSpec>(m, "CompileSpec")
       .def(py::init<>())
+      .def("_get_calibrator_handle", &CompileSpec::getPTQCalibratorHandle, "[Internal] gets a handle from a calibrator")
       .def_readwrite("input_ranges", &CompileSpec::input_ranges)
       .def_readwrite("op_precision", &CompileSpec::op_precision)
       .def_readwrite("ptq_calibrator", &CompileSpec::ptq_calibrator)
