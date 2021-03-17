@@ -84,6 +84,8 @@ class TestAccuracy(ModelTestCase):
 
 def test_suite():
     suite = unittest.TestSuite()
+    # You need a pre-trained VGG cifar10 model to run this test. Please follow instructions at
+    # https://github.com/NVIDIA/TRTorch/tree/master/cpp/ptq/training/vgg16 to export this model.
     suite.addTest(TestAccuracy.parametrize(TestAccuracy, model=torch.jit.load('./trained_vgg16.jit.pt')))
 
     return suite
