@@ -18,7 +18,7 @@ bool add_split(ConversionCtx* ctx, const torch::jit::Node* n, args& args, bool s
   auto in = args[0].ITensor();
   auto axis = args[2].unwrapToInt();
   auto inDimSize = in->getDimensions().d[axis];
-  auto numOutputs = 1;
+  auto numOutputs = 1, numRemainder = 0;
   std::vector<int64_t> sizes;
 
   if (split_list) {
@@ -27,10 +27,13 @@ bool add_split(ConversionCtx* ctx, const torch::jit::Node* n, args& args, bool s
   } else {
     auto split_size = args[1].unwrapToInt();
     numOutputs = inDimSize / split_size;
-    if (numOutputs == 1) {
+    numRemainder = inDimSize % split_size;
+    for (int i = 0; i < numOutputs; i++) {
       sizes.push_back(split_size);
-    } else {
-      sizes = std::vector<int64_t>(numOutputs, 1);
+    }
+    if (numRemainder) {
+      numOutputs += 1;
+      sizes.push_back(numRemainder);
     }
   }
 

@@ -288,3 +288,60 @@ TEST(Converters, ATenSplitFixedConvertsCorrectly) {
     ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[i], trt, 2e-6));
   }
 }
+
+TEST(Converters, ATenSplitFixedHasRemainderConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%argument_1.1 : Tensor):
+          %2 : int = prim::Constant[value=2]()
+          %2.1 : int = prim::Constant[value=1]()
+          %3 : Tensor[] = aten::split(%argument_1.1, %2, %2.1)
+          %4 : Tensor, %5 : Tensor, %6 : Tensor = prim::ListUnpack(%3)
+          return (%4, %5, %6))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+
+  torch::jit::parseIR(graph, &*g);
+
+  auto in = at::randint(1, 10, {1, 5, 4, 4}, {at::kCUDA});
+
+  auto jit_in = at::clone(in);
+  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
+
+  auto trt_in = at::clone(in);
+  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
+
+  for (size_t i = 0; i < jit_results.size(); i++) {
+    auto trt = trt_results[i].reshape(jit_results[i].sizes());
+    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[i], trt, 2e-6));
+  }
+}
+
+TEST(Converters, ATenSplitAndAddConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%argument_1.1 : Tensor):
+          %2 : int = prim::Constant[value=2]()
+          %2.1 : int = prim::Constant[value=1]()
+          %3 : Tensor[] = aten::split(%argument_1.1, %2, %2.1)
+          %4 : Tensor, %5 : Tensor = prim::ListUnpack(%3)
+          %6 : Tensor = aten::add(%4, %5, %2.1)
+          return (%6))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+
+  torch::jit::parseIR(graph, &*g);
+
+  auto in = at::randint(1, 10, {1, 4, 4, 4}, {at::kCUDA});
+
+  auto jit_in = at::clone(in);
+  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
+
+  auto trt_in = at::clone(in);
+  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
+
+  for (size_t i = 0; i < jit_results.size(); i++) {
+    auto trt = trt_results[i].reshape(jit_results[i].sizes());
+    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[i], trt, 2e-6));
+  }
+}
