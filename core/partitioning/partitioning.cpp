@@ -2,6 +2,8 @@
 #include "core/util/prelude.h"
 #include "torch/csrc/jit/api/module.h"
 #include "core/util/prelude.h"
+#include "core/lowering/passes/passes.h"
+
 
 
 namespace trtorch {
@@ -20,9 +22,9 @@ torch::jit::Value* getOrAddInputForValue(torch::jit::Value* old_value, std::shar
     }
     auto new_value = graph->block()->addInput();
     old_to_new[old_value] = new_value;
+    new_value->copyMetadata(old_value);
     // mapping from new graph input Values to original graph values
     old_to_new[new_value] = old_value;
-    new_value->copyMetadata(old_value);
     return new_value;
   } else {
     return old_to_new[old_value];
@@ -40,7 +42,6 @@ torch::jit::Node* cloneNode(torch::jit::Node* node, std::shared_ptr<torch::jit::
     auto no = new_node->outputs()[i];
     old_to_new[oo] = no;
   }
-
   return new_node;
 }
 
@@ -58,10 +59,13 @@ c10::FunctionSchema getFunctionSchema(std::string method_name, std::shared_ptr<t
   return c10::FunctionSchema(method_name, method_name, args, returns);
 }
 
-void registerSegmentInOutShape(SegmentedBlock &seg_block, std::unordered_map<torch::jit::Value*, nvinfer1::Dims> &input_shape_map) {
+void registerSegmentInOutIValues(SegmentedBlock &seg_block, std::unordered_map<torch::jit::Value*, torch::jit::IValue> &ivalues_maps) {
   // create a module to run the graph
   auto g = seg_block.g();
   auto copy_g = g->copy();
+  lowering::passes::RemoveInplaceAdd(copy_g);
+
+  // create tuple for multiple outputs
   if (seg_block.raw_outputs().size() > 1) {
     auto new_output_node = copy_g->appendNode(copy_g->createTuple(copy_g->outputs()));
     for (int idx = copy_g->outputs().size() - 1; idx >= 0; --idx) {
@@ -84,46 +88,60 @@ void registerSegmentInOutShape(SegmentedBlock &seg_block, std::unordered_map<tor
 
   // set inputs ivalues
   for (auto &input : seg_block.raw_inputs()) {
-    std::vector<int64_t> shape;
-    nvinfer1::Dims cur_shape = input_shape_map[input];
-    shape.insert(shape.begin(), std::begin(cur_shape.d), std::begin(cur_shape.d) + cur_shape.nbDims);
-    auto in = at::randint(5, shape, {at::kCUDA});
-    jit_inputs_ivalues.push_back(in.clone());
+    if (!ivalues_maps.count(input)) {
+      std::cerr << "could find graph input ivalues\n";
+    }
+    if (input->type()->isSubtypeOf(torch::jit::TensorType::get())) {
+      jit_inputs_ivalues.push_back(ivalues_maps[input].toTensor());
+    } else if (input->type()->isSubtypeOf(torch::jit::IntType::get())) {
+      jit_inputs_ivalues.push_back(ivalues_maps[input].toInt());
+    }
   }
 
-  std::vector<at::Tensor> jit_results;
+  std::vector<torch::jit::IValue> jit_results;
   torch::jit::IValue jit_results_ivalues = cur_mod.forward(jit_inputs_ivalues);
-  if (jit_results_ivalues.isTensor()) {
-    jit_results.push_back(jit_results_ivalues.toTensor());
-  } else {
+  if (jit_results_ivalues.isTuple()) {
     auto results = jit_results_ivalues.toTuple()->elements();
     for (auto r : results) {
-      jit_results.push_back(r.toTensor());
+        jit_results.push_back(r);
     }
+  } else {
+    jit_results.push_back(jit_results_ivalues);
   }
 
   size_t idx = 0;
   for (auto &output : seg_block.raw_outputs()) {
-    input_shape_map[output] = util::toDims(jit_results[idx++].sizes());
+    ivalues_maps[output] = jit_results[idx++];
   }
 
+  // set input shape for each segmented block so we wil use it in conversion process
   std::vector<nvinfer1::Dims> input_shape;
   for (auto &i : seg_block.raw_inputs()) {
-    input_shape.push_back(input_shape_map[i]);
+    if (ivalues_maps[i].isTensor()) {
+      input_shape.push_back(util::toDims(ivalues_maps[i].toTensor().sizes()));
+    }
   }
 
   seg_block.register_inshape(input_shape);
 }
 
-std::vector<nvinfer1::Dims> extractNvinfer1Dims(std::vector<conversion::InputRange>& input_ranges) {
-  std::vector<nvinfer1::Dims> res;
+
+std::vector<torch::jit::IValue> generateRandomInputs(std::vector<conversion::InputRange>& input_ranges) {
+  std::vector<torch::jit::IValue> random_inputs;
   for (auto &input_range : input_ranges) {
-    res.push_back(input_range.input_shape);
+    auto cur_shape = input_range.input_shape;
+    std::vector<int64_t> shape;
+    shape.insert(shape.begin(), std::begin(cur_shape.d), std::begin(cur_shape.d) + cur_shape.nbDims);
+    auto in = at::randint(5, shape, {at::kCUDA});
+    random_inputs.push_back(in.clone());
+    printf("is tensor: %d\n", random_inputs.back().isTensor());
   }
-  return res;
+  return random_inputs;
 }
 
+
 void registerSegmentsInputsOutputs(std::vector<SegmentedBlock> &segmented_blocks, std::shared_ptr<torch::jit::Graph> g) {
+  // find the corresponding raw values in original global graph for this segmented block's inputs/outputs
   std::set<torch::jit::Value*> input_values;
   for (auto &seg_block : segmented_blocks) {
     seg_block.registerInputs();
@@ -176,6 +194,7 @@ std::vector<SegmentedBlock> segment_graph(std::shared_ptr<torch::jit::Graph> g,
 
   for (const auto n : nodes) {
     if (n->kind() == torch::jit::prim::Constant) continue;
+
     std::string node_string(n->kind().toQualString());
 
     if (conversion::OpSupported(n) && !forced_fallback_operators.count(node_string)) {
@@ -186,19 +205,21 @@ std::vector<SegmentedBlock> segment_graph(std::shared_ptr<torch::jit::Graph> g,
     }
   }
   merge_nodes(pytorch_nodes, tensorrt_nodes, segmented_blocks, min_block_size);
-  if (!pytorch_nodes.empty()) segmented_blocks.emplace_back(SegmentedBlock::kTorch, pytorch_nodes);
+  if (!pytorch_nodes.empty()) {
+    segmented_blocks.emplace_back(SegmentedBlock::kTorch, pytorch_nodes);
+  }
 
   registerSegmentsInputsOutputs(segmented_blocks, g);
 
-  std::vector<nvinfer1::Dims> graph_inputs_shape = extractNvinfer1Dims(input_ranges);
-  std::unordered_map<torch::jit::Value*, nvinfer1::Dims> input_shape_map;
+  std::unordered_map<torch::jit::Value*, torch::jit::IValue> ivalues_maps;
 
+  std::vector<torch::jit::IValue> random_inputs = generateRandomInputs(input_ranges);
   for (size_t i = 0; i < g->inputs().size(); ++i) {
-    input_shape_map[g->inputs()[i]] = graph_inputs_shape[i];
+    ivalues_maps[g->inputs()[i]] = random_inputs[i];
   }
 
   for (auto &seg_block : segmented_blocks) {
-    registerSegmentInOutShape(seg_block, input_shape_map);
+    registerSegmentInOutIValues(seg_block, ivalues_maps);
   }
 
   return segmented_blocks;

@@ -111,8 +111,8 @@ void AddEngineToGraph(
   g->block()->appendNode(unpack_node);
 
   // If there are multiple output tensors from TensorRT we wrap them in a tuple
-  // to return
-  if (unpack_node->outputs().size() > 1) {
+  // to return, convert to tuple only when we only have 1 segmented graph
+  if (!engine_id && unpack_node->outputs().size() > 1) {
     // Creates prim::TupleConstruct(<output tensors>) using outputs of the
     // unpack node
     auto return_tuple_node = g->createTuple(unpack_node->outputs());
@@ -120,8 +120,9 @@ void AddEngineToGraph(
     // Set the output as the produced tuple
     g->registerOutput(return_tuple_node->outputs()[0]);
   } else {
-    // Set the output as the sole output tensor
-    g->registerOutput(unpack_node->outputs()[0]);
+    for (int i = 0; i < unpack_node->outputs().size(); ++i) {
+      g->registerOutput(unpack_node->outputs()[i]);
+    }
   }
 
   LOG_DEBUG(*g << "(AddEngineToGraph)\n");
@@ -159,32 +160,35 @@ std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::
 
 void AddSegmentedBlockToGraph(std::shared_ptr<torch::jit::Graph>& g, partitioning::SegmentedBlock &seg,
                               std::unordered_map<torch::jit::Value*, torch::jit::Value*> &old_to_new_g) {
-  //old_to_new_g contains: original_graph value => new graph value, mini_graph value -> new graph value, new graph value -> mini_graph value
+  //old_to_new_g contains: original global graph value => new global graph value,
+  //mini_to_new_g: mini graph value -> new graph value
+  std::unordered_map<torch::jit::Value*, torch::jit::Value*> mini_to_new_g;
   size_t input_idx = 0;
   if (seg.target() == partitioning::SegmentedBlock::kTensorRT && g->inputs().size() > 0) {
     if (g->inputs()[0]->type()->str().find("__torch__") == std::string::npos) {
       auto self = g->insertInput(0, "self_1");
       self->setType(seg.inputs()[0]->type());
     }
-    old_to_new_g[seg.inputs()[input_idx++]] = g->inputs()[0];
+    mini_to_new_g[seg.inputs()[input_idx++]] = g->inputs()[0];
   }
+
 
   for (auto &raw_input : seg.raw_inputs()) {
     if (old_to_new_g.count(raw_input)) {
-      old_to_new_g[seg.inputs()[input_idx++]] = old_to_new_g[raw_input];
+      mini_to_new_g[seg.inputs()[input_idx++]] = old_to_new_g[raw_input];
     }
   }
 
   for (const auto n : seg.nodes()) {
-    partitioning::cloneNode(n, g, old_to_new_g);
+    partitioning::cloneNode(n, g, mini_to_new_g);
   }
 
   // original graph value => new global graph value
   for (size_t i = 0; i < seg.raw_outputs().size(); ++i) {
-    old_to_new_g[seg.raw_outputs()[i]] = old_to_new_g[seg.outputs()[i]];
+    old_to_new_g[seg.raw_outputs()[i]] = mini_to_new_g[seg.outputs()[i]];
   }
 
-//  LOG_INFO(*g << "(AddSegmentedBlockToGraph)\n");
+  LOG_INFO(*g << "(AddSegmentedBlockToGraph)\n");
   return;
 }
 
@@ -199,6 +203,7 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
     if (method.name().rfind("_", 0)) {
       auto new_g = std::make_shared<torch::jit::Graph>();
       auto graph_and_parameters = lowering::Lower(mod, method.name());
+      LOG_INFO(*(method.graph()) << "Original grpah\n");
 
       auto g = graph_and_parameters.first;
       auto params = graph_and_parameters.second;
@@ -206,14 +211,13 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
       auto convert_cfg = std::move(cfg.convert_info);
       LOG_INFO(*g << "(CompileGraph)\n");
 
-
       // segment the graph and convert segmented TensorRT block
       auto segmented_blocks = partitioning::segment_graph(g, convert_cfg.input_ranges, convert_cfg.engine_settings.torch_fallback);
       if (segmented_blocks.size() == 1 && segmented_blocks[0].target() == partitioning::SegmentedBlock::kTorch) {
         return mod;
       }
 
-      int trt_engine_id = 0;
+      int trt_engine_id = 1;
       std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_g;
       for (auto &seg_block : segmented_blocks) {
         if (seg_block.target() == partitioning::SegmentedBlock::kTensorRT) {
@@ -225,6 +229,7 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
           auto engine = conversion::ConvertBlockToEngine(seg_block.block(), convert_cfg, named_params);
           auto temp_g = std::make_shared<torch::jit::Graph>();
           AddEngineToGraph(new_mod, temp_g, engine, trt_engine_id++);
+
           seg_block.update_graph(temp_g);
           AddSegmentedBlockToGraph(new_g, seg_block, old_to_new_g);
         } else {

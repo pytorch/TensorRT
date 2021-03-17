@@ -17,7 +17,8 @@ cc_library(
     ],
     deps = [
         "//core/conversion",
-        "//core/util:prelude"
+        "//core/util:prelude",
+        "//core/lowering"
     ] + select({
         ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default":  ["@libtorch//:libtorch"],
