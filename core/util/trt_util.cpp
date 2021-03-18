@@ -86,6 +86,30 @@ nvinfer1::Dims toDimsPad(c10::IntArrayRef l, uint64_t pad_to) {
   return dims;
 }
 
+nvinfer1::Dims toDimsPadAtEnd(c10::IntArrayRef l, uint64_t pad_to) {
+  if (l.size() > pad_to) {
+    LOG_DEBUG(
+        "Requested padding of dimensions to " << pad_to << " but found " << l.size()
+                                              << " dimensions, not going to pad");
+    return toDims(l);
+  }
+
+  TRTORCH_CHECK(
+      pad_to <= nvinfer1::Dims::MAX_DIMS,
+      "The list requested to be converted to nvinfer1::Dims exceeds the max number of dimensions for TensorRT");
+
+  nvinfer1::Dims dims;
+  dims.nbDims = pad_to;
+  for (size_t i = 0; i < l.size(); i++) {
+    dims.d[i] = l[i];
+  }
+
+  for (size_t i = pad_to - l.size(); i < pad_to; i++) {
+    dims.d[i] = 1;
+  }
+  return dims;
+}
+
 nvinfer1::Dims toDims(c10::IntArrayRef l) {
   TRTORCH_CHECK(
       l.size() <= nvinfer1::Dims::MAX_DIMS,
@@ -132,6 +156,30 @@ nvinfer1::Dims toDimsPad(c10::List<int64_t> l, uint64_t pad_to) {
 
   for (size_t i = pad_to - l.size(); i < pad_to; i++) {
     dims.d[i] = l[i - (pad_to - l.size())];
+  }
+  return dims;
+}
+
+nvinfer1::Dims toDimsPadAtEnd(c10::List<int64_t> l, uint64_t pad_to) {
+  if (l.size() > pad_to) {
+    LOG_DEBUG(
+        "Requested padding of dimensions to " << pad_to << " but found " << l.size()
+                                              << " dimensions, not going to pad");
+    return toDims(l);
+  }
+
+  TRTORCH_CHECK(
+      pad_to <= nvinfer1::Dims::MAX_DIMS,
+      "The list requested to be converted to nvinfer1::Dims exceeds the max number of dimensions for TensorRT");
+
+  nvinfer1::Dims dims;
+  dims.nbDims = pad_to;
+  for (size_t i = 0; i < l.size(); i++) {
+    dims.d[i] = l[i];
+  }
+
+  for (size_t i = pad_to - l.size(); i < pad_to; i++) {
+    dims.d[i] = 1;
   }
   return dims;
 }

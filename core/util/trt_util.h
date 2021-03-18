@@ -92,6 +92,8 @@ int64_t volume(const nvinfer1::Dims& d);
 bool broadcastable(nvinfer1::Dims a, nvinfer1::Dims b, bool multidirectional = true);
 nvinfer1::Dims toDimsPad(c10::IntArrayRef l, uint64_t pad_to);
 nvinfer1::Dims toDimsPad(c10::List<int64_t> l, uint64_t pad_to);
+nvinfer1::Dims toDimsPadAtEnd(c10::IntArrayRef l, uint64_t pad_to);
+nvinfer1::Dims toDimsPadAtEnd(c10::List<int64_t> l, uint64_t pad_to);
 nvinfer1::Dims unpadDims(const nvinfer1::Dims& d);
 nvinfer1::Dims unsqueezeDims(const nvinfer1::Dims& d, int pos);
 nvinfer1::Dims squeezeDims(const nvinfer1::Dims& d, int pos);
