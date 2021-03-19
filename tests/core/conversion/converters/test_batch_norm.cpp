@@ -18,7 +18,7 @@ TEST(Converters, ATenBatchNormConvertsCorrectly) {
         return (%8))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {1, 5, 5, 5}, {at::kCUDA});
   auto gamma = at::randint(1, 10, {5}, {at::kCUDA});

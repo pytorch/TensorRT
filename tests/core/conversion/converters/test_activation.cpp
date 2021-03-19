@@ -11,7 +11,7 @@ TEST(Converters, ATenReLUConvertsCorrectly) {
         return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(-5, 5, {5}, {at::kCUDA});
   auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
@@ -31,7 +31,7 @@ TEST(Converters, ATenSigmoidConvertsCorrectly) {
         return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(-5, 5, {5}, {at::kCUDA});
   auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
@@ -51,7 +51,7 @@ TEST(Converters, ATenTanhConvertsCorrectly) {
         return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(-5, 5, {5}, {at::kCUDA});
   auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
@@ -75,7 +75,7 @@ TEST(Converters, ATenHardTanhConvertsCorrectly) {
       return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(-5, 5, {5}, {at::kCUDA});
   auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
@@ -97,7 +97,7 @@ TEST(Converters, ATenHardTanhCustomRangeConvertsCorrectly) {
         return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(-5, 5, {5}, {at::kCUDA});
   auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
@@ -118,7 +118,7 @@ TEST(Converters, ATenPReLUConvertsCorrectly) {
         return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(-5, 5, {5}, {at::kCUDA});
   auto slope = at::randint(-5, 5, {1}, {at::kCUDA});
@@ -141,7 +141,7 @@ TEST(Converters, ATenPReLUMultiChannelConvertsCorrectly) {
         return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(-5, 5, {1, 10, 1, 1}, {at::kCUDA});
   auto slope = at::randint(-5, 5, {10}, {at::kCUDA});
@@ -164,7 +164,7 @@ TEST(Converters, ATenLeakyReluConvertsCorrectly) {
         return (%2))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(-5, 5, {5}, {at::kCUDA});
   auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
@@ -186,7 +186,7 @@ TEST(Converters, ATenEluConvertsCorrectly) {
         return (%result.2))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(-5, 5, {1, 10, 1, 1}, {at::kCUDA});
 

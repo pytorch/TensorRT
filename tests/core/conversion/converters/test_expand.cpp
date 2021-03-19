@@ -15,7 +15,7 @@ TEST(Converters, ATenExpandSameDimConvertsCorrectly) {
 
   auto g = std::make_shared<torch::jit::Graph>();
 
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {3, 1}, {at::kCUDA});
 
@@ -42,7 +42,7 @@ TEST(Converters, ATenExpandSameDimConvertsCorrectlyWithDynamicInput) {
 
   auto g = std::make_shared<torch::jit::Graph>();
 
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {3, 1}, {at::kCUDA});
 
@@ -69,7 +69,7 @@ TEST(Converters, ATenExpandTileConvertsCorrectly) {
 
   auto g = std::make_shared<torch::jit::Graph>();
 
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {3, 1}, {at::kCUDA});
 
@@ -96,7 +96,7 @@ TEST(Converters, ATenExpandTileConvertsCorrectlyWithDynamicInput) {
 
   auto g = std::make_shared<torch::jit::Graph>();
 
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {3, 1}, {at::kCUDA});
 
@@ -123,7 +123,7 @@ TEST(Converters, ATenExpandTileLastConvertsCorrectly) {
 
   auto g = std::make_shared<torch::jit::Graph>();
 
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {3, 1}, {at::kCUDA});
 
@@ -150,7 +150,7 @@ TEST(Converters, ATenExpandTileLastConvertsCorrectlyWithDynamicInput) {
 
   auto g = std::make_shared<torch::jit::Graph>();
 
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {3, 1}, {at::kCUDA});
 
@@ -177,7 +177,7 @@ TEST(Converters, ATenExpandNegativeSizeConvertsCorrectly) {
 
   auto g = std::make_shared<torch::jit::Graph>();
 
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {3, 1}, {at::kCUDA});
 
@@ -204,7 +204,7 @@ TEST(Converters, ATenExpandNegativeSizeConvertsCorrectlyWithDynamicInput) {
 
   auto g = std::make_shared<torch::jit::Graph>();
 
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {3, 1}, {at::kCUDA});
 
@@ -238,7 +238,7 @@ TEST(Converters, ATenExpandASConvertsCorrectly) {
 
   auto g = std::make_shared<torch::jit::Graph>();
 
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {3, 1}, {at::kCUDA});
   auto target_in = at::randint(1, 10, {2, 3, 1}, {at::kCUDA});
@@ -270,7 +270,7 @@ TEST(Converters, ATenExpandAsConvertsCorrectlyWithDynamicInput) {
 
   auto g = std::make_shared<torch::jit::Graph>();
 
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {3, 1}, {at::kCUDA});
   auto target_in = at::randint(1, 10, {3, 4}, {at::kCUDA});
@@ -299,7 +299,7 @@ TEST(Converters, ATenRepeatConvertsCorrectly) {
 
   auto g = std::make_shared<torch::jit::Graph>();
 
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {1, 3}, {at::kCUDA});
 
@@ -325,7 +325,7 @@ TEST(Converters, ATenRepeatConvertsCorrectlyWithDynamicInput) {
 
   auto g = std::make_shared<torch::jit::Graph>();
 
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {1, 3}, {at::kCUDA});
 
@@ -351,7 +351,7 @@ TEST(Converters, ATenRepeat3dConvertsCorrectly) {
 
   auto g = std::make_shared<torch::jit::Graph>();
 
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {2, 3, 2}, {at::kCUDA});
 
@@ -377,7 +377,7 @@ TEST(Converters, ATenRepeat3dConvertsCorrectlyWithDynamicInput) {
 
   auto g = std::make_shared<torch::jit::Graph>();
 
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {2, 3, 2}, {at::kCUDA});
 
@@ -403,7 +403,7 @@ TEST(Converters, ATenRepeatExtraDimsConvertsCorrectly) {
 
   auto g = std::make_shared<torch::jit::Graph>();
 
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {1, 3}, {at::kCUDA});
 
@@ -429,7 +429,7 @@ TEST(Converters, ATenRepeatExtraDimsConvertsCorrectlyWithDynamicInput) {
 
   auto g = std::make_shared<torch::jit::Graph>();
 
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {1, 3}, {at::kCUDA});
 

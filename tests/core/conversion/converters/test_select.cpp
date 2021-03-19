@@ -14,7 +14,7 @@ TEST(Converters, ATenSelectIntConvertsCorrectly) {
 
   auto g = std::make_shared<torch::jit::Graph>();
 
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {4, 4, 4}, {at::kCUDA});
 
@@ -42,7 +42,7 @@ TEST(Converters, ATenSelectIntTwiceConvertsCorrectly) {
 
   auto g = std::make_shared<torch::jit::Graph>();
 
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {4, 4, 4}, {at::kCUDA});
 
@@ -69,7 +69,7 @@ TEST(Converters, ATenNarrowStartScalarConvertsCorrectly) {
 
   auto g = std::make_shared<torch::jit::Graph>();
 
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {3, 2, 2, 4}, {at::kCUDA});
 
@@ -97,7 +97,7 @@ TEST(Converters, ATenEmbeddingConvertsCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
 
   // Run Pytorch
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
   auto options_pyt = torch::TensorOptions().device(torch::kCUDA, 0).dtype(torch::kLong);
   auto jit_in = at::tensor({0, 1, 2}, options_pyt);
   auto embWeight = at::randn({10, 3}, {at::kCUDA});
@@ -130,7 +130,7 @@ TEST(Converters, ATenSliceConvertsCorrectly) {
 
   auto g = std::make_shared<torch::jit::Graph>();
 
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {1, 3, 5, 5}, {at::kCUDA});
 
@@ -158,7 +158,7 @@ TEST(Converters, ATenSliceNegStartIndexConvertsCorrectly) {
 
   auto g = std::make_shared<torch::jit::Graph>();
 
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {6, 3}, {at::kCUDA});
 
@@ -191,7 +191,7 @@ TEST(Converters, ATenSliceNegEndIndexConvertsCorrectly) {
 
   auto g = std::make_shared<torch::jit::Graph>();
 
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {6, 5, 3, 3}, {at::kCUDA});
 
@@ -217,7 +217,7 @@ TEST(Converters, ATenSplitSizesInScriptingConvertsCorrectly) {
 
   auto g = std::make_shared<torch::jit::Graph>();
 
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {1, 3, 4, 4}, {at::kCUDA});
 
@@ -245,7 +245,7 @@ TEST(Converters, ATenSplitSizesinTracingConvertsCorrectly) {
 
   auto g = std::make_shared<torch::jit::Graph>();
 
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {1, 3, 4, 4}, {at::kCUDA});
 
@@ -272,7 +272,7 @@ TEST(Converters, ATenSplitFixedConvertsCorrectly) {
 
   auto g = std::make_shared<torch::jit::Graph>();
 
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(1, 10, {1, 3, 4, 4}, {at::kCUDA});
 
