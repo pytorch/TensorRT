@@ -399,15 +399,15 @@ struct TRTORCH_API CompileSpec {
      */
     TorchFallback() = default;
 
-     /**
-      * @brief Construct from a bool
-      */
+    /**
+     * @brief Construct from a bool
+     */
     TorchFallback(bool enabled) : enabled(enabled) {}
 
     /**
      * @brief Constructor for setting min_block_size
      */
-     TorchFallback(bool enabled, uint64_t min_size) : enabled(enabled), min_block_size(min_size) {}
+    TorchFallback(bool enabled, uint64_t min_size) : enabled(enabled), min_block_size(min_size) {}
   };
 
   TorchFallback torch_fallback;

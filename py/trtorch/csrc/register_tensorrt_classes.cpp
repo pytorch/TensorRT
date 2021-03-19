@@ -30,7 +30,6 @@ void RegisterTRTCompileSpec() {
   ADD_FIELD_GET_SET_REGISTRATION(TRTFallbackTSRegistration, trtorch::pyapi::TorchFallback, min_block_size);
   ADD_FIELD_GET_SET_REGISTRATION(TRTFallbackTSRegistration, trtorch::pyapi::TorchFallback, forced_fallback_operators);
 
-
   static auto TRTORCH_UNUSED TRTCompileSpecTSRegistration =
       torch::class_<trtorch::pyapi::CompileSpec>("tensorrt", "CompileSpec")
           .def(torch::init<>())

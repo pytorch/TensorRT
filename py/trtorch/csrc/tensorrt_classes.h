@@ -113,7 +113,7 @@ struct CompileSpec : torch::CustomClassHolder {
     device = *d;
   }
 
-  void setTorchFallbackIntrusive(const c10::intrusive_ptr<TorchFallback> &fb) {
+  void setTorchFallbackIntrusive(const c10::intrusive_ptr<TorchFallback>& fb) {
     torch_fallback = *fb;
   }
   void setPTQCalibratorViaHandle(int64_t handle) {

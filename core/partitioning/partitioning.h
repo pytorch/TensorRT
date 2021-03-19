@@ -5,16 +5,19 @@
 #include "core/conversion/conversion.h"
 #include "torch/csrc/jit/ir/ir.h"
 
-
 namespace trtorch {
 namespace core {
 namespace partitioning {
 
-torch::jit::Value* getOrAddInputForValue(torch::jit::Value* old_value, std::shared_ptr<torch::jit::Graph> &graph,
-                                         std::unordered_map<torch::jit::Value*, torch::jit::Value*> &old_to_new);
+torch::jit::Value* getOrAddInputForValue(
+    torch::jit::Value* old_value,
+    std::shared_ptr<torch::jit::Graph>& graph,
+    std::unordered_map<torch::jit::Value*, torch::jit::Value*>& old_to_new);
 
-torch::jit::Node* cloneNode(torch::jit::Node* node, std::shared_ptr<torch::jit::Graph> &graph,
-                            std::unordered_map<torch::jit::Value*, torch::jit::Value*> &old_to_new);
+torch::jit::Node* cloneNode(
+    torch::jit::Node* node,
+    std::shared_ptr<torch::jit::Graph>& graph,
+    std::unordered_map<torch::jit::Value*, torch::jit::Value*>& old_to_new);
 
 struct SegmentedBlock {
  public:
@@ -27,9 +30,9 @@ struct SegmentedBlock {
 
   SegmentedBlock(SegmentedBlockTarget blk_target) : target_(blk_target), g_(std::make_shared<torch::jit::Graph>()) {}
 
-  SegmentedBlock(SegmentedBlockTarget blk_target, const std::vector<torch::jit::Node*> &nodes) :
-        target_(blk_target), g_(std::make_shared<torch::jit::Graph>()) {
-    for (auto &node : nodes) {
+  SegmentedBlock(SegmentedBlockTarget blk_target, const std::vector<torch::jit::Node*>& nodes)
+      : target_(blk_target), g_(std::make_shared<torch::jit::Graph>()) {
+    for (auto& node : nodes) {
       appendNode(node);
     }
   }
@@ -45,7 +48,7 @@ struct SegmentedBlock {
   }
 
   void registerInputs() {
-    for (auto &value : g_->inputs()) {
+    for (auto& value : g_->inputs()) {
       inputs_.push_back(old_to_new_[value]);
     }
   }
@@ -67,11 +70,11 @@ struct SegmentedBlock {
     return g_->outputs();
   }
 
-  const std::vector<torch::jit::Value*> &raw_inputs() const {
+  const std::vector<torch::jit::Value*>& raw_inputs() const {
     return inputs_;
   }
 
-  const std::vector<torch::jit::Value*> &raw_outputs() const {
+  const std::vector<torch::jit::Value*>& raw_outputs() const {
     return outputs_;
   }
 
@@ -87,43 +90,32 @@ struct SegmentedBlock {
     in_shape_ = in_shape;
   }
 
-  void register_outshape(std::vector<nvinfer1::Dims>& out_shape) {
-    out_shape_ = out_shape;
-  }
-
   const std::vector<nvinfer1::Dims>& in_shape() const {
     return in_shape_;
   }
 
-  const std::vector<nvinfer1::Dims>& out_shape() const {
-    return out_shape_;
-  }
-
-  std::shared_ptr<torch::jit::Graph>& g()  {
+  std::shared_ptr<torch::jit::Graph>& g() {
     return g_;
   }
-
 
   void update_graph(std::shared_ptr<torch::jit::Graph> new_g) {
     g_ = new_g;
   }
 
-// private:
+ private:
   SegmentedBlockTarget target_;
   std::vector<nvinfer1::Dims> in_shape_;
-  std::vector<nvinfer1::Dims> out_shape_;
   std::vector<torch::jit::Value*> inputs_;
   std::vector<torch::jit::Value*> outputs_;
   std::shared_ptr<torch::jit::Graph> g_;
   std::string trt_engine;
-  //last node on original global graph
   std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_;
-
 };
 
-std::vector<SegmentedBlock> segment_graph(std::shared_ptr<torch::jit::Graph> g,
-                                          std::vector<conversion::InputRange>& input_ranges,
-                                          const conversion::TorchFallback &fallback_info);
-}
-}
-}
+std::vector<SegmentedBlock> segment_graph(
+    std::shared_ptr<torch::jit::Graph> g,
+    std::vector<conversion::InputRange>& input_ranges,
+    const conversion::TorchFallback& fallback_info);
+} // namespace partitioning
+} // namespace core
+} // namespace trtorch

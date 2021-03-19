@@ -97,7 +97,8 @@ core::CompileSpec to_internal_compile_spec(CompileSpec external) {
   internal.convert_info.engine_settings.max_batch_size = external.max_batch_size;
   internal.convert_info.engine_settings.torch_fallback.enabled = external.torch_fallback.enabled;
   internal.convert_info.engine_settings.torch_fallback.min_block_size = external.torch_fallback.min_block_size;
-  internal.convert_info.engine_settings.torch_fallback.forced_fallback_operators = external.torch_fallback.forced_fallback_operators;
+  internal.convert_info.engine_settings.torch_fallback.forced_fallback_operators =
+      external.torch_fallback.forced_fallback_operators;
 
   switch (external.device.device_type) {
     case CompileSpec::Device::DeviceType::kDLA:

@@ -17,7 +17,7 @@ void UnpackAddMM(std::shared_ptr<torch::jit::Graph>& graph) {
     graph(%b, %x, %w, %1):
       %mm: Tensor = aten::matmul(%x, %w)
       %bias: Tensor = trt::const(%b)
-      %out: Tensor = aten::add_(%bias, %mm, %1)
+      %out: Tensor = aten::add(%bias, %mm, %1)
       return (%out))IR";
 
   torch::jit::SubgraphRewriter unpack_addmm;

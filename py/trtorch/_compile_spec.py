@@ -122,6 +122,7 @@ def _parse_device(device_info: Dict[str, Any]) -> trtorch._C.Device:
 
     return info
 
+
 def _parse_torch_fallback(fallback_info: Dict[str, Any]) -> trtorch._C.TorchFallback:
     info = trtorch._C.TorchFallback()
     if "enabled" not in fallback_info:
@@ -196,7 +197,6 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
 
     if "torch_fallback" in compile_spec:
         info.torch_fallback = _parse_torch_fallback(compile_spec["torch_fallback"])
-
 
     return info
 
