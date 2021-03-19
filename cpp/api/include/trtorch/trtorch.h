@@ -259,6 +259,11 @@ struct TRTORCH_API CompileSpec {
   bool debug = false;
 
   /**
+   * Truncate long/double type to int/float type
+   */
+  bool truncate_long_and_double = false;
+
+  /**
    * Restrict operating type to only set default operation precision
    * (op_precision)
    */
