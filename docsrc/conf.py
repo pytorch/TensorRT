@@ -12,6 +12,7 @@
 #
 import os
 import sys
+
 sys.path.append(os.path.join(os.path.dirname(__name__), '../py'))
 
 import sphinx_material
@@ -118,6 +119,7 @@ html_theme_options = {
     'master_doc': True,
     "version_info": {
         "master": "https://nvidia.github.io/TRTorch/",
+        "v0.2.0": "https://nvidia.github.io/TRTorch/v0.2.0/",
         "v0.1.0": "https://nvidia.github.io/TRTorch/v0.1.0/",
         "v0.0.3": "https://nvidia.github.io/TRTorch/v0.0.3/",
         "v0.0.2": "https://nvidia.github.io/TRTorch/v0.0.2/",

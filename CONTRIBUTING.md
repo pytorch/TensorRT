@@ -6,7 +6,7 @@ Do try to fill an issue with your feature or bug before filling a PR (op support
 
 #### Communication
 
-The primary location for discussion is GitHub issues. This is the best place for questions about the project and discussion about specific issues.
+The primary location for discussion is GitHub issues and Github discussions. This is the best place for questions about the project and discussion about specific issues.
 
 We use the PyTorch Slack for communication about core development, integration with PyTorch and other communication that doesn't make sense in GitHub issues. If you need an invite, take a look at the [PyTorch README](https://github.com/pytorch/pytorch/blob/master/README.md) for instructions on requesting one.
 

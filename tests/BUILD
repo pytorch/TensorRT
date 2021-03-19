@@ -34,6 +34,14 @@ test_suite(
     name = "python_api_tests",
     tests = [
         "//tests/py:test_api",
-        "//tests/py:test_to_backend_api"
+        "//tests/py:test_to_backend_api",
+    ]
+)
+
+test_suite(
+    name = "python_required_and_optional_tests",
+    tests = [
+        ":python_api_tests",
+        "//tests/py:py_calibrator_tests"
     ]
 )

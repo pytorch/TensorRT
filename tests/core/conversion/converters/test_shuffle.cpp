@@ -240,3 +240,29 @@ TEST(Converters, ATenTransposeConvertsCorrectly) {
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
+
+TEST(Converters, ATenTransposeNegativeConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%x.1 : Tensor):
+      %2 : int = prim::Constant[value=-1]()
+      %3 : int = prim::Constant[value=-3]()
+      %4 : Tensor = aten::transpose(%x.1, %2, %3)
+      return (%4))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, &*g);
+
+  auto in = at::randint(0, 5, {2, 3, 4, 5, 6}, {at::kCUDA});
+  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+
+  std::cout << "Running JIT" << std::endl;
+  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
+
+  std::cout << "Running TRT" << std::endl;
+  in = at::clone(in);
+  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
+  auto trt = trt_results[0].reshape_as(jit_results[0]);
+
+  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+}

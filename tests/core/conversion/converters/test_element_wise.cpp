@@ -250,7 +250,7 @@ TEST(Converters, ATenRsubWithScalarConvertsCorrectly) {
 TEST(Converters, ATenClampMinConvertsCorrectly) {
   const auto graph = R"IR(
   graph(%x.1 : Tensor):
-          %2 : int = prim::Constant[value=-2]()
+          %2 : float = prim::Constant[value=1.5]()
           %3 : None = prim::Constant()
           %4 : Tensor = aten::clamp(%x.1, %2, %3)
           return (%4))IR";
@@ -260,7 +260,7 @@ TEST(Converters, ATenClampMinConvertsCorrectly) {
 TEST(Converters, ATenClampMaxConvertsCorrectly) {
   const auto graph = R"IR(
   graph(%x.1 : Tensor):
-          %2 : int = prim::Constant[value=3]()
+          %2 : float = prim::Constant[value=3.5]()
           %3 : None = prim::Constant()
           %4 : Tensor = aten::clamp(%x.1, %3, %2)
           return (%4))IR";
@@ -270,9 +270,27 @@ TEST(Converters, ATenClampMaxConvertsCorrectly) {
 TEST(Converters, ATenClampMinMaxConvertsCorrectly) {
   const auto graph = R"IR(
   graph(%x.1 : Tensor):
-          %2 : int = prim::Constant[value=3]()
-          %3 : int = prim::Constant[value=-2]()
+          %2 : float = prim::Constant[value=3.5]()
+          %3 : float = prim::Constant[value=1.5]()
           %4 : Tensor = aten::clamp(%x.1, %3, %2)
+          return (%4))IR";
+  pointwise_test_helper(graph, true);
+}
+
+TEST(Converters, ATenClampMinimumConvertsCorrectly) {
+  const auto graph = R"IR(
+  graph(%x.1 : Tensor):
+          %2 : float = prim::Constant[value=2.5]()
+          %4 : Tensor = aten::clamp_min(%x.1, %2)
+          return (%4))IR";
+  pointwise_test_helper(graph, true);
+}
+
+TEST(Converters, ATenClampMaximumConvertsCorrectly) {
+  const auto graph = R"IR(
+  graph(%x.1 : Tensor):
+          %2 : float = prim::Constant[value=2.5]()
+          %4 : Tensor = aten::clamp_max(%x.1, %2)
           return (%4))IR";
   pointwise_test_helper(graph, true);
 }

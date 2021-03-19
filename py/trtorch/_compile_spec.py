@@ -152,6 +152,9 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
     if "op_precision" in compile_spec:
         info.op_precision = _parse_op_precision(compile_spec["op_precision"])
 
+    if "calibrator" in compile_spec:
+        info.ptq_calibrator = compile_spec["calibrator"]
+
     if "disable_tf32" in compile_spec:
         assert isinstance(compile_spec["disable_tf32"], bool)
         info.disable_tf32 = compile_spec["disable_tf32"]
@@ -281,5 +284,6 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]) -> torch.classes.tensorrt.
     backend_spec.set_num_avg_timing_iters(parsed_spec.num_avg_timing_iters)
     backend_spec.set_workspace_size(parsed_spec.workspace_size)
     backend_spec.set_max_batch_size(parsed_spec.max_batch_size)
+    backend_spec._set_ptq_calibrator(parsed_spec._get_calibrator_handle())
 
     return backend_spec
