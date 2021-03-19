@@ -14,7 +14,7 @@ TEST(Converters, ATenCatPureTensorConvertsCorrectly) {
         return (%4))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in1 = at::randint(1, 10, {5}, {at::kCUDA});
   auto in2 = at::randint(1, 10, {5}, {at::kCUDA});
@@ -38,7 +38,7 @@ TEST(Converters, ATenCatDiffTensorConvertsCorrectly) {
         return (%4))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in1 = at::randint(1, 10, {5}, {at::kCUDA});
   auto in2 = at::randint(1, 10, {5}, {at::kCUDA});

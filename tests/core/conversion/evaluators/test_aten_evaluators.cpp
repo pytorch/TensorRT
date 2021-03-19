@@ -13,7 +13,7 @@ TEST(Evaluators, DivIntEvaluatesCorrectly) {
         return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto jit_results = trtorch::tests::util::EvaluateGraphJIT(g, {});
   auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {});
@@ -30,7 +30,7 @@ TEST(Evaluators, DivFloatEvaluatesCorrectly) {
         return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto jit_results = trtorch::tests::util::EvaluateGraphJIT(g, {});
   auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {});
@@ -49,7 +49,7 @@ TEST(Evaluators, ZerosEvaluatesCorrectly) {
   auto in = at::randint(1, 10, {1, 5, 5, 5}, {at::kCUDA});
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto jit_results = trtorch::tests::util::EvaluateGraphJIT(g, {in});
   auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {in});
@@ -69,7 +69,7 @@ TEST(Evaluators, ZerosDataTypeEvaluatesCorrectly) {
   auto in = at::randint(1, 10, {1, 5, 5, 5}, {at::kCUDA});
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto jit_results = trtorch::tests::util::EvaluateGraphJIT(g, {in});
   auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {in});

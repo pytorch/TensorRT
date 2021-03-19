@@ -11,7 +11,7 @@ void pointwise_test_helper(
     std::vector<int64_t> shape1 = {5},
     std::vector<int64_t> shape2 = {5}) {
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph_ir, &*g);
+  torch::jit::parseIR(graph_ir, g.get());
 
   // singleInput case is enabled when elementwise operation is performed
   // with an input and a constant embedded in graph
