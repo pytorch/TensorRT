@@ -470,8 +470,6 @@ auto aten_registrations TRTORCH_UNUSED =
                     EvalOptions()})
         .evaluator({c10::Symbol::fromQualString("aten::arange"),
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-                      // int end_scalar = 0;
-                      // auto end_scalar = ceil(args.at(n->input(0)).unwrapToScalar());
                       int input_size = n->inputs().size();
                       int scalar_count = 0;
                       for (int i = 0; i < input_size; i++) {
@@ -484,7 +482,7 @@ auto aten_registrations TRTORCH_UNUSED =
                           int end_scalar = args.at(n->input(0)).unwrapToInt();
                           return torch::arange(end_scalar);
                         } else if (args.at(n->input(0)).IValue()->isDouble()) {
-                          float end_scalar = ceil(args.at(n->input(0)).unwrapToScalar().to<float>());
+                          float end_scalar = args.at(n->input(0)).unwrapToScalar().to<float>();
                           return torch::arange(end_scalar);
                         }
                       } else if (scalar_count == 2) {
