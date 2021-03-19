@@ -467,7 +467,61 @@ auto aten_registrations TRTORCH_UNUSED =
                       LOG_WARNING("Warning from TorchScript: " << *warning);
                       return {};
                     },
-                    EvalOptions()});
+                    EvalOptions()})
+        .evaluator({c10::Symbol::fromQualString("aten::arange"),
+                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+                      int input_size = n->inputs().size();
+                      int scalar_count = 0;
+                      for (int i = 0; i < input_size; i++) {
+                        if (args.at(n->input(i)).IValue()->isScalar()) {
+                          scalar_count += 1;
+                        }
+                      }
+                      if (scalar_count == 1) {
+                        if (args.at(n->input(0)).IValue()->isInt()) {
+                          int end_scalar = args.at(n->input(0)).unwrapToInt();
+                          return torch::arange(end_scalar);
+                        } else if (args.at(n->input(0)).IValue()->isDouble()) {
+                          float end_scalar = args.at(n->input(0)).unwrapToScalar().to<float>();
+                          return torch::arange(end_scalar);
+                        }
+                      } else if (scalar_count == 2) {
+                        if (args.at(n->input(0)).IValue()->isDouble() || args.at(n->input(1)).IValue()->isDouble()) {
+                          float start_scalar = args.at(n->input(0)).unwrapToScalar().to<float>();
+                          float end_scalar = args.at(n->input(1)).unwrapToScalar().to<float>();
+                          return torch::arange(start_scalar, end_scalar);
+                        } else {
+                          int start_scalar = args.at(n->input(0)).unwrapToInt();
+                          int end_scalar = args.at(n->input(1)).unwrapToInt();
+                          return torch::arange(start_scalar, end_scalar);
+                        }
+                      } else if (scalar_count == 3) {
+                        if (args.at(n->input(0)).IValue()->isDouble() || args.at(n->input(1)).IValue()->isDouble() ||
+                            args.at(n->input(2)).IValue()->isDouble()) {
+                          float start_scalar = args.at(n->input(0)).unwrapToScalar().to<float>();
+                          float end_scalar = args.at(n->input(1)).unwrapToScalar().to<float>();
+                          float step_scalar = args.at(n->input(2)).unwrapToScalar().to<float>();
+                          return torch::arange(start_scalar, end_scalar, step_scalar);
+                        } else {
+                          int start_scalar = args.at(n->input(0)).unwrapToInt();
+                          int end_scalar = args.at(n->input(1)).unwrapToInt();
+                          int step_scalar = args.at(n->input(2)).unwrapToInt();
+                          return torch::arange(start_scalar, end_scalar, step_scalar);
+                        }
+                      } else {
+                        TRTORCH_THROW_ERROR(
+                            "Invalid input argument size for aten::arange, input argument size: " << input_size);
+                      }
+                      return {};
+                    },
+                    EvalOptions().validSchemas({
+                        R"SIG(aten::arange(Scalar end, *, int? dtype=None, int? layout=None,
+                            Device? device=None, bool? pin_memory=None) -> (Tensor))SIG",
+                        R"SIG(aten::arange.start(Scalar start, Scalar end, *, ScalarType? dtype=None,
+                            Layout? layout=None, Device? device=None, bool? pin_memory=None) -> (Tensor))SIG",
+                        R"SIG(aten::arange.start_step(Scalar start, Scalar end, Scalar step, *, ScalarType? dtype=None,
+                        Layout? layout=None, Device? device=None, bool? pin_memory=None) -> (Tensor))SIG",
+                    })});
 } // namespace
 } // namespace evaluators
 } // namespace conversion
