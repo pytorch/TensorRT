@@ -9,7 +9,7 @@
     const auto graph = graph_src;                                                        \
                                                                                          \
     auto g = std::make_shared<torch::jit::Graph>();                                      \
-    torch::jit::parseIR(graph, g.get());                                                     \
+    torch::jit::parseIR(graph, g.get());                                                 \
                                                                                          \
     auto in = at::randint(1, 10, input_shape, {at::kCUDA});                              \
     auto jit_in = at::clone(in);                                                         \
@@ -28,7 +28,7 @@
     const auto graph = graph_src;                                                        \
                                                                                          \
     auto g = std::make_shared<torch::jit::Graph>();                                      \
-    torch::jit::parseIR(graph, g.get());                                                     \
+    torch::jit::parseIR(graph, g.get());                                                 \
                                                                                          \
     auto in = at::randint(1, 10, input_shape, {at::kCUDA});                              \
     auto jit_in = at::clone(in);                                                         \
@@ -48,7 +48,7 @@
     const auto graph = graph_src;                                                 \
                                                                                   \
     auto g = std::make_shared<torch::jit::Graph>();                               \
-    torch::jit::parseIR(graph, g.get());                                              \
+    torch::jit::parseIR(graph, g.get());                                          \
                                                                                   \
     auto in = at::randint(1, 10, input_shape, {at::kCUDA});                       \
     auto jit_in = at::clone(in);                                                  \
