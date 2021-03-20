@@ -28,7 +28,7 @@ bool add_split(ConversionCtx* ctx, const torch::jit::Node* n, args& args, bool s
     auto split_size = args[1].unwrapToInt();
     numOutputs = inDimSize / split_size;
     numRemainder = inDimSize % split_size;
-    for (int i = 0; i < numOutputs; i++) {
+    for (int64_t i = 0; i < numOutputs; i++) {
       sizes.push_back(split_size);
     }
     if (numRemainder) {
@@ -45,7 +45,7 @@ bool add_split(ConversionCtx* ctx, const torch::jit::Node* n, args& args, bool s
   list.reserve(numOutputs);
 
   int start_idx = 0;
-  for (int i = 0; i < numOutputs; i++) {
+  for (int64_t i = 0; i < numOutputs; i++) {
     at::Tensor indices = torch::arange(start_idx, start_idx + sizes[i], 1).to(torch::kI32);
     auto indicesTensor = tensor_to_const(ctx, indices);
 
