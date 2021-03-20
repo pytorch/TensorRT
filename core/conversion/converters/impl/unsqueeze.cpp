@@ -22,10 +22,10 @@ auto unsqueeze_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().p
 
        auto selfDim = util::toVec(self->getDimensions());
        int64_t nbDims = selfDim.size();
-       TRTORCH_ASSERT(
+       TRTORCH_CHECK(
            dim <= nbDims && dim >= -(nbDims + 1),
-           "imension out of range (expected to be in range of [" << -(nbDims + 1) << ", " << nbDims << "], but got "
-                                                                 << dim << ")");
+           "Dimension out of range (expected to be in range of [" << -(nbDims + 1) << ", " << nbDims << "], but got "
+                                                                  << dim << ")");
        if (dim < 0) {
          dim = nbDims + 1 + dim;
        }
