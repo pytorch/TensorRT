@@ -43,7 +43,7 @@ auto batch_norm_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().
       auto should_unpack = util::toVec(orig_shape).size() < 4;
       if (should_unpack) {
         // expand spatial dims from 1D to 2D
-        auto new_shape = util::toDimsPadAtEnd(util::toVec(orig_shape), 4);
+        auto new_shape = util::toDimsTailPad(util::toVec(orig_shape), 4);
         LOG_DEBUG(
             "Input shape is less than 4D got: "
             << orig_shape << ", inserting shuffle layer to reshape to 4D tensor shape: " << new_shape);

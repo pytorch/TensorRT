@@ -86,7 +86,7 @@ nvinfer1::Dims toDimsPad(c10::IntArrayRef l, uint64_t pad_to) {
   return dims;
 }
 
-nvinfer1::Dims toDimsPadAtEnd(c10::IntArrayRef l, uint64_t pad_to) {
+nvinfer1::Dims toDimsTailPad(c10::IntArrayRef l, uint64_t pad_to) {
   if (l.size() > pad_to) {
     LOG_DEBUG(
         "Requested padding of dimensions to " << pad_to << " but found " << l.size()
@@ -160,7 +160,7 @@ nvinfer1::Dims toDimsPad(c10::List<int64_t> l, uint64_t pad_to) {
   return dims;
 }
 
-nvinfer1::Dims toDimsPadAtEnd(c10::List<int64_t> l, uint64_t pad_to) {
+nvinfer1::Dims toDimsTailPad(c10::List<int64_t> l, uint64_t pad_to) {
   if (l.size() > pad_to) {
     LOG_DEBUG(
         "Requested padding of dimensions to " << pad_to << " but found " << l.size()
