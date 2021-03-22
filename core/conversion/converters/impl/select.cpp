@@ -68,7 +68,9 @@ auto select_registrations TRTORCH_UNUSED =
         .pattern({"aten::select.int(Tensor(a) self, int dim, int index) -> (Tensor(a))",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                     auto in = args[0].ITensor();
+                    auto maxDim = static_cast<int64_t>(in->getDimensions().nbDims);
                     auto axis = args[1].unwrapToInt();
+                    axis = axis < 0 ? axis + maxDim : axis;
                     auto ind = (int32_t)args[2].unwrapToInt();
 
                     // index to access needs to be an at::Tensor
@@ -89,7 +91,7 @@ auto select_registrations TRTORCH_UNUSED =
                     // IShuffleLayer removes redundant dimensions
                     auto shuffle_layer = ctx->net->addShuffle(*gather_out);
                     TRTORCH_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
-                    shuffle_layer->setReshapeDimensions(util::unpadDims(gather_out->getDimensions()));
+                    shuffle_layer->setReshapeDimensions(util::squeezeDims(gather_out->getDimensions(), axis));
                     shuffle_layer->setName(util::node_info(n).c_str());
                     auto shuffle_out = shuffle_layer->getOutput(0);
 
