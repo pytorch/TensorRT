@@ -176,9 +176,11 @@ auto select_registrations TRTORCH_UNUSED =
             {"aten::embedding(Tensor weight, Tensor indices, int padding_idx=-1, bool scale_grad_by_freq=False, bool sparse=False) -> (Tensor)",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                auto embeddingTensor = args[0].ITensorOrFreeze(ctx);
-               auto indicesTensor = args[1].ITensor();
+               auto indicesTensor = args[1].ITensorOrFreeze(ctx);
                // Set datatype for indices tensor to INT32
-               indicesTensor->setType(nvinfer1::DataType::kINT32);
+               auto identity = ctx->net->addIdentity(*indicesTensor);
+               identity->setOutputType(0, nvinfer1::DataType::kINT32);
+               indicesTensor = identity->getOutput(0);
 
                // IGatherLayer takes in input tensor, the indices, and the axis of input tensor to take indices from
                auto gather_layer = ctx->net->addGather(*embeddingTensor, *indicesTensor, 0);

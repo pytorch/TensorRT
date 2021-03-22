@@ -159,7 +159,7 @@ TEST(Converters, ATenEmbeddingConvertsCorrectly) {
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
 
   // Run TensorRT
-  auto options_trt = torch::TensorOptions().device(torch::kCUDA, 0).dtype(torch::kI32);
+  auto options_trt = torch::TensorOptions().device(torch::kCUDA, 0).dtype(torch::kFloat);
   auto trt_in = at::tensor({0, 1, 2}, options_trt);
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
