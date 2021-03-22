@@ -19,7 +19,7 @@ std::string gen_test_graph(const std::string& unary) {
     const auto graph = gen_test_graph(#unary);                                            \
                                                                                           \
     auto g = std::make_shared<torch::jit::Graph>();                                       \
-    torch::jit::parseIR(graph, g.get());                                                      \
+    torch::jit::parseIR(graph, g.get());                                                  \
                                                                                           \
     float offset = 0;                                                                     \
     if (strcmp(#name, "Acosh") == 0)                                                      \

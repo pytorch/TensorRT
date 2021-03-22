@@ -141,7 +141,7 @@ TEST(Converters, ATenNarrowStartScalarConvertsCorrectly) {
 
 TEST(Converters, ATenEmbeddingConvertsCorrectly) {
   const auto graph = R"IR(
-      graph(%1 : Tensor, %emb_weight : Float(10:3, 3:1)):
+      graph(%1 : Tensor, %emb_weight : Float(10, 3, strides=[3, 1])):
             %2 : bool = prim::Constant[value=0]()
             %3 : int = prim::Constant[value=-1]()
             %5 : Tensor = aten::embedding(%emb_weight, %1, %3, %2, %2)

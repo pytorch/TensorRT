@@ -7,10 +7,10 @@
 TEST(Converters, ATenBatchNormConvertsCorrectly) {
   const auto graph = R"IR(
       graph(%0 : Tensor,
-            %1: Float(5:1),
-            %2: Float(5:1),
-            %3: Float(5:1),
-            %4: Float(5:1)):
+            %1: Float(5, strides=[1]),
+            %2: Float(5, strides=[1]),
+            %3: Float(5, strides=[1]),
+            %4: Float(5, strides=[1])):
         %5 : bool = prim::Constant[value=0]()
         %6 : float = prim::Constant[value=1.0000000000000001e-05]()
         %7 : float = prim::Constant[value=0.10000000000000001]()
