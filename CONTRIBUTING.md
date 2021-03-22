@@ -16,7 +16,7 @@ We use the PyTorch Slack for communication about core development, integration w
 
     - Use the built in linting tools to ensure that your code matches the style guidelines
       ```sh
-      # C++ Linting (After installing clang-format)
+      # C++ Linting (After installing clang-format [Version 9.0.0])
       # Print non-conforming sections of code
       bazel run //tools/linter:cpplint_diff -- //...
       # Modify code to conform with style guidelines
