@@ -97,12 +97,14 @@ nvinfer1::ITensor* Var::ITensorOrFreeze(ConversionCtx* ctx) {
   auto weights = converters::Weights();
   if (isIValue()) {
     auto tensor = ptr_.ivalue->toTensor();
-    if (tensor.scalar_type() == at::kLong && ctx->settings.truncate_long_and_double) {
+    if ((tensor.scalar_type() == at::kLong || tensor.scalar_type() == at::kDouble) && !ctx->settings.truncate_long_and_double) {
+      TRTORCH_CHECK(0, "Unable to freeze tensor of type kLong/kDouble into constant layer, try to compile model with truncate_long_and_double ON");
+    } else if (tensor.scalar_type() == at::kLong && ctx->settings.truncate_long_and_double) {
       weights = converters::Weights(ctx, tensor.toType(at::kInt));
-      LOG_WARNING("Truncate kLong to kInt for IValue");
+      LOG_WARNING("Warning: Truncating weight (constant in the graph) from kLong to kInt to indicate that only constants are affected.");
     } else if (tensor.scalar_type() == at::kDouble && ctx->settings.truncate_long_and_double) {
       weights = converters::Weights(ctx, tensor.toType(at::kFloat));
-      LOG_WARNING("Truncate kDouble to kFloat for IValue");
+      LOG_WARNING("Warning: Truncating weight (constant in the graph) from kDouble to kFloat to indicate that only constants are affected.");
     } else {
       weights = converters::Weights(ctx, tensor);
     }
