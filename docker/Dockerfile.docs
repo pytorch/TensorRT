@@ -1,10 +1,10 @@
-FROM nvcr.io/nvidia/tensorrt:20.10-py3
+FROM nvcr.io/nvidia/tensorrt:21.02-py3
 
 RUN curl https://bazel.build/bazel-release.pub.gpg | apt-key add -
 RUN echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" | tee /etc/apt/sources.list.d/bazel.list
 
-RUN apt-get update && apt-get install -y bazel-3.7.1 clang-format-9
-RUN ln -s /usr/bin/bazel-3.7.1 /usr/bin/bazel
+RUN apt-get update && apt-get install -y bazel-4.0.0 clang-format-9
+RUN ln -s /usr/bin/bazel-4.0.0 /usr/bin/bazel
 RUN ln -s $(which clang-format-9) /usr/bin/clang-format
 
 # Workaround for bazel expecting both static and shared versions, we only use shared libraries inside container
