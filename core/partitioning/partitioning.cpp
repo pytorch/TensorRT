@@ -1,4 +1,5 @@
 #include "partitioning.h"
+#include "core/conversion/evaluators/eval_util.h"
 #include "core/lowering/passes/passes.h"
 #include "core/util/prelude.h"
 #include "torch/csrc/jit/api/module.h"
@@ -97,6 +98,12 @@ void registerSegmentInOutIValues(
       jit_inputs_ivalues.push_back(ivalues_maps[input].toTensor());
     } else if (input->type()->isSubtypeOf(torch::jit::IntType::get())) {
       jit_inputs_ivalues.push_back(ivalues_maps[input].toInt());
+    } else if (input->type()->isSubtypeOf(torch::jit::BoolType::get())) {
+      jit_inputs_ivalues.push_back(ivalues_maps[input].toBool());
+    } else if (input->type()->isSubtypeOf(torch::jit::ListType::ofTensors())) {
+      jit_inputs_ivalues.push_back(ivalues_maps[input].toList());
+    } else {
+      std::cerr << "Currently not support the type cast for input type " << input->type()->str() << ".\n";
     }
   }
 
