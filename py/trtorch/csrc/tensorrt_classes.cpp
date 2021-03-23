@@ -99,6 +99,8 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
   }
   auto info = core::CompileSpec(internal_input_ranges);
   info.convert_info.engine_settings.op_precision = toTRTDataType(op_precision);
+  info.convert_info.engine_settings.calibrator = ptq_calibrator;
+  info.convert_info.engine_settings.disable_tf32 = disable_tf32;
   info.convert_info.engine_settings.refit = refit;
   info.convert_info.engine_settings.debug = debug;
   info.convert_info.engine_settings.strict_types = strict_types;
@@ -128,6 +130,7 @@ std::string CompileSpec::stringify() {
   }
   ss << "     ]" << std::endl;
   ss << "     \"Op Precision\": " << to_str(op_precision) << std::endl;
+  ss << "     \"TF32 Disabled\": " << disable_tf32 << std::endl;
   ss << "     \"Refit\": " << refit << std::endl;
   ss << "     \"Debug\": " << debug << std::endl;
   ss << "     \"Strict Types\": " << strict_types << std::endl;

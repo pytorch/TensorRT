@@ -99,6 +99,7 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule, method_name: st
                         "allow_gpu_fallback": false, # (DLA only) Allow layers unsupported on DLA to run on GPU
                     },
                     "op_precision": torch.half, # Operating precision set to FP16
+                    "disable_tf32": False, # Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
                     "refit": false, # enable refit
                     "debug": false, # enable debuggable engine
                     "strict_types": false, # kernels should strictly run in operating precision
@@ -155,3 +156,7 @@ def get_build_info() -> str:
     build_info = trtorch._C.get_build_info()
     build_info = "TRTorch Version: " + str(__version__) + '\n' + build_info
     return build_info
+
+
+def set_device(gpu_id):
+    trtorch._C.set_device(gpu_id)

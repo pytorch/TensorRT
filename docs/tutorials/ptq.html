@@ -154,6 +154,9 @@
        <a href="https://nvidia.github.io/TRTorch/" title="master">
         master
        </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.2.0/" title="v0.2.0">
+        v0.2.0
+       </a>
        <a href="https://nvidia.github.io/TRTorch/v0.1.0/" title="v0.1.0">
         v0.1.0
        </a>
@@ -250,8 +253,13 @@
               <nav class="md-nav">
                <ul class="md-nav__list">
                 <li class="md-nav__item">
-                 <a class="md-nav__link" href="#how-to-create-your-own-ptq-application">
-                  How to create your own PTQ application
+                 <a class="md-nav__link" href="#how-to-create-your-own-ptq-application-in-c">
+                  How to create your own PTQ application in C++
+                 </a>
+                </li>
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#how-to-create-your-own-ptq-application-in-python">
+                  How to create your own PTQ application in Python
                  </a>
                  <nav class="md-nav">
                   <ul class="md-nav__list">
@@ -362,6 +370,18 @@
             Useful Links for TRTorch Development
            </a>
           </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Indices
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../indices/supported_ops.html">
+            Operators Supported
+           </a>
+          </li>
          </ul>
         </nav>
        </div>
@@ -382,8 +402,13 @@
            <nav class="md-nav">
             <ul class="md-nav__list">
              <li class="md-nav__item">
-              <a class="md-nav__link" href="#how-to-create-your-own-ptq-application">
-               How to create your own PTQ application
+              <a class="md-nav__link" href="#how-to-create-your-own-ptq-application-in-c">
+               How to create your own PTQ application in C++
+              </a>
+             </li>
+             <li class="md-nav__item">
+              <a class="md-nav__link" href="#how-to-create-your-own-ptq-application-in-python">
+               How to create your own PTQ application in Python
               </a>
               <nav class="md-nav">
                <ul class="md-nav__list">
@@ -446,9 +471,40 @@ calibrators easier.
          </span>
         </code>
         API which steamlines preprocessing and batching input data.
+These APIs are exposed via both C++ and Python interface which makes it easier for the end user.
+For C++ interface, we use
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          torch::Dataset
+         </span>
+        </code>
+        and
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          torch::data::make_data_loader
+         </span>
+        </code>
+        objects to construct and perform pre-processing on datasets.
+The equivalent functionality in python interface uses
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          torch.utils.data.Dataset
+         </span>
+        </code>
+        and
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          torch.utils.data.DataLoader
+         </span>
+        </code>
+        .
 This section of the PyTorch documentation has more information
         <a class="reference external" href="https://pytorch.org/tutorials/advanced/cpp_frontend.html#loading-data">
          https://pytorch.org/tutorials/advanced/cpp_frontend.html#loading-data
+        </a>
+        and
+        <a class="reference external" href="https://pytorch.org/tutorials/recipes/recipes/loading_data_recipe.html">
+         https://pytorch.org/tutorials/recipes/recipes/loading_data_recipe.html
         </a>
         .
 TRTorch uses Dataloaders as the base of a generic calibrator implementation. So you will be able to reuse or quickly
@@ -461,11 +517,11 @@ implement a
         for your target domain, place it in a DataLoader and create a INT8 Calibrator
 which you can provide to TRTorch to run INT8 Calibration during compliation of your module.
        </p>
-       <span id="writing-ptq">
+       <span id="writing-ptq-cpp">
        </span>
-       <h2 id="how-to-create-your-own-ptq-application">
-        How to create your own PTQ application
-        <a class="headerlink" href="#how-to-create-your-own-ptq-application" title="Permalink to this headline">
+       <h2 id="how-to-create-your-own-ptq-application-in-c">
+        How to create your own PTQ application in C++
+        <a class="headerlink" href="#how-to-create-your-own-ptq-application-in-c" title="Permalink to this headline">
          ¶
         </a>
        </h2>
@@ -483,52 +539,52 @@ which you can provide to TRTorch to run INT8 Calibration during compliation of y
          <tr>
           <td class="linenos">
            <div class="linenodiv">
-            <pre> 1
- 2
- 3
- 4
- 5
- 6
- 7
- 8
- 9
-10
-11
-12
-13
-14
-15
-16
-17
-18
-19
-20
-21
-22
-23
-24
-25
-26
-27
-28
-29
-30
-31
-32
-33
-34
-35
-36
-37
-38
-39
-40
-41
-42
-43
-44
-45
-46</pre>
+            <pre><span class="normal"> 1</span>
+<span class="normal"> 2</span>
+<span class="normal"> 3</span>
+<span class="normal"> 4</span>
+<span class="normal"> 5</span>
+<span class="normal"> 6</span>
+<span class="normal"> 7</span>
+<span class="normal"> 8</span>
+<span class="normal"> 9</span>
+<span class="normal">10</span>
+<span class="normal">11</span>
+<span class="normal">12</span>
+<span class="normal">13</span>
+<span class="normal">14</span>
+<span class="normal">15</span>
+<span class="normal">16</span>
+<span class="normal">17</span>
+<span class="normal">18</span>
+<span class="normal">19</span>
+<span class="normal">20</span>
+<span class="normal">21</span>
+<span class="normal">22</span>
+<span class="normal">23</span>
+<span class="normal">24</span>
+<span class="normal">25</span>
+<span class="normal">26</span>
+<span class="normal">27</span>
+<span class="normal">28</span>
+<span class="normal">29</span>
+<span class="normal">30</span>
+<span class="normal">31</span>
+<span class="normal">32</span>
+<span class="normal">33</span>
+<span class="normal">34</span>
+<span class="normal">35</span>
+<span class="normal">36</span>
+<span class="normal">37</span>
+<span class="normal">38</span>
+<span class="normal">39</span>
+<span class="normal">40</span>
+<span class="normal">41</span>
+<span class="normal">42</span>
+<span class="normal">43</span>
+<span class="normal">44</span>
+<span class="normal">45</span>
+<span class="normal">46</span></pre>
            </div>
           </td>
           <td class="code">
@@ -694,9 +750,7 @@ defines the calibration algorithm used when calibrating. You can explicitly make
          </span>
         </code>
         field with a pointer to your calibrator and it will work as well.
-       </p>
-       <p>
-        From here not much changes in terms of how to execution works. You are still able to fully use LibTorch as the sole interface for inference. Data should remain
+From here not much changes in terms of how to execution works. You are still able to fully use LibTorch as the sole interface for inference. Data should remain
 in FP32 precision when it’s passed into
         <cite>
          trt_mod.forward
@@ -705,6 +759,103 @@ in FP32 precision when it’s passed into
 CIFAR10 to deploying in INT8 with TRTorch here:
         <a class="reference external" href="https://github.com/NVIDIA/TRTorch/tree/master/cpp/ptq">
          https://github.com/NVIDIA/TRTorch/tree/master/cpp/ptq
+        </a>
+       </p>
+       <span id="writing-ptq-python">
+       </span>
+       <h2 id="how-to-create-your-own-ptq-application-in-python">
+        How to create your own PTQ application in Python
+        <a class="headerlink" href="#how-to-create-your-own-ptq-application-in-python" title="Permalink to this headline">
+         ¶
+        </a>
+       </h2>
+       <p>
+        TRTorch Python API provides an easy and convenient way to use pytorch dataloaders with TensorRT calibrators.
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          DataLoaderCalibrator
+         </span>
+        </code>
+        class can be used to create
+a TensorRT calibrator by providing desired configuration. The following code demonstrates an example on how to use it
+       </p>
+       <div class="highlight-python notranslate">
+        <div class="highlight">
+         <pre><span></span><span class="n">testing_dataset</span> <span class="o">=</span> <span class="n">torchvision</span><span class="o">.</span><span class="n">datasets</span><span class="o">.</span><span class="n">CIFAR10</span><span class="p">(</span><span class="n">root</span><span class="o">=</span><span class="s1">'./data'</span><span class="p">,</span>
+                                                        <span class="n">train</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                                                        <span class="n">download</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                                                        <span class="n">transform</span><span class="o">=</span><span class="n">transforms</span><span class="o">.</span><span class="n">Compose</span><span class="p">([</span>
+                                                            <span class="n">transforms</span><span class="o">.</span><span class="n">ToTensor</span><span class="p">(),</span>
+                                                            <span class="n">transforms</span><span class="o">.</span><span class="n">Normalize</span><span class="p">((</span><span class="mf">0.4914</span><span class="p">,</span> <span class="mf">0.4822</span><span class="p">,</span> <span class="mf">0.4465</span><span class="p">),</span>
+                                                                                 <span class="p">(</span><span class="mf">0.2023</span><span class="p">,</span> <span class="mf">0.1994</span><span class="p">,</span> <span class="mf">0.2010</span><span class="p">))</span>
+                                                        <span class="p">]))</span>
+
+<span class="n">testing_dataloader</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">(</span><span class="n">testing_dataset</span><span class="p">,</span>
+                                                      <span class="n">batch_size</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                                                      <span class="n">shuffle</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                                                      <span class="n">num_workers</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">calibrator</span> <span class="o">=</span> <span class="n">trtorch</span><span class="o">.</span><span class="n">ptq</span><span class="o">.</span><span class="n">DataLoaderCalibrator</span><span class="p">(</span><span class="n">testing_dataloader</span><span class="p">,</span>
+                                              <span class="n">cache_file</span><span class="o">=</span><span class="s1">'./calibration.cache'</span><span class="p">,</span>
+                                              <span class="n">use_cache</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                                              <span class="n">algo_type</span><span class="o">=</span><span class="n">trtorch</span><span class="o">.</span><span class="n">ptq</span><span class="o">.</span><span class="n">CalibrationAlgo</span><span class="o">.</span><span class="n">ENTROPY_CALIBRATION_2</span><span class="p">,</span>
+                                              <span class="n">device</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s1">'cuda:0'</span><span class="p">))</span>
+
+<span class="n">compile_spec</span> <span class="o">=</span> <span class="p">{</span>
+         <span class="s2">"input_shapes"</span><span class="p">:</span> <span class="p">[[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">]],</span>
+         <span class="s2">"op_precision"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">int8</span><span class="p">,</span>
+         <span class="s2">"calibrator"</span><span class="p">:</span> <span class="n">calibrator</span><span class="p">,</span>
+         <span class="s2">"device"</span><span class="p">:</span> <span class="p">{</span>
+             <span class="s2">"device_type"</span><span class="p">:</span> <span class="n">trtorch</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span><span class="p">,</span>
+             <span class="s2">"gpu_id"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+             <span class="s2">"dla_core"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+             <span class="s2">"allow_gpu_fallback"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+             <span class="s2">"disable_tf32"</span><span class="p">:</span> <span class="kc">False</span>
+         <span class="p">}</span>
+     <span class="p">}</span>
+<span class="n">trt_mod</span> <span class="o">=</span> <span class="n">trtorch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">compile_spec</span><span class="p">)</span>
+</pre>
+        </div>
+       </div>
+       <p>
+        In the cases where there is a pre-existing calibration cache file that users want to use,
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          CacheCalibrator
+         </span>
+        </code>
+        can be used without any dataloaders. The following example demonstrates how
+to use
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          CacheCalibrator
+         </span>
+        </code>
+        to use in INT8 mode.
+       </p>
+       <div class="highlight-python notranslate">
+        <div class="highlight">
+         <pre><span></span><span class="n">calibrator</span> <span class="o">=</span> <span class="n">trtorch</span><span class="o">.</span><span class="n">ptq</span><span class="o">.</span><span class="n">CacheCalibrator</span><span class="p">(</span><span class="s2">"./calibration.cache"</span><span class="p">)</span>
+
+<span class="n">compile_settings</span> <span class="o">=</span> <span class="p">{</span>
+      <span class="s2">"input_shapes"</span><span class="p">:</span> <span class="p">[[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">]],</span>
+      <span class="s2">"op_precision"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">int8</span><span class="p">,</span>
+      <span class="s2">"calibrator"</span><span class="p">:</span> <span class="n">calibrator</span><span class="p">,</span>
+      <span class="s2">"max_batch_size"</span><span class="p">:</span> <span class="mi">32</span><span class="p">,</span>
+  <span class="p">}</span>
+
+<span class="n">trt_mod</span> <span class="o">=</span> <span class="n">trtorch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">compile_settings</span><span class="p">)</span>
+</pre>
+        </div>
+       </div>
+       <p>
+        If you already have an existing calibrator class (implemented directly using TensorRT API), you can directly set the calibrator field to your class which can be very convenient.
+For a demo on how PTQ can be performed on a VGG network using TRTorch API, you can refer to
+        <a class="reference external" href="https://github.com/NVIDIA/TRTorch/blob/master/tests/py/test_ptq_dataloader_calibrator.py">
+         https://github.com/NVIDIA/TRTorch/blob/master/tests/py/test_ptq_dataloader_calibrator.py
+        </a>
+        and
+        <a class="reference external" href="https://github.com/NVIDIA/TRTorch/blob/master/tests/py/test_ptq_trt_calibrator.py">
+         https://github.com/NVIDIA/TRTorch/blob/master/tests/py/test_ptq_trt_calibrator.py
         </a>
        </p>
        <h3 id="citations">

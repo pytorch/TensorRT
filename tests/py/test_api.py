@@ -20,7 +20,8 @@ class TestCompile(ModelTestCase):
                 "device_type": trtorch.DeviceType.GPU,
                 "gpu_id": 0,
                 "dla_core": 0,
-                "allow_gpu_fallback": False
+                "allow_gpu_fallback": False,
+                "disable_tf32": False
             }
         }
 
@@ -35,7 +36,8 @@ class TestCompile(ModelTestCase):
                 "device_type": trtorch.DeviceType.GPU,
                 "gpu_id": 0,
                 "dla_core": 0,
-                "allow_gpu_fallback": False
+                "allow_gpu_fallback": False,
+                "disable_tf32": False
             }
         }
 
@@ -77,7 +79,6 @@ class TestLoggingAPIs(unittest.TestCase):
 def test_suite():
     suite = unittest.TestSuite()
     suite.addTest(TestCompile.parametrize(TestCompile, model=models.resnet18(pretrained=True)))
-    suite.addTest(TestCompile.parametrize(TestCompile, model=models.resnet50(pretrained=True)))
     suite.addTest(TestCompile.parametrize(TestCompile, model=models.mobilenet_v2(pretrained=True)))
     suite.addTest(unittest.makeSuite(TestCheckMethodOpSupport))
     suite.addTest(unittest.makeSuite(TestLoggingAPIs))

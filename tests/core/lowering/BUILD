@@ -8,6 +8,10 @@ config_setting(
 )
 
 lowering_test(
+  name = "test_linear_to_addmm",
+)
+
+lowering_test(
   name = "test_remove_contiguous_pass",
 )
 
@@ -19,11 +23,21 @@ lowering_test(
   name = "test_remove_detach_pass",
 )
 
+lowering_test(
+  name = "test_operator_aliasing_pass",
+)
+
+lowering_test(
+  name = "test_silu_to_sigmoid_multiplication",
+)
+
 test_suite(
     name = "lowering_tests",
     tests = [
+        ":test_linear_to_addmm",
         ":test_remove_contiguous_pass",
         ":test_remove_to",
-        ":test_remove_detach_pass"
+        ":test_remove_detach_pass",
+        ":test_operator_aliasing_pass"
     ]
 )

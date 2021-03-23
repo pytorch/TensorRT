@@ -94,11 +94,20 @@ struct CompileSpec : torch::CustomClassHolder {
     input_ranges.push_back(*ir);
   }
 
+  int64_t getPTQCalibratorHandle() {
+    return (int64_t)ptq_calibrator;
+  }
+
   void setDeviceIntrusive(const c10::intrusive_ptr<Device>& d) {
     device = *d;
   }
 
+  void setPTQCalibratorViaHandle(int64_t handle) {
+    ptq_calibrator = (nvinfer1::IInt8Calibrator*)handle;
+  }
+
   ADD_ENUM_GET_SET(op_precision, DataType, static_cast<int64_t>(DataType::kChar));
+  ADD_FIELD_GET_SET(disable_tf32, bool);
   ADD_FIELD_GET_SET(refit, bool);
   ADD_FIELD_GET_SET(debug, bool);
   ADD_FIELD_GET_SET(strict_types, bool);
@@ -108,9 +117,12 @@ struct CompileSpec : torch::CustomClassHolder {
   ADD_FIELD_GET_SET(workspace_size, int64_t);
   ADD_FIELD_GET_SET(max_batch_size, int64_t);
   ADD_FIELD_GET_SET(device, Device);
+  ADD_FIELD_GET_SET(ptq_calibrator, nvinfer1::IInt8Calibrator*);
 
   std::vector<InputRange> input_ranges;
+  nvinfer1::IInt8Calibrator* ptq_calibrator = nullptr;
   DataType op_precision = DataType::kFloat;
+  bool disable_tf32 = false;
   bool refit = false;
   bool debug = false;
   bool strict_types = false;

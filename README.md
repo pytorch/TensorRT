@@ -63,8 +63,8 @@ torch.jit.save(trt_ts_module, "trt_torchscript_module.ts")
 | Platform | Support |
 | -------- | ------- |
 | Linux AMD64 / GPU   | **Supported** |
-| Linux aarch64 / GPU | **Native Compilation Supported on JetPack-4.4** |
-| Linux aarch64 / DLA | **Native Compilation Supported on JetPack-4.4** |
+| Linux aarch64 / GPU | **Native Compilation Supported on JetPack-4.4+** |
+| Linux aarch64 / DLA | **Native Compilation Supported on JetPack-4.4+** |
 | Windows / GPU       | **Unofficial Support** |
 | Linux ppc64le / GPU | - |
 
@@ -73,11 +73,11 @@ torch.jit.save(trt_ts_module, "trt_torchscript_module.ts")
 ### Dependencies
 These are the following dependencies used to verify the testcases. TRTorch can work with other versions, but the tests are not guaranteed to pass.
 
-- Bazel 3.7.0
-- Libtorch 1.7.1 (built with CUDA 11.0)
-- CUDA 11.0
-- cuDNN 8
-- TensorRT 7.2.1.6
+- Bazel 4.0.0
+- Libtorch 1.8.0 (built with CUDA 11.1)
+- CUDA 11.1 (10.2 on Jetson)
+- cuDNN 8.1
+- TensorRT 7.2.3
 
 ## Prebuilt Binaries and Wheel files
 

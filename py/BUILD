@@ -9,6 +9,7 @@ py_library(
         "trtorch/__init__.py",
         "trtorch/_version.py",
         "trtorch/_compiler.py",
+        "trtorch/ptq.py",
         "trtorch/_compile_spec.py",
         "trtorch/_types.py",
         "trtorch/logging.py"

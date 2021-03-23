@@ -135,6 +135,13 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
     if "op_precision" in compile_spec:
         info.op_precision = _parse_op_precision(compile_spec["op_precision"])
 
+    if "calibrator" in compile_spec:
+        info.ptq_calibrator = compile_spec["calibrator"]
+
+    if "disable_tf32" in compile_spec:
+        assert isinstance(compile_spec["disable_tf32"], bool)
+        info.disable_tf32 = compile_spec["disable_tf32"]
+
     if "refit" in compile_spec:
         assert isinstance(compile_spec["refit"], bool)
         info.refit = compile_spec["refit"]
@@ -201,6 +208,7 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]) -> torch.classes.tensorrt.
                             "allow_gpu_fallback": false, # (DLA only) Allow layers unsupported on DLA to run on GPU
                         },
                         "op_precision": torch.half, # Operating precision set to FP16
+                        "disable_tf32": False, # Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
                         "refit": False, # enable refit
                         "debug": False, # enable debuggable engine
                         "strict_types": False, # kernels should strictly run in operating precision
@@ -239,6 +247,7 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]) -> torch.classes.tensorrt.
 
     backend_spec.set_device(d)
     backend_spec.set_op_precision(int(parsed_spec.op_precision))
+    backend_spec.set_disable_tf32(parsed_spec.disable_tf32)
     backend_spec.set_refit(parsed_spec.refit)
     backend_spec.set_debug(parsed_spec.debug)
     backend_spec.set_refit(parsed_spec.refit)
@@ -248,5 +257,6 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]) -> torch.classes.tensorrt.
     backend_spec.set_num_avg_timing_iters(parsed_spec.num_avg_timing_iters)
     backend_spec.set_workspace_size(parsed_spec.workspace_size)
     backend_spec.set_max_batch_size(parsed_spec.max_batch_size)
+    backend_spec._set_ptq_calibrator(parsed_spec._get_calibrator_handle())
 
     return backend_spec

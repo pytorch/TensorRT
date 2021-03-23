@@ -89,6 +89,7 @@ core::CompileSpec to_internal_compile_spec(CompileSpec external) {
       internal.convert_info.engine_settings.op_precision = nvinfer1::DataType::kFLOAT;
   }
 
+  internal.convert_info.engine_settings.disable_tf32 = external.disable_tf32;
   internal.convert_info.engine_settings.refit = external.refit;
   internal.convert_info.engine_settings.debug = external.debug;
   internal.convert_info.engine_settings.strict_types = external.strict_types;

@@ -17,7 +17,7 @@ cc_library(
         "conv3d_to_convolution.cpp",
         "exception_elimination.cpp",
         "fuse_addmm_branches.cpp",
-        "fuse_flatten_linear.cpp",
+        "linear_to_addmm.cpp",
         "remove_bn_dim_check.cpp",
         "remove_contiguous.cpp",
         "remove_dropout.cpp",
@@ -25,6 +25,8 @@ cc_library(
         "unpack_addmm.cpp",
         "unpack_batch_norm.cpp",
         "unpack_log_softmax.cpp",
+        "op_aliasing.cpp",
+        "silu_to_sigmoid_multiplication.cpp"
     ],
     deps = [
         "//core/util:prelude",
