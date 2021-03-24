@@ -20,6 +20,9 @@ jobs:
       - uses: actions/checkout@v2
         with:
           ref: ${{github.head_ref}}
+      - name: Get HEAD SHA
+        id: vars
+        run: echo "::set-output name=sha::$(git rev-parse --short HEAD)"
       - name: Build Python Package
         run: |
           cp docker/WORKSPACE.docs WORKSPACE
@@ -32,7 +35,7 @@ jobs:
       - uses: stefanzweifel/git-auto-commit-action@v4
         with:
         # Required
-          commit_message: "docs: [Automated] Regenerating documenation from $GITHUB_SHA"
+          commit_message: "docs: [Automated] Regenerating documenation for ${{ steps.vars.outputs.sha }}"
           commit_options: "--no-verify --signoff"
           file_pattern: docs/
           commit_user_name: TRTorch Github Bot
