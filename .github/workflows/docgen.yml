@@ -32,8 +32,7 @@ jobs:
       - uses: stefanzweifel/git-auto-commit-action@v4
         with:
         # Required
-          commit_message: >
-            docs: [Automated] Regenerating documenation from $GITHUB_SHA
+          commit_message: "docs: [Automated] Regenerating documenation from $GITHUB_SHA"
           commit_options: "--no-verify --signoff"
           file_pattern: docs/
           commit_user_name: TRTorch Github Bot
