@@ -10,21 +10,25 @@ on:
 
 jobs:
   build-docs:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
+    container:
+      image: docker.pkg.github.com/nvidia/trtorch/docgen:latest
+      credentials:
+        username: $GITHUB_ACTOR
+        password: ${{secrets.GITHUB_TOKEN}}
     steps:
       - uses: actions/checkout@v2
         with:
           ref: ${{github.head_ref}}
-      - name: Docker login
-        run: docker login docker.pkg.github.com -u $GITHUB_ACTOR -p $GITHUB_TOKEN
-        env:
-          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-      - name: Run image
-        run: docker run -it -d --name builder -v $GITHUB_WORKSPACE:/workspace -w /workspace docker.pkg.github.com/nvidia/trtorch/docgen:latest
-      - name: Build python package
-        run: docker exec builder bash -c "cp docker/WORKSPACE.docs WORKSPACE && cd py && python3 setup.py install"
-      - name: Generate new docs
-        run: docker exec builder bash -c "cd docsrc && make html"
+      - name: Build Python Package
+        run: |
+          cp docker/WORKSPACE.docs WORKSPACE
+          cd py
+          python3 setup.py install
+      - name: Generate New Docs
+        run: |
+          cd docsrc
+          make html
       - uses: stefanzweifel/git-auto-commit-action@v4
         with:
         # Required
