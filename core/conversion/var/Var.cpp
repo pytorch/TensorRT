@@ -89,6 +89,7 @@ nvinfer1::ITensor* Var::ITensorOrFreeze(ConversionCtx* ctx) {
   if (isIValue()) {
     LOG_DEBUG(ctx->logger, "Found IValue containing object of type " << *(ptr_.ivalue->type()));
   }
+  
   TRTORCH_CHECK(
       isITensor() || (isIValue() && (ptr_.ivalue->isTensor() || ptr_.ivalue->isCustomClass())),
       "Requested either IValue containing a Tensor, or ITensor, however Var type is " << type_name());
@@ -97,11 +98,22 @@ nvinfer1::ITensor* Var::ITensorOrFreeze(ConversionCtx* ctx) {
 
   if (isIValue()) {
     if (ptr_.ivalue->isTensor()) {
-      auto weights = converters::Weights(ctx, ptr_.ivalue->toTensor());
-
+      auto weights = converters::Weights();
+      auto tensor = ptr_.ivalue->toTensor();
+      if ((tensor.scalar_type() == at::kLong || tensor.scalar_type() == at::kDouble) && !ctx->settings.truncate_long_and_double) {
+        TRTORCH_THROW_ERROR("Unable to freeze tensor of type Int64/Float64 into constant layer, try to compile model with truncate_long_and_double enabled");
+      } else if (tensor.scalar_type() == at::kLong && ctx->settings.truncate_long_and_double) {
+        weights = converters::Weights(ctx, tensor.toType(at::kInt));
+        LOG_WARNING("Truncating weight (constant in the graph) from Int64 to Int32");
+      } else if (tensor.scalar_type() == at::kDouble && ctx->settings.truncate_long_and_double) {
+        weights = converters::Weights(ctx, tensor.toType(at::kFloat));
+        LOG_WARNING("Truncating weight (constant in the graph) from Float64 to Float32");
+      } else {
+        weights = converters::Weights(ctx, tensor);
+      }
+      
       auto const_layer = ctx->net->addConstant(weights.shape, weights.data);
       TRTORCH_CHECK(const_layer, "Unable to freeze tensor into constant layer");
-
       out = const_layer->getOutput(0);
 
       std::ostringstream tensor_id;
@@ -119,7 +131,6 @@ nvinfer1::ITensor* Var::ITensorOrFreeze(ConversionCtx* ctx) {
   }
 
   LOG_DEBUG("Frozen tensor shape: " << out->getDimensions());
-
   return out;
 }
 
