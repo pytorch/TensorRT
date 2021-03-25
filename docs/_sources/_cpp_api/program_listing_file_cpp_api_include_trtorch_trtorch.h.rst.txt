@@ -113,6 +113,8 @@ Program Listing for File trtorch.h
    
      bool debug = false;
    
+     bool truncate_long_and_double = false;
+   
      bool strict_types = false;
    
      /*
