@@ -3,6 +3,7 @@
 #include "core/lowering/passes/passes.h"
 #include "core/util/prelude.h"
 #include "torch/csrc/jit/api/module.h"
+#include "torch/csrc/jit/ir/constants.h"
 
 namespace trtorch {
 namespace core {
@@ -67,6 +68,7 @@ void registerSegmentInOutIValues(
   // create a module to run the graph
   auto g = seg_block.g();
   auto copy_g = g->copy();
+//  LOG_INFO(*copy_g << "(copy graph)\n");
 
   // create tuple for multiple outputs
   if (seg_block.raw_outputs().size() > 1) {
@@ -163,17 +165,51 @@ void registerSegmentsInputsOutputs(
     input_values.insert(graph_output);
   }
 
-  for (auto& mini_graph_input : input_values) {
-    for (auto& seg_block : segmented_blocks) {
+  // should be careful here because some in-place operations don't return any values
+  for (auto& seg_block : segmented_blocks) {
+    for (auto& mini_graph_input : input_values) {
       if (std::find(seg_block.raw_inputs().begin(), seg_block.raw_inputs().end(), mini_graph_input) ==
               seg_block.raw_inputs().end() &&
           seg_block.contain_raw_input(mini_graph_input)) {
         seg_block.registerOutput(mini_graph_input);
       }
     }
+    if (seg_block.raw_outputs().empty()) {
+      seg_block.registerOutput(seg_block.raw_inputs()[0]);
+    }
   }
 
   return;
+}
+
+void eraseNonTensorInputsOutputs(
+    SegmentedBlock& seg_block,
+    std::unordered_map<torch::jit::Value*, torch::jit::IValue>& ivalues_maps) {
+  if (seg_block.target() == SegmentedBlock::kTorch)
+    return;
+  auto mini_graph = seg_block.g();
+
+  for (int i = seg_block.raw_inputs().size() - 1; i >= 0; --i) {
+    // erase this input and prepend a prim::Constant if it's not Tensor
+    if (!seg_block.raw_inputs()[i]->type()->isSubtypeOf(torch::jit::TensorType::get()) &&
+        !seg_block.raw_inputs()[i]->type()->isSubtypeOf(c10::ListType::ofTensors())) {
+      auto new_val = torch::jit::insertConstant(*mini_graph, ivalues_maps[seg_block.raw_inputs()[i]]);
+      seg_block.inputs()[i]->replaceAllUsesWith(new_val);
+      seg_block.eraseInput(i);
+    }
+  }
+
+  for (int i = seg_block.raw_outputs().size() - 1; i >= 0; --i) {
+    if (!seg_block.raw_outputs()[i]->type()->isSubtypeOf(torch::jit::TensorType::get()) &&
+        !seg_block.raw_outputs()[i]->type()->isSubtypeOf(c10::ListType::ofTensors())) {
+      seg_block.eraseOutput(i);
+    }
+  }
+
+  // not sure to delete this block or just fallback to pytorch
+  if (seg_block.raw_outputs().empty()) {
+    seg_block.update_target(SegmentedBlock::kTorch);
+  }
 }
 
 void construct_segments(
@@ -240,6 +276,7 @@ std::vector<SegmentedBlock> segment_graph(
   // register every segment's input shape, and it's running output Ivalues
   for (auto& seg_block : segmented_blocks) {
     registerSegmentInOutIValues(seg_block, ivalues_maps);
+    eraseNonTensorInputsOutputs(seg_block, ivalues_maps);
   }
 
   return segmented_blocks;

@@ -66,8 +66,18 @@ struct SegmentedBlock {
     return g_->inputs();
   }
 
+  void eraseInput(size_t i) {
+    inputs_.erase(inputs_.begin() + i);
+    g_->eraseInput(i);
+  }
+
   c10::ArrayRef<torch::jit::Value*> outputs() {
     return g_->outputs();
+  }
+
+  void eraseOutput(size_t i) {
+    outputs_.erase(outputs_.begin() + i);
+    g_->eraseOutput(i);
   }
 
   const std::vector<torch::jit::Value*>& raw_inputs() const {
@@ -100,6 +110,10 @@ struct SegmentedBlock {
 
   void update_graph(std::shared_ptr<torch::jit::Graph> new_g) {
     g_ = new_g;
+  }
+
+  void update_target(SegmentedBlockTarget new_target) {
+    target_ = new_target;
   }
 
  private:
