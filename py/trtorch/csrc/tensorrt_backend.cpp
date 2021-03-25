@@ -11,11 +11,6 @@ namespace trtorch {
 namespace backend {
 
 c10::IValue TensorRTBackend::preprocess(c10::IValue mod, c10::impl::GenericDict method_compile_spec) {
-  auto mod_ = mod.toModule();
-  LOG_DEBUG("Placing module in eval mode if not already");
-  mod_.eval();
-  mod_ = core::lowering::LowerModule(mod_);
-
   auto spec = c10::impl::toTypedDict<std::string, at::IValue>(method_compile_spec);
 
   for (auto it = spec.begin(), end = spec.end(); it != end; ++it) {
@@ -24,19 +19,21 @@ c10::IValue TensorRTBackend::preprocess(c10::IValue mod, c10::impl::GenericDict 
         "Method " << it->key() << "cannot be compiled by TRTorch");
   }
 
+  return mod;
+}
+
+c10::impl::GenericDict TensorRTBackend::compile(c10::IValue mod_val, c10::impl::GenericDict method_compile_spec) {
+  auto mod = mod_val.toModule();
+  mod = core::lowering::LowerModule(mod);
+
+  auto spec = c10::impl::toTypedDict<std::string, at::IValue>(method_compile_spec);
+
   for (auto it = spec.begin(), end = spec.end(); it != end; ++it) {
     const auto& method_name = it->key();
-    auto method = mod_.get_method(method_name);
+    auto method = mod.get_method(method_name);
     auto graph = method.graph();
     core::lowering::LowerGraph(graph);
   }
-
-  return mod_._ivalue();
-}
-
-c10::impl::GenericDict TensorRTBackend::compile(c10::IValue processed_mod, c10::impl::GenericDict method_compile_spec) {
-  auto mod = processed_mod.toModule();
-  auto spec = c10::impl::toTypedDict<std::string, at::IValue>(method_compile_spec);
 
   auto handles = c10::impl::GenericDict(
       c10::StringType::get(), c10::getCustomClassType<c10::intrusive_ptr<core::runtime::TRTEngine>>());

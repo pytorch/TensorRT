@@ -23,7 +23,7 @@ struct Module;
 } // namespace torch
 
 namespace c10 {
-enum class DeviceType : int16_t;
+enum class DeviceType : int8_t;
 enum class ScalarType : int8_t;
 template <class>
 class ArrayRef;
