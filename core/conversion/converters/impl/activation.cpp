@@ -166,10 +166,8 @@ auto acthardtanh TRTORCH_UNUSED =
                    "gelu only supports kFLOAT and kHALF");
                std::string pluginName = "CustomGeluPluginDynamic";
                nvinfer1::PluginFieldCollection fc;
-               std::vector<nvinfer1::PluginField> f;
-               int type_id = 0; // Integer encoding the DataType (0: FP32, 1: FP16)
-               if (type == nvinfer1::DataType::kHALF)
-                 type_id = 1;
+               std::vector<nvinfer1::PluginField> f; 
+               int type_id = ctx->settings.op_precision == nvinfer1::DataType::kFLOAT ? 0 : 1; // Integer encoding the DataType (0: FP32, 1: FP16)
                f.emplace_back(nvinfer1::PluginField("type_id", &type_id, nvinfer1::PluginFieldType::kINT32, 1));
                fc.nbFields = f.size();
                fc.fields = f.data();
