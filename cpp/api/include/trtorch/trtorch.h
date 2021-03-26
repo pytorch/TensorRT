@@ -23,7 +23,7 @@ struct Module;
 } // namespace torch
 
 namespace c10 {
-enum class DeviceType : int16_t;
+enum class DeviceType : int8_t;
 enum class ScalarType : int8_t;
 template <class>
 class ArrayRef;
@@ -257,6 +257,11 @@ struct TRTORCH_API CompileSpec {
    * Build a debugable engine
    */
   bool debug = false;
+
+  /**
+   * Truncate long/double type to int/float type
+   */
+  bool truncate_long_and_double = false;
 
   /**
    * Restrict operating type to only set default operation precision

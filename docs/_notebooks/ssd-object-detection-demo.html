@@ -804,7 +804,7 @@ div.rendered_html tbody tr:hover {
         </div>
        </div>
        <p>
-        <img alt="71b57a93fad34034a8a37d637b575dce" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
+        <img alt="6513e8a318fc439aa24eef9f2d37b324" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
        </p>
        <h1 id="notebooks-ssd-object-detection-demo--page-root">
         Object Detection with TRTorch (SSD)
@@ -902,13 +902,9 @@ div.rendered_html tbody tr:hover {
         </li>
        </ol>
        <hr class="docutils"/>
-       <blockquote>
-        <div>
-         <p>
-          ## 1. Requirements
-         </p>
-        </div>
-       </blockquote>
+       <p>
+        ## 1. Requirements
+       </p>
        <p>
         Follow the steps in
         <code class="docutils literal notranslate">
@@ -940,13 +936,9 @@ pip install numpy==1.19 scipy==1.5.2 Pillow==6.2.0 scikit-image==0.17.2 matplotl
         </div>
        </div>
        <hr class="docutils"/>
-       <blockquote>
-        <div>
-         <p>
-          ## 2. SSD
-         </p>
-        </div>
-       </blockquote>
+       <p>
+        ## 2. SSD
+       </p>
        <h3 id="Single-Shot-MultiBox-Detector-model-for-object-detection">
         Single Shot MultiBox Detector model for object detection
         <a class="headerlink" href="#Single-Shot-MultiBox-Detector-model-for-object-detection" title="Permalink to this headline">
@@ -1386,13 +1378,9 @@ Average batch time: 362.99 ms
         </div>
        </div>
        <hr class="docutils"/>
-       <blockquote>
-        <div>
-         <p>
-          ## 3. Creating TorchScript modules
-         </p>
-        </div>
-       </blockquote>
+       <p>
+        ## 3. Creating TorchScript modules
+       </p>
        <p>
         To compile with TRTorch, the model must first be in
         <strong>
@@ -1490,13 +1478,9 @@ Average batch time: 363.08 ms
         </div>
        </div>
        <hr class="docutils"/>
-       <blockquote>
-        <div>
-         <p>
-          ## 4. Compiling with TRTorch TorchScript modules behave just like normal PyTorch modules and are intercompatible. From TorchScript we can now compile a TensorRT based module. This module will still be implemented in TorchScript but all the computation will be done in TensorRT.
-         </p>
-        </div>
-       </blockquote>
+       <p>
+        ## 4. Compiling with TRTorch TorchScript modules behave just like normal PyTorch modules and are intercompatible. From TorchScript we can now compile a TensorRT based module. This module will still be implemented in TorchScript but all the computation will be done in TensorRT.
+       </p>
        <div class="nbinput nblast docutils container">
         <div class="prompt highlight-none notranslate">
          <div class="highlight">
@@ -1521,13 +1505,9 @@ trt_model = trtorch.compile(traced_model, {
         </div>
        </div>
        <hr class="docutils"/>
-       <blockquote>
-        <div>
-         <p>
-          ## 5. Running Inference
-         </p>
-        </div>
-       </blockquote>
+       <p>
+        ## 5. Running Inference
+       </p>
        <p>
         Next, we run object detection
        </p>

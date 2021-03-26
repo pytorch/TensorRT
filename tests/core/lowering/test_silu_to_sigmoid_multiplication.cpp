@@ -19,11 +19,11 @@ TEST(LoweringPasses, RemoveSiluLowersCorrectly) {
 
   trtorch::core::util::logging::get_logger().set_reportable_log_level(trtorch::core::util::logging::LogLevel::kGRAPH);
   auto sg = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(source_graph, &*sg);
+  torch::jit::parseIR(source_graph, sg.get());
   trtorch::core::lowering::passes::SiluToSigmoidMultipication(sg);
 
   auto tg = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(target_graph, &*tg);
+  torch::jit::parseIR(target_graph, tg.get());
 
   ASSERT_TRUE(!torch::jit::findPatternMatches(*tg, *sg).empty());
 }

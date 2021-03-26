@@ -7,13 +7,13 @@
 TEST(Converters, ATenLinearNoBiasConvertsCorrectly) {
   const auto graph = R"IR(
       graph(%0 : Tensor,
-            %1 : Float(3:2, 2:1)):
+            %1 : Float(3, 2, strides=[2, 1])):
         %2 : None = prim::Constant()
         %3 : Tensor = aten::linear(%0, %1, %2)
         return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   // Input Tensor needs to be 4D for TensorRT linear
   auto in = at::randint(1, 10, {1, 2}, {at::kCUDA});
@@ -33,13 +33,13 @@ TEST(Converters, ATenLinearNoBiasConvertsCorrectly) {
 TEST(Converters, ATenLinearBiasConvertsCorrectly) {
   const auto graph = R"IR(
       graph(%0 : Tensor,
-            %1 : Float(2:3, 3:1),
-            %2 : Float(2:1)):
+            %1 : Float(2, 3, strides=[3, 1]),
+            %2 : Float(2)):
         %3 : Tensor = aten::linear(%0, %1, %2)
         return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   // WARN: TRT expects a 4D input eventually, but pytorch does not require a
   // channel dim
