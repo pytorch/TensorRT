@@ -18,9 +18,6 @@ using namespace nvinfer1;
 
 namespace trtorch {
 namespace core {
-namespace conversion {
-namespace converters {
-namespace impl {
 namespace plugins {
 
 class InterpolatePlugin : public nvinfer1::IPluginV2DynamicExt {
@@ -155,9 +152,6 @@ class InterpolatePluginCreator : public nvinfer1::IPluginCreator {
 };
 
 } // namespace plugins
-} // namespace impl
-} // namespace converters
-} // namespace conversion
 } // namespace core
 } // namespace trtorch
 

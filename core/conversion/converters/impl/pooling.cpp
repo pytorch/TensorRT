@@ -1,6 +1,6 @@
 #include "core/conversion/converters/converters.h"
 #include "core/util/prelude.h"
-#include "plugins/interpolate_plugin.h"
+#include "core/plugins/impl/interpolate_plugin.h"
 
 namespace trtorch {
 namespace core {

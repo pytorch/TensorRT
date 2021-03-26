@@ -40,6 +40,10 @@ converter_test(
 )
 
 converter_test(
+  name = "test_normalize"
+)
+
+converter_test(
   name = "test_pooling"
 )
 

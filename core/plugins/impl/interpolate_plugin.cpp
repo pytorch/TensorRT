@@ -1,12 +1,10 @@
-#include "interpolate_plugin.h"
+#include "core/plugins/impl/interpolate_plugin.h"
+// #include "core/plugins/plugin_prelude.h"
 
 using namespace nvinfer1;
 
 namespace trtorch {
 namespace core {
-namespace conversion {
-namespace converters {
-namespace impl {
 namespace plugins {
 
 /*
@@ -390,8 +388,5 @@ const nvinfer1::PluginFieldCollection* InterpolatePluginCreator::getFieldNames()
 REGISTER_TENSORRT_PLUGIN(InterpolatePluginCreator);
 
 } // namespace plugins
-} // namespace impl
-} // namespace converters
-} // namespace conversion
 } // namespace core
 } // namespace trtorch

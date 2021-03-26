@@ -8,34 +8,32 @@ config_setting(
 )
 
 cc_library(
-    name = "plugins",
+    name = "trtorch_plugins",
     hdrs = [
-        "interpolate_plugin.h"
+        "impl/interpolate_plugin.h",
+        "impl/normalize_plugin.h",
+        "plugin_prelude.h",
     ],
     srcs = [
-        "interpolate_plugin.cpp"
+        "PluginRegistry.cpp",
+        "impl/interpolate_plugin.cpp",
+        "impl/normalize_plugin.cpp",
     ],
     deps = [
         "@tensorrt//:nvinfer",
-        "//core/util:prelude",
-        "//core/conversion/conversionctx",
+        "@tensorrt//:nvinferplugin",
+        "//core/util:prelude"
     ] + select({
         ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default":  ["@libtorch//:libtorch"],
     }),
     alwayslink = True,
-    copts = [
-        "-pthread"
-    ],
-    linkopts = [
-        "-lpthread",
-    ]
 )
 
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 
 pkg_tar(
     name = "include",
-    package_dir = "core/conversion/converters/impl/plugins",
-    srcs = ["interpolate_plugin.h"],
+    package_dir = "core/plugins/",
+    srcs = ["plugin_prelude.h"],
 )

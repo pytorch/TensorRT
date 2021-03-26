@@ -42,12 +42,13 @@ cc_library(
         "impl/expand.cpp",
         "impl/linear.cpp",
         "impl/matrix_multiply.cpp",
+        "impl/normalize.cpp",
         "impl/pooling.cpp",
         "impl/reduce.cpp",
         "impl/shuffle.cpp",
         "impl/softmax.cpp",
         "impl/unary.cpp",
-        "impl/interpolate.cpp",
+        #"impl/interpolate.cpp",
         "impl/select.cpp",
         "impl/squeeze.cpp",
         "impl/stack.cpp",
@@ -61,7 +62,7 @@ cc_library(
         "//core/conversion/var",
         "//core/conversion/tensorcontainer",
         "//core/conversion/conversionctx",
-        "//core/conversion/converters/impl/plugins"
+        "//core/plugins:trtorch_plugins",
     ] + select({
         ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default":  ["@libtorch//:libtorch"],
