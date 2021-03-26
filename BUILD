@@ -18,7 +18,7 @@ pkg_tar(
         "//core/conversion/var:include",
         "//core/conversion/tensorcontainer:include",
         "//core/conversion/evaluators:include",
-        "//core/conversion/converters/impl/plugins:include",
+        "//core/plugins:include",
         "//core/runtime:include",
         "//core/lowering:include",
         "//core/lowering/passes:include",
@@ -43,6 +43,7 @@ pkg_tar(
         "//conditions:default": [
             "//cpp/api/lib:libtrtorch.so",
             "//cpp/api/lib:libtrtorchrt.so",
+            "//cpp/api/lib:libtrtorch_plugins.so",
         ],
     }),
     mode = "0755",
