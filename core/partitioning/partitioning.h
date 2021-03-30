@@ -30,11 +30,13 @@ struct SegmentedBlock {
 
   SegmentedBlock(SegmentedBlockTarget blk_target) : target_(blk_target), g_(std::make_shared<torch::jit::Graph>()) {}
 
-  SegmentedBlock(SegmentedBlockTarget blk_target, const std::vector<torch::jit::Node*>& nodes)
+  SegmentedBlock(SegmentedBlockTarget blk_target, std::vector<torch::jit::Node*>& nodes)
       : target_(blk_target), g_(std::make_shared<torch::jit::Graph>()) {
     for (auto& node : nodes) {
+      nodes_.push_back(node);
       appendNode(node);
     }
+    registerInputs();
   }
 
   SegmentedBlock(SegmentedBlockTarget blk_target, std::shared_ptr<torch::jit::Graph> g) : target_(blk_target), g_(g) {}
@@ -53,9 +55,9 @@ struct SegmentedBlock {
     }
   }
 
-  void registerOutput(torch::jit::Value* raw_input) {
-    outputs_.push_back(raw_input);
-    g_->registerOutput(old_to_new_[raw_input]);
+  void registerOutput(torch::jit::Value* raw_output) {
+    outputs_.push_back(raw_output);
+    g_->registerOutput(old_to_new_[raw_output]);
   }
 
   torch::jit::Block* block() {
@@ -88,7 +90,11 @@ struct SegmentedBlock {
     return outputs_;
   }
 
-  bool contain_raw_input(torch::jit::Value* input) {
+  const std::vector<torch::jit::Node*>& raw_nodes() const {
+    return nodes_;
+  }
+
+  bool contain_raw_value(torch::jit::Value* input) {
     return old_to_new_.count(input);
   }
 
@@ -121,15 +127,17 @@ struct SegmentedBlock {
   std::vector<nvinfer1::Dims> in_shape_;
   std::vector<torch::jit::Value*> inputs_;
   std::vector<torch::jit::Value*> outputs_;
+  std::vector<torch::jit::Node*> nodes_;
   std::shared_ptr<torch::jit::Graph> g_;
   std::string trt_engine;
   std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_;
 };
 
-std::vector<SegmentedBlock> segment_graph(
+std::vector<SegmentedBlock> Partition(
     std::shared_ptr<torch::jit::Graph> g,
     std::vector<conversion::InputRange>& input_ranges,
     const conversion::TorchFallback& fallback_info);
+
 } // namespace partitioning
 } // namespace core
 } // namespace trtorch
