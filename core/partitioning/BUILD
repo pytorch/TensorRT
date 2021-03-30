@@ -10,9 +10,13 @@ config_setting(
 cc_library(
     name = "partitioning",
     hdrs = [
+        "SegmentedBlock.h",
+        "shape_analysis.h",
         "partitioning.h",
     ],
     srcs = [
+        "SegmentedBlock.cpp",
+        "shape_analysis.cpp",
         "partitioning.cpp",
     ],
     deps = [
