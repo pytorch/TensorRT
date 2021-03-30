@@ -122,9 +122,7 @@ void registerSegmentInOutIValues(
 
   // run segments to get outputs for later segments input shape, and other arguments such as Int
   std::vector<torch::jit::IValue> jit_results;
-  printf("before forward\n");
   torch::jit::IValue jit_results_ivalues = cur_mod.forward(jit_inputs_ivalues);
-  printf("after forward\n");
 
   if (jit_results_ivalues.isTuple()) {
     auto results = jit_results_ivalues.toTuple()->elements();
