@@ -194,6 +194,10 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
     if "max_batch_size" in compile_spec:
         assert type(compile_spec["max_batch_size"]) is int
         info.max_batch_size = compile_spec["max_batch_size"]
+    
+    if "truncate_long_and_double" in compile_spec:
+        assert type(compile_spec["truncate_long_and_double"]) is bool
+        info.truncate_long_and_double = compile_spec["truncate_long_and_double"]
 
     if "torch_fallback" in compile_spec:
         info.torch_fallback = _parse_torch_fallback(compile_spec["torch_fallback"])
@@ -238,6 +242,7 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]) -> torch.classes.tensorrt.
                         "num_avg_timing_iters": 1, # Number of averaging timing iterations used to select kernels
                         "workspace_size": 0, # Maximum size of workspace given to TensorRT
                         "max_batch_size": 0, # Maximum batch size (must be >= 1 to be set, 0 means not set)
+                        "truncate_long_and_double": False, # Truncate long and double into int and float
                     })
                 }
 
@@ -284,6 +289,7 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]) -> torch.classes.tensorrt.
     backend_spec.set_num_avg_timing_iters(parsed_spec.num_avg_timing_iters)
     backend_spec.set_workspace_size(parsed_spec.workspace_size)
     backend_spec.set_max_batch_size(parsed_spec.max_batch_size)
+    backend_spec.set_truncate_long_and_double(parsed_spec.truncate_long_and_double)
     backend_spec._set_ptq_calibrator(parsed_spec._get_calibrator_handle())
 
     return backend_spec

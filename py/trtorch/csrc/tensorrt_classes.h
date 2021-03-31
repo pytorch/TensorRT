@@ -129,6 +129,7 @@ struct CompileSpec : torch::CustomClassHolder {
   ADD_FIELD_GET_SET(num_min_timing_iters, int64_t);
   ADD_FIELD_GET_SET(num_avg_timing_iters, int64_t);
   ADD_FIELD_GET_SET(workspace_size, int64_t);
+  ADD_FIELD_GET_SET(truncate_long_and_double, bool);
   ADD_FIELD_GET_SET(max_batch_size, int64_t);
   ADD_FIELD_GET_SET(device, Device);
   ADD_FIELD_GET_SET(torch_fallback, TorchFallback);
@@ -141,6 +142,7 @@ struct CompileSpec : torch::CustomClassHolder {
   bool refit = false;
   bool debug = false;
   bool strict_types = false;
+  bool truncate_long_and_double = false;
   Device device;
   TorchFallback torch_fallback;
   EngineCapability capability = EngineCapability::kDEFAULT;

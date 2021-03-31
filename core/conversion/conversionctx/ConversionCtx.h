@@ -34,6 +34,7 @@ struct BuilderSettings {
   bool refit = false;
   bool debug = false;
   bool strict_types = false;
+  bool truncate_long_and_double = false;
   Device device;
   TorchFallback torch_fallback;
   nvinfer1::EngineCapability capability = nvinfer1::EngineCapability::kDEFAULT;
