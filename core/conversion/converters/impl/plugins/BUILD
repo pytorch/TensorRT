@@ -10,12 +10,10 @@ config_setting(
 cc_library(
     name = "plugins",
     hdrs = [
-        "interpolate_plugin.h",
-        "cumsum_plugin.h"
+        "interpolate_plugin.h"
     ],
     srcs = [
-        "interpolate_plugin.cpp",
-        "cumsum_plugin.cpp"
+        "interpolate_plugin.cpp"
     ],
     deps = [
         "@tensorrt//:nvinfer",
@@ -39,5 +37,5 @@ load("@rules_pkg//:pkg.bzl", "pkg_tar")
 pkg_tar(
     name = "include",
     package_dir = "core/conversion/converters/impl/plugins",
-    srcs = ["interpolate_plugin.h", "cumsum_plugin.h"],
+    srcs = ["interpolate_plugin.h"],
 )
