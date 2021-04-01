@@ -1,5 +1,6 @@
-#ifndef TRTORCH_NORMALIZE_PLUGIN_H
-#define TRTORCH_NORMALIZE_PLUGIN_H
+// #ifndef TRTORCH_NORMALIZE_PLUGIN_H
+// #define TRTORCH_NORMALIZE_PLUGIN_H
+#pragma once
 
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAEvent.h>
@@ -16,9 +17,9 @@
 
 using namespace nvinfer1;
 
-namespace trtorch {
-namespace core {
-namespace plugins {
+// namespace trtorch {
+// namespace core {
+// namespace plugins {
 
 class NormalizePlugin : public nvinfer1::IPluginV2DynamicExt {
  private:
@@ -125,8 +126,8 @@ class NormalizePluginCreator : public nvinfer1::IPluginCreator {
   const nvinfer1::PluginFieldCollection* getFieldNames() override;
 };
 
-} // namespace plugins
-} // namespace core
-} // namespace trtorch
+// } // namespace plugins
+// } // namespace core
+// } // namespace trtorch
 
-#endif // TRTORCH_NORMALIZE_PLUGIN_H
+// #endif // TRTORCH_NORMALIZE_PLUGIN_H

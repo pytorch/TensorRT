@@ -1,11 +1,14 @@
-#include "core/plugins/impl/normalize_plugin.h"
+#include "core/plugins/plugins.h"
 // #include "core/plugins/plugin_prelude.h"
-
+#include "core/util/prelude.h"
+#include "core/plugins/impl/normalize_plugin.h"
+#include "NvInferPlugin.h"
+#include "NvInferPluginUtils.h"
 using namespace nvinfer1;
-
-namespace trtorch {
-namespace core {
-namespace plugins {
+using namespace trtorch::core;
+// namespace trtorch {
+// namespace core {
+// namespace plugins {
 
 /*
  * NormalizePlugin class implementations
@@ -265,8 +268,8 @@ const nvinfer1::PluginFieldCollection* NormalizePluginCreator::getFieldNames() {
   return nullptr;
 }
 
-REGISTER_TENSORRT_PLUGIN(NormalizePluginCreator);
+REGISTER_TRTORCH_PLUGIN(NormalizePluginCreator);
 
-} // namespace plugins
-} // namespace core
-} // namespace trtorch
+// } // namespace plugins
+// } // namespace core
+// } // namespace trtorch

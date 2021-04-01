@@ -2,7 +2,8 @@
 #include "NvInferRuntimeCommon.h"
 #include "core/conversion/converters/converters.h"
 #include "core/util/prelude.h"
-#include "core/plugins/impl/normalize_plugin.h"
+// #include "core/plugins/impl/normalize_plugin.h"
+// #include "core/plugins/plugin_prelude.h"
 #include "torch/torch.h"
 
 namespace trtorch {
@@ -25,7 +26,22 @@ void create_plugin(
     const char* name) {
   LOG_WARNING("Normalize layer will be run through ATen, not TensorRT. Performance may be lower than expected");
 
-  auto creator = new plugins::NormalizePluginCreator();
+  int numCreators = 0;
+  auto tmpList = getPluginRegistry()->getPluginCreatorList(&numCreators);
+  for (int k = 0; k < numCreators; ++k)
+  {
+       if (!tmpList[k])
+       {
+           std::cout << "Plugin Creator for plugin " << k << " is a nullptr." << std::endl;
+           continue;
+       }
+       std::string pluginName = tmpList[k]->getPluginName();
+       // plugin_creator_registry[pluginName] = tmpList[k];
+       LOG_DEBUG("Register plugin: " << pluginName);
+  }
+
+  // auto creator = new plugins::NormalizePluginCreator();
+  auto creator = getPluginRegistry()->getPluginCreator("NormalizePlugin", "1", "trtorch");
   auto inputnbDims = in->getDimensions().nbDims;
   for (int64_t i = 0; i < axes.size(); i++) {
     if (axes[i] < 0) {
@@ -36,9 +52,10 @@ void create_plugin(
     }
   }
 
-  auto plugin = creator->createPlugin(name, order, axes, keep_dims);
+  // auto plugin = creator->createPlugin(name, order, axes, keep_dims);
 
-  auto normalize_layer = ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(&in), 1, *plugin);
+  // auto normalize_layer = ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(&in), 1, *plugin);
+  auto normalize_layer = ctx->net->addIdentity(*in);
   TRTORCH_CHECK(normalize_layer, "Unable to create normalization plugin from node" << *n);
 
   normalize_layer->setName(util::node_info(n).c_str());

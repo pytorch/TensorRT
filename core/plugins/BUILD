@@ -8,21 +8,21 @@ config_setting(
 )
 
 cc_library(
-    name = "trtorch_plugins",
+    name = "plugins",
     hdrs = [
-        "impl/interpolate_plugin.h",
+        "plugins.h",
+        #"impl/interpolate_plugin.h",
         "impl/normalize_plugin.h",
-        "plugin_prelude.h",
     ],
     srcs = [
-        "PluginRegistry.cpp",
-        "impl/interpolate_plugin.cpp",
+        "register_plugins.cpp",
+        #"impl/interpolate_plugin.cpp",
         "impl/normalize_plugin.cpp",
     ],
     deps = [
         "@tensorrt//:nvinfer",
         "@tensorrt//:nvinferplugin",
-        "//core/util:prelude"
+        "//core/util:prelude",
     ] + select({
         ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default":  ["@libtorch//:libtorch"],

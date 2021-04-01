@@ -1,6 +1,6 @@
 #include "core/conversion/converters/converters.h"
 #include "core/util/prelude.h"
-#include "core/plugins/plugin_prelude.h"
+// #include "core/plugins/plugin_prelude.h"
 #include "torch/torch.h"
 
 namespace trtorch {
@@ -137,8 +137,11 @@ auto batch_norm_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().
 
          fc.nbFields = f.size();
          fc.fields = f.data();
+         LOG_DEBUG("=========IN PLUGIN INSTANCE NORM===========");
          // nvinfer1::IPluginV2* pluginV2 = ctx->mPluginRegistry.at(pluginName)->createPlugin("instancenorm", &fc);
-         nvinfer1::IPluginV2* pluginV2 = get_trtorch_plugin_registry().get_plugin_creator_registry().at(pluginName)->createPlugin("instancenorm", &fc);
+         // std::unordered_map<std::string, nvinfer1::IPluginCreator*> mPluginRegistry = plugins::registerPlugins();
+
+         nvinfer1::IPluginV2* pluginV2 = getPluginRegistry()->getPluginCreator("NormalizePlugin", "1", "trtorch")->createPlugin("instancenorm", &fc);
 
          TRTORCH_CHECK(pluginV2, "Unable to create interpolation plugin from node" << *n);
          auto instance_norm_layer = ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(&input), 1, *pluginV2);
@@ -151,6 +154,7 @@ auto batch_norm_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().
          }
          else
          {
+             LOG_DEBUG("=========IN NORMAL INSTANCE NORM===========");
              torch::Tensor gamma, beta, mean, var;
 
              if (ctx->input_is_dynamic) {

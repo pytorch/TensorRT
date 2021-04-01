@@ -16,7 +16,8 @@ cc_library(
     ],
     deps = [
         "//core",
-        "//core/util:prelude"
+        "//core/util:prelude",
+        "//core/plugins",
     ],
     strip_include_prefix = "include/",
     linkstatic = True,

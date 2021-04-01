@@ -1,6 +1,6 @@
 #include "core/conversion/converters/converters.h"
 #include "core/util/prelude.h"
-#include "core/plugins/impl/interpolate_plugin.h"
+// #include "core/plugins/impl/interpolate_plugin.h"
 
 namespace trtorch {
 namespace core {
@@ -315,7 +315,7 @@ auto pooling_registrations TRTORCH_UNUSED =
                  auto out_shape = in_shape;
                  std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
 
-                 auto creator = new plugins::InterpolatePluginCreator();
+                 auto creator = getPluginRegistry()->getPluginCreator("InterpolatePlugin", "1", "trtorch"); //new plugins::InterpolatePluginCreator();
                  auto plugin = creator->createPlugin(
                      "adaptive_pool2d",
                      in_shape,
