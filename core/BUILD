@@ -27,6 +27,7 @@ cc_library(
         "//core/runtime",
         "//core/lowering",
         "//core/util/logging",
+        "//core/plugins:plugins",
         "@tensorrt//:nvinfer"
     ] + select({
         ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],

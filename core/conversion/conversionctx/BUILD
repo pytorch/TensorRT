@@ -17,12 +17,13 @@ cc_library(
     ],
     deps = [
         "@tensorrt//:nvinfer",
-        "@tensorrt//:nvinferplugin",
         "//core/util:prelude",
+        #"//core/plugins:trtorch_plugins",
     ] + select({
         ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default":  ["@libtorch//:libtorch"],
     }),
+    copts = ["-fpic"],
 )
 
 load("@rules_pkg//:pkg.bzl", "pkg_tar")

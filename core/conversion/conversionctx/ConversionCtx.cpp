@@ -1,10 +1,10 @@
 #include <iostream>
 #include <sstream>
 #include <utility>
-
+// #include "core/plugins/plugin_prelude.h"
 #include "core/conversion/conversionctx/ConversionCtx.h"
-#include "NvInferPlugin.h"
-#include "NvInferPluginUtils.h"
+// #include "NvInferPlugin.h"
+// #include "NvInferPluginUtils.h"
 
 namespace trtorch {
 namespace core {
@@ -49,6 +49,9 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
           util::logging::get_logger().get_reportable_severity(),
           util::logging::get_logger().get_is_colored_output_on()) {
 
+   // Register plugins
+   // mPluginRegistry = plugins::registerPlugins();
+   // plugins::registerPlugins();
    // Initialize TRT plugins
    // initLibNvInferPlugins(&logger, "");
    // int numCreators = 0;

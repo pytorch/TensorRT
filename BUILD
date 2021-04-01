@@ -18,7 +18,7 @@ pkg_tar(
         "//core/conversion/var:include",
         "//core/conversion/tensorcontainer:include",
         "//core/conversion/evaluators:include",
-        "//core/plugins:include",
+        "//core/plugins:trtorch_plugins",
         "//core/runtime:include",
         "//core/lowering:include",
         "//core/lowering/passes:include",

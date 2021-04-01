@@ -29,7 +29,7 @@ cc_library(
 cc_library(
     name = "converters",
     hdrs = [
-        "converters.h"
+        "converters.h",
     ],
     srcs = [
         "NodeConverterRegistry.cpp",
@@ -43,7 +43,7 @@ cc_library(
         "impl/linear.cpp",
         "impl/matrix_multiply.cpp",
         "impl/normalize.cpp",
-        "impl/pooling.cpp",
+        #"impl/pooling.cpp",
         "impl/reduce.cpp",
         "impl/shuffle.cpp",
         "impl/softmax.cpp",
@@ -62,11 +62,12 @@ cc_library(
         "//core/conversion/var",
         "//core/conversion/tensorcontainer",
         "//core/conversion/conversionctx",
-        "//core/plugins:trtorch_plugins",
+        "//core/plugins",
     ] + select({
         ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default":  ["@libtorch//:libtorch"],
     }),
+    #copts = ["-fPIC"],
     alwayslink = True,
 )
 
