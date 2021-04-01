@@ -19,6 +19,7 @@ cc_library(
         "SegmentedBlock.cpp",
         "shape_analysis.cpp",
         "partitioning.cpp",
+        "PartitionInfo.cpp",
     ],
     deps = [
         "//core/util:prelude",
