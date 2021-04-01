@@ -12,6 +12,7 @@ cc_library(
     hdrs = [
         "SegmentedBlock.h",
         "shape_analysis.h",
+        "PartitionInfo.h",
         "partitioning.h",
     ],
     srcs = [
@@ -20,8 +21,9 @@ cc_library(
         "partitioning.cpp",
     ],
     deps = [
-        "//core/conversion",
         "//core/util:prelude",
+        "//core/ir",
+        "//core/conversion",
         "//core/lowering"
     ] + select({
         ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
@@ -35,6 +37,11 @@ load("@rules_pkg//:pkg.bzl", "pkg_tar")
 pkg_tar(
     name = "include",
     package_dir = "core/partitioning/",
-    srcs = ["partitioning.h"],
+    srcs = [
+        "SegmentedBlock.h",
+        "shape_analysis.h",
+        "PartitionInfo.h",
+        "partitioning.h",
+    ],
 )
 

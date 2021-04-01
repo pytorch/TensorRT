@@ -2,8 +2,10 @@
 
 #include <vector>
 
-#include "core/conversion/conversion.h"
+#include "NvInfer.h"
 #include "torch/csrc/jit/ir/ir.h"
+
+#include "core/partitioning/PartitionInfo.h"
 
 namespace trtorch {
 namespace core {
@@ -111,7 +113,7 @@ struct SegmentedBlock {
 
  private:
   SegmentedBlockTarget target_;
-  std::vector<nvinfer1::Dims> in_shape_;
+  std::vector<nvinfer1::Dims> in_shape_; // REVIEW: This should just be ir::InputRange
   std::vector<torch::jit::Value*> inputs_;
   std::vector<torch::jit::Value*> outputs_;
   std::vector<torch::jit::Node*> nodes_;
@@ -120,10 +122,6 @@ struct SegmentedBlock {
   std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_;
 };
 
-std::vector<SegmentedBlock> segment_graph(
-    std::shared_ptr<torch::jit::Graph> g,
-    const conversion::TorchFallback& fallback_info);
-
-} // namespace partitioning
+} // namespace ir
 } // namespace core
 } // namespace trtorch

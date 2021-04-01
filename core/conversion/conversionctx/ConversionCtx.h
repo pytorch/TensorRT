@@ -22,12 +22,6 @@ struct Device {
   Device() : device_type(nvinfer1::DeviceType::kGPU), gpu_id(0), dla_core(0), allow_gpu_fallback(false) {}
 };
 
-struct TorchFallback {
-  bool enabled = false;
-  uint64_t min_block_size = 1;
-  std::vector<std::string> forced_fallback_operators;
-};
-
 struct BuilderSettings {
   nvinfer1::DataType op_precision = nvinfer1::DataType::kFLOAT;
   bool disable_tf32 = false;
@@ -36,7 +30,6 @@ struct BuilderSettings {
   bool strict_types = false;
   bool truncate_long_and_double = false;
   Device device;
-  TorchFallback torch_fallback;
   nvinfer1::EngineCapability capability = nvinfer1::EngineCapability::kDEFAULT;
   nvinfer1::IInt8Calibrator* calibrator = nullptr;
   uint64_t num_min_timing_iters = 2;

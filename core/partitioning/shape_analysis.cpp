@@ -1,11 +1,12 @@
-#include "shape_analysis.h"
+#include "core/partitioning/shape_analysis.h"
+#include "core/util/prelude.h"
 #include "torch/csrc/jit/api/module.h"
 
 namespace trtorch {
 namespace core {
 namespace partitioning {
 
-std::vector<torch::jit::IValue> generateRandomInputs(std::vector<conversion::InputRange>& input_ranges) {
+std::vector<torch::jit::IValue> generateRandomInputs(std::vector<ir::InputRange>& input_ranges) {
   // generate random inputs for running pytorch segments
   std::vector<torch::jit::IValue> random_inputs;
   for (auto& input_range : input_ranges) {
