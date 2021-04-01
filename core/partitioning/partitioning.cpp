@@ -153,9 +153,7 @@ void registerSegmentsOutputs(PartitionedGraph& segmented_blocks, std::shared_ptr
   return;
 }
 
-std::vector<SegmentedBlock> segment_graph(
-    std::shared_ptr<torch::jit::Graph> g,
-    const PartitionInfo& partition_info) {
+std::vector<SegmentedBlock> segment_graph(std::shared_ptr<torch::jit::Graph> g, const PartitionInfo& partition_info) {
   auto min_block_size = partition_info.min_block_size;
   std::unordered_set<std::string> forced_fallback_operators(
       partition_info.forced_fallback_operators.begin(), partition_info.forced_fallback_operators.end());
@@ -199,12 +197,10 @@ std::vector<SegmentedBlock> segment_graph(
   return std::move(segmented_blocks);
 }
 
-
 std::vector<SegmentedBlock> Partition(
     std::shared_ptr<torch::jit::Graph> g,
     std::vector<ir::InputRange>& input_ranges,
     const PartitionInfo& partition_info) {
-
   LOG_DEBUG(partition_info);
   // segment lowering global graph into blocks
   std::vector<SegmentedBlock> segmented_blocks = segment_graph(g, partition_info);

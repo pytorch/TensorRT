@@ -38,8 +38,6 @@ torch::jit::Node* SegmentedBlock::cloneNode(torch::jit::Node* node) {
   return new_node;
 }
 
-
-
 } // namespace partitioning
 } // namespace core
 } // namespace trtorch

@@ -122,6 +122,6 @@ struct SegmentedBlock {
   std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_;
 };
 
-} // namespace ir
+} // namespace partitioning
 } // namespace core
 } // namespace trtorch

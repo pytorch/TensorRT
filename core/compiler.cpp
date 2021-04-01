@@ -213,8 +213,7 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
       LOG_INFO(*g << "(LoweringGraph)\n");
 
       // segment the graph and convert segmented TensorRT block
-      auto segmented_blocks =
-          partitioning::Partition(g, convert_cfg.input_ranges, cfg.partition_info);
+      auto segmented_blocks = partitioning::Partition(g, convert_cfg.input_ranges, cfg.partition_info);
       if (segmented_blocks.size() == 1 && segmented_blocks[0].target() == partitioning::SegmentedBlock::kTorch) {
         return mod;
       }

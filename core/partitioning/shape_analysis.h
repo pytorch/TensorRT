@@ -1,6 +1,5 @@
-#include "core/partitioning/SegmentedBlock.h"
 #include "core/ir/ir.h"
-
+#include "core/partitioning/SegmentedBlock.h"
 
 namespace trtorch {
 namespace core {

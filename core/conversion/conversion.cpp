@@ -118,7 +118,10 @@ void AddLayer(ConversionCtx* ctx, const torch::jit::Node* n) {
                        << "please report this error to https://www.github.com/NVIDIA/TRTorch/issues");
 }
 
-void AddInputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> inputs, std::vector<ir::InputRange>& input_dims) {
+void AddInputs(
+    ConversionCtx* ctx,
+    at::ArrayRef<const torch::jit::Value*> inputs,
+    std::vector<ir::InputRange>& input_dims) {
   std::vector<const torch::jit::Value*> input_tensors;
   for (auto in : inputs) {
     // Disregarding inputs that are not tensors
