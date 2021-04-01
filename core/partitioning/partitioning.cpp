@@ -204,6 +204,8 @@ std::vector<SegmentedBlock> Partition(
     std::shared_ptr<torch::jit::Graph> g,
     std::vector<ir::InputRange>& input_ranges,
     const PartitionInfo& partition_info) {
+
+  LOG_DEBUG(partition_info);
   // segment lowering global graph into blocks
   std::vector<SegmentedBlock> segmented_blocks = segment_graph(g, partition_info);
 

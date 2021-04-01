@@ -14,6 +14,8 @@ struct PartitionInfo {
     std::vector<std::string> forced_fallback_operators;
 };
 
+std::ostream& operator<<(std::ostream& os, const PartitionInfo& s);
+
 } // namespace partitioning
 } // namespace core
 } // namespace trtorch

@@ -108,10 +108,10 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
   info.convert_info.engine_settings.device.gpu_id = device.gpu_id;
   info.convert_info.engine_settings.device.dla_core = device.dla_core;
   info.convert_info.engine_settings.device.allow_gpu_fallback = device.allow_gpu_fallback;
-  info.convert_info.engine_settings.torch_fallback.enabled = torch_fallback.enabled;
   info.partition_info.enabled = torch_fallback.enabled;
   info.partition_info.min_block_size = torch_fallback.min_block_size;
   info.partition_info.forced_fallback_operators = torch_fallback.forced_fallback_operators;
+  info.convert_info.engine_settings.truncate_long_and_double = truncate_long_and_double;
 
   info.convert_info.engine_settings.capability = toTRTEngineCapability(capability);
   TRTORCH_CHECK(num_min_timing_iters >= 0, "num_min_timing_iters must be 0 or greater");
@@ -148,6 +148,15 @@ std::string CompileSpec::stringify() {
   ss << "     \"Workspace Size\": " << workspace_size << std::endl;
   ss << "     \"Max Batch Size\": " << max_batch_size << std::endl;
   ss << "     \"Truncate long and double\": " << truncate_long_and_double << std::endl;
+  ss << "    \"Torch Fallback: {" << std::endl;
+  ss << "        \"enabled\": " << torch_fallback.enabled ? "True" : "False" << std::endl;
+  ss << "        \"min_block_size\": " << torch_fallback.min_block_size << std::endl;
+  ss << "        \"forced_fallback_operators\": [" << std::endl;
+  for (auto i : torch_fallback.forced_fallback_operators) {
+    ss << "            " << i << ',' << std::endl;
+  }
+  ss << "        ]" << std::endl;
+  ss << "    }" << std::endl;
   ss << "}";
   return ss.str();
 }
