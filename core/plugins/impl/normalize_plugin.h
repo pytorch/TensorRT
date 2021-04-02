@@ -25,9 +25,9 @@ class NormalizePlugin : public nvinfer1::IPluginV2DynamicExt {
  private:
   at::TensorOptions tensor_options_;
   DataType dtype_;
-  int64_t order_;
-  std::vector<int64_t> axes_;
-  bool keep_dims_;
+  int32_t order_;
+  std::vector<int32_t> axes_;
+  int32_t keep_dims_;
 
  protected:
   // To prevent compiler warnings
@@ -40,7 +40,7 @@ class NormalizePlugin : public nvinfer1::IPluginV2DynamicExt {
   using nvinfer1::IPluginV2DynamicExt::supportsFormat;
 
  public:
-  NormalizePlugin(int64_t order, std::vector<int64_t> axes, bool keep_dims);
+  NormalizePlugin(int32_t order, std::vector<int32_t> axes, int32_t keep_dims);
 
   NormalizePlugin(const char* data, size_t length);
 
@@ -105,9 +105,11 @@ class NormalizePlugin : public nvinfer1::IPluginV2DynamicExt {
 class NormalizePluginCreator : public nvinfer1::IPluginCreator {
  private:
   std::string name_;
+  std::vector<PluginField> mPluginAttributes;
+  PluginFieldCollection mFC;
 
  public:
-  NormalizePluginCreator() = default;
+  NormalizePluginCreator();
 
   const char* getPluginNamespace() const override;
 
@@ -119,7 +121,7 @@ class NormalizePluginCreator : public nvinfer1::IPluginCreator {
 
   nvinfer1::IPluginV2* createPlugin(const char* name, const nvinfer1::PluginFieldCollection* fc) override;
 
-  NormalizePlugin* createPlugin(const char* name, int64_t order, std::vector<int64_t> axes, bool keep_dims);
+  // NormalizePlugin* createPlugin(const char* name, int32_t order, std::vector<int32_t> axes, int32_t keep_dims);
 
   nvinfer1::IPluginV2* deserializePlugin(const char* name, const void* serialData, size_t serialLength) override;
 

@@ -49,26 +49,6 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
           util::logging::get_logger().get_reportable_severity(),
           util::logging::get_logger().get_is_colored_output_on()) {
 
-   // Register plugins
-   // mPluginRegistry = plugins::registerPlugins();
-   // plugins::registerPlugins();
-   // Initialize TRT plugins
-   // initLibNvInferPlugins(&logger, "");
-   // int numCreators = 0;
-   //  auto tmpList = getPluginRegistry()->getPluginCreatorList(&numCreators);
-   //  for (int k = 0; k < numCreators; ++k)
-   //  {
-   //      if (!tmpList[k])
-   //      {
-   //          std::cout << "Plugin Creator for plugin " << k << " is a nullptr." << std::endl;
-   //          continue;
-   //      }
-   //      std::string pluginName = tmpList[k]->getPluginName();
-   //      mPluginRegistry[pluginName] = tmpList[k];
-   //      LOG_DEBUG("Register plugin: " << pluginName);
-   //  }
-   //  LOG_DEBUG("Number of plugin: " << mPluginRegistry.size());
-
   // TODO: Support FP16 and FP32 from JIT information
   if (settings.device.gpu_id) {
     TRTORCH_CHECK(

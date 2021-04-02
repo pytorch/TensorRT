@@ -21,29 +21,20 @@ void create_plugin(
     const torch::jit::Node* n,
     nvinfer1::ITensor* in,
     int64_t order,
-    std::vector<int64_t> axes,
+    std::vector<int32_t> axes,
     bool keep_dims,
     const char* name) {
   LOG_WARNING("Normalize layer will be run through ATen, not TensorRT. Performance may be lower than expected");
+  nvinfer1::PluginFieldCollection fc;
+  std::vector<nvinfer1::PluginField> f;
+  f.emplace_back(nvinfer1::PluginField("order", &order, nvinfer1::PluginFieldType::kINT32, 1));
+  f.emplace_back(nvinfer1::PluginField("axes", axes.data(), nvinfer1::PluginFieldType::kINT32, axes.size()));
+  f.emplace_back(nvinfer1::PluginField("keep_dims", &keep_dims, nvinfer1::PluginFieldType::kINT32, 1));
+  fc.nbFields = f.size();
+  fc.fields = f.data();
 
-  int numCreators = 0;
-  auto tmpList = getPluginRegistry()->getPluginCreatorList(&numCreators);
-  for (int k = 0; k < numCreators; ++k)
-  {
-       if (!tmpList[k])
-       {
-           std::cout << "Plugin Creator for plugin " << k << " is a nullptr." << std::endl;
-           continue;
-       }
-       std::string pluginName = tmpList[k]->getPluginName();
-       // plugin_creator_registry[pluginName] = tmpList[k];
-       LOG_DEBUG("Register plugin: " << pluginName);
-  }
-
-  // auto creator = new plugins::NormalizePluginCreator();
-  auto creator = getPluginRegistry()->getPluginCreator("NormalizePlugin", "1", "trtorch");
   auto inputnbDims = in->getDimensions().nbDims;
-  for (int64_t i = 0; i < axes.size(); i++) {
+  for (int64_t i = 0; i < (int64_t)axes.size(); i++) {
     if (axes[i] < 0) {
       axes[i] += inputnbDims;
     }
@@ -51,11 +42,9 @@ void create_plugin(
       TRTORCH_THROW_ERROR("Axis of normalization layer cannot exceed input rank");
     }
   }
-
-  // auto plugin = creator->createPlugin(name, order, axes, keep_dims);
-
-  // auto normalize_layer = ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(&in), 1, *plugin);
-  auto normalize_layer = ctx->net->addIdentity(*in);
+  auto creator = getPluginRegistry()->getPluginCreator("NormalizePlugintrtorch", "1", "");
+  auto plugin = creator->createPlugin(name, &fc);
+  auto normalize_layer = ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(&in), 1, *plugin);
   TRTORCH_CHECK(normalize_layer, "Unable to create normalization plugin from node" << *n);
 
   normalize_layer->setName(util::node_info(n).c_str());
@@ -70,13 +59,14 @@ auto normalize_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().p
      [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
        auto in = args[0].ITensor();
        auto in_shape = util::toVec(in->getDimensions());
-       auto order = args[1].unwrapToScalar().to<int64_t>();
-       auto axes = args[2].unwrapToIntList().vec();
-       auto keep_dims = args[3].unwrapToBool();
+       auto order = args[1].unwrapToScalar().to<int32_t>();
+       auto axes_values = args[2].unwrapToIntList().vec();
+       std::vector<int32_t> axes(axes_values.begin(), axes_values.end());
+       auto keep_dims = (int32_t)args[3].unwrapToBool();
        LOG_DEBUG("Order of normalize_plugin: " << order);
        LOG_DEBUG("Axis: " << axes);
        LOG_DEBUG("keep_dims: " << keep_dims);
-       create_plugin(ctx, n, in, order, axes, keep_dims, "Normalize");
+       create_plugin(ctx, n, in, order, axes, keep_dims, "NormalizePlugintrtorch");
        return true;
      }
 

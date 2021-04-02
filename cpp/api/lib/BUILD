@@ -1,5 +1,14 @@
 package(default_visibility = ["//visibility:public"])
 
+cc_binary(
+    name = "libtrtorch_plugins.so",
+    srcs = [],
+    deps = [
+        "//core/plugins:trtorch_plugins"
+    ],
+    linkstatic = True,
+    linkshared = True
+)
 
 cc_binary(
     name = "libtrtorchrt.so",

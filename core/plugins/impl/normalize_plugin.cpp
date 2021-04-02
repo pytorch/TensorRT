@@ -1,9 +1,8 @@
-#include "core/plugins/plugins.h"
-// #include "core/plugins/plugin_prelude.h"
-#include "core/util/prelude.h"
 #include "core/plugins/impl/normalize_plugin.h"
 #include "NvInferPlugin.h"
 #include "NvInferPluginUtils.h"
+#include "core/plugins/plugins.h"
+#include "core/util/prelude.h"
 using namespace nvinfer1;
 using namespace trtorch::core;
 // namespace trtorch {
@@ -14,7 +13,7 @@ using namespace trtorch::core;
  * NormalizePlugin class implementations
  */
 
-NormalizePlugin::NormalizePlugin(int64_t order, std::vector<int64_t> axes, bool keep_dims)
+NormalizePlugin::NormalizePlugin(int32_t order, std::vector<int32_t> axes, int32_t keep_dims)
     : order_(order), axes_(axes), keep_dims_(keep_dims) {}
 
 NormalizePlugin::NormalizePlugin(const char* data, size_t length) {
@@ -25,17 +24,20 @@ NormalizePlugin::NormalizePlugin(const char* data, size_t length) {
   {
     torch::IValue value;
     input_archive.read("order", value);
-    order_ = value.toInt();
+    order_ = (int32_t)value.toInt();
   }
   {
     torch::IValue value;
     input_archive.read("axes", value);
-    axes_ = value.toIntVector();
+    auto values = value.toIntVector();
+    std::vector<int32_t> doubleVec(values.begin(), values.end());
+    // axes_ = doubleVec;
+    axes_.assign(doubleVec.begin(), doubleVec.end());
   }
   {
     torch::IValue value;
     input_archive.read("keep_dims", value);
-    keep_dims_ = value.toBool();
+    keep_dims_ = (int32_t)value.toInt();
   }
 }
 
@@ -44,7 +46,7 @@ int NormalizePlugin::getNbOutputs() const {
 }
 
 const char* NormalizePlugin::getPluginType() const {
-  return "Normalize";
+  return "NormalizePlugintrtorch";
 }
 
 const char* NormalizePlugin::getPluginVersion() const {
@@ -71,7 +73,7 @@ nvinfer1::DimsExprs NormalizePlugin::getOutputDimensions(
   // TODO: For dim=None, the axes_ passed would have [0, 0, 0] which is obtained through loop counter in TRTorch.
   // Resolve this. For dim=None case, change the axes_ inplace to range(0, axes_.size())
   bool isAxisNone =
-      std::all_of(axes_.begin(), axes_.end(), [](int64_t i) { return i == 0; }) && (axes_.size() == inputs[0].nbDims);
+      std::all_of(axes_.begin(), axes_.end(), [](int32_t i) { return i == 0; }) && (axes_.size() == inputs[0].nbDims);
   if (isAxisNone) {
     std::iota(axes_.data(), axes_.data() + axes_.size(), 0);
   }
@@ -121,10 +123,13 @@ void NormalizePlugin::serialize(void* buffer) const {
 
 std::string NormalizePlugin::serializeToString() const {
   torch::serialize::OutputArchive output_archive;
-
-  output_archive.write("order", torch::IValue(order_));
-  output_archive.write("axes", torch::IValue(axes_));
-  output_archive.write("keep_dims", torch::IValue(keep_dims_));
+  std::vector<int64_t> axesVec(axes_.begin(), axes_.end());
+  output_archive.write("order", torch::IValue((int64_t)order_));
+  output_archive.write("axes", torch::IValue(axesVec));
+  output_archive.write("keep_dims", torch::IValue((int64_t)keep_dims_));
+  // output_archive.write("pluginType", torch::IValue("trtorch"));
+  // output_archive.write("pluginVersion", torch::IValue("1"));
+  // output_archive.write("pluginNamespace", torch::IValue("trtorch"));
   std::ostringstream data_str;
   output_archive.save_to(data_str);
 
@@ -192,7 +197,7 @@ int NormalizePlugin::enqueue(
   cudaEventRecord(event, stream);
 
   cudaStreamWaitEvent(torch_stream.stream(), event, 0);
-  at::Tensor result = at::norm(input, order_, axes, keep_dims_);
+  at::Tensor result = at::norm(input, order_, axes_, keep_dims_);
   output.copy_(result);
   cudaEvent_t torch_event;
   cudaEventCreate(&torch_event);
@@ -217,8 +222,8 @@ int NormalizePlugin::enqueue(
   cudaStreamSynchronize(stream);
 
   at::Tensor input = at::from_blob((void*)input_blob, util::toVec(inputDesc->dims), tensor_options_);
-  at::Tensor output = at::norm(input, order_, axes_, keep_dims_);
-
+  std::vector<int64_t> axes_new(axes_.begin(), axes_.end());
+  at::Tensor output = at::norm(input, (int64_t)order_, axes_new, (bool)keep_dims_);
   cudaMemcpyAsync(
       outputs[0], output.data_ptr(), util::volume(outputDesc->dims) * sizeof(float), cudaMemcpyHostToDevice, stream);
   cudaStreamSynchronize(stream);
@@ -231,12 +236,21 @@ int NormalizePlugin::enqueue(
 /*
  * NormalizePluginCreator class implementations
  */
+NormalizePluginCreator::NormalizePluginCreator() {
+  mPluginAttributes.emplace_back(PluginField("order", nullptr, PluginFieldType::kINT32, 1));
+  mPluginAttributes.emplace_back(PluginField("axes", nullptr, PluginFieldType::kINT32, 1));
+  mPluginAttributes.emplace_back(PluginField("keep_dims", nullptr, PluginFieldType::kINT32, 1));
+
+  mFC.nbFields = mPluginAttributes.size();
+  mFC.fields = mPluginAttributes.data();
+}
+
 const char* NormalizePluginCreator::getPluginNamespace() const {
   return "";
 }
 
 const char* NormalizePluginCreator::getPluginName() const {
-  return "Normalize";
+  return "NormalizePlugintrtorch";
 }
 
 const char* NormalizePluginCreator::getPluginVersion() const {
@@ -244,16 +258,22 @@ const char* NormalizePluginCreator::getPluginVersion() const {
 }
 
 nvinfer1::IPluginV2* NormalizePluginCreator::createPlugin(const char* name, const nvinfer1::PluginFieldCollection* fc) {
-  return nullptr;
-}
-
-NormalizePlugin* NormalizePluginCreator::createPlugin(
-    const char* name,
-    int64_t order,
-    std::vector<int64_t> axes,
-    bool keep_dims) {
-  name_ = name;
-  return new NormalizePlugin(order, axes, keep_dims);
+  int32_t order = 0;
+  std::vector<int32_t> axes;
+  int32_t keep_dims = 0;
+  for (int i = 0; i < fc->nbFields; i++) {
+    std::string field_name(fc->fields[i].name);
+    if (field_name.compare("order") == 0) {
+      order = *static_cast<const int32_t*>(fc->fields[i].data);
+    } else if (field_name.compare("axes") == 0) {
+      auto axes_values = static_cast<const int32_t*>(fc->fields[i].data);
+      axes.assign(axes_values, axes_values + fc->fields[i].length);
+    } else if (field_name.compare("keep_dims") == 0) {
+      keep_dims = *static_cast<const int32_t*>(fc->fields[i].data);
+    }
+  }
+  NormalizePlugin* plugin = new NormalizePlugin(order, axes, keep_dims);
+  return plugin;
 }
 
 nvinfer1::IPluginV2* NormalizePluginCreator::deserializePlugin(
@@ -261,7 +281,9 @@ nvinfer1::IPluginV2* NormalizePluginCreator::deserializePlugin(
     const void* serialData,
     size_t serialLength) {
   name_ = name;
-  return new NormalizePlugin((const char*)serialData, serialLength);
+  auto plugin = new NormalizePlugin((const char*)serialData, serialLength);
+  // plugin->setPluginNamespace("trtorch");
+  return plugin;
 }
 
 const nvinfer1::PluginFieldCollection* NormalizePluginCreator::getFieldNames() {

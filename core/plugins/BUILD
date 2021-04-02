@@ -8,15 +8,15 @@ config_setting(
 )
 
 cc_library(
-    name = "plugins",
+    name = "trtorch_plugins",
     hdrs = [
         "plugins.h",
-        #"impl/interpolate_plugin.h",
+        "impl/interpolate_plugin.h",
         "impl/normalize_plugin.h",
     ],
     srcs = [
         "register_plugins.cpp",
-        #"impl/interpolate_plugin.cpp",
+        "impl/interpolate_plugin.cpp",
         "impl/normalize_plugin.cpp",
     ],
     deps = [
@@ -35,5 +35,5 @@ load("@rules_pkg//:pkg.bzl", "pkg_tar")
 pkg_tar(
     name = "include",
     package_dir = "core/plugins/",
-    srcs = ["plugin_prelude.h"],
+    srcs = ["plugins.h"],
 )

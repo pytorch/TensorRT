@@ -1,6 +1,5 @@
 #include "core/conversion/converters/converters.h"
 #include "core/util/prelude.h"
-// #include "core/plugins/impl/interpolate_plugin.h"
 
 namespace trtorch {
 namespace core {
@@ -300,7 +299,6 @@ auto pooling_registrations TRTORCH_UNUSED =
                  in_shape = util::toVec(in->getDimensions());
                }
 
-               // auto out_size = args[1].IValue()->toIntList();
                auto out_size = util::toVec(util::toDims(args[1].unwrapToIntList()));
 
                if (ctx->input_is_dynamic) {
@@ -315,19 +313,38 @@ auto pooling_registrations TRTORCH_UNUSED =
                  auto out_shape = in_shape;
                  std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
 
-                 auto creator = getPluginRegistry()->getPluginCreator("InterpolatePlugin", "1", "trtorch"); //new plugins::InterpolatePluginCreator();
-                 auto plugin = creator->createPlugin(
-                     "adaptive_pool2d",
-                     in_shape,
-                     out_shape,
-                     out_size,
-                     {},
-                     std::string("adaptive_pool2d"),
-                     false,
-                     false);
+                 auto creator = getPluginRegistry()->getPluginCreator("Interpolate", "1", "");
+
+                 // Configure the plugin fields
+                 nvinfer1::PluginFieldCollection fc;
+                 std::vector<nvinfer1::PluginField> f;
+
+                 std::vector<int32_t> in_shape_casted(in_shape.begin(), in_shape.end());
+                 f.emplace_back(nvinfer1::PluginField("in_shape", in_shape_casted.data(), nvinfer1::PluginFieldType::kINT32, in_shape.size()));
+
+                 std::vector<int32_t> out_shape_casted(out_shape.begin(), out_shape.end());
+                 f.emplace_back(nvinfer1::PluginField("out_shape", out_shape_casted.data(), nvinfer1::PluginFieldType::kINT32, out_shape.size()));
+
+                 std::vector<int32_t> out_size_casted(out_size.begin(), out_size.end());
+                 f.emplace_back(nvinfer1::PluginField("out_size", out_size_casted.data(), nvinfer1::PluginFieldType::kINT32, out_size.size()));
+
+                 f.emplace_back(nvinfer1::PluginField("scales", nullptr, nvinfer1::PluginFieldType::kFLOAT64, 0));
+
+                 std::string name = "adaptive_pool2d";
+                 f.emplace_back(nvinfer1::PluginField("mode", &name, nvinfer1::PluginFieldType::kCHAR , 1));
+
+                 int32_t align_corners = 0;
+                 f.emplace_back(nvinfer1::PluginField("align_corners", &align_corners, nvinfer1::PluginFieldType::kINT32, 1));
+
+                 int32_t use_scales = 0;
+                 f.emplace_back(nvinfer1::PluginField("use_scales", &use_scales, nvinfer1::PluginFieldType::kINT32, 1));
+                 fc.nbFields = f.size();
+                 fc.fields = f.data();
+
+                 auto adaptive_pool_plugin = creator->createPlugin("Interpolate", &fc);
 
                  auto pooling_layer =
-                     ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(&in), 1, *plugin);
+                     ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(&in), 1, *adaptive_pool_plugin);
                  TRTORCH_CHECK(pooling_layer, "Unable to create pooling (interpolation) plugin from node" << *n);
 
                  pooling_layer->setName(util::node_info(n).c_str());

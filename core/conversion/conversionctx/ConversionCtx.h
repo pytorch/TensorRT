@@ -69,8 +69,6 @@ struct ConversionCtx {
 
   std::unordered_map<const torch::jit::Value*, nvinfer1::ITensor*> value_tensor_map;
   std::unordered_map<const torch::jit::Value*, torch::jit::IValue> evaluated_value_map;
-  //Registry of official tensorrt plugin layers.
-  // std::unordered_map<std::string, nvinfer1::IPluginCreator*> mPluginRegistry;
 };
 
 } // namespace conversion

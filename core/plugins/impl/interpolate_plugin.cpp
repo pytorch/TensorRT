@@ -1,10 +1,12 @@
-#include "core/plugins/plugins.h"
 #include "core/plugins/impl/interpolate_plugin.h"
-using namespace nvinfer1;
+#include "core/plugins/plugins.h"
+#include "core/util/prelude.h"
 
-namespace trtorch {
-namespace core {
-namespace plugins {
+using namespace nvinfer1;
+using namespace trtorch::core;
+// namespace trtorch {
+// namespace core {
+// namespace plugins {
 
 /*
  * InterpolatePlugin class implementations
@@ -251,8 +253,7 @@ int InterpolatePlugin::enqueue(
     cudaStream_t stream) {
 #if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1)
   at::Tensor input = at::from_blob((void*)inputs[0], util::toVec(inputDesc->dims), [](void*) {}, tensor_options_);
-  at::Tensor output = at::from_blob(
-      outputs[0], util::volume(outputDesc->dims), [](void*) {}, tensor_options_);
+  at::Tensor output = at::from_blob(outputs[0], util::volume(outputDesc->dims), [](void*) {}, tensor_options_);
 
   at::cuda::CUDAStream torch_stream = at::cuda::getStreamFromPool();
   at::cuda::CUDAStreamGuard torch_guard(torch_stream);
@@ -341,6 +342,20 @@ int InterpolatePlugin::enqueue(
 /*
  * InterpolatePluginCreator class implementations
  */
+
+InterpolatePluginCreator::InterpolatePluginCreator() {
+  mPluginAttributes.emplace_back(PluginField("in_shape", nullptr, PluginFieldType::kINT32, 1));
+  mPluginAttributes.emplace_back(PluginField("out_shape", nullptr, PluginFieldType::kINT32, 1));
+  mPluginAttributes.emplace_back(PluginField("out_size", nullptr, PluginFieldType::kINT32, 1));
+  mPluginAttributes.emplace_back(PluginField("scales", nullptr, PluginFieldType::kFLOAT32, 1));
+  mPluginAttributes.emplace_back(PluginField("mode", nullptr, PluginFieldType::kCHAR, 1));
+  mPluginAttributes.emplace_back(PluginField("align_corners", nullptr, PluginFieldType::kINT32, 1));
+  mPluginAttributes.emplace_back(PluginField("use_scales", nullptr, PluginFieldType::kINT32, 1));
+
+  mFC.nbFields = mPluginAttributes.size();
+  mFC.fields = mPluginAttributes.data();
+}
+
 const char* InterpolatePluginCreator::getPluginNamespace() const {
   return "";
 }
@@ -356,20 +371,39 @@ const char* InterpolatePluginCreator::getPluginVersion() const {
 nvinfer1::IPluginV2* InterpolatePluginCreator::createPlugin(
     const char* name,
     const nvinfer1::PluginFieldCollection* fc) {
-  return nullptr;
-}
+  std::vector<int64_t> in_shape;
+  std::vector<int64_t> out_shape;
+  std::vector<int64_t> out_size;
+  std::vector<double> scales;
+  std::string mode;
+  int32_t align_corners = 0;
+  int32_t use_scales = 0;
 
-InterpolatePlugin* InterpolatePluginCreator::createPlugin(
-    const char* name,
-    std::vector<int64_t> in_shape,
-    std::vector<int64_t> out_shape,
-    std::vector<int64_t> size,
-    std::vector<double> scales,
-    std::string mode,
-    bool align_corners,
-    bool use_scales) {
-  name_ = name;
-  return new InterpolatePlugin(in_shape, out_shape, size, scales, mode, align_corners, use_scales);
+  for (int i = 0; i < fc->nbFields; i++) {
+    std::string field_name(fc->fields[i].name);
+    if (field_name.compare("in_shape") == 0) {
+      auto in_shape_values = static_cast<const int32_t*>(fc->fields[i].data);
+      in_shape.assign(in_shape_values, in_shape_values + fc->fields[i].length);
+    } else if (field_name.compare("out_shape") == 0) {
+      auto out_shape_values = static_cast<const int32_t*>(fc->fields[i].data);
+      out_shape.assign(out_shape_values, out_shape_values + fc->fields[i].length);
+    } else if (field_name.compare("out_size") == 0) {
+      auto out_size_values = static_cast<const int32_t*>(fc->fields[i].data);
+      out_size.assign(out_size_values, out_size_values + fc->fields[i].length);
+    } else if (field_name.compare("scales") == 0) {
+      auto scales_values = static_cast<const double*>(fc->fields[i].data);
+      scales.assign(scales_values, scales_values + fc->fields[i].length);
+    } else if (field_name.compare("mode") == 0) {
+      mode = *static_cast<const std::string*>(fc->fields[i].data);
+    } else if (field_name.compare("align_corners") == 0) {
+      align_corners = *static_cast<const int32_t*>(fc->fields[i].data);
+    } else if (field_name.compare("use_scales") == 0) {
+      use_scales = *static_cast<const int32_t*>(fc->fields[i].data);
+    }
+  }
+  InterpolatePlugin* plugin =
+      new InterpolatePlugin(in_shape, out_shape, out_size, scales, mode, (bool)align_corners, (bool)use_scales);
+  return plugin;
 }
 
 nvinfer1::IPluginV2* InterpolatePluginCreator::deserializePlugin(
@@ -386,6 +420,6 @@ const nvinfer1::PluginFieldCollection* InterpolatePluginCreator::getFieldNames()
 
 REGISTER_TRTORCH_PLUGIN(InterpolatePluginCreator);
 
-} // namespace plugins
-} // namespace core
-} // namespace trtorch
+// } // namespace plugins
+// } // namespace core
+// } // namespace trtorch
