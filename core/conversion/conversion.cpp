@@ -173,7 +173,8 @@ void AddInputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> inputs
   }
 #endif
 }
-void MarkOutputsOfIvalue(ConversionCtx* ctx, c10::IValue out_ivalue, const torch::jit::Value* out) {
+
+void MarkIValueOutputs(ConversionCtx* ctx, c10::IValue out_ivalue, const torch::jit::Value* out) {
   if (out_ivalue.isCustomClass()) {
     std::string name = std::string("output_") + std::to_string(ctx->num_outputs);
     auto output_container = out_ivalue.toCustomClass<TensorContainer>();
@@ -184,7 +185,7 @@ void MarkOutputsOfIvalue(ConversionCtx* ctx, c10::IValue out_ivalue, const torch
         ctx->logger, "Marking Output " << out->debugName() << " named " << name << " in engine (ctx.MarkOutput)");
     ctx->num_outputs += 1;
   } else {
-    TRTORCH_THROW_ERROR("Unknown output type. Only a single tensor or a TensorList type is supported.");
+    TRTORCH_THROW_ERROR("Unsupported output type, only Tensors or unwrapped collections of Tensors can be marked as engine outputs but found type: " << out_ivalue.tagKind());
   }
 }
 
@@ -197,10 +198,10 @@ void MarkOutputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> outp
         if (out_ivalue.isList()) {
           c10::List<c10::IValue> value_list = out_ivalue.toList();
           for(auto it = value_list.begin(); it != value_list.end(); it++) {
-            MarkOutputsOfIvalue(ctx, *it, out);
+            MarkIValueOutputs(ctx, *it, out);
           }
         } else {
-           MarkOutputsOfIvalue(ctx, out_ivalue, out);
+           MarkIValueOutputs(ctx, out_ivalue, out);
         }
       }
     } else {
