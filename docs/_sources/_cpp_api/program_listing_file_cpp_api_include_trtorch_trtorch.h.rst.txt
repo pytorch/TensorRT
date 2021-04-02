@@ -35,7 +35,7 @@ Program Listing for File trtorch.h
    } // namespace torch
    
    namespace c10 {
-   enum class DeviceType : int16_t;
+   enum class DeviceType : int8_t;
    enum class ScalarType : int8_t;
    template <class>
    class ArrayRef;
@@ -112,6 +112,8 @@ Program Listing for File trtorch.h
      bool refit = false;
    
      bool debug = false;
+   
+     bool truncate_long_and_double = false;
    
      bool strict_types = false;
    

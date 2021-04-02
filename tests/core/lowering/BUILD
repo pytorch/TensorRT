@@ -16,6 +16,10 @@ lowering_test(
 )
 
 lowering_test(
+  name = "test_remove_dropout_pass",
+)
+
+lowering_test(
   name = "test_remove_to",
 )
 
@@ -38,6 +42,7 @@ test_suite(
         ":test_remove_contiguous_pass",
         ":test_remove_to",
         ":test_remove_detach_pass",
-        ":test_operator_aliasing_pass"
+        ":test_operator_aliasing_pass",
+        ":test_remove_dropout_pass"
     ]
 )

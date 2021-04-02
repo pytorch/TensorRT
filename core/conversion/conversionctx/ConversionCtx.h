@@ -28,6 +28,7 @@ struct BuilderSettings {
   bool refit = false;
   bool debug = false;
   bool strict_types = false;
+  bool truncate_long_and_double = false;
   Device device;
   nvinfer1::EngineCapability capability = nvinfer1::EngineCapability::kDEFAULT;
   nvinfer1::IInt8Calibrator* calibrator = nullptr;
