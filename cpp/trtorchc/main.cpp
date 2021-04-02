@@ -230,7 +230,7 @@ int main(int argc, char** argv) {
   }
 
   if (verbose) {
-    trtorch::logging::set_reportable_log_level(trtorch::logging::Level::kDEBUG);
+    trtorch::logging::set_reportable_log_level(trtorch::logging::Level::kGRAPH);
   } else if (info) {
     trtorch::logging::set_reportable_log_level(trtorch::logging::Level::kINFO);
   } else if (warning) {
@@ -371,7 +371,7 @@ int main(int argc, char** argv) {
     mod = torch::jit::load(real_input_path);
   } catch (const c10::Error& e) {
     trtorch::logging::log(trtorch::logging::Level::kERROR, "Error loading the model (path may be incorrect)");
-    std::cerr << parser;
+    std::cerr << e.what();
     return 1;
   }
 

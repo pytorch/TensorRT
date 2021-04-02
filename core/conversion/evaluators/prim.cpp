@@ -48,7 +48,13 @@ auto prim_registrations =
                           c10::List<int64_t> list;
                           list.reserve(num_inputs);
                           for (auto in : n->inputs()) {
-                            list.emplace_back(std::move(args.at(in).unwrapToInt()));
+                              if (args.at(in).IValue()->isInt()) {
+                                  list.emplace_back(std::move(args.at(in).unwrapToInt()));
+                              } else if (args.at(in).IValue()->isTuple()) {
+                                  auto unpack_tuple = args.at(in).IValue()->toTuple();
+                                  for (size_t j = 0; j < unpack_tuple->elements().size(); ++j)
+                                      list.emplace_back(unpack_tuple->elements()[j].toInt());
+                              }
                           }
                           return c10::optional<torch::jit::IValue>(std::move(torch::jit::IValue(list)));
                         } else if (torch::jit::FloatType::get() == lt->getElementType()) {
