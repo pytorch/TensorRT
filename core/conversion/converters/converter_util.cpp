@@ -17,13 +17,16 @@ namespace util {
 	    auto newDims = dims;
 	    for (int dim = dims.nbDims; dim < nDim; ++dim)
 	      newDims = unsqueezeDims(newDims, dim);
+	    LOG_DEBUG(
+		      "Input shape is less than 4D got: "
+		      << dims << ", inserting shuffle layer to reshape to 4D tensor shape: " << newDims);
+	    
             LOG_DEBUG("Original shape: " << dims << ", unsqueezing to: " << newDims);
             auto shuffle_layer = ctx->net->addShuffle(*tensor);
             TRTORCH_CHECK(shuffle_layer, "Unable to create shuffle layer");
             shuffle_layer->setReshapeDimensions(newDims);
             shuffle_layer->setZeroIsPlaceholder(true);
-            shuffle_layer->setName((util::node_info(n)+ " : Unsqueeze "+ tensor->getName()
-                                    + " "  + toStr(dims) + "->" + toStr(newDims)).c_str());
+	    shuffle_layer->setName((util::node_info(n) + " [Reshape to " + util::toStr(newDims) + ']').c_str());
             return shuffle_layer;
         } else
             return nullptr;

@@ -1,4 +1,5 @@
 #include "core/conversion/converters/converters.h"
+#include "core/conversion/converters/converter_util.h"
 #include "core/util/prelude.h"
 #include "plugins/interpolate_plugin.h"
 
@@ -9,19 +10,94 @@ namespace converters {
 namespace impl {
 namespace {
 
+
+bool AdaptiveAvgPoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& args) {
+               auto in = args[0].ITensorOrFreeze(ctx);
+               auto out_size = util::toVec(util::toDims(args[1].unwrapToIntList()));
+	       bool shuffle_back=false;
+	       auto shuffle = util::padTensorDim(ctx, n, in, 4);
+               if (shuffle) {
+                 in = shuffle->getOutput(0);
+               }
+	       
+	       if (out_size.size()==1) {
+		 shuffle_back = true;
+		 out_size.push_back(1);
+	       }
+
+	       auto in_shape = util::toVec(in->getDimensions());
+	       nvinfer1::ILayer* new_layer = nullptr;
+		 
+               if (ctx->input_is_dynamic) {
+#if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1)
+                 LOG_WARNING(
+                     "Adaptive pooling layer will be run through ATen, via not TensorRT, performace will be lower than expected. Consider switching either to static input shape or moving to non adaptive pooling if this is an issue");
+#else
+                 LOG_WARNING(
+                     "Adaptive pooling layer will be run through ATen (on CPU), via not TensorRT, performace will suffer. Consider switching either to static input shape or moving to non adaptive pooling");
+#endif
+
+                 auto out_shape = in_shape;
+                 std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
+
+                 auto creator = new plugins::InterpolatePluginCreator();
+                 auto plugin = creator->createPlugin(
+                     "adaptive_pool2d",
+                     in_shape,
+                     out_shape,
+                     out_size,
+                     {},
+                     std::string("adaptive_pool2d"),
+                     false,
+                     false);
+
+                 new_layer =
+                     ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(&in), 1, *plugin);
+                 TRTORCH_CHECK(new_layer, "Unable to create pooling (interpolation) plugin from node" << *n);
+
+               } else {
+                 std::vector<int64_t> stride(out_size.size());
+                 for (size_t i = 0; i < out_size.size(); i++) {
+                   stride[(stride.size() - 1) - i] =
+                       in_shape[(in_shape.size() - 1) - i] / out_size[(out_size.size() - 1) - i];
+                 }
+                 LOG_DEBUG("Stride: " << util::toDims(stride));
+
+                 std::vector<int64_t> window(out_size.size());
+                 for (size_t i = 0; i < out_size.size(); i++) {
+                   window[window.size() - 1 - i] = in_shape[in_shape.size() - 1 - i] -
+                       (out_size[out_size.size() - 1 - i] - 1) * stride[stride.size() - 1 - i];
+                 }
+
+                 LOG_DEBUG("Window: " << util::toDims(window));
+
+		 auto pooling_layer = ctx->net->addPoolingNd(*in, nvinfer1::PoolingType::kAVERAGE, util::toDims(window));
+                 TRTORCH_CHECK(pooling_layer, "Unable to create average pooling layer from node: " << *n);
+                 pooling_layer->setStrideNd(util::toDims(stride));
+		 new_layer = pooling_layer;
+               }
+	       
+	       new_layer->setName(util::node_info(n).c_str());
+
+	       if (shuffle_back) {
+		 new_layer = util::unpadTensorDim(ctx, n, new_layer->getOutput(0), 3);
+		 assert(new_layer);
+	       }
+	       
+	       auto layer_output = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
+	       LOG_DEBUG("Output tensor shape: " << layer_output->getDimensions());
+	       
+	       return true;
+}
+  
 bool MaxPoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& args) {
   auto in = args[0].ITensorOrFreeze(ctx);
   auto shape = util::toVec(in->getDimensions());
 
   // Max Pool needs at least 4D input
-  if (shape.size() < 4) {
-    auto new_shape = util::toDimsPad(shape, 4);
-    LOG_DEBUG(
-        "Input shape is less than 4D got: "
-        << util::toDims(shape) << ", inserting shuffle layer to reshape to 4D tensor shape: " << new_shape);
-    auto shuffle = ctx->net->addShuffle(*in);
-    shuffle->setReshapeDimensions(new_shape);
-    shuffle->setName((util::node_info(n) + " [Reshape to " + util::toStr(new_shape) + ']').c_str());
+  auto shuffle = util::padTensorDim(ctx, n, in, 4);
+
+  if (shuffle) {
     in = shuffle->getOutput(0);
   }
 
@@ -284,86 +360,13 @@ auto pooling_registrations TRTORCH_UNUSED =
         .pattern(
             {"aten::adaptive_avg_pool2d(Tensor self, int[2] output_size) -> (Tensor)",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-               auto in = args[0].ITensorOrFreeze(ctx);
-               auto in_shape = util::toVec(in->getDimensions());
-
-               if (in_shape.size() < 4) {
-                 auto new_shape = util::toDimsPad(in_shape, 4);
-                 LOG_DEBUG(
-                     "Input shape is less than 4D got: " << util::toDims(in_shape)
-                                                         << ", inserting shuffle layer to reshape to 4D tensor shape: "
-                                                         << new_shape);
-                 auto shuffle = ctx->net->addShuffle(*in);
-                 shuffle->setReshapeDimensions(new_shape);
-                 shuffle->setName((util::node_info(n) + " [Reshape to " + util::toStr(new_shape) + ']').c_str());
-                 in = shuffle->getOutput(0);
-                 in_shape = util::toVec(in->getDimensions());
-               }
-
-               // auto out_size = args[1].IValue()->toIntList();
-               auto out_size = util::toVec(util::toDims(args[1].unwrapToIntList()));
-
-               if (ctx->input_is_dynamic) {
-#if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1)
-                 LOG_WARNING(
-                     "Adaptive pooling layer will be run through ATen, via not TensorRT, performace will be lower than expected. Consider switching either to static input shape or moving to non adaptive pooling if this is an issue");
-#else
-                 LOG_WARNING(
-                     "Adaptive pooling layer will be run through ATen (on CPU), via not TensorRT, performace will suffer. Consider switching either to static input shape or moving to non adaptive pooling");
-#endif
-
-                 auto out_shape = in_shape;
-                 std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
-
-                 auto creator = new plugins::InterpolatePluginCreator();
-                 auto plugin = creator->createPlugin(
-                     "adaptive_pool2d",
-                     in_shape,
-                     out_shape,
-                     out_size,
-                     {},
-                     std::string("adaptive_pool2d"),
-                     false,
-                     false);
-
-                 auto pooling_layer =
-                     ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(&in), 1, *plugin);
-                 TRTORCH_CHECK(pooling_layer, "Unable to create pooling (interpolation) plugin from node" << *n);
-
-                 pooling_layer->setName(util::node_info(n).c_str());
-
-                 auto layer_output = ctx->AssociateValueAndTensor(n->outputs()[0], pooling_layer->getOutput(0));
-
-                 LOG_DEBUG("Output tensor shape: " << layer_output->getDimensions());
-               } else {
-                 std::vector<int64_t> stride(out_size.size());
-                 for (size_t i = 0; i < out_size.size(); i++) {
-                   stride[(stride.size() - 1) - i] =
-                       in_shape[(in_shape.size() - 1) - i] / out_size[(out_size.size() - 1) - i];
-                 }
-                 LOG_DEBUG("Stride: " << util::toDims(stride));
-
-                 std::vector<int64_t> window(out_size.size());
-                 for (size_t i = 0; i < out_size.size(); i++) {
-                   window[window.size() - 1 - i] = in_shape[in_shape.size() - 1 - i] -
-                       (out_size[out_size.size() - 1 - i] - 1) * stride[stride.size() - 1 - i];
-                 }
-
-                 LOG_DEBUG("Window: " << util::toDims(window));
-
-                 auto new_layer = ctx->net->addPoolingNd(*in, nvinfer1::PoolingType::kAVERAGE, util::toDims(window));
-                 TRTORCH_CHECK(new_layer, "Unable to create average pooling layer from node: " << *n);
-
-                 new_layer->setStrideNd(util::toDims(stride));
-
-                 new_layer->setName(util::node_info(n).c_str());
-                 auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
-
-                 LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
-               }
-
-               return true;
-             }});
+               return AdaptiveAvgPoolingConverter(ctx, n, args);
+	      }})
+        .pattern(
+            {"aten::adaptive_avg_pool1d(Tensor self, int[1] output_size) -> (Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               return AdaptiveAvgPoolingConverter(ctx, n, args);
+	      }});
 } // namespace
 } // namespace impl
 } // namespace converters
