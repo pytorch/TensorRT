@@ -15,7 +15,7 @@ cc_binary(
     srcs = [],
     deps = [
         "//core/runtime:runtime",
-        "//core/plugins"
+        "//core/plugins:trtorch_plugins"
     ],
     linkstatic = True,
     linkshared = True

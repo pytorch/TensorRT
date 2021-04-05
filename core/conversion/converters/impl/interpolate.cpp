@@ -1,7 +1,6 @@
 #include "NvInfer.h"
 #include "NvInferRuntimeCommon.h"
 #include "core/conversion/converters/converters.h"
-#include "core/plugins/impl/interpolate_plugin.h"
 #include "core/util/prelude.h"
 #include "torch/torch.h"
 

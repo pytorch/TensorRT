@@ -320,21 +320,25 @@ auto pooling_registrations TRTORCH_UNUSED =
                  std::vector<nvinfer1::PluginField> f;
 
                  std::vector<int32_t> in_shape_casted(in_shape.begin(), in_shape.end());
-                 f.emplace_back(nvinfer1::PluginField("in_shape", in_shape_casted.data(), nvinfer1::PluginFieldType::kINT32, in_shape.size()));
+                 f.emplace_back(nvinfer1::PluginField(
+                     "in_shape", in_shape_casted.data(), nvinfer1::PluginFieldType::kINT32, in_shape.size()));
 
                  std::vector<int32_t> out_shape_casted(out_shape.begin(), out_shape.end());
-                 f.emplace_back(nvinfer1::PluginField("out_shape", out_shape_casted.data(), nvinfer1::PluginFieldType::kINT32, out_shape.size()));
+                 f.emplace_back(nvinfer1::PluginField(
+                     "out_shape", out_shape_casted.data(), nvinfer1::PluginFieldType::kINT32, out_shape.size()));
 
                  std::vector<int32_t> out_size_casted(out_size.begin(), out_size.end());
-                 f.emplace_back(nvinfer1::PluginField("out_size", out_size_casted.data(), nvinfer1::PluginFieldType::kINT32, out_size.size()));
+                 f.emplace_back(nvinfer1::PluginField(
+                     "out_size", out_size_casted.data(), nvinfer1::PluginFieldType::kINT32, out_size.size()));
 
                  f.emplace_back(nvinfer1::PluginField("scales", nullptr, nvinfer1::PluginFieldType::kFLOAT64, 0));
 
                  std::string name = "adaptive_pool2d";
-                 f.emplace_back(nvinfer1::PluginField("mode", &name, nvinfer1::PluginFieldType::kCHAR , 1));
+                 f.emplace_back(nvinfer1::PluginField("mode", &name, nvinfer1::PluginFieldType::kCHAR, 1));
 
                  int32_t align_corners = 0;
-                 f.emplace_back(nvinfer1::PluginField("align_corners", &align_corners, nvinfer1::PluginFieldType::kINT32, 1));
+                 f.emplace_back(
+                     nvinfer1::PluginField("align_corners", &align_corners, nvinfer1::PluginFieldType::kINT32, 1));
 
                  int32_t use_scales = 0;
                  f.emplace_back(nvinfer1::PluginField("use_scales", &use_scales, nvinfer1::PluginFieldType::kINT32, 1));

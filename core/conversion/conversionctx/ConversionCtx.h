@@ -68,9 +68,6 @@ struct ConversionCtx {
   // copy of the values
   std::vector<void*> builder_resources;
 
-  // Registry of official tensorrt plugin layers.
-  std::unordered_map<std::string, nvinfer1::IPluginCreator*> mPluginRegistry;
-
   std::unordered_map<const torch::jit::Value*, nvinfer1::ITensor*> value_tensor_map;
   std::unordered_map<const torch::jit::Value*, torch::jit::IValue> evaluated_value_map;
 };
