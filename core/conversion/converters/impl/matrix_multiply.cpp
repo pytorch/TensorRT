@@ -35,7 +35,12 @@ auto mm_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().pattern(
          for (int i = 0; i < min_dim; i++) {
            new_shape.push_back(old_shape[i]);
          }
+	 for (int i = 0; i < new_shape.size(); i++) {
+	   if (new_shape[i] == -1)
+	     new_shape[i] = 0;
+	 }
          shuffle->setReshapeDimensions(util::toDims(new_shape));
+	 shuffle->setZeroIsPlaceholder(true);
          auto reshaped_tensor = shuffle->getOutput(0);
          auto new_self = in_shape.size() > other_shape.size() ? self : reshaped_tensor;
          auto new_other = other_shape.size() > in_shape.size() ? other : reshaped_tensor;
