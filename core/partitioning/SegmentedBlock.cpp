@@ -6,17 +6,18 @@ namespace partitioning {
 
 torch::jit::Value* getOrAddInputForValue(
     torch::jit::Value* old_value,
-    std::shared_ptr<torch::jit::Graph>& graph,
+    torch::jit::Block* block,
     std::unordered_map<torch::jit::Value*, torch::jit::Value*>& old_to_new) {
   if (old_to_new.count(old_value) == 0) {
     auto node = old_value->node();
 
     if (node->kind() == torch::jit::prim::Constant) {
-      auto new_const = graph->createClone(node, {nullptr});
-      graph->block()->prependNode(new_const);
+      auto new_const = block->owningGraph()->createClone(node, {nullptr});
+      block->prependNode(new_const);
+      old_to_new[old_value] = new_const->output();
       return new_const->output();
     }
-    auto new_value = graph->block()->addInput();
+    auto new_value = block->addInput();
     old_to_new[old_value] = new_value;
     new_value->copyMetadata(old_value);
     // mapping from new graph input Values to original graph values
@@ -32,7 +33,7 @@ torch::jit::Node* cloneNode(
     std::shared_ptr<torch::jit::Graph>& graph,
     std::unordered_map<torch::jit::Value*, torch::jit::Value*>& old_to_new) {
   auto* block = graph->block();
-  auto env = [&](torch::jit::Value* v) { return getOrAddInputForValue(v, graph, old_to_new); };
+  auto env = [&](torch::jit::Value* v) { return getOrAddInputForValue(v, graph->block(), old_to_new); };
 
   // create node for current graph by using the metadata in node and input Values in env
   auto new_node = block->appendNode(graph->createClone(node, env));
@@ -44,14 +45,18 @@ torch::jit::Node* cloneNode(
   return new_node;
 }
 
+//std::vector<SegmentedBlock> segment_graph(
+//    std::shared_ptr<torch::jit::Graph> g,
+//    const conversion::TorchFallback& fallback_info)
+
 std::vector<SegmentedBlock> segment_graph(
-    std::shared_ptr<torch::jit::Graph> g,
+    torch::jit::Block* block,
     const conversion::TorchFallback& fallback_info) {
   auto min_block_size = fallback_info.min_block_size;
   std::unordered_set<std::string> forced_fallback_operators(
       fallback_info.forced_fallback_operators.begin(), fallback_info.forced_fallback_operators.end());
 
-  auto nodes = g->block()->nodes();
+  auto nodes = block->nodes();
   std::vector<SegmentedBlock> segmented_blocks;
 
   // segment the nodes
@@ -78,8 +83,8 @@ std::vector<SegmentedBlock> segment_graph(
     }
   }
 
-  // if there is any kTorch nodes left, then either the last nodes are kTorch or last nodes are kTensorRT but num <
-  // min_block_size
+  // if there is any kTorch nodes left, then either the last nodes are kTorch or
+  // last nodes are kTensorRT but num < min_block_size
   if (!pytorch_nodes.empty()) {
     pytorch_nodes.insert(pytorch_nodes.end(), tensorrt_nodes.begin(), tensorrt_nodes.end());
     segmented_blocks.emplace_back(SegmentedBlock::kTorch, pytorch_nodes);

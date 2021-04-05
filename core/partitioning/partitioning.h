@@ -12,10 +12,18 @@ namespace trtorch {
 namespace core {
 namespace partitioning {
 
+//std::vector<SegmentedBlock> Partition(
+//    std::shared_ptr<torch::jit::Graph> g,
+//    std::vector<conversion::InputRange>& input_ranges,
+//    const conversion::TorchFallback& fallback_info);
+
+
 std::vector<SegmentedBlock> Partition(
-    std::shared_ptr<torch::jit::Graph> g,
+    torch::jit::Block* block,
     std::vector<conversion::InputRange>& input_ranges,
     const conversion::TorchFallback& fallback_info);
+
+
 
 } // namespace partitioning
 } // namespace core

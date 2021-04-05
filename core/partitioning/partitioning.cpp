@@ -55,7 +55,7 @@ SegmentedBlock injectNodesForNonTensorInputs(SegmentedBlock& seg_block) {
   return std::move(SegmentedBlock(seg_block.target(), new_block_nodes));
 }
 
-void resolveNonTensorInputs(std::vector<SegmentedBlock>& segmented_blocks, std::shared_ptr<torch::jit::Graph> g) {
+void resolveNonTensorInputs(std::vector<SegmentedBlock>& segmented_blocks) {
   // for NonTensor inputs in TensorRT segments, count the usages on Torch segments and TensorRT segments
   std::unordered_map<torch::jit::Value*, usage_info> usage_counts;
   for (int i = segmented_blocks.size() - 1; i >= 0; --i) {
@@ -97,7 +97,7 @@ void resolveNonTensorInputs(std::vector<SegmentedBlock>& segmented_blocks, std::
   return;
 }
 
-void registerSegmentsOutputs(std::vector<SegmentedBlock>& segmented_blocks, std::shared_ptr<torch::jit::Graph> g) {
+void registerSegmentsOutputs(std::vector<SegmentedBlock>& segmented_blocks, torch::jit::Block* block) {
   // find the corresponding raw values in original global graph for this segmented block's inputs/outputs
   std::set<torch::jit::Value*> input_values;
   for (auto& seg_block : segmented_blocks) {
@@ -106,12 +106,13 @@ void registerSegmentsOutputs(std::vector<SegmentedBlock>& segmented_blocks, std:
     }
   }
 
-  for (auto& graph_output : g->outputs()) {
+  for (auto& graph_output : block->outputs()) {
     input_values.insert(graph_output);
   }
 
   // should be careful here because some in-place operations don't return any values, there is no output for this kind
-  // of segment identify the output for each mini-graph by checking if any value in this graph is used later we
+  // of segment.
+  // identify the output for each mini-graph by checking if any value in this graph is used later, we
   // shouldn't register nonTensor output for TensorRT segments
   for (auto& seg_block : segmented_blocks) {
     for (auto& mini_graph_input : input_values) {
@@ -152,25 +153,37 @@ void registerSegmentsOutputs(std::vector<SegmentedBlock>& segmented_blocks, std:
   return;
 }
 
+//std::vector<SegmentedBlock> Partition(
+//    std::shared_ptr<torch::jit::Graph> g,
+//    std::vector<conversion::InputRange>& input_ranges,
+//    const conversion::TorchFallback& fallback_info)
+
 std::vector<SegmentedBlock> Partition(
-    std::shared_ptr<torch::jit::Graph> g,
+    torch::jit::Block* block,
     std::vector<conversion::InputRange>& input_ranges,
     const conversion::TorchFallback& fallback_info) {
   // segment lowering global graph into blocks
-  std::vector<SegmentedBlock> segmented_blocks = segment_graph(g, fallback_info);
+  std::vector<SegmentedBlock> segmented_blocks = segment_graph(block, fallback_info);
+
 
   // resolve nonTensor inputs/outputs
-  resolveNonTensorInputs(segmented_blocks, g);
+  resolveNonTensorInputs(segmented_blocks);
 
   // register input/output torch::jit::Value for segmented graphs
-  registerSegmentsOutputs(segmented_blocks, g);
+  registerSegmentsOutputs(segmented_blocks, block);
 
   // store the mapping from lowering graph torch::jit::Value => torch::jit::IValue that we get by running segments
   std::unordered_map<torch::jit::Value*, torch::jit::IValue> ivalues_maps;
   std::vector<torch::jit::IValue> random_inputs = generateRandomInputs(input_ranges);
-  for (size_t i = 0; i < g->inputs().size(); ++i) {
-    ivalues_maps[g->inputs()[i]] = random_inputs[i];
+  int idx = 0;
+  for (size_t i = 0; i < block->inputs().size(); ++i) {
+    if (!block->inputs()[i]->type()->isSubtypeOf(torch::jit::TensorType::get())) continue;
+    ivalues_maps[block->inputs()[i]] = random_inputs[idx++];
   }
+
+//  for (auto& seg_block : segmented_blocks) {
+//    LOG_INFO(*seg_block.g() << "(in partition)\n");
+//  }
 
   // register every segment's input shape, and it's running output IValues
   for (auto& seg_block : segmented_blocks) {
