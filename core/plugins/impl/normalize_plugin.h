@@ -1,5 +1,3 @@
-// #ifndef TRTORCH_NORMALIZE_PLUGIN_H
-// #define TRTORCH_NORMALIZE_PLUGIN_H
 #pragma once
 
 #include <ATen/ATen.h>
@@ -133,5 +131,3 @@ class NormalizePluginCreator : public nvinfer1::IPluginCreator {
 } // namespace plugins
 } // namespace core
 } // namespace trtorch
-
-// #endif // TRTORCH_NORMALIZE_PLUGIN_H
