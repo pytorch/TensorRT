@@ -313,7 +313,7 @@ auto pooling_registrations TRTORCH_UNUSED =
                  auto out_shape = in_shape;
                  std::copy(out_size.begin(), out_size.end(), out_shape.begin() + (in_shape.size() - out_size.size()));
 
-                 auto creator = getPluginRegistry()->getPluginCreator("Interpolate", "1", "");
+                 auto creator = getPluginRegistry()->getPluginCreator("Interpolate", "1", "trtorch");
 
                  // Configure the plugin fields
                  nvinfer1::PluginFieldCollection fc;

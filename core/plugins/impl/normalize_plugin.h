@@ -15,16 +15,17 @@
 #include "core/util/prelude.h"
 #include "torch/torch.h"
 
-using namespace nvinfer1;
+// using namespace nvinfer1;
 
-// namespace trtorch {
-// namespace core {
-// namespace plugins {
+namespace trtorch {
+namespace core {
+namespace plugins {
+namespace impl {
 
 class NormalizePlugin : public nvinfer1::IPluginV2DynamicExt {
  private:
   at::TensorOptions tensor_options_;
-  DataType dtype_;
+  nvinfer1::DataType dtype_;
   int32_t order_;
   std::vector<int32_t> axes_;
   int32_t keep_dims_;
@@ -105,8 +106,8 @@ class NormalizePlugin : public nvinfer1::IPluginV2DynamicExt {
 class NormalizePluginCreator : public nvinfer1::IPluginCreator {
  private:
   std::string name_;
-  std::vector<PluginField> mPluginAttributes;
-  PluginFieldCollection mFC;
+  std::vector<nvinfer1::PluginField> mPluginAttributes;
+  nvinfer1::PluginFieldCollection mFC;
 
  public:
   NormalizePluginCreator();
@@ -128,8 +129,9 @@ class NormalizePluginCreator : public nvinfer1::IPluginCreator {
   const nvinfer1::PluginFieldCollection* getFieldNames() override;
 };
 
-// } // namespace plugins
-// } // namespace core
-// } // namespace trtorch
+} // namespace impl
+} // namespace plugins
+} // namespace core
+} // namespace trtorch
 
 // #endif // TRTORCH_NORMALIZE_PLUGIN_H

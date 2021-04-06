@@ -10,13 +10,6 @@ namespace converters {
 namespace impl {
 namespace {
 
-static inline at::Tensor repeat_if_defined(const at::Tensor& t, int64_t repeat) {
-  if (t.defined()) {
-    return t.repeat(repeat);
-  }
-  return t;
-}
-
 auto batch_norm_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().pattern({
     R"SIG(aten::batch_norm(Tensor input, Tensor? gamma, Tensor? beta,
                             Tensor? mean, Tensor? var,

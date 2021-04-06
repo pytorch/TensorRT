@@ -2,11 +2,10 @@
 #include "core/plugins/plugins.h"
 #include "core/util/prelude.h"
 
-using namespace nvinfer1;
-using namespace trtorch::core;
-// namespace trtorch {
-// namespace core {
-// namespace plugins {
+namespace trtorch {
+namespace core {
+namespace plugins {
+namespace impl {
 
 /*
  * InterpolatePlugin class implementations
@@ -119,7 +118,7 @@ const char* InterpolatePlugin::getPluginVersion() const {
 }
 
 const char* InterpolatePlugin::getPluginNamespace() const {
-  return "";
+  return "trtorch";
 }
 
 nvinfer1::IPluginV2DynamicExt* InterpolatePlugin::clone() const {
@@ -163,7 +162,7 @@ nvinfer1::DimsExprs InterpolatePlugin::getOutputDimensions(
 
 nvinfer1::DataType InterpolatePlugin::getOutputDataType(int index, const nvinfer1::DataType* inputTypes, int nbInputs)
     const {
-  return DataType::kFLOAT;
+  return nvinfer1::DataType::kFLOAT;
 }
 
 int InterpolatePlugin::initialize() {
@@ -216,14 +215,14 @@ bool InterpolatePlugin::supportsFormatCombination(
   TRTORCH_ASSERT(nbInputs == 1, "Expected a single tensor as input to interpolate plugin");
   TRTORCH_ASSERT(nbOutputs == 1, "Expected a single tensor as output to interpolate plugin");
 
-  const PluginTensorDesc& in = inOut[0];
+  const nvinfer1::PluginTensorDesc& in = inOut[0];
 
   if (pos == 0) {
     return (in.type == nvinfer1::DataType::kFLOAT) && (in.format == nvinfer1::TensorFormat::kLINEAR);
   }
 
   // pos == 1, accessing information about output tensor
-  const PluginTensorDesc& out = inOut[1];
+  const nvinfer1::PluginTensorDesc& out = inOut[1];
 
   return (in.type == out.type) && (in.format == out.format);
 }
@@ -233,7 +232,7 @@ void InterpolatePlugin::configurePlugin(
     int nbInputs,
     const nvinfer1::DynamicPluginTensorDesc* out,
     int nbOutputs) {
-  dtype_ = DataType::kFLOAT;
+  dtype_ = nvinfer1::DataType::kFLOAT;
 }
 
 size_t InterpolatePlugin::getWorkspaceSize(
@@ -344,20 +343,20 @@ int InterpolatePlugin::enqueue(
  */
 
 InterpolatePluginCreator::InterpolatePluginCreator() {
-  mPluginAttributes.emplace_back(PluginField("in_shape", nullptr, PluginFieldType::kINT32, 1));
-  mPluginAttributes.emplace_back(PluginField("out_shape", nullptr, PluginFieldType::kINT32, 1));
-  mPluginAttributes.emplace_back(PluginField("out_size", nullptr, PluginFieldType::kINT32, 1));
-  mPluginAttributes.emplace_back(PluginField("scales", nullptr, PluginFieldType::kFLOAT32, 1));
-  mPluginAttributes.emplace_back(PluginField("mode", nullptr, PluginFieldType::kCHAR, 1));
-  mPluginAttributes.emplace_back(PluginField("align_corners", nullptr, PluginFieldType::kINT32, 1));
-  mPluginAttributes.emplace_back(PluginField("use_scales", nullptr, PluginFieldType::kINT32, 1));
+  mPluginAttributes.emplace_back(nvinfer1::PluginField("in_shape", nullptr, nvinfer1::PluginFieldType::kINT32, 1));
+  mPluginAttributes.emplace_back(nvinfer1::PluginField("out_shape", nullptr, nvinfer1::PluginFieldType::kINT32, 1));
+  mPluginAttributes.emplace_back(nvinfer1::PluginField("out_size", nullptr, nvinfer1::PluginFieldType::kINT32, 1));
+  mPluginAttributes.emplace_back(nvinfer1::PluginField("scales", nullptr, nvinfer1::PluginFieldType::kFLOAT32, 1));
+  mPluginAttributes.emplace_back(nvinfer1::PluginField("mode", nullptr, nvinfer1::PluginFieldType::kCHAR, 1));
+  mPluginAttributes.emplace_back(nvinfer1::PluginField("align_corners", nullptr, nvinfer1::PluginFieldType::kINT32, 1));
+  mPluginAttributes.emplace_back(nvinfer1::PluginField("use_scales", nullptr, nvinfer1::PluginFieldType::kINT32, 1));
 
   mFC.nbFields = mPluginAttributes.size();
   mFC.fields = mPluginAttributes.data();
 }
 
 const char* InterpolatePluginCreator::getPluginNamespace() const {
-  return "";
+  return "trtorch";
 }
 
 const char* InterpolatePluginCreator::getPluginName() const {
@@ -418,8 +417,7 @@ const nvinfer1::PluginFieldCollection* InterpolatePluginCreator::getFieldNames()
   return nullptr;
 }
 
-REGISTER_TRTORCH_PLUGIN(InterpolatePluginCreator);
-
-// } // namespace plugins
-// } // namespace core
-// } // namespace trtorch
+} // namespace impl
+} // namespace plugins
+} // namespace core
+} // namespace trtorch

@@ -5,9 +5,6 @@ package(default_visibility = ["//visibility:public"])
 cc_library(
     name = "trtorch_runtime",
     srcs = ["trtorch/lib/libtrtorchrt.so", "trtorch/lib/libtrtorch_plugins.so"],
-    hdrs = ["trtorch/include/trtorch/core/runtime/runtime.h"], # "trtorch/include/trtorch/trtorch.h", "trtorch/include/trtorch/macros.h"],
-    includes = ["trtorch/include/trtorch"],
-    #include_prefix="trtorch/include",
 )
 
 cc_binary(
@@ -15,7 +12,6 @@ cc_binary(
     srcs = [
         "main.cpp"
     ],
-    includes = ["trtorch/include", "trtorch/include/trtorch"],
     deps = [
         ":trtorch_runtime",
         "@libtorch//:libtorch",

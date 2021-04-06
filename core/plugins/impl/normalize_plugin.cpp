@@ -3,11 +3,11 @@
 #include "NvInferPluginUtils.h"
 #include "core/plugins/plugins.h"
 #include "core/util/prelude.h"
-using namespace nvinfer1;
-using namespace trtorch::core;
-// namespace trtorch {
-// namespace core {
-// namespace plugins {
+
+namespace trtorch {
+namespace core {
+namespace plugins {
+namespace impl {
 
 /*
  * NormalizePlugin class implementations
@@ -46,7 +46,7 @@ int NormalizePlugin::getNbOutputs() const {
 }
 
 const char* NormalizePlugin::getPluginType() const {
-  return "NormalizePlugintrtorch";
+  return "NormalizePlugin";
 }
 
 const char* NormalizePlugin::getPluginVersion() const {
@@ -54,7 +54,7 @@ const char* NormalizePlugin::getPluginVersion() const {
 }
 
 const char* NormalizePlugin::getPluginNamespace() const {
-  return "";
+  return "trtorch";
 }
 
 nvinfer1::IPluginV2DynamicExt* NormalizePlugin::clone() const {
@@ -99,7 +99,7 @@ nvinfer1::DimsExprs NormalizePlugin::getOutputDimensions(
 
 nvinfer1::DataType NormalizePlugin::getOutputDataType(int index, const nvinfer1::DataType* inputTypes, int nbInputs)
     const {
-  return DataType::kFLOAT;
+  return nvinfer1::DataType::kFLOAT;
 }
 
 int NormalizePlugin::initialize() {
@@ -127,9 +127,6 @@ std::string NormalizePlugin::serializeToString() const {
   output_archive.write("order", torch::IValue((int64_t)order_));
   output_archive.write("axes", torch::IValue(axesVec));
   output_archive.write("keep_dims", torch::IValue((int64_t)keep_dims_));
-  // output_archive.write("pluginType", torch::IValue("trtorch"));
-  // output_archive.write("pluginVersion", torch::IValue("1"));
-  // output_archive.write("pluginNamespace", torch::IValue("trtorch"));
   std::ostringstream data_str;
   output_archive.save_to(data_str);
 
@@ -149,14 +146,14 @@ bool NormalizePlugin::supportsFormatCombination(
   TRTORCH_ASSERT(nbInputs == 1, "Expected a single tensor as input to normalize plugin");
   TRTORCH_ASSERT(nbOutputs == 1, "Expected a single tensor as output to normalize plugin");
 
-  const PluginTensorDesc& in = inOut[0];
+  const nvinfer1::PluginTensorDesc& in = inOut[0];
 
   if (pos == 0) {
     return (in.type == nvinfer1::DataType::kFLOAT) && (in.format == nvinfer1::TensorFormat::kLINEAR);
   }
 
   // pos == 1, accessing information about output tensor
-  const PluginTensorDesc& out = inOut[1];
+  const nvinfer1::PluginTensorDesc& out = inOut[1];
 
   return (in.type == out.type) && (in.format == out.format);
 }
@@ -166,7 +163,7 @@ void NormalizePlugin::configurePlugin(
     int nbInputs,
     const nvinfer1::DynamicPluginTensorDesc* out,
     int nbOutputs) {
-  dtype_ = DataType::kFLOAT;
+  dtype_ = nvinfer1::DataType::kFLOAT;
 }
 
 size_t NormalizePlugin::getWorkspaceSize(
@@ -237,20 +234,20 @@ int NormalizePlugin::enqueue(
  * NormalizePluginCreator class implementations
  */
 NormalizePluginCreator::NormalizePluginCreator() {
-  mPluginAttributes.emplace_back(PluginField("order", nullptr, PluginFieldType::kINT32, 1));
-  mPluginAttributes.emplace_back(PluginField("axes", nullptr, PluginFieldType::kINT32, 1));
-  mPluginAttributes.emplace_back(PluginField("keep_dims", nullptr, PluginFieldType::kINT32, 1));
+  mPluginAttributes.emplace_back(nvinfer1::PluginField("order", nullptr, nvinfer1::PluginFieldType::kINT32, 1));
+  mPluginAttributes.emplace_back(nvinfer1::PluginField("axes", nullptr, nvinfer1::PluginFieldType::kINT32, 1));
+  mPluginAttributes.emplace_back(nvinfer1::PluginField("keep_dims", nullptr, nvinfer1::PluginFieldType::kINT32, 1));
 
   mFC.nbFields = mPluginAttributes.size();
   mFC.fields = mPluginAttributes.data();
 }
 
 const char* NormalizePluginCreator::getPluginNamespace() const {
-  return "";
+  return "trtorch";
 }
 
 const char* NormalizePluginCreator::getPluginName() const {
-  return "NormalizePlugintrtorch";
+  return "NormalizePlugin";
 }
 
 const char* NormalizePluginCreator::getPluginVersion() const {
@@ -282,7 +279,6 @@ nvinfer1::IPluginV2* NormalizePluginCreator::deserializePlugin(
     size_t serialLength) {
   name_ = name;
   auto plugin = new NormalizePlugin((const char*)serialData, serialLength);
-  // plugin->setPluginNamespace("trtorch");
   return plugin;
 }
 
@@ -290,8 +286,7 @@ const nvinfer1::PluginFieldCollection* NormalizePluginCreator::getFieldNames() {
   return nullptr;
 }
 
-REGISTER_TRTORCH_PLUGIN(NormalizePluginCreator);
-
-// } // namespace plugins
-// } // namespace core
-// } // namespace trtorch
+} // namespace impl
+} // namespace plugins
+} // namespace core
+} // namespace trtorch

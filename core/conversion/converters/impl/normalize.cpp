@@ -2,8 +2,6 @@
 #include "NvInferRuntimeCommon.h"
 #include "core/conversion/converters/converters.h"
 #include "core/util/prelude.h"
-// #include "core/plugins/impl/normalize_plugin.h"
-// #include "core/plugins/plugin_prelude.h"
 #include "torch/torch.h"
 
 namespace trtorch {
@@ -42,7 +40,8 @@ void create_plugin(
       TRTORCH_THROW_ERROR("Axis of normalization layer cannot exceed input rank");
     }
   }
-  auto creator = getPluginRegistry()->getPluginCreator("NormalizePlugintrtorch", "1", "");
+
+  auto creator = getPluginRegistry()->getPluginCreator("NormalizePlugin", "1", "trtorch");
   auto plugin = creator->createPlugin(name, &fc);
   auto normalize_layer = ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(&in), 1, *plugin);
   TRTORCH_CHECK(normalize_layer, "Unable to create normalization plugin from node" << *n);

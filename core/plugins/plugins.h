@@ -7,13 +7,13 @@
 namespace trtorch {
 namespace core {
 namespace plugins {
-namespace nvinfer1 {
-// Alternate implementation similar to automatic converter registration.
+namespace impl {
+// Helper class which registers a plugin in trtorch namespace
 template <typename T>
 class PluginRegistrar {
  public:
   PluginRegistrar() {
-    getPluginRegistry()->registerCreator(instance, "");
+    getPluginRegistry()->registerCreator(instance, "trtorch");
   }
 
  private:
@@ -21,9 +21,9 @@ class PluginRegistrar {
 };
 
 #define REGISTER_TRTORCH_PLUGIN(name) \
-  static nvinfer1::PluginRegistrar<name> pluginRegistrar##name {}
+  static PluginRegistrar<name> pluginRegistrar##name {}
 
-} // namespace nvinfer1
+} // namespace impl
 } // namespace plugins
 } // namespace core
 } // namespace trtorch

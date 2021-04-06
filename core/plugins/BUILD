@@ -10,14 +10,15 @@ config_setting(
 cc_library(
     name = "trtorch_plugins",
     hdrs = [
-        "plugins.h",
         "impl/interpolate_plugin.h",
         "impl/normalize_plugin.h",
+        "plugins.h",
+
     ],
     srcs = [
-        "register_plugins.cpp",
         "impl/interpolate_plugin.cpp",
         "impl/normalize_plugin.cpp",
+        "register_plugins.cpp",
     ],
     deps = [
         "@tensorrt//:nvinfer",
@@ -28,6 +29,12 @@ cc_library(
         "//conditions:default":  ["@libtorch//:libtorch"],
     }),
     alwayslink = True,
+    copts = [
+        "-pthread"
+    ],
+    linkopts = [
+        "-lpthread",
+    ]
 )
 
 load("@rules_pkg//:pkg.bzl", "pkg_tar")

@@ -53,7 +53,7 @@ void create_plugin(
 
   fc.nbFields = f.size();
   fc.fields = f.data();
-  auto creator = getPluginRegistry()->getPluginCreator("Interpolate", "1", "");
+  auto creator = getPluginRegistry()->getPluginCreator("Interpolate", "1", "trtorch");
   auto interpolate_plugin = creator->createPlugin(name, &fc);
 
   auto resize_layer = ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(&in), 1, *interpolate_plugin);

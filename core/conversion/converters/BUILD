@@ -29,7 +29,7 @@ cc_library(
 cc_library(
     name = "converters",
     hdrs = [
-        "converters.h",
+        "converters.h"
     ],
     srcs = [
         "NodeConverterRegistry.cpp",
@@ -67,7 +67,6 @@ cc_library(
         ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default":  ["@libtorch//:libtorch"],
     }),
-    #copts = ["-fPIC"],
     alwayslink = True,
 )
 
