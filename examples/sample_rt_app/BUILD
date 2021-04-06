@@ -1,6 +1,6 @@
 package(default_visibility = ["//visibility:public"])
 
-# trtorch is the dowloaded tar file
+# trtorch is the directory extracted from dowloaded release tar file
 # It has include, lib, bin directory and LICENSE file
 cc_library(
     name = "trtorch_runtime",
