@@ -9,16 +9,6 @@ namespace trtorch {
 namespace core {
 namespace partitioning {
 
-torch::jit::Value* getOrAddInputForValue(
-    torch::jit::Value* old_value,
-    std::shared_ptr<torch::jit::Graph>& graph,
-    std::unordered_map<torch::jit::Value*, torch::jit::Value*>& old_to_new);
-
-torch::jit::Node* cloneNode(
-    torch::jit::Node* node,
-    std::shared_ptr<torch::jit::Graph>& graph,
-    std::unordered_map<torch::jit::Value*, torch::jit::Value*>& old_to_new);
-
 struct SegmentedBlock {
  public:
   enum SegmentedBlockTarget {
@@ -36,7 +26,6 @@ struct SegmentedBlock {
       nodes_.push_back(node);
       appendNode(node);
     }
-    registerInputs();
   }
 
   SegmentedBlock(SegmentedBlockTarget blk_target, std::shared_ptr<torch::jit::Graph> g) : target_(blk_target), g_(g) {}
@@ -46,13 +35,7 @@ struct SegmentedBlock {
   }
 
   void appendNode(torch::jit::Node* n) {
-    cloneNode(n, g_, old_to_new_);
-  }
-
-  void registerInputs() {
-    for (auto& value : g_->inputs()) {
-      inputs_.push_back(old_to_new_[value]);
-    }
+    cloneNode(n);
   }
 
   void registerOutput(torch::jit::Value* raw_output) {
@@ -121,6 +104,10 @@ struct SegmentedBlock {
   void update_target(SegmentedBlockTarget new_target) {
     target_ = new_target;
   }
+
+  torch::jit::Value* getOrAddInputForValue(torch::jit::Value* v);
+
+  torch::jit::Node* cloneNode(torch::jit::Node* node);
 
  private:
   SegmentedBlockTarget target_;

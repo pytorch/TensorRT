@@ -181,7 +181,7 @@ void AddSegmentedBlockToGraph(
   }
 
   for (const auto n : seg.nodes()) {
-    partitioning::cloneNode(n, g, mini_to_new_g);
+    util::cloneNode(n, g, mini_to_new_g);
   }
 
   // original graph value => new global graph value
@@ -210,7 +210,7 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
       auto params = graph_and_parameters.second;
       auto named_params = conversion::get_named_params(g->inputs(), params);
       auto convert_cfg = std::move(cfg.convert_info);
-      LOG_INFO(*g << "(CompileGraph)\n");
+      LOG_INFO(*g << "(LoweringGraph)\n");
 
       // segment the graph and convert segmented TensorRT block
       auto segmented_blocks =

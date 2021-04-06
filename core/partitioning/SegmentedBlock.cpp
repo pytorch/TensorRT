@@ -4,42 +4,36 @@ namespace trtorch {
 namespace core {
 namespace partitioning {
 
-torch::jit::Value* getOrAddInputForValue(
-    torch::jit::Value* old_value,
-    std::shared_ptr<torch::jit::Graph>& graph,
-    std::unordered_map<torch::jit::Value*, torch::jit::Value*>& old_to_new) {
-  if (old_to_new.count(old_value) == 0) {
+torch::jit::Value* SegmentedBlock::getOrAddInputForValue(torch::jit::Value* old_value) {
+  if (old_to_new_.count(old_value) == 0) {
     auto node = old_value->node();
 
     if (node->kind() == torch::jit::prim::Constant) {
-      auto new_const = graph->createClone(node, {nullptr});
-      graph->block()->prependNode(new_const);
+      auto new_const = g_->createClone(node, {nullptr});
+      g_->block()->prependNode(new_const);
       return new_const->output();
     }
-    auto new_value = graph->block()->addInput();
-    old_to_new[old_value] = new_value;
+    auto new_value = g_->block()->addInput();
+    // every time when we addInput, we push back the corresponding lowering graph torch::jit::Value to our raw_inputs
+    inputs_.push_back(old_value);
+    old_to_new_[old_value] = new_value;
     new_value->copyMetadata(old_value);
-    // mapping from new graph input Values to original graph values
-    old_to_new[new_value] = old_value;
     return new_value;
   } else {
-    return old_to_new[old_value];
+    return old_to_new_[old_value];
   }
 }
 
-torch::jit::Node* cloneNode(
-    torch::jit::Node* node,
-    std::shared_ptr<torch::jit::Graph>& graph,
-    std::unordered_map<torch::jit::Value*, torch::jit::Value*>& old_to_new) {
-  auto* block = graph->block();
-  auto env = [&](torch::jit::Value* v) { return getOrAddInputForValue(v, graph, old_to_new); };
+torch::jit::Node* SegmentedBlock::cloneNode(torch::jit::Node* node) {
+  auto* block = g_->block();
+  auto env = [&](torch::jit::Value* v) { return getOrAddInputForValue(v); };
 
   // create node for current graph by using the metadata in node and input Values in env
-  auto new_node = block->appendNode(graph->createClone(node, env));
+  auto new_node = block->appendNode(g_->createClone(node, env));
   for (size_t i = 0; i < node->outputs().size(); ++i) {
     auto oo = node->outputs()[i];
     auto no = new_node->outputs()[i];
-    old_to_new[oo] = no;
+    old_to_new_[oo] = no;
   }
   return new_node;
 }
