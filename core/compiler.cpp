@@ -213,8 +213,7 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
       LOG_INFO(*g << "(LoweringGraph)\n");
 
       // segment the graph and convert segmented TensorRT block
-      auto segmented_blocks =
-          partitioning::Partition(g, convert_cfg.input_ranges, convert_cfg.engine_settings.torch_fallback);
+      auto segmented_blocks = partitioning::Partition(g, convert_cfg.input_ranges, cfg.partition_info);
       if (segmented_blocks.size() == 1 && segmented_blocks[0].target() == partitioning::SegmentedBlock::kTorch) {
         return mod;
       }
@@ -223,9 +222,9 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
       std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_g;
       for (auto& seg_block : segmented_blocks) {
         if (seg_block.target() == partitioning::SegmentedBlock::kTensorRT) {
-          std::vector<conversion::InputRange> input_ranges;
+          std::vector<ir::InputRange> input_ranges;
           for (auto& shape : seg_block.in_shape()) {
-            input_ranges.push_back(conversion::InputRange(util::toVec(shape)));
+            input_ranges.push_back(ir::InputRange(util::toVec(shape)));
           }
           // update the input ranges for each segments
           convert_cfg.input_ranges = input_ranges;
@@ -258,7 +257,7 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
 
 torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod, CompileSpec cfg) {
   // TODO: not sure how to deal with duplicated code here, so just cut out a branch temporally
-  if (cfg.convert_info.engine_settings.torch_fallback.enabled) {
+  if (cfg.partition_info.enabled) {
     return CompileGraphWithFallback(mod, cfg);
   }
   // TODO: Should be doing a functional transform but need PR #31978

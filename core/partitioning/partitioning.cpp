@@ -1,7 +1,8 @@
 #include "partitioning.h"
 
 #include <queue>
-#include "shape_analysis.h"
+#include "core/conversion/conversion.h"
+#include "core/partitioning/shape_analysis.h"
 #include "torch/csrc/jit/passes/constant_pooling.h"
 
 namespace trtorch {
@@ -55,7 +56,7 @@ SegmentedBlock injectNodesForNonTensorInputs(SegmentedBlock& seg_block) {
   return std::move(SegmentedBlock(seg_block.target(), new_block_nodes));
 }
 
-void resolveNonTensorInputs(std::vector<SegmentedBlock>& segmented_blocks, std::shared_ptr<torch::jit::Graph> g) {
+void resolveNonTensorInputs(PartitionedGraph& segmented_blocks, std::shared_ptr<torch::jit::Graph> g) {
   // for NonTensor inputs in TensorRT segments, count the usages on Torch segments and TensorRT segments
   std::unordered_map<torch::jit::Value*, usage_info> usage_counts;
   for (int i = segmented_blocks.size() - 1; i >= 0; --i) {
@@ -97,7 +98,7 @@ void resolveNonTensorInputs(std::vector<SegmentedBlock>& segmented_blocks, std::
   return;
 }
 
-void registerSegmentsOutputs(std::vector<SegmentedBlock>& segmented_blocks, std::shared_ptr<torch::jit::Graph> g) {
+void registerSegmentsOutputs(PartitionedGraph& segmented_blocks, std::shared_ptr<torch::jit::Graph> g) {
   // find the corresponding raw values in original global graph for this segmented block's inputs/outputs
   std::set<torch::jit::Value*> input_values;
   for (auto& seg_block : segmented_blocks) {
@@ -152,12 +153,57 @@ void registerSegmentsOutputs(std::vector<SegmentedBlock>& segmented_blocks, std:
   return;
 }
 
+std::vector<SegmentedBlock> segment_graph(std::shared_ptr<torch::jit::Graph> g, const PartitionInfo& partition_info) {
+  auto min_block_size = partition_info.min_block_size;
+  std::unordered_set<std::string> forced_fallback_operators(
+      partition_info.forced_fallback_operators.begin(), partition_info.forced_fallback_operators.end());
+
+  auto nodes = g->block()->nodes();
+  std::vector<SegmentedBlock> segmented_blocks;
+
+  // segment the nodes
+  std::vector<torch::jit::Node*> tensorrt_nodes, pytorch_nodes;
+  for (const auto n : nodes) {
+    if (n->kind() == torch::jit::prim::Constant)
+      continue;
+
+    std::string node_string(n->kind().toQualString());
+    if (conversion::OpSupported(n) && !forced_fallback_operators.count(node_string)) {
+      tensorrt_nodes.push_back(n);
+      if (tensorrt_nodes.size() >= min_block_size && !pytorch_nodes.empty()) {
+        segmented_blocks.emplace_back(SegmentedBlock::kTorch, pytorch_nodes);
+        pytorch_nodes.clear();
+      }
+    } else {
+      if (tensorrt_nodes.size() >= min_block_size) {
+        segmented_blocks.emplace_back(SegmentedBlock::kTensorRT, tensorrt_nodes);
+      } else {
+        pytorch_nodes.insert(pytorch_nodes.end(), tensorrt_nodes.begin(), tensorrt_nodes.end());
+      }
+      tensorrt_nodes.clear();
+      pytorch_nodes.push_back(n);
+    }
+  }
+
+  // if there is any kTorch nodes left, then either the last nodes are kTorch or last nodes are kTensorRT but num <
+  // min_block_size
+  if (!pytorch_nodes.empty()) {
+    pytorch_nodes.insert(pytorch_nodes.end(), tensorrt_nodes.begin(), tensorrt_nodes.end());
+    segmented_blocks.emplace_back(SegmentedBlock::kTorch, pytorch_nodes);
+  } else {
+    segmented_blocks.emplace_back(SegmentedBlock::kTensorRT, tensorrt_nodes);
+  }
+
+  return std::move(segmented_blocks);
+}
+
 std::vector<SegmentedBlock> Partition(
     std::shared_ptr<torch::jit::Graph> g,
-    std::vector<conversion::InputRange>& input_ranges,
-    const conversion::TorchFallback& fallback_info) {
+    std::vector<ir::InputRange>& input_ranges,
+    const PartitionInfo& partition_info) {
+  LOG_DEBUG(partition_info);
   // segment lowering global graph into blocks
-  std::vector<SegmentedBlock> segmented_blocks = segment_graph(g, fallback_info);
+  std::vector<SegmentedBlock> segmented_blocks = segment_graph(g, partition_info);
 
   // resolve nonTensor inputs/outputs
   resolveNonTensorInputs(segmented_blocks, g);

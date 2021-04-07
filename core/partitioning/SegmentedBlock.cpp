@@ -4,6 +4,29 @@ namespace trtorch {
 namespace core {
 namespace partitioning {
 
+SegmentedBlock::SegmentedBlock(SegmentedBlockTarget blk_target, std::vector<torch::jit::Node*>& nodes)
+    : target_(blk_target), g_(std::make_shared<torch::jit::Graph>()) {
+  for (auto& node : nodes) {
+    nodes_.push_back(node);
+    appendNode(node);
+  }
+}
+
+void SegmentedBlock::registerOutput(torch::jit::Value* raw_output) {
+  outputs_.push_back(raw_output);
+  g_->registerOutput(old_to_new_[raw_output]);
+}
+
+void SegmentedBlock::eraseInput(size_t i) {
+  inputs_.erase(inputs_.begin() + i);
+  g_->eraseInput(i);
+}
+
+void SegmentedBlock::eraseOutput(size_t i) {
+  outputs_.erase(outputs_.begin() + i);
+  g_->eraseOutput(i);
+}
+
 torch::jit::Value* SegmentedBlock::getOrAddInputForValue(torch::jit::Value* old_value) {
   if (old_to_new_.count(old_value) == 0) {
     auto node = old_value->node();
@@ -36,52 +59,6 @@ torch::jit::Node* SegmentedBlock::cloneNode(torch::jit::Node* node) {
     old_to_new_[oo] = no;
   }
   return new_node;
-}
-
-std::vector<SegmentedBlock> segment_graph(
-    std::shared_ptr<torch::jit::Graph> g,
-    const conversion::TorchFallback& fallback_info) {
-  auto min_block_size = fallback_info.min_block_size;
-  std::unordered_set<std::string> forced_fallback_operators(
-      fallback_info.forced_fallback_operators.begin(), fallback_info.forced_fallback_operators.end());
-
-  auto nodes = g->block()->nodes();
-  std::vector<SegmentedBlock> segmented_blocks;
-
-  // segment the nodes
-  std::vector<torch::jit::Node*> tensorrt_nodes, pytorch_nodes;
-  for (const auto n : nodes) {
-    if (n->kind() == torch::jit::prim::Constant)
-      continue;
-
-    std::string node_string(n->kind().toQualString());
-    if (conversion::OpSupported(n) && !forced_fallback_operators.count(node_string)) {
-      tensorrt_nodes.push_back(n);
-      if (tensorrt_nodes.size() >= min_block_size && !pytorch_nodes.empty()) {
-        segmented_blocks.emplace_back(SegmentedBlock::kTorch, pytorch_nodes);
-        pytorch_nodes.clear();
-      }
-    } else {
-      if (tensorrt_nodes.size() >= min_block_size) {
-        segmented_blocks.emplace_back(SegmentedBlock::kTensorRT, tensorrt_nodes);
-      } else {
-        pytorch_nodes.insert(pytorch_nodes.end(), tensorrt_nodes.begin(), tensorrt_nodes.end());
-      }
-      tensorrt_nodes.clear();
-      pytorch_nodes.push_back(n);
-    }
-  }
-
-  // if there is any kTorch nodes left, then either the last nodes are kTorch or last nodes are kTensorRT but num <
-  // min_block_size
-  if (!pytorch_nodes.empty()) {
-    pytorch_nodes.insert(pytorch_nodes.end(), tensorrt_nodes.begin(), tensorrt_nodes.end());
-    segmented_blocks.emplace_back(SegmentedBlock::kTorch, pytorch_nodes);
-  } else {
-    segmented_blocks.emplace_back(SegmentedBlock::kTensorRT, tensorrt_nodes);
-  }
-
-  return std::move(segmented_blocks);
 }
 
 } // namespace partitioning

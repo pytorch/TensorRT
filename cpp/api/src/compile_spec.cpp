@@ -62,12 +62,12 @@ CompileSpec::CompileSpec(std::vector<std::vector<int64_t>> fixed_sizes) {
   }
 }
 
-core::conversion::InputRange to_internal_input_range(CompileSpec::InputRange i) {
-  return core::conversion::InputRange(i.min, i.opt, i.max);
+core::ir::InputRange to_internal_input_range(CompileSpec::InputRange i) {
+  return core::ir::InputRange(i.min, i.opt, i.max);
 }
 
-std::vector<core::conversion::InputRange> to_vec_internal_input_ranges(std::vector<CompileSpec::InputRange> external) {
-  std::vector<core::conversion::InputRange> internal;
+std::vector<core::ir::InputRange> to_vec_internal_input_ranges(std::vector<CompileSpec::InputRange> external) {
+  std::vector<core::ir::InputRange> internal;
   for (auto range : external) {
     internal.push_back(to_internal_input_range(range));
   }
@@ -96,10 +96,9 @@ core::CompileSpec to_internal_compile_spec(CompileSpec external) {
   internal.convert_info.engine_settings.strict_types = external.strict_types;
   internal.convert_info.engine_settings.device.allow_gpu_fallback = external.device.allow_gpu_fallback;
   internal.convert_info.engine_settings.max_batch_size = external.max_batch_size;
-  internal.convert_info.engine_settings.torch_fallback.enabled = external.torch_fallback.enabled;
-  internal.convert_info.engine_settings.torch_fallback.min_block_size = external.torch_fallback.min_block_size;
-  internal.convert_info.engine_settings.torch_fallback.forced_fallback_operators =
-      external.torch_fallback.forced_fallback_operators;
+  internal.partition_info.enabled = external.torch_fallback.enabled;
+  internal.partition_info.min_block_size = external.torch_fallback.min_block_size;
+  internal.partition_info.forced_fallback_operators = external.torch_fallback.forced_fallback_operators;
 
   switch (external.device.device_type) {
     case CompileSpec::Device::DeviceType::kDLA:
