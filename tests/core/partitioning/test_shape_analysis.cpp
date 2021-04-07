@@ -32,11 +32,11 @@ TEST(Partitioning, InferSegmentedBlockShapeCorrectly) {
   auto graph_and_parameters = trtorch::core::lowering::Lower(mod, "forward");
   auto g = graph_and_parameters.first;
 
-  trtorch::core::conversion::TorchFallback fallback_info;
-  fallback_info.enabled = true;
-  std::vector<trtorch::core::conversion::InputRange> input_ranges{trtorch::core::conversion::InputRange({3, 3, 16, 16})};
+  trtorch::core::partitioning::PartitionInfo partition_info;
+  partition_info.enabled = true;
+  std::vector<trtorch::core::ir::InputRange> input_ranges{trtorch::core::ir::InputRange({3, 3, 16, 16})};
 
-  std::vector<trtorch::core::partitioning::SegmentedBlock> segmented_blocks = trtorch::core::partitioning::Partition(g, input_ranges, fallback_info);
+  std::vector<trtorch::core::partitioning::SegmentedBlock> segmented_blocks = trtorch::core::partitioning::Partition(g, input_ranges, partition_info);
   ASSERT_TRUE(checkSegmentedBlockInputShape(segmented_blocks, {{{3, 3, 16, 16}}, {{3, 16, 16, 16}}, {{3, 16, 16, 16}}}));
 }
 
@@ -51,10 +51,10 @@ TEST(Partitioning, InferSegmentedBlockShapeCorrectlyEdge) {
   auto graph_and_parameters = trtorch::core::lowering::Lower(mod, "forward");
   auto g = graph_and_parameters.first;
 
-  trtorch::core::conversion::TorchFallback fallback_info;
-  fallback_info.enabled = true;
-  std::vector<trtorch::core::conversion::InputRange> input_ranges{trtorch::core::conversion::InputRange({3, 3, 16, 16})};
+  trtorch::core::partitioning::PartitionInfo partition_info;
+  partition_info.enabled = true;
+  std::vector<trtorch::core::ir::InputRange> input_ranges{trtorch::core::ir::InputRange({3, 3, 16, 16})};
 
-  std::vector<trtorch::core::partitioning::SegmentedBlock> segmented_blocks = trtorch::core::partitioning::Partition(g, input_ranges, fallback_info);
+  std::vector<trtorch::core::partitioning::SegmentedBlock> segmented_blocks = trtorch::core::partitioning::Partition(g, input_ranges, partition_info);
   ASSERT_TRUE(checkSegmentedBlockInputShape(segmented_blocks, {{{3, 3, 16, 16}}, {{3, 32, 16, 16}}, {{3, 32, 16, 16}, {3, 16, 16, 16}}}));
 }
