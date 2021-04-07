@@ -4,6 +4,29 @@ namespace trtorch {
 namespace core {
 namespace partitioning {
 
+SegmentedBlock::SegmentedBlock(SegmentedBlockTarget blk_target, std::vector<torch::jit::Node*>& nodes)
+    : target_(blk_target), g_(std::make_shared<torch::jit::Graph>()) {
+  for (auto& node : nodes) {
+    nodes_.push_back(node);
+    appendNode(node);
+  }
+}
+
+void SegmentedBlock::registerOutput(torch::jit::Value* raw_output) {
+  outputs_.push_back(raw_output);
+  g_->registerOutput(old_to_new_[raw_output]);
+}
+
+void SegmentedBlock::eraseInput(size_t i) {
+  inputs_.erase(inputs_.begin() + i);
+  g_->eraseInput(i);
+}
+
+void SegmentedBlock::eraseOutput(size_t i) {
+  outputs_.erase(outputs_.begin() + i);
+  g_->eraseOutput(i);
+}
+
 torch::jit::Value* SegmentedBlock::getOrAddInputForValue(torch::jit::Value* old_value) {
   if (old_to_new_.count(old_value) == 0) {
     auto node = old_value->node();
