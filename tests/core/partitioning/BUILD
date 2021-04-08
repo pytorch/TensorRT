@@ -20,10 +20,25 @@ partitioning_test(
   name = "test_shape_analysis",
 )
 
+partitioning_test(
+  name = "test_tensorrt_conversion",
+)
+
+partitioning_test(
+  name = "test_stitched_graph",
+)
+
+partitioning_test(
+  name = "test_fallback_graph_output",
+)
+
 test_suite(
     name = "partitioning_test",
     tests = [
         ":test_segmentation",
         ":test_shape_analysis",
+        ":test_tensorrt_conversion",
+        ":test_stitched_graph",
+        ":test_fallback_graph_output"
     ]
 )
