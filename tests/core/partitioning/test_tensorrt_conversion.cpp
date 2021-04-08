@@ -1,8 +1,8 @@
 #include <string>
-#include "gtest/gtest.h"
-#include "torch/script.h"
 #include "core/compiler.h"
 #include "core/util/trt_util.h"
+#include "gtest/gtest.h"
+#include "torch/script.h"
 
 int count_trt_engines(std::shared_ptr<torch::jit::Graph> g) {
   int count = 0;
@@ -17,10 +17,10 @@ int count_trt_engines(std::shared_ptr<torch::jit::Graph> g) {
 TEST(Partitioning, ConvertSegmentedBlockCorrectly) {
   torch::jit::script::Module mod;
   try {
-  mod = torch::jit::load("tests/core/partitioning/test_base_model.jit");
+    mod = torch::jit::load("tests/core/partitioning/test_base_model.jit");
   } catch (const c10::Error& e) {
-  std::cerr << "error loading the model\n";
-  return;
+    std::cerr << "error loading the model\n";
+    return;
   }
 
   std::vector<trtorch::core::ir::InputRange> input_ranges{trtorch::core::ir::InputRange({3, 3, 16, 16})};
@@ -32,14 +32,13 @@ TEST(Partitioning, ConvertSegmentedBlockCorrectly) {
   ASSERT_TRUE(count == 2);
 }
 
-
 TEST(Partitioning, ConvertSegmentedBlockCorrectlyEdge) {
   torch::jit::script::Module mod;
   try {
-  mod = torch::jit::load("tests/core/partitioning/test_edge_model.jit");
+    mod = torch::jit::load("tests/core/partitioning/test_edge_model.jit");
   } catch (const c10::Error& e) {
-  std::cerr << "error loading the model\n";
-  return;
+    std::cerr << "error loading the model\n";
+    return;
   }
 
   std::vector<trtorch::core::ir::InputRange> input_ranges{trtorch::core::ir::InputRange({3, 3, 16, 16})};

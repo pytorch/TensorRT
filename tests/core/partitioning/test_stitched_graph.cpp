@@ -1,9 +1,9 @@
 #include <string>
 #include <unordered_set>
-#include "gtest/gtest.h"
-#include "torch/script.h"
 #include "core/compiler.h"
 #include "core/util/trt_util.h"
+#include "gtest/gtest.h"
+#include "torch/script.h"
 
 bool checkAllInputsExistInStitchedGraph(std::shared_ptr<torch::jit::Graph> g) {
   std::unordered_set<torch::jit::Value*> available_values;
@@ -25,10 +25,10 @@ bool checkAllInputsExistInStitchedGraph(std::shared_ptr<torch::jit::Graph> g) {
 TEST(Partitioning, StitchSegmentedBlockCorrectly) {
   torch::jit::script::Module mod;
   try {
-  mod = torch::jit::load("tests/core/partitioning/test_base_model.jit");
+    mod = torch::jit::load("tests/core/partitioning/test_base_model.jit");
   } catch (const c10::Error& e) {
-  std::cerr << "error loading the model\n";
-  return;
+    std::cerr << "error loading the model\n";
+    return;
   }
 
   std::vector<trtorch::core::ir::InputRange> input_ranges{trtorch::core::ir::InputRange({3, 3, 16, 16})};
@@ -39,14 +39,13 @@ TEST(Partitioning, StitchSegmentedBlockCorrectly) {
   ASSERT_TRUE(checkAllInputsExistInStitchedGraph(g));
 }
 
-
 TEST(Partitioning, StitchSegmentedBlockCorrectlyEdge) {
   torch::jit::script::Module mod;
   try {
-  mod = torch::jit::load("tests/core/partitioning/test_edge_model.jit");
+    mod = torch::jit::load("tests/core/partitioning/test_edge_model.jit");
   } catch (const c10::Error& e) {
-  std::cerr << "error loading the model\n";
-  return;
+    std::cerr << "error loading the model\n";
+    return;
   }
 
   std::vector<trtorch::core::ir::InputRange> input_ranges{trtorch::core::ir::InputRange({3, 3, 16, 16})};
