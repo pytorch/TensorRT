@@ -19,20 +19,6 @@ std::vector<torch::jit::IValue> generateRandomInputs(std::vector<ir::InputRange>
   return random_inputs;
 }
 
-c10::FunctionSchema getFunctionSchema(std::string method_name, std::shared_ptr<torch::jit::Graph>& g) {
-  std::vector<c10::Argument> args;
-  for (auto in : g->inputs()) {
-    args.push_back(c10::Argument(in->debugName(), in->type()));
-  }
-
-  std::vector<c10::Argument> returns;
-  for (auto out : g->outputs()) {
-    returns.push_back(c10::Argument(out->debugName(), out->type()));
-  }
-
-  return c10::FunctionSchema(method_name, method_name, args, returns);
-}
-
 void getSegmentsOutputByRunning(
     SegmentedBlock& seg_block,
     std::unordered_map<torch::jit::Value*, torch::jit::IValue>& ivalues_maps) {
@@ -56,7 +42,7 @@ void getSegmentsOutputByRunning(
   self->setType(cur_mod.type());
 
   auto cur_method = cur_mod._ivalue()->compilation_unit()->create_function(c10::QualifiedName("forward"), copy_g);
-  auto schema = getFunctionSchema(cur_method->name(), copy_g);
+  auto schema = util::GenerateGraphSchema(cur_method->name(), copy_g);
   cur_mod.type()->addMethod(cur_method);
   cur_method->setSchema(schema);
 

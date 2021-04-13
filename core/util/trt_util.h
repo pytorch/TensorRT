@@ -3,6 +3,7 @@
 #include "ATen/Tensor.h"
 #include "ATen/core/List.h"
 #include "NvInfer.h"
+#include "torch/csrc/jit/api/module.h"
 #include "torch/csrc/jit/ir/ir.h"
 
 namespace nvinfer1 {
@@ -108,6 +109,7 @@ std::string toStr(nvinfer1::Dims d);
 at::ScalarType toATenDType(nvinfer1::DataType t);
 nvinfer1::DataType toTRTDataType(at::ScalarType t);
 c10::optional<nvinfer1::DataType> toTRTDataType(caffe2::TypeMeta dtype);
+c10::FunctionSchema GenerateGraphSchema(std::string method_name, std::shared_ptr<torch::jit::Graph>& g);
 torch::jit::Node* cloneNode(
     torch::jit::Node* node,
     std::shared_ptr<torch::jit::Graph>& graph,

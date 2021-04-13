@@ -27,23 +27,6 @@
 namespace trtorch {
 namespace core {
 
-c10::FunctionSchema GenerateGraphSchema(
-    torch::jit::script::Module mod,
-    std::string method_name,
-    std::shared_ptr<torch::jit::Graph>& g) {
-  std::vector<c10::Argument> args;
-  for (auto in : g->inputs()) {
-    args.push_back(c10::Argument(in->debugName(), in->type()));
-  }
-
-  std::vector<c10::Argument> returns;
-  for (auto out : g->outputs()) {
-    returns.push_back(c10::Argument(out->debugName(), out->type()));
-  }
-
-  return c10::FunctionSchema(method_name, method_name, args, returns);
-}
-
 void AddEngineToGraph(
     torch::jit::script::Module mod,
     std::shared_ptr<torch::jit::Graph>& g,
@@ -246,7 +229,7 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
       LOG_INFO(*new_g << "(FallbackGraph)\n");
 
       auto new_method = new_mod._ivalue()->compilation_unit()->create_function(method.name(), new_g);
-      auto schema = GenerateGraphSchema(new_mod, new_method->name(), new_g);
+      auto schema = util::GenerateGraphSchema(new_method->name(), new_g);
       new_mod.type()->addMethod(new_method);
       new_method->setSchema(schema);
     }
@@ -272,7 +255,7 @@ torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod, C
       auto new_g = std::make_shared<torch::jit::Graph>();
       AddEngineToGraph(new_mod, new_g, engine);
       auto new_method = new_mod._ivalue()->compilation_unit()->create_function(method.name(), new_g);
-      auto schema = GenerateGraphSchema(new_mod, new_method->name(), new_g);
+      auto schema = util::GenerateGraphSchema(new_method->name(), new_g);
       new_mod.type()->addMethod(new_method);
       new_method->setSchema(schema);
     }
