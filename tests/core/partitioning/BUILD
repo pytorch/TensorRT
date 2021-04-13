@@ -9,7 +9,8 @@ config_setting(
 
 filegroup(
     name = "jit_models",
-    srcs = glob(["**/*.jit"])
+    srcs = ["//tests/modules:resnet50_traced.jit.pt",
+            "//tests/modules:mobilenet_v2_traced.jit.pt"]
 )
 
 partitioning_test(
