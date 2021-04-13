@@ -48,6 +48,10 @@ converter_test(
 )
 
 converter_test(
+  name = "test_replication_pad"
+)
+
+converter_test(
   name = "test_shuffle"
 )
 
@@ -99,6 +103,7 @@ test_suite(
     ":test_matrix_multiply",
     ":test_pooling",
     ":test_reduce",
+    ":test_replication_pad",
     ":test_shuffle",
     ":test_softmax",
     ":test_unary",
