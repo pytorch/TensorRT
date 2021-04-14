@@ -8,23 +8,16 @@ config_setting(
 )
 
 cc_library(
-    name = "conversion",
+    name = "ir",
     hdrs = [
-        "conversion.h",
+        "ir.h"
     ],
     srcs = [
-        "conversion.cpp",
-        "conversion_ignorelist.cpp",
-        "InterfaceTypes.cpp"
+        "InputRange.cpp",
     ],
     deps = [
         "@tensorrt//:nvinfer",
-        "//core/conversion/var",
-        "//core/conversion/conversionctx",
-        "//core/conversion/converters",
-        "//core/conversion/evaluators",
         "//core/util:prelude",
-        "//core/ir",
     ] + select({
         ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default":  ["@libtorch//:libtorch"],
@@ -35,6 +28,8 @@ load("@rules_pkg//:pkg.bzl", "pkg_tar")
 
 pkg_tar(
     name = "include",
-    package_dir = "core/conversion/",
-    srcs = ["conversion.h"],
+    package_dir = "core/ir/",
+    srcs = [
+        "ir.h",
+    ],
 )

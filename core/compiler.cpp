@@ -28,23 +28,6 @@
 namespace trtorch {
 namespace core {
 
-c10::FunctionSchema GenerateGraphSchema(
-    torch::jit::script::Module mod,
-    std::string method_name,
-    std::shared_ptr<torch::jit::Graph>& g) {
-  std::vector<c10::Argument> args;
-  for (auto in : g->inputs()) {
-    args.push_back(c10::Argument(in->debugName(), in->type()));
-  }
-
-  std::vector<c10::Argument> returns;
-  for (auto out : g->outputs()) {
-    returns.push_back(c10::Argument(out->debugName(), out->type()));
-  }
-
-  return c10::FunctionSchema(method_name, method_name, args, returns);
-}
-
 void AddEngineToGraph(
     torch::jit::script::Module mod,
     std::shared_ptr<torch::jit::Graph>& g,
@@ -182,7 +165,7 @@ void AddSegmentedBlockToGraph(
   }
 
   for (const auto n : seg.nodes()) {
-    partitioning::cloneNode(n, g, mini_to_new_g);
+    util::cloneNode(n, g, mini_to_new_g);
   }
 
   // original graph value => new global graph value
@@ -201,20 +184,21 @@ void AddSegmentedBlockToGraph(
 
 typedef std::pair<std::shared_ptr<torch::jit::Graph>, std::unordered_map<torch::jit::Value*, torch::jit::Value*>> fallback_graph;
 
-fallback_graph ConstructFallbackBlock(torch::jit::script::Module& new_mod, torch::jit::Block* block, conversion::ConversionInfo convert_cfg,
+fallback_graph ConstructFallbackBlock(torch::jit::script::Module& new_mod, torch::jit::Block* block, CompileSpec cfg,
                                           int &trt_engine_id, conversion::GraphParams named_params) {
   auto new_g = std::make_shared<torch::jit::Graph>();
 
+  auto convert_cfg = cfg.convert_info;
   auto segmented_blocks =
-      partitioning::Partition(block, convert_cfg.input_ranges, convert_cfg.engine_settings.torch_fallback);
+      partitioning::Partition(block, convert_cfg.input_ranges, cfg.partition_info);
 
   // the mapping from lowering graph => fallback global graph
   std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_g;
   for (auto& seg_block : segmented_blocks) {
     if (seg_block.target() == partitioning::SegmentedBlock::kTensorRT) {
-      std::vector<conversion::InputRange> input_ranges;
+      std::vector<ir::InputRange> input_ranges;
       for (auto& shape : seg_block.in_shape()) {
-        input_ranges.push_back(conversion::InputRange(util::toVec(shape)));
+        input_ranges.push_back(ir::InputRange(shape));
       }
       // update the input ranges for each segments
       convert_cfg.input_ranges = input_ranges;
@@ -226,7 +210,7 @@ fallback_graph ConstructFallbackBlock(torch::jit::script::Module& new_mod, torch
       AddSegmentedBlockToGraph(new_g, seg_block, old_to_new_g);
     } else {
       if (seg_block.raw_nodes()[0]->kind() == torch::jit::prim::Loop) {
-        auto inner_fallback_graph = ConstructFallbackBlock(new_mod, seg_block.raw_nodes()[0]->blocks()[0], convert_cfg, trt_engine_id, named_params);
+        auto inner_fallback_graph = ConstructFallbackBlock(new_mod, seg_block.raw_nodes()[0]->blocks()[0], cfg, trt_engine_id, named_params);
         auto inner_graph = inner_fallback_graph.first;
         auto inner_mapping = inner_fallback_graph.second;
 
@@ -234,7 +218,7 @@ fallback_graph ConstructFallbackBlock(torch::jit::script::Module& new_mod, torch
         torch::jit::LoopView lv(outer_node);
         auto block_outputs = lv.bodyBlock()->outputs();
         auto block_inputs = lv.bodyBlock()->inputs();
-        auto max_count = partitioning::getOrAddInputForValue(lv.maxTripCount(), new_g->block(), old_to_new_g);
+        auto max_count = util::getOrAddInputForValue(lv.maxTripCount(), new_g, old_to_new_g);
 
         auto new_loop = new_g->insertNode(new_g->create(torch::jit::prim::Loop, {}, 0))
                         ->setSourceRange(outer_node->sourceRange());
@@ -242,17 +226,17 @@ fallback_graph ConstructFallbackBlock(torch::jit::script::Module& new_mod, torch
 
         std::unordered_map<torch::jit::Value*, torch::jit::Value*> mini_to_new_g;
 
-        new_loop->addInput(partitioning::getOrAddInputForValue(lv.inputCond(), new_g->block(), old_to_new_g));
+        new_loop->addInput(util::getOrAddInputForValue(lv.inputCond(), new_g, old_to_new_g));
         for (auto ci : lv.carriedInputs()) {
           printf("ci: %s\n", ci->debugName().c_str());
-          new_loop->addInput(partitioning::getOrAddInputForValue(ci, new_g->block(), old_to_new_g));
+          new_loop->addInput(util::getOrAddInputForValue(ci, new_g, old_to_new_g));
         }
 
         mini_to_new_g[inner_graph->block()->inputs()[0]] = new_g->inputs()[0];
 
         auto new_loop_body = new_loop->addBlock();
         auto env = [&](torch::jit::Value *v) {
-          return partitioning::getOrAddInputForValue(v, new_g->block(), mini_to_new_g);
+          return util::getOrAddInputForValue(v, new_g, mini_to_new_g);
         };
         new_loop_body->cloneFrom(inner_graph->block(), env);
         new_loop_body->inputs()[0]->replaceAllUsesWith(new_g->inputs()[0]);
@@ -315,22 +299,21 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
       auto g = graph_and_parameters.first;
       auto params = graph_and_parameters.second;
       auto named_params = conversion::get_named_params(g->inputs(), params);
-      auto convert_cfg = std::move(cfg.convert_info);
-      LOG_INFO(*g << "(CompileGraph)\n");
+//      auto convert_cfg = std::move(cfg.convert_info);
+      LOG_INFO(*g << "(LoweringGraph)\n");
 
       // segment the graph and convert segmented TensorRT block
-//      auto segmented_blocks =
-//          partitioning::Partition(g, convert_cfg.input_ranges, convert_cfg.engine_settings.torch_fallback);
+//      auto segmented_blocks = partitioning::Partition(g, convert_cfg.input_ranges, cfg.partition_info);
 //      if (segmented_blocks.size() == 1 && segmented_blocks[0].target() == partitioning::SegmentedBlock::kTorch) {
 //        return mod;
 //      }
 
       std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_g;
       int trt_engine_id = 1;
-      auto inner_fallback_graph = ConstructFallbackBlock(new_mod, g->block(), convert_cfg, trt_engine_id, named_params);
+      auto inner_fallback_graph = ConstructFallbackBlock(new_mod, g->block(), cfg, trt_engine_id, named_params);
       auto inner_graph = inner_fallback_graph.first;
       auto env = [&](torch::jit::Value* v) {
-        return partitioning::getOrAddInputForValue(v, new_g->block(), old_to_new_g);
+        return util::getOrAddInputForValue(v, new_g, old_to_new_g);
       };
       new_g->block()->cloneFrom(inner_graph->block(), env);
 
@@ -360,7 +343,7 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
       LOG_INFO(*new_g << "(FallbackGraph)\n");
 
       auto new_method = new_mod._ivalue()->compilation_unit()->create_function(method.name(), new_g);
-      auto schema = GenerateGraphSchema(new_mod, new_method->name(), new_g);
+      auto schema = util::GenerateGraphSchema(new_method->name(), new_g);
       new_mod.type()->addMethod(new_method);
       new_method->setSchema(schema);
     }
@@ -371,7 +354,7 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
 
 torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod, CompileSpec cfg) {
   // TODO: not sure how to deal with duplicated code here, so just cut out a branch temporally
-  if (cfg.convert_info.engine_settings.torch_fallback.enabled) {
+  if (cfg.partition_info.enabled) {
     return CompileGraphWithFallback(mod, cfg);
   }
   // TODO: Should be doing a functional transform but need PR #31978
@@ -386,7 +369,7 @@ torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod, C
       auto new_g = std::make_shared<torch::jit::Graph>();
       AddEngineToGraph(new_mod, new_g, engine);
       auto new_method = new_mod._ivalue()->compilation_unit()->create_function(method.name(), new_g);
-      auto schema = GenerateGraphSchema(new_mod, new_method->name(), new_g);
+      auto schema = util::GenerateGraphSchema(new_method->name(), new_g);
       new_mod.type()->addMethod(new_method);
       new_method->setSchema(schema);
     }

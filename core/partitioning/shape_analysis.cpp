@@ -1,11 +1,12 @@
-#include "shape_analysis.h"
+#include "core/partitioning/shape_analysis.h"
+#include "core/util/prelude.h"
 #include "torch/csrc/jit/api/module.h"
 
 namespace trtorch {
 namespace core {
 namespace partitioning {
 
-std::vector<torch::jit::IValue> generateRandomInputs(std::vector<conversion::InputRange>& input_ranges) {
+std::vector<torch::jit::IValue> generateRandomInputs(std::vector<ir::InputRange>& input_ranges) {
   // generate random inputs for running pytorch segments
   std::vector<torch::jit::IValue> random_inputs;
   for (auto& input_range : input_ranges) {
@@ -16,20 +17,6 @@ std::vector<torch::jit::IValue> generateRandomInputs(std::vector<conversion::Inp
     random_inputs.push_back(in.clone());
   }
   return random_inputs;
-}
-
-c10::FunctionSchema getFunctionSchema(std::string method_name, std::shared_ptr<torch::jit::Graph>& g) {
-  std::vector<c10::Argument> args;
-  for (auto in : g->inputs()) {
-    args.push_back(c10::Argument(in->debugName(), in->type()));
-  }
-
-  std::vector<c10::Argument> returns;
-  for (auto out : g->outputs()) {
-    returns.push_back(c10::Argument(out->debugName(), out->type()));
-  }
-
-  return c10::FunctionSchema(method_name, method_name, args, returns);
 }
 
 void getSegmentsOutputByRunning(
@@ -55,7 +42,7 @@ void getSegmentsOutputByRunning(
   self->setType(cur_mod.type());
 
   auto cur_method = cur_mod._ivalue()->compilation_unit()->create_function(c10::QualifiedName("forward"), copy_g);
-  auto schema = getFunctionSchema(cur_method->name(), copy_g);
+  auto schema = util::GenerateGraphSchema(cur_method->name(), copy_g);
   cur_mod.type()->addMethod(cur_method);
   cur_method->setSchema(schema);
 
@@ -99,10 +86,10 @@ void getSegmentsOutputByRunning(
   }
 
   // set input shape for each segmented block so we wil use it in conversion process
-  std::vector<nvinfer1::Dims> input_shape;
+  std::vector<ir::InputRange> input_shape;
   for (auto& i : seg_block.raw_inputs()) {
     if (ivalues_maps[i].isTensor()) {
-      input_shape.push_back(util::toDims(ivalues_maps[i].toTensor().sizes()));
+      input_shape.push_back(util::toVec(util::toDims(ivalues_maps[i].toTensor().sizes())));
     }
   }
 
