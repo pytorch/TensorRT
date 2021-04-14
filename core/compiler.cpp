@@ -176,7 +176,6 @@ void AddSegmentedBlockToGraph(
   return;
 }
 
-
 torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Module& mod, CompileSpec cfg) {
   // TODO: Should be doing a functional transform but need PR #31978
   // [jit] More robust mangling

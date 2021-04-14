@@ -57,7 +57,6 @@ TEST(Partitioning, ComputeMobileNetFallbackGraphCorrectly) {
   cfg.partition_info.enabled = true;
   cfg.partition_info.forced_fallback_operators.push_back("aten::hardtanh");
 
-
   auto jit_results = mod.forward(jit_inputs_ivalues).toTensor();
   auto trt_mod = trtorch::core::CompileGraph(mod, cfg);
   auto trt_results = trt_mod.forward(trt_inputs_ivalues).toTensor();

@@ -19,7 +19,6 @@ std::vector<torch::jit::IValue> generateRandomInputs(std::vector<ir::InputRange>
   return random_inputs;
 }
 
-
 void getSegmentsOutputByRunning(
     SegmentedBlock& seg_block,
     std::unordered_map<torch::jit::Value*, torch::jit::IValue>& ivalues_maps) {

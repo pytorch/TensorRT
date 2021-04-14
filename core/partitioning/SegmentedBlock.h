@@ -3,9 +3,9 @@
 #include <vector>
 
 #include "NvInfer.h"
-#include "torch/csrc/jit/ir/ir.h"
 #include "core/ir/ir.h"
 #include "core/partitioning/PartitionInfo.h"
+#include "torch/csrc/jit/ir/ir.h"
 
 namespace trtorch {
 namespace core {

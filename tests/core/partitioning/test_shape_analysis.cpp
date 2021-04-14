@@ -2,9 +2,8 @@
 #include "core/partitioning/partitioning.h"
 #include "core/util/trt_util.h"
 #include "gtest/gtest.h"
-#include "torch/script.h"
 #include "torch/csrc/jit/ir/irparser.h"
-
+#include "torch/script.h"
 
 bool checkSegmentedBlockInputShape(
     std::vector<trtorch::core::partitioning::SegmentedBlock>& segmented_blocks,
@@ -62,8 +61,11 @@ TEST(Partitioning, InferSequentialModelSegmentedBlockShapeCorrectly) {
 
   std::vector<trtorch::core::partitioning::SegmentedBlock> segmented_blocks =
       trtorch::core::partitioning::Partition(g, input_ranges, partition_info);
-  ASSERT_TRUE(checkSegmentedBlockInputShape(segmented_blocks, {{{3, 3, 16, 16}, {32, 3, 3, 3}, {32}, {16, 32, 3, 3}, {16}},
-                                                               {{3, 16, 16, 16}}, {{3, 16, 16, 16}, {8, 16, 3, 3}, {8}}}));
+  ASSERT_TRUE(checkSegmentedBlockInputShape(
+      segmented_blocks,
+      {{{3, 3, 16, 16}, {32, 3, 3, 3}, {32}, {16, 32, 3, 3}, {16}},
+       {{3, 16, 16, 16}},
+       {{3, 16, 16, 16}, {8, 16, 3, 3}, {8}}}));
 }
 
 TEST(Partitioning, InferBranchModelSegmentedBlockShapeCorrectly) {
@@ -99,10 +101,11 @@ TEST(Partitioning, InferBranchModelSegmentedBlockShapeCorrectly) {
   input_ranges.push_back(trtorch::core::ir::InputRange({16, 32, 3, 3}));
   input_ranges.push_back(trtorch::core::ir::InputRange({16}));
 
-
-std::vector<trtorch::core::partitioning::SegmentedBlock> segmented_blocks =
+  std::vector<trtorch::core::partitioning::SegmentedBlock> segmented_blocks =
       trtorch::core::partitioning::Partition(g, input_ranges, partition_info);
   ASSERT_TRUE(checkSegmentedBlockInputShape(
-      segmented_blocks, {{{3, 3, 16, 16}, {32, 3, 3, 3}, {32}, {16, 32, 3, 3}, {16}},
-                         {{3, 32, 16, 16}}, {{3, 32, 16, 16},  {16, 32, 3, 3}, {16}, {3, 16, 16, 16}}}));
+      segmented_blocks,
+      {{{3, 3, 16, 16}, {32, 3, 3, 3}, {32}, {16, 32, 3, 3}, {16}},
+       {{3, 32, 16, 16}},
+       {{3, 32, 16, 16}, {16, 32, 3, 3}, {16}, {3, 16, 16, 16}}}));
 }
