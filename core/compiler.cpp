@@ -176,6 +176,7 @@ void AddSegmentedBlockToGraph(
   return;
 }
 
+
 torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Module& mod, CompileSpec cfg) {
   // TODO: Should be doing a functional transform but need PR #31978
   // [jit] More robust mangling
@@ -207,7 +208,7 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
         if (seg_block.target() == partitioning::SegmentedBlock::kTensorRT) {
           std::vector<ir::InputRange> input_ranges;
           for (auto& shape : seg_block.in_shape()) {
-            input_ranges.push_back(ir::InputRange(util::toVec(shape)));
+            input_ranges.push_back(ir::InputRange(shape));
           }
           // update the input ranges for each segments
           convert_cfg.input_ranges = input_ranges;

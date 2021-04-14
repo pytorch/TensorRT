@@ -31,7 +31,7 @@ TEST(Partitioning, ComputeResNet50FallbackGraphCorrectly) {
   auto jit_results = mod.forward(jit_inputs_ivalues).toTensor();
   auto trt_mod = trtorch::core::CompileGraph(mod, cfg);
   auto trt_results = trt_mod.forward(trt_inputs_ivalues).toTensor();
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results, trt_results, 2e-8));
+  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results, trt_results, 2e-6));
 }
 
 TEST(Partitioning, ComputeMobileNetFallbackGraphCorrectly) {
@@ -56,6 +56,7 @@ TEST(Partitioning, ComputeMobileNetFallbackGraphCorrectly) {
   trtorch::core::CompileSpec cfg(input_ranges);
   cfg.partition_info.enabled = true;
   cfg.partition_info.forced_fallback_operators.push_back("aten::hardtanh");
+
 
   auto jit_results = mod.forward(jit_inputs_ivalues).toTensor();
   auto trt_mod = trtorch::core::CompileGraph(mod, cfg);

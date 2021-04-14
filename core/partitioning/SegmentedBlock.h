@@ -4,7 +4,7 @@
 
 #include "NvInfer.h"
 #include "torch/csrc/jit/ir/ir.h"
-
+#include "core/ir/ir.h"
 #include "core/partitioning/PartitionInfo.h"
 
 namespace trtorch {
@@ -61,10 +61,10 @@ struct SegmentedBlock {
   bool contain_raw_value(torch::jit::Value* input) {
     return old_to_new_.count(input);
   }
-  void register_inshape(std::vector<nvinfer1::Dims>& in_shape) {
+  void register_inshape(std::vector<ir::InputRange>& in_shape) {
     in_shape_ = in_shape;
   }
-  const std::vector<nvinfer1::Dims>& in_shape() const {
+  const std::vector<ir::InputRange>& in_shape() const {
     return in_shape_;
   }
   void update_target(SegmentedBlockTarget new_target) {
@@ -76,12 +76,11 @@ struct SegmentedBlock {
 
  private:
   SegmentedBlockTarget target_;
-  std::vector<nvinfer1::Dims> in_shape_; // REVIEW: This should just be ir::InputRange
+  std::vector<ir::InputRange> in_shape_; // REVIEW: This should just be ir::InputRange
   std::vector<torch::jit::Value*> inputs_;
   std::vector<torch::jit::Value*> outputs_;
   std::vector<torch::jit::Node*> nodes_;
   std::shared_ptr<torch::jit::Graph> g_;
-  std::string trt_engine;
   std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_;
 };
 

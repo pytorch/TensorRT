@@ -19,6 +19,7 @@ std::vector<torch::jit::IValue> generateRandomInputs(std::vector<ir::InputRange>
   return random_inputs;
 }
 
+
 void getSegmentsOutputByRunning(
     SegmentedBlock& seg_block,
     std::unordered_map<torch::jit::Value*, torch::jit::IValue>& ivalues_maps) {
@@ -86,10 +87,10 @@ void getSegmentsOutputByRunning(
   }
 
   // set input shape for each segmented block so we wil use it in conversion process
-  std::vector<nvinfer1::Dims> input_shape;
+  std::vector<ir::InputRange> input_shape;
   for (auto& i : seg_block.raw_inputs()) {
     if (ivalues_maps[i].isTensor()) {
-      input_shape.push_back(util::toDims(ivalues_maps[i].toTensor().sizes()));
+      input_shape.push_back(util::toVec(util::toDims(ivalues_maps[i].toTensor().sizes())));
     }
   }
 
