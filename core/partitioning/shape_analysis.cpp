@@ -51,9 +51,7 @@ void getSegmentsOutputByRunning(
   // set inputs ivalues, now supports Tensor/Int to pass argumentes between different segments
   for (auto& input : seg_block.raw_inputs()) {
     TRTORCH_CHECK(ivalues_maps.count(input), "Could not find mini graph input IValue " << input->debugName());
-    if (input->node()->kind() == torch::jit::prim::Param) {
-      jit_inputs_ivalues.push_back(ivalues_maps[input]);
-    } else if (input->type()->isSubtypeOf(torch::jit::TensorType::get())) {
+    if (input->type()->isSubtypeOf(torch::jit::TensorType::get())) {
       jit_inputs_ivalues.push_back(ivalues_maps[input].toTensor());
     } else if (input->type()->isSubtypeOf(torch::jit::IntType::get())) {
       jit_inputs_ivalues.push_back(ivalues_maps[input].toInt());
@@ -61,15 +59,18 @@ void getSegmentsOutputByRunning(
       jit_inputs_ivalues.push_back(ivalues_maps[input].toBool());
     } else if (input->type()->kind() == torch::jit::TypeKind::ListType) {
       jit_inputs_ivalues.push_back(ivalues_maps[input].toList());
-    } else {
-      TRTORCH_CHECK(input->type()->kind() == torch::jit::TypeKind::TupleType, "Input for mini graph is not TupleType.");
+    } else if (input->type()->kind() == torch::jit::TypeKind::TupleType) {
       jit_inputs_ivalues.push_back(ivalues_maps[input].toTuple());
+    } else {
+      TRTORCH_CHECK(input->node()->kind() == torch::jit::prim::Param, "Input for mini graph is not Prim::Param.\n");
+      jit_inputs_ivalues.push_back(ivalues_maps[input]);
     }
   }
 
   // run segments to get outputs for later segments input shape, and other arguments such as Int
   std::vector<torch::jit::IValue> jit_results;
   torch::jit::IValue jit_results_ivalues = cur_mod.forward(jit_inputs_ivalues);
+
 
   if (jit_results_ivalues.isTuple()) {
     auto results = jit_results_ivalues.toTuple()->elements();

@@ -376,6 +376,7 @@ torch::jit::Value* getOrAddInputForValue(
     if (node->kind() == torch::jit::prim::Constant) {
       auto new_const = graph->createClone(node, {nullptr});
       graph->block()->prependNode(new_const);
+      old_to_new[old_value] = new_const->output();
       return new_const->output();
     }
     auto new_value = graph->block()->addInput();

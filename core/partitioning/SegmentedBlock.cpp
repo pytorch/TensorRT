@@ -34,6 +34,7 @@ torch::jit::Value* SegmentedBlock::getOrAddInputForValue(torch::jit::Value* old_
     if (node->kind() == torch::jit::prim::Constant) {
       auto new_const = g_->createClone(node, {nullptr});
       g_->block()->prependNode(new_const);
+      old_to_new_[old_value] = new_const->output();
       return new_const->output();
     }
     auto new_value = g_->block()->addInput();
