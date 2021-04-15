@@ -5,28 +5,6 @@
 #include <vector>
 #include "torch/script.h"
 
-// Load the TRT engine from engine_path
-std::vector<char> loadEngine(std::string engine_path){
-  std::ifstream engineFile(engine_path, std::ios::binary);
-  if (!engineFile)
-  {
-      std::cerr << "Error opening TensorRT Engine file at : " << engine_path << std::endl;
-  }
-
-  engineFile.seekg(0, engineFile.end);
-  long int fsize = engineFile.tellg();
-  engineFile.seekg(0, engineFile.beg);
-
-  std::vector<char> engineData(fsize);
-  engineFile.read(engineData.data(), fsize);
-  if (!engineFile)
-  {
-      std::cerr << "Error loading engine from: " << engine_path << std::endl;
-  }
-
-  return engineData;
-}
-
 int main(int argc, const char* argv[]) {
   if (argc < 2) {
     std::cerr
@@ -35,7 +13,6 @@ int main(int argc, const char* argv[]) {
   }
 
   std::string trt_ts_module_path = argv[1];
-  // auto engineData = loadEngine(engine_path);
 
   torch::jit::Module trt_ts_mod;
   try {

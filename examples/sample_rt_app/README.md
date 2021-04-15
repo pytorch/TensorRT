@@ -32,5 +32,5 @@ To build and run the app
 
 ```
 cd TRTorch
-bs run //examples/sample_rt_app:samplertapp $PWD/examples/sample_rt_app/norm.jit
+bazel run //examples/sample_rt_app:samplertapp $PWD/examples/sample_rt_app/norm.jit
 ```
