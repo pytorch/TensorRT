@@ -31,6 +31,10 @@ torch::jit::script::Module CompileGraph(const torch::jit::script::Module& module
   return core::CompileGraph(module, to_internal_compile_spec(info));
 }
 
+torch::jit::Module EmbedEngineInNewModule(std::string& engine) {
+  return core::EmbedEngineInNewModule(engine);
+}
+
 std::string get_build_info() {
   auto info = core::util::get_build_info();
   return std::string("TRTorch Version: ") + TRTORCH_VERSION + '\n' + info;

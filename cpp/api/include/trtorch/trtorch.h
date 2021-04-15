@@ -480,6 +480,20 @@ TRTORCH_API std::string ConvertGraphToTRTEngine(
     const torch::jit::Module& module,
     std::string method_name,
     CompileSpec info);
+
+/**
+ * @brief Take a previously created TensorRT engine and embed it in
+ * in a TorchScript module
+ *
+ * @param engine: std::string - Precompiled serialized TensorRT engine
+ *
+ * Takes a prebuilt serialized TensorRT engine and embeds it in a TorchScript
+ * graph. Registers the engine as the forward method of the module
+ *
+ * @return: A new module trageting a TensorRT engine
+ */
+TRTORCH_API torch::jit::Module EmbedEngineInNewModule(std::string& engine);
+
 /**
  * @brief Set gpu device id
  *

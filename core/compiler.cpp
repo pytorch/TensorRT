@@ -173,6 +173,20 @@ torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod, C
   return new_mod;
 }
 
+torch::jit::script::Module EmbedEngineInNewModule(std::string& engine) {
+  std::ostringstream engine_id;
+  engine_id << reinterpret_cast<int*>(&engine);
+  torch::jit::script::Module new_mod("tensorrt_engine_mod_" + engine_id.str());
+  auto new_g = std::make_shared<torch::jit::Graph>();
+  AddEngineToGraph(new_mod, new_g, engine);
+  auto new_method = new_mod._ivalue()->compilation_unit()->create_function("forward", new_g);
+  auto schema = GenerateGraphSchema(new_mod, new_method->name(), new_g);
+  new_mod.type()->addMethod(new_method);
+  new_method->setSchema(schema);
+
+  return new_mod;
+}
+
 void set_device(const int gpu_id) {
   TRTORCH_ASSERT(cudaSetDevice(gpu_id) == cudaSuccess, "Unable to set CUDA device: " << gpu_id);
 }

@@ -19,6 +19,8 @@ std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::
 
 torch::jit::script::Module CompileGraph(const torch::jit::script::Module& module, CompileSpec cfg);
 
+torch::jit::script::Module EmbedEngineInNewModule(std::string& engine);
+
 void set_device(const int gpu_id);
 
 } // namespace core
