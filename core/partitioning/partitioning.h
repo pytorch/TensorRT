@@ -18,7 +18,7 @@ PartitionedGraph segment_graph(std::shared_ptr<torch::jit::Graph> g, const Parti
 
 std::vector<SegmentedBlock> Partition(
     torch::jit::Block* block,
-    std::vector<ir::InputRange>& input_ranges,
+    std::unordered_map<torch::jit::Value*, ir::InputRange>& input_ranges,
     const PartitionInfo& partition_info);
 
 

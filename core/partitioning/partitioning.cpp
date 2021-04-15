@@ -102,9 +102,12 @@ void registerSegmentsOutputs(PartitionedGraph& segmented_blocks, torch::jit::Blo
   // find the corresponding raw values in original global graph for this segmented block's inputs/outputs
   std::set<torch::jit::Value*> input_values;
   for (auto& seg_block : segmented_blocks) {
+    LOG_INFO(*seg_block.g() << "(registeroutput)\n");
     for (auto& input : seg_block.raw_inputs()) {
+      printf("input: %s\n", input->debugName().c_str());
       input_values.insert(input);
     }
+    printf("ddd\n");
   }
 
   for (auto& graph_output : block->outputs()) {
@@ -200,7 +203,7 @@ std::vector<SegmentedBlock> segment_graph(torch::jit::Block* block, const Partit
 
 std::vector<SegmentedBlock> Partition(
     torch::jit::Block* block,
-    std::vector<ir::InputRange>& input_ranges,
+    std::unordered_map<torch::jit::Value*, ir::InputRange>& input_ranges,
     const PartitionInfo& partition_info) {
   LOG_DEBUG(partition_info);
   // segment lowering global graph into blocks
@@ -213,13 +216,12 @@ std::vector<SegmentedBlock> Partition(
   registerSegmentsOutputs(segmented_blocks, block);
 
   // store the mapping from lowering graph torch::jit::Value => torch::jit::IValue that we get by running segments
-  std::unordered_map<torch::jit::Value*, torch::jit::IValue> ivalues_maps;
-  std::vector<torch::jit::IValue> random_inputs = generateRandomInputs(input_ranges);
-  int idx = 0;
-  for (size_t i = 0; i < block->inputs().size(); ++i) {
-    if (!block->inputs()[i]->type()->isSubtypeOf(torch::jit::TensorType::get())) continue;
-    ivalues_maps[block->inputs()[i]] = random_inputs[idx++];
-  }
+  std::unordered_map<torch::jit::Value*, torch::jit::IValue> ivalues_maps = generateRandomInputs(input_ranges);
+//  int idx = 0;
+//  for (size_t i = 0; i < block->inputs().size(); ++i) {
+//    if (!block->inputs()[i]->type()->isSubtypeOf(torch::jit::TensorType::get())) continue;
+//    ivalues_maps[block->inputs()[i]] = random_inputs[idx++];
+//  }
 
 //  for (auto& seg_block : segmented_blocks) {
 //    LOG_INFO(*seg_block.g() << "(in partition)\n");
@@ -227,6 +229,8 @@ std::vector<SegmentedBlock> Partition(
 
   // register every segment's input shape, and it's running output IValues
   for (auto& seg_block : segmented_blocks) {
+    LOG_INFO(*seg_block.g() << "(inrunning shape analysis)\n");
+
     torch::jit::ConstantPooling(seg_block.g());
     getSegmentsOutputByRunning(seg_block, ivalues_maps);
   }

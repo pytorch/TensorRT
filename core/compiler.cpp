@@ -179,13 +179,17 @@ void AddSegmentedBlockToGraph(
 
 typedef std::pair<std::shared_ptr<torch::jit::Graph>, std::unordered_map<torch::jit::Value*, torch::jit::Value*>> graph_with_mapping;
 
-graph_with_mapping ConstructFallbackBlock(torch::jit::script::Module& new_mod, torch::jit::Block* block, CompileSpec cfg,
+graph_with_mapping ConstructFallbackBlock(torch::jit::script::Module& new_mod, torch::jit::Block* block,
+                                          std::unordered_map<torch::jit::Value*, ir::InputRange> input_ranges,
+                                          CompileSpec cfg,
                                           int &trt_engine_id, conversion::GraphParams named_params) {
+  auto convert_cfg = cfg.convert_info;
+  auto partition_info = cfg.partition_info;
+
   auto new_g = std::make_shared<torch::jit::Graph>();
 
-  auto convert_cfg = cfg.convert_info;
   auto segmented_blocks =
-      partitioning::Partition(block, convert_cfg.input_ranges, cfg.partition_info);
+      partitioning::Partition(block, input_ranges, partition_info);
 
   // the mapping from lowering graph => fallback global graph
   std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_g;
@@ -220,7 +224,18 @@ graph_with_mapping ConstructFallbackBlock(torch::jit::script::Module& new_mod, t
         auto block_inputs = lv.bodyBlock()->inputs();
 
         cfg.convert_info.input_ranges = seg_block.in_shape();
-        auto loop_graph_mapping = ConstructFallbackBlock(new_mod, seg_block.raw_nodes()[0]->blocks()[0], cfg, trt_engine_id, named_params);
+        printf("inshape size: %d\n", seg_block.in_shape().size());
+
+        std::unordered_map<torch::jit::Value*, ir::InputRange> cur_input_ranges;
+        for (size_t i = 0; i < seg_block.in_shape().size(); ++i) {
+          printf("input: %s\n", seg_block.raw_inputs()[i]->debugName().c_str());
+          cur_input_ranges.insert({seg_block.raw_inputs()[i], seg_block.in_shape()[i]});
+//          cur_input_ranges[seg_block.raw_inputs()[i]] = seg_block.in_shape()[i];
+        }
+        cur_input_ranges.insert({block_inputs[1], seg_block.in_shape()[0]});
+
+
+        auto loop_graph_mapping = ConstructFallbackBlock(new_mod, seg_block.raw_nodes()[0]->blocks()[0], cur_input_ranges, cfg, trt_engine_id, named_params);
         auto loop_graph = loop_graph_mapping.first;
         auto loop_mapping = loop_graph_mapping.second;
         LOG_INFO(*loop_graph << "(LoopGraph)\n");
@@ -306,7 +321,13 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
 
       std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_g;
       int trt_engine_id = 1;
-      auto inner_fallback_graph = ConstructFallbackBlock(new_mod, g->block(), cfg, trt_engine_id, named_params);
+
+      std::unordered_map<torch::jit::Value*, ir::InputRange> input_ranges;
+      for (size_t i = 0; i < g->inputs().size(); ++i) {
+        input_ranges.insert({g->inputs()[i], cfg.convert_info.input_ranges[i]});
+//        input_ranges[g->inputs()[i]] = cfg.convert_info.input_ranges[i];
+      }
+      auto inner_fallback_graph = ConstructFallbackBlock(new_mod, g->block(), input_ranges, cfg, trt_engine_id, named_params);
       auto inner_graph = inner_fallback_graph.first;
       auto env = [&](torch::jit::Value* v) {
         return util::getOrAddInputForValue(v, new_g, old_to_new_g);

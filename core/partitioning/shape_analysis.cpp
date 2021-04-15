@@ -6,17 +6,18 @@ namespace trtorch {
 namespace core {
 namespace partitioning {
 
-std::vector<torch::jit::IValue> generateRandomInputs(std::vector<ir::InputRange>& input_ranges) {
+std::unordered_map<torch::jit::Value*, torch::jit::IValue> generateRandomInputs(std::unordered_map<torch::jit::Value*, ir::InputRange>& input_ranges) {
   // generate random inputs for running pytorch segments
+  std::unordered_map<torch::jit::Value*, torch::jit::IValue> ivalue_maps;
   std::vector<torch::jit::IValue> random_inputs;
   for (auto& input_range : input_ranges) {
-    auto cur_shape = input_range.input_shape;
+    auto cur_shape = input_range.second.input_shape;
     std::vector<int64_t> shape;
     shape.insert(shape.begin(), std::begin(cur_shape.d), std::begin(cur_shape.d) + cur_shape.nbDims);
     auto in = at::randint(5, shape, {at::kCUDA});
-    random_inputs.push_back(in.clone());
+    ivalue_maps[input_range.first] = in.clone();
   }
-  return random_inputs;
+  return ivalue_maps;
 }
 
 void getSegmentsOutputByRunning(
