@@ -172,7 +172,6 @@ void AddSegmentedBlockToGraph(
     old_to_new_g[seg.raw_outputs()[i]] = mini_to_new_g[seg.outputs()[i]];
   }
 
-  LOG_INFO(*g << "(AddSegmentedBlockToGraph)\n");
   return;
 }
 
@@ -187,7 +186,6 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
     if (method.name().rfind("_", 0)) {
       auto new_g = std::make_shared<torch::jit::Graph>();
       auto graph_and_parameters = lowering::Lower(mod, method.name());
-      //      LOG_INFO(*(method.graph()) << "Original graph\n");
 
       auto g = graph_and_parameters.first;
       auto params = graph_and_parameters.second;
@@ -204,6 +202,7 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
       int trt_engine_id = 1;
       std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_g;
       for (auto& seg_block : segmented_blocks) {
+        LOG_INFO(*g << "(MiniGraphInSegmentedBlock)\n");
         if (seg_block.target() == partitioning::SegmentedBlock::kTensorRT) {
           std::vector<ir::InputRange> input_ranges;
           for (auto& shape : seg_block.in_shape()) {
