@@ -34,7 +34,7 @@ git_repository(
 # CUDA should be installed on the system locally
 new_local_repository(
     name = "cuda",
-    path = "/usr/local/cuda",
+    path = "/usr/local/cuda-11.1/",
     build_file = "@//third_party/cuda:BUILD",
 )
 
@@ -62,21 +62,21 @@ http_archive(
 # Either place them in the distdir directory in third_party and use the --distdir flag
 # or modify the urls to "file:///<PATH TO TARBALL>/<TARBALL NAME>.tar.gz
 
-#http_archive(
-#    name = "cudnn",
-#    urls = ["https://developer.nvidia.com/compute/machine-learning/cudnn/secure/8.1.1.33/11.2_20210301/cudnn-11.2-linux-x64-v8.1.1.33.tgz",],
-#    build_file = "@//third_party/cudnn/archive:BUILD",
-#    sha256 = "98a8784e92862f20018d20c281b30d4a0cd951f93694f6433ccf4ae9c502ba6a",
-#    strip_prefix = "cuda"
-#)
+http_archive(
+    name = "cudnn",
+    urls = ["https://developer.nvidia.com/compute/machine-learning/cudnn/secure/8.1.1.33/11.2_20210301/cudnn-11.2-linux-x64-v8.1.1.33.tgz",],
+    build_file = "@//third_party/cudnn/archive:BUILD",
+    sha256 = "98a8784e92862f20018d20c281b30d4a0cd951f93694f6433ccf4ae9c502ba6a",
+    strip_prefix = "cuda"
+)
 
-#http_archive(
-#    name = "tensorrt",
-#    urls = ["https://developer.nvidia.com/compute/machine-learning/tensorrt/secure/7.2.3/tars/TensorRT-7.2.3.4.Ubuntu-18.04.x86_64-gnu.cuda-11.1.cudnn8.1.tar.gz",],
-#    build_file = "@//third_party/tensorrt/archive:BUILD",
-#    strip_prefix = "TensorRT-7.2.3.4",
-#    sha256 = "d3a1f478e304b48878604fac70ce7920fece71f9cac62f925c9c59c197f5d087"
-#)
+http_archive(
+    name = "tensorrt",
+    urls = ["https://developer.nvidia.com/compute/machine-learning/tensorrt/secure/7.2.3/tars/TensorRT-7.2.3.4.Ubuntu-18.04.x86_64-gnu.cuda-11.1.cudnn8.1.tar.gz",],
+    build_file = "@//third_party/tensorrt/archive:BUILD",
+    strip_prefix = "TensorRT-7.2.3.4",
+    sha256 = "d3a1f478e304b48878604fac70ce7920fece71f9cac62f925c9c59c197f5d087"
+)
 
 ####################################################################################
 # Locally installed dependencies (use in cases of custom dependencies or aarch64)
@@ -101,17 +101,17 @@ http_archive(
 #    build_file = "third_party/libtorch/BUILD"
 #)
 
-new_local_repository(
-    name = "cudnn",
-    path = "/usr/",
-    build_file = "@//third_party/cudnn/local:BUILD"
-)
+#new_local_repository(
+#    name = "cudnn",
+#    path = "/usr/",
+#    build_file = "@//third_party/cudnn/local:BUILD"
+#)
 
-new_local_repository(
-   name = "tensorrt",
-   path = "/usr/",
-   build_file = "@//third_party/tensorrt/local:BUILD"
-)
+#new_local_repository(
+#   name = "tensorrt",
+#   path = "/usr/",
+#   build_file = "@//third_party/tensorrt/local:BUILD"
+#)
 
 #########################################################################
 # Testing Dependencies (optional - comment out on aarch64)
