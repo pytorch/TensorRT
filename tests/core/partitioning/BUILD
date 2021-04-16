@@ -29,8 +29,20 @@ partitioning_test(
   name = "test_stitched_graph",
 )
 
-partitioning_test(
+cc_test(
   name = "test_fallback_graph_output",
+  srcs = ["test_fallback_graph_output.cpp"],
+  deps = [
+      "//tests/util",
+      "//core",
+      "@googletest//:gtest_main",
+  ] + select({
+      ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
+      "//conditions:default":  ["@libtorch//:libtorch"],
+  }),
+  data = [
+      ":jit_models"
+  ]
 )
 
 test_suite(

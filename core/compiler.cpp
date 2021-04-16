@@ -201,6 +201,10 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
 
       int trt_engine_id = 1;
       std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_g;
+      // add global graph's input to old_to_new_g mapping
+      for (auto input : g->inputs()) {
+        util::getOrAddInputForValue(input, new_g, old_to_new_g);
+      }
       for (auto& seg_block : segmented_blocks) {
         LOG_INFO(*g << "(MiniGraphInSegmentedBlock)\n");
         if (seg_block.target() == partitioning::SegmentedBlock::kTensorRT) {
