@@ -16,7 +16,7 @@ TEST_P(ModuleTests, ModuleAsEngineIsClose) {
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-5));
 }
 
-TEST_P(ModuleTests, ModuleToModuleIsClose) {
+TEST_P(ModuleTests, ModuleToEngineToModuleIsClose) {
   std::vector<at::Tensor> inputs;
   std::vector<torch::jit::IValue> inputs_ivalues;
   for (auto in_shape : input_shapes) {

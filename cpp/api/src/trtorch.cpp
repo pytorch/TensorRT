@@ -31,7 +31,7 @@ torch::jit::script::Module CompileGraph(const torch::jit::script::Module& module
   return core::CompileGraph(module, to_internal_compile_spec(info));
 }
 
-torch::jit::Module EmbedEngineInNewModule(std::string& engine) {
+torch::jit::Module EmbedEngineInNewModule(const std::string& engine) {
   return core::EmbedEngineInNewModule(engine);
 }
 

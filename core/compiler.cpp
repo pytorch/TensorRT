@@ -46,7 +46,7 @@ c10::FunctionSchema GenerateGraphSchema(
 void AddEngineToGraph(
     torch::jit::script::Module mod,
     std::shared_ptr<torch::jit::Graph>& g,
-    std::string& serialized_engine) {
+    const std::string& serialized_engine) {
   auto engine_ptr = c10::make_intrusive<runtime::TRTEngine>(mod._ivalue()->name(), serialized_engine);
   // Get required metadata about the engine out
   auto num_io = engine_ptr->num_io;
@@ -173,9 +173,9 @@ torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod, C
   return new_mod;
 }
 
-torch::jit::script::Module EmbedEngineInNewModule(std::string& engine) {
+torch::jit::script::Module EmbedEngineInNewModule(const std::string& engine) {
   std::ostringstream engine_id;
-  engine_id << reinterpret_cast<int*>(&engine);
+  engine_id << reinterpret_cast<const int*>(&engine);
   torch::jit::script::Module new_mod("tensorrt_engine_mod_" + engine_id.str());
   auto new_g = std::make_shared<torch::jit::Graph>();
   AddEngineToGraph(new_mod, new_g, engine);

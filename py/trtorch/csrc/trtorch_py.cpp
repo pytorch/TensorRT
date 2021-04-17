@@ -119,6 +119,10 @@ bool CheckMethodOperatorSupport(const torch::jit::Module& module, const std::str
   return core::CheckMethodOperatorSupport(module, method_name);
 }
 
+torch::jit::Module EmbedEngineInNewModule(const py::bytes& engine) {
+  return core::EmbedEngineInNewModule(engine);
+}
+
 std::string get_build_info() {
   auto info = core::util::get_build_info();
   return info;
@@ -270,6 +274,10 @@ PYBIND11_MODULE(_C, m) {
       "check_method_op_support",
       &trtorch::pyapi::CheckMethodOperatorSupport,
       "Takes a module and a method name and checks if the method graph contains purely convertable operators");
+  m.def(
+      "embed_engine_in_new_module",
+      &trtorch::pyapi::EmbedEngineInNewModule,
+      "Takes a serialized TensorRT engine and wraps it in the forward method of a new TorchScript module");
   m.def("get_build_info", &get_build_info, "Returns build info about the compiler as a string");
 
   m.def("_get_logging_prefix", &logging::get_logging_prefix, "Get the current prefix for the logging output");

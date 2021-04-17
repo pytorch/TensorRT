@@ -45,6 +45,27 @@ class TestCompile(ModelTestCase):
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
         self.assertTrue(same < 2e-3)
 
+class TestPTtoTRTtoPT(ModelTestCase):
+    def setUp(self):
+        self.input = torch.randn((1, 3, 224, 224)).to("cuda")
+        self.ts_model = torch.jit.script(self.model)
+
+    def test_pt_to_trt_to_pt(self):
+        compile_spec = {
+            "input_shapes": [self.input.shape],
+            "device": {
+                "device_type": trtorch.DeviceType.GPU,
+                "gpu_id": 0,
+                "dla_core": 0,
+                "allow_gpu_fallback": False,
+                "disable_tf32": False
+            }
+        }
+
+        trt_engine = trtorch.convert_method_to_trt_engine(self.ts_model, "forward", compile_spec)
+        trt_mod = trtorch.embed_engine_in_new_module(trt_engine)
+        same = (trt_mod(self.input) - self.ts_model(self.input)).abs().max()
+        self.assertTrue(same < 2e-3)
 
 class TestCheckMethodOpSupport(unittest.TestCase):
 
@@ -59,13 +80,13 @@ class TestCheckMethodOpSupport(unittest.TestCase):
 class TestLoggingAPIs(unittest.TestCase):
 
     def test_logging_prefix(self):
-        new_prefix = "TEST"
+        new_prefix = "Python API Test: "
         trtorch.logging.set_logging_prefix(new_prefix)
         logging_prefix = trtorch.logging.get_logging_prefix()
         self.assertEqual(new_prefix, logging_prefix)
 
     def test_reportable_log_level(self):
-        new_level = trtorch.logging.Level.Warning
+        new_level = trtorch.logging.Level.Error
         trtorch.logging.set_reportable_log_level(new_level)
         level = trtorch.logging.get_reportable_log_level()
         self.assertEqual(new_level, level)
@@ -78,10 +99,11 @@ class TestLoggingAPIs(unittest.TestCase):
 
 def test_suite():
     suite = unittest.TestSuite()
+    suite.addTest(unittest.makeSuite(TestLoggingAPIs))
     suite.addTest(TestCompile.parametrize(TestCompile, model=models.resnet18(pretrained=True)))
     suite.addTest(TestCompile.parametrize(TestCompile, model=models.mobilenet_v2(pretrained=True)))
+    suite.addTest(TestPTtoTRTtoPT.parametrize(TestPTtoTRTtoPT, model=models.mobilenet_v2(pretrained=True)))
     suite.addTest(unittest.makeSuite(TestCheckMethodOpSupport))
-    suite.addTest(unittest.makeSuite(TestLoggingAPIs))
 
     return suite
 
