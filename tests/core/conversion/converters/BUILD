@@ -36,6 +36,10 @@ converter_test(
 )
 
 converter_test(
+  name = "test_layer_norm",
+)
+
+converter_test(
     name = "test_linear",
 )
 
