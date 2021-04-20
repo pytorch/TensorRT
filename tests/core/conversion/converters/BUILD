@@ -20,6 +20,10 @@ converter_test(
 )
 
 converter_test(
+  name = "test_constant_pad"
+)
+
+converter_test(
   name = "test_conv_deconv"
 )
 
@@ -96,6 +100,7 @@ test_suite(
   tests = [
     ":test_activation",
     ":test_batch_norm",
+    ":test_constant_pad",
     ":test_conv_deconv",
     ":test_element_wise",
     ":test_expand",

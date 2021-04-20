@@ -37,6 +37,7 @@ cc_library(
         "impl/batch_norm.cpp",
         "impl/concat.cpp",
         "impl/constant.cpp",
+        "impl/constant_pad.cpp",
         "impl/conv_deconv.cpp",
         "impl/element_wise.cpp",
         "impl/expand.cpp",
