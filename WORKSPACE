@@ -3,23 +3,21 @@ workspace(name = "TRTorch")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 
-git_repository(
-    name = "rules_python",
-    remote = "https://github.com/bazelbuild/rules_python.git",
-    commit = "4fcc24fd8a850bdab2ef2e078b1de337eea751a6",
-    shallow_since = "1589292086 -0400"
-)
+http_archive(
+        name = "rules_python",
+        url = "https://github.com/bazelbuild/rules_python/releases/download/0.2.0/rules_python-0.2.0.tar.gz",
+        sha256 = "778197e26c5fbeb07ac2a2c5ae405b30f6cb7ad1f5510ea6fdac03bded96cc6f",
+    )
 
-load("@rules_python//python:repositories.bzl", "py_repositories")
-py_repositories()
-
-load("@rules_python//python:pip.bzl", "pip_repositories", "pip3_import")
-pip_repositories()
+load("@rules_python//python:pip.bzl", "pip_install")
 
 http_archive(
     name = "rules_pkg",
-    url = "https://github.com/bazelbuild/rules_pkg/releases/download/0.2.4/rules_pkg-0.2.4.tar.gz",
-    sha256 = "4ba8f4ab0ff85f2484287ab06c0d871dcb31cc54d439457d28fd4ae14b18450a",
+    urls = [
+    	"https://mirror.bazel.build/github.com/bazelbuild/rules_pkg/releases/download/0.4.0/rules_pkg-0.4.0.tar.gz",
+	"https://github.com/bazelbuild/rules_pkg/releases/download/0.4.0/rules_pkg-0.4.0.tar.gz",
+    ],
+    sha256 = "038f1caa773a7e35b3663865ffb003169c6a71dc995e39bf4815792f385d837d",
 )
 
 load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
@@ -37,12 +35,6 @@ new_local_repository(
     name = "cuda",
     path = "/usr/local/cuda-11.1/",
     build_file = "@//third_party/cuda:BUILD",
-)
-
-new_local_repository(
-    name = "cublas",
-    path = "/usr",
-    build_file = "@//third_party/cublas:BUILD",
 )
 
 #############################################################################################################
@@ -123,26 +115,17 @@ http_archive(
 #########################################################################
 # Testing Dependencies (optional - comment out on aarch64)
 #########################################################################
-pip3_import(
+pip_install(
     name = "trtorch_py_deps",
-    requirements = "//py:requirements.txt"
+    requirements = "//py:requirements.txt",
 )
 
-load("@trtorch_py_deps//:requirements.bzl", "pip_install")
-pip_install()
-
-pip3_import(
+pip_install(
     name = "py_test_deps",
-    requirements = "//tests/py:requirements.txt"
+    requirements = "//tests/py:requirements.txt",
 )
 
-load("@py_test_deps//:requirements.bzl", "pip_install")
-pip_install()
-
-pip3_import(
-   name = "pylinter_deps",
-   requirements = "//tools/linter:requirements.txt",
+pip_install(
+    name = "pylinter_deps",
+    requirements = "//tools/linter:requirements.txt",
 )
-
-load("@pylinter_deps//:requirements.bzl", "pip_install")
-pip_install()
