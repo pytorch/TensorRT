@@ -45,7 +45,9 @@ class TestCompile(ModelTestCase):
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
         self.assertTrue(same < 2e-3)
 
+
 class TestPTtoTRTtoPT(ModelTestCase):
+
     def setUp(self):
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
         self.ts_model = torch.jit.script(self.model)
@@ -66,6 +68,7 @@ class TestPTtoTRTtoPT(ModelTestCase):
         trt_mod = trtorch.embed_engine_in_new_module(trt_engine)
         same = (trt_mod(self.input) - self.ts_model(self.input)).abs().max()
         self.assertTrue(same < 2e-3)
+
 
 class TestCheckMethodOpSupport(unittest.TestCase):
 
