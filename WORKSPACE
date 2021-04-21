@@ -45,16 +45,16 @@ http_archive(
     name = "libtorch",
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
-    sha256 = "62a2c06761c32576b30f5884240cf675b937945d929e4b13cc776de8d9c2236c",
-    urls = ["https://download.pytorch.org/libtorch/cu111/libtorch-cxx11-abi-shared-with-deps-1.8.0%2Bcu111.zip"],
+    sha256 = "1f8aec376f9343538bd7c2fd3abb81ed3af11f575efe3aa72777c4d62044b832",
+    urls = ["https://download.pytorch.org/libtorch/cu111/libtorch-cxx11-abi-shared-with-deps-1.8.1%2Bcu111.zip"],
 )
 
 http_archive(
     name = "libtorch_pre_cxx11_abi",
     build_file = "@//third_party/libtorch:BUILD",
     strip_prefix = "libtorch",
-    sha256 = "1c8b0c0883dd17f5ce952d42ec5f7f0cc7ceb370307535cee26a66c10419f1f6",
-    urls = ["https://download.pytorch.org/libtorch/cu111/libtorch-shared-with-deps-1.8.0%2Bcu111.zip"],
+    sha256 = "3a6e0dc11859111e75caa640c8ce9bf904fbb6e9992b4345e444ed5410e4d77e",
+    urls = ["https://download.pytorch.org/libtorch/cu111/libtorch-shared-with-deps-1.8.1%2Bcu111.zip"],
 )
 
 # Download these tarballs manually from the NVIDIA website
@@ -63,7 +63,9 @@ http_archive(
 
 http_archive(
     name = "cudnn",
-    urls = ["https://developer.nvidia.com/compute/machine-learning/cudnn/secure/8.1.1.33/11.2_20210301/cudnn-11.2-linux-x64-v8.1.1.33.tgz",],
+    urls = [
+        "https://developer.nvidia.com/compute/machine-learning/cudnn/secure/8.1.1.33/11.2_20210301/cudnn-11.2-linux-x64-v8.1.1.33.tgz",
+    ],
     build_file = "@//third_party/cudnn/archive:BUILD",
     sha256 = "98a8784e92862f20018d20c281b30d4a0cd951f93694f6433ccf4ae9c502ba6a",
     strip_prefix = "cuda"
@@ -71,7 +73,9 @@ http_archive(
 
 http_archive(
     name = "tensorrt",
-    urls = ["https://developer.nvidia.com/compute/machine-learning/tensorrt/secure/7.2.3/tars/TensorRT-7.2.3.4.Ubuntu-18.04.x86_64-gnu.cuda-11.1.cudnn8.1.tar.gz",],
+    urls = [
+        "https://developer.nvidia.com/compute/machine-learning/tensorrt/secure/7.2.3/tars/TensorRT-7.2.3.4.Ubuntu-18.04.x86_64-gnu.cuda-11.1.cudnn8.1.tar.gz",
+    ],
     build_file = "@//third_party/tensorrt/archive:BUILD",
     strip_prefix = "TensorRT-7.2.3.4",
     sha256 = "d3a1f478e304b48878604fac70ce7920fece71f9cac62f925c9c59c197f5d087"

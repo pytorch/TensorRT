@@ -167,7 +167,7 @@ def test(model, dataloader, crit, epoch):
     model.eval()
     with torch.no_grad():
         for data, labels in dataloader:
-            data, labels = data.cuda(), labels.cuda(async=True)
+            data, labels = data.cuda(), labels.cuda(non_blocking=True)
             out = model(data)
             loss += crit(out, labels)
             preds = torch.max(out, 1)[1]
