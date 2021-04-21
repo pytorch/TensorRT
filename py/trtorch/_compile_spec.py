@@ -176,7 +176,7 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
     if "max_batch_size" in compile_spec:
         assert type(compile_spec["max_batch_size"]) is int
         info.max_batch_size = compile_spec["max_batch_size"]
-    
+
     if "truncate_long_and_double" in compile_spec:
         assert type(compile_spec["truncate_long_and_double"]) is bool
         info.truncate_long_and_double = compile_spec["truncate_long_and_double"]

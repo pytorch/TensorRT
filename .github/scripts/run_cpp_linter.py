@@ -23,6 +23,7 @@ approval = 'APPROVE'
 if output.returncode != 0:
     comment = '''There are some changes that do not conform to C++ style guidelines:\n ```diff\n{}```'''.format(output.stdout.decode("utf-8"))
     approval = 'REQUEST_CHANGES'
+    exit(1)
 
 pr.create_review(commit, comment, approval)
 
