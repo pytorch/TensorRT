@@ -45,26 +45,41 @@ auto replication_pad_registrations TRTORCH_UNUSED = RegisterNodeConversionPatter
 
          if (padding[padding_index] > 0) { // left/top/front padding value
            tensors_vec.clear();
-           at::Tensor left_indices = torch::tensor({0}, torch::kInt32);
-           auto indicesTensor = tensor_to_const(ctx, left_indices);
-           auto left_gather_layer = ctx->net->addGather(*in, *indicesTensor, axis);
-           auto left_gather_out = left_gather_layer->getOutput(0);
+           if (ctx->input_is_dynamic) {
+             at::Tensor left_indices = torch::tensor({0}, torch::kInt32);
+             auto indicesTensor = tensor_to_const(ctx, left_indices);
+             auto left_gather_layer = ctx->net->addGather(*in, *indicesTensor, axis);
+             auto left_gather_out = left_gather_layer->getOutput(0);
 
-           // fill the left_gather_out with value
-           auto fill_layer = ctx->net->addFill(nvinfer1::Dims{1, {1}}, nvinfer1::FillOperation::kLINSPACE);
-           auto shape_gather_out = ctx->net->addShape(*left_gather_out)->getOutput(0);
-           fill_layer->setInput(0, *shape_gather_out);
-           at::Tensor value_tensor = torch::tensor(value, torch::kFloat32);
-           auto valueTensor = tensor_to_const(ctx, value_tensor);
-           fill_layer->setInput(1, *valueTensor);
-           at::Tensor delta_tensor = torch::zeros(inRank);
-           auto deltaTensor = tensor_to_const(ctx, delta_tensor);
-           fill_layer->setInput(2, *deltaTensor);
-           auto padTensor = fill_layer->getOutput(0);
+             // fill the left_gather_out with value
+             auto fill_layer = ctx->net->addFill(nvinfer1::Dims{1, {1}}, nvinfer1::FillOperation::kLINSPACE);
+             auto shape_gather_out = ctx->net->addShape(*left_gather_out)->getOutput(0);
+             fill_layer->setInput(0, *shape_gather_out);
+             at::Tensor value_tensor = torch::tensor(value, torch::kFloat32);
+             auto valueTensor = tensor_to_const(ctx, value_tensor);
+             fill_layer->setInput(1, *valueTensor);
+             at::Tensor delta_tensor = torch::zeros(inRank);
+             auto deltaTensor = tensor_to_const(ctx, delta_tensor);
+             fill_layer->setInput(2, *deltaTensor);
+             auto padTensor = fill_layer->getOutput(0);
 
-           for (int i = 0; i < padding[padding_index]; i++) {
+             for (int i = 0; i < padding[padding_index]; i++) {
+               tensors_vec.push_back(padTensor);
+             }
+           } else {
+             inDims.d[axis] = padding[padding_index];
+             auto fill_layer = ctx->net->addFill(inDims, nvinfer1::FillOperation::kLINSPACE);
+             at::Tensor value_tensor = torch::tensor(value, torch::kFloat32);
+             auto valueTensor = tensor_to_const(ctx, value_tensor);
+             fill_layer->setInput(1, *valueTensor);
+             at::Tensor delta_tensor = torch::zeros(inRank);
+             auto deltaTensor = tensor_to_const(ctx, delta_tensor);
+             fill_layer->setInput(2, *deltaTensor);
+             auto padTensor = fill_layer->getOutput(0);
+
              tensors_vec.push_back(padTensor);
            }
+
            tensors_vec.push_back(in);
            auto concat_layer = ctx->net->addConcatenation(tensors_vec.data(), tensors_vec.size());
            concat_layer->setAxis(axis);
@@ -92,19 +107,33 @@ auto replication_pad_registrations TRTORCH_UNUSED = RegisterNodeConversionPatter
            auto right_gather_layer = ctx->net->addGather(*in, *indicesTensor, axis);
            auto right_gather_out = right_gather_layer->getOutput(0);
 
-           // fill the right_gather_out with value
-           auto fill_layer = ctx->net->addFill(nvinfer1::Dims{1, {1}}, nvinfer1::FillOperation::kLINSPACE);
-           auto shape_gather_out = ctx->net->addShape(*right_gather_out)->getOutput(0);
-           fill_layer->setInput(0, *shape_gather_out);
-           at::Tensor value_tensor = torch::tensor(value, torch::kFloat32);
-           auto valueTensor = tensor_to_const(ctx, value_tensor);
-           fill_layer->setInput(1, *valueTensor);
-           at::Tensor delta_tensor = torch::zeros(inRank);
-           auto deltaTensor = tensor_to_const(ctx, delta_tensor);
-           fill_layer->setInput(2, *deltaTensor);
-           auto padTensor = fill_layer->getOutput(0);
+           if (ctx->input_is_dynamic) {
+             // fill the right_gather_out with value
+             auto fill_layer = ctx->net->addFill(nvinfer1::Dims{1, {1}}, nvinfer1::FillOperation::kLINSPACE);
+             auto shape_gather_out = ctx->net->addShape(*right_gather_out)->getOutput(0);
+             fill_layer->setInput(0, *shape_gather_out);
+             at::Tensor value_tensor = torch::tensor(value, torch::kFloat32);
+             auto valueTensor = tensor_to_const(ctx, value_tensor);
+             fill_layer->setInput(1, *valueTensor);
+             at::Tensor delta_tensor = torch::zeros(inRank);
+             auto deltaTensor = tensor_to_const(ctx, delta_tensor);
+             fill_layer->setInput(2, *deltaTensor);
+             auto padTensor = fill_layer->getOutput(0);
 
-           for (int i = 0; i < padding[padding_index + 1]; i++) {
+             for (int i = 0; i < padding[padding_index + 1]; i++) {
+               tensors_vec.push_back(padTensor);
+             }
+           } else {
+             inDims.d[axis] = padding[padding_index + 1];
+             auto fill_layer = ctx->net->addFill(inDims, nvinfer1::FillOperation::kLINSPACE);
+             at::Tensor value_tensor = torch::tensor(value, torch::kFloat32);
+             auto valueTensor = tensor_to_const(ctx, value_tensor);
+             fill_layer->setInput(1, *valueTensor);
+             at::Tensor delta_tensor = torch::zeros(inRank);
+             auto deltaTensor = tensor_to_const(ctx, delta_tensor);
+             fill_layer->setInput(2, *deltaTensor);
+             auto padTensor = fill_layer->getOutput(0);
+
              tensors_vec.push_back(padTensor);
            }
            auto concat_layer = ctx->net->addConcatenation(tensors_vec.data(), tensors_vec.size());
