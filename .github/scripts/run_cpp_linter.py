@@ -26,4 +26,7 @@ if output.returncode != 0:
 
 pr.create_review(commit, comment, approval)
 
-
+if output.returncode != 0:
+    exit(1)
+else:
+    exit(0)
