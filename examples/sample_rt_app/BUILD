@@ -4,7 +4,7 @@ package(default_visibility = ["//visibility:public"])
 # It has include, lib, bin directory and LICENSE file
 cc_library(
     name = "trtorch_runtime",
-    srcs = ["trtorch/lib/libtrtorchrt.so", "trtorch/lib/libtrtorch_plugins.so"],
+    srcs = ["trtorch/lib/libtrtorchrt.so"], # , "trtorch/lib/libtrtorch_plugins.so"
 )
 
 cc_binary(

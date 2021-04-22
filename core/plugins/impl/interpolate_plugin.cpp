@@ -417,6 +417,8 @@ const nvinfer1::PluginFieldCollection* InterpolatePluginCreator::getFieldNames()
   return nullptr;
 }
 
+REGISTER_TRTORCH_PLUGIN(InterpolatePluginCreator);
+
 } // namespace impl
 } // namespace plugins
 } // namespace core

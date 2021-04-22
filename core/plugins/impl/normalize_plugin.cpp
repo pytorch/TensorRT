@@ -286,6 +286,8 @@ const nvinfer1::PluginFieldCollection* NormalizePluginCreator::getFieldNames() {
   return nullptr;
 }
 
+REGISTER_TRTORCH_PLUGIN(NormalizePluginCreator);
+
 } // namespace impl
 } // namespace plugins
 } // namespace core
