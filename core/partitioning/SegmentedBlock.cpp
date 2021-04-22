@@ -4,7 +4,7 @@ namespace trtorch {
 namespace core {
 namespace partitioning {
 
-SegmentedBlock::SegmentedBlock(SegmentedBlockTarget blk_target, std::vector<torch::jit::Node*>& nodes)
+SegmentedBlock::SegmentedBlock(SegmentedBlockTarget blk_target, const std::vector<torch::jit::Node*>& nodes)
     : target_(blk_target), g_(std::make_shared<torch::jit::Graph>()) {
   for (auto& node : nodes) {
     nodes_.push_back(node);

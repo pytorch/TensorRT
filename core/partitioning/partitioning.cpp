@@ -185,6 +185,13 @@ std::vector<SegmentedBlock> segment_graph(torch::jit::Block* block, const Partit
         pytorch_nodes.insert(pytorch_nodes.end(), tensorrt_nodes.begin(), tensorrt_nodes.end());
       }
       tensorrt_nodes.clear();
+      // if there is a prim::Loop then this loop node will be encapsulated in a SegmentedBlock
+      if (n->kind() == torch::jit::prim::Loop && !pytorch_nodes.empty()) {
+        segmented_blocks.emplace_back(SegmentedBlock::kTorch, pytorch_nodes);
+        pytorch_nodes.clear();
+        segmented_blocks.emplace_back(SegmentedBlock::kTorch, std::vector<torch::jit::Node*>{n});
+        continue;
+      }
       pytorch_nodes.push_back(n);
     }
   }

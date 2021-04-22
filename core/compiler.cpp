@@ -218,23 +218,25 @@ graph_with_mapping ConstructFallbackBlock(torch::jit::script::Module& new_mod, t
       AddSegmentedBlockToGraph(new_g, seg_block, old_to_new_g);
     } else {
       if (seg_block.raw_nodes()[0]->kind() == torch::jit::prim::Loop) {
+        // the LoopView of the original loop node
         auto outer_node = seg_block.raw_nodes()[0];
         torch::jit::LoopView lv(outer_node);
         auto block_outputs = lv.bodyBlock()->outputs();
         auto block_inputs = lv.bodyBlock()->inputs();
 
+        // get the required input shapes for the block in loop
         cfg.convert_info.input_ranges = seg_block.in_shape();
-        printf("inshape size: %d\n", seg_block.in_shape().size());
-
         std::unordered_map<torch::jit::Value*, ir::InputRange> cur_input_ranges;
+        // for every loop, we have carriedInput in prim::Loop node, and bodyCarriedInputs in the block
+        // Some values used in Loop block appears in bodyCarriedInputs, some are outer block values in seg_block_raw_inputs
         for (size_t i = 0; i < seg_block.in_shape().size(); ++i) {
-          printf("input: %s\n", seg_block.raw_inputs()[i]->debugName().c_str());
           cur_input_ranges.insert({seg_block.raw_inputs()[i], seg_block.in_shape()[i]});
-//          cur_input_ranges[seg_block.raw_inputs()[i]] = seg_block.in_shape()[i];
         }
-        cur_input_ranges.insert({block_inputs[1], seg_block.in_shape()[0]});
+        for (size_t i = 0; i < lv.bodyCarriedInputs().size(); ++i) {
+          cur_input_ranges.insert({lv.bodyCarriedInputs()[i], cur_input_ranges.at(lv.carriedInputs()[i])});
+        }
 
-
+        // get the converted hybrid graph in the loop
         auto loop_graph_mapping = ConstructFallbackBlock(new_mod, seg_block.raw_nodes()[0]->blocks()[0], cur_input_ranges, cfg, trt_engine_id, named_params);
         auto loop_graph = loop_graph_mapping.first;
         auto loop_mapping = loop_graph_mapping.second;
@@ -243,6 +245,8 @@ graph_with_mapping ConstructFallbackBlock(torch::jit::script::Module& new_mod, t
         // create a new loop for current graph
         auto new_loop = new_g->insertNode(new_g->create(torch::jit::prim::Loop, {}, 0))
                         ->setSourceRange(outer_node->sourceRange());
+
+        // add inputs for new_loop node in new_g
         new_loop->addInput(util::getOrAddInputForValue(lv.maxTripCount(), new_g, old_to_new_g));
         new_loop->addInput(util::getOrAddInputForValue(lv.inputCond(), new_g, old_to_new_g));
 
@@ -250,16 +254,34 @@ graph_with_mapping ConstructFallbackBlock(torch::jit::script::Module& new_mod, t
           new_loop->addInput(util::getOrAddInputForValue(ci, new_g, old_to_new_g));
         }
 
+        // assure that new_g->inputs()[0] is fallback_trt, if not, insert it to new_g
         std::unordered_map<torch::jit::Value*, torch::jit::Value*> mini_to_new_g;
+        if (new_g->inputs()[0]->type()->str().find("__torch__") == std::string::npos) {
+          auto self = new_g->insertInput(0, "self_1");
+          self->setType(loop_graph->inputs()[0]->type());
+        }
+        mini_to_new_g[loop_graph->inputs()[0]] = new_g->inputs()[0];
 
+        // add the block into our new loop
         auto new_loop_body = new_loop->addBlock();
         auto env = [&](torch::jit::Value *v) {
           return util::getOrAddInputForValue(v, new_g, mini_to_new_g);
         };
         new_loop_body->cloneFrom(loop_graph->block(), env);
+        // replace the inputs()[0] in loop with currentTripCount();
         new_loop_body->inputs()[0]->replaceAllUsesWith(new_g->inputs()[0]);
         new_loop_body->inputs()[0]->copyMetadata(lv.currentTripCount());
 
+        // replace the new created loop inputs that won't be updated in the loop with the values from outer blocks
+        torch::jit::LoopView new_lv(new_loop);
+        if (new_lv.bodyCarriedInputs().size() > lv.bodyCarriedInputs().size()) {
+          for (int i = new_lv.bodyCarriedInputs().size() - 1; i >= lv.bodyCarriedInputs().size(); --i) {
+            new_loop_body->inputs()[i + 1]->replaceAllUsesWith(old_to_new_g[seg_block.raw_inputs()[i]]);
+            new_loop_body->eraseInput(i + 1);
+          }
+        }
+
+        // adjust the output order
         auto loop_out_idx = 0;
         for (size_t i = 0; i < block_outputs.size(); ++i) {
           if (loop_mapping.count(block_outputs[i])) {
