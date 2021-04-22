@@ -18,9 +18,9 @@ class TRTorchPluginRegistry {
     // register libNvInferPlugins and TRTorch plugins
     // trtorch_logger logging level is set to kERROR and reset back to kDEBUG.
     // This is because initLibNvInferPlugins initializes only a subset of plugins and logs them.
-    // Plugins outside this subset in TensorRT are not being logged in this. So temporarily we disable this to prevent multiple logging of same plugins.
-    // To provide a clear list of all plugins, we iterate through getPluginRegistry() where it prints the
-    // list of all the plugins registered in TensorRT with their namespaces.
+    // Plugins outside this subset in TensorRT are not being logged in this. So temporarily we disable this to prevent
+    // multiple logging of same plugins. To provide a clear list of all plugins, we iterate through getPluginRegistry()
+    // where it prints the list of all the plugins registered in TensorRT with their namespaces.
     trtorch_logger.set_reportable_log_level(util::logging::LogLevel::kERROR);
     initLibNvInferPlugins(&trtorch_logger, "");
     trtorch_logger.set_reportable_log_level(util::logging::LogLevel::kDEBUG);
@@ -33,14 +33,17 @@ class TRTorchPluginRegistry {
         continue;
       }
       std::string pluginNamespace = pluginsList[k]->getPluginNamespace();
-      trtorch_logger.log(util::logging::LogLevel::kDEBUG, "Registered plugin creator - " + std::string(pluginsList[k]->getPluginName()) + ", Namespace: " + pluginNamespace);
+      trtorch_logger.log(
+          util::logging::LogLevel::kDEBUG,
+          "Registered plugin creator - " + std::string(pluginsList[k]->getPluginName()) +
+              ", Namespace: " + pluginNamespace);
     }
     trtorch_logger.log(util::logging::LogLevel::kDEBUG, "Total number of plugins registered: " + str(numCreators));
   }
-public:
-  util::logging::TRTorchLogger trtorch_logger = util::logging::TRTorchLogger("[TRTorch Plugins Context] - ",
-                                                                              util::logging::LogLevel::kDEBUG,
-                                                                              true);
+
+ public:
+  util::logging::TRTorchLogger trtorch_logger =
+      util::logging::TRTorchLogger("[TRTorch Plugins Context] - ", util::logging::LogLevel::kDEBUG, true);
 };
 
 namespace {
