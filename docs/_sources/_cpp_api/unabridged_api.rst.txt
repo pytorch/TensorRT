@@ -96,6 +96,11 @@ Functions
 .. toctree::
    :maxdepth: 5
 
+   function_trtorch_8h_1ac4ead1d30e521d581462bb51e283be08.rst
+
+.. toctree::
+   :maxdepth: 5
+
    function_trtorch_8h_1a2cf17d43ba9117b3b4d652744b4f0447.rst
 
 .. toctree::

@@ -30,7 +30,7 @@ py_test(
     srcs = [
         "test_ptq_dataloader_calibrator.py",
         "model_test_case.py"
-    ]
+    ],
     deps = [
         requirement("torchvision")
     ]
@@ -43,7 +43,7 @@ py_test(
     srcs = [
         "test_ptq_trt_calibrator.py",
         "model_test_case.py"
-    ]
+    ],
     deps = [
         requirement("torchvision")
     ]
@@ -56,8 +56,6 @@ py_test(
         "test_multi_gpu.py",
         "model_test_case.py"
     ],
-    "//conditions:default" : []
-    }),
     deps = [
         requirement("torchvision")
     ]
@@ -75,11 +73,22 @@ py_test(
 )
 
 py_test(
+    name = "test_trt_intercompatability",
+    srcs = [
+        "test_trt_intercompatability.py",
+        "model_test_case.py"
+    ],
+    deps = [
+        requirement("torchvision")
+    ]
+)
+
+py_test(
     name = "test_ptq_to_backend",
     srcs = [
         "test_ptq_to_backend.py",
         "model_test_case.py"
-    ]
+    ],
     deps = [
         requirement("torchvision")
     ]

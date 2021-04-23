@@ -192,6 +192,9 @@ Program Listing for File trtorch.h
        const torch::jit::Module& module,
        std::string method_name,
        CompileSpec info);
+   
+   TRTORCH_API torch::jit::Module EmbedEngineInNewModule(const std::string& engine);
+   
    TRTORCH_API void set_device(const int gpu_id);
    
    } // namespace trtorch
