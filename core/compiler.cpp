@@ -274,7 +274,7 @@ torch::jit::script::Module EmbedEngineInNewModule(const std::string& engine) {
   auto new_g = std::make_shared<torch::jit::Graph>();
   AddEngineToGraph(new_mod, new_g, engine);
   auto new_method = new_mod._ivalue()->compilation_unit()->create_function("forward", new_g);
-  auto schema = GenerateGraphSchema(new_mod, new_method->name(), new_g);
+  auto schema = util::GenerateGraphSchema(new_method->name(), new_g);
   new_mod.type()->addMethod(new_method);
   new_method->setSchema(schema);
 
