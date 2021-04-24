@@ -25,29 +25,32 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
   LOG_DEBUG("Original input dims: " << orig_dims);
 
   // Expand spatial dims from 1D to 2D if needed
-  auto expandDims = addPaddingLayer(ctx, n, in, 4);
+  bool expandDims = (orig_dims.nbDims < 4);
   if (expandDims) {
-    auto tensorPtr = expandDims->getOutput(0);
-    assert(tensorPtr);
-    dims = tensorPtr->getDimensions();
-    in = tensorPtr;
+    in = addPadding(ctx, n, in, 4);
+    dims = in->getDimensions();
   }
   if (w.shape.nbDims < 4) {
-    for (int i = w.shape.nbDims; i < 4; ++i)
+    for (int i = w.shape.nbDims; i < 4; ++i) {
       w.shape.d[i] = 1;
+    }
     w.shape.nbDims = 4;
     w.kernel_shape.nbDims = 2;
     w.kernel_shape.d[1] = 1;
   }
-  if (stride.nbDims==1)
+  if (stride.nbDims==1) {
     stride = util::unsqueezeDims(stride, 1, 1);
-  if (dilation.nbDims==1)
+  }
+  if (dilation.nbDims==1) {
     dilation = util::unsqueezeDims(dilation, 1, 1);
-  if (padding.nbDims==1)  
+  }
+  if (padding.nbDims==1) {
     padding = util::unsqueezeDims(padding, 1, 0);
-  if (out_padding.nbDims==1)
+  }
+  if (out_padding.nbDims==1) {
     out_padding = util::unsqueezeDims(out_padding, 1, 0);
-
+  }
+  
   LOG_DEBUG("Input dims: " << dims);
   LOG_DEBUG("Weights: " << w);
   LOG_DEBUG("stride: " << stride);
@@ -101,14 +104,13 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
     conv->setNbGroups(groups);
     new_layer = conv;
   }
+  
   new_layer->setName(util::node_info(n).c_str());
-
-  if (expandDims) {
-    // Un-expand spatial dims back to 1D
-    new_layer = addUnpaddingLayer(ctx, n, new_layer->getOutput(0), orig_dims.nbDims);
-  }
-
-  auto out = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
+  
+  // Un-expand spatial dims back to 1D if needed
+  auto out = addUnpadding(ctx, n, new_layer->getOutput(0), orig_dims.nbDims);
+  
+  ctx->AssociateValueAndTensor(n->outputs()[0], out);
 
   LOG_DEBUG("Output tensor shape: " << out->getDimensions());
 

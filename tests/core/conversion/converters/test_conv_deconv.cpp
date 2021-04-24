@@ -98,8 +98,8 @@ TEST(Converters, ATenConvolution1dConvertsCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  auto in = at::randint(1, 2, {1, 1, 3, 3}, {at::kCUDA});
-  auto w = at::randint(1, 2, {4, 1, 2, 2}, {at::kCUDA});
+  auto in = at::randint(1, 2, {1, 3, 3}, {at::kCUDA});
+  auto w = at::randint(1, 2, {4, 3, 3}, {at::kCUDA});
 
   auto jit_in = at::clone(in);
   auto jit_w = at::clone(w);

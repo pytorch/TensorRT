@@ -30,11 +30,11 @@ cc_library(
     name = "converters",
     hdrs = [
         "converters.h",
-	"converter_util.h",
+        "converter_util.h",
     ],
     srcs = [
         "NodeConverterRegistry.cpp",
-	"converter_util.cpp",	
+        "converter_util.cpp",   
         "impl/activation.cpp",
         "impl/batch_norm.cpp",
         "impl/concat.cpp",

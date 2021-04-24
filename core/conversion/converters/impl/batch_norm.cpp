@@ -41,9 +41,11 @@ auto batch_norm_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().
       LOG_DEBUG("training disregarded");
       LOG_DEBUG("cudnn disregarded");
 
-      auto expandDims = addPaddingLayer(ctx, n, input, 4);
+      // Expand spatial dims from 1D to 2D if needed
+      bool expandDims = (orig_shape.nbDims < 4);
+      
       if (expandDims) {
-        input = expandDims->getOutput(0);
+        input = addPadding(ctx, n, input, 4);
       }
 
       auto scale = gamma / torch::sqrt(var + eps);
@@ -56,13 +58,8 @@ auto batch_norm_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().
       auto bn = ctx->net->addScaleNd(
           *input, nvinfer1::ScaleMode::kCHANNEL, bias_weights.data, scale_weights.data, power.data, 1);
       bn->setName(util::node_info(n).c_str());
-      auto out_tensor = bn->getOutput(0);
-
-      if (expandDims) {
-        LOG_DEBUG("Inserting shuffle layer to reshape to back to original shape: " << orig_shape);
-        auto new_layer = addUnpaddingLayer(ctx, n, out_tensor, orig_shape.nbDims);
-        out_tensor = new_layer->getOutput(0);
-      }
+      // Un-pad bn output if needed
+      auto out_tensor = addUnpadding(ctx, n, bn->getOutput(0), orig_shape.nbDims);
       ctx->AssociateValueAndTensor(n->outputs()[0], out_tensor);
       return true;
     }});

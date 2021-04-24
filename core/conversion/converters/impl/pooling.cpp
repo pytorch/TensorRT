@@ -29,22 +29,23 @@ bool GlobalPoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args&
 bool AdaptivePoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& args,  nvinfer1::PoolingType pool_type) {
   auto in = args[0].ITensorOrFreeze(ctx);
   auto out_size = util::toDims(args[1].unwrapToIntList());
-  bool shuffle_back = false;
 
   // Corner case: when out dimension is all ones, replace with simpler operation
   if (out_size.d[0] == 1 && (out_size.nbDims < 2 || out_size.d[1] == 1 ) && (out_size.nbDims < 3 || out_size.d[2] == 1 ))  {
     return GlobalPoolingConverter(ctx, n, args, pool_type);
   }
 
-  auto shuffle = addPaddingLayer(ctx, n, in, 4, false, false);
-  if (shuffle) {
-    in = shuffle->getOutput(0);
+  auto orig_dims = in->getDimensions();
+  bool expandDims = (orig_dims.nbDims < 4); 
+ 
+  if (expandDims) {
+    in = addPadding(ctx, n, in, 4, false, false);
   }
   
   if (out_size.nbDims == 1) {
     out_size = util::unsqueezeDims(out_size, 0, 1);
-    shuffle_back = true;
   }
+  
   auto in_shape = util::toVec(in->getDimensions());
   nvinfer1::ILayer* new_layer = nullptr;
 
@@ -91,13 +92,10 @@ bool AdaptivePoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, arg
     new_layer = pooling_layer;
   }
 
-  new_layer->setName(util::node_info(n).c_str());
+  new_layer->setName(util::node_info(n).c_str()); 
+  auto layer_output = addUnpadding(ctx, n, new_layer->getOutput(0), orig_dims.nbDims, false, false);
 
-  if (shuffle_back ) {
-    new_layer = addUnpaddingLayer(ctx, n, new_layer->getOutput(0), 3, false, false);
-  }
-
-  auto layer_output = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
+  ctx->AssociateValueAndTensor(n->outputs()[0], layer_output);
   LOG_DEBUG("Output tensor shape: " << layer_output->getDimensions());
 
   return true;
@@ -107,10 +105,11 @@ bool PoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& args,
   auto in = args[0].ITensorOrFreeze(ctx);
   
   // Max Pool needs at least 4D input
-  auto shuffle = addPaddingLayer(ctx, n, in, 4, false, true);
+  auto orig_dims = in->getDimensions();
+  bool expandDims = (orig_dims.nbDims < 4);
 
-  if (shuffle) {
-    in = shuffle->getOutput(0);
+  if (expandDims) {
+    in = addPadding(ctx, n, in, 4, false, true);
   }
 
   auto kernel_size = util::toDims(args[1].unwrapToIntList());
@@ -121,19 +120,18 @@ bool PoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& args,
     stride = util::toDims(args[1].unwrapToIntList());
   }
 
-  bool shuffle_back = false;
   if (kernel_size.nbDims == 1) {
     kernel_size = util::unsqueezeDims(kernel_size, 0, 1);
-    if (shuffle)
-      shuffle_back = true;
     LOG_DEBUG("kernel_size.nbDims < 2, padding:" << kernel_size);
     LOG_DEBUG("kernel_size: " << kernel_size);
   }
-  if (padding.nbDims == 1)
-    padding = util::unsqueezeDims(padding, 0, 0); 
-  if (stride.nbDims == 1)
+  if (padding.nbDims == 1) {
+    padding = util::unsqueezeDims(padding, 0, 0);
+  }
+  if (stride.nbDims == 1) {
     stride = util::unsqueezeDims(stride, 0, 1);
-
+  }
+  
   LOG_DEBUG("kernel_size: " << kernel_size);
   LOG_DEBUG("padding: " << padding);
   LOG_DEBUG("stride: " << stride);
@@ -161,15 +159,18 @@ bool PoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& args,
     new_layer = ctx->net->addPoolingNd(*in, pool_type, kernel_size);
     TRTORCH_CHECK(new_layer, "Unable to create Avg Pooling layer from node: " << *n);
     new_layer->setAverageCountExcludesPadding(!count_inlcude_pad);
-    // if (!(args[6].IValue()->isNone())) {
-    //  LOG_WARNING("Divisor override is now handled by Avg Pooling Converter");
-    // }
   } else {
     TRTORCH_ASSERT(0, "Unsupported pool mode!");
   }
 
+  auto padding_mode =
+      ceil_mode ? nvinfer1::PaddingMode::kEXPLICIT_ROUND_UP : nvinfer1::PaddingMode::kEXPLICIT_ROUND_DOWN;
+  
   new_layer->setName(util::node_info(n).c_str());
+  new_layer->setPaddingMode(padding_mode);
   new_layer->setPaddingNd(padding);
+  new_layer->setStrideNd(stride);
+  
   if (stride.nbDims != 2 && ctx->settings.device.device_type == nvinfer1::DeviceType::kDLA) {
     if (!ctx->settings.device.allow_gpu_fallback) {
       TRTORCH_THROW_ERROR("DLA Pooling stride is limited to 2D, allow GPU fallback");
@@ -177,21 +178,9 @@ bool PoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& args,
       LOG_WARNING("DLA Pooling stride is limited to 2D, will run on GPU");
     }
   }
-  new_layer->setStrideNd(stride);
-
-  auto padding_mode =
-      ceil_mode ? nvinfer1::PaddingMode::kEXPLICIT_ROUND_UP : nvinfer1::PaddingMode::kEXPLICIT_ROUND_DOWN;
-  new_layer->setPaddingMode(padding_mode);
-
-  new_layer->setName(util::node_info(n).c_str());
-
-  nvinfer1::ILayer* out_layer = new_layer;
   
-  if (shuffle_back) {
-    out_layer = addUnpaddingLayer(ctx, n, new_layer->getOutput(0), 3, false, true);
-  }
-
-  auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], out_layer->getOutput(0));
+  auto out_tensor = addUnpadding(ctx, n, new_layer->getOutput(0), orig_dims.nbDims, false, true);
+  ctx->AssociateValueAndTensor(n->outputs()[0], out_tensor);
 
   LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
   return true;
