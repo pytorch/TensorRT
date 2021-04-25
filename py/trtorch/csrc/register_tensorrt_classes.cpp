@@ -29,6 +29,7 @@ void RegisterTRTCompileSpec() {
           .def(torch::init<>())
           .def("append_input_range", &trtorch::pyapi::CompileSpec::appendInputRange)
           .def("set_device", &trtorch::pyapi::CompileSpec::setDeviceIntrusive)
+          .def("_set_ptq_calibrator", &trtorch::pyapi::CompileSpec::setPTQCalibratorViaHandle)
           .def("__str__", &trtorch::pyapi::CompileSpec::stringify);
 
   ADD_FIELD_GET_SET_REGISTRATION(TRTCompileSpecTSRegistration, trtorch::pyapi::CompileSpec, op_precision);
@@ -41,6 +42,7 @@ void RegisterTRTCompileSpec() {
   ADD_FIELD_GET_SET_REGISTRATION(TRTCompileSpecTSRegistration, trtorch::pyapi::CompileSpec, num_avg_timing_iters);
   ADD_FIELD_GET_SET_REGISTRATION(TRTCompileSpecTSRegistration, trtorch::pyapi::CompileSpec, workspace_size);
   ADD_FIELD_GET_SET_REGISTRATION(TRTCompileSpecTSRegistration, trtorch::pyapi::CompileSpec, max_batch_size);
+  ADD_FIELD_GET_SET_REGISTRATION(TRTCompileSpecTSRegistration, trtorch::pyapi::CompileSpec, truncate_long_and_double);
 }
 
 struct TRTTSRegistrations {

@@ -23,7 +23,7 @@ struct Module;
 } // namespace torch
 
 namespace c10 {
-enum class DeviceType : int16_t;
+enum class DeviceType : int8_t;
 enum class ScalarType : int8_t;
 template <class>
 class ArrayRef;
@@ -259,6 +259,11 @@ struct TRTORCH_API CompileSpec {
   bool debug = false;
 
   /**
+   * Truncate long/double type to int/float type
+   */
+  bool truncate_long_and_double = false;
+
+  /**
    * Restrict operating type to only set default operation precision
    * (op_precision)
    */
@@ -475,6 +480,21 @@ TRTORCH_API std::string ConvertGraphToTRTEngine(
     const torch::jit::Module& module,
     std::string method_name,
     CompileSpec info);
+
+/**
+ * @brief Take a previously created TensorRT engine and embed it in
+ * in a TorchScript module
+ *
+ * @param engine: std::string - Pre-built serialized TensorRT engine
+ *
+ * Takes a pre-built serialized TensorRT engine and embeds it in a TorchScript
+ * module. Registers execution of the engine as the forward method of the module
+ * Forward is defined as: forward(Tensor[]) -> Tensor[]
+ *
+ * @return: A new module trageting a TensorRT engine
+ */
+TRTORCH_API torch::jit::Module EmbedEngineInNewModule(const std::string& engine);
+
 /**
  * @brief Set gpu device id
  *

@@ -13,6 +13,7 @@ std::ostream& operator<<(std::ostream& os, const BuilderSettings& s) {
     os << "Settings requested for TensorRT engine:"                                        \
        << "\n    Operating Precision: " << s.op_precision                                  \
        << "\n    TF32 Floating Point Computation Enabled: " << !s.disable_tf32             \
+       << "\n    Truncate Long and Double: " << s.truncate_long_and_double                 \
        << "\n    Make Refittable Engine: " << s.refit                                      \
        << "\n    Debuggable Engine: " << s.debug                                           \
        << "\n    Strict Types: " << s.strict_types                                         \

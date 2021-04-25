@@ -410,7 +410,7 @@
 <span class="p">}</span> <span class="c1">// namespace torch</span>
 
 <span class="k">namespace</span> <span class="n">c10</span> <span class="p">{</span>
-<span class="k">enum</span> <span class="k">class</span> <span class="nc">DeviceType</span> <span class="o">:</span> <span class="kt">int16_t</span><span class="p">;</span>
+<span class="k">enum</span> <span class="k">class</span> <span class="nc">DeviceType</span> <span class="o">:</span> <span class="kt">int8_t</span><span class="p">;</span>
 <span class="k">enum</span> <span class="k">class</span> <span class="nc">ScalarType</span> <span class="o">:</span> <span class="kt">int8_t</span><span class="p">;</span>
 <span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span><span class="o">&gt;</span>
 <span class="k">class</span> <span class="nc">ArrayRef</span><span class="p">;</span>
@@ -487,6 +487,8 @@
   <span class="kt">bool</span> <span class="n">refit</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
 
   <span class="kt">bool</span> <span class="n">debug</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
+
+  <span class="kt">bool</span> <span class="n">truncate_long_and_double</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
 
   <span class="kt">bool</span> <span class="n">strict_types</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
 
@@ -565,6 +567,9 @@
     <span class="k">const</span> <span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Module</span><span class="o">&amp;</span> <span class="k">module</span><span class="p">,</span>
     <span class="n">std</span><span class="o">::</span><span class="n">string</span> <span class="n">method_name</span><span class="p">,</span>
     <span class="n">CompileSpec</span> <span class="n">info</span><span class="p">);</span>
+
+<span class="n">TRTORCH_API</span> <span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Module</span> <span class="n">EmbedEngineInNewModule</span><span class="p">(</span><span class="k">const</span> <span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span> <span class="n">engine</span><span class="p">);</span>
+
 <span class="n">TRTORCH_API</span> <span class="kt">void</span> <span class="n">set_device</span><span class="p">(</span><span class="k">const</span> <span class="kt">int</span> <span class="n">gpu_id</span><span class="p">);</span>
 
 <span class="p">}</span> <span class="c1">// namespace trtorch</span>

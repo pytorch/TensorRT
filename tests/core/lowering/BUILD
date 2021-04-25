@@ -8,11 +8,23 @@ config_setting(
 )
 
 lowering_test(
+  name = "test_linear_to_addmm",
+)
+
+lowering_test(
   name = "test_remove_contiguous_pass",
 )
 
 lowering_test(
+<<<<<<< HEAD
   name = "test_reduce_to_pass",
+=======
+  name = "test_remove_dropout_pass",
+)
+
+lowering_test(
+  name = "test_remove_to",
+>>>>>>> origin/master
 )
 
 lowering_test(
@@ -30,9 +42,11 @@ lowering_test(
 test_suite(
     name = "lowering_tests",
     tests = [
+        ":test_linear_to_addmm",
         ":test_remove_contiguous_pass",
         ":test_reduce_to_pass",
         ":test_remove_detach_pass",
-        ":test_operator_aliasing_pass"
+        ":test_operator_aliasing_pass",
+        ":test_remove_dropout_pass"
     ]
 )

@@ -12,5 +12,5 @@ def converter_test(name, visibility=None):
             ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
             "//conditions:default":  ["@libtorch//:libtorch"],
         }),
-        timeout="short"
+        timeout="moderate"
     )

@@ -10,7 +10,7 @@ namespace passes {
 void Conv2DToConvolution(std::shared_ptr<torch::jit::Graph>& graph);
 void Conv3DToConvolution(std::shared_ptr<torch::jit::Graph>& graph);
 void FuseAddMMBranches(std::shared_ptr<torch::jit::Graph> graph);
-void FuseFlattenLinear(std::shared_ptr<torch::jit::Graph>& graph);
+void LinearToAddMM(std::shared_ptr<torch::jit::Graph>& graph);
 void EliminateExceptionOrPassPattern(std::shared_ptr<torch::jit::Graph> graph);
 void ReduceToOperation(std::shared_ptr<torch::jit::Graph>& graph);
 void RemoveBNDimCheck(std::shared_ptr<torch::jit::Graph> graph);

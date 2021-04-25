@@ -78,6 +78,8 @@ Functions
 
 - :ref:`exhale_function_trtorch_8h_1a726f6e7091b6b7be45b5a4275b2ffb10`
 
+- :ref:`exhale_function_trtorch_8h_1ac4ead1d30e521d581462bb51e283be08`
+
 - :ref:`exhale_function_trtorch_8h_1a2cf17d43ba9117b3b4d652744b4f0447`
 
 - :ref:`exhale_function_trtorch_8h_1a589ea96d16e2df44146ad0919424e00e`

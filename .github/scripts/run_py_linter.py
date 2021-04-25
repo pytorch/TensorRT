@@ -25,3 +25,8 @@ if output.returncode != 0:
     approval = 'REQUEST_CHANGES'
 
 pr.create_review(commit, comment, approval)
+
+if output.returncode != 0:
+    exit(1)
+else:
+    exit(0)

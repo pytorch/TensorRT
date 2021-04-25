@@ -141,7 +141,7 @@ def train(model, dataloader, crit, opt, epoch):
     model.train()
     running_loss = 0.0
     for batch, (data, labels) in enumerate(dataloader):
-        data, labels = data.cuda(), labels.cuda(async=True)
+        data, labels = data.cuda(), labels.cuda(non_blocking=True)
         opt.zero_grad()
         out = model(data)
         loss = crit(out, labels)
@@ -167,7 +167,7 @@ def test(model, dataloader, crit, epoch):
     model.eval()
     with torch.no_grad():
         for data, labels in dataloader:
-            data, labels = data.cuda(), labels.cuda(async=True)
+            data, labels = data.cuda(), labels.cuda(non_blocking=True)
             out = model(data)
             loss += crit(out, labels)
             preds = torch.max(out, 1)[1]

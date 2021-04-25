@@ -198,7 +198,7 @@ auto expand_registrations TRTORCH_UNUSED =
     RegisterNodeConversionPatterns()
         .pattern({"aten::expand(Tensor(a) self, int[] size, *, bool implicit=False) -> (Tensor(a))",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    auto in = args[0].ITensor();
+                    auto in = args[0].ITensorOrFreeze(ctx);
                     auto input_dims = in->getDimensions();
                     auto expanded_size = args[1].unwrapToIntList();
                     auto expandedDims = util::toDims(expanded_size);
@@ -213,9 +213,9 @@ auto expand_registrations TRTORCH_UNUSED =
                   }})
         .pattern({"aten::expand_as(Tensor(a) self, Tensor other) -> (Tensor(a))",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    auto in = args[0].ITensor();
+                    auto in = args[0].ITensorOrFreeze(ctx);
                     auto input_dims = in->getDimensions();
-                    auto targetTensor = args[1].ITensor();
+                    auto targetTensor = args[1].ITensorOrFreeze(ctx);
                     auto targetDims = targetTensor->getDimensions();
                     LOG_DEBUG("(expand_as layer) Expand input from " << input_dims << " to " << targetDims);
                     if (ctx->input_is_dynamic) {
@@ -227,7 +227,7 @@ auto expand_registrations TRTORCH_UNUSED =
                   }})
         .pattern({"aten::repeat(Tensor self, int[] repeats) -> (Tensor)",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    auto in = args[0].ITensor();
+                    auto in = args[0].ITensorOrFreeze(ctx);
                     auto input_dims = in->getDimensions();
                     auto repeats = args[1].unwrapToIntList().vec();
                     int repeats_rank = repeats.size();

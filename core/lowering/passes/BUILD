@@ -17,7 +17,7 @@ cc_library(
         "conv3d_to_convolution.cpp",
         "exception_elimination.cpp",
         "fuse_addmm_branches.cpp",
-        "fuse_flatten_linear.cpp",
+        "linear_to_addmm.cpp",
         "reduce_to.cpp",
         "remove_bn_dim_check.cpp",
         "remove_contiguous.cpp",

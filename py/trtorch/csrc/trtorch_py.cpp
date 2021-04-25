@@ -9,11 +9,95 @@
 #include "torch/custom_class.h"
 #include "torch/script.h"
 #include "torch/torch.h"
+#include "util.h"
 
 namespace py = pybind11;
 
 namespace trtorch {
 namespace pyapi {
+
+template <typename Derived>
+class pyCalibratorTrampoline : public Derived {
+ public:
+  using Derived::Derived; // Inherit constructors
+
+  int getBatchSize() const noexcept override {
+    PYBIND11_OVERLOAD_PURE_NAME(int, Derived, "get_batch_size", getBatchSize);
+  }
+
+  bool getBatch(void* bindings[], const char* names[], int nbBindings) noexcept override {
+    py::gil_scoped_acquire gil{};
+
+    py::function pyGetBatch = trtorch::pyapi::util::getOverload(static_cast<Derived*>(this), "get_batch");
+    std::vector<const char*> namesVec(names, names + nbBindings);
+    py::object result = pyGetBatch(namesVec);
+    // Copy over into the other data structure.
+    if (!result.is_none() && result.cast<std::vector<size_t>>().size() != 0) {
+      std::memcpy(bindings, result.cast<std::vector<size_t>>().data(), nbBindings * sizeof(void*));
+      return true;
+    }
+    return false;
+  }
+
+  const void* readCalibrationCache(std::size_t& length) noexcept override {
+    py::gil_scoped_acquire gil{};
+
+    py::function pyReadCalibrationCache =
+        trtorch::pyapi::util::getOverload(static_cast<Derived*>(this), "read_calibration_cache");
+    py::buffer cache = pyReadCalibrationCache();
+    if (!cache.is_none()) {
+      py::buffer_info info = cache.request();
+      length = info.size * info.itemsize;
+      return info.ptr;
+    }
+    return nullptr;
+  }
+
+  void writeCalibrationCache(const void* ptr, std::size_t length) noexcept override {
+    py::gil_scoped_acquire gil{};
+
+    py::function pyWriteCalibrationCache =
+        trtorch::pyapi::util::getOverload(static_cast<Derived*>(this), "write_calibration_cache");
+
+    py::memoryview cache{py::memoryview::from_buffer(static_cast<const uint8_t*>(ptr), {length}, {sizeof(uint8_t)})};
+    pyWriteCalibrationCache(cache);
+  }
+};
+
+class pyIInt8Calibrator : public pyCalibratorTrampoline<nvinfer1::IInt8Calibrator> {
+ public:
+  using Derived = pyCalibratorTrampoline<nvinfer1::IInt8Calibrator>;
+  using Derived::Derived;
+
+  nvinfer1::CalibrationAlgoType getAlgorithm() noexcept override {
+    PYBIND11_OVERLOAD_PURE_NAME(
+        nvinfer1::CalibrationAlgoType, nvinfer1::IInt8Calibrator, "get_algorithm", getAlgorithm);
+  }
+};
+
+class pyIInt8LegacyCalibrator : public pyCalibratorTrampoline<nvinfer1::IInt8LegacyCalibrator> {
+ public:
+  using Derived = pyCalibratorTrampoline<nvinfer1::IInt8LegacyCalibrator>;
+  using Derived::Derived;
+
+  double getQuantile() const noexcept override {
+    PYBIND11_OVERLOAD_PURE_NAME(double, nvinfer1::IInt8LegacyCalibrator, "get_quantile", getQuantile);
+  }
+
+  double getRegressionCutoff() const noexcept override {
+    PYBIND11_OVERLOAD_PURE_NAME(double, nvinfer1::IInt8LegacyCalibrator, "get_regression_cutoff", getRegressionCutoff);
+  }
+
+  const void* readHistogramCache(std::size_t& length) noexcept override {
+    PYBIND11_OVERLOAD_PURE_NAME(
+        const void*, nvinfer1::IInt8LegacyCalibrator, "read_histogram_cache", readHistogramCache, length);
+  }
+
+  void writeHistogramCache(const void* ptr, std::size_t length) noexcept override {
+    PYBIND11_OVERLOAD_PURE_NAME(
+        void, nvinfer1::IInt8LegacyCalibrator, "write_histogram_cache", writeHistogramCache, ptr, length);
+  }
+};
 
 void set_device(const int device_id) {
   core::set_device(device_id);
@@ -33,6 +117,10 @@ py::bytes ConvertGraphToTRTEngine(const torch::jit::Module& mod, const std::stri
 
 bool CheckMethodOperatorSupport(const torch::jit::Module& module, const std::string& method_name) {
   return core::CheckMethodOperatorSupport(module, method_name);
+}
+
+torch::jit::Module EmbedEngineInNewModule(const py::bytes& engine) {
+  return core::EmbedEngineInNewModule(engine);
 }
 
 std::string get_build_info() {
@@ -102,10 +190,57 @@ PYBIND11_MODULE(_C, m) {
       .value("safe_dla", EngineCapability::kSAFE_DLA, "Use safety DLA kernels only")
       .value("default", EngineCapability::kDEFAULT, "Use default behavior");
 
+  py::enum_<nvinfer1::CalibrationAlgoType>(m, "CalibrationAlgo", py::module_local(), "Type of calibration algorithm")
+      .value("LEGACY_CALIBRATION", nvinfer1::CalibrationAlgoType::kLEGACY_CALIBRATION)
+      .value("ENTROPY_CALIBRATION", nvinfer1::CalibrationAlgoType::kENTROPY_CALIBRATION)
+      .value("ENTROPY_CALIBRATION_2", nvinfer1::CalibrationAlgoType::kENTROPY_CALIBRATION_2)
+      .value("MINMAX_CALIBRATION", nvinfer1::CalibrationAlgoType::kMINMAX_CALIBRATION);
+
+  py::class_<nvinfer1::IInt8Calibrator, pyIInt8Calibrator>(
+      m, "IInt8Calibrator", py::module_local(), "Int8 Calibrator base class")
+      .def(py::init_alias<>()) // Always initialize trampoline class.
+      .def("get_batch_size", &nvinfer1::IInt8Calibrator::getBatchSize, "Get batch size")
+      .def("get_algorithm", &nvinfer1::IInt8Calibrator::getAlgorithm, "Get algorithm");
+
+  py::class_<nvinfer1::IInt8LegacyCalibrator, nvinfer1::IInt8Calibrator, pyIInt8LegacyCalibrator>(
+      m, "IInt8LegacyCalibrator", py::module_local(), "Int8 Legacy Calibrator class")
+      .def(py::init_alias<>()) // Always initialize trampoline class.
+      .def("get_batch_size", &nvinfer1::IInt8LegacyCalibrator::getBatchSize, "Get batch size")
+      .def("get_algorithm", &nvinfer1::IInt8LegacyCalibrator::getAlgorithm, "Get algorithm");
+
+  py::class_<
+      nvinfer1::IInt8EntropyCalibrator,
+      nvinfer1::IInt8Calibrator,
+      pyCalibratorTrampoline<nvinfer1::IInt8EntropyCalibrator>>(
+      m, "IInt8EntropyCalibrator", py::module_local(), "Int8 Entropy Calibrator class")
+      .def(py::init_alias<>()) // Always initialize trampoline class.
+      .def("get_batch_size", &nvinfer1::IInt8EntropyCalibrator::getBatchSize, "Get batch size")
+      .def("get_algorithm", &nvinfer1::IInt8EntropyCalibrator::getAlgorithm, "Get algorithm");
+
+  py::class_<
+      nvinfer1::IInt8EntropyCalibrator2,
+      nvinfer1::IInt8Calibrator,
+      pyCalibratorTrampoline<nvinfer1::IInt8EntropyCalibrator2>>(
+      m, "IInt8EntropyCalibrator2", py::module_local(), "Int8 Entropy Calibrator2 class")
+      .def(py::init_alias<>()) // Always initialize trampoline class.
+      .def("get_batch_size", &nvinfer1::IInt8EntropyCalibrator2::getBatchSize, "Get batch size")
+      .def("get_algorithm", &nvinfer1::IInt8EntropyCalibrator2::getAlgorithm, "Get algorithm");
+
+  py::class_<
+      nvinfer1::IInt8MinMaxCalibrator,
+      nvinfer1::IInt8Calibrator,
+      pyCalibratorTrampoline<nvinfer1::IInt8MinMaxCalibrator>>(
+      m, "IInt8MinMaxCalibrator", py::module_local(), "Int8 MinMax Calibrator class")
+      .def(py::init_alias<>()) // Always initialize trampoline class.
+      .def("get_batch_size", &nvinfer1::IInt8MinMaxCalibrator::getBatchSize, "Get batch size")
+      .def("get_algorithm", &nvinfer1::IInt8MinMaxCalibrator::getAlgorithm, "Get algorithm");
+
   py::class_<CompileSpec>(m, "CompileSpec")
       .def(py::init<>())
+      .def("_get_calibrator_handle", &CompileSpec::getPTQCalibratorHandle, "[Internal] gets a handle from a calibrator")
       .def_readwrite("input_ranges", &CompileSpec::input_ranges)
       .def_readwrite("op_precision", &CompileSpec::op_precision)
+      .def_readwrite("ptq_calibrator", &CompileSpec::ptq_calibrator)
       .def_readwrite("refit", &CompileSpec::refit)
       .def_readwrite("disable_tf32", &CompileSpec::disable_tf32)
       .def_readwrite("debug", &CompileSpec::debug)
@@ -115,7 +250,8 @@ PYBIND11_MODULE(_C, m) {
       .def_readwrite("num_min_timing_iters", &CompileSpec::num_min_timing_iters)
       .def_readwrite("num_avg_timing_iters", &CompileSpec::num_avg_timing_iters)
       .def_readwrite("workspace_size", &CompileSpec::workspace_size)
-      .def_readwrite("max_batch_size", &CompileSpec::max_batch_size);
+      .def_readwrite("max_batch_size", &CompileSpec::max_batch_size)
+      .def_readwrite("truncate_long_and_double", &CompileSpec::truncate_long_and_double);
 
   py::class_<Device>(m, "Device")
       .def(py::init<>())
@@ -138,6 +274,10 @@ PYBIND11_MODULE(_C, m) {
       "check_method_op_support",
       &trtorch::pyapi::CheckMethodOperatorSupport,
       "Takes a module and a method name and checks if the method graph contains purely convertable operators");
+  m.def(
+      "embed_engine_in_new_module",
+      &trtorch::pyapi::EmbedEngineInNewModule,
+      "Takes a serialized TensorRT engine and wraps it in the forward method of a new TorchScript module");
   m.def("get_build_info", &get_build_info, "Returns build info about the compiler as a string");
 
   m.def("_get_logging_prefix", &logging::get_logging_prefix, "Get the current prefix for the logging output");

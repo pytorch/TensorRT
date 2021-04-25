@@ -1011,7 +1011,7 @@ that are not supported are printed out and the function returns false, else true
          <span class="sig-paren">
           )
          </span>
-         → &lt;torch._C.ScriptClass object at 0x7f08ddd06260&gt;
+         → &lt;torch._C.ScriptClass object at 0x7faaac5bf570&gt;
          <a class="headerlink" href="#trtorch.TensorRTCompileSpec" title="Permalink to this definition">
           ¶
          </a>
@@ -1074,6 +1074,7 @@ to the graph. All other keys are optional. Entries for each method to be compile
         <span class="s2">"num_avg_timing_iters"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="c1"># Number of averaging timing iterations used to select kernels</span>
         <span class="s2">"workspace_size"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="c1"># Maximum size of workspace given to TensorRT</span>
         <span class="s2">"max_batch_size"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="c1"># Maximum batch size (must be &gt;= 1 to be set, 0 means not set)</span>
+        <span class="s2">"truncate_long_and_double"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="c1"># Truncate long and double into int and float</span>
     <span class="p">})</span>
 <span class="p">}</span>
 </pre>
