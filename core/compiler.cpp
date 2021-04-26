@@ -18,7 +18,6 @@
 #include "torch/custom_class.h"
 
 #include "core/compiler.h"
-#include "core/util/prelude.h"
 
 #include "core/conversion/conversion.h"
 #include "core/lowering/lowering.h"
@@ -31,8 +30,9 @@ namespace core {
 void AddEngineToGraph(
     torch::jit::script::Module mod,
     std::shared_ptr<torch::jit::Graph>& g,
-    std::string& serialized_engine,
-    int engine_id = 0) {
+    const std::string& serialized_engine,
+    int engine_id = 0,
+    bool fallback = false) {
   auto engine_ptr =
       c10::make_intrusive<runtime::TRTEngine>(mod._ivalue()->name() + std::to_string(engine_id), serialized_engine);
   // Get required metadata about the engine out
@@ -97,7 +97,7 @@ void AddEngineToGraph(
 
   // If there are multiple output tensors from TensorRT we wrap them in a tuple
   // to return, convert to tuple only when we only have 1 segmented graph
-  if (!engine_id && unpack_node->outputs().size() > 1) {
+  if (!fallback && unpack_node->outputs().size() > 1) {
     // Creates prim::TupleConstruct(<output tensors>) using outputs of the
     // unpack node
     auto return_tuple_node = g->createTuple(unpack_node->outputs());
@@ -173,7 +173,6 @@ void AddSegmentedBlockToGraph(
     old_to_new_g[seg.raw_outputs()[i]] = mini_to_new_g[seg.outputs()[i]];
   }
 
-  LOG_INFO(*g << "(AddSegmentedBlockToGraph)\n");
   return;
 }
 
@@ -212,7 +211,7 @@ graph_with_mapping ConstructFallbackBlock(torch::jit::script::Module& new_mod, t
       convert_cfg.input_ranges = input_ranges;
       auto engine = conversion::ConvertBlockToEngine(seg_block.block(), convert_cfg, named_params);
       auto temp_g = std::make_shared<torch::jit::Graph>();
-      AddEngineToGraph(new_mod, temp_g, engine, trt_engine_id++);
+      AddEngineToGraph(new_mod, temp_g, engine, trt_engine_id++, true);
 
       seg_block.update_graph(temp_g);
       AddSegmentedBlockToGraph(new_g, seg_block, old_to_new_g);
@@ -327,7 +326,6 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
     if (method.name().rfind("_", 0)) {
       auto new_g = std::make_shared<torch::jit::Graph>();
       auto graph_and_parameters = lowering::Lower(mod, method.name());
-      //      LOG_INFO(*(method.graph()) << "Original graph\n");
 
       auto g = graph_and_parameters.first;
       auto params = graph_and_parameters.second;
@@ -342,8 +340,7 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
 //      }
 
       std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_g;
-      int trt_engine_id = 1;
-
+      int trt_engine_id = 0;
       std::unordered_map<torch::jit::Value*, ir::InputRange> input_ranges;
       for (size_t i = 0; i < g->inputs().size(); ++i) {
         input_ranges.insert({g->inputs()[i], cfg.convert_info.input_ranges[i]});
@@ -413,6 +410,20 @@ torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod, C
       new_method->setSchema(schema);
     }
   }
+
+  return new_mod;
+}
+
+torch::jit::script::Module EmbedEngineInNewModule(const std::string& engine) {
+  std::ostringstream engine_id;
+  engine_id << reinterpret_cast<const int*>(&engine);
+  torch::jit::script::Module new_mod("tensorrt_engine_mod_" + engine_id.str());
+  auto new_g = std::make_shared<torch::jit::Graph>();
+  AddEngineToGraph(new_mod, new_g, engine);
+  auto new_method = new_mod._ivalue()->compilation_unit()->create_function("forward", new_g);
+  auto schema = util::GenerateGraphSchema(new_method->name(), new_g);
+  new_mod.type()->addMethod(new_method);
+  new_method->setSchema(schema);
 
   return new_mod;
 }

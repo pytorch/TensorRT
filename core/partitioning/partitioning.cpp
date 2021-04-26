@@ -4,15 +4,11 @@
 #include "core/conversion/conversion.h"
 #include "core/partitioning/shape_analysis.h"
 #include "torch/csrc/jit/passes/constant_pooling.h"
+#include "torch/csrc/jit/passes/dead_code_elimination.h"
 
 namespace trtorch {
 namespace core {
 namespace partitioning {
-
-inline bool isTensorOrTensorList(torch::jit::Value* val) {
-  return val->type()->isSubtypeOf(torch::jit::TensorType::get()) ||
-      val->type()->isSubtypeOf(torch::jit::ListType::ofTensors());
-}
 
 struct usage_info {
   int produce_id = -1;
@@ -20,8 +16,40 @@ struct usage_info {
   std::vector<int> tensorrt_use_id;
 };
 
+inline bool isTensorOrTensorList(torch::jit::Value* val) {
+  return val->type()->isSubtypeOf(torch::jit::TensorType::get()) ||
+      val->type()->isSubtypeOf(torch::jit::ListType::ofTensors());
+}
+
+bool isAllNodesSupported(const std::vector<torch::jit::Node*>& nodes) {
+  for (auto node : nodes) {
+    if (!conversion::OpSupported(node)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool containNonTensorInputs(torch::jit::Node* n, const std::unordered_set<torch::jit::Value*>& target_inputs) {
+  for (auto input : n->inputs()) {
+    if (!isTensorOrTensorList(input) && target_inputs.count(input)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool containNonTensorOutputs(torch::jit::Node* n) {
+  for (auto output : n->outputs()) {
+    if (!isTensorOrTensorList(output)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 std::vector<torch::jit::Node*> getDependencyNodes(std::vector<torch::jit::Value*>& vals) {
-  // using bfs to get the DAG dependency nodes for input value
+  // use bfs to get the DAG dependency nodes for input value
   std::queue<torch::jit::Value*, std::deque<torch::jit::Value*>> q(
       std::deque<torch::jit::Value*>(vals.begin(), vals.end()));
   std::unordered_set<torch::jit::Node*> visited;
@@ -43,7 +71,7 @@ std::vector<torch::jit::Node*> getDependencyNodes(std::vector<torch::jit::Value*
   return stk;
 }
 
-SegmentedBlock injectNodesForNonTensorInputs(SegmentedBlock& seg_block) {
+std::vector<SegmentedBlock> injectNodesForNonTensorInputs(SegmentedBlock& seg_block) {
   // reconstruct segmented_block if this block requires nonTensor input
   std::vector<torch::jit::Value*> nontensor_inputs;
   for (auto input : seg_block.raw_inputs()) {
@@ -51,9 +79,42 @@ SegmentedBlock injectNodesForNonTensorInputs(SegmentedBlock& seg_block) {
       nontensor_inputs.push_back(input);
     }
   }
-  std::vector<torch::jit::Node*> new_block_nodes = getDependencyNodes(nontensor_inputs);
-  new_block_nodes.insert(new_block_nodes.end(), seg_block.raw_nodes().begin(), seg_block.raw_nodes().end());
-  return std::move(SegmentedBlock(seg_block.target(), new_block_nodes));
+  std::vector<torch::jit::Node*> dependency_nodes = getDependencyNodes(nontensor_inputs);
+
+  std::vector<SegmentedBlock> new_seg_blocks;
+  // if current block is kTorch or current block is TensorRT and all dependent nodes are also supported, construct only
+  // one new block
+  if (seg_block.target() == SegmentedBlock::kTorch || isAllNodesSupported(dependency_nodes)) {
+    dependency_nodes.insert(dependency_nodes.end(), seg_block.raw_nodes().begin(), seg_block.raw_nodes().end());
+    new_seg_blocks.emplace_back(seg_block.target(), dependency_nodes);
+  } else {
+    // if current block is kTensorRT but the dependency nodes contain unsupported node, then we have to segment again
+    std::unordered_set<torch::jit::Value*> nontensor_inputs_set(nontensor_inputs.begin(), nontensor_inputs.end());
+    new_seg_blocks.emplace_back(SegmentedBlock::kTorch, dependency_nodes);
+    std::vector<torch::jit::Node*> tensorrt_nodes, pytorch_nodes;
+    bool prev_non_tensor_outputs = false;
+    for (auto n : seg_block.raw_nodes()) {
+      // it's a kTorch block if it uses the nonTensor input and the nonTensor input is produced in kTorch block
+      if (containNonTensorInputs(n, nontensor_inputs_set) || prev_non_tensor_outputs) {
+        if (!tensorrt_nodes.empty()) {
+          new_seg_blocks.emplace_back(SegmentedBlock::kTensorRT, tensorrt_nodes);
+        }
+        pytorch_nodes.push_back(n);
+        prev_non_tensor_outputs = containNonTensorOutputs(n);
+      } else {
+        if (!pytorch_nodes.empty()) {
+          new_seg_blocks.emplace_back(SegmentedBlock::kTorch, pytorch_nodes);
+        }
+        tensorrt_nodes.push_back(n);
+      }
+    }
+    if (!tensorrt_nodes.empty()) {
+      new_seg_blocks.emplace_back(SegmentedBlock::kTensorRT, tensorrt_nodes);
+    } else {
+      new_seg_blocks.emplace_back(SegmentedBlock::kTorch, pytorch_nodes);
+    }
+  }
+  return std::move(new_seg_blocks);
 }
 
 void resolveNonTensorInputs(PartitionedGraph& segmented_blocks) {
@@ -80,7 +141,7 @@ void resolveNonTensorInputs(PartitionedGraph& segmented_blocks) {
     if (segmented_blocks[use_info.produce_id].target() == SegmentedBlock::kTensorRT && !use_info.torch_use_id.empty()) {
       int first_torch_id = use_info.torch_use_id.front();
       if (!updated_segments.count(first_torch_id)) {
-        auto new_torch_block = injectNodesForNonTensorInputs(segmented_blocks[first_torch_id]);
+        auto new_torch_block = injectNodesForNonTensorInputs(segmented_blocks[first_torch_id]).front();
         segmented_blocks[first_torch_id] = new_torch_block;
         updated_segments.insert(first_torch_id);
       }
@@ -88,8 +149,9 @@ void resolveNonTensorInputs(PartitionedGraph& segmented_blocks) {
       // KTensorRT segments always need to inject nodes for the nonTensor inputs
       for (int i : use_info.tensorrt_use_id) {
         if (!updated_segments.count(i)) {
-          auto new_seg_block = injectNodesForNonTensorInputs(segmented_blocks[i]);
-          segmented_blocks[i] = new_seg_block;
+          auto to_inject_blocks = injectNodesForNonTensorInputs(segmented_blocks[i]);
+          segmented_blocks.erase(segmented_blocks.begin() + i);
+          segmented_blocks.insert(segmented_blocks.begin() + i, to_inject_blocks.begin(), to_inject_blocks.end());
           updated_segments.insert(i);
         }
       }
@@ -146,13 +208,17 @@ void registerSegmentsOutputs(PartitionedGraph& segmented_blocks, torch::jit::Blo
       }
     }
   }
-  // erase segments which still have no output
-  segmented_blocks.erase(
-      std::remove_if(
-          segmented_blocks.begin(),
-          segmented_blocks.end(),
-          [](SegmentedBlock& seg_block) { return seg_block.raw_outputs().empty(); }),
-      segmented_blocks.end());
+  std::for_each(
+      segmented_blocks.begin(),
+      segmented_blocks.end(),
+      [](SegmentedBlock& seg_block) { torch::jit::EliminateDeadCode(seg_block.g()); });
+      // erase segments which still have no output
+      segmented_blocks.erase(
+          std::remove_if(
+              segmented_blocks.begin(),
+              segmented_blocks.end(),
+              [](SegmentedBlock& seg_block) { return seg_block.raw_outputs().empty(); }),
+          segmented_blocks.end());
 
   return;
 }
@@ -168,8 +234,9 @@ std::vector<SegmentedBlock> segment_graph(torch::jit::Block* block, const Partit
   // segment the nodes
   std::vector<torch::jit::Node*> tensorrt_nodes, pytorch_nodes;
   for (const auto n : nodes) {
-    if (n->kind() == torch::jit::prim::Constant)
+    if (n->kind() == torch::jit::prim::Constant) {
       continue;
+    }
 
     std::string node_string(n->kind().toQualString());
     if (conversion::OpSupported(n) && !forced_fallback_operators.count(node_string)) {
