@@ -207,7 +207,7 @@ void registerSegmentsOutputs(PartitionedGraph& segmented_blocks, std::shared_ptr
   std::for_each(
       segmented_blocks.begin(),
       segmented_blocks.end(),
-      [](SegmentedBlock& seg_block) { torch::jit::EliminateDeadCode(seg_block.g()); })
+      [](SegmentedBlock& seg_block) { torch::jit::EliminateDeadCode(seg_block.g()); });
       // erase segments which still have no output
       segmented_blocks.erase(
           std::remove_if(
