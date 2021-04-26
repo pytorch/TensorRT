@@ -61,9 +61,10 @@ void getSegmentsOutputByRunning(
       jit_inputs_ivalues.push_back(ivalues_maps[input].toBool());
     } else if (input->type()->kind() == torch::jit::TypeKind::ListType) {
       jit_inputs_ivalues.push_back(ivalues_maps[input].toList());
-    } else {
-      TRTORCH_CHECK(input->type()->kind() == torch::jit::TypeKind::TupleType, "Input for mini graph is not TupleType.");
+    } else if (input->type()->kind() == torch::jit::TypeKind::TupleType){
       jit_inputs_ivalues.push_back(ivalues_maps[input].toTuple());
+    } else {
+      TRTORCH_THROW_ERROR("Unable to find type for value: " << input->debugName() << " to get the ivalues.\n");
     }
   }
 

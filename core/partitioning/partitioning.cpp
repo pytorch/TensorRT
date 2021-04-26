@@ -4,6 +4,7 @@
 #include "core/conversion/conversion.h"
 #include "core/partitioning/shape_analysis.h"
 #include "torch/csrc/jit/passes/constant_pooling.h"
+#include "torch/csrc/jit/passes/dead_code_elimination.h"
 
 namespace trtorch {
 namespace core {
@@ -203,13 +204,17 @@ void registerSegmentsOutputs(PartitionedGraph& segmented_blocks, std::shared_ptr
       }
     }
   }
-  // erase segments which still have no output
-  segmented_blocks.erase(
-      std::remove_if(
-          segmented_blocks.begin(),
-          segmented_blocks.end(),
-          [](SegmentedBlock& seg_block) { return seg_block.raw_outputs().empty(); }),
-      segmented_blocks.end());
+  std::for_each(
+      segmented_blocks.begin(),
+      segmented_blocks.end(),
+      [](SegmentedBlock& seg_block) { torch::jit::EliminateDeadCode(seg_block.g()); })
+      // erase segments which still have no output
+      segmented_blocks.erase(
+          std::remove_if(
+              segmented_blocks.begin(),
+              segmented_blocks.end(),
+              [](SegmentedBlock& seg_block) { return seg_block.raw_outputs().empty(); }),
+          segmented_blocks.end());
 
   return;
 }
@@ -225,8 +230,9 @@ std::vector<SegmentedBlock> segment_graph(std::shared_ptr<torch::jit::Graph> g, 
   // segment the nodes
   std::vector<torch::jit::Node*> tensorrt_nodes, pytorch_nodes;
   for (const auto n : nodes) {
-    if (n->kind() == torch::jit::prim::Constant)
+    if (n->kind() == torch::jit::prim::Constant) {
       continue;
+    }
 
     std::string node_string(n->kind().toQualString());
     if (conversion::OpSupported(n) && !forced_fallback_operators.count(node_string)) {

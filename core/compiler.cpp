@@ -17,7 +17,6 @@
 #include "torch/custom_class.h"
 
 #include "core/compiler.h"
-#include "core/util/prelude.h"
 
 #include "core/conversion/conversion.h"
 #include "core/lowering/lowering.h"
@@ -31,7 +30,8 @@ void AddEngineToGraph(
     torch::jit::script::Module mod,
     std::shared_ptr<torch::jit::Graph>& g,
     const std::string& serialized_engine,
-    int engine_id = 0) {
+    int engine_id = 0,
+    bool fallback = false) {
   auto engine_ptr =
       c10::make_intrusive<runtime::TRTEngine>(mod._ivalue()->name() + std::to_string(engine_id), serialized_engine);
   // Get required metadata about the engine out
@@ -96,7 +96,7 @@ void AddEngineToGraph(
 
   // If there are multiple output tensors from TensorRT we wrap them in a tuple
   // to return, convert to tuple only when we only have 1 segmented graph
-  if (!engine_id && unpack_node->outputs().size() > 1) {
+  if (!fallback && unpack_node->outputs().size() > 1) {
     // Creates prim::TupleConstruct(<output tensors>) using outputs of the
     // unpack node
     auto return_tuple_node = g->createTuple(unpack_node->outputs());
@@ -196,10 +196,11 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
       // segment the graph and convert segmented TensorRT block
       auto segmented_blocks = partitioning::Partition(g, convert_cfg.input_ranges, cfg.partition_info);
       if (segmented_blocks.size() == 1 && segmented_blocks[0].target() == partitioning::SegmentedBlock::kTorch) {
+        LOG_WARNING("Didn't generate any TensorRT engines, the compiler did nothing\n");
         return mod;
       }
 
-      int trt_engine_id = 1;
+      int trt_engine_id = 0;
       std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_g;
       // add global graph's input to old_to_new_g mapping
       for (auto input : g->inputs()) {
@@ -216,7 +217,7 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
           convert_cfg.input_ranges = input_ranges;
           auto engine = conversion::ConvertBlockToEngine(seg_block.block(), convert_cfg, named_params);
           auto temp_g = std::make_shared<torch::jit::Graph>();
-          AddEngineToGraph(new_mod, temp_g, engine, trt_engine_id++);
+          AddEngineToGraph(new_mod, temp_g, engine, trt_engine_id++, true);
 
           seg_block.update_graph(temp_g);
           AddSegmentedBlockToGraph(new_g, seg_block, old_to_new_g);

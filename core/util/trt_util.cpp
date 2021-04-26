@@ -350,20 +350,6 @@ c10::optional<nvinfer1::DataType> toTRTDataType(caffe2::TypeMeta dtype) {
   }
 }
 
-c10::FunctionSchema GenerateGraphSchema(std::string method_name, std::shared_ptr<torch::jit::Graph>& g) {
-  std::vector<c10::Argument> args;
-  for (auto in : g->inputs()) {
-    args.push_back(c10::Argument(in->debugName(), in->type()));
-  }
-
-  std::vector<c10::Argument> returns;
-  for (auto out : g->outputs()) {
-    returns.push_back(c10::Argument(out->debugName(), out->type()));
-  }
-
-  return c10::FunctionSchema(method_name, method_name, args, returns);
-}
-
 torch::jit::Value* getOrAddInputForValue(
     torch::jit::Value* old_value,
     std::shared_ptr<torch::jit::Graph>& graph,

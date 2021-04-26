@@ -76,7 +76,7 @@ struct SegmentedBlock {
 
  private:
   SegmentedBlockTarget target_;
-  std::vector<ir::InputRange> in_shape_; // REVIEW: This should just be ir::InputRange
+  std::vector<ir::InputRange> in_shape_;
   std::vector<torch::jit::Value*> inputs_;
   std::vector<torch::jit::Value*> outputs_;
   std::vector<torch::jit::Node*> nodes_;

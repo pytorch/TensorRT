@@ -33,6 +33,20 @@ inline std::vector<int64_t> toVec(c10::IntArrayRef a) {
   return arr;
 }
 
+inline c10::FunctionSchema GenerateGraphSchema(std::string method_name, std::shared_ptr<torch::jit::Graph>& g) {
+  std::vector<c10::Argument> args;
+  for (auto in : g->inputs()) {
+    args.push_back(c10::Argument(in->debugName(), in->type()));
+  }
+
+  std::vector<c10::Argument> returns;
+  for (auto out : g->outputs()) {
+    returns.push_back(c10::Argument(out->debugName(), out->type()));
+  }
+
+  return c10::FunctionSchema(method_name, method_name, args, returns);
+}
+
 } // namespace util
 } // namespace core
 } // namespace trtorch
