@@ -4,6 +4,36 @@
 #include "tests/util/util.h"
 #include "torch/csrc/jit/ir/irparser.h"
 
+TEST(Converters, ATenLayerNormConvertsCorrectlyLast3DimsNoGammaBeta) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor):
+        %gamma : None = prim::Constant()
+        %beta : None = prim::Constant()
+        %1: int = prim::Constant[value=3]()
+        %2: int = prim::Constant[value=100]()
+        %3: int = prim::Constant[value=100]()
+        %4 : int[] = prim::ListConstruct(%1, %2, %3)
+        %7 : bool = prim::Constant[value=0]()
+        %8 : float = prim::Constant[value=1.0000000000000001e-05]()
+        %9 : Tensor = aten::layer_norm(%0, %4, %gamma, %beta, %8, %7)
+        return (%9))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto in = at::randint(1, 10, {4, 3, 100, 100}, {at::kCUDA});
+
+  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
+
+  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
+
+  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+ 
+}
+
+
 TEST(Converters, ATenLayerNormConvertsCorrectlyLast3Dims) {
   const auto graph = R"IR(
       graph(%0 : Tensor,
