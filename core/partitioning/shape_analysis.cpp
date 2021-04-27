@@ -6,7 +6,8 @@ namespace trtorch {
 namespace core {
 namespace partitioning {
 
-std::unordered_map<torch::jit::Value*, torch::jit::IValue> generateRandomInputs(std::unordered_map<torch::jit::Value*, ir::InputRange>& input_ranges) {
+std::unordered_map<torch::jit::Value*, torch::jit::IValue> generateRandomInputs(
+    std::unordered_map<torch::jit::Value*, ir::InputRange>& input_ranges) {
   // generate random inputs for running pytorch segments
   std::unordered_map<torch::jit::Value*, torch::jit::IValue> ivalue_maps;
   std::vector<torch::jit::IValue> random_inputs;
@@ -63,14 +64,13 @@ void getSegmentsOutputByRunning(
     } else if (input->type()->kind() == torch::jit::TypeKind::TupleType) {
       jit_inputs_ivalues.push_back(ivalues_maps[input].toTuple());
     } else {
-     TRTORCH_THROW_ERROR("Unable to find type for value: " << input->debugName() << " to get the ivalues.\n");
+      TRTORCH_THROW_ERROR("Unable to find type for value: " << input->debugName() << " to get the ivalues.\n");
     }
   }
 
   // run segments to get outputs for later segments input shape, and other arguments such as Int
   std::vector<torch::jit::IValue> jit_results;
   torch::jit::IValue jit_results_ivalues = cur_mod.forward(jit_inputs_ivalues);
-
 
   if (jit_results_ivalues.isTuple()) {
     auto results = jit_results_ivalues.toTuple()->elements();

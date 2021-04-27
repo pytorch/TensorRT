@@ -95,14 +95,17 @@ std::vector<SegmentedBlock> injectNodesForNonTensorInputs(SegmentedBlock& seg_bl
     for (auto n : seg_block.raw_nodes()) {
       // it's a kTorch block if it uses the nonTensor input and the nonTensor input is produced in kTorch block
       if (containNonTensorInputs(n, nontensor_inputs_set) || prev_non_tensor_outputs) {
+        printf("containNonTensorInputs\n");
         if (!tensorrt_nodes.empty()) {
           new_seg_blocks.emplace_back(SegmentedBlock::kTensorRT, tensorrt_nodes);
+          tensorrt_nodes.clear();
         }
         pytorch_nodes.push_back(n);
         prev_non_tensor_outputs = containNonTensorOutputs(n);
       } else {
         if (!pytorch_nodes.empty()) {
           new_seg_blocks.emplace_back(SegmentedBlock::kTorch, pytorch_nodes);
+          pytorch_nodes.clear();
         }
         tensorrt_nodes.push_back(n);
       }
@@ -168,7 +171,6 @@ void registerSegmentsOutputs(PartitionedGraph& segmented_blocks, torch::jit::Blo
       printf("input: %s\n", input->debugName().c_str());
       input_values.insert(input);
     }
-    printf("ddd\n");
   }
 
   for (auto& graph_output : block->outputs()) {
@@ -207,7 +209,10 @@ void registerSegmentsOutputs(PartitionedGraph& segmented_blocks, torch::jit::Blo
       }
     }
   }
+
   std::for_each(segmented_blocks.begin(), segmented_blocks.end(), [](SegmentedBlock& seg_block) {
+    LOG_INFO(*seg_block.g() << "(afterregisteroutput)\n");
+
     torch::jit::EliminateDeadCode(seg_block.g());
   });
   // erase segments which still have no output
@@ -275,7 +280,7 @@ std::vector<SegmentedBlock> segment_graph(torch::jit::Block* block, const Partit
 
 std::vector<SegmentedBlock> Partition(
     torch::jit::Block* block,
-    std::unordered_map<torch::jit::Value*, ir::InputRange>& input_ranges,
+    std::unordered_map<torch::jit::Value*, torch::jit::IValue>& ivalues_maps,
     const PartitionInfo& partition_info) {
   LOG_DEBUG(partition_info);
   // segment lowering global graph into blocks
@@ -288,16 +293,7 @@ std::vector<SegmentedBlock> Partition(
   registerSegmentsOutputs(segmented_blocks, block);
 
   // store the mapping from lowering graph torch::jit::Value => torch::jit::IValue that we get by running segments
-  std::unordered_map<torch::jit::Value*, torch::jit::IValue> ivalues_maps = generateRandomInputs(input_ranges);
-//  int idx = 0;
-//  for (size_t i = 0; i < block->inputs().size(); ++i) {
-//    if (!block->inputs()[i]->type()->isSubtypeOf(torch::jit::TensorType::get())) continue;
-//    ivalues_maps[block->inputs()[i]] = random_inputs[idx++];
-//  }
-
-//  for (auto& seg_block : segmented_blocks) {
-//    LOG_INFO(*seg_block.g() << "(in partition)\n");
-//  }
+  //  std::unordered_map<torch::jit::Value*, torch::jit::IValue> ivalues_maps = generateRandomInputs(input_ranges);
 
   // register every segment's input shape, and it's running output IValues
   for (auto& seg_block : segmented_blocks) {

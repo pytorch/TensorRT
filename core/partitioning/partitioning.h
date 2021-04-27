@@ -5,6 +5,7 @@
 #include "core/ir/ir.h"
 #include "core/partitioning/PartitionInfo.h"
 #include "core/partitioning/SegmentedBlock.h"
+#include "core/partitioning/shape_analysis.h"
 #include "core/util/prelude.h"
 #include "torch/csrc/jit/ir/ir.h"
 
@@ -18,10 +19,8 @@ PartitionedGraph segment_graph(std::shared_ptr<torch::jit::Graph> g, const Parti
 
 std::vector<SegmentedBlock> Partition(
     torch::jit::Block* block,
-    std::unordered_map<torch::jit::Value*, ir::InputRange>& input_ranges,
+    std::unordered_map<torch::jit::Value*, torch::jit::IValue>& ivalues_maps,
     const PartitionInfo& partition_info);
-
-
 
 } // namespace partitioning
 } // namespace core

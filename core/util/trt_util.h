@@ -3,8 +3,8 @@
 #include "ATen/Tensor.h"
 #include "ATen/core/List.h"
 #include "NvInfer.h"
-#include "torch/csrc/jit/ir/ir.h"
 #include "torch/csrc/jit/api/module.h"
+#include "torch/csrc/jit/ir/ir.h"
 
 namespace nvinfer1 {
 inline std::ostream& operator<<(std::ostream& stream, const nvinfer1::DataType& dtype) {

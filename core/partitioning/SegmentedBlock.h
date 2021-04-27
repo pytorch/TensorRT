@@ -74,11 +74,11 @@ struct SegmentedBlock {
     return target_;
   }
 
-  void update_mapping(std::unordered_map<torch::jit::Value*, torch::jit::Value*> &new_map) {
+  void update_mapping(std::unordered_map<torch::jit::Value*, torch::jit::Value*>& new_map) {
     old_to_new_ = new_map;
   }
 
-// private:
+  // private:
   SegmentedBlockTarget target_;
   std::vector<ir::InputRange> in_shape_;
   std::vector<torch::jit::Value*> inputs_;
