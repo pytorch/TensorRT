@@ -97,12 +97,14 @@ std::vector<SegmentedBlock> injectNodesForNonTensorInputs(SegmentedBlock& seg_bl
       if (containNonTensorInputs(n, nontensor_inputs_set) || prev_non_tensor_outputs) {
         if (!tensorrt_nodes.empty()) {
           new_seg_blocks.emplace_back(SegmentedBlock::kTensorRT, tensorrt_nodes);
+          tensorrt_nodes.clear();
         }
         pytorch_nodes.push_back(n);
         prev_non_tensor_outputs = containNonTensorOutputs(n);
       } else {
         if (!pytorch_nodes.empty()) {
           new_seg_blocks.emplace_back(SegmentedBlock::kTorch, pytorch_nodes);
+          pytorch_nodes.clear();
         }
         tensorrt_nodes.push_back(n);
       }
