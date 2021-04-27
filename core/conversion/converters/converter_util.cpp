@@ -24,7 +24,7 @@ nvinfer1::ITensor* addPadding(ConversionCtx* ctx, const torch::jit::Node* n, nvi
     shuffle_layer->setName((util::node_info(n) + " [Reshape to " + util::toStr(newDims) + ']').c_str());
     return shuffle_layer->getOutput(0);
   } else {
-    return nullptr;
+    return tensor;
   }
 }
 

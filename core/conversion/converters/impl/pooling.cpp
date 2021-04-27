@@ -142,7 +142,7 @@ bool PoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& args,
   if (pool_type == nvinfer1::PoolingType::kMAX) {
     auto dilation = util::toDims(args[4].unwrapToIntList());
 
-    TRTORCH_ASSERT(
+    TRTORCH_CHECK(
         dilation == util::toDims(std::vector<int64_t>(dilation.nbDims, 1)),
         "Pooling dilation is not supported in TensorRT");
 
@@ -160,7 +160,7 @@ bool PoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& args,
     TRTORCH_CHECK(new_layer, "Unable to create Avg Pooling layer from node: " << *n);
     new_layer->setAverageCountExcludesPadding(!count_inlcude_pad);
   } else {
-    TRTORCH_ASSERT(0, "Unsupported pool mode!");
+    TRTORCH_THROW_ERROR("Unsupported pool mode!");
   }
 
   auto padding_mode =
