@@ -90,7 +90,6 @@ std::vector<SegmentedBlock> injectNodesForNonTensorInputs(SegmentedBlock& seg_bl
   } else {
     // if current block is kTensorRT but the dependency nodes contain unsupported node, then we have to segment again
     std::unordered_set<torch::jit::Value*> nontensor_inputs_set(nontensor_inputs.begin(), nontensor_inputs.end());
-    new_seg_blocks.emplace_back(SegmentedBlock::kTorch, dependency_nodes);
     std::vector<torch::jit::Node*> tensorrt_nodes, pytorch_nodes;
     bool prev_non_tensor_outputs = false;
     for (auto n : seg_block.raw_nodes()) {
@@ -204,17 +203,16 @@ void registerSegmentsOutputs(PartitionedGraph& segmented_blocks, std::shared_ptr
       }
     }
   }
-  std::for_each(
-      segmented_blocks.begin(),
-      segmented_blocks.end(),
-      [](SegmentedBlock& seg_block) { torch::jit::EliminateDeadCode(seg_block.g()); });
-      // erase segments which still have no output
-      segmented_blocks.erase(
-          std::remove_if(
-              segmented_blocks.begin(),
-              segmented_blocks.end(),
-              [](SegmentedBlock& seg_block) { return seg_block.raw_outputs().empty(); }),
-          segmented_blocks.end());
+  std::for_each(segmented_blocks.begin(), segmented_blocks.end(), [](SegmentedBlock& seg_block) {
+    torch::jit::EliminateDeadCode(seg_block.g());
+  });
+  // erase segments which still have no output
+  segmented_blocks.erase(
+      std::remove_if(
+          segmented_blocks.begin(),
+          segmented_blocks.end(),
+          [](SegmentedBlock& seg_block) { return seg_block.raw_outputs().empty(); }),
+      segmented_blocks.end());
 
   return;
 }
