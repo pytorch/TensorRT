@@ -240,6 +240,11 @@ struct TRTORCH_API CompileSpec {
   DataType op_precision = DataType::kFloat;
 
   /**
+   * List of available layer precisions for TensorRT to consider during engine building.
+   */
+  std::vector<std::string> enabled_precisions = {"fp32"};
+
+  /**
    * Prevent Float32 layers from using TF32 data format
    *
    * TF32 computes inner products by rounding the inputs to 10-bit mantissas
