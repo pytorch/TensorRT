@@ -103,6 +103,7 @@ test_suite(
     ":test_conv_deconv",
     ":test_element_wise",
     ":test_expand",
+    ":test_layer_norm",
     ":test_linear",
     ":test_matrix_multiply",
     ":test_pooling",
