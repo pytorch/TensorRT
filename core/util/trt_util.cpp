@@ -167,9 +167,9 @@ nvinfer1::Dims unsqueezeDims(const nvinfer1::Dims& d, int pos, int val, bool use
   nvinfer1::Dims dims;
   for (int i = 0, j = 0; j <= d.nbDims; j++) {
     // add new dimension at pos
-    if (j == pos)
+    if (j == pos) {
       dims.d[j] = val;
-    else {
+    } else {
       dims.d[j] = (use_zeros && d.d[i] == -1) ? 0 : d.d[i];
       ++i;
     }
@@ -187,8 +187,9 @@ nvinfer1::Dims squeezeDims(const nvinfer1::Dims& d, int pos, bool use_zeros) {
   nvinfer1::Dims dims;
   int j = 0;
   for (int i = 0; i < d.nbDims; i++) {
-    if (i != pos)
+    if (i != pos) {
       dims.d[j++] = (use_zeros && d.d[i] == -1) ? 0 : d.d[i];
+    }
   }
   dims.nbDims = j;
 

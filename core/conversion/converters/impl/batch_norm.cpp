@@ -43,7 +43,7 @@ auto batch_norm_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().
 
       // Expand spatial dims from 1D to 2D if needed
       bool expandDims = (orig_shape.nbDims < 4);
-      
+
       if (expandDims) {
         input = addPadding(ctx, n, input, 4);
       }
