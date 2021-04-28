@@ -7,7 +7,13 @@ namespace core {
 namespace conversion {
 namespace converters {
 
-nvinfer1::ITensor* addPadding(ConversionCtx* ctx, const torch::jit::Node* n, nvinfer1::ITensor* tensor, int nDim, bool trailing, bool use_zeros) {
+nvinfer1::ITensor* addPadding(
+    ConversionCtx* ctx,
+    const torch::jit::Node* n,
+    nvinfer1::ITensor* tensor,
+    int nDim,
+    bool trailing,
+    bool use_zeros) {
   const auto dims = tensor->getDimensions();
 
   if (dims.nbDims < nDim) {
@@ -28,7 +34,13 @@ nvinfer1::ITensor* addPadding(ConversionCtx* ctx, const torch::jit::Node* n, nvi
   }
 }
 
-nvinfer1::ITensor* addUnpadding(ConversionCtx* ctx, const torch::jit::Node* n, nvinfer1::ITensor* tensor, int nDim, bool trailing, bool use_zeros) {
+nvinfer1::ITensor* addUnpadding(
+    ConversionCtx* ctx,
+    const torch::jit::Node* n,
+    nvinfer1::ITensor* tensor,
+    int nDim,
+    bool trailing,
+    bool use_zeros) {
   const auto dims = tensor->getDimensions();
   if (dims.nbDims > nDim) {
     auto newDims = dims;
