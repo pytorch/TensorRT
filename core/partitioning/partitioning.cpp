@@ -2,7 +2,6 @@
 
 #include <queue>
 #include "core/conversion/conversion.h"
-#include "core/partitioning/shape_analysis.h"
 #include "torch/csrc/jit/passes/constant_pooling.h"
 #include "torch/csrc/jit/passes/dead_code_elimination.h"
 
@@ -118,7 +117,7 @@ std::vector<SegmentedBlock> injectNodesForNonTensorInputs(SegmentedBlock& seg_bl
   return std::move(new_seg_blocks);
 }
 
-void resolveNonTensorInputs(PartitionedGraph& segmented_blocks, std::shared_ptr<torch::jit::Graph> g) {
+void resolveNonTensorInputs(PartitionedGraph& segmented_blocks) {
   // for NonTensor inputs in TensorRT segments, count the usages on Torch segments and TensorRT segments
   std::unordered_map<torch::jit::Value*, usage_info> usage_counts;
   for (int i = segmented_blocks.size() - 1; i >= 0; --i) {
@@ -161,7 +160,7 @@ void resolveNonTensorInputs(PartitionedGraph& segmented_blocks, std::shared_ptr<
   return;
 }
 
-void registerSegmentsOutputs(PartitionedGraph& segmented_blocks, std::shared_ptr<torch::jit::Graph> g) {
+void registerSegmentsOutputs(PartitionedGraph& segmented_blocks, torch::jit::Block* block) {
   // find the corresponding raw values in original global graph for this segmented block's inputs/outputs
   std::set<torch::jit::Value*> input_values;
   for (auto& seg_block : segmented_blocks) {
@@ -170,7 +169,7 @@ void registerSegmentsOutputs(PartitionedGraph& segmented_blocks, std::shared_ptr
     }
   }
 
-  for (auto& graph_output : g->outputs()) {
+  for (auto& graph_output : block->outputs()) {
     input_values.insert(graph_output);
   }
 
@@ -219,12 +218,13 @@ void registerSegmentsOutputs(PartitionedGraph& segmented_blocks, std::shared_ptr
   return;
 }
 
-std::vector<SegmentedBlock> segment_graph(std::shared_ptr<torch::jit::Graph> g, const PartitionInfo& partition_info) {
+std::vector<SegmentedBlock> segment_graph(torch::jit::Block* block, const PartitionInfo& partition_info) {
   auto min_block_size = partition_info.min_block_size;
   std::unordered_set<std::string> forced_fallback_operators(
       partition_info.forced_fallback_operators.begin(), partition_info.forced_fallback_operators.end());
 
-  auto nodes = g->block()->nodes();
+
+  auto nodes = block->nodes();
   std::vector<SegmentedBlock> segmented_blocks;
 
   // segment the nodes
@@ -248,6 +248,16 @@ std::vector<SegmentedBlock> segment_graph(std::shared_ptr<torch::jit::Graph> g, 
         pytorch_nodes.insert(pytorch_nodes.end(), tensorrt_nodes.begin(), tensorrt_nodes.end());
       }
       tensorrt_nodes.clear();
+      // if there is a prim::If then this if node will be encapsulated in a SegmentedBlock
+      // we shouldn't inject node for this block in dependency analysis process
+      if (n->kind() == torch::jit::prim::If) {
+        if (!pytorch_nodes.empty()) {
+          segmented_blocks.emplace_back(SegmentedBlock::kTorch, pytorch_nodes);
+          pytorch_nodes.clear();
+        }
+        segmented_blocks.emplace_back(SegmentedBlock::kTorch, std::vector<torch::jit::Node*>{n});
+        continue;
+      }
       pytorch_nodes.push_back(n);
     }
   }
@@ -265,30 +275,23 @@ std::vector<SegmentedBlock> segment_graph(std::shared_ptr<torch::jit::Graph> g, 
 }
 
 std::vector<SegmentedBlock> Partition(
-    std::shared_ptr<torch::jit::Graph> g,
-    std::vector<ir::InputRange>& input_ranges,
+    torch::jit::Block* block,
+    std::unordered_map<torch::jit::Value*, torch::jit::IValue>& input_ivalues_map,
     const PartitionInfo& partition_info) {
   LOG_DEBUG(partition_info);
   // segment lowering global graph into blocks
-  std::vector<SegmentedBlock> segmented_blocks = segment_graph(g, partition_info);
+  std::vector<SegmentedBlock> segmented_blocks = segment_graph(block, partition_info);
 
   // resolve nonTensor inputs/outputs
-  resolveNonTensorInputs(segmented_blocks, g);
+  resolveNonTensorInputs(segmented_blocks);
 
   // register input/output torch::jit::Value for segmented graphs
-  registerSegmentsOutputs(segmented_blocks, g);
-
-  // store the mapping from lowering graph torch::jit::Value => torch::jit::IValue that we get by running segments
-  std::unordered_map<torch::jit::Value*, torch::jit::IValue> ivalues_maps;
-  std::vector<torch::jit::IValue> random_inputs = generateRandomInputs(input_ranges);
-  for (size_t i = 0; i < g->inputs().size(); ++i) {
-    ivalues_maps[g->inputs()[i]] = random_inputs[i];
-  }
+  registerSegmentsOutputs(segmented_blocks, block);
 
   // register every segment's input shape, and it's running output IValues
   for (auto& seg_block : segmented_blocks) {
     torch::jit::ConstantPooling(seg_block.g());
-    getSegmentsOutputByRunning(seg_block, ivalues_maps);
+    getSegmentsOutputByRunning(seg_block, input_ivalues_map);
   }
 
   return segmented_blocks;
