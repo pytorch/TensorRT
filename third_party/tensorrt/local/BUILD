@@ -63,9 +63,9 @@ cc_library(
 cc_import(
     name = "nvinfer_static_lib",
     static_library = select({
-	":aarch64_linux": "lib/aarch64-linux-gnu/libnvinfer_static.a",
-	":windows": "lib/nvinfer.lib",
-	"//conditions:default": "lib/x86_64-linux-gnu/libnvinfer_static.a",
+        ":aarch64_linux": "lib/aarch64-linux-gnu/libnvinfer_static.a",
+        ":windows": "lib/nvinfer.lib",
+        "//conditions:default": "lib/x86_64-linux-gnu/libnvinfer_static.a",
     }),
     visibility = ["//visibility:private"],
 )
@@ -82,14 +82,14 @@ cc_import(
 
 cc_library(
     name = "nvinfer",
+    visibility = ["//visibility:public"],
     deps = [
         "nvinfer_headers",
         "nvinfer_lib",
-        "@cuda//:cudart",
         "@cuda//:cublas",
-        "@cudnn//:cudnn"
+        "@cuda//:cudart",
+        "@cudnn",
     ],
-    visibility = ["//visibility:public"],
 )
 
 ####################################################################################
@@ -104,7 +104,6 @@ cc_import(
     visibility = ["//visibility:private"],
 )
 
-
 cc_library(
     name = "nvparsers_headers",
     hdrs = select({
@@ -113,22 +112,22 @@ cc_library(
             "include/aarch64-linux-gnu/NvOnnxParser.h",
             "include/aarch64-linux-gnu/NvOnnxParserRuntime.h",
             "include/aarch64-linux-gnu/NvOnnxConfig.h",
-            "include/aarch64-linux-gnu/NvUffParser.h"
+            "include/aarch64-linux-gnu/NvUffParser.h",
         ],
         ":windows": [
             "include/NvCaffeParser.h",
             "include/NvOnnxParser.h",
             "include/NvOnnxParserRuntime.h",
             "include/NvOnnxConfig.h",
-            "include/NvUffParser.h"
+            "include/NvUffParser.h",
         ],
         "//conditions:default": [
             "include/x86_64-linux-gnu/NvCaffeParser.h",
             "include/x86_64-linux-gnu/NvOnnxParser.h",
             "include/x86_64-linux-gnu/NvOnnxParserRuntime.h",
             "include/x86_64-linux-gnu/NvOnnxConfig.h",
-            "include/x86_64-linux-gnu/NvUffParser.h"
-        ]
+            "include/x86_64-linux-gnu/NvUffParser.h",
+        ],
     }),
     includes = select({
         ":aarch64_linux": ["include/aarch64-linux-gnu"],
@@ -140,12 +139,12 @@ cc_library(
 
 cc_library(
     name = "nvparsers",
+    visibility = ["//visibility:public"],
     deps = [
+        "nvinfer",
         "nvparsers_headers",
         "nvparsers_lib",
-        "nvinfer"
     ],
-    visibility = ["//visibility:public"],
 )
 
 ####################################################################################
@@ -166,18 +165,18 @@ cc_library(
         ":aarch64_linux": [
             "include/aarch64-linux-gnu/NvOnnxParser.h",
             "include/aarch64-linux-gnu/NvOnnxParserRuntime.h",
-            "include/aarch64-linux-gnu/NvOnnxConfig.h"
+            "include/aarch64-linux-gnu/NvOnnxConfig.h",
         ],
         ":windows": [
             "include/NvOnnxParser.h",
             "include/NvOnnxParserRuntime.h",
-            "include/NvOnnxConfig.h"
+            "include/NvOnnxConfig.h",
         ],
         "//conditions:default": [
             "include/x86_64-linux-gnu/NvOnnxParser.h",
             "include/x86_64-linux-gnu/NvOnnxParserRuntime.h",
-            "include/x86_64-linux-gnu/NvOnnxConfig.h"
-        ]
+            "include/x86_64-linux-gnu/NvOnnxConfig.h",
+        ],
     }),
     includes = select({
         ":aarch64_linux": ["include/aarch64-linux-gnu"],
@@ -189,12 +188,12 @@ cc_library(
 
 cc_library(
     name = "nvonnxparser",
+    visibility = ["//visibility:public"],
     deps = [
+        "nvinfer",
         "nvonnxparser_headers",
         "nvonnxparser_lib",
-        "nvinfer"
     ],
-    visibility = ["//visibility:public"],
 )
 
 ####################################################################################
@@ -220,7 +219,7 @@ cc_library(
         ],
         "//conditions:default": [
             "include/x86_64-linux-gnu/NvOnnxParserRuntime.h",
-        ]
+        ],
     }),
     includes = select({
         ":aarch64_linux": ["include/aarch64-linux-gnu"],
@@ -232,12 +231,12 @@ cc_library(
 
 cc_library(
     name = "nvonnxparser_runtime",
+    visibility = ["//visibility:public"],
     deps = [
+        "nvinfer",
         "nvparsers_headers",
         "nvparsers_lib",
-        "nvinfer"
     ],
-    visibility = ["//visibility:public"],
 )
 
 ####################################################################################
@@ -263,7 +262,7 @@ cc_library(
         ],
         "//conditions:default": [
             "include/x86_64-linux-gnu/NvCaffeParser.h",
-        ]
+        ],
     }),
     includes = select({
         ":aarch64_linux": ["include/aarch64-linux-gnu"],
@@ -275,12 +274,12 @@ cc_library(
 
 cc_library(
     name = "nvcaffeparser",
+    visibility = ["//visibility:public"],
     deps = [
         "nvcaffeparser_headers",
         "nvcaffeparser_lib",
-        "nvinfer"
+        "nvinfer",
     ],
-    visibility = ["//visibility:public"],
 )
 
 ####################################################################################
@@ -300,7 +299,7 @@ cc_library(
     hdrs = select({
         ":aarch64_linux": glob(["include/aarch64-linux-gnu/NvInferPlugin*.h"]),
         ":windows": glob(["include/NvInferPlugin*.h"]),
-        "//conditions:default": glob(["include/x86_64-linux-gnu/NvInferPlugin*.h"])
+        "//conditions:default": glob(["include/x86_64-linux-gnu/NvInferPlugin*.h"]),
     }),
     includes = select({
         ":aarch64_linux": ["include/aarch64-linux-gnu"],
@@ -312,10 +311,10 @@ cc_library(
 
 cc_library(
     name = "nvinferplugin",
+    visibility = ["//visibility:public"],
     deps = [
+        "nvinfer",
         "nvinferplugin_headers",
         "nvinferplugin_lib",
-        "nvinfer"
     ],
-    visibility = ["//visibility:public"],
 )
