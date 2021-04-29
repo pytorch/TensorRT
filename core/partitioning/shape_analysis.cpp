@@ -1,6 +1,7 @@
 #include "core/partitioning/shape_analysis.h"
 #include "core/util/prelude.h"
 #include "torch/csrc/jit/api/module.h"
+#include "torch/csrc/jit/passes/constant_pooling.h"
 
 namespace trtorch {
 namespace core {
@@ -95,6 +96,25 @@ void getSegmentsOutputByRunning(
   }
 
   seg_block.register_inshape(input_shape);
+}
+
+void runShapeAnalysis(
+    std::vector<SegmentedBlock>& segmented_blocks,
+    std::vector<ir::InputRange>& input_ranges,
+    std::shared_ptr<torch::jit::Graph> g) {
+  // store the mapping from lowering graph torch::jit::Value => torch::jit::IValue that we get by running segments
+  std::unordered_map<torch::jit::Value*, torch::jit::IValue> ivalues_maps;
+  std::vector<torch::jit::IValue> random_inputs = generateRandomInputs(input_ranges);
+  for (size_t i = 0; i < g->inputs().size(); ++i) {
+    ivalues_maps[g->inputs()[i]] = random_inputs[i];
+  }
+
+  // register every segment's input shape, and it's running output IValues
+  for (auto& seg_block : segmented_blocks) {
+    torch::jit::ConstantPooling(seg_block.g());
+    getSegmentsOutputByRunning(seg_block, ivalues_maps);
+  }
+  return;
 }
 
 } // namespace partitioning

@@ -12,6 +12,7 @@
 #include "torch/csrc/jit/frontend/function_schema_parser.h"
 #include "torch/csrc/jit/ir/ir.h"
 #include "torch/csrc/jit/passes/graph_fuser.h"
+#include "torch/csrc/jit/passes/loop_unrolling.h"
 #include "torch/csrc/jit/passes/lower_graph.h"
 #include "torch/csrc/jit/passes/pass_manager.h"
 #include "torch/custom_class.h"
@@ -30,10 +31,9 @@ void AddEngineToGraph(
     torch::jit::script::Module mod,
     std::shared_ptr<torch::jit::Graph>& g,
     const std::string& serialized_engine,
-    int engine_id = 0,
+    std::string engine_id = "",
     bool fallback = false) {
-  auto engine_ptr =
-      c10::make_intrusive<runtime::TRTEngine>(mod._ivalue()->name() + std::to_string(engine_id), serialized_engine);
+  auto engine_ptr = c10::make_intrusive<runtime::TRTEngine>(mod._ivalue()->name() + engine_id, serialized_engine);
   // Get required metadata about the engine out
   auto num_io = engine_ptr->num_io;
   auto name = engine_ptr->name;
@@ -200,14 +200,17 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
         return mod;
       }
 
-      int trt_engine_id = 0;
       std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_g;
       // add global graph's input to old_to_new_g mapping
       for (auto input : g->inputs()) {
         util::getOrAddInputForValue(input, new_g, old_to_new_g);
       }
       for (auto& seg_block : segmented_blocks) {
-        LOG_INFO(*g << "(MiniGraphInSegmentedBlock)\n");
+        std::string cur_block_target =
+            seg_block.target() == partitioning::SegmentedBlock::kTensorRT ? "TensorRT" : "Torch";
+        LOG_INFO(*g << "(MiniGraphIn" << cur_block_target << "Block\n");
+        std::ostringstream trt_engine_id;
+        trt_engine_id << reinterpret_cast<const int*>(&seg_block);
         if (seg_block.target() == partitioning::SegmentedBlock::kTensorRT) {
           std::vector<ir::InputRange> input_ranges;
           for (auto& shape : seg_block.in_shape()) {
@@ -217,7 +220,7 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
           convert_cfg.input_ranges = input_ranges;
           auto engine = conversion::ConvertBlockToEngine(seg_block.block(), convert_cfg, named_params);
           auto temp_g = std::make_shared<torch::jit::Graph>();
-          AddEngineToGraph(new_mod, temp_g, engine, trt_engine_id++, true);
+          AddEngineToGraph(new_mod, temp_g, engine, trt_engine_id.str(), true);
 
           seg_block.update_graph(temp_g);
           AddSegmentedBlockToGraph(new_g, seg_block, old_to_new_g);

@@ -3,7 +3,6 @@
 #include <queue>
 #include "core/conversion/conversion.h"
 #include "core/partitioning/shape_analysis.h"
-#include "torch/csrc/jit/passes/constant_pooling.h"
 #include "torch/csrc/jit/passes/dead_code_elimination.h"
 
 namespace trtorch {
@@ -30,7 +29,7 @@ bool isAllNodesSupported(const std::vector<torch::jit::Node*>& nodes) {
   return true;
 }
 
-bool containNonTensorInputs(torch::jit::Node* n, const std::unordered_set<torch::jit::Value*>& target_inputs) {
+bool containTargetInputs(torch::jit::Node* n, const std::unordered_set<torch::jit::Value*>& target_inputs) {
   for (auto input : n->inputs()) {
     if (!isTensorOrTensorList(input) && target_inputs.count(input)) {
       return true;
@@ -94,7 +93,7 @@ std::vector<SegmentedBlock> injectNodesForNonTensorInputs(SegmentedBlock& seg_bl
     bool prev_non_tensor_outputs = false;
     for (auto n : seg_block.raw_nodes()) {
       // it's a kTorch block if it uses the nonTensor input and the nonTensor input is produced in kTorch block
-      if (containNonTensorInputs(n, nontensor_inputs_set) || prev_non_tensor_outputs) {
+      if (containTargetInputs(n, nontensor_inputs_set) || prev_non_tensor_outputs) {
         if (!tensorrt_nodes.empty()) {
           new_seg_blocks.emplace_back(SegmentedBlock::kTensorRT, tensorrt_nodes);
           tensorrt_nodes.clear();
@@ -278,18 +277,8 @@ std::vector<SegmentedBlock> Partition(
   // register input/output torch::jit::Value for segmented graphs
   registerSegmentsOutputs(segmented_blocks, g);
 
-  // store the mapping from lowering graph torch::jit::Value => torch::jit::IValue that we get by running segments
-  std::unordered_map<torch::jit::Value*, torch::jit::IValue> ivalues_maps;
-  std::vector<torch::jit::IValue> random_inputs = generateRandomInputs(input_ranges);
-  for (size_t i = 0; i < g->inputs().size(); ++i) {
-    ivalues_maps[g->inputs()[i]] = random_inputs[i];
-  }
-
-  // register every segment's input shape, and it's running output IValues
-  for (auto& seg_block : segmented_blocks) {
-    torch::jit::ConstantPooling(seg_block.g());
-    getSegmentsOutputByRunning(seg_block, ivalues_maps);
-  }
+  // run shape analysis on each segmented block
+  runShapeAnalysis(segmented_blocks, input_ranges, g);
 
   return segmented_blocks;
 }
