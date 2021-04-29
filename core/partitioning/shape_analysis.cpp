@@ -52,7 +52,9 @@ void getSegmentsOutputByRunning(
 
   // set inputs ivalues, now supports Tensor/Int to pass argumentes between different segments
   for (auto& input : seg_block.raw_inputs()) {
-    TRTORCH_CHECK(ivalues_maps.count(input), "Could not find torch::jit::Value* " << input->debugName() << " in lowering graph for mini graph input.\n");
+    TRTORCH_CHECK(
+        ivalues_maps.count(input),
+        "Could not find torch::jit::Value* " << input->debugName() << " in lowering graph for mini graph input.\n");
     if (input->node()->kind() == torch::jit::prim::Param) {
       jit_inputs_ivalues.push_back(ivalues_maps[input]);
     } else if (input->type()->isSubtypeOf(torch::jit::TensorType::get())) {

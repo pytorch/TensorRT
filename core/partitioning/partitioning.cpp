@@ -223,7 +223,6 @@ std::vector<SegmentedBlock> segment_graph(torch::jit::Block* block, const Partit
   std::unordered_set<std::string> forced_fallback_operators(
       partition_info.forced_fallback_operators.begin(), partition_info.forced_fallback_operators.end());
 
-
   auto nodes = block->nodes();
   std::vector<SegmentedBlock> segmented_blocks;
 

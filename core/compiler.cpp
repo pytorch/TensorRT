@@ -182,11 +182,62 @@ void AddSegmentedBlockToGraph(
   return;
 }
 
-typedef std::pair<std::shared_ptr<torch::jit::Graph>, std::unordered_map<torch::jit::Value*, torch::jit::Value*>> GraphAndMapping;
+typedef std::pair<std::shared_ptr<torch::jit::Graph>, std::unordered_map<torch::jit::Value*, torch::jit::Value*>>
+    GraphAndMapping;
 
-GraphAndMapping ConstructFallbackGraph(torch::jit::script::Module& new_mod, torch::jit::Block* block,
-                                                          std::unordered_map<torch::jit::Value*, torch::jit::IValue> input_ivalues_map,
-                                                          CompileSpec cfg, int& trt_engine_id, conversion::GraphParams named_params) {
+void AddIfBlockToGraph(
+    std::shared_ptr<torch::jit::Graph>& new_g,
+    torch::jit::Node* if_node,
+    const std::vector<GraphAndMapping>& graph_and_mappings,
+    std::unordered_map<torch::jit::Value*, torch::jit::Value*>& old_to_new_g) {
+  torch::jit::IfView if_view(if_node);
+
+  // create a new if node in new_g and add corresponding inputs
+  auto new_if = new_g->insertNode(new_g->create(torch::jit::prim::If, {}, 0));
+  new_if->addInput(util::getOrAddInputForValue(if_view.cond(), new_g, old_to_new_g));
+
+  for (auto graph_and_mapping : graph_and_mappings) {
+    auto new_if_block = new_if->addBlock();
+    auto cur_block_graph = graph_and_mapping.first;
+    auto cur_block_mapping = graph_and_mapping.second;
+    std::unordered_map<torch::jit::Value*, torch::jit::Value*> block_graph_to_new_g;
+    for (auto& i : cur_block_mapping) {
+      // for every pair in then_mapping, old_value => then value, if old_value also appears in old_to_new_g, then it's
+      // then graph's input
+      if (old_to_new_g.count(i.first)) {
+        block_graph_to_new_g[i.second] = old_to_new_g[i.first];
+      }
+    }
+
+    auto env = [&](torch::jit::Value* v) { return util::getOrAddInputForValue(v, new_g, block_graph_to_new_g); };
+    new_if_block->cloneFrom(cur_block_graph->block(), env);
+    if (cur_block_graph->inputs()[0]->type()->str().find("__torch__") != std::string::npos) {
+      if (new_g->inputs()[0]->type()->str().find("__torch__") == std::string::npos) {
+        auto self = new_g->insertInput(0, "self_1");
+        self->setType(loop_graph->inputs()[0]->type());
+      }
+      block_graph_to_new_g[cur_block_graph->inputs()[0]] = new_g->inputs()[0];
+    }
+    for (int i = cur_block_graph->inputs().size() - 1; i >= 0; --i) {
+      new_if_block->inputs()[i]->replaceAllUsesWith(block_graph_to_new_g[cur_block_graph->inputs()[i]]);
+      new_if_block->eraseInput(i);
+    }
+  }
+  for (auto ov : if_view.outputs()) {
+    auto no = new_if->addOutput();
+    old_to_new_g[ov] = no;
+    no->copyMetadata(ov);
+  }
+  return;
+}
+
+GraphAndMapping ConstructFallbackGraph(
+    torch::jit::script::Module& new_mod,
+    torch::jit::Block* block,
+    std::unordered_map<torch::jit::Value*, torch::jit::IValue> input_ivalues_map,
+    CompileSpec cfg,
+    int& trt_engine_id,
+    conversion::GraphParams named_params) {
   auto convert_cfg = cfg.convert_info;
   auto partition_info = cfg.partition_info;
 
@@ -218,51 +269,16 @@ GraphAndMapping ConstructFallbackGraph(torch::jit::script::Module& new_mod, torc
       AddSegmentedBlockToGraph(new_g, seg_block, old_to_new_g);
     } else {
       if (seg_block.raw_nodes()[0]->kind() == torch::jit::prim::If) {
-        auto outer_node = seg_block.raw_nodes()[0];
-        torch::jit::IfView if_view(outer_node);
-
+        auto if_node = seg_block.raw_nodes()[0];
 
         // convert the 2 blocks in prim::if and get the converted graph with mappings
         std::vector<GraphAndMapping> graph_and_mappings;
-        for (auto cur_block : outer_node->blocks()) {
-          graph_and_mappings.push_back(ConstructFallbackGraph(new_mod, cur_block, input_ivalues_map, cfg, trt_engine_id, named_params));
+        for (auto cur_block : if_node->blocks()) {
+          graph_and_mappings.push_back(
+              ConstructFallbackGraph(new_mod, cur_block, input_ivalues_map, cfg, trt_engine_id, named_params));
         }
+        AddIfBlockToGraph(new_g, if_node, graph_and_mappings, old_to_new_g);
 
-        // create a new if node in new_g and add corresponding inputs
-        auto new_if =
-            new_g->insertNode(new_g->create(torch::jit::prim::If, {}, 0));
-        new_if->addInput(util::getOrAddInputForValue(if_view.cond(), new_g, old_to_new_g));
-
-
-        for (auto graph_and_mapping : graph_and_mappings) {
-          auto new_if_block = new_if->addBlock();
-          auto cur_block_graph = graph_and_mapping.first;
-          auto cur_block_mapping = graph_and_mapping.second;
-          std::unordered_map<torch::jit::Value*, torch::jit::Value*> block_graph_to_new_g;
-          for (auto& i : cur_block_mapping) {
-            // for every pair in then_mapping, old_value => then value, if old_value also appears in old_to_new_g, then it's then graph's input
-            if (old_to_new_g.count(i.first)) {
-              block_graph_to_new_g[i.second] = old_to_new_g[i.first];
-            }
-          }
-
-          auto env = [&](torch::jit::Value* v) { return util::getOrAddInputForValue(v, new_g, block_graph_to_new_g); };
-          new_if_block->cloneFrom(cur_block_graph->block(), env);
-          if (cur_block_graph->inputs()[0]->type()->str().find("__torch__") != std::string::npos) {
-            block_graph_to_new_g[cur_block_graph->inputs()[0]] = new_g->inputs()[0];
-          }
-          for (int i = cur_block_graph->inputs().size() - 1; i >= 0; --i) {
-            new_if_block->inputs()[i]->replaceAllUsesWith(block_graph_to_new_g[cur_block_graph->inputs()[i]]);
-            new_if_block->eraseInput(i);
-          }
-        }
-        for (auto ov : if_view.outputs()) {
-          auto no = new_if->addOutput();
-          old_to_new_g[ov] = no;
-          no->copyMetadata(ov);
-        }
-
-        LOG_INFO(*new_g << "new g with if\n");
       } else {
         AddSegmentedBlockToGraph(new_g, seg_block, old_to_new_g);
       }
@@ -294,22 +310,23 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
       auto named_params = conversion::get_named_params(g->inputs(), params);
       LOG_INFO(*g << "(LoweringGraph)\n");
 
-      // segment the graph and convert segmented TensorRT block
-//      auto segmented_blocks = partitioning::Partition(g->block(), convert_cfg.input_ranges, cfg.partition_info);
-//      if (segmented_blocks.size() == 1 && segmented_blocks[0].target() == partitioning::SegmentedBlock::kTorch) {
-//        LOG_WARNING("Didn't generate any TensorRT engines, the compiler did nothing\n");
-//        return mod;
-//      }
-
       int trt_engine_id = 0;
       std::unordered_map<torch::jit::Value*, ir::InputRange> input_ranges;
       for (size_t i = 0; i < g->inputs().size(); ++i) {
         input_ranges.insert({g->inputs()[i], cfg.convert_info.input_ranges[i]});
       }
       auto input_ivalues_map = partitioning::generateRandomInputs(input_ranges);
-      auto graph_and_mapping = ConstructFallbackGraph(new_mod, g->block(), input_ivalues_map, cfg, trt_engine_id, named_params);
+      auto graph_and_mapping =
+          ConstructFallbackGraph(new_mod, g->block(), input_ivalues_map, cfg, trt_engine_id, named_params);
       new_g = graph_and_mapping.first;
       LOG_INFO(*new_g << "(FallbackGraph)\n");
+
+      // if there is no tensorrt engine self in fallback graph, there is no conversion, we just return the initial
+      // module
+      if (new_g->inputs()[0]->type()->str().find("__torch__") == std::string::npos) {
+        LOG_WARNING("Didn't generate any TensorRT engines, the compiler did nothing\n");
+        return mod;
+      }
 
       auto new_method = new_mod._ivalue()->compilation_unit()->create_function(method.name(), new_g);
       auto schema = util::GenerateGraphSchema(new_method->name(), new_g);
