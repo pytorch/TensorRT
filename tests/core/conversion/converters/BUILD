@@ -24,6 +24,10 @@ converter_test(
 )
 
 converter_test(
+    name = "test_cumsum"
+)
+
+converter_test(
     name = "test_element_wise",
 )
 
@@ -96,7 +100,9 @@ test_suite(
     tests = [
         ":test_activation",
         ":test_batch_norm",
+        ":test_concat",
         ":test_conv_deconv",
+        ":test_cumsum",
         ":test_element_wise",
         ":test_expand",
         ":test_interpolate",

@@ -36,6 +36,7 @@ cc_library(
         "impl/concat.cpp",
         "impl/constant.cpp",
         "impl/conv_deconv.cpp",
+        "impl/cumsum.cpp",
         "impl/element_wise.cpp",
         "impl/expand.cpp",
         "impl/interpolate.cpp",

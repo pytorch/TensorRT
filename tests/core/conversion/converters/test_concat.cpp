@@ -31,7 +31,7 @@ TEST(Converters, ATenCatPureTensorConvertsCorrectly) {
 TEST(Converters, ATenCatDiffTensorConvertsCorrectly) {
   const auto graph = R"IR(
       graph(%0 : Tensor,
-            %1 : Float(5:1)):
+            %1 : Float(5)):
         %2 : Tensor[] = prim::ListConstruct(%0, %1)
         %3 : int = prim::Constant[value=0]()
         %4 : Tensor = aten::cat(%2, %3)
