@@ -78,6 +78,17 @@ struct Device : torch::CustomClassHolder {
 std::string to_str(DeviceType value);
 nvinfer1::DeviceType toTRTDeviceType(DeviceType value);
 
+struct TorchFallback : torch::CustomClassHolder {
+  bool enabled;
+  int64_t min_block_size;
+  std::vector<std::string> forced_fallback_operators;
+  TorchFallback() : enabled(false), min_block_size(1) {}
+
+  ADD_FIELD_GET_SET(enabled, bool);
+  ADD_FIELD_GET_SET(min_block_size, int64_t);
+  ADD_FIELD_GET_SET(forced_fallback_operators, std::vector<std::string>);
+};
+
 enum class EngineCapability : int8_t {
   kDEFAULT,
   kSAFE_GPU,
@@ -102,6 +113,9 @@ struct CompileSpec : torch::CustomClassHolder {
     device = *d;
   }
 
+  void setTorchFallbackIntrusive(const c10::intrusive_ptr<TorchFallback>& fb) {
+    torch_fallback = *fb;
+  }
   void setPTQCalibratorViaHandle(int64_t handle) {
     ptq_calibrator = (nvinfer1::IInt8Calibrator*)handle;
   }
@@ -118,6 +132,7 @@ struct CompileSpec : torch::CustomClassHolder {
   ADD_FIELD_GET_SET(truncate_long_and_double, bool);
   ADD_FIELD_GET_SET(max_batch_size, int64_t);
   ADD_FIELD_GET_SET(device, Device);
+  ADD_FIELD_GET_SET(torch_fallback, TorchFallback);
   ADD_FIELD_GET_SET(ptq_calibrator, nvinfer1::IInt8Calibrator*);
 
   std::vector<InputRange> input_ranges;
@@ -129,6 +144,7 @@ struct CompileSpec : torch::CustomClassHolder {
   bool strict_types = false;
   bool truncate_long_and_double = false;
   Device device;
+  TorchFallback torch_fallback;
   EngineCapability capability = EngineCapability::kDEFAULT;
   int64_t num_min_timing_iters = 2;
   int64_t num_avg_timing_iters = 1;

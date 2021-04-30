@@ -23,6 +23,7 @@ cc_library(
         "//core/conversion/conversionctx",
         "//core/conversion/converters",
         "//core/conversion/evaluators",
+        "//core/ir",
         "//core/util:prelude",
     ] + select({
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],

@@ -3,6 +3,8 @@
 #include "ATen/Tensor.h"
 #include "ATen/core/List.h"
 #include "NvInfer.h"
+#include "torch/csrc/jit/api/module.h"
+#include "torch/csrc/jit/ir/ir.h"
 
 namespace nvinfer1 {
 inline std::ostream& operator<<(std::ostream& stream, const nvinfer1::DataType& dtype) {
@@ -107,7 +109,14 @@ std::string toStr(nvinfer1::Dims d);
 at::ScalarType toATenDType(nvinfer1::DataType t);
 nvinfer1::DataType toTRTDataType(at::ScalarType t);
 c10::optional<nvinfer1::DataType> toTRTDataType(caffe2::TypeMeta dtype);
-
+torch::jit::Value* getOrAddInputForValue(
+    torch::jit::Value* old_value,
+    std::shared_ptr<torch::jit::Graph>& graph,
+    std::unordered_map<torch::jit::Value*, torch::jit::Value*>& old_to_new);
+torch::jit::Node* cloneNode(
+    torch::jit::Node* node,
+    std::shared_ptr<torch::jit::Graph>& graph,
+    std::unordered_map<torch::jit::Value*, torch::jit::Value*>& old_to_new);
 const std::unordered_map<at::ScalarType, nvinfer1::DataType>& get_aten_trt_type_map();
 
 } // namespace util

@@ -1,6 +1,7 @@
 #include "NvInfer.h"
 #include "c10/cuda/CUDAStream.h"
 #include "core/conversion/conversion.h"
+#include "core/ir/ir.h"
 #include "core/runtime/runtime.h"
 #include "core/util/prelude.h"
 #include "cuda_runtime_api.h"
@@ -15,16 +16,16 @@ namespace trtorch {
 namespace tests {
 namespace util {
 
-std::vector<core::conversion::InputRange> toInputRanges(std::vector<at::Tensor> ten) {
-  std::vector<core::conversion::InputRange> a;
+std::vector<core::ir::InputRange> toInputRanges(std::vector<at::Tensor> ten) {
+  std::vector<core::ir::InputRange> a;
   for (auto i : ten) {
-    a.push_back(core::conversion::InputRange(core::util::toVec(i.sizes())));
+    a.push_back(core::ir::InputRange(core::util::toVec(i.sizes())));
   }
   return std::move(a);
 }
 
-std::vector<core::conversion::InputRange> toInputRangesDynamic(std::vector<at::Tensor> ten, bool dynamic_batch) {
-  std::vector<core::conversion::InputRange> a;
+std::vector<core::ir::InputRange> toInputRangesDynamic(std::vector<at::Tensor> ten, bool dynamic_batch) {
+  std::vector<core::ir::InputRange> a;
 
   for (auto i : ten) {
     auto opt = core::util::toVec(i.sizes());
@@ -36,7 +37,7 @@ std::vector<core::conversion::InputRange> toInputRangesDynamic(std::vector<at::T
       min_range[0] = ceil(opt[0] / 2.0);
       max_range[0] = 2 * opt[0];
 
-      a.push_back(core::conversion::InputRange(min_range, opt, max_range));
+      a.push_back(core::ir::InputRange(min_range, opt, max_range));
     } else {
       std::vector<int64_t> min_range(opt);
       std::vector<int64_t> max_range(opt);
@@ -44,7 +45,7 @@ std::vector<core::conversion::InputRange> toInputRangesDynamic(std::vector<at::T
       min_range[1] = ceil(opt[1] / 2.0);
       max_range[1] = 2 * opt[1];
 
-      a.push_back(core::conversion::InputRange(min_range, opt, max_range));
+      a.push_back(core::ir::InputRange(min_range, opt, max_range));
     }
   }
 
