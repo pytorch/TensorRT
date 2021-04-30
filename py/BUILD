@@ -1,24 +1,25 @@
 package(default_visibility = ["//visibility:public"])
-load("@trtorch_py_deps//:requirements.bzl", "requirement")
 
+load("@trtorch_py_deps//:requirements.bzl", "requirement")
 
 # Exposes the library for testing
 py_library(
     name = "trtorch",
     srcs = [
         "trtorch/__init__.py",
-        "trtorch/_version.py",
-        "trtorch/_compiler.py",
         "trtorch/_compile_spec.py",
+        "trtorch/_compiler.py",
         "trtorch/_types.py",
-        "trtorch/logging.py"
+        "trtorch/_version.py",
+        "trtorch/logging.py",
+        "trtorch/ptq.py",
     ],
     data = [
-        "trtorch/lib/libtrtorch.so"
+        "trtorch/lib/libtrtorch.so",
     ] + glob([
-        "trtorch/_C.cpython*.so"
+        "trtorch/_C.cpython*.so",
     ]),
     deps = [
-        requirement("torch")
-    ]
+        requirement("torch"),
+    ],
 )

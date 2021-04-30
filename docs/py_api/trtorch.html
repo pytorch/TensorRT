@@ -154,6 +154,9 @@
        <a href="https://nvidia.github.io/TRTorch/" title="master">
         master
        </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.2.0/" title="v0.2.0">
+        v0.2.0
+       </a>
        <a href="https://nvidia.github.io/TRTorch/v0.1.0/" title="v0.1.0">
         v0.1.0
        </a>
@@ -442,6 +445,32 @@
          ¶
         </a>
        </h2>
+       <dl class="py function">
+        <dt id="trtorch.set_device">
+         <code class="sig-prename descclassname">
+          trtorch.
+         </code>
+         <code class="sig-name descname">
+          set_device
+         </code>
+         <span class="sig-paren">
+          (
+         </span>
+         <em class="sig-param">
+          <span class="n">
+           gpu_id
+          </span>
+         </em>
+         <span class="sig-paren">
+          )
+         </span>
+         <a class="headerlink" href="#trtorch.set_device" title="Permalink to this definition">
+          ¶
+         </a>
+        </dt>
+        <dd>
+        </dd>
+       </dl>
        <dl class="py function">
         <dt id="trtorch.compile">
          <code class="sig-prename descclassname">
@@ -982,7 +1011,7 @@ that are not supported are printed out and the function returns false, else true
          <span class="sig-paren">
           )
          </span>
-         → &lt;torch._C.ScriptClass object at 0x7fe4589a4228&gt;
+         → &lt;torch._C.ScriptClass object at 0x7f15110981f0&gt;
          <a class="headerlink" href="#trtorch.TensorRTCompileSpec" title="Permalink to this definition">
           ¶
          </a>
@@ -1045,6 +1074,7 @@ to the graph. All other keys are optional. Entries for each method to be compile
         <span class="s2">"num_avg_timing_iters"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="c1"># Number of averaging timing iterations used to select kernels</span>
         <span class="s2">"workspace_size"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="c1"># Maximum size of workspace given to TensorRT</span>
         <span class="s2">"max_batch_size"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="c1"># Maximum batch size (must be &gt;= 1 to be set, 0 means not set)</span>
+        <span class="s2">"truncate_long_and_double"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="c1"># Truncate long and double into int and float</span>
     <span class="p">})</span>
 <span class="p">}</span>
 </pre>

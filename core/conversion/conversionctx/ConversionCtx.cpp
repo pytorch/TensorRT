@@ -13,6 +13,7 @@ std::ostream& operator<<(std::ostream& os, const BuilderSettings& s) {
     os << "Settings requested for TensorRT engine:"                                        \
        << "\n    Operating Precision: " << s.op_precision                                  \
        << "\n    TF32 Floating Point Computation Enabled: " << !s.disable_tf32             \
+       << "\n    Truncate Long and Double: " << s.truncate_long_and_double                 \
        << "\n    Make Refittable Engine: " << s.refit                                      \
        << "\n    Debuggable Engine: " << s.debug                                           \
        << "\n    Strict Types: " << s.strict_types                                         \
@@ -47,6 +48,11 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
           util::logging::get_logger().get_reportable_severity(),
           util::logging::get_logger().get_is_colored_output_on()) {
   // TODO: Support FP16 and FP32 from JIT information
+  if (settings.device.gpu_id) {
+    TRTORCH_CHECK(
+        cudaSetDevice(settings.device.gpu_id) == cudaSuccess, "Unable to set gpu id: " << settings.device.gpu_id);
+  }
+
   builder = nvinfer1::createInferBuilder(logger);
   net = builder->createNetworkV2(1U << static_cast<uint32_t>(nvinfer1::NetworkDefinitionCreationFlag::kEXPLICIT_BATCH));
 
@@ -108,10 +114,6 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
   cfg->setDefaultDeviceType(settings.device.device_type);
   cfg->setEngineCapability(settings.capability);
 
-  if (settings.device.gpu_id) {
-    TRTORCH_CHECK(cudaSetDevice(settings.device.gpu_id), "Unable to set gpu id: " << settings.device.gpu_id);
-  }
-
   if (settings.device.device_type == nvinfer1::DeviceType::kDLA) {
     auto nbDLACores = builder->getNbDLACores();
     TRTORCH_CHECK(
@@ -147,7 +149,9 @@ std::string ConversionCtx::SerializeEngine() {
   auto engine = builder->buildEngineWithConfig(*net, *cfg);
   auto serialized_engine = engine->serialize();
   engine->destroy();
-  return std::string((const char*)serialized_engine->data(), serialized_engine->size());
+  auto engine_str = std::string((const char*)serialized_engine->data(), serialized_engine->size());
+  serialized_engine->destroy();
+  return engine_str;
 }
 
 bool ConversionCtx::CheckLayerAddition(const torch::jit::Node* n) {

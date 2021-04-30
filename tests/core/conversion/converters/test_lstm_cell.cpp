@@ -18,7 +18,7 @@ TEST(Converters, ATenLSTMCellConvertsCorrectlyWithBiasCheckHidden) {
         return (%8))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto input = at::randn({50, 10}, {at::kCUDA});
   auto h0 = at::randn({50, 20}, {at::kCUDA});
@@ -69,7 +69,7 @@ TEST(Converters, ATenLSTMCellConvertsCorrectlyWithBiasCheckCell) {
         return (%9))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto input = at::randn({50, 10}, {at::kCUDA});
   auto h0 = at::randn({50, 20}, {at::kCUDA});
@@ -120,7 +120,7 @@ TEST(Converters, ATenLSTMCellConvertsCorrectlyWithoutBiasCheckHidden) {
         return (%8))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto input = at::randn({50, 10}, {at::kCUDA});
   auto h0 = at::randn({50, 20}, {at::kCUDA});
@@ -163,7 +163,7 @@ TEST(Converters, ATenLSTMCellConvertsCorrectlyWithoutBiasCheckCell) {
         return (%9))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto input = at::randn({50, 10}, {at::kCUDA});
   auto h0 = at::randn({50, 20}, {at::kCUDA});

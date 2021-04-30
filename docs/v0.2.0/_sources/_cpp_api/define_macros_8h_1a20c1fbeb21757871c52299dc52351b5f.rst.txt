@@ -1,0 +1,13 @@
+.. _exhale_define_macros_8h_1a20c1fbeb21757871c52299dc52351b5f:
+
+Define TRTORCH_API
+==================
+
+- Defined in :ref:`file_cpp_api_include_trtorch_macros.h`
+
+
+Define Documentation
+--------------------
+
+
+.. doxygendefine:: TRTORCH_API

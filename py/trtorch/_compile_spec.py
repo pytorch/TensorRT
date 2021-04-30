@@ -123,6 +123,24 @@ def _parse_device(device_info: Dict[str, Any]) -> trtorch._C.Device:
     return info
 
 
+def _parse_torch_fallback(fallback_info: Dict[str, Any]) -> trtorch._C.TorchFallback:
+    info = trtorch._C.TorchFallback()
+    if "enabled" not in fallback_info:
+        raise KeyError("Enabled is required parameter")
+    else:
+        assert isinstance(fallback_info["enabled"], bool)
+        info.enabled = fallback_info["enabled"]
+    if "min_block_size" in fallback_info:
+        assert isinstance(fallback_info["min_block_size"], int)
+        info.min_block_size = fallback_info["min_block_size"]
+
+    if "forced_fallback_operators" in fallback_info:
+        assert isinstance(fallback_info["forced_fallback_operators"], list)
+        info.forced_fallback_operators = fallback_info["forced_fallback_operators"]
+
+    return info
+
+
 def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
     info = trtorch._C.CompileSpec()
     if "input_shapes" not in compile_spec:
@@ -134,6 +152,9 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
 
     if "op_precision" in compile_spec:
         info.op_precision = _parse_op_precision(compile_spec["op_precision"])
+
+    if "calibrator" in compile_spec:
+        info.ptq_calibrator = compile_spec["calibrator"]
 
     if "disable_tf32" in compile_spec:
         assert isinstance(compile_spec["disable_tf32"], bool)
@@ -173,6 +194,13 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
     if "max_batch_size" in compile_spec:
         assert type(compile_spec["max_batch_size"]) is int
         info.max_batch_size = compile_spec["max_batch_size"]
+
+    if "truncate_long_and_double" in compile_spec:
+        assert type(compile_spec["truncate_long_and_double"]) is bool
+        info.truncate_long_and_double = compile_spec["truncate_long_and_double"]
+
+    if "torch_fallback" in compile_spec:
+        info.torch_fallback = _parse_torch_fallback(compile_spec["torch_fallback"])
 
     return info
 
@@ -214,6 +242,7 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]) -> torch.classes.tensorrt.
                         "num_avg_timing_iters": 1, # Number of averaging timing iterations used to select kernels
                         "workspace_size": 0, # Maximum size of workspace given to TensorRT
                         "max_batch_size": 0, # Maximum batch size (must be >= 1 to be set, 0 means not set)
+                        "truncate_long_and_double": False, # Truncate long and double into int and float
                     })
                 }
 
@@ -242,7 +271,13 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]) -> torch.classes.tensorrt.
     d.set_dla_core(parsed_spec.device.dla_core)
     d.set_allow_gpu_fallback(parsed_spec.device.allow_gpu_fallback)
 
+    torch_fallback = torch.classes.tensorrt.TorchFallback()
+    torch_fallback.set_enabled(parsed_spec.torch_fallback.enabled)
+    torch_fallback.set_min_block_size(parsed_spec.torch_fallback.min_block_size)
+    torch_fallback.set_forced_fallback_operators(parsed_spec.torch_fallback.forced_fallback_operators)
+
     backend_spec.set_device(d)
+    backend_spec.set_torch_fallback(fallback)
     backend_spec.set_op_precision(int(parsed_spec.op_precision))
     backend_spec.set_disable_tf32(parsed_spec.disable_tf32)
     backend_spec.set_refit(parsed_spec.refit)
@@ -254,5 +289,7 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]) -> torch.classes.tensorrt.
     backend_spec.set_num_avg_timing_iters(parsed_spec.num_avg_timing_iters)
     backend_spec.set_workspace_size(parsed_spec.workspace_size)
     backend_spec.set_max_batch_size(parsed_spec.max_batch_size)
+    backend_spec.set_truncate_long_and_double(parsed_spec.truncate_long_and_double)
+    backend_spec._set_ptq_calibrator(parsed_spec._get_calibrator_handle())
 
     return backend_spec
