@@ -397,7 +397,7 @@ struct TRTORCH_API CompileSpec {
     uint64_t min_block_size = 1;
 
     /// A list of names of operations that will explicitly run in PyTorch
-    std::vector<std::string> forced_fallback_operators;
+    std::vector<std::string> forced_fallback_ops;
 
     /**
      * @brief Construct a default Torch Fallback object, fallback will be off

@@ -134,9 +134,9 @@ def _parse_torch_fallback(fallback_info: Dict[str, Any]) -> trtorch._C.TorchFall
         assert isinstance(fallback_info["min_block_size"], int)
         info.min_block_size = fallback_info["min_block_size"]
 
-    if "forced_fallback_operators" in fallback_info:
-        assert isinstance(fallback_info["forced_fallback_operators"], list)
-        info.forced_fallback_operators = fallback_info["forced_fallback_operators"]
+    if "forced_fallback_ops" in fallback_info:
+        assert isinstance(fallback_info["forced_fallback_ops"], list)
+        info.forced_fallback_operators = fallback_info["forced_fallback_ops"]
 
     return info
 
