@@ -1,7 +1,7 @@
-#include "torch/torch.h"
-
+#include "core/conversion/converters/converter_util.h"
 #include "core/conversion/converters/converters.h"
 #include "core/util/prelude.h"
+#include "torch/torch.h"
 
 namespace trtorch {
 namespace core {
@@ -14,16 +14,54 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
   auto in = args[0].ITensor(); // assumes non-static input Tensor
   auto w = Weights(ctx, args[1].unwrapToTensor());
   auto stride = util::toDims(args[3].unwrapToIntList());
-  LOG_DEBUG("stride: " << stride);
   auto padding = util::toDims(args[4].unwrapToIntList());
-  LOG_DEBUG("padding: " << padding);
   auto dilation = util::toDims(args[5].unwrapToIntList());
-  LOG_DEBUG("dilation: " << dilation);
   bool transposed = args[6].unwrapToBool();
   auto out_padding = util::toDims(args[7].unwrapToIntList());
-  LOG_DEBUG("out_padding: " << out_padding);
   int64_t groups = args[8].unwrapToInt();
+
+  auto dims = in->getDimensions();
+  auto orig_dims = dims;
+  LOG_DEBUG("Input dims: " << orig_dims);
+  LOG_DEBUG("Weights: " << w);
+  LOG_DEBUG("stride: " << stride);
+  LOG_DEBUG("padding: " << padding);
+  LOG_DEBUG("dilation: " << dilation);
+  LOG_DEBUG("out_padding: " << out_padding);
   LOG_DEBUG("groups: " << groups);
+
+  // Expand spatial dims from 1D to 2D if needed
+  bool expandDims = (orig_dims.nbDims < 4);
+  if (expandDims) {
+    in = addPadding(ctx, n, in, 4);
+    dims = in->getDimensions();
+    LOG_DEBUG("Reshaped Input dims: " << dims);
+  }
+  if (w.shape.nbDims < 4) {
+    for (int i = w.shape.nbDims; i < 4; ++i) {
+      w.shape.d[i] = 1;
+    }
+    w.shape.nbDims = 4;
+    w.kernel_shape.nbDims = 2;
+    w.kernel_shape.d[1] = 1;
+    LOG_DEBUG("Reshaped Weights: " << w);
+  }
+  if (stride.nbDims == 1) {
+    stride = util::unsqueezeDims(stride, 1, 1);
+    LOG_DEBUG("Reshaped stride: " << stride);
+  }
+  if (dilation.nbDims == 1) {
+    dilation = util::unsqueezeDims(dilation, 1, 1);
+    LOG_DEBUG("Reshaped dilation: " << dilation);
+  }
+  if (padding.nbDims == 1) {
+    padding = util::unsqueezeDims(padding, 1, 0);
+    LOG_DEBUG("Reshaped padding: " << padding);
+  }
+  if (out_padding.nbDims == 1) {
+    out_padding = util::unsqueezeDims(out_padding, 1, 0);
+    LOG_DEBUG("Reshaped out_padding: " << out_padding);
+  }
 
   nvinfer1::ILayer* new_layer;
   if (transposed) {
@@ -31,12 +69,11 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
     if (args[2].IValue()->isTensor()) {
       bias = Weights(ctx, args[2].unwrapToTensor());
     } else {
-      bias = Weights(ctx, torch::zeros(args[1].unwrapToTensor().sizes()[1] * groups));
+      bias = Weights(ctx, torch::zeros(w.shape.d[1] * groups));
     }
 
     // shape of deconvolution's weight: [in, out/groups, ...]
-    auto deconv = ctx->net->addDeconvolutionNd(
-        *in, args[1].unwrapToTensor().sizes()[1] * groups, w.kernel_shape, w.data, bias.data);
+    auto deconv = ctx->net->addDeconvolutionNd(*in, w.shape.d[1] * groups, w.kernel_shape, w.data, bias.data);
     TRTORCH_CHECK(deconv, "Unable to create deconvolution layer from node: " << *n);
 
     deconv->setStrideNd(stride);
@@ -56,11 +93,11 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
     if (args[2].IValue()->isTensor()) {
       bias = Weights(ctx, args[2].unwrapToTensor());
     } else {
-      bias = Weights(ctx, torch::zeros(args[1].unwrapToTensor().sizes()[0]));
+      bias = Weights(ctx, torch::zeros(w.shape.d[0]));
     }
 
     // shape of convolution's weight: [out, in/groups, ...]
-    auto conv = ctx->net->addConvolutionNd(*in, args[1].unwrapToTensor().sizes()[0], w.kernel_shape, w.data, bias.data);
+    auto conv = ctx->net->addConvolutionNd(*in, w.shape.d[0], w.kernel_shape, w.data, bias.data);
     TRTORCH_CHECK(conv, "Unable to create convolution layer from node: " << *n);
 
     conv->setStrideNd(stride);
@@ -71,9 +108,13 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
     conv->setNbGroups(groups);
     new_layer = conv;
   }
+
   new_layer->setName(util::node_info(n).c_str());
 
-  auto out = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
+  // Un-expand spatial dims back to 1D if needed
+  auto out = addUnpadding(ctx, n, new_layer->getOutput(0), orig_dims.nbDims);
+
+  ctx->AssociateValueAndTensor(n->outputs()[0], out);
 
   LOG_DEBUG("Output tensor shape: " << out->getDimensions());
 
