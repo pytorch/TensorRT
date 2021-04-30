@@ -124,6 +124,26 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule, method_name: st
     return trtorch._C.convert_graph_to_trt_engine(module._c, method_name, _parse_compile_spec(compile_spec))
 
 
+def embed_engine_in_new_module(serialized_engine: bytes) -> torch.jit.ScriptModule:
+    """Takes a pre-built serialized TensorRT engine and embeds it within a TorchScript module
+
+    Takes a pre-built serialied TensorRT engine (as bytes) and embeds it within a TorchScript module.
+    Registers the forward method to execute the TensorRT engine with the function signature:
+
+        forward(Tensor[]) -> Tensor[]
+
+    Module can be save with engine embedded with torch.jit.save and moved / loaded according to TRTorch portability rules
+
+    Args:
+        serialized_engine (bytes): Serialized TensorRT engine from either TRTorch or TensorRT APIs
+
+    Returns:
+        torch.jit.ScriptModule: New TorchScript module with engine embedded
+    """
+    cpp_mod = trtorch._C.embed_engine_in_new_module(serialized_engine)
+    return torch.jit._recursive.wrap_cpp_module(cpp_mod)
+
+
 def check_method_op_support(module: torch.jit.ScriptModule, method_name: str) -> bool:
     """Checks to see if a method is fully supported by TRTorch
 

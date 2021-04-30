@@ -459,7 +459,7 @@ auto aten_registrations TRTORCH_UNUSED =
                       if (args.at(n->input(0)).IValue()->isInt()) {
                         auto a = args.at(n->input(0)).unwrapToInt();
                         auto b = args.at(n->input(1)).unwrapToInt();
-                        return std::floor(a / b);
+                        return static_cast<int>(std::floor(a / b));
                       } else if (args.at(n->input(0)).IValue()->isDouble()) {
                         auto a = args.at(n->input(0)).unwrapToDouble();
                         auto b = args.at(n->input(1)).unwrapToDouble();
@@ -477,11 +477,21 @@ auto aten_registrations TRTORCH_UNUSED =
                     })})
         .evaluator({c10::Symbol::fromQualString("aten::floor"),
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-                      auto el = args.at(n->input(0)).unwrapToDouble();
-
-                      return static_cast<int64_t>(std::floor(el));
+                      if (args.at(n->input(0)).IValue()->isInt()) {
+                        auto el = args.at(n->input(0)).unwrapToInt();
+                        return static_cast<int64_t>(std::floor(el));
+                      } else if (args.at(n->input(0)).IValue()->isDouble()) {
+                        auto el = args.at(n->input(0)).unwrapToDouble();
+                        return static_cast<int64_t>(std::floor(el));
+                      } else {
+                        TRTORCH_THROW_ERROR(
+                            "Unimplemented data type for aten::floor evaluator: "
+                            << args.at(n->input(0)).IValue()->type()->str());
+                        return {};
+                      }
                     },
                     EvalOptions().validSchemas({
+                        "aten::floor.int(int a) -> (int)",
                         "aten::floor.float(float a) -> (int)",
                     })})
         .evaluator({c10::Symbol::fromQualString("aten::warn"),

@@ -387,6 +387,37 @@ struct TRTORCH_API CompileSpec {
   Device device;
 
   /**
+   * @brief A struct to hold fallback info
+   */
+  struct TRTORCH_API TorchFallback {
+    /// enable the automatic fallback feature
+    bool enabled = false;
+
+    /// minimum consecutive operation number that needs to be satisfied to convert to TensorRT
+    uint64_t min_block_size = 1;
+
+    /// A list of names of operations that will explicitly run in PyTorch
+    std::vector<std::string> forced_fallback_operators;
+
+    /**
+     * @brief Construct a default Torch Fallback object, fallback will be off
+     */
+    TorchFallback() = default;
+
+    /**
+     * @brief Construct from a bool
+     */
+    TorchFallback(bool enabled) : enabled(enabled) {}
+
+    /**
+     * @brief Constructor for setting min_block_size
+     */
+    TorchFallback(bool enabled, uint64_t min_size) : enabled(enabled), min_block_size(min_size) {}
+  };
+
+  TorchFallback torch_fallback;
+
+  /**
    * Sets the restrictions for the engine (CUDA Safety)
    */
   EngineCapability capability = EngineCapability::kDEFAULT;
@@ -480,6 +511,21 @@ TRTORCH_API std::string ConvertGraphToTRTEngine(
     const torch::jit::Module& module,
     std::string method_name,
     CompileSpec info);
+
+/**
+ * @brief Take a previously created TensorRT engine and embed it in
+ * in a TorchScript module
+ *
+ * @param engine: std::string - Pre-built serialized TensorRT engine
+ *
+ * Takes a pre-built serialized TensorRT engine and embeds it in a TorchScript
+ * module. Registers execution of the engine as the forward method of the module
+ * Forward is defined as: forward(Tensor[]) -> Tensor[]
+ *
+ * @return: A new module trageting a TensorRT engine
+ */
+TRTORCH_API torch::jit::Module EmbedEngineInNewModule(const std::string& engine);
+
 /**
  * @brief Set gpu device id
  *

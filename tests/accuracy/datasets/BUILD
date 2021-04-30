@@ -2,22 +2,21 @@ package(default_visibility = ["//visibility:public"])
 
 cc_library(
     name = "cifar10",
-    hdrs = [
-        "cifar10.h"
-    ],
     srcs = [
-        "cifar10.cpp"
+        "cifar10.cpp",
     ],
-    deps = [
-        "@libtorch//:libtorch"
+    hdrs = [
+        "cifar10.h",
     ],
     data = [
-        ":cifar10_data"
-    ]
-
+        ":cifar10_data",
+    ],
+    deps = [
+        "@libtorch",
+    ],
 )
 
 filegroup(
     name = "cifar10_data",
-    srcs = glob(["data/cifar-10-batches-bin/**/*.bin"])
+    srcs = glob(["data/cifar-10-batches-bin/**/*.bin"]),
 )

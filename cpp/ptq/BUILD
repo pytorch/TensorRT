@@ -5,18 +5,18 @@ cc_binary(
     srcs = [
         "main.cpp",
     ],
-    deps = [
-        "//cpp/ptq/benchmark",
-        "//cpp/ptq/datasets:cifar10",
-        "@libtorch//:libtorch",
-        "@libtorch//:caffe2",
-        "//cpp/api:trtorch",
-        "@tensorrt//:nvinfer"
-    ],
     copts = [
-        "-pthread"
+        "-pthread",
     ],
     linkopts = [
         "-lpthread",
-    ]
+    ],
+    deps = [
+        "//cpp/api:trtorch",
+        "//cpp/ptq/benchmark",
+        "//cpp/ptq/datasets:cifar10",
+        "@libtorch",
+        "@libtorch//:caffe2",
+        "@tensorrt//:nvinfer",
+    ],
 )

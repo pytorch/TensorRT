@@ -119,6 +119,10 @@ bool CheckMethodOperatorSupport(const torch::jit::Module& module, const std::str
   return core::CheckMethodOperatorSupport(module, method_name);
 }
 
+torch::jit::Module EmbedEngineInNewModule(const py::bytes& engine) {
+  return core::EmbedEngineInNewModule(engine);
+}
+
 std::string get_build_info() {
   auto info = core::util::get_build_info();
   return info;
@@ -247,6 +251,7 @@ PYBIND11_MODULE(_C, m) {
       .def_readwrite("num_avg_timing_iters", &CompileSpec::num_avg_timing_iters)
       .def_readwrite("workspace_size", &CompileSpec::workspace_size)
       .def_readwrite("max_batch_size", &CompileSpec::max_batch_size)
+      .def_readwrite("torch_fallback", &CompileSpec::torch_fallback)
       .def_readwrite("truncate_long_and_double", &CompileSpec::truncate_long_and_double);
 
   py::class_<Device>(m, "Device")
@@ -255,6 +260,12 @@ PYBIND11_MODULE(_C, m) {
       .def_readwrite("gpu_id", &Device::gpu_id)
       .def_readwrite("dla_core", &Device::dla_core)
       .def_readwrite("allow_gpu_fallback", &Device::allow_gpu_fallback);
+
+  py::class_<TorchFallback>(m, "TorchFallback")
+      .def(py::init<>())
+      .def_readwrite("enabled", &TorchFallback::enabled)
+      .def_readwrite("min_block_size", &TorchFallback::min_block_size)
+      .def_readwrite("forced_fallback_operators", &TorchFallback::forced_fallback_operators);
 
   m.doc() =
       "TRTorch Internal C Bindings: Ahead of Time compilation for PyTorch JIT. A tool to convert PyTorch JIT to TensorRT";
@@ -270,6 +281,10 @@ PYBIND11_MODULE(_C, m) {
       "check_method_op_support",
       &trtorch::pyapi::CheckMethodOperatorSupport,
       "Takes a module and a method name and checks if the method graph contains purely convertable operators");
+  m.def(
+      "embed_engine_in_new_module",
+      &trtorch::pyapi::EmbedEngineInNewModule,
+      "Takes a serialized TensorRT engine and wraps it in the forward method of a new TorchScript module");
   m.def("get_build_info", &get_build_info, "Returns build info about the compiler as a string");
 
   m.def("_get_logging_prefix", &logging::get_logging_prefix, "Get the current prefix for the logging output");

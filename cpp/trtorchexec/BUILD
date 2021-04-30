@@ -3,11 +3,11 @@ package(default_visibility = ["//visibility:public"])
 cc_binary(
     name = "trtorchexec",
     srcs = [
-        "main.cpp"
+        "main.cpp",
     ],
     deps = [
-        "@libtorch//:libtorch",
+        "//cpp/api:trtorch",
+        "@libtorch",
         "@libtorch//:caffe2",
-        "//cpp/api:trtorch"
     ],
 )
