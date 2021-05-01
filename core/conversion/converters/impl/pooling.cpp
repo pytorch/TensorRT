@@ -80,17 +80,17 @@ bool AdaptivePoolingConverter(
     std::copy_n(out_size.d, out_size.nbDims, out_shape.begin() + (in_shape.size() - out_size.nbDims));
 
     std::vector<int32_t> in_shape_casted(in_shape.begin(), in_shape.end());
-    f.emplace_back(
-        nvinfer1::PluginField("in_shape", in_shape_casted.data(), nvinfer1::PluginFieldType::kINT32, in_shape.size()));
+    f.emplace_back(nvinfer1::PluginField(
+        "in_shape", in_shape_casted.data(), nvinfer1::PluginFieldType::kINT32, in_shape.size()));
 
     std::vector<int32_t> out_shape_casted(out_shape.begin(), out_shape.end());
-    f.emplace_back(
-        nvinfer1::PluginField("out_shape", out_shape_casted.data(), nvinfer1::PluginFieldType::kINT32, out_shape.size()));
+    f.emplace_back(nvinfer1::PluginField(
+        "out_shape", out_shape_casted.data(), nvinfer1::PluginFieldType::kINT32, out_shape.size()));
 
     auto out_size_vec = util::toVec(out_size);
     std::vector<int32_t> out_size_casted(out_size_vec.begin(), out_size_vec.end());
-    f.emplace_back(
-        nvinfer1::PluginField("out_size", out_size_casted.data(), nvinfer1::PluginFieldType::kINT32, out_size_vec.size()));
+    f.emplace_back(nvinfer1::PluginField(
+        "out_size", out_size_casted.data(), nvinfer1::PluginFieldType::kINT32, out_size_vec.size()));
 
     f.emplace_back(nvinfer1::PluginField("scales", nullptr, nvinfer1::PluginFieldType::kFLOAT64, 0));
 
