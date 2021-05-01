@@ -80,8 +80,8 @@ bool AdaptivePoolingConverter(
     std::copy_n(out_size.d, out_size.nbDims, out_shape.begin() + (in_shape.size() - out_size.nbDims));
 
     std::vector<int32_t> in_shape_casted(in_shape.begin(), in_shape.end());
-    f.emplace_back(nvinfer1::PluginField(
-        "in_shape", in_shape_casted.data(), nvinfer1::PluginFieldType::kINT32, in_shape.size()));
+    f.emplace_back(
+        nvinfer1::PluginField("in_shape", in_shape_casted.data(), nvinfer1::PluginFieldType::kINT32, in_shape.size()));
 
     std::vector<int32_t> out_shape_casted(out_shape.begin(), out_shape.end());
     f.emplace_back(nvinfer1::PluginField(

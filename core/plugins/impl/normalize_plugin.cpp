@@ -73,7 +73,7 @@ nvinfer1::DimsExprs NormalizePlugin::getOutputDimensions(
   // TODO: For dim=None, the axes_ passed would have [0, 0, 0] which is obtained through loop counter in TRTorch.
   // Resolve this. For dim=None case, change the axes_ inplace to range(0, axes_.size())
   bool isAxisNone = std::all_of(axes_.begin(), axes_.end(), [](int32_t i) { return i == 0; }) &&
-      ((int32_t) axes_.size() == inputs[0].nbDims);
+      ((int32_t)axes_.size() == inputs[0].nbDims);
   if (isAxisNone) {
     std::iota(axes_.data(), axes_.data() + axes_.size(), 0);
   }
