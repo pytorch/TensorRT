@@ -25,7 +25,7 @@ void LinearToAddMM(std::shared_ptr<torch::jit::Graph>& graph) {
             %weight = aten::t(%weight_t)
             %mm: Tensor = aten::matmul(%input, %weight)
             %b_f: Tensor = trt::const(%bias)
-            %out: Tensor = aten::add_(%b_f, %mm, %1)
+            %out: Tensor = aten::add(%b_f, %mm, %1)
             return (%out))IR";
   std::string fused_linear_bias_none = R"IR(
         graph(%input, %weight_t):

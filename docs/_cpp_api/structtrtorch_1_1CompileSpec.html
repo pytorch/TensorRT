@@ -467,6 +467,15 @@
           </a>
          </p>
         </li>
+        <li>
+         <p>
+          <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1TorchFallback.html#exhale-struct-structtrtorch-1-1compilespec-1-1torchfallback">
+           <span class="std std-ref">
+            Struct CompileSpec::TorchFallback
+           </span>
+          </a>
+         </p>
+        </li>
        </ul>
        <h2 id="struct-documentation">
         Struct Documentation
@@ -922,6 +931,24 @@
              device
             </code>
             <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec6deviceE" title="Permalink to this definition">
+             ¶
+            </a>
+            <br/>
+           </dt>
+           <dd>
+           </dd>
+          </dl>
+          <dl class="cpp var">
+           <dt id="_CPPv4N7trtorch11CompileSpec14torch_fallbackE">
+            <span class="target" id="structtrtorch_1_1CompileSpec_1a560b75f8e4fece91b83ea5d477b52fe9">
+            </span>
+            <a class="reference internal" href="#_CPPv4N7trtorch11CompileSpec13TorchFallbackE" title="trtorch::CompileSpec::TorchFallback">
+             TorchFallback
+            </a>
+            <code class="sig-name descname">
+             torch_fallback
+            </code>
+            <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec14torch_fallbackE" title="Permalink to this definition">
              ¶
             </a>
             <br/>
@@ -2664,6 +2691,181 @@
              <dd>
               <p>
                Maximum acceptable input size into the engine.
+              </p>
+             </dd>
+            </dl>
+           </div>
+          </dd>
+         </dl>
+         <dl class="cpp struct">
+          <dt id="_CPPv4N7trtorch11CompileSpec13TorchFallbackE">
+           <span class="target" id="structtrtorch_1_1CompileSpec_1_1TorchFallback">
+           </span>
+           <em class="property">
+            struct
+           </em>
+           <code class="sig-name descname">
+            TorchFallback
+           </code>
+           <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec13TorchFallbackE" title="Permalink to this definition">
+            ¶
+           </a>
+           <br/>
+          </dt>
+          <dd>
+           <p>
+            A struct to hold fallback info.
+           </p>
+           <div class="breathe-sectiondef docutils container">
+            <p class="breathe-sectiondef-title rubric">
+             Public Functions
+            </p>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec13TorchFallback13TorchFallbackEv">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1TorchFallback_1a4545332f018d1a7b7d6fb270e8a23088">
+              </span>
+              <code class="sig-name descname">
+               TorchFallback
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <span class="sig-paren">
+               )
+              </span>
+              = default
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec13TorchFallback13TorchFallbackEv" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Construct a default Torch Fallback object, fallback will be off.
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec13TorchFallback13TorchFallbackEb">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1TorchFallback_1a739d08442353926de60e9d7b89a8ceb8">
+              </span>
+              <code class="sig-name descname">
+               TorchFallback
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              bool
+              <em>
+               enabled
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec13TorchFallback13TorchFallbackEb" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Construct from a bool.
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec13TorchFallback13TorchFallbackEb8uint64_t">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1TorchFallback_1a44696c72b224aca736ba4ddb74826399">
+              </span>
+              <code class="sig-name descname">
+               TorchFallback
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              bool
+              <em>
+               enabled
+              </em>
+              , uint64_t
+              <em>
+               min_size
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec13TorchFallback13TorchFallbackEb8uint64_t" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Constructor for setting min_block_size.
+              </p>
+             </dd>
+            </dl>
+           </div>
+           <div class="breathe-sectiondef docutils container">
+            <p class="breathe-sectiondef-title rubric">
+             Public Members
+            </p>
+            <dl class="cpp var">
+             <dt id="_CPPv4N7trtorch11CompileSpec13TorchFallback7enabledE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1TorchFallback_1a5b8dd90653a0100214de8ba46882a996">
+              </span>
+              bool
+              <code class="sig-name descname">
+               enabled
+              </code>
+              = false
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec13TorchFallback7enabledE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               enable the automatic fallback feature
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp var">
+             <dt id="_CPPv4N7trtorch11CompileSpec13TorchFallback14min_block_sizeE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1TorchFallback_1a7570d5a9fb96ff3c509cb94c3ff4a3d2">
+              </span>
+              uint64_t
+              <code class="sig-name descname">
+               min_block_size
+              </code>
+              = 1
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec13TorchFallback14min_block_sizeE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               minimum consecutive operation number that needs to be satisfied to convert to TensorRT
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp var">
+             <dt id="_CPPv4N7trtorch11CompileSpec13TorchFallback19forced_fallback_opsE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1TorchFallback_1a4cc23c4331403cba9d19ef0a07294fc0">
+              </span>
+              std::vector&lt;std::string&gt;
+              <code class="sig-name descname">
+               forced_fallback_ops
+              </code>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec13TorchFallback19forced_fallback_opsE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               A list of names of operations that will explicitly run in PyTorch.
               </p>
              </dd>
             </dl>

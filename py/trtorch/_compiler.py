@@ -49,6 +49,13 @@ def compile(module: torch.jit.ScriptModule, compile_spec: Any) -> torch.jit.Scri
                     "num_avg_timing_iters": 1, # Number of averaging timing iterations used to select kernels
                     "workspace_size": 0, # Maximum size of workspace given to TensorRT
                     "max_batch_size": 0, # Maximum batch size (must be >= 1 to be set, 0 means not set)
+                    "torch_fallback": {
+                        "enabled": True,
+                        "force_fallback_ops": [
+                            "aten::max_pool2d"
+                        ],
+                        "min_block_size": 1
+                    }
                 }
 
             Input Sizes can be specified as torch sizes, tuples or lists. Op precisions can be specified using

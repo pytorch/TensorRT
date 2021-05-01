@@ -123,6 +123,24 @@ def _parse_device(device_info: Dict[str, Any]) -> trtorch._C.Device:
     return info
 
 
+def _parse_torch_fallback(fallback_info: Dict[str, Any]) -> trtorch._C.TorchFallback:
+    info = trtorch._C.TorchFallback()
+    if "enabled" not in fallback_info:
+        raise KeyError("Enabled is required parameter")
+    else:
+        assert isinstance(fallback_info["enabled"], bool)
+        info.enabled = fallback_info["enabled"]
+    if "min_block_size" in fallback_info:
+        assert isinstance(fallback_info["min_block_size"], int)
+        info.min_block_size = fallback_info["min_block_size"]
+
+    if "forced_fallback_ops" in fallback_info:
+        assert isinstance(fallback_info["forced_fallback_ops"], list)
+        info.forced_fallback_operators = fallback_info["forced_fallback_ops"]
+
+    return info
+
+
 def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
     info = trtorch._C.CompileSpec()
     if "input_shapes" not in compile_spec:
@@ -180,6 +198,9 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
     if "truncate_long_and_double" in compile_spec:
         assert type(compile_spec["truncate_long_and_double"]) is bool
         info.truncate_long_and_double = compile_spec["truncate_long_and_double"]
+
+    if "torch_fallback" in compile_spec:
+        info.torch_fallback = _parse_torch_fallback(compile_spec["torch_fallback"])
 
     return info
 
@@ -250,7 +271,13 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]) -> torch.classes.tensorrt.
     d.set_dla_core(parsed_spec.device.dla_core)
     d.set_allow_gpu_fallback(parsed_spec.device.allow_gpu_fallback)
 
+    torch_fallback = torch.classes.tensorrt.TorchFallback()
+    torch_fallback.set_enabled(parsed_spec.torch_fallback.enabled)
+    torch_fallback.set_min_block_size(parsed_spec.torch_fallback.min_block_size)
+    torch_fallback.set_forced_fallback_operators(parsed_spec.torch_fallback.forced_fallback_operators)
+
     backend_spec.set_device(d)
+    backend_spec.set_torch_fallback(fallback)
     backend_spec.set_op_precision(int(parsed_spec.op_precision))
     backend_spec.set_disable_tf32(parsed_spec.disable_tf32)
     backend_spec.set_refit(parsed_spec.refit)

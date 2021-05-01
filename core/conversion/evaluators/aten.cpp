@@ -180,9 +180,18 @@ auto aten_registrations TRTORCH_UNUSED =
                         auto dim = args.at(n->input(1)).unwrapToInt();
                         if (tensor_var.isITensor()) {
                           auto tensor = tensor_var.ITensor();
-                          return util::toVec(tensor->getDimensions())[dim];
+                          auto dims = util::toVec(tensor->getDimensions());
+                          auto nbDims = tensor->getDimensions().nbDims;
+                          if (dim < 0) {
+                            dim += nbDims;
+                          }
+                          return dims[dim];
                         } else {
                           auto tensor = tensor_var.unwrapToTensor();
+                          auto nbDims = tensor.sizes().size();
+                          if (dim < 0) {
+                            dim += nbDims;
+                          }
                           return tensor.sizes()[dim];
                         }
                       }
@@ -450,7 +459,7 @@ auto aten_registrations TRTORCH_UNUSED =
                       if (args.at(n->input(0)).IValue()->isInt()) {
                         auto a = args.at(n->input(0)).unwrapToInt();
                         auto b = args.at(n->input(1)).unwrapToInt();
-                        return std::floor(a / b);
+                        return static_cast<int>(std::floor(a / b));
                       } else if (args.at(n->input(0)).IValue()->isDouble()) {
                         auto a = args.at(n->input(0)).unwrapToDouble();
                         auto b = args.at(n->input(1)).unwrapToDouble();
