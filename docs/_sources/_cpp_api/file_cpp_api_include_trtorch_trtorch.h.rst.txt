@@ -61,6 +61,8 @@ Classes
 
 - :ref:`exhale_struct_structtrtorch_1_1CompileSpec_1_1InputRange`
 
+- :ref:`exhale_struct_structtrtorch_1_1CompileSpec_1_1TorchFallback`
+
 - :ref:`exhale_class_classtrtorch_1_1CompileSpec_1_1DataType`
 
 - :ref:`exhale_class_classtrtorch_1_1CompileSpec_1_1Device_1_1DeviceType`

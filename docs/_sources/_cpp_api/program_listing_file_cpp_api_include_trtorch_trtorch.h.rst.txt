@@ -168,6 +168,22 @@ Program Listing for File trtorch.h
       */
      Device device;
    
+     struct TRTORCH_API TorchFallback {
+       bool enabled = false;
+   
+       uint64_t min_block_size = 1;
+   
+       std::vector<std::string> forced_fallback_ops;
+   
+       TorchFallback() = default;
+   
+       TorchFallback(bool enabled) : enabled(enabled) {}
+   
+       TorchFallback(bool enabled, uint64_t min_size) : enabled(enabled), min_block_size(min_size) {}
+     };
+   
+     TorchFallback torch_fallback;
+   
      EngineCapability capability = EngineCapability::kDEFAULT;
    
      uint64_t num_min_timing_iters = 2;
