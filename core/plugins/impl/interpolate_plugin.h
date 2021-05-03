@@ -1,5 +1,4 @@
-#ifndef TRTORCH_INTERPOLATE_PLUGIN_H
-#define TRTORCH_INTERPOLATE_PLUGIN_H
+#pragma once
 
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAEvent.h>
@@ -14,19 +13,15 @@
 #include "core/util/prelude.h"
 #include "torch/torch.h"
 
-using namespace nvinfer1;
-
 namespace trtorch {
 namespace core {
-namespace conversion {
-namespace converters {
-namespace impl {
 namespace plugins {
+namespace impl {
 
 class InterpolatePlugin : public nvinfer1::IPluginV2DynamicExt {
  private:
   at::TensorOptions tensor_options_;
-  DataType dtype_;
+  nvinfer1::DataType dtype_;
 
   std::vector<int64_t> in_shape_;
   std::vector<int64_t> out_shape_;
@@ -125,9 +120,11 @@ class InterpolatePlugin : public nvinfer1::IPluginV2DynamicExt {
 class InterpolatePluginCreator : public nvinfer1::IPluginCreator {
  private:
   std::string name_;
+  std::vector<nvinfer1::PluginField> mPluginAttributes;
+  nvinfer1::PluginFieldCollection mFC;
 
  public:
-  InterpolatePluginCreator() = default;
+  InterpolatePluginCreator();
 
   const char* getPluginNamespace() const override;
 
@@ -139,26 +136,12 @@ class InterpolatePluginCreator : public nvinfer1::IPluginCreator {
 
   nvinfer1::IPluginV2* createPlugin(const char* name, const nvinfer1::PluginFieldCollection* fc) override;
 
-  InterpolatePlugin* createPlugin(
-      const char* name,
-      std::vector<int64_t> in_shape,
-      std::vector<int64_t> out_shape,
-      std::vector<int64_t> size,
-      std::vector<double> scales,
-      std::string mode,
-      bool align_corners,
-      bool use_scales);
-
   nvinfer1::IPluginV2* deserializePlugin(const char* name, const void* serialData, size_t serialLength) override;
 
   const nvinfer1::PluginFieldCollection* getFieldNames() override;
 };
 
-} // namespace plugins
 } // namespace impl
-} // namespace converters
-} // namespace conversion
+} // namespace plugins
 } // namespace core
 } // namespace trtorch
-
-#endif // TRTORCH_INTERPOLATE_PLUGIN_H

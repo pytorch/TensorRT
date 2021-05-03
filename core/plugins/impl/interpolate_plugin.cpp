@@ -1,13 +1,11 @@
-#include "interpolate_plugin.h"
-
-using namespace nvinfer1;
+#include "core/plugins/impl/interpolate_plugin.h"
+#include "core/plugins/plugins.h"
+#include "core/util/prelude.h"
 
 namespace trtorch {
 namespace core {
-namespace conversion {
-namespace converters {
-namespace impl {
 namespace plugins {
+namespace impl {
 
 /*
  * InterpolatePlugin class implementations
@@ -120,7 +118,7 @@ const char* InterpolatePlugin::getPluginVersion() const {
 }
 
 const char* InterpolatePlugin::getPluginNamespace() const {
-  return "";
+  return "trtorch";
 }
 
 nvinfer1::IPluginV2DynamicExt* InterpolatePlugin::clone() const {
@@ -164,7 +162,7 @@ nvinfer1::DimsExprs InterpolatePlugin::getOutputDimensions(
 
 nvinfer1::DataType InterpolatePlugin::getOutputDataType(int index, const nvinfer1::DataType* inputTypes, int nbInputs)
     const {
-  return DataType::kFLOAT;
+  return nvinfer1::DataType::kFLOAT;
 }
 
 int InterpolatePlugin::initialize() {
@@ -217,14 +215,14 @@ bool InterpolatePlugin::supportsFormatCombination(
   TRTORCH_ASSERT(nbInputs == 1, "Expected a single tensor as input to interpolate plugin");
   TRTORCH_ASSERT(nbOutputs == 1, "Expected a single tensor as output to interpolate plugin");
 
-  const PluginTensorDesc& in = inOut[0];
+  const nvinfer1::PluginTensorDesc& in = inOut[0];
 
   if (pos == 0) {
     return (in.type == nvinfer1::DataType::kFLOAT) && (in.format == nvinfer1::TensorFormat::kLINEAR);
   }
 
   // pos == 1, accessing information about output tensor
-  const PluginTensorDesc& out = inOut[1];
+  const nvinfer1::PluginTensorDesc& out = inOut[1];
 
   return (in.type == out.type) && (in.format == out.format);
 }
@@ -234,7 +232,7 @@ void InterpolatePlugin::configurePlugin(
     int nbInputs,
     const nvinfer1::DynamicPluginTensorDesc* out,
     int nbOutputs) {
-  dtype_ = DataType::kFLOAT;
+  dtype_ = nvinfer1::DataType::kFLOAT;
 }
 
 size_t InterpolatePlugin::getWorkspaceSize(
@@ -344,8 +342,22 @@ int InterpolatePlugin::enqueue(
 /*
  * InterpolatePluginCreator class implementations
  */
+
+InterpolatePluginCreator::InterpolatePluginCreator() {
+  mPluginAttributes.emplace_back(nvinfer1::PluginField("in_shape", nullptr, nvinfer1::PluginFieldType::kINT32, 1));
+  mPluginAttributes.emplace_back(nvinfer1::PluginField("out_shape", nullptr, nvinfer1::PluginFieldType::kINT32, 1));
+  mPluginAttributes.emplace_back(nvinfer1::PluginField("out_size", nullptr, nvinfer1::PluginFieldType::kINT32, 1));
+  mPluginAttributes.emplace_back(nvinfer1::PluginField("scales", nullptr, nvinfer1::PluginFieldType::kFLOAT32, 1));
+  mPluginAttributes.emplace_back(nvinfer1::PluginField("mode", nullptr, nvinfer1::PluginFieldType::kCHAR, 1));
+  mPluginAttributes.emplace_back(nvinfer1::PluginField("align_corners", nullptr, nvinfer1::PluginFieldType::kINT32, 1));
+  mPluginAttributes.emplace_back(nvinfer1::PluginField("use_scales", nullptr, nvinfer1::PluginFieldType::kINT32, 1));
+
+  mFC.nbFields = mPluginAttributes.size();
+  mFC.fields = mPluginAttributes.data();
+}
+
 const char* InterpolatePluginCreator::getPluginNamespace() const {
-  return "";
+  return "trtorch";
 }
 
 const char* InterpolatePluginCreator::getPluginName() const {
@@ -359,20 +371,39 @@ const char* InterpolatePluginCreator::getPluginVersion() const {
 nvinfer1::IPluginV2* InterpolatePluginCreator::createPlugin(
     const char* name,
     const nvinfer1::PluginFieldCollection* fc) {
-  return nullptr;
-}
+  std::vector<int64_t> in_shape;
+  std::vector<int64_t> out_shape;
+  std::vector<int64_t> out_size;
+  std::vector<double> scales;
+  std::string mode;
+  int32_t align_corners = 0;
+  int32_t use_scales = 0;
 
-InterpolatePlugin* InterpolatePluginCreator::createPlugin(
-    const char* name,
-    std::vector<int64_t> in_shape,
-    std::vector<int64_t> out_shape,
-    std::vector<int64_t> size,
-    std::vector<double> scales,
-    std::string mode,
-    bool align_corners,
-    bool use_scales) {
-  name_ = name;
-  return new InterpolatePlugin(in_shape, out_shape, size, scales, mode, align_corners, use_scales);
+  for (int i = 0; i < fc->nbFields; i++) {
+    std::string field_name(fc->fields[i].name);
+    if (field_name.compare("in_shape") == 0) {
+      auto in_shape_values = static_cast<const int32_t*>(fc->fields[i].data);
+      in_shape.assign(in_shape_values, in_shape_values + fc->fields[i].length);
+    } else if (field_name.compare("out_shape") == 0) {
+      auto out_shape_values = static_cast<const int32_t*>(fc->fields[i].data);
+      out_shape.assign(out_shape_values, out_shape_values + fc->fields[i].length);
+    } else if (field_name.compare("out_size") == 0) {
+      auto out_size_values = static_cast<const int32_t*>(fc->fields[i].data);
+      out_size.assign(out_size_values, out_size_values + fc->fields[i].length);
+    } else if (field_name.compare("scales") == 0) {
+      auto scales_values = static_cast<const double*>(fc->fields[i].data);
+      scales.assign(scales_values, scales_values + fc->fields[i].length);
+    } else if (field_name.compare("mode") == 0) {
+      mode = *static_cast<const std::string*>(fc->fields[i].data);
+    } else if (field_name.compare("align_corners") == 0) {
+      align_corners = *static_cast<const int32_t*>(fc->fields[i].data);
+    } else if (field_name.compare("use_scales") == 0) {
+      use_scales = *static_cast<const int32_t*>(fc->fields[i].data);
+    }
+  }
+  InterpolatePlugin* plugin =
+      new InterpolatePlugin(in_shape, out_shape, out_size, scales, mode, (bool)align_corners, (bool)use_scales);
+  return plugin;
 }
 
 nvinfer1::IPluginV2* InterpolatePluginCreator::deserializePlugin(
@@ -387,11 +418,9 @@ const nvinfer1::PluginFieldCollection* InterpolatePluginCreator::getFieldNames()
   return nullptr;
 }
 
-REGISTER_TENSORRT_PLUGIN(InterpolatePluginCreator);
+REGISTER_TRTORCH_PLUGIN(InterpolatePluginCreator);
 
-} // namespace plugins
 } // namespace impl
-} // namespace converters
-} // namespace conversion
+} // namespace plugins
 } // namespace core
 } // namespace trtorch

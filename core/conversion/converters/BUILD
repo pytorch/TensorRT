@@ -43,6 +43,7 @@ cc_library(
         "impl/linear.cpp",
         "impl/lstm_cell.cpp",
         "impl/matrix_multiply.cpp",
+        "impl/normalize.cpp",
         "impl/pooling.cpp",
         "impl/reduce.cpp",
         "impl/replication_pad.cpp",
@@ -65,7 +66,7 @@ cc_library(
         "//core/conversion/var",
         "//core/conversion/tensorcontainer",
         "//core/conversion/conversionctx",
-        "//core/conversion/converters/impl/plugins",
+        "//core/plugins:trtorch_plugins",
     ] + select({
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default": ["@libtorch//:libtorch"],

@@ -44,6 +44,10 @@ converter_test(
 )
 
 converter_test(
+    name = "test_normalize"
+)
+
+converter_test(
     name = "test_pooling",
 )
 
@@ -109,6 +113,7 @@ test_suite(
         ":test_linear",
         ":test_lstm_cell",
         ":test_matrix_multiply",
+        ":test_normalize",
         ":test_pooling",
         ":test_reduce",
         ":test_replication_pad",

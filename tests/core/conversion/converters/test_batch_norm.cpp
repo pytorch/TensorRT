@@ -51,17 +51,23 @@ TEST(Converters, ATenBatchNormShouldUnpackConvertsCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, &*g);
 
-  auto in = at::randint(1, 10, {3, 5}, {at::kCUDA});
+  auto in = at::randint(1, 10, {2, 5, 5, 5}, {at::kCUDA});
   auto gamma = at::randint(1, 10, {5}, {at::kCUDA});
   auto beta = at::randint(1, 10, {5}, {at::kCUDA});
   auto mean = at::randint(1, 10, {5}, {at::kCUDA});
   auto var = at::randint(1, 10, {5}, {at::kCUDA});
 
+  auto trt_in = at::clone(in);
+  auto trt_gamma = at::clone(gamma);
+  auto trt_beta = at::clone(beta);
+  auto trt_mean = at::clone(mean);
+  auto trt_var = at::clone(var);
+
   auto params = trtorch::core::conversion::get_named_params(g->inputs(), {gamma, beta, mean, var});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
 
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {gamma, beta, mean, var});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
+  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_gamma, trt_beta, trt_mean, trt_var});
+  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
 }
