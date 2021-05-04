@@ -32,8 +32,8 @@ struct InputRange : torch::CustomClassHolder {
   std::vector<int64_t> opt;
   std::vector<int64_t> max;
 
-  core::conversion::InputRange toInternalInputRange() {
-    return core::conversion::InputRange(min, opt, max);
+  core::ir::InputRange toInternalInputRange() {
+    return core::ir::InputRange(min, opt, max);
   }
 
   ADD_FIELD_GET_SET(min, std::vector<int64_t>);

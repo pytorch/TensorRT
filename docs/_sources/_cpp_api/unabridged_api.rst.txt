@@ -43,6 +43,11 @@ Classes and Structs
 .. toctree::
    :maxdepth: 5
 
+   structtrtorch_1_1CompileSpec_1_1TorchFallback.rst
+
+.. toctree::
+   :maxdepth: 5
+
    classtrtorch_1_1CompileSpec_1_1DataType.rst
 
 .. toctree::

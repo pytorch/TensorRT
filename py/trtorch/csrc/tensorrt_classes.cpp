@@ -93,7 +93,7 @@ nvinfer1::EngineCapability toTRTEngineCapability(EngineCapability value) {
 }
 
 core::CompileSpec CompileSpec::toInternalCompileSpec() {
-  std::vector<core::conversion::InputRange> internal_input_ranges;
+  std::vector<core::ir::InputRange> internal_input_ranges;
   for (auto i : input_ranges) {
     internal_input_ranges.push_back(i.toInternalInputRange());
   }
@@ -132,6 +132,7 @@ std::string CompileSpec::stringify() {
   for (auto i : input_ranges) {
     ss << to_str(i);
   }
+  std::string enabled = torch_fallback.enabled ? "True" : "False";
   ss << "     ]" << std::endl;
   ss << "     \"Op Precision\": " << to_str(op_precision) << std::endl;
   ss << "     \"TF32 Disabled\": " << disable_tf32 << std::endl;
@@ -149,7 +150,7 @@ std::string CompileSpec::stringify() {
   ss << "     \"Max Batch Size\": " << max_batch_size << std::endl;
   ss << "     \"Truncate long and double\": " << truncate_long_and_double << std::endl;
   ss << "    \"Torch Fallback: {" << std::endl;
-  ss << "        \"enabled\": " << torch_fallback.enabled ? "True" : "False" << std::endl;
+  ss << "        \"enabled\": " << enabled << std::endl;
   ss << "        \"min_block_size\": " << torch_fallback.min_block_size << std::endl;
   ss << "        \"forced_fallback_operators\": [" << std::endl;
   for (auto i : torch_fallback.forced_fallback_operators) {

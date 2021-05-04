@@ -19,7 +19,7 @@ TEST(LoweringPasses, LinearToAddMM) {
       %weight = aten::t(%weight_t)
       %mm: Tensor = aten::matmul(%flat, %weight)
       %b_f: Tensor = trt::const(%bias)
-      %out: Tensor = aten::add_(%b_f, %mm, %1)
+      %out: Tensor = aten::add(%b_f, %mm, %1)
       return (%out))IR";
 
   trtorch::core::util::logging::get_logger().set_reportable_log_level(trtorch::core::util::logging::LogLevel::kGRAPH);
