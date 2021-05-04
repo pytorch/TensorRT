@@ -40,6 +40,7 @@ cc_library(
         "impl/element_wise.cpp",
         "impl/expand.cpp",
         "impl/interpolate.cpp",
+        "impl/layer_norm.cpp",
         "impl/linear.cpp",
         "impl/lstm_cell.cpp",
         "impl/matrix_multiply.cpp",

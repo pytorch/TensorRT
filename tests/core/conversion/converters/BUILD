@@ -36,6 +36,10 @@ converter_test(
 )
 
 converter_test(
+    name = "test_layer_norm",
+)
+
+converter_test(
     name = "test_linear",
 )
 
@@ -110,6 +114,7 @@ test_suite(
         ":test_element_wise",
         ":test_expand",
         ":test_interpolate",
+        ":test_layer_norm",
         ":test_linear",
         ":test_lstm_cell",
         ":test_matrix_multiply",

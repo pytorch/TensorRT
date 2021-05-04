@@ -35,6 +35,13 @@ nvinfer1::ITensor* addUnpadding(
     bool trailing = true,
     bool use_zeros = true);
 
+nvinfer1::ILayer* add_elementwise(
+    ConversionCtx* ctx,
+    nvinfer1::ElementWiseOperation op,
+    nvinfer1::ITensor* self,
+    nvinfer1::ITensor* other,
+    const std::string& name);
+
 } // namespace converters
 } // namespace conversion
 } // namespace core
