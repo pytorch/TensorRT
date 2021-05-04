@@ -2,8 +2,8 @@
 
 #include <queue>
 #include "core/conversion/conversion.h"
-#include "torch/csrc/jit/passes/constant_pooling.h"
 #include "core/partitioning/shape_analysis.h"
+#include "torch/csrc/jit/passes/constant_pooling.h"
 #include "torch/csrc/jit/passes/dead_code_elimination.h"
 
 namespace trtorch {
@@ -150,7 +150,8 @@ void resolveNonTensorInputs(PartitionedGraph& segmented_blocks) {
       if (!updated_segments.count(first_torch_id)) {
         auto to_inject_blocks = injectNodesForNonTensorInputs(segmented_blocks[first_torch_id]);
         segmented_blocks.erase(segmented_blocks.begin() + first_torch_id);
-        segmented_blocks.insert(segmented_blocks.begin() + first_torch_id, to_inject_blocks.begin(), to_inject_blocks.end());
+        segmented_blocks.insert(
+            segmented_blocks.begin() + first_torch_id, to_inject_blocks.begin(), to_inject_blocks.end());
         updated_segments.insert(first_torch_id);
       }
     } else {

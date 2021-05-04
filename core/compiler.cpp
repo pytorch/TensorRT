@@ -203,8 +203,8 @@ void AddIfBlockToGraph(
     auto cur_block_mapping = graph_and_mapping.second;
     std::unordered_map<torch::jit::Value*, torch::jit::Value*> block_graph_to_new_g;
     for (auto& i : cur_block_mapping) {
-      // for every pair in then_mapping, old_value => mini graph value, if old_value also appears in old_to_new_g, then it's
-      // mini graph's input
+      // for every pair in then_mapping, old_value => mini graph value, if old_value also appears in old_to_new_g, then
+      // it's mini graph's input
       if (old_to_new_g.count(i.first)) {
         block_graph_to_new_g[i.second] = old_to_new_g[i.first];
       }
@@ -317,8 +317,7 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
         input_ranges.insert({g->inputs()[i], cfg.convert_info.input_ranges[i]});
       }
       auto input_ivalues_map = partitioning::generateRandomInputs(input_ranges);
-      auto graph_and_mapping =
-          ConstructFallbackGraph(new_mod, g->block(), input_ivalues_map, cfg, named_params);
+      auto graph_and_mapping = ConstructFallbackGraph(new_mod, g->block(), input_ivalues_map, cfg, named_params);
       new_g = graph_and_mapping.first;
       LOG_INFO(*new_g << "(FallbackGraph)\n");
 
