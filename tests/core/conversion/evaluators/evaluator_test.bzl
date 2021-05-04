@@ -1,4 +1,4 @@
-def evaluator_test(name, visibility=None):
+def evaluator_test(name, visibility = None):
     native.cc_test(
         name = name,
         srcs = [name + ".cpp"],
@@ -8,8 +8,8 @@ def evaluator_test(name, visibility=None):
             "//core",
             "@googletest//:gtest_main",
         ] + select({
-            ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
-            "//conditions:default":  ["@libtorch//:libtorch"],
+            ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
+            "//conditions:default": ["@libtorch//:libtorch"],
         }),
-        timeout="short"
+        timeout = "short",
     )

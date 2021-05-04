@@ -7,12 +7,6 @@ config_setting(
     }
 )
 
-filegroup(
-    name = "jit_models",
-    srcs = ["//tests/modules:resnet50_traced.jit.pt",
-            "//tests/modules:mobilenet_v2_traced.jit.pt"]
-)
-
 partitioning_test(
   name = "test_segmentation",
 )
@@ -41,12 +35,12 @@ cc_test(
       "//conditions:default":  ["@libtorch//:libtorch"],
   }),
   data = [
-      ":jit_models"
+      "//tests/modules:jit_models"
   ]
 )
 
 test_suite(
-    name = "partitioning_test",
+    name = "partitioning_tests",
     tests = [
         ":test_segmentation",
         ":test_shape_analysis",

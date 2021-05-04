@@ -13,6 +13,7 @@
 #include "torch/csrc/jit/ir/ir.h"
 #include "torch/csrc/jit/ir/ir_views.h"
 #include "torch/csrc/jit/passes/graph_fuser.h"
+#include "torch/csrc/jit/passes/loop_unrolling.h"
 #include "torch/csrc/jit/passes/lower_graph.h"
 #include "torch/csrc/jit/passes/pass_manager.h"
 #include "torch/custom_class.h"
@@ -31,10 +32,9 @@ void AddEngineToGraph(
     torch::jit::script::Module mod,
     std::shared_ptr<torch::jit::Graph>& g,
     const std::string& serialized_engine,
-    int engine_id = 0,
+    std::string engine_id = "",
     bool fallback = false) {
-  auto engine_ptr =
-      c10::make_intrusive<runtime::TRTEngine>(mod._ivalue()->name() + std::to_string(engine_id), serialized_engine);
+  auto engine_ptr = c10::make_intrusive<runtime::TRTEngine>(mod._ivalue()->name() + engine_id, serialized_engine);
   // Get required metadata about the engine out
   auto num_io = engine_ptr->num_io;
   auto name = engine_ptr->name;
@@ -237,7 +237,6 @@ GraphAndMapping ConstructFallbackGraph(
     torch::jit::Block* block,
     std::unordered_map<torch::jit::Value*, torch::jit::IValue> input_ivalues_map,
     CompileSpec cfg,
-    int& trt_engine_id,
     conversion::GraphParams named_params) {
   auto convert_cfg = cfg.convert_info;
   auto partition_info = cfg.partition_info;
@@ -254,6 +253,8 @@ GraphAndMapping ConstructFallbackGraph(
 
   for (auto& seg_block : segmented_blocks) {
     LOG_INFO(*seg_block.g() << "(GraphInSegmentedBlock)\n");
+    std::ostringstream trt_engine_id;
+    trt_engine_id << reinterpret_cast<const int*>(&seg_block);
 
     if (seg_block.target() == partitioning::SegmentedBlock::kTensorRT) {
       std::vector<ir::InputRange> input_ranges;
@@ -264,7 +265,7 @@ GraphAndMapping ConstructFallbackGraph(
       convert_cfg.input_ranges = input_ranges;
       auto engine = conversion::ConvertBlockToEngine(seg_block.block(), convert_cfg, named_params);
       auto temp_g = std::make_shared<torch::jit::Graph>();
-      AddEngineToGraph(new_mod, temp_g, engine, trt_engine_id++, true);
+      AddEngineToGraph(new_mod, temp_g, engine, trt_engine_id.str(), true);
 
       seg_block.update_graph(temp_g);
       AddSegmentedBlockToGraph(new_g, seg_block, old_to_new_g);
@@ -276,7 +277,7 @@ GraphAndMapping ConstructFallbackGraph(
         std::vector<GraphAndMapping> graph_and_mappings;
         for (auto cur_block : if_node->blocks()) {
           graph_and_mappings.push_back(
-              ConstructFallbackGraph(new_mod, cur_block, input_ivalues_map, cfg, trt_engine_id, named_params));
+              ConstructFallbackGraph(new_mod, cur_block, input_ivalues_map, cfg, named_params));
         }
         AddIfBlockToGraph(new_g, if_node, graph_and_mappings, old_to_new_g);
 
@@ -311,14 +312,13 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
       auto named_params = conversion::get_named_params(g->inputs(), params);
       LOG_INFO(*g << "(LoweringGraph)\n");
 
-      int trt_engine_id = 0;
       std::unordered_map<torch::jit::Value*, ir::InputRange> input_ranges;
       for (size_t i = 0; i < g->inputs().size(); ++i) {
         input_ranges.insert({g->inputs()[i], cfg.convert_info.input_ranges[i]});
       }
       auto input_ivalues_map = partitioning::generateRandomInputs(input_ranges);
       auto graph_and_mapping =
-          ConstructFallbackGraph(new_mod, g->block(), input_ivalues_map, cfg, trt_engine_id, named_params);
+          ConstructFallbackGraph(new_mod, g->block(), input_ivalues_map, cfg, named_params);
       new_g = graph_and_mapping.first;
       LOG_INFO(*new_g << "(FallbackGraph)\n");
 

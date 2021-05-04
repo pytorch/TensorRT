@@ -4,35 +4,33 @@ config_setting(
     name = "use_pre_cxx11_abi",
     values = {
         "define": "abi=pre_cxx11_abi",
-    }
+    },
 )
 
 cc_library(
     name = "weights",
-    hdrs = [
-        "Weights.h"
-    ],
     srcs = [
-        "Weights.cpp"
+        "Weights.cpp",
+    ],
+    hdrs = [
+        "Weights.h",
     ],
     deps = [
         "@tensorrt//:nvinfer",
         "//core/util:prelude",
-        "//core/conversion/conversionctx"
+        "//core/conversion/conversionctx",
     ] + select({
-        ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default":  ["@libtorch//:libtorch"],
+        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
+        "//conditions:default": ["@libtorch//:libtorch"],
     }),
     alwayslink = True,
 )
 
 cc_library(
     name = "converters",
-    hdrs = [
-        "converters.h"
-    ],
     srcs = [
         "NodeConverterRegistry.cpp",
+        "converter_util.cpp",
         "impl/activation.cpp",
         "impl/batch_norm.cpp",
         "impl/concat.cpp",
@@ -40,21 +38,25 @@ cc_library(
         "impl/conv_deconv.cpp",
         "impl/element_wise.cpp",
         "impl/expand.cpp",
+        "impl/interpolate.cpp",
         "impl/linear.cpp",
+        "impl/lstm_cell.cpp",
         "impl/matrix_multiply.cpp",
         "impl/pooling.cpp",
         "impl/reduce.cpp",
         "impl/replication_pad.cpp",
+        "impl/select.cpp",
         "impl/shuffle.cpp",
         "impl/softmax.cpp",
-        "impl/unary.cpp",
-        "impl/interpolate.cpp",
-        "impl/select.cpp",
         "impl/squeeze.cpp",
         "impl/stack.cpp",
-        "impl/lstm_cell.cpp",
-        "impl/unsqueeze.cpp",
         "impl/topk.cpp",
+        "impl/unary.cpp",
+        "impl/unsqueeze.cpp",
+    ],
+    hdrs = [
+        "converter_util.h",
+        "converters.h",
     ],
     deps = [
         "@tensorrt//:nvinfer",
@@ -62,10 +64,10 @@ cc_library(
         "//core/conversion/var",
         "//core/conversion/tensorcontainer",
         "//core/conversion/conversionctx",
-        "//core/conversion/converters/impl/plugins"
+        "//core/conversion/converters/impl/plugins",
     ] + select({
-        ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default":  ["@libtorch//:libtorch"],
+        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
+        "//conditions:default": ["@libtorch//:libtorch"],
     }),
     alwayslink = True,
 )
@@ -74,9 +76,9 @@ load("@rules_pkg//:pkg.bzl", "pkg_tar")
 
 pkg_tar(
     name = "include",
-    package_dir = "core/conversion/converters/",
     srcs = [
+        "Weights.h",
         "converters.h",
-        "Weights.h"
     ],
+    package_dir = "core/conversion/converters/",
 )
