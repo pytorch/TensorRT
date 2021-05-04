@@ -196,14 +196,15 @@ void AddIfBlockToGraph(
   auto new_if = new_g->insertNode(new_g->create(torch::jit::prim::If, {}, 0));
   new_if->addInput(util::getOrAddInputForValue(if_view.cond(), new_g, old_to_new_g));
 
+  // iterate over all blocks and add them to new created prim::If
   for (auto graph_and_mapping : graph_and_mappings) {
     auto new_if_block = new_if->addBlock();
     auto cur_block_graph = graph_and_mapping.first;
     auto cur_block_mapping = graph_and_mapping.second;
     std::unordered_map<torch::jit::Value*, torch::jit::Value*> block_graph_to_new_g;
     for (auto& i : cur_block_mapping) {
-      // for every pair in then_mapping, old_value => then value, if old_value also appears in old_to_new_g, then it's
-      // then graph's input
+      // for every pair in then_mapping, old_value => mini graph value, if old_value also appears in old_to_new_g, then it's
+      // mini graph's input
       if (old_to_new_g.count(i.first)) {
         block_graph_to_new_g[i.second] = old_to_new_g[i.first];
       }
@@ -214,7 +215,7 @@ void AddIfBlockToGraph(
     if (cur_block_graph->inputs()[0]->type()->str().find("__torch__") != std::string::npos) {
       if (new_g->inputs()[0]->type()->str().find("__torch__") == std::string::npos) {
         auto self = new_g->insertInput(0, "self_1");
-        self->setType(loop_graph->inputs()[0]->type());
+        self->setType(cur_block_graph->inputs()[0]->type());
       }
       block_graph_to_new_g[cur_block_graph->inputs()[0]] = new_g->inputs()[0];
     }

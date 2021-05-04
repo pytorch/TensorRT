@@ -84,8 +84,14 @@ std::vector<SegmentedBlock> injectNodesForNonTensorInputs(SegmentedBlock& seg_bl
   // if current block is kTorch or current block is TensorRT and all dependent nodes are also supported, construct only
   // one new block
   if (seg_block.target() == SegmentedBlock::kTorch || isAllNodesSupported(dependency_nodes)) {
-    dependency_nodes.insert(dependency_nodes.end(), seg_block.raw_nodes().begin(), seg_block.raw_nodes().end());
-    new_seg_blocks.emplace_back(seg_block.target(), dependency_nodes);
+    // if current node is prim::If, just ensure that we have all required input in kTorch
+    if (seg_block.raw_nodes()[0]->kind() == torch::jit::prim::If) {
+      new_seg_blocks.emplace_back(seg_block.target(), dependency_nodes);
+      new_seg_blocks.push_back(seg_block);
+    } else {
+      dependency_nodes.insert(dependency_nodes.end(), seg_block.raw_nodes().begin(), seg_block.raw_nodes().end());
+      new_seg_blocks.emplace_back(seg_block.target(), dependency_nodes);
+    }
   } else {
     // if current block is kTensorRT but the dependency nodes contain unsupported node, then we have to segment again
     std::unordered_set<torch::jit::Value*> nontensor_inputs_set(nontensor_inputs.begin(), nontensor_inputs.end());
@@ -141,8 +147,9 @@ void resolveNonTensorInputs(PartitionedGraph& segmented_blocks) {
     if (segmented_blocks[use_info.produce_id].target() == SegmentedBlock::kTensorRT && !use_info.torch_use_id.empty()) {
       int first_torch_id = use_info.torch_use_id.front();
       if (!updated_segments.count(first_torch_id)) {
-        auto new_torch_block = injectNodesForNonTensorInputs(segmented_blocks[first_torch_id]).front();
-        segmented_blocks[first_torch_id] = new_torch_block;
+        auto to_inject_blocks = injectNodesForNonTensorInputs(segmented_blocks[first_torch_id]);
+        segmented_blocks.erase(segmented_blocks.begin() + first_torch_id);
+        segmented_blocks.insert(segmented_blocks.begin() + first_torch_id, to_inject_blocks.begin(), to_inject_blocks.end());
         updated_segments.insert(first_torch_id);
       }
     } else {
