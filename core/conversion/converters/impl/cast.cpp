@@ -1,5 +1,6 @@
 #include <torch/torch.h>
 #include "core/conversion/converters/converters.h"
+#include "core/conversion/converters/converter_util.h"
 #include "core/util/prelude.h"
 #include "core/util/trt_util.h"
 
@@ -9,21 +10,6 @@ namespace conversion {
 namespace converters {
 namespace impl {
 namespace {
-
-bool register_cast_layer(
-    ConversionCtx* ctx,
-    const torch::jit::Node* n,
-    nvinfer1::ITensor* input,
-    nvinfer1::DataType output_dtype) {
-  auto cast_layer = ctx->net->addIdentity(*input);
-  cast_layer->setName(util::node_info(n).c_str());
-  cast_layer->setOutputType(0, output_dtype);
-
-  auto output = ctx->AssociateValueAndTensor(n->outputs()[0], cast_layer->getOutput(0));
-  LOG_DEBUG("Cast layer output tensor shape: " << output->getDimensions());
-
-  return true;
-}
 
 auto cast_registrations TRTORCH_UNUSED =
     RegisterNodeConversionPatterns()
@@ -36,7 +22,7 @@ auto cast_registrations TRTORCH_UNUSED =
                TRTORCH_CHECK(
                    aten_to_trt_dtype_map.find(static_cast<at::ScalarType>(output_dtype)) != aten_to_trt_dtype_map.end(),
                    "Conversion to desired datatype is not supported");
-               return register_cast_layer(
+               return register_cast_layer_orig(
                    ctx, n, self, aten_to_trt_dtype_map.at(static_cast<at::ScalarType>(output_dtype)));
              }})
         .pattern(
@@ -52,7 +38,7 @@ auto cast_registrations TRTORCH_UNUSED =
                  }
                }
                TRTORCH_CHECK(is_datatype_supported, "Conversion to desired datatype is not supported");
-               return register_cast_layer(ctx, n, self, other_dtype);
+               return register_cast_layer_orig(ctx, n, self, other_dtype);
              }});
 // clang-format on
 } // namespace

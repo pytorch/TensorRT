@@ -68,40 +68,17 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
                                                                             can only be set to 1 value but received " << settings.enabled_precisions.size() << " values.");
 
   for (auto precision : settings.enabled_precisions){
-    if(strcmp(precision, "fp16") != 0){
+    if(precision == nvinfer1::DataType::kHALF){
       TRTORCH_CHECK(builder->platformHasFastFp16(), "Requested inference in FP16 but platform does not support FP16");
       cfg->setFlag(nvinfer1::BuilderFlag::kFP16);
       input_type = nvinfer1::DataType::kHALF;
-    }else if (strcmp(precision, "int8") != 0){
+    }else if(precision == nvinfer1::DataType::kINT8){
       TRTORCH_CHECK(builder->platformHasFastInt8(), "Requested inference in INT8 but platform does not support INT8");
       cfg->setFlag(nvinfer1::BuilderFlag::kINT8);
     }
   }
 
-  // switch (settings.op_precision) {
-  //   case nvinfer1::DataType::kHALF:
-  //     TRTORCH_CHECK(builder->platformHasFastFp16(), "Requested inference in FP16 but platform does not support FP16");
-  //     cfg->setFlag(nvinfer1::BuilderFlag::kFP16);
-  //     input_type = nvinfer1::DataType::kHALF;
-  //     break;
-  //   case nvinfer1::DataType::kINT8:
-  //     TRTORCH_CHECK(builder->platformHasFastInt8(), "Requested inference in INT8 but platform does not support INT8");
-  //     cfg->setFlag(nvinfer1::BuilderFlag::kINT8);
-  //     if (!settings.strict_types) {
-  //       cfg->setFlag(nvinfer1::BuilderFlag::kFP16);
-  //     }
-  //     input_type = nvinfer1::DataType::kFLOAT;
-  //     TRTORCH_CHECK(
-  //         settings.calibrator != nullptr,
-  //         "Requested inference in INT8 but no calibrator provided, set the ptq_calibrator field in the CompileSpec struct with your calibrator");
-  //     cfg->setInt8Calibrator(settings.calibrator);
-  //     break;
-  //   case nvinfer1::DataType::kFLOAT:
-  //   default:
-  //     input_type = nvinfer1::DataType::kFLOAT;
-  //     break;
-  // }
-  input_type = nvinfer1::DataType::kFLOAT;
+  input_type = nvinfer1::DataType::kHALF;
   op_precision = settings.op_precision;
 
   if (settings.disable_tf32) {

@@ -1,5 +1,6 @@
 #include "core/conversion/converters/converter_util.h"
 #include "core/conversion/converters/converters.h"
+#include "core/conversion/converters/precision_handler.h"
 #include "core/util/prelude.h"
 #include "torch/torch.h"
 
@@ -12,6 +13,12 @@ namespace {
 
 bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) {
   auto in = args[0].ITensor(); // assumes non-static input Tensor
+  auto weight_tensor = args[1].unwrapToTensor();
+  std::vector<nvinfer1::ITensor*> input_tensors;
+  input_tensors.push_back(in);
+  std::vector<at::Tensor> weight_tensors;
+  weight_tensors.push_back(weight_tensor);
+  PrecisionHandler(ctx, n, input_tensors, weight_tensors, ctx->settings.enabled_precisions, ctx->settings.strict_types);
   auto w = Weights(ctx, args[1].unwrapToTensor());
   auto stride = util::toDims(args[3].unwrapToIntList());
   auto padding = util::toDims(args[4].unwrapToIntList());
