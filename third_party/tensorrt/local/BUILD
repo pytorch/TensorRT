@@ -306,7 +306,6 @@ cc_library(
     }),
     deps = [
         "nvinfer",
-        "@cublas//:cublas",
         "@cuda//:cudart",
         "@cudnn",
     ] + select({
