@@ -1,5 +1,20 @@
 package(default_visibility = ["//visibility:public"])
 
+config_setting(
+    name = "aarch64_linux",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
+)
+
+config_setting(
+    name = "windows",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+)
+
 cc_library(
     name = "nvinfer_headers",
     hdrs = glob(
@@ -27,10 +42,13 @@ cc_library(
     deps = [
         "nvinfer_headers",
         "nvinfer_lib",
-        "@cuda//:cublas",
         "@cuda//:cudart",
         "@cudnn",
-    ],
+    ] + select({
+        ":aarch64_linux": ["@cublas//:cublas"],
+        ":windows": ["@cuda//:cublas"],
+        "//conditions:default": ["@cuda//:cublas"],
+    }),
 )
 
 ####################################################################################
@@ -165,8 +183,11 @@ cc_library(
         "nvinfer",
         "nvinferplugin_headers",
         "nvinferplugin_lib",
-        "@cublas//:cublas",
         "@cuda//:cudart",
         "@cudnn",
-    ],
+    ] + select({
+        ":aarch64_linux": ["@cublas//:cublas"],
+        ":windows": ["@cuda//:cublas"],
+        "//conditions:default": ["@cuda//:cublas"],
+    }),
 )

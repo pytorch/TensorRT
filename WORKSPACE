@@ -38,6 +38,11 @@ new_local_repository(
     path = "/usr/local/cuda-11.1/",
 )
 
+new_local_repository(
+    name = "cublas",
+    build_file = "@//third_party/cublas:BUILD",
+    path = "/usr",
+)
 #############################################################################################################
 # Tarballs and fetched dependencies (default - use in cases when building from precompiled bin and tarballs)
 #############################################################################################################
