@@ -165,5 +165,8 @@ cc_library(
         "nvinfer",
         "nvinferplugin_headers",
         "nvinferplugin_lib",
+        "@cublas//:cublas",
+        "@cuda//:cudart",
+        "@cudnn",
     ],
 )

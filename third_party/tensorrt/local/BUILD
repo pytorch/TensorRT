@@ -274,47 +274,45 @@ cc_library(
 
 cc_library(
     name = "nvcaffeparser",
-    visibility = ["//visibility:public"],
     deps = [
         "nvcaffeparser_headers",
         "nvcaffeparser_lib",
         "nvinfer",
     ],
+    visibility = ["//visibility:public"],
 )
 
 ####################################################################################
 
-cc_import(
-    name = "nvinferplugin_lib",
-    shared_library = select({
-        ":aarch64_linux": "lib/x86_64-linux-gnu/libnvinfer_plugin.so",
-        ":windows": "lib/nvinfer_plugin.dll",
-        "//conditions:default": "lib/x86_64-linux-gnu/libnvinfer_plugin.so",
-    }),
-    visibility = ["//visibility:private"],
-)
-
 cc_library(
-    name = "nvinferplugin_headers",
+    name = "nvinferplugin",
     hdrs = select({
         ":aarch64_linux": glob(["include/aarch64-linux-gnu/NvInferPlugin*.h"]),
         ":windows": glob(["include/NvInferPlugin*.h"]),
         "//conditions:default": glob(["include/x86_64-linux-gnu/NvInferPlugin*.h"]),
     }),
+    srcs = select({
+        ":aarch64_linux": ["lib/aarch64-linux-gnu/libnvinfer_plugin.so"],
+        ":windows": ["lib/nvinfer_plugin.dll"],
+        "//conditions:default": ["lib/x86_64-linux-gnu/libnvinfer_plugin.so"],
+    }),
     includes = select({
-        ":aarch64_linux": ["include/aarch64-linux-gnu"],
+        ":aarch64_linux": ["include/aarch64-linux-gnu/"],
         ":windows": ["include/"],
         "//conditions:default": ["include/x86_64-linux-gnu/"],
     }),
-    visibility = ["//visibility:private"],
-)
-
-cc_library(
-    name = "nvinferplugin",
-    visibility = ["//visibility:public"],
     deps = [
         "nvinfer",
-        "nvinferplugin_headers",
-        "nvinferplugin_lib",
+        "@cublas//:cublas",
+        "@cuda//:cudart",
+        "@cuda//:cublas",
+        "@cudnn",
     ],
+    alwayslink = True,
+    copts = [
+        "-pthread"
+    ],
+    linkopts = [
+        "-lpthread",
+    ]
 )
