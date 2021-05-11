@@ -5,23 +5,22 @@ namespace backend {
 namespace {
 
 #define ADD_FIELD_GET_SET_REGISTRATION(registry, class_name, field_name) \
-  (registry).def("_set_" #field_name, &class_name::set_##field_name);     \
+  (registry).def("_set_" #field_name, &class_name::set_##field_name);    \
   (registry).def("_get_" #field_name, &class_name::get_##field_name);
 
 void RegisterTRTCompileSpec() {
   static auto TRTORCH_UNUSED TRTInputRangeTSRegistration =
-    torch::class_<trtorch::pyapi::InputRange>("tensorrt", "_InputRange")
-      .def(torch::init<>())
-      .def("__str__", &trtorch::pyapi::InputRange::to_str);
+      torch::class_<trtorch::pyapi::InputRange>("tensorrt", "_InputRange")
+          .def(torch::init<>())
+          .def("__str__", &trtorch::pyapi::InputRange::to_str);
 
   ADD_FIELD_GET_SET_REGISTRATION(TRTInputRangeTSRegistration, trtorch::pyapi::InputRange, min);
   ADD_FIELD_GET_SET_REGISTRATION(TRTInputRangeTSRegistration, trtorch::pyapi::InputRange, opt);
   ADD_FIELD_GET_SET_REGISTRATION(TRTInputRangeTSRegistration, trtorch::pyapi::InputRange, max);
 
-  static auto TRTORCH_UNUSED TRTDeviceTSRegistration =
-    torch::class_<trtorch::pyapi::Device>("tensorrt", "_Device")
-      .def(torch::init<>())
-      .def("__str__", &trtorch::pyapi::Device::to_str);
+  static auto TRTORCH_UNUSED TRTDeviceTSRegistration = torch::class_<trtorch::pyapi::Device>("tensorrt", "_Device")
+                                                           .def(torch::init<>())
+                                                           .def("__str__", &trtorch::pyapi::Device::to_str);
 
   ADD_FIELD_GET_SET_REGISTRATION(TRTDeviceTSRegistration, trtorch::pyapi::Device, device_type);
   ADD_FIELD_GET_SET_REGISTRATION(TRTDeviceTSRegistration, trtorch::pyapi::Device, gpu_id);
@@ -29,9 +28,9 @@ void RegisterTRTCompileSpec() {
   ADD_FIELD_GET_SET_REGISTRATION(TRTDeviceTSRegistration, trtorch::pyapi::Device, allow_gpu_fallback);
 
   static auto TRTORCH_UNUSED TRTFallbackTSRegistration =
-    torch::class_<trtorch::pyapi::TorchFallback>("tensorrt", "_TorchFallback")
-      .def(torch::init<>())
-      .def("__str__", &trtorch::pyapi::TorchFallback::to_str);
+      torch::class_<trtorch::pyapi::TorchFallback>("tensorrt", "_TorchFallback")
+          .def(torch::init<>())
+          .def("__str__", &trtorch::pyapi::TorchFallback::to_str);
 
   ADD_FIELD_GET_SET_REGISTRATION(TRTFallbackTSRegistration, trtorch::pyapi::TorchFallback, enabled);
   ADD_FIELD_GET_SET_REGISTRATION(TRTFallbackTSRegistration, trtorch::pyapi::TorchFallback, min_block_size);

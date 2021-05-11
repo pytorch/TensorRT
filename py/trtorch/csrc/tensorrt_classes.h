@@ -93,7 +93,6 @@ struct TorchFallback : torch::CustomClassHolder {
   std::string to_str();
 };
 
-
 enum class EngineCapability : int8_t {
   kDEFAULT,
   kSAFE_GPU,

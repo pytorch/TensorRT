@@ -214,6 +214,10 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]) -> torch.classes.tensorrt.
             One key is required which is ``input_shapes``, describing the input sizes or ranges for inputs
             to the graph. All other keys are optional. Entries for each method to be compiled.
 
+            Note: Partial compilation of TorchScript modules is not supported through the PyTorch TensorRT backend
+            If you need this feature, use trtorch.compile to compile your module. Usage of the resulting module is
+            as if you were using the TensorRT integration.
+
             .. code-block:: py
 
                 CompileSpec = {
@@ -272,7 +276,9 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]) -> torch.classes.tensorrt.
     d._set_allow_gpu_fallback(parsed_spec.device.allow_gpu_fallback)
 
     if parsed_spec.torch_fallback.enabled:
-        raise RuntimeError("Partial module compilation is not currently supported via the PyTorch to_backend API integration. If you need partial compilation, use trtorch.compile")
+        raise RuntimeError(
+            "Partial module compilation is not currently supported via the PyTorch TensorRT backend. If you need partial compilation, use trtorch.compile"
+        )
 
     torch_fallback = torch.classes.tensorrt._TorchFallback()
     torch_fallback._set_enabled(parsed_spec.torch_fallback.enabled)
