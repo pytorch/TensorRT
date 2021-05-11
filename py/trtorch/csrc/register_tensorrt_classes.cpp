@@ -25,7 +25,7 @@ void RegisterTRTCompileSpec() {
   ADD_FIELD_GET_SET_REGISTRATION(TRTDeviceTSRegistration, trtorch::pyapi::Device, allow_gpu_fallback);
 
   static auto TRTORCH_UNUSED TRTFallbackTSRegistration =
-      torch::class_<trtorch::pyapi::TorchFallback>("tensorrt", "Fallback").def(torch::init<>());
+      torch::class_<trtorch::pyapi::TorchFallback>("tensorrt", "TorchFallback").def(torch::init<>());
   ADD_FIELD_GET_SET_REGISTRATION(TRTFallbackTSRegistration, trtorch::pyapi::TorchFallback, enabled);
   ADD_FIELD_GET_SET_REGISTRATION(TRTFallbackTSRegistration, trtorch::pyapi::TorchFallback, min_block_size);
   ADD_FIELD_GET_SET_REGISTRATION(TRTFallbackTSRegistration, trtorch::pyapi::TorchFallback, forced_fallback_operators);

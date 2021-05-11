@@ -277,7 +277,7 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]) -> torch.classes.tensorrt.
     torch_fallback.set_forced_fallback_operators(parsed_spec.torch_fallback.forced_fallback_operators)
 
     backend_spec.set_device(d)
-    backend_spec.set_torch_fallback(fallback)
+    backend_spec.set_torch_fallback(torch_fallback)
     backend_spec.set_op_precision(int(parsed_spec.op_precision))
     backend_spec.set_disable_tf32(parsed_spec.disable_tf32)
     backend_spec.set_refit(parsed_spec.refit)
