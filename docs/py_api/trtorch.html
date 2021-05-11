@@ -596,11 +596,11 @@ to the graph. All other keys are optional
     <span class="s2">"workspace_size"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="c1"># Maximum size of workspace given to TensorRT</span>
     <span class="s2">"max_batch_size"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="c1"># Maximum batch size (must be &gt;= 1 to be set, 0 means not set)</span>
     <span class="s2">"torch_fallback"</span><span class="p">:</span> <span class="p">{</span>
-        <span class="s2">"enabled"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="s2">"enabled"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="c1"># Turn on or turn off falling back to PyTorch if operations are not supported in TensorRT</span>
         <span class="s2">"force_fallback_ops"</span><span class="p">:</span> <span class="p">[</span>
-            <span class="s2">"aten::max_pool2d"</span>
+            <span class="s2">"aten::max_pool2d"</span> <span class="c1"># List of specific ops to require running in PyTorch</span>
         <span class="p">],</span>
-        <span class="s2">"min_block_size"</span><span class="p">:</span> <span class="mi">1</span>
+        <span class="s2">"min_block_size"</span><span class="p">:</span> <span class="mi">3</span> <span class="c1"># Minimum number of ops an engine must incapsulate to be run in TensorRT</span>
     <span class="p">}</span>
 <span class="p">}</span>
 </pre>
@@ -1018,7 +1018,7 @@ that are not supported are printed out and the function returns false, else true
          <span class="sig-paren">
           )
          </span>
-         → &lt;torch._C.ScriptClass object at 0x7fabde990ef0&gt;
+         → &lt;torch._C.ScriptClass object at 0x7fdd093be6f0&gt;
          <a class="headerlink" href="#trtorch.TensorRTCompileSpec" title="Permalink to this definition">
           ¶
          </a>
@@ -1052,6 +1052,11 @@ One key is required which is
             </code>
             , describing the input sizes or ranges for inputs
 to the graph. All other keys are optional. Entries for each method to be compiled.
+           </p>
+           <p>
+            Note: Partial compilation of TorchScript modules is not supported through the PyTorch TensorRT backend
+If you need this feature, use trtorch.compile to compile your module. Usage of the resulting module is
+as if you were using the TensorRT integration.
            </p>
            <div class="highlight-py notranslate">
             <div class="highlight">
