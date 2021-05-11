@@ -39,9 +39,9 @@ struct InputRange : torch::CustomClassHolder {
   ADD_FIELD_GET_SET(min, std::vector<int64_t>);
   ADD_FIELD_GET_SET(opt, std::vector<int64_t>);
   ADD_FIELD_GET_SET(max, std::vector<int64_t>);
-};
 
-std::string to_str(InputRange& value);
+  std::string to_str();
+};
 
 enum class DataType : int8_t {
   kFloat,
@@ -73,6 +73,8 @@ struct Device : torch::CustomClassHolder {
   ADD_FIELD_GET_SET(gpu_id, int64_t);
   ADD_FIELD_GET_SET(dla_core, int64_t);
   ADD_FIELD_GET_SET(allow_gpu_fallback, bool);
+
+  std::string to_str();
 };
 
 std::string to_str(DeviceType value);
@@ -87,7 +89,10 @@ struct TorchFallback : torch::CustomClassHolder {
   ADD_FIELD_GET_SET(enabled, bool);
   ADD_FIELD_GET_SET(min_block_size, int64_t);
   ADD_FIELD_GET_SET(forced_fallback_operators, std::vector<std::string>);
+
+  std::string to_str();
 };
+
 
 enum class EngineCapability : int8_t {
   kDEFAULT,
