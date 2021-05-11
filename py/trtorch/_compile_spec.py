@@ -214,6 +214,10 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]) -> torch.classes.tensorrt.
             One key is required which is ``input_shapes``, describing the input sizes or ranges for inputs
             to the graph. All other keys are optional. Entries for each method to be compiled.
 
+            Note: Partial compilation of TorchScript modules is not supported through the PyTorch TensorRT backend
+            If you need this feature, use trtorch.compile to compile your module. Usage of the resulting module is
+            as if you were using the TensorRT integration.
+
             .. code-block:: py
 
                 CompileSpec = {
@@ -259,37 +263,42 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]) -> torch.classes.tensorrt.
     backend_spec = torch.classes.tensorrt.CompileSpec()
 
     for i in parsed_spec.input_ranges:
-        ir = torch.classes.tensorrt.InputRange()
-        ir.set_min(i.min)
-        ir.set_opt(i.opt)
-        ir.set_max(i.max)
-        backend_spec.append_input_range(ir)
+        ir = torch.classes.tensorrt._InputRange()
+        ir._set_min(i.min)
+        ir._set_opt(i.opt)
+        ir._set_max(i.max)
+        backend_spec._append_input_range(ir)
 
-    d = torch.classes.tensorrt.Device()
-    d.set_device_type(int(parsed_spec.device.device_type))
-    d.set_gpu_id(parsed_spec.device.gpu_id)
-    d.set_dla_core(parsed_spec.device.dla_core)
-    d.set_allow_gpu_fallback(parsed_spec.device.allow_gpu_fallback)
+    d = torch.classes.tensorrt._Device()
+    d._set_device_type(int(parsed_spec.device.device_type))
+    d._set_gpu_id(parsed_spec.device.gpu_id)
+    d._set_dla_core(parsed_spec.device.dla_core)
+    d._set_allow_gpu_fallback(parsed_spec.device.allow_gpu_fallback)
 
-    torch_fallback = torch.classes.tensorrt.TorchFallback()
-    torch_fallback.set_enabled(parsed_spec.torch_fallback.enabled)
-    torch_fallback.set_min_block_size(parsed_spec.torch_fallback.min_block_size)
-    torch_fallback.set_forced_fallback_operators(parsed_spec.torch_fallback.forced_fallback_operators)
+    if parsed_spec.torch_fallback.enabled:
+        raise RuntimeError(
+            "Partial module compilation is not currently supported via the PyTorch TensorRT backend. If you need partial compilation, use trtorch.compile"
+        )
 
-    backend_spec.set_device(d)
-    backend_spec.set_torch_fallback(fallback)
-    backend_spec.set_op_precision(int(parsed_spec.op_precision))
-    backend_spec.set_disable_tf32(parsed_spec.disable_tf32)
-    backend_spec.set_refit(parsed_spec.refit)
-    backend_spec.set_debug(parsed_spec.debug)
-    backend_spec.set_refit(parsed_spec.refit)
-    backend_spec.set_strict_types(parsed_spec.strict_types)
-    backend_spec.set_capability(int(parsed_spec.capability))
-    backend_spec.set_num_min_timing_iters(parsed_spec.num_min_timing_iters)
-    backend_spec.set_num_avg_timing_iters(parsed_spec.num_avg_timing_iters)
-    backend_spec.set_workspace_size(parsed_spec.workspace_size)
-    backend_spec.set_max_batch_size(parsed_spec.max_batch_size)
-    backend_spec.set_truncate_long_and_double(parsed_spec.truncate_long_and_double)
+    torch_fallback = torch.classes.tensorrt._TorchFallback()
+    torch_fallback._set_enabled(parsed_spec.torch_fallback.enabled)
+    torch_fallback._set_min_block_size(parsed_spec.torch_fallback.min_block_size)
+    torch_fallback._set_forced_fallback_operators(parsed_spec.torch_fallback.forced_fallback_operators)
+
+    backend_spec._set_device(d)
+    backend_spec._set_torch_fallback(torch_fallback)
+    backend_spec._set_op_precision(int(parsed_spec.op_precision))
+    backend_spec._set_disable_tf32(parsed_spec.disable_tf32)
+    backend_spec._set_refit(parsed_spec.refit)
+    backend_spec._set_debug(parsed_spec.debug)
+    backend_spec._set_refit(parsed_spec.refit)
+    backend_spec._set_strict_types(parsed_spec.strict_types)
+    backend_spec._set_capability(int(parsed_spec.capability))
+    backend_spec._set_num_min_timing_iters(parsed_spec.num_min_timing_iters)
+    backend_spec._set_num_avg_timing_iters(parsed_spec.num_avg_timing_iters)
+    backend_spec._set_workspace_size(parsed_spec.workspace_size)
+    backend_spec._set_max_batch_size(parsed_spec.max_batch_size)
+    backend_spec._set_truncate_long_and_double(parsed_spec.truncate_long_and_double)
     backend_spec._set_ptq_calibrator(parsed_spec._get_calibrator_handle())
 
     return backend_spec
