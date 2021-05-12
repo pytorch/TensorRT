@@ -208,7 +208,7 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
       for (auto& seg_block : segmented_blocks) {
         std::string cur_block_target =
             seg_block.target() == partitioning::SegmentedBlock::kTensorRT ? "TensorRT" : "Torch";
-        LOG_INFO(*g << "(MiniGraphIn" << cur_block_target << "Block\n");
+        LOG_INFO(*seg_block.g() << "(MiniGraphIn" << cur_block_target << "Block)\n");
         std::ostringstream trt_engine_id;
         trt_engine_id << reinterpret_cast<const int*>(&seg_block);
         if (seg_block.target() == partitioning::SegmentedBlock::kTensorRT) {
