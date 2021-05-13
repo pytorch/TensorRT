@@ -161,7 +161,7 @@ auto acthardtanh TRTORCH_UNUSED =
                     TRTORCH_CHECK(new_layer, "Unable to create layer for aten::elu");
                     new_layer->setAlpha(alpha);
 
-                    new_layer->setName(trtorch::core::util::node_info(n).c_str());
+                    new_layer->setName(util::node_info(n).c_str());
 
                     auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
                     LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
@@ -190,7 +190,7 @@ auto acthardtanh TRTORCH_UNUSED =
                     TRTORCH_CHECK(gelu_plugin, "Unable to create gelu plugin from TensorRT plugin registry" << *n);
                     auto new_layer =
                         ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(&in), 1, *gelu_plugin);
-                    new_layer->setName("gelu");
+                    new_layer->setName(util::node_info(n).c_str());
                     auto out_tensor = new_layer->getOutput(0);
                     out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], out_tensor);
                     LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
