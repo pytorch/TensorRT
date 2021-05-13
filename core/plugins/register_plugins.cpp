@@ -14,9 +14,9 @@ namespace impl {
 class TRTorchPluginRegistry {
  public:
   TRTorchPluginRegistry() {
-    #ifndef NDEBUG
-      trtorch_logger.log(util::logging::LogLevel::kDEBUG, "Instatiated the TRTorch plugin registry class");
-    #endif
+#ifndef NDEBUG
+    trtorch_logger.log(util::logging::LogLevel::kDEBUG, "Instatiated the TRTorch plugin registry class");
+#endif
     // register libNvInferPlugins and TRTorch plugins
     // trtorch_logger logging level is set to kERROR and reset back to kDEBUG.
     // This is because initLibNvInferPlugins initializes only a subset of plugins and logs them.
@@ -26,22 +26,23 @@ class TRTorchPluginRegistry {
     trtorch_logger.set_reportable_log_level(util::logging::LogLevel::kERROR);
     initLibNvInferPlugins(&trtorch_logger, "");
     trtorch_logger.set_reportable_log_level(util::logging::LogLevel::kDEBUG);
-    #ifndef NDEBUG
-      int numCreators = 0;
-      auto pluginsList = getPluginRegistry()->getPluginCreatorList(&numCreators);
-      for (int k = 0; k < numCreators; ++k) {
-        if (!pluginsList[k]) {
-          trtorch_logger.log(util::logging::LogLevel::kDEBUG, "Plugin creator for plugin " + str(k) + " is a nullptr");
-          continue;
-        }
-        std::string pluginNamespace = pluginsList[k]->getPluginNamespace();
-        trtorch_logger.log(
-            util::logging::LogLevel::kDEBUG,
-            "Registered plugin creator - " + std::string(pluginsList[k]->getPluginName()) +
-                ", Namespace: " + pluginNamespace);
+#ifndef NDEBUG
+    int numCreators = 0;
+    auto pluginsList = getPluginRegistry()->getPluginCreatorList(&numCreators);
+    for (int k = 0; k < numCreators; ++k) {
+      if (!pluginsList[k]) {
+        trtorch_logger.log(util::logging::LogLevel::kDEBUG, "Plugin creator for plugin " + str(k) + " is a nullptr");
+        continue;
       }
-      trtorch_logger.log(util::logging::LogLevel::kDEBUG, "Total number of plugins registered: " + str(numCreators));
-    #endif
+
+      std::string pluginNamespace = pluginsList[k]->getPluginNamespace();
+      trtorch_logger.log(
+          util::logging::LogLevel::kDEBUG,
+          "Registered plugin creator - " + std::string(pluginsList[k]->getPluginName()) +
+              ", Namespace: " + pluginNamespace);
+    }
+    trtorch_logger.log(util::logging::LogLevel::kDEBUG, "Total number of plugins registered: " + str(numCreators));
+#endif
   }
 
  public:
