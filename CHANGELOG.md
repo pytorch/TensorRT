@@ -614,4 +614,80 @@ Signed-off-by: Naren Dasan <naren@narendasan.com>
 Signed-off-by: Naren Dasan <narens@nvidia.com>
 
 
+# 0.3.0 (2021-05-13)
+
+
+### Bug Fixes
+
+* **//plugins:** Readding cuBLAS BUILD to allow linking of libnvinfer_plugin on Jetson ([a8008f4](https://github.com/NVIDIA/TRTorch/commit/a8008f4))
+* **//tests/../concat:** Concat test fix ([2432fb8](https://github.com/NVIDIA/TRTorch/commit/2432fb8))
+* **//tests/core/partitioning:** Fixing some issues with the partition ([ff89059](https://github.com/NVIDIA/TRTorch/commit/ff89059))
+* erase the repetitive nodes in dependency analysis ([80b1038](https://github.com/NVIDIA/TRTorch/commit/80b1038))
+* fix a typo for debug ([c823ebd](https://github.com/NVIDIA/TRTorch/commit/c823ebd))
+* fix typo bug ([e491bb5](https://github.com/NVIDIA/TRTorch/commit/e491bb5))
+* **aten::linear:** Fixes new issues in 1.8 that cause script based ([c5057f8](https://github.com/NVIDIA/TRTorch/commit/c5057f8))
+* register the torch_fallback attribute in Python API ([8b7919f](https://github.com/NVIDIA/TRTorch/commit/8b7919f))
+* support expand/repeat with IValue type input ([a4882c6](https://github.com/NVIDIA/TRTorch/commit/a4882c6))
+* support shape inference for add_, support non-tensor arguments for segmented graphs ([46950bb](https://github.com/NVIDIA/TRTorch/commit/46950bb))
+
+
+* feat!: Updating versions of CUDA, cuDNN, TensorRT and PyTorch ([71c4dcb](https://github.com/NVIDIA/TRTorch/commit/71c4dcb))
+* feat(WORKSPACE)!: Updating PyTorch version to 1.8.1 ([c9aa99a](https://github.com/NVIDIA/TRTorch/commit/c9aa99a))
+
+
+### Features
+
+* **//.github:** Linter throws 1 when there needs to be style changes to ([a39dea7](https://github.com/NVIDIA/TRTorch/commit/a39dea7))
+* **//core:** New API to register arbitrary TRT engines in TorchScript ([3ec836e](https://github.com/NVIDIA/TRTorch/commit/3ec836e))
+* **//core/conversion/conversionctx:** Adding logging for truncated ([96245ee](https://github.com/NVIDIA/TRTorch/commit/96245ee))
+* **//core/partitioing:** Adding ostream for Partition Info ([b3589c5](https://github.com/NVIDIA/TRTorch/commit/b3589c5))
+* **//core/partitioning:** Add an ostream implementation for ([ee536b6](https://github.com/NVIDIA/TRTorch/commit/ee536b6))
+* **//core/partitioning:** Refactor top level partitioning API, fix a bug with ([abc63f6](https://github.com/NVIDIA/TRTorch/commit/abc63f6))
+* **//core/plugins:** Gating plugin logging based on global config ([1d5a088](https://github.com/NVIDIA/TRTorch/commit/1d5a088))
+* added user level API for fallback ([f4c29b4](https://github.com/NVIDIA/TRTorch/commit/f4c29b4))
+* allow users to set fallback block size and ops ([6d3064a](https://github.com/NVIDIA/TRTorch/commit/6d3064a))
+* insert nodes by dependencies for nonTensor inputs/outputs ([4e32eff](https://github.com/NVIDIA/TRTorch/commit/4e32eff))
+* support aten::arange converter ([014e381](https://github.com/NVIDIA/TRTorch/commit/014e381))
+* support aten::transpose with negative dim ([4a1d2f3](https://github.com/NVIDIA/TRTorch/commit/4a1d2f3))
+* support Int/Bool and other constants' inputs/outputs for TensorRT segments ([54e407e](https://github.com/NVIDIA/TRTorch/commit/54e407e))
+* support prim::Param for fallback inputs ([ec2bbf2](https://github.com/NVIDIA/TRTorch/commit/ec2bbf2))
+* support prim::Param for input type after refactor ([3cebe97](https://github.com/NVIDIA/TRTorch/commit/3cebe97))
+* support Python APIs for Automatic Fallback ([100b090](https://github.com/NVIDIA/TRTorch/commit/100b090))
+* support the case when the injected node is not supported in dependency analysis ([c67d8f6](https://github.com/NVIDIA/TRTorch/commit/c67d8f6))
+* support truncate long/double to int/float with option ([740eb54](https://github.com/NVIDIA/TRTorch/commit/740eb54))
+* Try to submit review before exit ([9a9d7f0](https://github.com/NVIDIA/TRTorch/commit/9a9d7f0))
+* update truncate long/double python api ([69e49e8](https://github.com/NVIDIA/TRTorch/commit/69e49e8))
+* **//docker:** Adding Docker 21.03 ([9b326e8](https://github.com/NVIDIA/TRTorch/commit/9b326e8))
+* update truncate long/double warning message ([60dba12](https://github.com/NVIDIA/TRTorch/commit/60dba12))
+* **//docker:** Update CI container ([df63467](https://github.com/NVIDIA/TRTorch/commit/df63467))
+* **//py:** Allowing people using the PyTorch backend to use TRTorch/TRT ([6c3e0ad](https://github.com/NVIDIA/TRTorch/commit/6c3e0ad))
+* **//py:** Catch when bazel is not in path and error out when running ([1da999d](https://github.com/NVIDIA/TRTorch/commit/1da999d))
+* **//py:** Gate partial compilation from to_backend API ([bf1b2d8](https://github.com/NVIDIA/TRTorch/commit/bf1b2d8))
+* **//py:** New API to embed engine in new module ([88d07a9](https://github.com/NVIDIA/TRTorch/commit/88d07a9))
+* **aten::floor:** Adds floor.int evaluator ([a6a46e5](https://github.com/NVIDIA/TRTorch/commit/a6a46e5))
+
+
+### BREAKING CHANGES
+
+* PyTorch version has been bumped to 1.8.0
+Default CUDA version is CUDA 11.1
+TensorRT version is TensorRT 7.2.3.4
+cuDNN version is now cuDNN 8.1
+
+Signed-off-by: Naren Dasan <naren@narendasan.com>
+Signed-off-by: Naren Dasan <narens@nvidia.com>
+* Due to issues with compatability between PyTorch 1.8.0
+and 1.8.1 in the Torch Python API, TRTorch 0.3.0 compiled for 1.8.0 does not
+work with PyTorch 1.8.1 and will show an error about use_input_stats.
+If you see this error make sure the version of libtorch you are
+compiling with is PyTorch 1.8.1
+
+TRTorch 0.3.0 will target PyTorch 1.8.1. There is no backwards
+compatability with 1.8.0. If you need this specific version compile from
+source with the dependencies in WORKSPACE changed
+
+Signed-off-by: Naren Dasan <naren@narendasan.com>
+Signed-off-by: Naren Dasan <narens@nvidia.com>
+
+
 

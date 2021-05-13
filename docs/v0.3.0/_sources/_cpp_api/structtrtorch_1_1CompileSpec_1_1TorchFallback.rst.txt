@@ -1,0 +1,22 @@
+.. _exhale_struct_structtrtorch_1_1CompileSpec_1_1TorchFallback:
+
+Struct CompileSpec::TorchFallback
+=================================
+
+- Defined in :ref:`file_cpp_api_include_trtorch_trtorch.h`
+
+
+Nested Relationships
+--------------------
+
+This struct is a nested type of :ref:`exhale_struct_structtrtorch_1_1CompileSpec`.
+
+
+Struct Documentation
+--------------------
+
+
+.. doxygenstruct:: trtorch::CompileSpec::TorchFallback
+   :members:
+   :protected-members:
+   :undoc-members:

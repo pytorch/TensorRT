@@ -16,7 +16,7 @@ import subprocess
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
-__version__ = '0.3.0a0'
+__version__ = '0.3.0'
 
 CXX11_ABI = False
 
