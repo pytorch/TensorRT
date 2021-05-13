@@ -10,9 +10,9 @@ namespace core {
 namespace partitioning {
 
 struct usage_info {
-  int produce_id = -1;
-  std::vector<int> torch_use_id;
-  std::vector<int> tensorrt_use_id;
+  size_t produce_id;
+  std::vector<size_t> torch_use_id;
+  std::vector<size_t> tensorrt_use_id;
 };
 
 inline bool isTensorOrTensorList(torch::jit::Value* val) {
@@ -89,7 +89,7 @@ std::vector<SegmentedBlock> injectNodesForNonTensorInputs(SegmentedBlock& seg_bl
   } else {
     // if current block is kTensorRT but the dependency nodes contain unsupported node, then we have to segment again
     std::unordered_set<torch::jit::Value*> nontensor_inputs_set(nontensor_inputs.begin(), nontensor_inputs.end());
-    std::vector<torch::jit::Node*> tensorrt_nodes, pytorch_nodes;
+    std::vector<torch::jit::Node*> tensorrt_nodes, pytorch_nodes(dependency_nodes.begin(), dependency_nodes.end());
     bool prev_non_tensor_outputs = false;
     for (auto n : seg_block.raw_nodes()) {
       // it's a kTorch block if it uses the nonTensor input and the nonTensor input is produced in kTorch block
@@ -118,6 +118,14 @@ std::vector<SegmentedBlock> injectNodesForNonTensorInputs(SegmentedBlock& seg_bl
 }
 
 void resolveNonTensorInputs(PartitionedGraph& segmented_blocks, std::shared_ptr<torch::jit::Graph> g) {
+  // create a list so we can insert SegmentedBlock without losing the iterators
+  std::list<SegmentedBlock> segmented_blocks_list(segmented_blocks.begin(), segmented_blocks.end());
+  std::unordered_map<size_t, std::list<SegmentedBlock>::iterator> idx_to_iter;
+  auto iter = segmented_blocks_list.begin();
+  for (size_t i = 0; i < segmented_blocks.size(); ++i, ++iter) {
+    idx_to_iter[i] = iter;
+  }
+
   // for NonTensor inputs in TensorRT segments, count the usages on Torch segments and TensorRT segments
   std::unordered_map<torch::jit::Value*, usage_info> usage_counts;
   for (int i = segmented_blocks.size() - 1; i >= 0; --i) {
@@ -139,24 +147,25 @@ void resolveNonTensorInputs(PartitionedGraph& segmented_blocks, std::shared_ptr<
     // if the segment that produce this nonTensor value is kTensorRT but consumed in kTorch, inject nodes in the first
     // kTorch segments
     if (segmented_blocks[use_info.produce_id].target() == SegmentedBlock::kTensorRT && !use_info.torch_use_id.empty()) {
-      int first_torch_id = use_info.torch_use_id.front();
+      auto first_torch_id = use_info.torch_use_id.front();
       if (!updated_segments.count(first_torch_id)) {
         auto new_torch_block = injectNodesForNonTensorInputs(segmented_blocks[first_torch_id]).front();
-        segmented_blocks[first_torch_id] = new_torch_block;
+        *idx_to_iter[first_torch_id] = new_torch_block;
         updated_segments.insert(first_torch_id);
       }
-    } else {
-      // KTensorRT segments always need to inject nodes for the nonTensor inputs
-      for (int i : use_info.tensorrt_use_id) {
-        if (!updated_segments.count(i)) {
-          auto to_inject_blocks = injectNodesForNonTensorInputs(segmented_blocks[i]);
-          segmented_blocks.erase(segmented_blocks.begin() + i);
-          segmented_blocks.insert(segmented_blocks.begin() + i, to_inject_blocks.begin(), to_inject_blocks.end());
-          updated_segments.insert(i);
-        }
+    }
+    // kTensorRT segments always need to inject nodes for the nonTensor inputs
+    for (auto i : use_info.tensorrt_use_id) {
+      if (!updated_segments.count(i)) {
+        auto to_inject_blocks = injectNodesForNonTensorInputs(segmented_blocks[i]);
+        auto next_iter = segmented_blocks_list.erase(idx_to_iter[i]);
+        segmented_blocks_list.insert(next_iter, to_inject_blocks.begin(), to_inject_blocks.end());
+        updated_segments.insert(i);
       }
     }
   }
+  segmented_blocks.clear();
+  segmented_blocks.insert(segmented_blocks.begin(), segmented_blocks_list.begin(), segmented_blocks_list.end());
   return;
 }
 
