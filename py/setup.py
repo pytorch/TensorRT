@@ -49,6 +49,7 @@ BAZEL_EXE = which("bazel")
 if BAZEL_EXE is None:
     sys.exit("Could not find bazel in PATH")
 
+
 def build_libtrtorch_pre_cxx11_abi(develop=True, use_dist_dir=True, cxx11_abi=False):
     cmd = [BAZEL_EXE, "build"]
     cmd.append("//cpp/api/lib:libtrtorch.so")
