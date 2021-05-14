@@ -919,6 +919,89 @@ that are not supported are printed out and the function returns false, else true
         </dd>
        </dl>
        <dl class="py function">
+        <dt id="trtorch.embed_engine_in_new_module">
+         <code class="sig-prename descclassname">
+          trtorch.
+         </code>
+         <code class="sig-name descname">
+          embed_engine_in_new_module
+         </code>
+         <span class="sig-paren">
+          (
+         </span>
+         <em class="sig-param">
+          <span class="n">
+           serialized_engine
+          </span>
+          <span class="p">
+           :
+          </span>
+          <span class="n">
+           bytes
+          </span>
+         </em>
+         <span class="sig-paren">
+          )
+         </span>
+         → torch.jit._script.ScriptModule
+         <a class="headerlink" href="#trtorch.embed_engine_in_new_module" title="Permalink to this definition">
+          ¶
+         </a>
+        </dt>
+        <dd>
+         <p>
+          Takes a pre-built serialized TensorRT engine and embeds it within a TorchScript module
+         </p>
+         <p>
+          Takes a pre-built serialied TensorRT engine (as bytes) and embeds it within a TorchScript module.
+Registers the forward method to execute the TensorRT engine with the function signature:
+         </p>
+         <blockquote>
+          <div>
+           <p>
+            forward(Tensor[]) -&gt; Tensor[]
+           </p>
+          </div>
+         </blockquote>
+         <p>
+          Module can be save with engine embedded with torch.jit.save and moved / loaded according to TRTorch portability rules
+         </p>
+         <dl class="field-list simple">
+          <dt class="field-odd">
+           Parameters
+          </dt>
+          <dd class="field-odd">
+           <p>
+            <strong>
+             serialized_engine
+            </strong>
+            (
+            <em>
+             bytes
+            </em>
+            ) – Serialized TensorRT engine from either TRTorch or TensorRT APIs
+           </p>
+          </dd>
+          <dt class="field-even">
+           Returns
+          </dt>
+          <dd class="field-even">
+           <p>
+            New TorchScript module with engine embedded
+           </p>
+          </dd>
+          <dt class="field-odd">
+           Return type
+          </dt>
+          <dd class="field-odd">
+           <p>
+            torch.jit.ScriptModule
+           </p>
+          </dd>
+         </dl>
+        </dd>
+       </dl>
+       <dl class="py function">
         <dt id="trtorch.get_build_info">
          <code class="sig-prename descclassname">
           trtorch.
@@ -1021,7 +1104,7 @@ that are not supported are printed out and the function returns false, else true
          <span class="sig-paren">
           )
          </span>
-         → &lt;torch._C.ScriptClass object at 0x7ff6a30319b0&gt;
+         → &lt;torch._C.ScriptClass object at 0x7f35105b3e70&gt;
          <a class="headerlink" href="#trtorch.TensorRTCompileSpec" title="Permalink to this definition">
           ¶
          </a>
