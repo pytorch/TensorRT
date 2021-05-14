@@ -42,7 +42,12 @@ load("@rules_pkg//:pkg.bzl", "pkg_tar")
 pkg_tar(
     name = "include",
     package_dir = "core/plugins/",
-    srcs = ["plugins.h",
-            "impl/interpolate_plugin.h",
+    srcs = ["plugins.h"],
+)
+
+pkg_tar(
+    name = "impl_include",
+    package_dir = "core/plugins/impl",
+    srcs = ["impl/interpolate_plugin.h",
             "impl/normalize_plugin.h"],
 )
