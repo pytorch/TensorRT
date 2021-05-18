@@ -4,7 +4,7 @@
 namespace trtorch {
 namespace pyapi {
 
-std::string to_str(InputRange& value) {
+std::string InputRange::to_str() {
   auto vec_to_str = [](std::vector<int64_t> shape) -> std::string {
     std::stringstream ss;
     ss << '[';
@@ -17,9 +17,9 @@ std::string to_str(InputRange& value) {
 
   std::stringstream ss;
   ss << "        {" << std::endl;
-  ss << "            min: " << vec_to_str(value.min) << ',' << std::endl;
-  ss << "            opt: " << vec_to_str(value.opt) << ',' << std::endl;
-  ss << "            max: " << vec_to_str(value.max) << ',' << std::endl;
+  ss << "            min: " << vec_to_str(min) << ',' << std::endl;
+  ss << "            opt: " << vec_to_str(opt) << ',' << std::endl;
+  ss << "            max: " << vec_to_str(max) << ',' << std::endl;
   ss << "        }" << std::endl;
   return ss.str();
 }
@@ -68,6 +68,18 @@ nvinfer1::DeviceType toTRTDeviceType(DeviceType value) {
   }
 }
 
+std::string Device::to_str() {
+  std::stringstream ss;
+  std::string fallback = allow_gpu_fallback ? "True" : "False";
+  ss << " {" << std::endl;
+  ss << "        \"device_type\": " << pyapi::to_str(device_type) << std::endl;
+  ss << "        \"allow_gpu_fallback\": " << fallback << std::endl;
+  ss << "        \"gpu_id\": " << gpu_id << std::endl;
+  ss << "        \"dla_core\": " << dla_core << std::endl;
+  ss << "    }" << std::endl;
+  return ss.str();
+}
+
 std::string to_str(EngineCapability value) {
   switch (value) {
     case EngineCapability::kSAFE_GPU:
@@ -92,8 +104,23 @@ nvinfer1::EngineCapability toTRTEngineCapability(EngineCapability value) {
   }
 }
 
+std::string TorchFallback::to_str() {
+  std::stringstream ss;
+  std::string e = enabled ? "True" : "False";
+  ss << " {" << std::endl;
+  ss << "        \"enabled\": " << e << std::endl;
+  ss << "        \"min_block_size\": " << min_block_size << std::endl;
+  ss << "        \"forced_fallback_operators\": [" << std::endl;
+  for (auto i : forced_fallback_operators) {
+    ss << "            " << i << ',' << std::endl;
+  }
+  ss << "        ]" << std::endl;
+  ss << "    }" << std::endl;
+  return ss.str();
+}
+
 core::CompileSpec CompileSpec::toInternalCompileSpec() {
-  std::vector<core::conversion::InputRange> internal_input_ranges;
+  std::vector<core::ir::InputRange> internal_input_ranges;
   for (auto i : input_ranges) {
     internal_input_ranges.push_back(i.toInternalInputRange());
   }
@@ -108,6 +135,9 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
   info.convert_info.engine_settings.device.gpu_id = device.gpu_id;
   info.convert_info.engine_settings.device.dla_core = device.dla_core;
   info.convert_info.engine_settings.device.allow_gpu_fallback = device.allow_gpu_fallback;
+  info.partition_info.enabled = torch_fallback.enabled;
+  info.partition_info.min_block_size = torch_fallback.min_block_size;
+  info.partition_info.forced_fallback_operators = torch_fallback.forced_fallback_operators;
   info.convert_info.engine_settings.truncate_long_and_double = truncate_long_and_double;
 
   info.convert_info.engine_settings.capability = toTRTEngineCapability(capability);
@@ -125,26 +155,25 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
 std::string CompileSpec::stringify() {
   std::stringstream ss;
   ss << "TensorRT Compile Spec: {" << std::endl;
-  ss << "     \"Input Shapes\": [" << std::endl;
+  ss << "    \"Input Shapes\": [" << std::endl;
   for (auto i : input_ranges) {
-    ss << to_str(i);
+    ss << i.to_str();
   }
-  ss << "     ]" << std::endl;
-  ss << "     \"Op Precision\": " << to_str(op_precision) << std::endl;
-  ss << "     \"TF32 Disabled\": " << disable_tf32 << std::endl;
-  ss << "     \"Refit\": " << refit << std::endl;
-  ss << "     \"Debug\": " << debug << std::endl;
-  ss << "     \"Strict Types\": " << strict_types << std::endl;
-  ss << "     \"Device Type: " << to_str(device.device_type) << std::endl;
-  ss << "     \"GPU ID: " << device.gpu_id << std::endl;
-  ss << "     \"DLA Core: " << device.dla_core << std::endl;
-  ss << "     \"Allow GPU Fallback\": " << device.allow_gpu_fallback << std::endl;
-  ss << "     \"Engine Capability\": " << to_str(capability) << std::endl;
-  ss << "     \"Num Min Timing Iters\": " << num_min_timing_iters << std::endl;
-  ss << "     \"Num Avg Timing Iters\": " << num_avg_timing_iters << std::endl;
-  ss << "     \"Workspace Size\": " << workspace_size << std::endl;
-  ss << "     \"Max Batch Size\": " << max_batch_size << std::endl;
-  ss << "     \"Truncate long and double\": " << truncate_long_and_double << std::endl;
+  std::string enabled = torch_fallback.enabled ? "True" : "False";
+  ss << "    ]" << std::endl;
+  ss << "    \"Op Precision\": " << to_str(op_precision) << std::endl;
+  ss << "    \"TF32 Disabled\": " << disable_tf32 << std::endl;
+  ss << "    \"Refit\": " << refit << std::endl;
+  ss << "    \"Debug\": " << debug << std::endl;
+  ss << "    \"Strict Types\": " << strict_types << std::endl;
+  ss << "    \"Device\": " << device.to_str() << std::endl;
+  ss << "    \"Engine Capability\": " << to_str(capability) << std::endl;
+  ss << "    \"Num Min Timing Iters\": " << num_min_timing_iters << std::endl;
+  ss << "    \"Num Avg Timing Iters\": " << num_avg_timing_iters << std::endl;
+  ss << "    \"Workspace Size\": " << workspace_size << std::endl;
+  ss << "    \"Max Batch Size\": " << max_batch_size << std::endl;
+  ss << "    \"Truncate long and double\": " << truncate_long_and_double << std::endl;
+  ss << "    \"Torch Fallback\": " << torch_fallback.to_str();
   ss << "}";
   return ss.str();
 }

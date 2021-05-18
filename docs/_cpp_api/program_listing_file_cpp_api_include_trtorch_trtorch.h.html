@@ -152,6 +152,9 @@
        <a href="https://nvidia.github.io/TRTorch/" title="master">
         master
        </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.3.0/" title="v0.3.0">
+        v0.3.0
+       </a>
        <a href="https://nvidia.github.io/TRTorch/v0.2.0/" title="v0.2.0">
         v0.2.0
        </a>
@@ -543,6 +546,22 @@
 <span class="cm">   */</span>
   <span class="n">Device</span> <span class="n">device</span><span class="p">;</span>
 
+  <span class="k">struct</span> <span class="nc">TRTORCH_API</span> <span class="n">TorchFallback</span> <span class="p">{</span>
+    <span class="kt">bool</span> <span class="n">enabled</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
+
+    <span class="kt">uint64_t</span> <span class="n">min_block_size</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+
+    <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span> <span class="n">forced_fallback_ops</span><span class="p">;</span>
+
+    <span class="n">TorchFallback</span><span class="p">()</span> <span class="o">=</span> <span class="k">default</span><span class="p">;</span>
+
+    <span class="n">TorchFallback</span><span class="p">(</span><span class="kt">bool</span> <span class="n">enabled</span><span class="p">)</span> <span class="o">:</span> <span class="n">enabled</span><span class="p">(</span><span class="n">enabled</span><span class="p">)</span> <span class="p">{}</span>
+
+    <span class="n">TorchFallback</span><span class="p">(</span><span class="kt">bool</span> <span class="n">enabled</span><span class="p">,</span> <span class="kt">uint64_t</span> <span class="n">min_size</span><span class="p">)</span> <span class="o">:</span> <span class="n">enabled</span><span class="p">(</span><span class="n">enabled</span><span class="p">),</span> <span class="n">min_block_size</span><span class="p">(</span><span class="n">min_size</span><span class="p">)</span> <span class="p">{}</span>
+  <span class="p">};</span>
+
+  <span class="n">TorchFallback</span> <span class="n">torch_fallback</span><span class="p">;</span>
+
   <span class="n">EngineCapability</span> <span class="n">capability</span> <span class="o">=</span> <span class="n">EngineCapability</span><span class="o">::</span><span class="n">kDEFAULT</span><span class="p">;</span>
 
   <span class="kt">uint64_t</span> <span class="n">num_min_timing_iters</span> <span class="o">=</span> <span class="mi">2</span><span class="p">;</span>
@@ -567,6 +586,9 @@
     <span class="k">const</span> <span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Module</span><span class="o">&amp;</span> <span class="k">module</span><span class="p">,</span>
     <span class="n">std</span><span class="o">::</span><span class="n">string</span> <span class="n">method_name</span><span class="p">,</span>
     <span class="n">CompileSpec</span> <span class="n">info</span><span class="p">);</span>
+
+<span class="n">TRTORCH_API</span> <span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Module</span> <span class="n">EmbedEngineInNewModule</span><span class="p">(</span><span class="k">const</span> <span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span> <span class="n">engine</span><span class="p">);</span>
+
 <span class="n">TRTORCH_API</span> <span class="kt">void</span> <span class="n">set_device</span><span class="p">(</span><span class="k">const</span> <span class="kt">int</span> <span class="n">gpu_id</span><span class="p">);</span>
 
 <span class="p">}</span> <span class="c1">// namespace trtorch</span>

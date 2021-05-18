@@ -19,6 +19,8 @@ Functions
 
 .. autofunction:: check_method_op_support
 
+.. autofunction:: embed_engine_in_new_module
+
 .. autofunction:: get_build_info
 
 .. autofunction:: dump_build_info

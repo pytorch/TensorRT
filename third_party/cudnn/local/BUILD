@@ -17,7 +17,10 @@ config_setting(
 
 cc_library(
     name = "cudnn_headers",
-    hdrs = ["include/cudnn.h"] + glob(["include/cudnn+.h", "include/cudnn_*.h"]),
+    hdrs = ["include/cudnn.h"] + glob([
+        "include/cudnn+.h",
+        "include/cudnn_*.h",
+    ]),
     includes = ["include/"],
     visibility = ["//visibility:private"],
 )
@@ -26,7 +29,7 @@ cc_import(
     name = "cudnn_lib",
     shared_library = select({
         ":aarch64_linux": "lib/aarch64-linux-gnu/libcudnn.so",
-        ":windows": "bin/cudnn64_7.dll", #Need to configure specific version for windows
+        ":windows": "bin/cudnn64_7.dll",  #Need to configure specific version for windows
         "//conditions:default": "lib/x86_64-linux-gnu/libcudnn.so",
     }),
     visibility = ["//visibility:private"],
@@ -34,11 +37,9 @@ cc_import(
 
 cc_library(
     name = "cudnn",
+    visibility = ["//visibility:public"],
     deps = [
         "cudnn_headers",
-        "cudnn_lib"
+        "cudnn_lib",
     ],
-    visibility = ["//visibility:public"],
 )
-
-

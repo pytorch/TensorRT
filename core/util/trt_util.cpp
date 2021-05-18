@@ -86,30 +86,6 @@ nvinfer1::Dims toDimsPad(c10::IntArrayRef l, uint64_t pad_to) {
   return dims;
 }
 
-nvinfer1::Dims toDimsTailPad(c10::IntArrayRef l, uint64_t pad_to) {
-  if (l.size() > pad_to) {
-    LOG_DEBUG(
-        "Requested padding of dimensions to " << pad_to << " but found " << l.size()
-                                              << " dimensions, not going to pad");
-    return toDims(l);
-  }
-
-  TRTORCH_CHECK(
-      pad_to <= nvinfer1::Dims::MAX_DIMS,
-      "The list requested to be converted to nvinfer1::Dims exceeds the max number of dimensions for TensorRT");
-
-  nvinfer1::Dims dims;
-  dims.nbDims = pad_to;
-  for (size_t i = 0; i < l.size(); i++) {
-    dims.d[i] = l[i];
-  }
-
-  for (size_t i = pad_to - l.size(); i < pad_to; i++) {
-    dims.d[i] = 1;
-  }
-  return dims;
-}
-
 nvinfer1::Dims toDims(c10::IntArrayRef l) {
   TRTORCH_CHECK(
       l.size() <= nvinfer1::Dims::MAX_DIMS,
@@ -160,30 +136,6 @@ nvinfer1::Dims toDimsPad(c10::List<int64_t> l, uint64_t pad_to) {
   return dims;
 }
 
-nvinfer1::Dims toDimsTailPad(c10::List<int64_t> l, uint64_t pad_to) {
-  if (l.size() > pad_to) {
-    LOG_DEBUG(
-        "Requested padding of dimensions to " << pad_to << " but found " << l.size()
-                                              << " dimensions, not going to pad");
-    return toDims(l);
-  }
-
-  TRTORCH_CHECK(
-      pad_to <= nvinfer1::Dims::MAX_DIMS,
-      "The list requested to be converted to nvinfer1::Dims exceeds the max number of dimensions for TensorRT");
-
-  nvinfer1::Dims dims;
-  dims.nbDims = pad_to;
-  for (size_t i = 0; i < l.size(); i++) {
-    dims.d[i] = l[i];
-  }
-
-  for (size_t i = pad_to - l.size(); i < pad_to; i++) {
-    dims.d[i] = 1;
-  }
-  return dims;
-}
-
 nvinfer1::Dims unpadDims(const nvinfer1::Dims& d) {
   nvinfer1::Dims dims;
 
@@ -208,25 +160,19 @@ nvinfer1::Dims unpadDims(const nvinfer1::Dims& d) {
   return dims;
 }
 
-nvinfer1::Dims unsqueezeDims(const nvinfer1::Dims& d, int pos) {
+nvinfer1::Dims unsqueezeDims(const nvinfer1::Dims& d, int pos, int val, bool use_zeros) {
   // acceptable range for pos is [0, d.nbDims]
   TRTORCH_ASSERT(pos >= 0 && pos <= d.nbDims, "ERROR: Index to unsqueeze is out of bounds.");
 
   nvinfer1::Dims dims;
-
-  int i = 0;
-  int j = 0;
-
-  while (i <= d.nbDims) {
-    if (j != pos) {
-      dims.d[j] = d.d[i];
-      i++;
+  for (int i = 0, j = 0; j <= d.nbDims; j++) {
+    // add new dimension at pos
+    if (j == pos) {
+      dims.d[j] = val;
     } else {
-      // add new dimension at pos
-      dims.d[j] = 1;
+      dims.d[j] = (use_zeros && d.d[i] == -1) ? 0 : d.d[i];
+      ++i;
     }
-
-    j++;
   }
 
   dims.nbDims = d.nbDims + 1;
@@ -234,30 +180,18 @@ nvinfer1::Dims unsqueezeDims(const nvinfer1::Dims& d, int pos) {
   return dims;
 }
 
-nvinfer1::Dims squeezeDims(const nvinfer1::Dims& d, int pos) {
+nvinfer1::Dims squeezeDims(const nvinfer1::Dims& d, int pos, bool use_zeros) {
   // acceptable range for pos is [0, d.nbDims]
   TRTORCH_ASSERT(pos >= 0 && pos <= d.nbDims, "ERROR: Index to squeeze is out of bounds.");
 
   nvinfer1::Dims dims;
-
-  int i = 0;
   int j = 0;
-
-  while (i <= d.nbDims) {
-    if (j != pos) {
-      dims.d[j] = d.d[i];
-    } else {
-      // add new dimension at pos
-      i++;
-      if (i <= d.nbDims) {
-        dims.d[j] = d.d[i];
-      }
+  for (int i = 0; i < d.nbDims; i++) {
+    if (i != pos) {
+      dims.d[j++] = (use_zeros && d.d[i] == -1) ? 0 : d.d[i];
     }
-    i++;
-    j++;
   }
-
-  dims.nbDims = d.nbDims - 1;
+  dims.nbDims = j;
 
   return dims;
 }
@@ -348,6 +282,44 @@ c10::optional<nvinfer1::DataType> toTRTDataType(caffe2::TypeMeta dtype) {
   } else {
     return {};
   }
+}
+
+torch::jit::Value* getOrAddInputForValue(
+    torch::jit::Value* old_value,
+    std::shared_ptr<torch::jit::Graph>& graph,
+    std::unordered_map<torch::jit::Value*, torch::jit::Value*>& old_to_new) {
+  if (old_to_new.count(old_value) == 0) {
+    auto node = old_value->node();
+
+    if (node->kind() == torch::jit::prim::Constant) {
+      auto new_const = graph->createClone(node, {nullptr});
+      graph->block()->prependNode(new_const);
+      return new_const->output();
+    }
+    auto new_value = graph->block()->addInput();
+    old_to_new[old_value] = new_value;
+    new_value->copyMetadata(old_value);
+    return new_value;
+  } else {
+    return old_to_new[old_value];
+  }
+}
+
+torch::jit::Node* cloneNode(
+    torch::jit::Node* node,
+    std::shared_ptr<torch::jit::Graph>& graph,
+    std::unordered_map<torch::jit::Value*, torch::jit::Value*>& old_to_new) {
+  auto* block = graph->block();
+  auto env = [&](torch::jit::Value* v) { return getOrAddInputForValue(v, graph, old_to_new); };
+
+  // create node for current graph by using the metadata in node and input Values in env
+  auto new_node = block->appendNode(graph->createClone(node, env));
+  for (size_t i = 0; i < node->outputs().size(); ++i) {
+    auto oo = node->outputs()[i];
+    auto no = new_node->outputs()[i];
+    old_to_new[oo] = no;
+  }
+  return new_node;
 }
 
 } // namespace util

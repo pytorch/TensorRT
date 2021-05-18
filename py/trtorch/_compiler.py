@@ -49,6 +49,13 @@ def compile(module: torch.jit.ScriptModule, compile_spec: Any) -> torch.jit.Scri
                     "num_avg_timing_iters": 1, # Number of averaging timing iterations used to select kernels
                     "workspace_size": 0, # Maximum size of workspace given to TensorRT
                     "max_batch_size": 0, # Maximum batch size (must be >= 1 to be set, 0 means not set)
+                    "torch_fallback": {
+                        "enabled": True, # Turn on or turn off falling back to PyTorch if operations are not supported in TensorRT
+                        "force_fallback_ops": [
+                            "aten::max_pool2d" # List of specific ops to require running in PyTorch
+                        ],
+                        "min_block_size": 3 # Minimum number of ops an engine must incapsulate to be run in TensorRT
+                    }
                 }
 
             Input Sizes can be specified as torch sizes, tuples or lists. Op precisions can be specified using
@@ -122,6 +129,26 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule, method_name: st
             "torch.jit.ScriptFunctions currently are not directly supported, wrap the function in a module to compile")
 
     return trtorch._C.convert_graph_to_trt_engine(module._c, method_name, _parse_compile_spec(compile_spec))
+
+
+def embed_engine_in_new_module(serialized_engine: bytes) -> torch.jit.ScriptModule:
+    """Takes a pre-built serialized TensorRT engine and embeds it within a TorchScript module
+
+    Takes a pre-built serialied TensorRT engine (as bytes) and embeds it within a TorchScript module.
+    Registers the forward method to execute the TensorRT engine with the function signature:
+
+        forward(Tensor[]) -> Tensor[]
+
+    Module can be save with engine embedded with torch.jit.save and moved / loaded according to TRTorch portability rules
+
+    Args:
+        serialized_engine (bytes): Serialized TensorRT engine from either TRTorch or TensorRT APIs
+
+    Returns:
+        torch.jit.ScriptModule: New TorchScript module with engine embedded
+    """
+    cpp_mod = trtorch._C.embed_engine_in_new_module(serialized_engine)
+    return torch.jit._recursive.wrap_cpp_module(cpp_mod)
 
 
 def check_method_op_support(module: torch.jit.ScriptModule, method_name: str) -> bool:
