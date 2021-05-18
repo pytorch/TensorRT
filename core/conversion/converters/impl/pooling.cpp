@@ -60,77 +60,53 @@ bool AdaptivePoolingConverter(
   auto in_shape = util::toVec(in->getDimensions());
   nvinfer1::ILayer* new_layer = nullptr;
 
-  if (ctx->input_is_dynamic) {
-#if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1)
-    LOG_WARNING(
-        "Adaptive pooling layer will be run through ATen, via not TensorRT, performace will be lower than expected. Consider switching either to static input shape or moving to non adaptive pooling if this is an issue");
-#else
-    LOG_WARNING(
-        "Adaptive pooling layer will be run through ATen (on CPU), via not TensorRT, performace will suffer. Consider switching either to static input shape or moving to non adaptive pooling");
-#endif
+  /*======CONFIGURE PLUGIN PARAMETERS======*/
+  nvinfer1::PluginFieldCollection fc;
+  std::vector<nvinfer1::PluginField> f;
 
-    TRTORCH_CHECK(
-        pool_type == nvinfer1::PoolingType::kAVERAGE,
-        "Unable to create MAX pooling (interpolation) plugin from node" << *n);
+  auto out_shape = in_shape;
+  auto out_size_vec = util::toVec(out_size);
 
-    nvinfer1::PluginFieldCollection fc;
-    std::vector<nvinfer1::PluginField> f;
+  std::copy(out_size_vec.begin(), out_size_vec.end(), out_shape.begin() + (in_shape.size() - out_size_vec.size()));
 
-    auto out_shape = in_shape;
-    std::copy_n(out_size.d, out_size.nbDims, out_shape.begin() + (in_shape.size() - out_size.nbDims));
+  std::vector<int32_t> in_shape_casted(in_shape.begin(), in_shape.end());
+  f.emplace_back(
+      nvinfer1::PluginField("in_shape", in_shape_casted.data(), nvinfer1::PluginFieldType::kINT32, in_shape.size()));
 
-    std::vector<int32_t> in_shape_casted(in_shape.begin(), in_shape.end());
-    f.emplace_back(
-        nvinfer1::PluginField("in_shape", in_shape_casted.data(), nvinfer1::PluginFieldType::kINT32, in_shape.size()));
+  std::vector<int32_t> out_shape_casted(out_shape.begin(), out_shape.end());
+  f.emplace_back(
+      nvinfer1::PluginField("out_shape", out_shape_casted.data(), nvinfer1::PluginFieldType::kINT32, out_shape.size()));
 
-    std::vector<int32_t> out_shape_casted(out_shape.begin(), out_shape.end());
-    f.emplace_back(nvinfer1::PluginField(
-        "out_shape", out_shape_casted.data(), nvinfer1::PluginFieldType::kINT32, out_shape.size()));
+  std::vector<int32_t> out_size_casted(out_size_vec.begin(), out_size_vec.end());
+  f.emplace_back(nvinfer1::PluginField(
+      "out_size", out_size_casted.data(), nvinfer1::PluginFieldType::kINT32, out_size_vec.size()));
 
-    auto out_size_vec = util::toVec(out_size);
-    std::vector<int32_t> out_size_casted(out_size_vec.begin(), out_size_vec.end());
-    f.emplace_back(nvinfer1::PluginField(
-        "out_size", out_size_casted.data(), nvinfer1::PluginFieldType::kINT32, out_size_vec.size()));
+  f.emplace_back(nvinfer1::PluginField("scales", nullptr, nvinfer1::PluginFieldType::kFLOAT64, 0));
 
-    f.emplace_back(nvinfer1::PluginField("scales", nullptr, nvinfer1::PluginFieldType::kFLOAT64, 0));
+  int32_t align_corners_casted = 0;
+  f.emplace_back(nvinfer1::PluginField("align_corners", &align_corners_casted, nvinfer1::PluginFieldType::kINT32, 1));
 
-    std::string mode = "adaptive_pool2d";
-    f.emplace_back(nvinfer1::PluginField("mode", &mode, nvinfer1::PluginFieldType::kCHAR, 1));
+  int32_t use_scales_casted = 0;
+  f.emplace_back(nvinfer1::PluginField("use_scales", &use_scales_casted, nvinfer1::PluginFieldType::kINT32, 1));
 
-    int32_t align_corners_casted = 0;
-    f.emplace_back(nvinfer1::PluginField("align_corners", &align_corners_casted, nvinfer1::PluginFieldType::kINT32, 1));
-
-    int32_t use_scales_casted = 0;
-    f.emplace_back(nvinfer1::PluginField("use_scales", &use_scales_casted, nvinfer1::PluginFieldType::kINT32, 1));
-
-    fc.nbFields = f.size();
-    fc.fields = f.data();
-    auto creator = getPluginRegistry()->getPluginCreator("Interpolate", "1", "trtorch");
-    auto interpolate_plugin = creator->createPlugin("adaptive_pool2d", &fc);
-
-    new_layer = ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(&in), 1, *interpolate_plugin);
-    TRTORCH_CHECK(new_layer, "Unable to create pooling (interpolation) plugin from node" << *n);
-
-  } else {
-    std::vector<int64_t> stride(out_size.nbDims);
-    for (int64_t i = 0; i < out_size.nbDims; i++) {
-      stride[(stride.size() - 1) - i] = in_shape[(in_shape.size() - 1) - i] / out_size.d[(out_size.nbDims - 1) - i];
-    }
-    LOG_DEBUG("Stride: " << util::toDims(stride));
-
-    std::vector<int64_t> window(out_size.nbDims);
-    for (int64_t i = 0; i < out_size.nbDims; i++) {
-      window[window.size() - 1 - i] =
-          in_shape[in_shape.size() - 1 - i] - (out_size.d[out_size.nbDims - 1 - i] - 1) * stride[stride.size() - 1 - i];
-    }
-
-    LOG_DEBUG("Window: " << util::toDims(window));
-
-    auto pooling_layer = ctx->net->addPoolingNd(*in, pool_type, util::toDims(window));
-    TRTORCH_CHECK(pooling_layer, "Unable to create average pooling layer from node: " << *n);
-    pooling_layer->setStrideNd(util::toDims(stride));
-    new_layer = pooling_layer;
+  std::string mode = "adaptive_avg_pool2d";
+  if (pool_type == nvinfer1::PoolingType::kMAX) {
+    mode = "adaptive_max_pool2d";
   }
+  f.emplace_back(nvinfer1::PluginField("mode", &mode, nvinfer1::PluginFieldType::kCHAR, 1));
+
+  fc.nbFields = f.size();
+  fc.fields = f.data();
+  /*====== PLUGIN PARAMETERS CONFIGURATION COMPLETED ======*/
+
+  LOG_WARNING(
+      "Adaptive pooling layer will be using Aten library kernels in pytorch for execution. TensorRT does not support adaptive pooling natively. Consider switching to non-adaptive pooling if this is an issue");
+
+  auto creator = getPluginRegistry()->getPluginCreator("Interpolate", "1", "trtorch");
+  auto interpolate_plugin = creator->createPlugin(mode.c_str(), &fc);
+
+  new_layer = ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(&in), 1, *interpolate_plugin);
+  TRTORCH_CHECK(new_layer, "Unable to create pooling (interpolation) plugin from node" << *n);
 
   new_layer->setName(util::node_info(n).c_str());
   auto layer_output = addUnpadding(ctx, n, new_layer->getOutput(0), orig_dims.nbDims, false, false);
@@ -156,7 +132,7 @@ bool PoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& args,
   auto padding = util::toDims(args[3].unwrapToIntList());
   auto stride = util::toDims(args[2].unwrapToIntList());
   if (stride.nbDims == 0) {
-    LOG_DEBUG("Stride not providied, using kernel_size as stride");
+    LOG_DEBUG("Stride not provided, using kernel_size as stride");
     stride = util::toDims(args[1].unwrapToIntList());
   }
 
@@ -265,6 +241,10 @@ auto pooling_registrations TRTORCH_UNUSED =
         .pattern({"aten::adaptive_avg_pool2d(Tensor self, int[2] output_size) -> (Tensor)",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                     return AdaptivePoolingConverter(ctx, n, args, nvinfer1::PoolingType::kAVERAGE);
+                  }})
+        .pattern({"aten::adaptive_max_pool2d(Tensor self, int[2] output_size) -> (Tensor, Tensor)",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    return AdaptivePoolingConverter(ctx, n, args, nvinfer1::PoolingType::kMAX);
                   }});
 } // namespace
 } // namespace impl

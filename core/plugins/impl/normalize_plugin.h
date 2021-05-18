@@ -22,7 +22,6 @@ namespace impl {
 
 class NormalizePlugin : public nvinfer1::IPluginV2DynamicExt {
  private:
-  at::TensorOptions tensor_options_;
   nvinfer1::DataType dtype_;
   int32_t order_;
   std::vector<int32_t> axes_;
