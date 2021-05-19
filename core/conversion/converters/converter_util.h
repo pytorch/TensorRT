@@ -49,6 +49,14 @@ bool register_cast_layer(
     nvinfer1::ITensor* input,
     nvinfer1::DataType output_dtype);
 
+nvinfer1::ILayer* add_elementwise(
+    ConversionCtx* ctx,
+    nvinfer1::ElementWiseOperation op,
+    nvinfer1::ITensor* self,
+    nvinfer1::ITensor* other,
+    const std::string& name);
+
+
 } // namespace converters
 } // namespace conversion
 } // namespace core

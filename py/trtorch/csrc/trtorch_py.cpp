@@ -165,6 +165,7 @@ void log(core::util::logging::LogLevel lvl, const std::string& msg) {
 PYBIND11_MODULE(_C, m) {
   py::class_<InputRange>(m, "InputRange")
       .def(py::init<>())
+      .def("__str__", &trtorch::pyapi::InputRange::to_str)
       .def_readwrite("min", &InputRange::min)
       .def_readwrite("opt", &InputRange::opt)
       .def_readwrite("max", &InputRange::max);
@@ -237,6 +238,7 @@ PYBIND11_MODULE(_C, m) {
 
   py::class_<CompileSpec>(m, "CompileSpec")
       .def(py::init<>())
+      .def("__str__", &trtorch::pyapi::CompileSpec::stringify)
       .def("_get_calibrator_handle", &CompileSpec::getPTQCalibratorHandle, "[Internal] gets a handle from a calibrator")
       .def_readwrite("input_ranges", &CompileSpec::input_ranges)
       .def_readwrite("op_precision", &CompileSpec::op_precision)
@@ -256,6 +258,7 @@ PYBIND11_MODULE(_C, m) {
 
   py::class_<Device>(m, "Device")
       .def(py::init<>())
+      .def("__str__", &trtorch::pyapi::Device::to_str)
       .def_readwrite("device_type", &Device::device_type)
       .def_readwrite("gpu_id", &Device::gpu_id)
       .def_readwrite("dla_core", &Device::dla_core)
@@ -263,6 +266,7 @@ PYBIND11_MODULE(_C, m) {
 
   py::class_<TorchFallback>(m, "TorchFallback")
       .def(py::init<>())
+      .def("__str__", &trtorch::pyapi::TorchFallback::to_str)
       .def_readwrite("enabled", &TorchFallback::enabled)
       .def_readwrite("min_block_size", &TorchFallback::min_block_size)
       .def_readwrite("forced_fallback_operators", &TorchFallback::forced_fallback_operators);

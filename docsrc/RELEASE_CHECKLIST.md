@@ -19,6 +19,8 @@ will result in a minor version bump and sigificant bug fixes will result in a pa
 2. Release Testing
     - Required, Python API and Optional Tests should pass on both x86_64 and aarch64
     - All checked in applications (cpp and python) should compile and work
+3. Generate new index of converters and evalutators
+    - `bazel run //tools/supportedops -- <PATH TO TRTORCH>/docsrc/indices/supported_ops.rst`
 3. Version bump PR
     - There should be a PR which will be the PR that bumps the actual version of the library, this PR should contain the following
         - Bump version in `py/setup.py`

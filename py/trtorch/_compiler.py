@@ -50,11 +50,11 @@ def compile(module: torch.jit.ScriptModule, compile_spec: Any) -> torch.jit.Scri
                     "workspace_size": 0, # Maximum size of workspace given to TensorRT
                     "max_batch_size": 0, # Maximum batch size (must be >= 1 to be set, 0 means not set)
                     "torch_fallback": {
-                        "enabled": True,
+                        "enabled": True, # Turn on or turn off falling back to PyTorch if operations are not supported in TensorRT
                         "force_fallback_ops": [
-                            "aten::max_pool2d"
+                            "aten::max_pool2d" # List of specific ops to require running in PyTorch
                         ],
-                        "min_block_size": 1
+                        "min_block_size": 3 # Minimum number of ops an engine must incapsulate to be run in TensorRT
                     }
                 }
 

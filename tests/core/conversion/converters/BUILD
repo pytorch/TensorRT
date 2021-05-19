@@ -40,11 +40,19 @@ converter_test(
 )
 
 converter_test(
+    name = "test_layer_norm",
+)
+
+converter_test(
     name = "test_linear",
 )
 
 converter_test(
     name = "test_matrix_multiply",
+)
+
+converter_test(
+    name = "test_normalize"
 )
 
 converter_test(
@@ -110,9 +118,11 @@ test_suite(
         ":test_element_wise",
         ":test_expand",
         ":test_interpolate",
+        ":test_layer_norm",
         ":test_linear",
         ":test_lstm_cell",
         ":test_matrix_multiply",
+        ":test_normalize",
         ":test_pooling",
         ":test_reduce",
         ":test_replication_pad",

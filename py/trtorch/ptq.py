@@ -42,12 +42,16 @@ def read_calibration_cache(self):
         if os.path.exists(self.cache_file):
             with open(self.cache_file, "rb") as f:
                 return f.read()
+    else:
+        return b""
 
 
 def write_calibration_cache(self, cache):
     if self.cache_file:
         with open(self.cache_file, "wb") as f:
             f.write(cache)
+    else:
+        return b""
 
 
 class DataLoaderCalibrator(object):

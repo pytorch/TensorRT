@@ -1,7 +1,6 @@
 #include "core/conversion/converters/converter_util.h"
 #include "core/conversion/converters/converters.h"
 #include "core/util/prelude.h"
-#include "plugins/interpolate_plugin.h"
 
 namespace trtorch {
 namespace core {
@@ -74,21 +73,42 @@ bool AdaptivePoolingConverter(
         pool_type == nvinfer1::PoolingType::kAVERAGE,
         "Unable to create MAX pooling (interpolation) plugin from node" << *n);
 
+    nvinfer1::PluginFieldCollection fc;
+    std::vector<nvinfer1::PluginField> f;
+
     auto out_shape = in_shape;
     std::copy_n(out_size.d, out_size.nbDims, out_shape.begin() + (in_shape.size() - out_size.nbDims));
 
-    auto creator = new plugins::InterpolatePluginCreator();
-    auto plugin = creator->createPlugin(
-        "adaptive_pool2d",
-        in_shape,
-        out_shape,
-        util::toVec(out_size),
-        {},
-        std::string("adaptive_pool2d"),
-        false,
-        false);
+    std::vector<int32_t> in_shape_casted(in_shape.begin(), in_shape.end());
+    f.emplace_back(
+        nvinfer1::PluginField("in_shape", in_shape_casted.data(), nvinfer1::PluginFieldType::kINT32, in_shape.size()));
 
-    new_layer = ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(&in), 1, *plugin);
+    std::vector<int32_t> out_shape_casted(out_shape.begin(), out_shape.end());
+    f.emplace_back(nvinfer1::PluginField(
+        "out_shape", out_shape_casted.data(), nvinfer1::PluginFieldType::kINT32, out_shape.size()));
+
+    auto out_size_vec = util::toVec(out_size);
+    std::vector<int32_t> out_size_casted(out_size_vec.begin(), out_size_vec.end());
+    f.emplace_back(nvinfer1::PluginField(
+        "out_size", out_size_casted.data(), nvinfer1::PluginFieldType::kINT32, out_size_vec.size()));
+
+    f.emplace_back(nvinfer1::PluginField("scales", nullptr, nvinfer1::PluginFieldType::kFLOAT64, 0));
+
+    std::string mode = "adaptive_pool2d";
+    f.emplace_back(nvinfer1::PluginField("mode", &mode, nvinfer1::PluginFieldType::kCHAR, 1));
+
+    int32_t align_corners_casted = 0;
+    f.emplace_back(nvinfer1::PluginField("align_corners", &align_corners_casted, nvinfer1::PluginFieldType::kINT32, 1));
+
+    int32_t use_scales_casted = 0;
+    f.emplace_back(nvinfer1::PluginField("use_scales", &use_scales_casted, nvinfer1::PluginFieldType::kINT32, 1));
+
+    fc.nbFields = f.size();
+    fc.fields = f.data();
+    auto creator = getPluginRegistry()->getPluginCreator("Interpolate", "1", "trtorch");
+    auto interpolate_plugin = creator->createPlugin("adaptive_pool2d", &fc);
+
+    new_layer = ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(&in), 1, *interpolate_plugin);
     TRTORCH_CHECK(new_layer, "Unable to create pooling (interpolation) plugin from node" << *n);
 
   } else {
