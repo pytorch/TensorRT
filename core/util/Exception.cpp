@@ -11,7 +11,7 @@ Error::Error(const std::string& new_msg, const void* caller) : msg_stack_{new_ms
 }
 
 Error::Error(const char* file, const uint32_t line, const std::string& msg, const void* caller)
-    : Error(str("[enforce fail at ", file, ":", line, "] ", msg, "\n"), caller) {}
+    : Error(str("[Error thrown at ", file, ":", line, "] ", msg, "\n"), caller) {}
 
 std::string Error::msg() const {
   return std::accumulate(msg_stack_.begin(), msg_stack_.end(), std::string(""));

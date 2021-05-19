@@ -23,16 +23,15 @@ std::ostream& operator<<(std::ostream& os, const BuilderSettings& s) {
        << "\n    Max Workspace Size: " << s.workspace_size;
 
     if (s.max_batch_size != 0) {
-        os << "\n    Max Batch Size: " << s.max_batch_size;
+    os << "\n    Max Batch Size: " << s.max_batch_size;
     } else {
-        os << "\n    Max Batch Size: Not set";
+    os << "\n    Max Batch Size: Not set";
     }
 
     os << "\n    Device Type: " << s.device.device_type                                    \
        << "\n    GPU ID: " << s.device.gpu_id;
-    if (s.device.device_type == nvinfer1::DeviceType::kDLA)
-    {
-        os << "\n    DLACore: " << s.device.dla_core;
+    if (s.device.device_type == nvinfer1::DeviceType::kDLA) {
+    os << "\n    DLACore: " << s.device.dla_core;
     }
     os << "\n    Engine Capability: " << s.capability                                      \
        << "\n    Calibrator Created: " << (s.calibrator != nullptr);
@@ -146,6 +145,9 @@ torch::jit::IValue* ConversionCtx::AssociateValueAndIValue(const torch::jit::Val
 
 std::string ConversionCtx::SerializeEngine() {
   auto engine = builder->buildEngineWithConfig(*net, *cfg);
+  if (!engine) {
+    TRTORCH_THROW_ERROR("Building TensorRT engine failed");
+  }
   auto serialized_engine = engine->serialize();
   engine->destroy();
   auto engine_str = std::string((const char*)serialized_engine->data(), serialized_engine->size());
