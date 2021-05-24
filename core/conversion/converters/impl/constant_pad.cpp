@@ -12,7 +12,7 @@ namespace converters {
 namespace impl {
 namespace {
 
-auto replication_pad_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().pattern(
+auto constant_pad_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().pattern(
     {"aten::constant_pad_nd(Tensor self, int[] pad, Scalar value=0) -> (Tensor)",
      [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
        auto in = args[0].ITensor();
@@ -31,7 +31,7 @@ auto replication_pad_registrations TRTORCH_UNUSED = RegisterNodeConversionPatter
            "dimensions of the input. Pad length is "
                << padSize << "while the input has " << inRank << "dimensions.");
 
-       // TODO negative padding
+       // TODO negative padding. When the pad is negative, we need to crop the image.
 
        std::vector<nvinfer1::ITensor*> tensors_vec;
        // input: (N, C, D_in, H_in, W_in).
