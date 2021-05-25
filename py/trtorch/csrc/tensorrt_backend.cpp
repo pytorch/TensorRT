@@ -53,8 +53,10 @@ c10::impl::GenericDict TensorRTBackend::compile(c10::IValue mod_val, c10::impl::
     auto params = graph_and_ivalues.second;
     auto named_params = core::conversion::get_named_params(g->inputs(), params);
 
+    auto device_spec = convert_cfg.engine_settings.device;
+    auto device = core::runtime::get_device_info(device_spec.gpu_id, device_spec.device_type);
     auto serialized_engine = core::conversion::ConvertBlockToEngine(g->block(), convert_cfg, named_params);
-    auto engine_handle = c10::make_intrusive<core::runtime::TRTEngine>(it->key(), serialized_engine);
+    auto engine_handle = c10::make_intrusive<core::runtime::TRTEngine>(it->key(), serialized_engine, device);
     handles.insert(method.name(), at::IValue(engine_handle));
   }
 

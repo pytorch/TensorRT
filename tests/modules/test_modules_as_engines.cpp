@@ -1,4 +1,6 @@
 #include "module_test.h"
+#include "core/runtime/runtime.h"
+
 
 TEST_P(ModuleTests, ModuleAsEngineIsClose) {
   std::vector<at::Tensor> inputs;
@@ -34,8 +36,9 @@ TEST_P(ModuleTests, ModuleToEngineToModuleIsClose) {
     input_ranges.push_back(in.sizes());
   }
 
+  auto compile_spec = trtorch::CompileSpec({input_ranges});
   auto engine = trtorch::ConvertGraphToTRTEngine(mod, "forward", input_ranges);
-  auto trt_mod = trtorch::EmbedEngineInNewModule(engine);
+  auto trt_mod = trtorch::EmbedEngineInNewModule(engine, compile_spec);
 
   torch::jit::IValue trt_results_ivalues = trtorch::tests::util::RunModuleForward(mod, inputs_ivalues);
   std::vector<at::Tensor> trt_results;
