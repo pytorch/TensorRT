@@ -1,6 +1,5 @@
-#include "module_test.h"
 #include "core/runtime/runtime.h"
-
+#include "module_test.h"
 
 TEST_P(ModuleTests, ModuleAsEngineIsClose) {
   std::vector<at::Tensor> inputs;

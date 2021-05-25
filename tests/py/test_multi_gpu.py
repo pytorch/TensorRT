@@ -113,7 +113,9 @@ class TestMultiGpuSerializeDeserializeSwitching(ModelTestCase):
 def test_suite():
     suite = unittest.TestSuite()
     suite.addTest(TestMultiGpuSwitching.parametrize(TestMultiGpuSwitching, model=models.resnet18(pretrained=True)))
-    suite.addTest(TestMultiGpuSerializeDeserializeSwitching.parametrize(TestMultiGpuSwitching, model=models.resnet18(pretrained=True)))
+    suite.addTest(
+        TestMultiGpuSerializeDeserializeSwitching.parametrize(TestMultiGpuSwitching,
+                                                              model=models.resnet18(pretrained=True)))
 
     return suite
 

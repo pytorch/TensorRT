@@ -15,7 +15,7 @@ TEST_P(ModuleTests, CompiledModuleIsClose) {
   jit_results.push_back(jit_results_ivalues.toTensor());
 
   auto trt_mod = trtorch::CompileGraph(mod, input_shapes);
-  
+
   // Deliberately changing the device ID. TRTorch runtime should correct the Device ID internally
   trtorch::set_device(1);
   torch::jit::IValue trt_results_ivalues = trtorch::tests::util::RunModuleForward(trt_mod, trt_inputs_ivalues);
@@ -30,5 +30,4 @@ TEST_P(ModuleTests, CompiledModuleIsClose) {
 INSTANTIATE_TEST_SUITE_P(
     CompiledModuleForwardIsCloseSuite,
     ModuleTests,
-    testing::Values(
-        PathAndInSize({"tests/modules/resnet18_traced.jit.pt", {{1, 3, 224, 224}}})));
+    testing::Values(PathAndInSize({"tests/modules/resnet18_traced.jit.pt", {{1, 3, 224, 224}}})));

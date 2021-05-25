@@ -14,20 +14,24 @@ namespace runtime {
 bool is_switch_required(const CudaDevice& curr_device, const CudaDevice& conf_device) {
   // If SM capability is not the same as configured then switch
   if ((curr_device.major != conf_device.major) || (curr_device.minor != conf_device.minor)) {
-      LOG_WARNING("Configured SM capability does not match with current device ID. Switching context");
-      return true;
+    LOG_WARNING("Configured SM capability does not match with current device ID. Switching context");
+    return true;
   }
 
   // GPU case
   if (conf_device.device_type == nvinfer1::DeviceType::kGPU) {
     if (curr_device.device_name != conf_device.device_name) {
-      LOG_WARNING("TRTEngine compiled for " << conf_device.device_name << " but current CUDA device is " << curr_device.device_name << ". Switching the device context");
+      LOG_WARNING(
+          "TRTEngine compiled for " << conf_device.device_name << " but current CUDA device is "
+                                    << curr_device.device_name << ". Switching the device context");
       return true;
     }
   }
 
   if (curr_device.id != conf_device.id) {
-    LOG_WARNING("Configured Device ID: " << conf_device.id << " is different that current device ID: " << curr_device.id << ". Switching context");
+    LOG_WARNING(
+        "Configured Device ID: " << conf_device.id << " is different that current device ID: " << curr_device.id
+                                 << ". Switching context");
     return true;
   }
 
@@ -47,27 +51,28 @@ int select_cuda_device(const CudaDevice& conf_device) {
 
   cudaDeviceProp device_prop;
 
-  for (int i=0; i < num_devices; i++) {
-    TRTORCH_CHECK((cudaGetDeviceProperties(&device_prop, i) == cudaSuccess), "Unable to read CUDA Device Properies for device id: " << i);
+  for (int i = 0; i < num_devices; i++) {
+    TRTORCH_CHECK(
+        (cudaGetDeviceProperties(&device_prop, i) == cudaSuccess),
+        "Unable to read CUDA Device Properies for device id: " << i);
     auto compute_cap = std::to_string(device_prop.major) + "." + std::to_string(device_prop.minor);
     std::string device_name{device_prop.name};
     // In case of DLA select the DLA supported device ID
     if (conf_device.device_type == nvinfer1::DeviceType::kDLA) {
-       if (dla_supported_SM.find(compute_cap) != dla_supported_SM.end() && dla_supported_SM[compute_cap] == device_name) {
-           device_id = i;
-           break;
-       }
-    }
-    else if (conf_device.device_type == nvinfer1::DeviceType::kGPU) {
+      if (dla_supported_SM.find(compute_cap) != dla_supported_SM.end() &&
+          dla_supported_SM[compute_cap] == device_name) {
+        device_id = i;
+        break;
+      }
+    } else if (conf_device.device_type == nvinfer1::DeviceType::kGPU) {
       auto conf_sm = std::to_string(conf_device.major) + "." + std::to_string(conf_device.minor);
       if (compute_cap == conf_sm && device_name == conf_device.device_name) {
         device_id = i;
         break;
       }
-    }
-    else {
-        LOG_ERROR("Unkown device type detected from the compiled engine");
-        break;
+    } else {
+      LOG_ERROR("Unkown device type detected from the compiled engine");
+      break;
     }
   }
   return device_id;
@@ -86,7 +91,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
 
     std::string target_device = "cuda:" + std::to_string(device.id);
 
-    for(auto& in : inputs) {
+    for (auto& in : inputs) {
       in = in.to(at::kCUDA);
     }
   }
