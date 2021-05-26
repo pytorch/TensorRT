@@ -95,7 +95,8 @@ std::vector<SegmentedBlock> segmentBlocksWithNonTensorInputs(SegmentedBlock& seg
     bool prev_non_tensor_outputs = false;
     for (auto n : seg_block.raw_nodes()) {
       // Check if the node has non-tensor inputs or if it consumes non-tensor outputs of previous node.
-      // In these cases, these nodes are placed into a new Pytorch SegmentedBlock. Else, they form a new TensorRT SegmentedBlock.
+      // In these cases, these nodes are placed into a new Pytorch SegmentedBlock. Else, they form a new TensorRT
+      // SegmentedBlock.
       if (containTargetInputs(n, nontensor_inputs_set) || prev_non_tensor_outputs) {
         // If tensorrt_nodes is not empty, the previous nodes were all tensorrt_nodes. Construct a
         // TensorRT segmented_block and clear the tensorrt_nodes list to be later used for new TRT segments.
@@ -135,11 +136,12 @@ void resolveNonTensorInputs(PartitionedGraph& segmented_blocks, std::shared_ptr<
     idx_to_iter[i] = iter;
   }
 
-  // usage_counts is a map which stores non-tensor inputs as keys and the values are indices of segmented blocks which have these non-tensor inputs.
-  // Iterate through the graph (segmented blocks) from bottom to top. When we find a non-tensor input in a segmented block of index "i",
-  // store it in the usage_counts map. Now for each non-tensor inputs recorded in the usage_counts map, we check if any previous segmented block
-  // (segmented block index i goes from n-1 to 0) generated/contains this non-tensor input. If so, we set this idx as the produce_id as it
-  // produces the non-tensor input.
+  // usage_counts is a map which stores non-tensor inputs as keys and the values are indices of segmented blocks which
+  // have these non-tensor inputs. Iterate through the graph (segmented blocks) from bottom to top. When we find a
+  // non-tensor input in a segmented block of index "i", store it in the usage_counts map. Now for each non-tensor
+  // inputs recorded in the usage_counts map, we check if any previous segmented block (segmented block index i goes
+  // from n-1 to 0) generated/contains this non-tensor input. If so, we set this idx as the produce_id as it produces
+  // the non-tensor input.
   std::unordered_map<torch::jit::Value*, usage_info> usage_counts;
   for (int i = segmented_blocks.size() - 1; i >= 0; --i) {
     for (auto input : segmented_blocks[i].raw_inputs()) {
