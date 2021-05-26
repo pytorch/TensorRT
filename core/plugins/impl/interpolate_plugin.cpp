@@ -105,23 +105,23 @@ std::vector<int64_t> InterpolatePlugin::getOutputSize() {
   return size_;
 }
 
-int InterpolatePlugin::getNbOutputs() const {
+int InterpolatePlugin::getNbOutputs() const noexcept {
   return 1;
 }
 
-const char* InterpolatePlugin::getPluginType() const {
+const char* InterpolatePlugin::getPluginType() const noexcept {
   return "Interpolate";
 }
 
-const char* InterpolatePlugin::getPluginVersion() const {
+const char* InterpolatePlugin::getPluginVersion() const noexcept {
   return "1";
 }
 
-const char* InterpolatePlugin::getPluginNamespace() const {
+const char* InterpolatePlugin::getPluginNamespace() const noexcept {
   return "trtorch";
 }
 
-nvinfer1::IPluginV2DynamicExt* InterpolatePlugin::clone() const {
+nvinfer1::IPluginV2DynamicExt* InterpolatePlugin::clone() const noexcept {
   return new InterpolatePlugin(in_shape_, out_shape_, size_, scales_, mode_, align_corners_, use_scales_);
 }
 
@@ -129,7 +129,7 @@ nvinfer1::DimsExprs InterpolatePlugin::getOutputDimensions(
     int outputIndex,
     const nvinfer1::DimsExprs* inputs,
     int nbInputs,
-    nvinfer1::IExprBuilder& exprBuilder) {
+    nvinfer1::IExprBuilder& exprBuilder) noexcept {
   nvinfer1::DimsExprs output(inputs[0]);
 
   // TODO: This should enable the case of using this plugin with dynamic shape, scale factor and align corners == true
@@ -161,11 +161,11 @@ nvinfer1::DimsExprs InterpolatePlugin::getOutputDimensions(
 }
 
 nvinfer1::DataType InterpolatePlugin::getOutputDataType(int index, const nvinfer1::DataType* inputTypes, int nbInputs)
-    const {
+    const noexcept {
   return nvinfer1::DataType::kFLOAT;
 }
 
-int InterpolatePlugin::initialize() {
+int InterpolatePlugin::initialize() noexcept {
 #if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1)
   tensor_options_ = tensor_options_.device(c10::kCUDA);
 #else
@@ -178,7 +178,7 @@ int InterpolatePlugin::initialize() {
   return 0;
 }
 
-void InterpolatePlugin::serialize(void* buffer) const {
+void InterpolatePlugin::serialize(void* buffer) const noexcept {
   std::string data = serializeToString();
   size_t size = getSerializationSize();
 
@@ -202,7 +202,7 @@ std::string InterpolatePlugin::serializeToString() const {
   return data_str.str();
 }
 
-size_t InterpolatePlugin::getSerializationSize() const {
+size_t InterpolatePlugin::getSerializationSize() const noexcept {
   return serializeToString().size();
 }
 
@@ -210,7 +210,7 @@ bool InterpolatePlugin::supportsFormatCombination(
     int pos,
     const nvinfer1::PluginTensorDesc* inOut,
     int nbInputs,
-    int nbOutputs) {
+    int nbOutputs) noexcept {
   TRTORCH_ASSERT(0 <= pos && pos <= 1, "There should be exactly 2 connections to the plugin - 1 input, 1 output");
   TRTORCH_ASSERT(nbInputs == 1, "Expected a single tensor as input to interpolate plugin");
   TRTORCH_ASSERT(nbOutputs == 1, "Expected a single tensor as output to interpolate plugin");
@@ -231,7 +231,7 @@ void InterpolatePlugin::configurePlugin(
     const nvinfer1::DynamicPluginTensorDesc* in,
     int nbInputs,
     const nvinfer1::DynamicPluginTensorDesc* out,
-    int nbOutputs) {
+    int nbOutputs) noexcept {
   dtype_ = nvinfer1::DataType::kFLOAT;
 }
 
@@ -239,7 +239,7 @@ size_t InterpolatePlugin::getWorkspaceSize(
     const nvinfer1::PluginTensorDesc* inputs,
     int nbInputs,
     const nvinfer1::PluginTensorDesc* outputs,
-    int nbOutputs) const {
+    int nbOutputs) const noexcept {
   return 0;
 }
 
@@ -249,7 +249,7 @@ int InterpolatePlugin::enqueue(
     const void* const* inputs,
     void* const* outputs,
     void* workspace,
-    cudaStream_t stream) {
+    cudaStream_t stream) noexcept {
 #if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1)
   at::Tensor input = at::from_blob((void*)inputs[0], util::toVec(inputDesc->dims), [](void*) {}, tensor_options_);
   at::Tensor output = at::from_blob(
@@ -356,21 +356,21 @@ InterpolatePluginCreator::InterpolatePluginCreator() {
   mFC.fields = mPluginAttributes.data();
 }
 
-const char* InterpolatePluginCreator::getPluginNamespace() const {
+const char* InterpolatePluginCreator::getPluginNamespace() const noexcept {
   return "trtorch";
 }
 
-const char* InterpolatePluginCreator::getPluginName() const {
+const char* InterpolatePluginCreator::getPluginName() const noexcept {
   return "Interpolate";
 }
 
-const char* InterpolatePluginCreator::getPluginVersion() const {
+const char* InterpolatePluginCreator::getPluginVersion() const noexcept {
   return "1";
 }
 
 nvinfer1::IPluginV2* InterpolatePluginCreator::createPlugin(
     const char* name,
-    const nvinfer1::PluginFieldCollection* fc) {
+    const nvinfer1::PluginFieldCollection* fc) noexcept {
   std::vector<int64_t> in_shape;
   std::vector<int64_t> out_shape;
   std::vector<int64_t> out_size;
@@ -409,12 +409,12 @@ nvinfer1::IPluginV2* InterpolatePluginCreator::createPlugin(
 nvinfer1::IPluginV2* InterpolatePluginCreator::deserializePlugin(
     const char* name,
     const void* serialData,
-    size_t serialLength) {
+    size_t serialLength) noexcept {
   name_ = name;
   return new InterpolatePlugin((const char*)serialData, serialLength);
 }
 
-const nvinfer1::PluginFieldCollection* InterpolatePluginCreator::getFieldNames() {
+const nvinfer1::PluginFieldCollection* InterpolatePluginCreator::getFieldNames() noexcept {
   return nullptr;
 }
 
