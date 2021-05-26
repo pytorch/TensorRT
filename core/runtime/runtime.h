@@ -19,7 +19,6 @@ struct TRTEngine : torch::CustomClassHolder {
   std::pair<uint64_t, uint64_t> num_io;
   EngineID id;
   std::string name;
-  util::logging::TRTorchLogger logger;
 
   std::unordered_map<uint64_t, uint64_t> in_binding_map;
   std::unordered_map<uint64_t, uint64_t> out_binding_map;

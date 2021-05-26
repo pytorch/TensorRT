@@ -60,7 +60,7 @@ struct ConversionCtx {
   nvinfer1::DataType input_type;
   nvinfer1::DataType op_precision;
   BuilderSettings settings;
-  util::logging::TRTorchLogger logger;
+  util::logging::TRTorchLogger& logger;
   // Pointers to data that needs to remain alive until conversion is done
   // All data will be freed when the destructor is called
   // The weights class is the main consumer of this, each time a weight object
