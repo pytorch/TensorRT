@@ -44,7 +44,6 @@ struct TRTEngine : torch::CustomClassHolder {
   EngineID id;
   std::string name;
   CudaDevice device_info;
-  util::logging::TRTorchLogger logger;
 
   std::unordered_map<uint64_t, uint64_t> in_binding_map;
   std::unordered_map<uint64_t, uint64_t> out_binding_map;

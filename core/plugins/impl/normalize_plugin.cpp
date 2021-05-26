@@ -41,23 +41,23 @@ NormalizePlugin::NormalizePlugin(const char* data, size_t length) {
   }
 }
 
-int NormalizePlugin::getNbOutputs() const {
+int NormalizePlugin::getNbOutputs() const noexcept {
   return 1;
 }
 
-const char* NormalizePlugin::getPluginType() const {
+const char* NormalizePlugin::getPluginType() const noexcept {
   return "NormalizePlugin";
 }
 
-const char* NormalizePlugin::getPluginVersion() const {
+const char* NormalizePlugin::getPluginVersion() const noexcept {
   return "1";
 }
 
-const char* NormalizePlugin::getPluginNamespace() const {
+const char* NormalizePlugin::getPluginNamespace() const noexcept {
   return "trtorch";
 }
 
-nvinfer1::IPluginV2DynamicExt* NormalizePlugin::clone() const {
+nvinfer1::IPluginV2DynamicExt* NormalizePlugin::clone() const noexcept {
   return new NormalizePlugin(order_, axes_, keep_dims_);
 }
 
@@ -65,7 +65,7 @@ nvinfer1::DimsExprs NormalizePlugin::getOutputDimensions(
     int outputIndex,
     const nvinfer1::DimsExprs* inputs,
     int nbInputs,
-    nvinfer1::IExprBuilder& exprBuilder) {
+    nvinfer1::IExprBuilder& exprBuilder) noexcept {
   nvinfer1::DimsExprs output;
   output.nbDims = keep_dims_ ? inputs[0].nbDims : inputs[0].nbDims - axes_.size();
 
@@ -98,21 +98,21 @@ nvinfer1::DimsExprs NormalizePlugin::getOutputDimensions(
 }
 
 nvinfer1::DataType NormalizePlugin::getOutputDataType(int index, const nvinfer1::DataType* inputTypes, int nbInputs)
-    const {
+    const noexcept {
   return nvinfer1::DataType::kFLOAT;
 }
 
-int NormalizePlugin::initialize() {
+int NormalizePlugin::initialize() noexcept {
   return 0;
 }
 
-void NormalizePlugin::serialize(void* buffer) const {
+void NormalizePlugin::serialize(void* buffer) const noexcept {
   std::string data = serializeToString();
   size_t size = getSerializationSize();
   data.copy((char*)buffer, size);
 }
 
-std::string NormalizePlugin::serializeToString() const {
+std::string NormalizePlugin::serializeToString() const noexcept {
   torch::serialize::OutputArchive output_archive;
   std::vector<int64_t> axesVec(axes_.begin(), axes_.end());
   output_archive.write("order", torch::IValue((int64_t)order_));
@@ -124,7 +124,7 @@ std::string NormalizePlugin::serializeToString() const {
   return data_str.str();
 }
 
-size_t NormalizePlugin::getSerializationSize() const {
+size_t NormalizePlugin::getSerializationSize() const noexcept {
   return serializeToString().size();
 }
 
@@ -132,10 +132,16 @@ bool NormalizePlugin::supportsFormatCombination(
     int pos,
     const nvinfer1::PluginTensorDesc* inOut,
     int nbInputs,
-    int nbOutputs) {
-  TRTORCH_ASSERT(0 <= pos && pos <= 1, "There should be exactly 2 connections to the plugin - 1 input, 1 output");
-  TRTORCH_ASSERT(nbInputs == 1, "Expected a single tensor as input to normalize plugin");
-  TRTORCH_ASSERT(nbOutputs == 1, "Expected a single tensor as output to normalize plugin");
+    int nbOutputs) noexcept {
+  if (pos < 0 || pos > 1) {
+    LOG_ERROR("There should be exactly 2 connections to the plugin - 1 input, 1 output");
+  }
+  if (nbInputs != 1) {
+    LOG_ERROR("Expected a single tensor as input to normalize plugin");
+  }
+  if (nbOutputs != 1) {
+    LOG_ERROR("Expected a single tensor as output to normalize plugin");
+  }
 
   const nvinfer1::PluginTensorDesc& in = inOut[0];
 
@@ -153,7 +159,7 @@ void NormalizePlugin::configurePlugin(
     const nvinfer1::DynamicPluginTensorDesc* in,
     int nbInputs,
     const nvinfer1::DynamicPluginTensorDesc* out,
-    int nbOutputs) {
+    int nbOutputs) noexcept {
   dtype_ = nvinfer1::DataType::kFLOAT;
 }
 
@@ -161,7 +167,7 @@ size_t NormalizePlugin::getWorkspaceSize(
     const nvinfer1::PluginTensorDesc* inputs,
     int nbInputs,
     const nvinfer1::PluginTensorDesc* outputs,
-    int nbOutputs) const {
+    int nbOutputs) const noexcept {
   return 0;
 }
 
@@ -171,7 +177,7 @@ int NormalizePlugin::enqueue(
     const void* const* inputs,
     void* const* outputs,
     void* workspace,
-    cudaStream_t stream) {
+    cudaStream_t stream) noexcept {
   at::Tensor input =
       at::from_blob((void*)inputs[0], util::toVec(inputDesc->dims), [](void*) {}, {at::kCUDA}).to(torch::kFloat);
   at::Tensor output =
@@ -212,47 +218,36 @@ NormalizePluginCreator::NormalizePluginCreator() {
   mFC.fields = mPluginAttributes.data();
 }
 
-const char* NormalizePluginCreator::getPluginNamespace() const {
+const char* NormalizePluginCreator::getPluginNamespace() const noexcept {
   return "trtorch";
 }
 
-const char* NormalizePluginCreator::getPluginName() const {
+const char* NormalizePluginCreator::getPluginName() const noexcept {
   return "NormalizePlugin";
 }
 
-const char* NormalizePluginCreator::getPluginVersion() const {
+const char* NormalizePluginCreator::getPluginVersion() const noexcept {
   return "1";
 }
 
-nvinfer1::IPluginV2* NormalizePluginCreator::createPlugin(const char* name, const nvinfer1::PluginFieldCollection* fc) {
-  int32_t order = 0;
-  std::vector<int32_t> axes;
-  int32_t keep_dims = 0;
-  for (int i = 0; i < fc->nbFields; i++) {
-    std::string field_name(fc->fields[i].name);
-    if (field_name.compare("order") == 0) {
-      order = *static_cast<const int32_t*>(fc->fields[i].data);
-    } else if (field_name.compare("axes") == 0) {
-      auto axes_values = static_cast<const int32_t*>(fc->fields[i].data);
-      axes.assign(axes_values, axes_values + fc->fields[i].length);
-    } else if (field_name.compare("keep_dims") == 0) {
-      keep_dims = *static_cast<const int32_t*>(fc->fields[i].data);
-    }
-  }
-  NormalizePlugin* plugin = new NormalizePlugin(order, axes, keep_dims);
+nvinfer1::IPluginV2* NormalizePluginCreator::createPlugin(
+    const char* name,
+    const nvinfer1::PluginFieldCollection* fc) noexcept {
+rmalizePluginCreator::createPlugin(const char* name, const nvinfer1::PluginFieldCollection* fc) noexcept {
+lugin = new NormalizePlugin(order, axes, keep_dims);
   return plugin;
 }
 
 nvinfer1::IPluginV2* NormalizePluginCreator::deserializePlugin(
     const char* name,
     const void* serialData,
-    size_t serialLength) {
+    size_t serialLength) noexcept {
   name_ = name;
   auto plugin = new NormalizePlugin((const char*)serialData, serialLength);
   return plugin;
 }
 
-const nvinfer1::PluginFieldCollection* NormalizePluginCreator::getFieldNames() {
+const nvinfer1::PluginFieldCollection* NormalizePluginCreator::getFieldNames() noexcept {
   return nullptr;
 }
 

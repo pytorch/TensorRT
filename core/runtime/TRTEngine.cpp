@@ -18,20 +18,12 @@ std::string slugify(std::string s) {
   return s;
 }
 
-TRTEngine::TRTEngine(std::string serialized_engine, CudaDevice cuda_device)
-    : logger(
-          std::string("[] - "),
-          util::logging::get_logger().get_reportable_severity(),
-          util::logging::get_logger().get_is_colored_output_on()) {
+TRTEngine::TRTEngine(std::string serialized_engine, CudaDevice cuda_device) {
   std::string _name = "deserialized_trt";
   new (this) TRTEngine(_name, serialized_engine, cuda_device);
 }
 
-TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
-    : logger(
-          std::string("[] = "),
-          util::logging::get_logger().get_reportable_severity(),
-          util::logging::get_logger().get_is_colored_output_on()) {
+TRTEngine::TRTEngine(std::vector<std::string> serialized_info) {
   TRTORCH_CHECK(
       serialized_info.size() == ENGINE_IDX + 1, "Program to be deserialized targets an incompatible TRTorch ABI");
   TRTORCH_CHECK(
@@ -45,15 +37,11 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
   new (this) TRTEngine(_name, engine_info, cuda_device);
 }
 
-TRTEngine::TRTEngine(std::string mod_name, std::string serialized_engine, CudaDevice cuda_device)
-    : logger(
-          std::string("[") + mod_name + std::string("_engine] - "),
-          util::logging::get_logger().get_reportable_severity(),
-          util::logging::get_logger().get_is_colored_output_on()) {
+TRTEngine::TRTEngine(std::string mod_name, std::string serialized_engine, CudaDevice cuda_device) {
   device_info = cuda_device;
   set_cuda_device(device_info);
 
-  rt = nvinfer1::createInferRuntime(logger);
+  rt = nvinfer1::createInferRuntime(util::logging::get_logger());
 
   name = slugify(mod_name) + "_engine";
 
