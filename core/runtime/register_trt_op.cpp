@@ -10,6 +10,13 @@ namespace trtorch {
 namespace core {
 namespace runtime {
 
+// SM Compute capability <Compute Capability, Device Name> map
+const std::unordered_map<std::string, std::string>& get_dla_supported_SM() {
+  // Xavier SM Compute Capability
+  static std::unordered_map<std::string, std::string> dla_supported_SM = {{"7.2", "Xavier"}};
+  return dla_supported_SM;
+}
+
 // Checks if the context switch requred for device ID
 bool is_switch_required(const CudaDevice& curr_device, const CudaDevice& conf_device) {
   // If SM capability is not the same as configured then switch
@@ -40,34 +47,23 @@ bool is_switch_required(const CudaDevice& curr_device, const CudaDevice& conf_de
 
 int select_cuda_device(const CudaDevice& conf_device) {
   int device_id = 0;
-  int num_devices = 0;
-  // SM Compute capability <major,minor> pair
-  std::unordered_map<std::string, std::string> dla_supported_SM;
+  auto dla_supported = get_dla_supported_SM();
 
-  // Xavier SM Compute Capability
-  dla_supported_SM.insert(std::make_pair("7.2", "Xavier"));
-  auto status = cudaGetDeviceCount(&num_devices);
-  TRTORCH_CHECK((status == cudaSuccess), "Unable to read CUDA capable devices. Return status: " << status);
+  auto cuda_device_list = DeviceList::instance().get_devices();
 
-  cudaDeviceProp device_prop;
-
-  for (int i = 0; i < num_devices; i++) {
-    TRTORCH_CHECK(
-        (cudaGetDeviceProperties(&device_prop, i) == cudaSuccess),
-        "Unable to read CUDA Device Properies for device id: " << i);
-    auto compute_cap = std::to_string(device_prop.major) + "." + std::to_string(device_prop.minor);
-    std::string device_name{device_prop.name};
+  for (auto device : cuda_device_list) {
+    auto compute_cap = std::to_string(device.second.major) + "." + std::to_string(device.second.minor);
     // In case of DLA select the DLA supported device ID
     if (conf_device.device_type == nvinfer1::DeviceType::kDLA) {
-      if (dla_supported_SM.find(compute_cap) != dla_supported_SM.end() &&
-          dla_supported_SM[compute_cap] == device_name) {
-        device_id = i;
+      if (dla_supported.find(compute_cap) != dla_supported.end() &&
+          dla_supported[compute_cap] == device.second.device_name) {
+        device_id = device.second.id;
         break;
       }
     } else if (conf_device.device_type == nvinfer1::DeviceType::kGPU) {
       auto conf_sm = std::to_string(conf_device.major) + "." + std::to_string(conf_device.minor);
-      if (compute_cap == conf_sm && device_name == conf_device.device_name) {
-        device_id = i;
+      if (compute_cap == conf_sm && device.second.device_name == conf_device.device_name) {
+        device_id = device.second.id;
         break;
       }
     } else {
@@ -83,6 +79,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
 
   CudaDevice curr_device;
   get_cuda_device(curr_device);
+  LOG_DEBUG("Current Device ID: " << curr_device.id);
 
   if (is_switch_required(curr_device, compiled_engine->device_info)) {
     // Scan through available CUDA devices and set the CUDA device context correctly

@@ -31,9 +31,9 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
           util::logging::get_logger().get_reportable_severity(),
           util::logging::get_logger().get_is_colored_output_on()) {
   std::string _name = "deserialized_trt";
-  std::string engine_info = serialized_info[EngineIdx];
+  std::string engine_info = serialized_info[ENGINE_IDX];
 
-  CudaDevice cuda_device = deserialize_device(serialized_info[DeviceIdx]);
+  CudaDevice cuda_device = deserialize_device(serialized_info[DEVICE_IDX]);
   new (this) TRTEngine(_name, engine_info, cuda_device);
 }
 

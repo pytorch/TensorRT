@@ -11,7 +11,7 @@ namespace runtime {
 
 using EngineID = int64_t;
 
-typedef enum { DeviceIdx = 0, EngineIdx } SerializedInfoIndex;
+typedef enum { DEVICE_IDX = 0, ENGINE_IDX } SerializedInfoIndex;
 
 struct CudaDevice {
   int64_t id; // CUDA device id
@@ -77,6 +77,28 @@ std::string serialize_device(CudaDevice& cuda_device);
 CudaDevice deserialize_device(std::string device_info);
 
 CudaDevice get_device_info(int64_t gpu_id, nvinfer1::DeviceType device_type);
+
+class DeviceList {
+  using DeviceMap = std::unordered_map<int, CudaDevice>;
+  DeviceMap device_list;
+  DeviceList() {}
+
+ public:
+  static DeviceList& instance() {
+    static DeviceList obj;
+    return obj;
+  }
+
+  void insert(int device_id, CudaDevice cuda_device) {
+    device_list[device_id] = cuda_device;
+  }
+  CudaDevice find(int device_id) {
+    return device_list[device_id];
+  }
+  DeviceMap get_devices() {
+    return device_list;
+  }
+};
 
 struct TRTEngine : torch::CustomClassHolder {
   // Each engine needs it's own runtime object

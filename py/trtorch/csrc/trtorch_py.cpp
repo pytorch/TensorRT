@@ -119,8 +119,8 @@ bool CheckMethodOperatorSupport(const torch::jit::Module& module, const std::str
   return core::CheckMethodOperatorSupport(module, method_name);
 }
 
-torch::jit::Module EmbedEngineInNewModule(const py::bytes& engine, CompileSpec& info) {
-  return core::EmbedEngineInNewModule(engine, info.toInternalCompileSpec());
+torch::jit::Module EmbedEngineInNewModule(const py::bytes& engine, core::runtime::CudaDevice& device) {
+  return core::EmbedEngineInNewModule(engine, device);
 }
 
 std::string get_build_info() {

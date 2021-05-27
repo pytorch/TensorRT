@@ -27,6 +27,24 @@
 namespace trtorch {
 namespace core {
 
+static std::unordered_map<int, runtime::CudaDevice> cuda_device_list;
+
+void update_cuda_device_list(void) {
+  int num_devices = 0;
+  auto status = cudaGetDeviceCount(&num_devices);
+  TRTORCH_ASSERT((status == cudaSuccess), "Unable to read CUDA capable devices. Return status: " << status);
+  cudaDeviceProp device_prop;
+  for (int i = 0; i < num_devices; i++) {
+    TRTORCH_CHECK(
+        (cudaGetDeviceProperties(&device_prop, i) == cudaSuccess),
+        "Unable to read CUDA Device Properies for device id: " << i);
+    std::string device_name(device_prop.name);
+    runtime::CudaDevice device = {
+        i, device_prop.major, device_prop.minor, nvinfer1::DeviceType::kGPU, device_name.size(), device_name};
+    cuda_device_list[i] = device;
+  }
+}
+
 void AddEngineToGraph(
     torch::jit::script::Module mod,
     std::shared_ptr<torch::jit::Graph>& g,
@@ -34,6 +52,8 @@ void AddEngineToGraph(
     runtime::CudaDevice& device_info,
     std::string engine_id = "",
     bool fallback = false) {
+  // Scan and Update the list of available cuda devices
+  update_cuda_device_list();
   auto engine_ptr =
       c10::make_intrusive<runtime::TRTEngine>(mod._ivalue()->name() + engine_id, serialized_engine, device_info);
   // Get required metadata about the engine out
@@ -277,13 +297,13 @@ torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod, C
   return new_mod;
 }
 
-torch::jit::script::Module EmbedEngineInNewModule(const std::string& engine, CompileSpec cfg) {
+torch::jit::script::Module EmbedEngineInNewModule(
+    const std::string& engine,
+    trtorch::core::runtime::CudaDevice cuda_device) {
   std::ostringstream engine_id;
   engine_id << reinterpret_cast<const int*>(&engine);
   torch::jit::script::Module new_mod("tensorrt_engine_mod_" + engine_id.str());
   auto new_g = std::make_shared<torch::jit::Graph>();
-  auto device_spec = cfg.convert_info.engine_settings.device;
-  auto cuda_device = runtime::get_device_info(device_spec.gpu_id, device_spec.device_type);
   AddEngineToGraph(new_mod, new_g, engine, cuda_device);
   auto new_method = new_mod._ivalue()->compilation_unit()->create_function("forward", new_g);
   auto schema = util::GenerateGraphSchema(new_method->name(), new_g);
