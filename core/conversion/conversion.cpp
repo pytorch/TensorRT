@@ -45,8 +45,15 @@ c10::optional<torch::jit::IValue> EvaluateNode(ConversionCtx* ctx, const torch::
       if (result) {
         // WARN: If the converter returns None then should pass through
         // but if repeated dep this section will get called each time
-        ctx->evaluated_value_map[eval_in] = std::move(result.value());
-        eval_args[eval_in] = &(ctx->evaluated_value_map[eval_in]);
+        auto val = result.value();
+        if (val.isCustomClass()){
+          auto cont = val.toCustomClass<TensorContainer>();
+          ctx->AssociateValueAndTensor(eval_in, cont->tensor());
+          eval_args[eval_in] = ctx->value_tensor_map[eval_in];
+        } else {
+          ctx->AssociateValueAndIValue(eval_in, val);
+          eval_args[eval_in] = &(ctx->evaluated_value_map[eval_in]);
+        }
       }
     } else {
       TRTORCH_THROW_ERROR(
@@ -374,6 +381,11 @@ void ConvertBlockToNetDef(
           } else {
             TRTORCH_THROW_ERROR("Unsupported return type for evaluated node");
           }
+        } else if (eval.value().isCustomClass()) {
+          auto container = eval.value().toCustomClass<TensorContainer>();
+          auto tensor = container->tensor();
+          LOG_DEBUG(ctx->logger, "Found the value to be an ITensor of shape: " << tensor->getDimensions());
+          ctx->AssociateValueAndTensor(n->output(0), tensor);
         } else if (!eval.value().isTensor()) {
           LOG_DEBUG(ctx->logger, "Found the value to be: " << eval.value());
           ctx->AssociateValueAndIValue(n->output(0), eval.value());

@@ -216,9 +216,17 @@ auto aten_registrations TRTORCH_UNUSED =
         .evaluator({c10::Symbol::fromQualString("aten::append"),
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                       auto list = args.at(n->input(0)).IValue()->to<c10::List<c10::IValue>>();
-                      auto el = args.at(n->input(1)).IValue();
 
-                      list.push_back(std::move(*el));
+                      if (args.at(n->input(1)).isITensor()) {
+                        auto tensor_holder = TensorContainer();
+                        tensor_holder.hold_tensor(args.at(n->input(1)).ITensor());
+                        auto el = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
+                        list.push_back(std::move(el));
+                      } else {
+                        auto el = args.at(n->input(1)).IValue();
+                        list.push_back(std::move(*el));
+                      }
+
                       return list;
                     },
                     EvalOptions().validSchemas({
