@@ -16,14 +16,20 @@ std::string slugify(std::string s) {
 }
 
 TRTEngine::TRTEngine(std::string serialized_engine)
-{
+    : logger(
+          std::string("[] - "),
+          util::logging::get_logger().get_reportable_severity(),
+          util::logging::get_logger().get_is_colored_output_on()) {
   std::string _name = "deserialized_trt";
   new (this) TRTEngine(_name, serialized_engine);
 }
 
 TRTEngine::TRTEngine(std::string mod_name, std::string serialized_engine)
-{
-  rt = nvinfer1::createInferRuntime(util::logging::get_logger());
+    : logger(
+          std::string("[") + mod_name + std::string("_engine] - "),
+          util::logging::get_logger().get_reportable_severity(),
+          util::logging::get_logger().get_is_colored_output_on()) {
+  rt = nvinfer1::createInferRuntime(logger);
 
   name = slugify(mod_name) + "_engine";
 
