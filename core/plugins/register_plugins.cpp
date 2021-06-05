@@ -41,7 +41,10 @@ class TRTorchPluginRegistry {
   }
 
  public:
-  util::logging::TRTorchLogger& plugin_logger = util::logging::get_logger();
+  util::logging::TRTorchLogger plugin_logger = util::logging::TRTorchLogger(
+      "[TRTorch Plugins Context] - ",
+      util::logging::get_logger().get_reportable_log_level(),
+      util::logging::get_logger().get_is_colored_output_on());
 };
 
 namespace {
