@@ -46,7 +46,7 @@ c10::optional<torch::jit::IValue> EvaluateNode(ConversionCtx* ctx, const torch::
         // WARN: If the converter returns None then should pass through
         // but if repeated dep this section will get called each time
         auto val = result.value();
-        if (val.isCustomClass()){
+        if (val.isCustomClass()) {
           auto cont = val.toCustomClass<TensorContainer>();
           ctx->AssociateValueAndTensor(eval_in, cont->tensor());
           eval_args[eval_in] = ctx->value_tensor_map[eval_in];
