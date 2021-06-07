@@ -218,8 +218,10 @@ TEST(Converters, ATenGELUConvertsCorrectly) {
   params = trtorch::core::conversion::get_named_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
 
-  // The official tensorrt plugin applies the Gelu activation x * Phi(x), where Phi is the Gaussian cdf, approximated
-  // by: 0.5 * (1 + tanh(sqrt(2 / M_PI) * (x + 0.044715 * x^3))) and the pytorch uses c10::cuda::compat::normcdf to
-  // compute Phi(x). So there's a difference here.
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-4));
+  // NOTE: The official tensorrt plugin applies the Gelu activation x * Phi(x), where Phi is the Gaussian cdf,
+  // approximated by: 0.5 * (1 + tanh(sqrt(2 / M_PI) * (x + 0.044715 * x^3))) and the pytorch uses
+  // c10::cuda::compat::normcdf to compute Phi(x). So there's a difference here and therefore the threshold is slightly
+  // higher than other ops. One in ten runs will give you an out of normal threshold result
+
+  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 5e-4));
 }
