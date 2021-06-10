@@ -49,9 +49,9 @@ int select_cuda_device(const CudaDevice& conf_device) {
   int device_id = 0;
   auto dla_supported = get_dla_supported_SM();
 
-  auto cuda_device_list = DeviceList::instance().get_devices();
+  auto device_list = cuda_device_list.instance().get_devices();
 
-  for (auto device : cuda_device_list) {
+  for (auto device : device_list) {
     auto compute_cap = std::to_string(device.second.major) + "." + std::to_string(device.second.minor);
     // In case of DLA select the DLA supported device ID
     if (conf_device.device_type == nvinfer1::DeviceType::kDLA) {

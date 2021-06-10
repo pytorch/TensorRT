@@ -50,6 +50,8 @@ TRTEngine::TRTEngine(std::string mod_name, std::string serialized_engine, CudaDe
   name = slugify(mod_name) + "_engine";
 
   cuda_engine = rt->deserializeCudaEngine(serialized_engine.c_str(), serialized_engine.size());
+  TRTORCH_CHECK((cuda_engine != nullptr), "Unable to deserialize the TensorRT engine");
+
   // Easy way to get a unique name for each engine, maybe there is a more
   // descriptive way (using something associated with the graph maybe)
   id = reinterpret_cast<EngineID>(cuda_engine);

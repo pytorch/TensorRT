@@ -78,28 +78,6 @@ CudaDevice deserialize_device(std::string device_info);
 
 CudaDevice get_device_info(int64_t gpu_id, nvinfer1::DeviceType device_type);
 
-class DeviceList {
-  using DeviceMap = std::unordered_map<int, CudaDevice>;
-  DeviceMap device_list;
-  DeviceList() {}
-
- public:
-  static DeviceList& instance() {
-    static DeviceList obj;
-    return obj;
-  }
-
-  void insert(int device_id, CudaDevice cuda_device) {
-    device_list[device_id] = cuda_device;
-  }
-  CudaDevice find(int device_id) {
-    return device_list[device_id];
-  }
-  DeviceMap get_devices() {
-    return device_list;
-  }
-};
-
 struct TRTEngine : torch::CustomClassHolder {
   // Each engine needs it's own runtime object
   nvinfer1::IRuntime* rt;
@@ -124,6 +102,49 @@ struct TRTEngine : torch::CustomClassHolder {
 };
 
 std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine);
+
+class DeviceList {
+  using DeviceMap = std::unordered_map<int, CudaDevice>;
+  DeviceMap device_list;
+
+ public:
+  // Scans and updates the list of available CUDA devices
+  DeviceList(void) {
+    int num_devices = 0;
+    auto status = cudaGetDeviceCount(&num_devices);
+    TRTORCH_ASSERT((status == cudaSuccess), "Unable to read CUDA capable devices. Return status: " << status);
+    cudaDeviceProp device_prop;
+    for (int i = 0; i < num_devices; i++) {
+      TRTORCH_CHECK(
+          (cudaGetDeviceProperties(&device_prop, i) == cudaSuccess),
+          "Unable to read CUDA Device Properies for device id: " << i);
+      std::string device_name(device_prop.name);
+      CudaDevice device = {
+          i, device_prop.major, device_prop.minor, nvinfer1::DeviceType::kGPU, device_name.size(), device_name};
+      device_list[i] = device;
+    }
+  }
+
+ public:
+  static DeviceList& instance() {
+    static DeviceList obj;
+    return obj;
+  }
+
+  void insert(int device_id, CudaDevice cuda_device) {
+    device_list[device_id] = cuda_device;
+  }
+  CudaDevice find(int device_id) {
+    return device_list[device_id];
+  }
+  DeviceMap get_devices() {
+    return device_list;
+  }
+};
+
+namespace {
+static DeviceList cuda_device_list;
+}
 
 } // namespace runtime
 } // namespace core

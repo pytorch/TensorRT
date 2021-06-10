@@ -517,7 +517,7 @@ TRTORCH_API std::string ConvertGraphToTRTEngine(
  * in a TorchScript module
  *
  * @param engine: std::string - Pre-built serialized TensorRT engine
- * @param info: CompileSepc::Device - Device information
+ * @param device: CompileSepc::Device - Device information
  *
  * Takes a pre-built serialized TensorRT engine and embeds it in a TorchScript
  * module. Registers execution of the engine as the forward method of the module
