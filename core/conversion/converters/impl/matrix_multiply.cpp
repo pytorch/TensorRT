@@ -1,3 +1,4 @@
+#include "core/conversion/converters/converter_util.h"
 #include "core/conversion/converters/converters.h"
 #include "core/util/prelude.h"
 
@@ -16,10 +17,12 @@ auto mm_registrations TRTORCH_UNUSED =
                     LOG_DEBUG("self tensor shape: " << self->getDimensions());
 
                     auto other = args[1].ITensorOrFreeze(ctx);
-                    LOG_DEBUG("other tensor shape: " << other->getDimensions());
+                    // "other" tensor should have same nbDims as self
+                    auto wt_tensor = addPadding(ctx, n, other, self->getDimensions().nbDims, false, false);
+                    LOG_DEBUG("other tensor shape: " << wt_tensor->getDimensions());
 
                     auto mm_layer = ctx->net->addMatrixMultiply(
-                        *self, nvinfer1::MatrixOperation::kNONE, *other, nvinfer1::MatrixOperation::kNONE);
+                        *self, nvinfer1::MatrixOperation::kNONE, *wt_tensor, nvinfer1::MatrixOperation::kNONE);
                     TRTORCH_CHECK(mm_layer, "Unable to create matrix multiplication node: " << *n);
                     mm_layer->setName(util::node_info(n).c_str());
                     auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], mm_layer->getOutput(0));
