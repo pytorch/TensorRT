@@ -183,7 +183,7 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
   std::vector<std::shared_ptr<torch::jit::Graph>> graphs;
   for (const torch::jit::script::Method& method : mod.get_methods()) {
     // Don't convert hidden methods
-    if (method.name().rfind("_", 0)) {
+    if (method.name().compare("forward")==0) {
       auto new_g = std::make_shared<torch::jit::Graph>();
       auto graph_and_parameters = lowering::Lower(mod, method.name());
 
@@ -257,7 +257,8 @@ torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod, C
   std::vector<std::shared_ptr<torch::jit::Graph>> graphs;
   for (const torch::jit::script::Method& method : mod.get_methods()) {
     // Don't convert hidden methods
-    if (method.name().rfind("_", 0)) {
+    //
+    if (method.name().compare("forward")==0) {
       auto engine = ConvertGraphToTRTEngine(mod, method.name(), cfg);
       auto new_g = std::make_shared<torch::jit::Graph>();
       AddEngineToGraph(new_mod, new_g, engine);
