@@ -52,7 +52,8 @@ class NormalizePlugin : public nvinfer1::IPluginV2DynamicExt {
       int nbInputs,
       nvinfer1::IExprBuilder& exprBuilder) noexcept override;
 
-  nvinfer1::DataType getOutputDataType(int index, const nvinfer1::DataType* inputTypes, int nbInputs) const noexcept override;
+  nvinfer1::DataType getOutputDataType(int index, const nvinfer1::DataType* inputTypes, int nbInputs) const
+      noexcept override;
 
   int initialize() noexcept override;
 
@@ -66,7 +67,11 @@ class NormalizePlugin : public nvinfer1::IPluginV2DynamicExt {
 
   void destroy() noexcept override {}
 
-  bool supportsFormatCombination(int pos, const nvinfer1::PluginTensorDesc* inOut, int nbInputs, int nbOutputs) noexcept override;
+  bool supportsFormatCombination(
+      int pos,
+      const nvinfer1::PluginTensorDesc* inOut,
+      int nbInputs,
+      int nbOutputs) noexcept override;
 
   void configurePlugin(
       const nvinfer1::DynamicPluginTensorDesc* in,
@@ -110,7 +115,10 @@ class NormalizePluginCreator : public nvinfer1::IPluginCreator {
 
   // NormalizePlugin* createPlugin(const char* name, int32_t order, std::vector<int32_t> axes, int32_t keep_dims);
 
-  nvinfer1::IPluginV2* deserializePlugin(const char* name, const void* serialData, size_t serialLength) noexcept override;
+  nvinfer1::IPluginV2* deserializePlugin(
+      const char* name,
+      const void* serialData,
+      size_t serialLength) noexcept override;
 
   const nvinfer1::PluginFieldCollection* getFieldNames() noexcept override;
 };
