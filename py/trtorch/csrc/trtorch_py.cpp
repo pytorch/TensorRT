@@ -309,6 +309,7 @@ PYBIND11_MODULE(_C, m) {
       .value("WARNING", core::util::logging::LogLevel::kWARNING)
       .value("INFO", core::util::logging::LogLevel::kINFO)
       .value("DEBUG", core::util::logging::LogLevel::kDEBUG)
+      .value("GRAPH", core::util::logging::LogLevel::kGRAPH)
       .export_values();
 }
 
