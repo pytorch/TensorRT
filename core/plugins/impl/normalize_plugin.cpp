@@ -103,15 +103,6 @@ nvinfer1::DataType NormalizePlugin::getOutputDataType(int index, const nvinfer1:
 }
 
 int NormalizePlugin::initialize() noexcept {
-#if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1)
-  tensor_options_ = tensor_options_.device(c10::kCUDA);
-#else
-  tensor_options_ = tensor_options_.device(c10::kCPU);
-#endif
-
-  // c10::kFloat = FLOAT32
-  tensor_options_ = tensor_options_.dtype(c10::kFloat);
-
   return 0;
 }
 
@@ -181,11 +172,10 @@ int NormalizePlugin::enqueue(
     void* const* outputs,
     void* workspace,
     cudaStream_t stream) noexcept {
-  // TRT <= 7.0
-#if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1)
-  at::Tensor input = at::from_blob((void*)inputs[0], util::toVec(inputDesc->dims), [](void*) {}, tensor_options_);
-  at::Tensor output = at::from_blob(
-      outputs[0], util::volume(outputDesc->dims), [](void*) {}, tensor_options_);
+  at::Tensor input =
+      at::from_blob((void*)inputs[0], util::toVec(inputDesc->dims), [](void*) {}, {at::kCUDA}).to(torch::kFloat);
+  at::Tensor output =
+      at::from_blob(outputs[0], util::toVec(outputDesc->dims), [](void*) {}, {at::kCUDA}).to(torch::kFloat);
 
   at::cuda::CUDAStream torch_stream = at::cuda::getStreamFromPool();
   at::cuda::CUDAStreamGuard torch_guard(torch_stream);
@@ -195,7 +185,9 @@ int NormalizePlugin::enqueue(
   cudaEventRecord(event, stream);
 
   cudaStreamWaitEvent(torch_stream.stream(), event, 0);
-  at::Tensor result = at::norm(input, order_, axes_, keep_dims_);
+
+  std::vector<int64_t> axes_double(axes_.begin(), axes_.end());
+  at::Tensor result = at::norm(input, (int64_t)order_, axes_double, (bool)keep_dims_);
   output.copy_(result);
   cudaEvent_t torch_event;
   cudaEventCreate(&torch_event);
@@ -206,29 +198,6 @@ int NormalizePlugin::enqueue(
   cudaEventDestroy(event);
   cudaEventDestroy(torch_event);
   return 0;
-#else
-  // TODO: When PyTorch updates to cuDNN 8 try moving back to CUDA based ATen
-  // kernels HACK: WAR because there is a segfault if you try to create a CUDA
-  // Tensor in the context of TensorRT execution
-  float* input_blob = (float*)malloc(util::volume(inputDesc->dims) * sizeof(float));
-  cudaMemcpyAsync(
-      input_blob,
-      static_cast<const void*>(inputs[0]),
-      util::volume(inputDesc->dims) * sizeof(float),
-      cudaMemcpyDeviceToHost,
-      stream);
-  cudaStreamSynchronize(stream);
-
-  at::Tensor input = at::from_blob((void*)input_blob, util::toVec(inputDesc->dims), tensor_options_);
-  std::vector<int64_t> axes_new(axes_.begin(), axes_.end());
-  at::Tensor output = at::norm(input, (int64_t)order_, axes_new, (bool)keep_dims_);
-  cudaMemcpyAsync(
-      outputs[0], output.data_ptr(), util::volume(outputDesc->dims) * sizeof(float), cudaMemcpyHostToDevice, stream);
-  cudaStreamSynchronize(stream);
-
-  free(input_blob);
-  return 0;
-#endif
 }
 
 /*
@@ -255,7 +224,9 @@ const char* NormalizePluginCreator::getPluginVersion() const noexcept {
   return "1";
 }
 
-nvinfer1::IPluginV2* NormalizePluginCreator::createPlugin(const char* name, const nvinfer1::PluginFieldCollection* fc) noexcept {
+nvinfer1::IPluginV2* NormalizePluginCreator::createPlugin(
+    const char* name,
+    const nvinfer1::PluginFieldCollection* fc) noexcept {
   int32_t order = 0;
   std::vector<int32_t> axes;
   int32_t keep_dims = 0;

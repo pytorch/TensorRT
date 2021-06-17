@@ -27,7 +27,7 @@ InterpolatePlugin::InterpolatePlugin(
       align_corners_(align_corners),
       use_scales_(use_scales) {
   if (use_scales) {
-    TRTORCH_ASSERT(mode_ != "adaptive_pool2d", "use_scales is not valid for adaptive_pool2d");
+    TRTORCH_ASSERT(mode_ != "adaptive_avg_pool2d", "use_scales is not valid for adaptive_avg_pool2d");
     TRTORCH_ASSERT(
         scales_.size() != 0, "Attempted to use interpolate plugin without providing scales while use_scales=true");
     at::Tensor input = at::randint(1, 10, in_shape, {at::kCUDA});
@@ -106,7 +106,11 @@ std::vector<int64_t> InterpolatePlugin::getOutputSize() {
 }
 
 int InterpolatePlugin::getNbOutputs() const noexcept {
-  return 1;
+  if (mode_ == "adaptive_max_pool2d") {
+    return 2;
+  } else {
+    return 1;
+  }
 }
 
 const char* InterpolatePlugin::getPluginType() const noexcept {
@@ -166,15 +170,6 @@ nvinfer1::DataType InterpolatePlugin::getOutputDataType(int index, const nvinfer
 }
 
 int InterpolatePlugin::initialize() noexcept {
-#if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1)
-  tensor_options_ = tensor_options_.device(c10::kCUDA);
-#else
-  tensor_options_ = tensor_options_.device(c10::kCPU);
-#endif
-
-  // c10::kFloat = FLOAT32
-  tensor_options_ = tensor_options_.dtype(c10::kFloat);
-
   return 0;
 }
 
@@ -211,9 +206,13 @@ bool InterpolatePlugin::supportsFormatCombination(
     const nvinfer1::PluginTensorDesc* inOut,
     int nbInputs,
     int nbOutputs) noexcept {
-  TRTORCH_ASSERT(0 <= pos && pos <= 1, "There should be exactly 2 connections to the plugin - 1 input, 1 output");
-  TRTORCH_ASSERT(nbInputs == 1, "Expected a single tensor as input to interpolate plugin");
-  TRTORCH_ASSERT(nbOutputs == 1, "Expected a single tensor as output to interpolate plugin");
+  if (mode_ == "adaptive_max_pool2d") {
+    TRTORCH_ASSERT(nbOutputs == 2, "Expected 2 tensors as output to interpolate plugin");
+    TRTORCH_ASSERT(0 <= pos && pos <= 2, "There should be exactly 3 connections to the plugin - 1 input, 2 output");
+  } else {
+    TRTORCH_ASSERT(nbOutputs == 1, "Expected a single tensor as output to interpolate plugin");
+    TRTORCH_ASSERT(0 <= pos && pos <= 1, "There should be exactly 2 connections to the plugin - 1 input, 1 output");
+  }
 
   const nvinfer1::PluginTensorDesc& in = inOut[0];
 
@@ -250,10 +249,10 @@ int InterpolatePlugin::enqueue(
     void* const* outputs,
     void* workspace,
     cudaStream_t stream) noexcept {
-#if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1)
-  at::Tensor input = at::from_blob((void*)inputs[0], util::toVec(inputDesc->dims), [](void*) {}, tensor_options_);
-  at::Tensor output = at::from_blob(
-      outputs[0], util::volume(outputDesc->dims), [](void*) {}, tensor_options_);
+  at::Tensor input =
+      at::from_blob((void*)inputs[0], util::toVec(inputDesc->dims), [](void*) {}, {at::kCUDA}).to(torch::kFloat);
+  at::Tensor output =
+      at::from_blob(outputs[0], util::toVec(outputDesc->dims), [](void*) {}, {at::kCUDA}).to(torch::kFloat);
 
   at::cuda::CUDAStream torch_stream = at::cuda::getStreamFromPool();
   at::cuda::CUDAStreamGuard torch_guard(torch_stream);
@@ -263,27 +262,30 @@ int InterpolatePlugin::enqueue(
   cudaEventRecord(event, stream);
 
   cudaStreamWaitEvent(torch_stream.stream(), event, 0);
-
+  at::Tensor out;
   if (use_scales_) {
     if (mode_ == "linear") {
-      at::upsample_linear1d_out(output, input, {}, align_corners_, scales_[0]);
+      out = at::upsample_linear1d(input, c10::nullopt, align_corners_, {scales_[0]});
     } else if (mode_ == "bilinear") {
-      at::upsample_bilinear2d_out(output, input, {}, align_corners_, scales_[0], scales_[1]);
+      out = at::upsample_bilinear2d(input, c10::nullopt, align_corners_, scales_);
     } else if (mode_ == "trilinear") {
-      at::upsample_trilinear3d_out(output, input, {}, align_corners_, scales_[0], scales_[1], scales_[2]);
+      out = at::upsample_trilinear3d(input, c10::nullopt, align_corners_, scales_);
     }
   } else {
     if (mode_ == "linear") {
-      at::upsample_linear1d_out(output, input, {size_[0]}, align_corners_);
+      out = at::upsample_linear1d(input, {size_[0]}, align_corners_);
     } else if (mode_ == "bilinear") {
-      at::upsample_bilinear2d_out(output, input, {size_[0], size_[1]}, align_corners_);
+      out = at::upsample_bilinear2d(input, {size_[0], size_[1]}, align_corners_);
     } else if (mode_ == "trilinear") {
-      at::upsample_trilinear3d_out(output, input, {size_[0], size_[1], size_[2]}, align_corners_);
-    } else if (mode_ == "adaptive_pool2d") {
-      at::adaptive_avg_pool2d_out(output, input, {size_[0], size_[1]});
+      out = at::upsample_trilinear3d(input, {size_[0], size_[1], size_[2]}, align_corners_);
+    } else if (mode_ == "adaptive_avg_pool2d") {
+      out = at::adaptive_avg_pool2d(input, {size_[0], size_[1]});
+    } else if (mode_ == "adaptive_max_pool2d") {
+      out = std::get<0>(at::adaptive_max_pool2d(input, {size_[0], size_[1]}));
     }
   }
 
+  output.copy_(out);
   cudaEvent_t torch_event;
   cudaEventCreate(&torch_event);
   cudaEventRecord(torch_event, torch_stream.stream());
@@ -294,49 +296,6 @@ int InterpolatePlugin::enqueue(
   cudaEventDestroy(torch_event);
 
   return 0;
-#else
-  // TODO: When PyTorch updates to cuDNN 8 try moving back to CUDA based ATen
-  // kernels HACK: WAR because there is a segfault if you try to create a CUDA
-  // Tensor in the context of TensorRT execution
-  float* input_blob = (float*)malloc(util::volume(inputDesc->dims) * sizeof(float));
-  cudaMemcpyAsync(
-      input_blob,
-      static_cast<const void*>(inputs[0]),
-      util::volume(inputDesc->dims) * sizeof(float),
-      cudaMemcpyDeviceToHost,
-      stream);
-  cudaStreamSynchronize(stream);
-
-  at::Tensor input = at::from_blob((void*)input_blob, util::toVec(inputDesc->dims), tensor_options_);
-  at::Tensor output;
-  if (use_scales_) {
-    if (mode_ == "linear") {
-      output = at::upsample_linear1d(input, c10::nullopt, align_corners_, {scales_[0]});
-    } else if (mode_ == "bilinear") {
-      output = at::upsample_bilinear2d(input, c10::nullopt, align_corners_, scales_);
-    } else if (mode_ == "trilinear") {
-      output = at::upsample_trilinear3d(input, c10::nullopt, align_corners_, scales_);
-    }
-  } else {
-    if (mode_ == "linear") {
-      output = at::upsample_linear1d(input, {size_[0]}, align_corners_);
-    } else if (mode_ == "bilinear") {
-      output = at::upsample_bilinear2d(input, {size_[0], size_[1]}, align_corners_);
-    } else if (mode_ == "trilinear") {
-      output = at::upsample_trilinear3d(input, {size_[0], size_[1], size_[2]}, align_corners_);
-    } else if (mode_ == "adaptive_pool2d") {
-      output = at::adaptive_avg_pool2d(input, {size_[0], size_[1]});
-    }
-  }
-
-  cudaMemcpyAsync(
-      outputs[0], output.data_ptr(), util::volume(outputDesc->dims) * sizeof(float), cudaMemcpyHostToDevice, stream);
-  cudaStreamSynchronize(stream);
-
-  free(input_blob);
-
-  return 0;
-#endif
 }
 
 /*
