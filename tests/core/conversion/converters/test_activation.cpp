@@ -41,7 +41,7 @@ TEST(Converters, ATenSigmoidConvertsCorrectly) {
   params = trtorch::core::conversion::get_named_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 4e-6));
 }
 
 TEST(Converters, ATenTanhConvertsCorrectly) {
@@ -61,7 +61,7 @@ TEST(Converters, ATenTanhConvertsCorrectly) {
   params = trtorch::core::conversion::get_named_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 7e-6));
 }
 
 // TODO: Seems like the IR parser is not handling negative numbers well, need to
@@ -221,5 +221,5 @@ TEST(Converters, ATenGELUConvertsCorrectly) {
   // The official tensorrt plugin applies the Gelu activation x * Phi(x), where Phi is the Gaussian cdf, approximated
   // by: 0.5 * (1 + tanh(sqrt(2 / M_PI) * (x + 0.044715 * x^3))) and the pytorch uses c10::cuda::compat::normcdf to
   // compute Phi(x). So there's a difference here.
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-4));
+  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 4e-4));
 }
