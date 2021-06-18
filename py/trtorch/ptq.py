@@ -26,7 +26,6 @@ def get_batch_size(self):
 
 
 def get_batch(self, names):
-    print("Current batch idx: ", self.current_batch_idx, " Dataset size: ", len(self.data_loader.dataset))
     if self.current_batch_idx + self.batch_size > len(self.data_loader.dataset):
         return None
 
