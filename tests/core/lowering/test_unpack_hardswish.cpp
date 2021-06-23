@@ -27,12 +27,23 @@ TEST(LoweringPasses, UnpackHardSwish) {
   trtorch::core::util::logging::get_logger().set_reportable_log_level(trtorch::core::util::logging::LogLevel::kGRAPH);
   auto sg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(source_graph, &*sg);
+
+  auto in = at::rand({10, 100}, {at::kCUDA});
+  auto sg_params = trtorch::core::conversion::get_named_params(sg->inputs(), {});
+  auto sg_results = trtorch::tests::util::RunGraph(sg, sg_params, {in});
+
   trtorch::core::lowering::passes::UnpackHardSwish(sg);
 
   auto tg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(target_graph, &*tg);
 
   ASSERT_TRUE(!torch::jit::findPatternMatches(*tg, *sg).empty());
+
+  in = at::clone(in);
+  auto tg_params = trtorch::core::conversion::get_named_params(tg->inputs(), {});
+  auto tg_results = trtorch::tests::util::RunGraph(tg, tg_params, {in});
+
+  ASSERT_TRUE(trtorch::tests::util::almostEqual(sg_results[0], tg_results[0], 2e-6));
 }
 
 TEST(LoweringPasses, UnpackHardInplaceSwish) {
@@ -56,10 +67,21 @@ TEST(LoweringPasses, UnpackHardInplaceSwish) {
   trtorch::core::util::logging::get_logger().set_reportable_log_level(trtorch::core::util::logging::LogLevel::kGRAPH);
   auto sg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(source_graph, &*sg);
+
+  auto in = at::rand({10, 100}, {at::kCUDA});
+  auto sg_params = trtorch::core::conversion::get_named_params(sg->inputs(), {});
+  auto sg_results = trtorch::tests::util::RunGraph(sg, sg_params, {in});
+
   trtorch::core::lowering::passes::UnpackHardSwish(sg);
 
   auto tg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(target_graph, &*tg);
 
   ASSERT_TRUE(!torch::jit::findPatternMatches(*tg, *sg).empty());
+
+  in = at::clone(in);
+  auto tg_params = trtorch::core::conversion::get_named_params(tg->inputs(), {});
+  auto tg_results = trtorch::tests::util::RunGraph(tg, tg_params, {in});
+
+  ASSERT_TRUE(trtorch::tests::util::almostEqual(sg_results[0], tg_results[0], 2e-6));
 }
