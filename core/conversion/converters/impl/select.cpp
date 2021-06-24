@@ -199,7 +199,7 @@ auto select_registrations TRTORCH_UNUSED =
         .pattern(
             {"aten::slice.Tensor(Tensor(a) self, int dim=0, int start=0, int end=9223372036854775807, int step=1) -> Tensor(a)",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-               auto in = args[0].ITensor();
+               auto in = args[0].ITensorOrFreeze(ctx);
                auto axis = args[1].unwrapToInt();
                auto maxDim = static_cast<int64_t>(in->getDimensions().d[axis]);
                // Handle case when given tensor index is negative
