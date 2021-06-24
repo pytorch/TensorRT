@@ -540,6 +540,25 @@ auto aten_registrations TRTORCH_UNUSED =
                         "aten::floor.int(int a) -> (int)",
                         "aten::floor.float(float a) -> (int)",
                     })})
+        .evaluator({c10::Symbol::fromQualString("aten::sqrt"),
+                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+                      if (args.at(n->input(0)).IValue()->isInt()) {
+                        auto a = args.at(n->input(0)).unwrapToInt();
+                        return std::sqrt(static_cast<double>(a));
+                      } else if (args.at(n->input(0)).IValue()->isDouble()) {
+                        auto a = args.at(n->input(0)).unwrapToDouble();
+                        return std::sqrt(a);
+                      } else {
+                        TRTORCH_THROW_ERROR(
+                            "Unimplemented data type for aten::sqrt evaluator: "
+                            << args.at(n->input(0)).IValue()->type()->str());
+                        return {};
+                      }
+                    },
+                    EvalOptions().validSchemas({
+                        "aten::sqrt.int(int a) -> (float)",
+                        "aten::sqrt.float(float a) -> (float)",
+                    })})
         .evaluator({c10::Symbol::fromQualString("aten::warn"),
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                       auto warning = args.at(n->input(0)).IValue();
