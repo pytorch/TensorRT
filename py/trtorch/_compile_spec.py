@@ -140,6 +140,24 @@ def _parse_torch_fallback(fallback_info: Dict[str, Any]) -> trtorch._C.TorchFall
 
     return info
 
+def _parse_input_dtypes(input_dtypes: List) -> List:
+    parsed_input_dtypes = []
+    for dtype in input_dtypes:
+        if isinstance(dtype, torch.dtype):
+            if dtype == torch.int8:
+                parsed_input_dtypes.append(_types.dtype.int8)
+            elif dtype == torch.half:
+                parsed_input_dtypes.append(_types.dtype.half)
+            elif dtype == torch.float:
+                parsed_input_dtypes.append(_types.dtype.float)
+            elif dtype == torch.int32:
+                parsed_input_dtypes.append(_types.dtype.int32)
+            elif dtype == torch.bool:
+                parsed_input_dtypes.append(_types.dtype.bool)
+            else:
+                raise TypeError("Invalid input dtype. Supported input datatypes include float|half|int8|int32|bool), got: " + str(dtype))
+
+    return parsed_input_dtypes
 
 def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
     info = trtorch._C.CompileSpec()
@@ -152,6 +170,9 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
 
     if "op_precision" in compile_spec:
         info.op_precision = _parse_op_precision(compile_spec["op_precision"])
+
+    if "input_dtypes" in compile_spec:
+        info.input_dtypes = _parse_input_dtypes(compile_spec["input_dtypes"])
 
     if "calibrator" in compile_spec:
         info.ptq_calibrator = compile_spec["calibrator"]
@@ -237,6 +258,7 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]) -> torch.classes.tensorrt.
                             "allow_gpu_fallback": false, # (DLA only) Allow layers unsupported on DLA to run on GPU
                         },
                         "op_precision": torch.half, # Operating precision set to FP16
+                        # List of datatypes that should be configured for each input. Supported options torch.{float|half|int8|int32|bool}.
                         "disable_tf32": False, # Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
                         "refit": False, # enable refit
                         "debug": False, # enable debuggable engine
@@ -288,6 +310,9 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]) -> torch.classes.tensorrt.
     backend_spec._set_device(d)
     backend_spec._set_torch_fallback(torch_fallback)
     backend_spec._set_op_precision(int(parsed_spec.op_precision))
+    for dtype in parsed_spec.input_dtypes:
+        backend_spec._append_input_dtypes(int64_t(dtype))
+
     backend_spec._set_disable_tf32(parsed_spec.disable_tf32)
     backend_spec._set_refit(parsed_spec.refit)
     backend_spec._set_debug(parsed_spec.debug)

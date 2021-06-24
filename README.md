@@ -20,7 +20,11 @@ More Information / System Architecture:
 ...
 auto compile_settings = trtorch::CompileSpec(dims);
 // FP16 execution
-compile_settings.op_precision = torch::kFloat;
+compile_settings.op_precision = torch::kHalf;
+// Set input datatypes. Allowerd options torch::{kFloat, kHalf, kChar, kInt32, kBool}
+// Size of input_dtypes should match number of inputs to the network.
+// If input_dtypes is not set, default precision for input tensors would be float32
+compile_spec.input_dtypes = {torch::kHalf};
 // Compile module
 auto trt_mod = trtorch::CompileGraph(ts_mod, compile_settings);
 // Run like normal
@@ -43,7 +47,8 @@ compile_settings = {
             "max": [1, 3, 1024, 1024]
         }, # For static size [1, 3, 224, 224]
     ],
-    "op_precision": torch.half # Run with FP16
+    "op_precision": torch.half, # Run with FP16
+    "input_dtypes": [torch.half] # Datatype of input tensor. Allowed options torch.(float|half|int8|int32|bool)
 }
 
 trt_ts_module = trtorch.compile(torch_script_module, compile_settings)

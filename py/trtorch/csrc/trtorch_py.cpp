@@ -176,6 +176,8 @@ PYBIND11_MODULE(_C, m) {
       .value("half", DataType::kHalf, "16 bit floating point number")
       .value("float16", DataType::kHalf, "16 bit floating point number")
       .value("int8", DataType::kChar, "8 bit integer number")
+      .value("int32", DataType::kInt32, "32 bit integer number")
+      .value("bool", DataType::kChar, "Boolean value")
       .export_values();
 
   py::enum_<DeviceType>(m, "DeviceType", "Enum to specify device kinds to build TensorRT engines for")
@@ -242,6 +244,7 @@ PYBIND11_MODULE(_C, m) {
       .def("_get_calibrator_handle", &CompileSpec::getPTQCalibratorHandle, "[Internal] gets a handle from a calibrator")
       .def_readwrite("input_ranges", &CompileSpec::input_ranges)
       .def_readwrite("op_precision", &CompileSpec::op_precision)
+      .def_readwrite("input_dtypes", &CompileSpec::input_dtypes)
       .def_readwrite("ptq_calibrator", &CompileSpec::ptq_calibrator)
       .def_readwrite("refit", &CompileSpec::refit)
       .def_readwrite("disable_tf32", &CompileSpec::disable_tf32)

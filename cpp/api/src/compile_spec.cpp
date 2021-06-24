@@ -7,17 +7,26 @@
 
 namespace trtorch {
 CompileSpec::DataType::DataType(c10::ScalarType t) {
-  TRTORCH_CHECK(t == at::kHalf || t == at::kFloat || t == at::kChar, "Data type is unsupported");
+  TRTORCH_CHECK(
+      t == at::kHalf || t == at::kFloat || t == at::kChar || t == at::kInt || t == at::kBool,
+      "Data type is unsupported");
   switch (t) {
     case at::kHalf:
       value = DataType::kHalf;
+      break;
+    case at::kChar:
+      value = DataType::kChar;
+      break;
+    case at::kInt:
+      value = DataType::kInt32;
+      break;
+    case at::kBool:
+      value = DataType::kBool;
       break;
     case at::kFloat:
     default:
       value = DataType::kFloat;
       break;
-    case at::kChar:
-      value = DataType::kChar;
   }
 }
 
@@ -74,19 +83,28 @@ std::vector<core::ir::InputRange> to_vec_internal_input_ranges(std::vector<Compi
   return internal;
 }
 
+nvinfer1::DataType toTRTDataType(CompileSpec::DataType value) {
+  switch (value) {
+    case CompileSpec::DataType::kChar:
+      return nvinfer1::DataType::kINT8;
+    case CompileSpec::DataType::kHalf:
+      return nvinfer1::DataType::kHALF;
+    case CompileSpec::DataType::kInt32:
+      return nvinfer1::DataType::kINT32;
+    case CompileSpec::DataType::kBool:
+      return nvinfer1::DataType::kBOOL;
+    case CompileSpec::DataType::kFloat:
+    default:
+      return nvinfer1::DataType::kFLOAT;
+  }
+}
+
 core::CompileSpec to_internal_compile_spec(CompileSpec external) {
   core::CompileSpec internal(to_vec_internal_input_ranges(external.input_ranges));
 
-  switch (external.op_precision) {
-    case CompileSpec::DataType::kChar:
-      internal.convert_info.engine_settings.op_precision = nvinfer1::DataType::kINT8;
-      break;
-    case CompileSpec::DataType::kHalf:
-      internal.convert_info.engine_settings.op_precision = nvinfer1::DataType::kHALF;
-      break;
-    case CompileSpec::DataType::kFloat:
-    default:
-      internal.convert_info.engine_settings.op_precision = nvinfer1::DataType::kFLOAT;
+  internal.convert_info.engine_settings.op_precision = toTRTDataType(external.op_precision);
+  for (auto dtype : external.input_dtypes) {
+    internal.convert_info.engine_settings.input_dtypes.push_back(toTRTDataType(dtype));
   }
 
   internal.convert_info.engine_settings.disable_tf32 = external.disable_tf32;

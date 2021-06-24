@@ -30,6 +30,10 @@ std::string to_str(DataType value) {
       return "Half";
     case DataType::kChar:
       return "Int8";
+    case DataType::kInt32:
+      return "Int32";
+    case DataType::kBool:
+      return "Bool";
     case DataType::kFloat:
     default:
       return "Float";
@@ -42,6 +46,10 @@ nvinfer1::DataType toTRTDataType(DataType value) {
       return nvinfer1::DataType::kINT8;
     case DataType::kHalf:
       return nvinfer1::DataType::kHALF;
+    case DataType::kInt32:
+      return nvinfer1::DataType::kINT32;
+    case DataType::kBool:
+      return nvinfer1::DataType::kBOOL;
     case DataType::kFloat:
     default:
       return nvinfer1::DataType::kFLOAT;
@@ -124,8 +132,15 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
   for (auto i : input_ranges) {
     internal_input_ranges.push_back(i.toInternalInputRange());
   }
+
+  std::vector<nvinfer1::DataType> trt_input_dtypes;
+  for (auto dtype : input_dtypes) {
+    trt_input_dtypes.push_back(toTRTDataType(dtype));
+  }
+
   auto info = core::CompileSpec(internal_input_ranges);
   info.convert_info.engine_settings.op_precision = toTRTDataType(op_precision);
+  info.convert_info.engine_settings.input_dtypes = trt_input_dtypes;
   info.convert_info.engine_settings.calibrator = ptq_calibrator;
   info.convert_info.engine_settings.disable_tf32 = disable_tf32;
   info.convert_info.engine_settings.refit = refit;
@@ -159,9 +174,13 @@ std::string CompileSpec::stringify() {
   for (auto i : input_ranges) {
     ss << i.to_str();
   }
-  std::string enabled = torch_fallback.enabled ? "True" : "False";
   ss << "    ]" << std::endl;
   ss << "    \"Op Precision\": " << to_str(op_precision) << std::endl;
+  ss << "    \"Input dtypes\": [" << std::endl;
+  for (auto i : input_dtypes) {
+    ss << to_str(i);
+  }
+  ss << "    ]" << std::endl;
   ss << "    \"TF32 Disabled\": " << disable_tf32 << std::endl;
   ss << "    \"Refit\": " << refit << std::endl;
   ss << "    \"Debug\": " << debug << std::endl;

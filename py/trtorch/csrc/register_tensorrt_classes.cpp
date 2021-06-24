@@ -43,6 +43,7 @@ void RegisterTRTCompileSpec() {
           .def("_set_device", &trtorch::pyapi::CompileSpec::setDeviceIntrusive)
           .def("_set_torch_fallback", &trtorch::pyapi::CompileSpec::setTorchFallbackIntrusive)
           .def("_set_ptq_calibrator", &trtorch::pyapi::CompileSpec::setPTQCalibratorViaHandle)
+          .def("_append_input_dtypes", &trtorch::pyapi::CompileSpec::appendInputDtypes)
           .def("__str__", &trtorch::pyapi::CompileSpec::stringify);
 
   ADD_FIELD_GET_SET_REGISTRATION(TRTCompileSpecTSRegistration, trtorch::pyapi::CompileSpec, op_precision);

@@ -115,6 +115,10 @@ struct TRTORCH_API CompileSpec {
       kHalf,
       /// INT8
       kChar,
+      /// INT32
+      kInt32,
+      /// Bool
+      kBool,
     };
 
     /**
@@ -238,6 +242,11 @@ struct TRTORCH_API CompileSpec {
    * Default operating precision for the engine
    */
   DataType op_precision = DataType::kFloat;
+
+  /**
+   * Data types for input tensors
+   */
+  std::vector<DataType> input_dtypes;
 
   /**
    * Prevent Float32 layers from using TF32 data format

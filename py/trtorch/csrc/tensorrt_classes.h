@@ -43,11 +43,7 @@ struct InputRange : torch::CustomClassHolder {
   std::string to_str();
 };
 
-enum class DataType : int8_t {
-  kFloat,
-  kHalf,
-  kChar,
-};
+enum class DataType : int8_t { kFloat, kHalf, kChar, kInt32, kBool };
 
 std::string to_str(DataType value);
 nvinfer1::DataType toTRTDataType(DataType value);
@@ -108,7 +104,9 @@ struct CompileSpec : torch::CustomClassHolder {
   void appendInputRange(const c10::intrusive_ptr<InputRange>& ir) {
     input_ranges.push_back(*ir);
   }
-
+  void appendInputDtypes(int64_t dtype) {
+    input_dtypes.push_back(static_cast<DataType>(dtype));
+  }
   int64_t getPTQCalibratorHandle() {
     return (int64_t)ptq_calibrator;
   }
@@ -120,6 +118,7 @@ struct CompileSpec : torch::CustomClassHolder {
   void setTorchFallbackIntrusive(const c10::intrusive_ptr<TorchFallback>& fb) {
     torch_fallback = *fb;
   }
+
   void setPTQCalibratorViaHandle(int64_t handle) {
     ptq_calibrator = (nvinfer1::IInt8Calibrator*)handle;
   }
@@ -142,6 +141,7 @@ struct CompileSpec : torch::CustomClassHolder {
   std::vector<InputRange> input_ranges;
   nvinfer1::IInt8Calibrator* ptq_calibrator = nullptr;
   DataType op_precision = DataType::kFloat;
+  std::vector<DataType> input_dtypes;
   bool disable_tf32 = false;
   bool refit = false;
   bool debug = false;

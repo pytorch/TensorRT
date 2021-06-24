@@ -24,6 +24,7 @@ struct Device {
 
 struct BuilderSettings {
   nvinfer1::DataType op_precision = nvinfer1::DataType::kFLOAT;
+  std::vector<nvinfer1::DataType> input_dtypes;
   bool disable_tf32 = false;
   bool refit = false;
   bool debug = false;
@@ -57,7 +58,7 @@ struct ConversionCtx {
   nvinfer1::IBuilder* builder;
   nvinfer1::INetworkDefinition* net;
   nvinfer1::IBuilderConfig* cfg;
-  nvinfer1::DataType input_type;
+  std::vector<nvinfer1::DataType> input_dtypes;
   nvinfer1::DataType op_precision;
   BuilderSettings settings;
   util::logging::TRTorchLogger logger;

@@ -150,14 +150,27 @@ void AddInputs(
 
   auto profile = ctx->builder->createOptimizationProfile();
 
+  TRTORCH_CHECK(
+      ctx->input_dtypes.size() == 0 || ctx->input_dtypes.size() == input_tensors.size(),
+      "Number of input_dtypes : " << ctx->input_dtypes.size()
+                                  << " should either be 0 or equal to number of input_tensors which is "
+                                  << input_tensors.size() << " (conversion.AddInputs)");
+
+  // If the input_dtypes is not provided, assume all the input tensors to be in float32
+  if (ctx->input_dtypes.size() == 0) {
+    LOG_DEBUG("Input datatypes are not provided explicitly. Default float32 datatype is being used for all inputs");
+    ctx->input_dtypes = std::vector<nvinfer1::DataType>{input_tensors.size(), nvinfer1::DataType::kFLOAT};
+  }
+
   for (size_t i = 0; i < input_tensors.size(); i++) {
     auto in = input_tensors[i];
     auto dims = input_dims[i];
     std::string name = std::string("input_") + std::to_string(ctx->num_inputs);
     LOG_INFO(
-        ctx->logger, "Adding Input " << in->debugName() << " named " << name << " in engine (conversion.AddInputs)");
-    LOG_DEBUG(ctx->logger, "Input shape set to " << dims.input_shape);
-    auto trt_in = ctx->net->addInput(name.c_str(), ctx->input_type, dims.input_shape);
+        ctx->logger,
+        "Adding Input " << in->debugName() << " named : " << name << ", shape: " << dims.input_shape
+                        << ", dtype : " << ctx->input_dtypes[i] << " in engine (conversion.AddInputs)");
+    auto trt_in = ctx->net->addInput(name.c_str(), ctx->input_dtypes[i], dims.input_shape);
     TRTORCH_CHECK(trt_in, "Failed to add input node: " << in->debugName() << " (conversion.AddInputs)");
 
     profile->setDimensions(trt_in->getName(), nvinfer1::OptProfileSelector::kMIN, dims.min);

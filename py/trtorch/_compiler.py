@@ -41,6 +41,7 @@ def compile(module: torch.jit.ScriptModule, compile_spec: Any) -> torch.jit.Scri
                         "allow_gpu_fallback": false, # (DLA only) Allow layers unsupported on DLA to run on GPU
                     },
                     "op_precision": torch.half, # Operating precision set to FP16
+                    "input_dtypes": [torch.float32] # List of datatypes that should be configured for each input. Supported options torch.{float|half|int8|int32|bool}.
                     "refit": false, # enable refit
                     "debug": false, # enable debuggable engine
                     "strict_types": false, # kernels should strictly run in operating precision
@@ -106,6 +107,7 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule, method_name: st
                         "allow_gpu_fallback": false, # (DLA only) Allow layers unsupported on DLA to run on GPU
                     },
                     "op_precision": torch.half, # Operating precision set to FP16
+                    # List of datatypes that should be configured for each input. Supported options torch.{float|half|int8|int32|bool}.
                     "disable_tf32": False, # Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
                     "refit": false, # enable refit
                     "debug": false, # enable debuggable engine

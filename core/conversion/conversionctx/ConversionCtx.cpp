@@ -61,7 +61,6 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
     case nvinfer1::DataType::kHALF:
       TRTORCH_CHECK(builder->platformHasFastFp16(), "Requested inference in FP16 but platform does not support FP16");
       cfg->setFlag(nvinfer1::BuilderFlag::kFP16);
-      input_type = nvinfer1::DataType::kHALF;
       break;
     case nvinfer1::DataType::kINT8:
       TRTORCH_CHECK(builder->platformHasFastInt8(), "Requested inference in INT8 but platform does not support INT8");
@@ -69,18 +68,20 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
       if (!settings.strict_types) {
         cfg->setFlag(nvinfer1::BuilderFlag::kFP16);
       }
-      input_type = nvinfer1::DataType::kFLOAT;
       TRTORCH_CHECK(
           settings.calibrator != nullptr,
           "Requested inference in INT8 but no calibrator provided, set the ptq_calibrator field in the CompileSpec struct with your calibrator");
       cfg->setInt8Calibrator(settings.calibrator);
       break;
     case nvinfer1::DataType::kFLOAT:
+    case nvinfer1::DataType::kINT32:
+    case nvinfer1::DataType::kBOOL:
     default:
-      input_type = nvinfer1::DataType::kFLOAT;
       break;
   }
+
   op_precision = settings.op_precision;
+  input_dtypes = settings.input_dtypes;
 
   if (settings.disable_tf32) {
     cfg->clearFlag(nvinfer1::BuilderFlag::kTF32);
