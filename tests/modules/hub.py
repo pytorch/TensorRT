@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
+import timm
 
 models = {
     "alexnet": {
@@ -63,6 +64,10 @@ models = {
     },
     "faster_rcnn": {
         "model": models.detection.fasterrcnn_resnet50_fpn(pretrained=True),
+        "path": "script"
+    },
+    "vit": {
+        "model": timm.create_model('efficientnet_b0', pretrained=True),
         "path": "script"
     }
 }
