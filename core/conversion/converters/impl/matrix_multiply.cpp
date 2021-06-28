@@ -14,15 +14,17 @@ auto mm_registrations TRTORCH_UNUSED =
         .pattern({"aten::matmul(Tensor self, Tensor other) -> (Tensor)",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                     auto self = args[0].ITensorOrFreeze(ctx);
-                    LOG_DEBUG("self tensor shape: " << self->getDimensions());
-
                     auto other = args[1].ITensorOrFreeze(ctx);
-                    // "other" tensor should have same nbDims as self
-                    auto wt_tensor = addPadding(ctx, n, other, self->getDimensions().nbDims, false, false);
-                    LOG_DEBUG("other tensor shape: " << wt_tensor->getDimensions());
+                    // Ensure self and other tensors have same nbDims by expanding the dimensions (from 0 axis) if
+                    // necessary.
+                    if (self->getDimensions().nbDims < other->getDimensions().nbDims) {
+                      self = addPadding(ctx, n, self, other->getDimensions().nbDims, false, false);
+                    } else {
+                      other = addPadding(ctx, n, other, self->getDimensions().nbDims, false, false);
+                    }
 
                     auto mm_layer = ctx->net->addMatrixMultiply(
-                        *self, nvinfer1::MatrixOperation::kNONE, *wt_tensor, nvinfer1::MatrixOperation::kNONE);
+                        *self, nvinfer1::MatrixOperation::kNONE, *other, nvinfer1::MatrixOperation::kNONE);
                     TRTORCH_CHECK(mm_layer, "Unable to create matrix multiplication node: " << *n);
                     mm_layer->setName(util::node_info(n).c_str());
                     auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], mm_layer->getOutput(0));
