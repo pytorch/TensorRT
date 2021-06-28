@@ -32,3 +32,26 @@ TEST(LoweringPasses, LinearToAddMM) {
 
   ASSERT_TRUE(!torch::jit::findPatternMatches(*tg, *sg).empty());
 }
+
+TEST(LoweringPasses, LinearToAddMMBiasNone) {
+  std::string source_graph = R"IR(
+    graph(%input, %weight):
+      %bias : None = prim::Constant()
+      %res = aten::linear(%input, %weight, %bias)
+      return (%res))IR";
+  std::string target_graph = R"IR(
+    graph(%input, %weight_t):
+      %weight = aten::t(%weight_t)
+      %mm: Tensor = aten::matmul(%input, %weight)
+      return (%mm))IR";
+
+  trtorch::core::util::logging::get_logger().set_reportable_log_level(trtorch::core::util::logging::LogLevel::kGRAPH);
+  auto sg = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(source_graph, &*sg);
+  trtorch::core::lowering::passes::LinearToAddMM(sg);
+
+  auto tg = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(target_graph, &*tg);
+
+  ASSERT_TRUE(!torch::jit::findPatternMatches(*tg, *sg).empty());
+}
