@@ -71,6 +71,33 @@ CompileSpec::CompileSpec(std::vector<std::vector<int64_t>> fixed_sizes) {
   }
 }
 
+/* ====== DEFINE INPUTS CLASS MEMBERS ======*/
+CompileSpec::Input::Input(std::vector<int64_t> opt) {
+  this->opt = opt;
+  this->min = opt;
+  this->max = opt;
+}
+
+CompileSpec::Input::Input(c10::IntArrayRef opt) {
+  this->opt = core::util::toVec(opt);
+  this->min = core::util::toVec(opt);
+  this->max = core::util::toVec(opt);
+}
+
+CompileSpec::Input::Input(std::vector<int64_t> min, std::vector<int64_t> opt, std::vector<int64_t> max) {
+  this->opt = opt;
+  this->min = min;
+  this->max = max;
+}
+
+CompileSpec::Input::Input(c10::IntArrayRef min, c10::IntArrayRef opt, c10::IntArrayRef max) {
+  this->opt = core::util::toVec(opt);
+  this->min = core::util::toVec(min);
+  this->max = core::util::toVec(max);
+}
+
+/* ==========================================*/
+
 core::ir::InputRange to_internal_input_range(CompileSpec::InputRange i) {
   return core::ir::InputRange(i.min, i.opt, i.max);
 }

@@ -192,6 +192,59 @@ struct TRTORCH_API CompileSpec {
   };
 
   /**
+   * @brief A struct to hold Input of a network.
+   * This struct has all the info (shape, dtype, name, memory_format) of an input tensor.
+   * The shape field in this struct can either hold a single vector representing an input shape,
+   * signifying a static input shape or a set of three input shapes representing
+   * the min, optiminal and max input shapes allowed for the engine.
+   * dtype : This can take values among values supported by trtorch::DataType
+   */
+  struct TRTORCH_API Input {
+    /// Minimum acceptable input size into the engine
+    std::vector<int64_t> min;
+    /// Optimal input size into the engine (gets best performace)
+    std::vector<int64_t> opt;
+    /// Maximum acceptable input size into the engine
+    std::vector<int64_t> max;
+    /// Data type of the input
+    DataType dtype;
+
+    /**
+     * @brief Construct a new Input Range object for static input size from
+     * vector
+     *
+     * @param opt
+     */
+    Input(std::vector<int64_t> opt, DataType dtype=DataType::kFloat);
+    /**
+     * @brief Construct a new Input Range object static input size from
+     * c10::ArrayRef (the type produced by tensor.sizes())
+     *
+     * @param opt
+     */
+    Input(c10::ArrayRef<int64_t> opt, DataType dtype=DataType::kFloat);
+    /**
+     * @brief Construct a new Input Range object dynamic input size from vectors
+     * for min, opt, and max supported sizes
+     *
+     * @param min
+     * @param opt
+     * @param max
+     */
+    Input(std::vector<int64_t> min, std::vector<int64_t> opt, std::vector<int64_t> max, DataType dtype=DataType::kFloat);
+    /**
+     * @brief Construct a new Input Range object dynamic input size from
+     * c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max
+     * supported sizes
+     *
+     * @param min
+     * @param opt
+     * @param max
+     */
+    Input(c10::ArrayRef<int64_t> min, c10::ArrayRef<int64_t> opt, c10::ArrayRef<int64_t> max, DataType dtype=DataType::kFloat);
+  };
+
+  /**
    * Emum for selecting engine capability
    */
   enum class EngineCapability : int8_t {
