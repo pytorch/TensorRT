@@ -34,6 +34,8 @@ def get_batch(self, names):
     # Treat the first element as input and others as targets.
     if isinstance(batch, list):
         batch = batch[0].to(self.device)
+    else:
+        batch = batch.to(self.device)
     return [batch.data_ptr()]
 
 
