@@ -48,33 +48,16 @@ nvinfer1::ITensor* add_bias(
 }
 
 auto lstm_cell_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().pattern(
-    {"aten::gru_cell(Tensor input, Tensor[] hx, Tensor w_ih, Tensor w_hh, Tensor? b_ih=None, Tensor? b_hh=None) -> Tensor",
+    {"aten::gru_cell(Tensor input, Tensor hx, Tensor w_ih, Tensor w_hh, Tensor? b_ih=None, Tensor? b_hh=None) -> Tensor",
      [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
        auto input = args[0].ITensorOrFreeze(ctx);
+       auto hx = args[1].ITensorOrFreeze(ctx);
        auto w_ih = args[2].ITensorOrFreeze(ctx);
        auto w_hh = args[3].ITensorOrFreeze(ctx);
 
        LOG_DEBUG("Input tensor shape: " << input->getDimensions());
        LOG_DEBUG("w_ih tensor shape: " << w_ih->getDimensions());
        LOG_DEBUG("w_hh tensor shape: " << w_hh->getDimensions());
-
-       std::vector<nvinfer1::ITensor*> state;
-       auto hx = args[1].IValue()->toListRef();
-       for (unsigned int i = 0; i < hx.size(); i++) {
-         auto t = hx[i];
-
-         nvinfer1::ITensor* itensor;
-
-         if (t.isTensor()) {
-           itensor = tensor_to_const(ctx, t.toTensor());
-         } else {
-           auto cont = t.toCustomClass<TensorContainer>();
-           itensor = cont->tensor();
-         }
-
-         LOG_DEBUG("State tensor " << i << " shape: " << itensor->getDimensions());
-         state.push_back(itensor);
-       }
 
        // calculate first half of gates
        auto mm1 = ctx->net->addMatrixMultiply(
@@ -88,7 +71,7 @@ auto lstm_cell_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().p
 
        // calculate second half of gates
        auto mm2 = ctx->net->addMatrixMultiply(
-           *state[0], nvinfer1::MatrixOperation::kNONE, *w_hh, nvinfer1::MatrixOperation::kTRANSPOSE);
+           *hx, nvinfer1::MatrixOperation::kNONE, *w_hh, nvinfer1::MatrixOperation::kTRANSPOSE);
        TRTORCH_CHECK(mm2, "Unable to create matrix multiplication node: " << *n);
        auto mm2_out = mm2->getOutput(0);
 
@@ -150,7 +133,7 @@ auto lstm_cell_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().p
        // compute new state H'
        auto interm_1 = ctx->net->addElementWise(*z_gate, *n_gate, nvinfer1::ElementWiseOperation::kPROD);
        TRTORCH_CHECK(interm_1, "Unable to create ElementWise layer from node: " << *n);
-       auto interm_2 = ctx->net->addElementWise(*z_gate, *state[0], nvinfer1::ElementWiseOperation::kPROD);
+       auto interm_2 = ctx->net->addElementWise(*z_gate, *hx, nvinfer1::ElementWiseOperation::kPROD);
        TRTORCH_CHECK(interm_2, "Unable to create ElementWise layer from node: " << *n);
        auto interm_3 = ctx->net->addElementWise(*n_gate, *interm_1->getOutput(0), nvinfer1::ElementWiseOperation::kSUB);
        TRTORCH_CHECK(interm_3, "Unable to create ElementWise layer from node: " << *n);
