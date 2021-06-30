@@ -19,7 +19,7 @@ TEST_P(ModuleTests, CompiledModuleIsClose) {
   trt_results.push_back(trt_results_ivalues.toTensor());
 
   for (size_t i = 0; i < trt_results.size(); i++) {
-    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[i], trt_results[i].reshape_as(jit_results[i]), 2e-5));
+    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[i], trt_results[i].reshape_as(jit_results[i]), 8e-3));
   }
 }
 
@@ -32,4 +32,6 @@ INSTANTIATE_TEST_SUITE_P(
         PathAndInSize({"tests/modules/mobilenet_v2_traced.jit.pt", {{1, 3, 224, 224}}}),
         PathAndInSize({"tests/modules/resnet18_scripted.jit.pt", {{1, 3, 224, 224}}}),
         PathAndInSize({"tests/modules/resnet50_scripted.jit.pt", {{1, 3, 224, 224}}}),
-        PathAndInSize({"tests/modules/mobilenet_v2_scripted.jit.pt", {{1, 3, 224, 224}}})));
+        PathAndInSize({"tests/modules/mobilenet_v2_scripted.jit.pt", {{1, 3, 224, 224}}}),
+        PathAndInSize({"tests/modules/efficientnet_b0_scripted.jit.pt", {{1, 3, 224, 224}}}),
+        PathAndInSize({"tests/modules/vit_scripted.jit.pt", {{1, 3, 224, 224}}})));
