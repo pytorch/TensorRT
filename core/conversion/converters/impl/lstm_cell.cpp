@@ -93,19 +93,25 @@ auto lstm_cell_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().p
        auto size = util::toDims(size_vec);
        auto stride = util::toDims(stride_vec);
 
-       auto out1_r = ctx->net->addSlice(*out1, util::toDims(offset0), size, stride);
-       TRTORCH_CHECK(out1_r, "Unable to create Slice layer from node: " << *n);
-       auto out1_z = ctx->net->addSlice(*out1, util::toDims(offset1), size, stride);
-       TRTORCH_CHECK(out1_z, "Unable to create Slice layer from node: " << *n);
-       auto out1_n = ctx->net->addSlice(*out1, util::toDims(offset2), size, stride);
-       TRTORCH_CHECK(out1_n, "Unable to create Slice layer from node: " << *n);
+       auto out1_r_elm = ctx->net->addSlice(*out1, util::toDims(offset0), size, stride);
+       TRTORCH_CHECK(out1_r_elm, "Unable to create Slice layer from node: " << *n);
+       auto out1_z_elm = ctx->net->addSlice(*out1, util::toDims(offset1), size, stride);
+       TRTORCH_CHECK(out1_z_elm, "Unable to create Slice layer from node: " << *n);
+       auto out1_n_elm = ctx->net->addSlice(*out1, util::toDims(offset2), size, stride);
+       TRTORCH_CHECK(out1_n_elm, "Unable to create Slice layer from node: " << *n);
+       auto out1_r = out1_r_elm->getOutput(0);
+       auto out1_z = out1_z_elm->getOutput(0);
+       auto out1_n = out1_n_elm->getOutput(0);
 
-       auto out2_r = ctx->net->addSlice(*out2, util::toDims(offset0), size, stride);
-       TRTORCH_CHECK(out2_r, "Unable to create Slice layer from node: " << *n);
-       auto out2_z = ctx->net->addSlice(*out2, util::toDims(offset1), size, stride);
-       TRTORCH_CHECK(out2_z, "Unable to create Slice layer from node: " << *n);
-       auto out2_n = ctx->net->addSlice(*out2, util::toDims(offset2), size, stride);
-       TRTORCH_CHECK(out2_n, "Unable to create Slice layer from node: " << *n);
+       auto out2_r_elm = ctx->net->addSlice(*out2, util::toDims(offset0), size, stride);
+       TRTORCH_CHECK(out2_r_elm, "Unable to create Slice layer from node: " << *n);
+       auto out2_z_elm = ctx->net->addSlice(*out2, util::toDims(offset1), size, stride);
+       TRTORCH_CHECK(out2_z_elm, "Unable to create Slice layer from node: " << *n);
+       auto out2_n_elm = ctx->net->addSlice(*out2, util::toDims(offset2), size, stride);
+       TRTORCH_CHECK(out2_n_elm, "Unable to create Slice layer from node: " << *n);
+       auto out2_r = out2_r_elm->getOutput(0);
+       auto out2_z = out2_z_elm->getOutput(0);
+       auto out2_n = out2_n_elm->getOutput(0);
 
        // compute the R gate
        auto add_r = ctx->net->addElementWise(*out1_r, *out2_r, nvinfer1::ElementWiseOperation::kSUM);
@@ -143,10 +149,10 @@ auto lstm_cell_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().p
 
        ctx->AssociateValueAndTensor(n->outputs()[0], h_prime_out);
 
-       LOG_DEBUG("Output tensor [h'] shape: " << h_prime->getDimensions());
+       LOG_DEBUG("Output tensor [h'] shape: " << h_prime_out->getDimensions());
 
        return true;
-    }},
+    }}).pattern(
     {"aten::lstm_cell(Tensor input, Tensor[] hx, Tensor w_ih, Tensor w_hh, Tensor? b_ih=None, Tensor? b_hh=None) -> (Tensor, Tensor)",
      [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
        auto input = args[0].ITensorOrFreeze(ctx);
