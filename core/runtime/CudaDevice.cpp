@@ -34,9 +34,6 @@ CudaDevice::CudaDevice(int64_t gpu_id, nvinfer1::DeviceType device_type) {
   // Set Device name
   this->device_name = device_name;
 
-  // Set Device name len for serialization/deserialization
-  this->device_name_len = device_name.size();
-
   // Set Device Type
   this->device_type = device_type;
 }
@@ -70,14 +67,20 @@ CudaDevice::CudaDevice(std::string device_info) {
 }
 
 std::string CudaDevice::serialize() {
+  std::vector<std::string> content;
+  content.resize(DEVICE_NAME_IDX + 1);
+
+  content[ID_IDX] = std::to_string(id);
+  content[SM_MAJOR_IDX] = std::to_string(major);
+  content[SM_MINOR_IDX] = std::to_string(minor);
+  content[DEVICE_TYPE_IDX] = std::to_string((int64_t)device_type);
+  content[DEVICE_NAME_IDX] = device_name;
+
   std::stringstream ss;
-  // clang-format off
-  ss << id << DEVICE_INFO_DELIM \
-     << major << DEVICE_INFO_DELIM \
-     << minor << DEVICE_INFO_DELIM \
-     << (int64_t) device_type << DEVICE_INFO_DELIM
-     << device_name;
-  // clang-format on
+  for (size_t i = 0; i < content.size() - 1; i++) {
+    ss << content[i] << DEVICE_INFO_DELIM;
+  }
+  ss << content[DEVICE_NAME_IDX];
 
   std::string serialized_device_info = ss.str();
 

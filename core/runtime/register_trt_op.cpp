@@ -27,18 +27,17 @@ bool is_switch_required(const CudaDevice& curr_device, const CudaDevice& conf_de
     if (curr_device.device_name != conf_device.device_name) {
       LOG_WARNING(
           "Program compiled for " << conf_device.device_name << " but current CUDA device is " << curr_device
-                                  << ". Switching the device context");
+                                  << ". Attempting to switch device context for better compatibility");
       return true;
     }
   }
 
-  // REVIEW: This shouldnt be a reason to switch GPU
-  // if (curr_device.id != conf_device.id) {
-  //   LOG_WARNING(
-  //       "Configured Device ID: " << conf_device.id << " is different that current device ID: " << curr_device.id
-  //                                << ". Switching context");
-  //   return true;
-  // }
+  if (curr_device.id != conf_device.id) {
+    LOG_WARNING(
+        "Configured Device ID: " << conf_device.id << " is different that current device ID: " << curr_device.id
+                                 << ". Moving input tensors to device: " << conf_device.id);
+    return true;
+  }
 
   return false;
 }

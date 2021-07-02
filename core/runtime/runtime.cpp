@@ -13,7 +13,7 @@ void set_cuda_device(CudaDevice& cuda_device) {
 }
 
 CudaDevice get_current_device() {
-  int device = 0;
+  int device = -1;
   TRTORCH_CHECK(
       (cudaGetDevice(reinterpret_cast<int*>(&device)) == cudaSuccess),
       "Unable to get current device (runtime.get_current_device)");

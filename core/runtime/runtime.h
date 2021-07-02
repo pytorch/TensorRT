@@ -18,7 +18,6 @@ struct CudaDevice {
   int64_t major; // CUDA compute major version
   int64_t minor; // CUDA compute minor version
   nvinfer1::DeviceType device_type;
-  size_t device_name_len;
   std::string device_name;
 
   CudaDevice();
