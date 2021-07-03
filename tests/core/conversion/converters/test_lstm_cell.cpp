@@ -44,8 +44,8 @@ TEST(Converters, ATenGRUCellConvertsCorrectlyWithBiasCheckHidden) {
   auto trt_b_hh = at::clone(b_hh);
 
   params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(
-      g, params, {trt_input, trt_h0, trt_w_ih, trt_w_hh, trt_b_ih, trt_b_hh});
+  auto trt_results =
+      trtorch::tests::util::RunGraphEngine(g, params, {trt_input, trt_h0, trt_w_ih, trt_w_hh, trt_b_ih, trt_b_hh});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-5));
 }
