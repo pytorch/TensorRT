@@ -19,8 +19,11 @@ namespace passes {
 void replaceLinearWithBiasNonePattern(std::shared_ptr<torch::jit::Graph> graph) {
   // Define the decomposition function for aten::linear for the case where bias (mat2) is None.
   static torch::jit::CompilationUnit decompose_funcs(R"SCRIPT(
-     def linear(self: Tensor, mat1: Tensor, mat2: Tensor):
+     def linear_bias_none(self: Tensor, mat1: Tensor, mat2: Tensor) -> Tensor:
          return torch.matmul(self, mat1.t())
+
+     def linear(self: Tensor, mat1: Tensor, mat2: Tensor) -> Tensor:
+         return torch.matmul(self, torch.transpose(mat1, 0, 1)) + mat2
      )SCRIPT");
 
   // Iterate through nodes and search for aten::linear nodes where bias is not a Tensor (includes bias=None case)
@@ -29,12 +32,19 @@ void replaceLinearWithBiasNonePattern(std::shared_ptr<torch::jit::Graph> graph) 
     auto n = *it;
     if (n->kind().toQualString() == std::string("aten::linear")) {
       auto input_values = n->inputs();
+      std::cout << "WEIGHT CONST ?: " << input_values[1]->type()->isSubtypeOf(c10::TensorType::get()) << std::endl;
       // input_values[2] is the bias. If none, replace it with the decomposed linear graph.
       if (input_values[2]->type()->isSubtypeOf(c10::TensorType::get())) {
-        continue;
-      } else {
+        // continue;
         torch::jit::WithInsertPoint guard(*it);
         std::shared_ptr<torch::jit::Graph> d_graph = decompose_funcs.get_function("linear").graph();
+        torch::jit::Value* new_output = insertGraph(*it->owningGraph(), *d_graph, it->inputs()).at(0);
+        new_output->setType(it->output()->type());
+        it->output()->replaceAllUsesWith(new_output);
+        it.destroyCurrent();
+      } else {
+        torch::jit::WithInsertPoint guard(*it);
+        std::shared_ptr<torch::jit::Graph> d_graph = decompose_funcs.get_function("linear_bias_none").graph();
         torch::jit::Value* new_output = insertGraph(*it->owningGraph(), *d_graph, it->inputs()).at(0);
         new_output->setType(it->output()->type());
         it->output()->replaceAllUsesWith(new_output);
