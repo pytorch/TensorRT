@@ -117,12 +117,31 @@ auto layer_norm_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().
       }
 
       auto power = Weights(ctx, at::ones(expand_size));
-      auto scale_nd = ctx->net->addScaleNd(
-          *div_out, nvinfer1::ScaleMode::kELEMENTWISE, beta_weights.data, gamma_weights.data, power.data, 1);
-      scale_nd->setName((util::node_info(n) + "_scale_nd").c_str());
-      auto scale_nd_out = scale_nd->getOutput(0);
 
-      ctx->AssociateValueAndTensor(n->outputs()[0], scale_nd_out);
+      auto gamma_tensor = ctx->net->addConstant(gamma_weights.shape, gamma_weights.data)->getOutput(0);
+      auto scale_l = add_elementwise(
+          ctx, nvinfer1::ElementWiseOperation::kPROD, div_out, gamma_tensor, (util::node_info(n) + "_scale").c_str());
+
+      auto beta_tensor = ctx->net->addConstant(beta_weights.shape, beta_weights.data)->getOutput(0);
+      auto shift_l = add_elementwise(
+          ctx,
+          nvinfer1::ElementWiseOperation::kSUM,
+          scale_l->getOutput(0),
+          beta_tensor,
+          (util::node_info(n) + "_shift").c_str());
+
+      auto power_tensor = ctx->net->addConstant(power.shape, power.data)->getOutput(0);
+      auto power_l = add_elementwise(
+          ctx,
+          nvinfer1::ElementWiseOperation::kPOW,
+          shift_l->getOutput(0),
+          power_tensor,
+          (util::node_info(n) + "_power").c_str());
+
+      power_l->setName((util::node_info(n) + "_scale_nd").c_str());
+      auto power_l_out = power_l->getOutput(0);
+
+      ctx->AssociateValueAndTensor(n->outputs()[0], power_l_out);
       return true;
     }});
 

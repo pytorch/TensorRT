@@ -35,6 +35,10 @@ lowering_test(
     name = "test_silu_to_sigmoid_multiplication",
 )
 
+lowering_test(
+    name = "test_unpack_hardswish",
+)
+
 test_suite(
     name = "lowering_tests",
     tests = [
@@ -44,5 +48,6 @@ test_suite(
         ":test_remove_detach_pass",
         ":test_remove_dropout_pass",
         ":test_remove_to",
+        ":test_unpack_hardswish"
     ],
 )
