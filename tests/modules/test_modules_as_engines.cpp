@@ -1,3 +1,4 @@
+#include "core/runtime/runtime.h"
 #include "module_test.h"
 
 TEST_P(ModuleTests, ModuleAsEngineIsClose) {
@@ -34,8 +35,13 @@ TEST_P(ModuleTests, ModuleToEngineToModuleIsClose) {
     input_ranges.push_back(in.sizes());
   }
 
+  auto compile_spec = trtorch::CompileSpec({input_ranges});
+  int device_id = 0;
+  cudaGetDevice(&device_id);
+  compile_spec.device.device_type = trtorch::CompileSpec::Device::DeviceType::kGPU;
+  compile_spec.device.gpu_id = device_id;
   auto engine = trtorch::ConvertGraphToTRTEngine(mod, "forward", input_ranges);
-  auto trt_mod = trtorch::EmbedEngineInNewModule(engine);
+  auto trt_mod = trtorch::EmbedEngineInNewModule(engine, compile_spec.device);
 
   torch::jit::IValue trt_results_ivalues = trtorch::tests::util::RunModuleForward(mod, inputs_ivalues);
   std::vector<at::Tensor> trt_results;
