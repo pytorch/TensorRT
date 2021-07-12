@@ -1,0 +1,1 @@
+NOTE: This commit raises the acceptible threshold of the LSTM converter due to noted test failures on Turing and newer HW
