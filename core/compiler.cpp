@@ -223,7 +223,7 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
           auto engine = conversion::ConvertBlockToEngine(seg_block.block(), convert_cfg, named_params);
           auto temp_g = std::make_shared<torch::jit::Graph>();
           auto device_spec = convert_cfg.engine_settings.device;
-          auto cuda_device = runtime::get_device_info(device_spec.gpu_id, device_spec.device_type);
+          auto cuda_device = runtime::CudaDevice(device_spec.gpu_id, device_spec.device_type);
           AddEngineToGraph(new_mod, temp_g, engine, cuda_device, trt_engine_id.str(), true);
 
           seg_block.update_graph(temp_g);
@@ -265,7 +265,7 @@ torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod, C
       auto engine = ConvertGraphToTRTEngine(mod, method.name(), cfg);
       auto new_g = std::make_shared<torch::jit::Graph>();
       auto device_spec = cfg.convert_info.engine_settings.device;
-      auto cuda_device = runtime::get_device_info(device_spec.gpu_id, device_spec.device_type);
+      auto cuda_device = runtime::CudaDevice(device_spec.gpu_id, device_spec.device_type);
       AddEngineToGraph(new_mod, new_g, engine, cuda_device);
       auto new_method = new_mod._ivalue()->compilation_unit()->create_function(method.name(), new_g);
       auto schema = util::GenerateGraphSchema(new_method->name(), new_g);
@@ -277,9 +277,7 @@ torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod, C
   return new_mod;
 }
 
-torch::jit::script::Module EmbedEngineInNewModule(
-    const std::string& engine,
-    trtorch::core::runtime::CudaDevice cuda_device) {
+torch::jit::script::Module EmbedEngineInNewModule(const std::string& engine, runtime::CudaDevice cuda_device) {
   std::ostringstream engine_id;
   engine_id << reinterpret_cast<const int*>(&engine);
   torch::jit::script::Module new_mod("tensorrt_engine_mod_" + engine_id.str());

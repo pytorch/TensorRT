@@ -84,7 +84,7 @@ core::runtime::CudaDevice to_internal_cuda_device(CompileSpec::Device device) {
     default:
       device_type = nvinfer1::DeviceType::kGPU;
   }
-  return core::runtime::get_device_info(device.gpu_id, device_type);
+  return core::runtime::CudaDevice(device.gpu_id, device_type);
 }
 
 core::CompileSpec to_internal_compile_spec(CompileSpec external) {
