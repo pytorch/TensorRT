@@ -53,7 +53,7 @@ nvinfer1::ITensor* addUnpadding(
     TRTORCH_CHECK(shuffle_layer, "Unable to create shuffle layer");
     shuffle_layer->setReshapeDimensions(newDims);
     shuffle_layer->setZeroIsPlaceholder(use_zeros);
-    shuffle_layer->setName((util::node_info(n) + " [Reshape to " + util::toStr(newDims) + "]").c_str());
+    shuffle_layer->setName((util::node_info(n) + " [Reshape from " + util::toStr(dims) + "]").c_str());
     return shuffle_layer->getOutput(0);
   } else {
     return tensor;
