@@ -29,8 +29,8 @@ TRTEngine::TRTEngine(std::string mod_name, std::string serialized_engine)
           std::string("[") + mod_name + std::string("_engine] - "),
           util::logging::get_logger().get_reportable_severity(),
           util::logging::get_logger().get_is_colored_output_on()) {
-  rt = nvinfer1::createInferRuntime(logger);
 
+  rt = nvinfer1::createInferRuntime(logger);
   name = slugify(mod_name) + "_engine";
 
   cuda_engine = rt->deserializeCudaEngine(serialized_engine.c_str(), serialized_engine.size());
@@ -69,9 +69,10 @@ TRTEngine& TRTEngine::operator=(const TRTEngine& other) {
 }
 
 TRTEngine::~TRTEngine() {
-  exec_ctx->destroy();
-  cuda_engine->destroy();
-  rt->destroy();
+   delete exec_ctx;
+   delete cuda_engine;
+   delete rt;
+
 }
 
 // TODO: Implement a call method

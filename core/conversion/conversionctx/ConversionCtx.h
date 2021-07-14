@@ -30,7 +30,7 @@ struct BuilderSettings {
   bool strict_types = false;
   bool truncate_long_and_double = false;
   Device device;
-  nvinfer1::EngineCapability capability = nvinfer1::EngineCapability::kDEFAULT;
+  nvinfer1::EngineCapability capability = nvinfer1::EngineCapability::kSTANDARD;
   nvinfer1::IInt8Calibrator* calibrator = nullptr;
   uint64_t num_min_timing_iters = 2;
   uint64_t num_avg_timing_iters = 1;
