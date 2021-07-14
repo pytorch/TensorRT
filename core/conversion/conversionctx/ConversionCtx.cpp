@@ -129,9 +129,9 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
 }
 
 ConversionCtx::~ConversionCtx() {
-  builder->destroy();
-  net->destroy();
-  cfg->destroy();
+  delete builder;
+  delete net;
+  delete cfg;
   for (auto ptr : builder_resources) {
     free(ptr);
   }
@@ -149,14 +149,11 @@ torch::jit::IValue* ConversionCtx::AssociateValueAndIValue(const torch::jit::Val
 }
 
 std::string ConversionCtx::SerializeEngine() {
-  auto engine = builder->buildEngineWithConfig(*net, *cfg);
-  if (!engine) {
-    TRTORCH_THROW_ERROR("Building TensorRT engine failed");
+  auto serialized_network = builder->buildSerializedNetwork(*net, *cfg);
+  if (!serialized_network) {
+    TRTORCH_THROW_ERROR("Building serialized network failed in TensorRT");
   }
-  auto serialized_engine = engine->serialize();
-  engine->destroy();
-  auto engine_str = std::string((const char*)serialized_engine->data(), serialized_engine->size());
-  serialized_engine->destroy();
+  auto engine_str = std::string((const char*)serialized_network->data(), serialized_network->size());
   return engine_str;
 }
 

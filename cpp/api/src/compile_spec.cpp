@@ -386,14 +386,14 @@ core::CompileSpec to_internal_compile_spec(CompileSpec external) {
 
   switch (external.capability) {
     case CompileSpec::EngineCapability::kSAFE_GPU:
-      internal.convert_info.engine_settings.capability = nvinfer1::EngineCapability::kSAFE_GPU;
+      internal.convert_info.engine_settings.capability = nvinfer1::EngineCapability::kSAFETY;
       break;
     case CompileSpec::EngineCapability::kSAFE_DLA:
-      internal.convert_info.engine_settings.capability = nvinfer1::EngineCapability::kSAFE_DLA;
+      internal.convert_info.engine_settings.capability = nvinfer1::EngineCapability::kDLA_STANDALONE;
       break;
     case CompileSpec::EngineCapability::kDEFAULT:
     default:
-      internal.convert_info.engine_settings.capability = nvinfer1::EngineCapability::kDEFAULT;
+      internal.convert_info.engine_settings.capability = nvinfer1::EngineCapability::kSTANDARD;
   }
 
   internal.convert_info.engine_settings.device.gpu_id = external.device.gpu_id;
