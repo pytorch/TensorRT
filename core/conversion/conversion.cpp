@@ -428,19 +428,15 @@ std::string ConvertBlockToEngine(const torch::jit::Block* b, ConversionInfo buil
   return engine;
 }
 
-std::set<std::pair<std::string, std::string>> GetUnsupportedOpsInBlock(const torch::jit::Block* b) {
-  std::set<std::pair<std::string, std::string>> unsupported_ops;
+std::unordered_set<c10::OperatorName> GetUnsupportedOpsInBlock(const torch::jit::Block* b) {
+  std::unordered_set<c10::OperatorName> unsupported_ops;
   for (const auto n : b->nodes()) {
     if (n->kind() != torch::jit::prim::Loop && n->kind() != torch::jit::prim::If && !OpSupported(n)) {
       auto schema = n->maybeSchema();
       TRTORCH_CHECK(
           schema,
           "Unable to get schema for Node " << util::node_info(n) << " (conversion.VerifyCoverterSupportForBlock)");
-      std::stringstream ss;
-      ss << *schema;
-      std::string pytorch_code = trtorch::core::util::GetPyTorchSourceCode(n);
-      auto current_unsupported_op = std::make_pair(ss.str(), pytorch_code);
-      unsupported_ops.insert(current_unsupported_op);
+      unsupported_ops.insert(schema->operator_name());
     }
     for (const auto sub_b : n->blocks()) {
       auto sub_b_unsupported_ops = GetUnsupportedOpsInBlock(sub_b);
@@ -482,12 +478,24 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b) {
     unsupported_msg << "Method requested cannot be compiled by TRTorch.\nUnsupported operators listed below:"
                     << std::endl;
     for (auto s : unsupported_ops) {
-      unsupported_msg << "  - " << s.first << std::endl;
-      unsupported_msg << "    Related PyTorch code:" << std::endl << s.second << std::endl;
+      unsupported_msg << "  - " << s << std::endl;
     }
     unsupported_msg << "You can either implement converters for these ops in your application or request implementation"
                     << std::endl;
     unsupported_msg << "https://www.github.com/nvidia/TRTorch/issues" << std::endl;
+    unsupported_msg << std::endl << "In Module:" << std::endl;
+
+    for (const auto n : b->nodes()) {
+      auto schema = n->maybeSchema();
+      if (schema){
+        for (const auto& x: unsupported_ops) {
+          if (x == schema->operator_name()) {
+            unsupported_msg << "  Unsupported operator: " << *schema << std::endl;
+            unsupported_msg << trtorch::core::util::GetPyTorchSourceCode(n) << std::endl;
+          }
+        }
+      }
+    }
     LOG_ERROR(unsupported_msg.str());
     return false;
   }
