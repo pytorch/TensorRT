@@ -206,9 +206,14 @@ bool InterpolatePlugin::supportsFormatCombination(
     const nvinfer1::PluginTensorDesc* inOut,
     int nbInputs,
     int nbOutputs) noexcept {
+<<<<<<< HEAD
   if (nbInputs != 1) {
     LOG_ERROR("Expected a single tensor as input to interpolate plugin");
   }
+=======
+  TRTORCH_ASSERT(nbInputs == 1, "Expected a single tensor as input to interpolate plugin");
+
+>>>>>>> chore: Linter fixes
   if (mode_ == "adaptive_max_pool2d") {
     if (nbOutputs != 2) {
       LOG_ERROR("Expected 2 tensors as output to interpolate plugin");
