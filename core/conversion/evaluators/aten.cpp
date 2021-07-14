@@ -576,6 +576,21 @@ auto aten_registrations TRTORCH_UNUSED =
                             Layout? layout=None, Device? device=None, bool? pin_memory=None) -> (Tensor))SIG",
                         R"SIG(aten::arange.start_step(Scalar start, Scalar end, Scalar step, *, ScalarType? dtype=None,
                         Layout? layout=None, Device? device=None, bool? pin_memory=None) -> (Tensor))SIG",
+                    })})
+        .evaluator({c10::Symbol::fromQualString("aten::clone"),
+                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+                      if (args.at(n->input(0)).isITensor()) {
+                        auto tensor_holder = TensorContainer();
+                        tensor_holder.hold_tensor(args.at(n->input(0)).ITensor());
+                        auto el = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
+                        return std::move(el);
+                      } else {
+                        auto el = args.at(n->input(0)).IValue();
+                        return std::move(*el);
+                      }       
+                    },
+                    EvalOptions().validSchemas({
+                        R"SIG(aten::clone(Tensor self, *, int? memory_format=None) -> (Tensor))SIG",
                     })});
 } // namespace
 } // namespace evaluators
