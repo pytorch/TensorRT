@@ -30,7 +30,8 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
   LOG_DEBUG("out_padding: " << out_padding);
   LOG_DEBUG("groups: " << groups);
 
-  // Expand spatial dims from 1D to 2D if needed
+  TRTORCH_CHECK(orig_dims.nbDims > 2 , "Unable to create convolution layer from node: " << *n);
+
   bool expandDims = (orig_dims.nbDims < 4);
   if (expandDims) {
     in = addPadding(ctx, n, in, 4);
