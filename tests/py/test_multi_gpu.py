@@ -58,9 +58,64 @@ class TestMultiGpuSwitching(ModelTestCase):
         self.assertTrue(same < 2e-3)
 
 
+class TestMultiGpuSerializeDeserializeSwitching(ModelTestCase):
+
+    def setUp(self):
+        if torch.cuda.device_count() < 2:
+            self.fail("Test is not relevant for this platform since number of available CUDA devices is less than 2")
+
+        self.target_gpu = 0
+        trtorch.set_device(0)
+        self.input = torch.randn((1, 3, 224, 224)).to("cuda:0")
+        self.model = self.model.to("cuda:0")
+        self.traced_model = torch.jit.trace(self.model, [self.input])
+        self.scripted_model = torch.jit.script(self.model)
+
+    def test_compile_traced(self):
+        trtorch.set_device(0)
+        compile_spec = {
+            "input_shapes": [self.input.shape],
+            "device": {
+                "device_type": trtorch.DeviceType.GPU,
+                "gpu_id": self.target_gpu,
+                "dla_core": 0,
+                "allow_gpu_fallback": False,
+                "disable_tf32": False
+            }
+        }
+
+        trt_mod = trtorch.compile(self.traced_model, compile_spec)
+        # Changing the device ID deliberately. It should still run on correct device ID by context switching
+        trtorch.set_device(1)
+        same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
+        self.assertTrue(same < 2e-3)
+
+    def test_compile_script(self):
+        trtorch.set_device(0)
+        compile_spec = {
+            "input_shapes": [self.input.shape],
+            "device": {
+                "device_type": trtorch.DeviceType.GPU,
+                "gpu_id": self.target_gpu,
+                "dla_core": 0,
+                "allow_gpu_fallback": False,
+                "disable_tf32": False
+            }
+        }
+
+        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
+        # Changing the device ID deliberately. It should still run on correct device ID by context switching
+        trtorch.set_device(1)
+        same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
+        self.assertTrue(same < 2e-3)
+
+
 def test_suite():
     suite = unittest.TestSuite()
     suite.addTest(TestMultiGpuSwitching.parametrize(TestMultiGpuSwitching, model=models.resnet18(pretrained=True)))
+    suite.addTest(
+        TestMultiGpuSerializeDeserializeSwitching.parametrize(TestMultiGpuSwitching,
+                                                              model=models.resnet18(pretrained=True)))
 
     return suite
 

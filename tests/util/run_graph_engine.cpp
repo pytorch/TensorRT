@@ -54,7 +54,8 @@ std::vector<core::ir::InputRange> toInputRangesDynamic(std::vector<at::Tensor> t
 
 std::vector<at::Tensor> RunEngine(std::string& eng, std::vector<at::Tensor> inputs) {
   LOG_DEBUG("Running TRT version");
-  auto engine_ptr = c10::make_intrusive<trtorch::core::runtime::TRTEngine>("test_engine", eng);
+  auto cuda_device = core::runtime::CudaDevice(0, nvinfer1::DeviceType::kGPU);
+  auto engine_ptr = c10::make_intrusive<trtorch::core::runtime::TRTEngine>("test_engine", eng, cuda_device);
   auto outputs = trtorch::core::runtime::execute_engine(inputs, engine_ptr);
   return outputs;
 }
