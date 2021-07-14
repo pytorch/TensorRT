@@ -63,9 +63,9 @@ torch::jit::Module LowerModule(const torch::jit::script::Module& mod) {
 std::pair<std::shared_ptr<torch::jit::Graph>, std::vector<torch::jit::IValue>> Lower(
     const torch::jit::script::Module& mod,
     std::string method_name) {
-  auto lowered_mod = LowerModule(mod);
+  auto lowered_mod = mod; // LowerModule(mod);
   auto g = lowered_mod.get_method(method_name).graph();
-  LOG_GRAPH(*g);
+  LOG_INFO(*g);
 
   // Go through TRTorch Lowering to reformat graph to be conversion friendly
   // and also segment for accelerators and executors (TRT-DLA, TRT-GPU, PYT)

@@ -45,13 +45,13 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
   if (args[2].IValue()->isTensor()) {
     bias = Weights(ctx, args[2].unwrapToTensor());
   } else {
-    bias = Weights(); //nvinfer1::Weights{nvinfer1::DataType::kFLOAT, nullptr, 0};
+    bias = Weights(); // nvinfer1::Weights{nvinfer1::DataType::kFLOAT, nullptr, 0};
   }
 
   // Handle case when weights of conv/deconv is an ITensor. This case happens for QAT networks where
   // conv_weights -> Quantize -> Dequantize -> new_conv_weights -> conv <- input
   // new_conv_weights will be an ITensor because it is an output of Dequantize layer defined in impl/quantization.cpp
-  if (args[1].isITensor()){
+  if (args[1].isITensor()) {
     // Get the kernel tensor
     auto kernel = args[1].ITensor();
     auto kernel_dims = kernel->getDimensions();
@@ -59,7 +59,9 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
     // Make a new Dims with only the spatial dimensions.
     nvinfer1::Dims filter_dim;
     int64_t nbSpatialDims = in->getDimensions().nbDims - 2;
-    TRTORCH_CHECK(nbSpatialDims = kernel_dims.nbDims - 2, "Number of input spatial dimensions should match the kernel spatial dimensions");
+    TRTORCH_CHECK(
+        nbSpatialDims = kernel_dims.nbDims - 2,
+        "Number of input spatial dimensions should match the kernel spatial dimensions");
     filter_dim.nbDims = nbSpatialDims;
     filter_dim.d[0] = kernel_dims.d[2];
     filter_dim.d[1] = kernel_dims.d[3];
@@ -68,9 +70,9 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
     auto kernel_weights = nvinfer1::Weights{nvinfer1::DataType::kFLOAT, nullptr, 0};
 
     nvinfer1::ILayer* layer = nullptr;
-    if (transposed){
-      nvinfer1::IDeconvolutionLayer* deconvLayer
-            = ctx->net->addDeconvolutionNd(*in, kernel_dims.d[0], filter_dim, kernel_weights, bias.data);
+    if (transposed) {
+      nvinfer1::IDeconvolutionLayer* deconvLayer =
+          ctx->net->addDeconvolutionNd(*in, kernel_dims.d[0], filter_dim, kernel_weights, bias.data);
       deconvLayer->setStrideNd(stride);
       deconvLayer->setDilationNd(dilation);
       deconvLayer->setNbGroups(groups);
@@ -79,9 +81,9 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
       deconvLayer->setInput(1, *kernel);
       TRTORCH_CHECK(deconvLayer, "Unable to create deconv layer with non-const weights from node: " << *n);
       layer = deconvLayer;
-    } else{
-      nvinfer1::IConvolutionLayer* convLayer
-            = ctx->net->addConvolutionNd(*in, kernel_dims.d[0], filter_dim, kernel_weights, bias.data);
+    } else {
+      nvinfer1::IConvolutionLayer* convLayer =
+          ctx->net->addConvolutionNd(*in, kernel_dims.d[0], filter_dim, kernel_weights, bias.data);
       convLayer->setStrideNd(stride);
       convLayer->setPaddingMode(nvinfer1::PaddingMode::kCAFFE_ROUND_DOWN);
       convLayer->setPaddingNd(padding);

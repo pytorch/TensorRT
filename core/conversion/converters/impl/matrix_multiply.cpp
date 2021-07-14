@@ -1,3 +1,4 @@
+#include <torch/torch.h>
 #include "core/conversion/converters/converter_util.h"
 #include "core/conversion/converters/converters.h"
 #include "core/util/prelude.h"
@@ -71,6 +72,60 @@ auto mm_registrations TRTORCH_UNUSED =
                auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], mm_layer->getOutput(0));
 
                LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+               return true;
+             }})
+        .pattern(
+            {"aten::addmm(Tensor self, Tensor mat1, Tensor mat2, *, Scalar beta=1, Scalar alpha=1) -> (Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               auto self = args[0].ITensorOrFreeze(ctx);
+               auto mat1 = args[1].ITensorOrFreeze(ctx);
+               auto mat2 = args[2].ITensorOrFreeze(ctx);
+               auto beta = args[4].unwrapToScalar().to<float>();
+               auto betaTensor = tensor_to_const(ctx, torch::tensor({beta}));
+               auto alpha = args[5].unwrapToScalar().to<float>();
+               auto alphaTensor = tensor_to_const(ctx, torch::tensor({alpha}));
+
+               // Ensure self and other tensors have same nbDims by expanding the dimensions (from 0 axis) if
+               // necessary.
+               if (mat1->getDimensions().nbDims < mat2->getDimensions().nbDims) {
+                 mat1 = addPadding(ctx, n, mat1, mat2->getDimensions().nbDims, false, false);
+               } else {
+                 mat2 = addPadding(ctx, n, mat2, mat1->getDimensions().nbDims, false, false);
+               }
+
+               auto mat2_dims = mat2->getDimensions();
+               nvinfer1::Dims transposed_mat2_dims;
+               for (int i = mat2_dims.nbDims - 1; i >= 0; i--) {
+                 transposed_mat2_dims.d[i] = mat2_dims.d[mat2_dims.nbDims - 1 - i];
+               }
+               auto shuffle_layer = ctx->net->addShuffle(*mat2);
+               shuffle_layer->setReshapeDimensions(transposed_mat2_dims);
+               mat2 = shuffle_layer->getOutput(0);
+
+               auto mm_layer = ctx->net->addMatrixMultiply(
+                   *mat1, nvinfer1::MatrixOperation::kNONE, *mat2, nvinfer1::MatrixOperation::kNONE);
+               TRTORCH_CHECK(mm_layer, "Unable to create matrix multiplication layer in node: " << *n);
+               auto mm_scale_layer = add_elementwise(
+                   ctx,
+                   nvinfer1::ElementWiseOperation::kPROD,
+                   mm_layer->getOutput(0),
+                   alphaTensor,
+                   util::node_info(n) + "_alphaScale");
+               TRTORCH_CHECK(mm_scale_layer, "Unable to create alpha scaling layer in node: " << *n);
+               auto beta_scale_layer = add_elementwise(
+                   ctx, nvinfer1::ElementWiseOperation::kPROD, self, betaTensor, util::node_info(n) + "_betaScale");
+               TRTORCH_CHECK(beta_scale_layer, "Unable to create beta scaling layer in node: " << *n);
+               auto add_mm_layer = add_elementwise(
+                   ctx,
+                   nvinfer1::ElementWiseOperation::kSUM,
+                   beta_scale_layer->getOutput(0),
+                   mm_scale_layer->getOutput(0),
+                   util::node_info(n));
+               TRTORCH_CHECK(add_mm_layer, "Unable to create addmm layer in node: " << *n);
+
+               auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], add_mm_layer->getOutput(0));
+
+               LOG_DEBUG("[AddMM layer] Output tensor shape: " << out_tensor->getDimensions());
                return true;
              }});
 } // namespace

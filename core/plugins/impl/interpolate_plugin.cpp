@@ -105,7 +105,6 @@ std::vector<int64_t> InterpolatePlugin::getOutputSize() {
   return size_;
 }
 
-
 int InterpolatePlugin::getNbOutputs() const noexcept {
   if (mode_ == "adaptive_max_pool2d") {
     return 2;
@@ -170,7 +169,6 @@ nvinfer1::DataType InterpolatePlugin::getOutputDataType(int index, const nvinfer
   return nvinfer1::DataType::kFLOAT;
 }
 
-
 int InterpolatePlugin::initialize() noexcept {
   return 0;
 }
@@ -208,7 +206,6 @@ bool InterpolatePlugin::supportsFormatCombination(
     const nvinfer1::PluginTensorDesc* inOut,
     int nbInputs,
     int nbOutputs) noexcept {
-
   TRTORCH_ASSERT(nbInputs == 1, "Expected a single tensor as input to interpolate plugin");
 
   if (mode_ == "adaptive_max_pool2d") {

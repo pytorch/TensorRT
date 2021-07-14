@@ -430,9 +430,14 @@ auto aten_registrations TRTORCH_UNUSED =
         .evaluator({c10::Symbol::fromQualString("aten::t"),
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                       auto tensor_var = args.at(n->input(0));
-                      if (tensor_var.IValue()->isTensor()) {
+                      if (tensor_var.isIValue() && tensor_var.IValue()->isTensor()) {
                         auto tensor = tensor_var.unwrapToTensor();
                         return tensor.t();
+                      } else if (tensor_var.isITensor()) {
+                        auto tensor_holder = TensorContainer();
+                        tensor_holder.hold_tensor(tensor_var.ITensor());
+                        auto ival = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
+                        return ival;
                       } else {
                         TRTORCH_THROW_ERROR("Unimplemented data type for aten::t evaluator: ITensor");
                         return {};

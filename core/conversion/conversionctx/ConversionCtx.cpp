@@ -72,7 +72,8 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
       input_type = nvinfer1::DataType::kFLOAT;
       // TRTORCH_CHECK(
       //     settings.calibrator != nullptr,
-      //     "Requested inference in INT8 but no calibrator provided, set the ptq_calibrator field in the CompileSpec struct with your calibrator");
+      //     "Requested inference in INT8 but no calibrator provided, set the ptq_calibrator field in the CompileSpec
+      //     struct with your calibrator");
       // cfg->setInt8Calibrator(settings.calibrator);
       break;
     case nvinfer1::DataType::kFLOAT:
