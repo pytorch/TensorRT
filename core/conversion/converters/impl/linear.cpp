@@ -40,30 +40,6 @@ auto linear_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().patt
          in = in_shuffle->getOutput(0);
        }
 
-       // Get the bias
-       Weights bias;
-       if(!args[2].IValue()->isNone()){
-         bias = Weights(ctx, args[2].IValue()->toTensor());
-       }else {
-         bias = Weights();
-       }
-
-       // Handle case when weights of conv/deconv is an ITensor. This case happens for QAT networks where
-       // conv_weights -> Quantize -> Dequantize -> new_conv_weights -> conv <- input
-       // new_conv_weights will be an ITensor because it is an output of Dequantize layer defined in impl/quantization.cpp
-       if(args[1].isITensor()){
-         auto kernel_tensor = args[1].ITensor();
-         auto kernel_dims = args[1].ITensor()->getDimensions();
-         // Initialize a dummy constant kernel to pass it to INetwork->addConvolutionNd/addDeconvolutionNd API.
-         auto kernel_weights = nvinfer1::Weights{nvinfer1::DataType::kFLOAT, nullptr, 0};
-         auto fc_layer = ctx->net->addFullyConnected(*in, kernel_dims.d[0], kernel_weights, bias.data);
-         fc_layer->setInput(1, *kernel_tensor);
-         fc_layer->setName(util::node_info(n).c_str());
-         auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], fc_layer->getOutput(0));
-         LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
-         return true;
-       }
-
        auto w_tensor = args[1].IValue()->toTensor();
        Weights w = Weights(ctx, w_tensor);
 

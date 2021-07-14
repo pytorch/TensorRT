@@ -72,7 +72,6 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
         if (settings.calibrator == nullptr) {
           LOG_INFO("INT8 kernels are enabled but not calibrator was provided, assuming source model was trained quantization aware");
         }
-        cfg->setInt8Calibrator(settings.calibrator);
         break;
       case nvinfer1::DataType::kFLOAT:
         break;

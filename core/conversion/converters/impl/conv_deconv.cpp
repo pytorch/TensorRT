@@ -11,10 +11,8 @@ namespace impl {
 namespace {
 
 bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) {
-  // Input to conv/deconv
-  auto in = args[0].ITensor();
-
-  // Conv /deconv parameters
+  auto in = args[0].ITensor(); // assumes non-static input Tensor
+  auto w = Weights(ctx, args[1].unwrapToTensor());
   auto stride = util::toDims(args[3].unwrapToIntList());
   auto padding = util::toDims(args[4].unwrapToIntList());
   auto dilation = util::toDims(args[5].unwrapToIntList());
@@ -22,84 +20,6 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
   auto out_padding = util::toDims(args[7].unwrapToIntList());
   int64_t groups = args[8].unwrapToInt();
 
-  // Reshape the parameters to 2D if needed
-  if (stride.nbDims == 1) {
-    stride = util::unsqueezeDims(stride, 1, 1);
-    LOG_DEBUG("Reshaped stride: " << stride);
-  }
-  if (dilation.nbDims == 1) {
-    dilation = util::unsqueezeDims(dilation, 1, 1);
-    LOG_DEBUG("Reshaped dilation: " << dilation);
-  }
-  if (padding.nbDims == 1) {
-    padding = util::unsqueezeDims(padding, 1, 0);
-    LOG_DEBUG("Reshaped padding: " << padding);
-  }
-  if (out_padding.nbDims == 1) {
-    out_padding = util::unsqueezeDims(out_padding, 1, 0);
-    LOG_DEBUG("Reshaped out_padding: " << out_padding);
-  }
-
-  // Get bias tensor or initialize it to zeros.
-  Weights bias;
-  if (args[2].IValue()->isTensor()) {
-    bias = Weights(ctx, args[2].unwrapToTensor());
-  } else {
-    bias = Weights(); //nvinfer1::Weights{nvinfer1::DataType::kFLOAT, nullptr, 0};
-  }
-
-  // Handle case when weights of conv/deconv is an ITensor. This case happens for QAT networks where
-  // conv_weights -> Quantize -> Dequantize -> new_conv_weights -> conv <- input
-  // new_conv_weights will be an ITensor because it is an output of Dequantize layer defined in impl/quantization.cpp
-  if (args[1].isITensor()){
-    // Get the kernel tensor
-    auto kernel = args[1].ITensor();
-    auto kernel_dims = kernel->getDimensions();
-
-    // Make a new Dims with only the spatial dimensions.
-    nvinfer1::Dims filter_dim;
-    int64_t nbSpatialDims = in->getDimensions().nbDims - 2;
-    TRTORCH_CHECK(nbSpatialDims = kernel_dims.nbDims - 2, "Number of input spatial dimensions should match the kernel spatial dimensions");
-    filter_dim.nbDims = nbSpatialDims;
-    filter_dim.d[0] = kernel_dims.d[2];
-    filter_dim.d[1] = kernel_dims.d[3];
-
-    // Initialize a dummy constant kernel to pass it to INetwork->addConvolutionNd/addDeconvolutionNd API.
-    auto kernel_weights = nvinfer1::Weights{nvinfer1::DataType::kFLOAT, nullptr, 0};
-
-    nvinfer1::ILayer* layer = nullptr;
-    if (transposed){
-      nvinfer1::IDeconvolutionLayer* deconvLayer
-            = ctx->net->addDeconvolutionNd(*in, kernel_dims.d[0], filter_dim, kernel_weights, bias.data);
-      deconvLayer->setStrideNd(stride);
-      deconvLayer->setDilationNd(dilation);
-      deconvLayer->setNbGroups(groups);
-      deconvLayer->setPaddingNd(padding);
-      // Set deconv kernel weights
-      deconvLayer->setInput(1, *kernel);
-      TRTORCH_CHECK(deconvLayer, "Unable to create deconv layer with non-const weights from node: " << *n);
-      layer = deconvLayer;
-    } else{
-      nvinfer1::IConvolutionLayer* convLayer
-            = ctx->net->addConvolutionNd(*in, kernel_dims.d[0], filter_dim, kernel_weights, bias.data);
-      convLayer->setStrideNd(stride);
-      convLayer->setPaddingMode(nvinfer1::PaddingMode::kCAFFE_ROUND_DOWN);
-      convLayer->setPaddingNd(padding);
-      convLayer->setPostPadding(out_padding);
-      convLayer->setDilationNd(dilation);
-      convLayer->setNbGroups(groups);
-
-      // Set conv kernel weights
-      convLayer->setInput(1, *kernel);
-      layer = convLayer;
-    }
-
-    ctx->AssociateValueAndTensor(n->outputs()[0], layer->getOutput(0));
-    LOG_DEBUG("Output tensor shape: " << layer->getOutput(0)->getDimensions());
-    return true;
-  }
-
-  auto w = Weights(ctx, args[1].unwrapToTensor());
   auto dims = in->getDimensions();
   auto orig_dims = dims;
   LOG_DEBUG("Input dims: " << orig_dims);
@@ -126,9 +46,32 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
     w.kernel_shape.d[1] = 1;
     LOG_DEBUG("Reshaped Weights: " << w);
   }
+  if (stride.nbDims == 1) {
+    stride = util::unsqueezeDims(stride, 1, 1);
+    LOG_DEBUG("Reshaped stride: " << stride);
+  }
+  if (dilation.nbDims == 1) {
+    dilation = util::unsqueezeDims(dilation, 1, 1);
+    LOG_DEBUG("Reshaped dilation: " << dilation);
+  }
+  if (padding.nbDims == 1) {
+    padding = util::unsqueezeDims(padding, 1, 0);
+    LOG_DEBUG("Reshaped padding: " << padding);
+  }
+  if (out_padding.nbDims == 1) {
+    out_padding = util::unsqueezeDims(out_padding, 1, 0);
+    LOG_DEBUG("Reshaped out_padding: " << out_padding);
+  }
 
   nvinfer1::ILayer* new_layer;
   if (transposed) {
+    Weights bias;
+    if (args[2].IValue()->isTensor()) {
+      bias = Weights(ctx, args[2].unwrapToTensor());
+    } else {
+      bias = Weights(ctx, torch::zeros(w.shape.d[1] * groups));
+    }
+
     // shape of deconvolution's weight: [in, out/groups, ...]
     auto deconv = ctx->net->addDeconvolutionNd(*in, w.shape.d[1] * groups, w.kernel_shape, w.data, bias.data);
     TRTORCH_CHECK(deconv, "Unable to create deconvolution layer from node: " << *n);
@@ -146,12 +89,12 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
 #endif
     new_layer = deconv;
   } else {
-    // Weights bias;
-    // if (args[2].IValue()->isTensor()) {
-    //   bias = Weights(ctx, args[2].unwrapToTensor());
-    // } else {
-    //   bias = Weights(ctx, torch::zeros(w.shape.d[0]));
-    // }
+    Weights bias;
+    if (args[2].IValue()->isTensor()) {
+      bias = Weights(ctx, args[2].unwrapToTensor());
+    } else {
+      bias = Weights(ctx, torch::zeros(w.shape.d[0]));
+    }
 
     // shape of convolution's weight: [out, in/groups, ...]
     auto conv = ctx->net->addConvolutionNd(*in, w.shape.d[0], w.kernel_shape, w.data, bias.data);
