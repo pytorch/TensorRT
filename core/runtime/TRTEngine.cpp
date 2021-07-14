@@ -85,10 +85,9 @@ TRTEngine& TRTEngine::operator=(const TRTEngine& other) {
 }
 
 TRTEngine::~TRTEngine() {
-   delete exec_ctx;
-   delete cuda_engine;
-   delete rt;
-
+  delete exec_ctx;
+  delete cuda_engine;
+  delete rt;
 }
 
 // TODO: Implement a call method
