@@ -360,6 +360,7 @@ TEST(Evaluators, ATenAppendWithITensorAndTensorEvaluatesCorrectly) {
 TEST(Evaluators, ATenCloneEvaluatesCorrectly) {
   const auto graph = R"IR(
       graph(%0 : Tensor):
+<<<<<<< HEAD
         %4 : None = prim::Constant()
         %5 : Tensor = aten::clone(%0, %4)
         return (%5))IR";
@@ -400,4 +401,25 @@ TEST(Evaluators, ATenCopyEvaluatesCorrectly) {
   auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {in});
 
   ASSERT_TRUE(at::equal(jit_results[0].toTensor().to(at::kCUDA), trt_results[0].toTensor()));
+=======
+        %1 : None = prim::Constant()
+        %2 : Tensor = aten::clone(%0, %1)
+        %3 : Tensor = aten::relu(%0)
+        %4 : int = prim::Constant[value=1]()
+        %5 : Tensor = aten::add(%3, %2, %4)
+        return (%5))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, &*g);
+
+  auto in = at::randint(1, 3, {224, 224}, {at::kCUDA});
+
+  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
+
+  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
+
+  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+>>>>>>> Add aten::clone converter.
 }
