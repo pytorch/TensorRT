@@ -60,9 +60,30 @@ torch::jit::Module LowerModule(const torch::jit::script::Module& mod) {
   return mod_;
 }
 
+void NotateModuleForFallback(const torch::jit::script::Module& mod, std::string method_name, std::unordered_set<std::string> forced_fallback_modules) {
+  auto named_submods = mod.named_modules();
+  int mod_count = 0;
+  for (const auto named_submod : named_submods) {
+    auto mod_name = named_submod.name;
+    if (mod_count == 0 && forced_fallback_modules.find(mod_name) != forced_fallback_modules.end()) {
+      auto g = mod.get_method(method_name).graph();
+      auto nodes = g->block()->nodes();
+      for (const auto n : nodes) {
+        n->i_(c10::Symbol::attr("to_compile"), (int64_t) false);
+      }
+    } else if (mod_count > 0) {
+      NotateModuleForFallback(named_submod, method_name, forced_fallback_modules);
+    }
+    mod_count++;
+  }
+}
+
 std::pair<std::shared_ptr<torch::jit::Graph>, std::vector<torch::jit::IValue>> Lower(
     const torch::jit::script::Module& mod,
-    std::string method_name) {
+    std::string method_name, const LowerInfo& lower_info) {
+  std::unordered_set<std::string> forced_fallback_modules(
+      lower_info.forced_fallback_modules.begin(), lower_info.forced_fallback_modules.end());
+  NotateModuleForFallback(mod, method_name, forced_fallback_modules);
   auto lowered_mod = LowerModule(mod);
   auto g = lowered_mod.get_method(method_name).graph();
   LOG_GRAPH(*g);
