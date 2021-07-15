@@ -489,8 +489,8 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b) {
 
     for (const auto n : b->nodes()) {
       auto schema = n->maybeSchema();
-      if (schema){
-        for (const auto& x: unsupported_ops) {
+      if (schema) {
+        for (const auto& x : unsupported_ops) {
           if (x.first == schema->operator_name()) {
             unsupported_msg << "  Unsupported operator: " << *schema << std::endl;
             unsupported_msg << trtorch::core::util::GetPyTorchSourceCode(n) << std::endl;
