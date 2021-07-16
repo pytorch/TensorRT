@@ -80,9 +80,9 @@ auto mm_registrations TRTORCH_UNUSED =
                auto self = args[0].ITensorOrFreeze(ctx);
                auto mat1 = args[1].ITensorOrFreeze(ctx);
                auto mat2 = args[2].ITensorOrFreeze(ctx);
-               auto beta = args[4].unwrapToScalar().to<float>();
+               auto beta = args[3].unwrapToScalar().to<float>();
                auto betaTensor = tensor_to_const(ctx, torch::tensor({beta}));
-               auto alpha = args[5].unwrapToScalar().to<float>();
+               auto alpha = args[4].unwrapToScalar().to<float>();
                auto alphaTensor = tensor_to_const(ctx, torch::tensor({alpha}));
 
                // Ensure self and other tensors have same nbDims by expanding the dimensions (from 0 axis) if
@@ -92,15 +92,6 @@ auto mm_registrations TRTORCH_UNUSED =
                } else {
                  mat2 = addPadding(ctx, n, mat2, mat1->getDimensions().nbDims, false, false);
                }
-
-               auto mat2_dims = mat2->getDimensions();
-               nvinfer1::Dims transposed_mat2_dims;
-               for (int i = mat2_dims.nbDims - 1; i >= 0; i--) {
-                 transposed_mat2_dims.d[i] = mat2_dims.d[mat2_dims.nbDims - 1 - i];
-               }
-               auto shuffle_layer = ctx->net->addShuffle(*mat2);
-               shuffle_layer->setReshapeDimensions(transposed_mat2_dims);
-               mat2 = shuffle_layer->getOutput(0);
 
                auto mm_layer = ctx->net->addMatrixMultiply(
                    *mat1, nvinfer1::MatrixOperation::kNONE, *mat2, nvinfer1::MatrixOperation::kNONE);
@@ -123,7 +114,7 @@ auto mm_registrations TRTORCH_UNUSED =
                    util::node_info(n));
                TRTORCH_CHECK(add_mm_layer, "Unable to create addmm layer in node: " << *n);
 
-               auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], add_mm_layer->getOutput(0));
+               auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], mm_layer->getOutput(0));
 
                LOG_DEBUG("[AddMM layer] Output tensor shape: " << out_tensor->getDimensions());
                return true;

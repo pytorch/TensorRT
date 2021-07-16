@@ -427,25 +427,36 @@ auto aten_registrations TRTORCH_UNUSED =
                     EvalOptions().validSchemas({
                         "aten::numel(Tensor self) -> int",
                     })})
-        .evaluator({c10::Symbol::fromQualString("aten::t"),
-                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-                      auto tensor_var = args.at(n->input(0));
-                      if (tensor_var.isIValue() && tensor_var.IValue()->isTensor()) {
-                        auto tensor = tensor_var.unwrapToTensor();
-                        return tensor.t();
-                      } else if (tensor_var.isITensor()) {
-                        auto tensor_holder = TensorContainer();
-                        tensor_holder.hold_tensor(tensor_var.ITensor());
-                        auto ival = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
-                        return ival;
-                      } else {
-                        TRTORCH_THROW_ERROR("Unimplemented data type for aten::t evaluator: ITensor");
-                        return {};
-                      }
-                    },
-                    EvalOptions().validSchemas({
-                        "aten::t(Tensor self) -> Tensor",
-                    })})
+        // .evaluator({c10::Symbol::fromQualString("aten::t"),
+        //             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+        //               auto tensor_var = args.at(n->input(0));
+        //               if (tensor_var.isIValue() && tensor_var.IValue()->isTensor()) {
+        //                 auto tensor = tensor_var.unwrapToTensor();
+        //                 return tensor.t();
+        //               } else if (tensor_var.isITensor()) {
+        //                 auto input_tensor = tensor_var.ITensor();
+        //                 auto input_dims = input_tensor->getDimensions();
+        //                 LOG_DEBUG("[aten::t] INPUT TENSOR DIMS: " << input_dims);
+        //                 // nvinfer1::Dims transposed_input_dims;
+        //                 // for (int i = input_dims.nbDims - 1; i >= 0; i--) {
+        //                 //   transposed_input_dims.d[i] = input_dims.d[input_dims.nbDims - 1 - i];
+        //                 // }
+        //                 // auto shuffle_layer = ctx->net->addShuffle(*input_tensor);
+        //                 // shuffle_layer->setReshapeDimensions(transposed_input_dims);
+        //                 // shuffle_layer->setZeroIsPlaceholder(true);
+        //                 // auto output_tensor = shuffle_layer->getOutput(0);
+        //                 auto tensor_holder = TensorContainer();
+        //                 tensor_holder.hold_tensor(input_tensor);
+        //                 auto ival = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
+        //                 return ival;
+        //               } else {
+        //                 TRTORCH_THROW_ERROR("Unimplemented data type for aten::t evaluator: ITensor");
+        //                 return {};
+        //               }
+        //             },
+        //             EvalOptions().validSchemas({
+        //                 "aten::t(Tensor self) -> Tensor",
+        //             })})
         .evaluator({c10::Symbol::fromQualString("aten::dim"),
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                       auto tensor_var = args.at(n->input(0));

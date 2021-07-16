@@ -1,3 +1,7 @@
+#include "core/lowering/lowering.h"
+#include <torch/csrc/jit/passes/inliner.h>
+#include "core/lowering/passes/passes.h"
+#include "core/util/prelude.h"
 #include "torch/csrc/jit/passes/common_subexpression_elimination.h"
 #include "torch/csrc/jit/passes/create_functional_graphs.h"
 #include "torch/csrc/jit/passes/dead_code_elimination.h"
@@ -9,10 +13,6 @@
 #include "torch/csrc/jit/passes/lower_tuples.h"
 #include "torch/csrc/jit/passes/peephole.h"
 #include "torch/csrc/jit/passes/remove_mutation.h"
-
-#include "core/lowering/lowering.h"
-#include "core/lowering/passes/passes.h"
-#include "core/util/prelude.h"
 
 namespace trtorch {
 namespace core {
@@ -65,16 +65,18 @@ std::pair<std::shared_ptr<torch::jit::Graph>, std::vector<torch::jit::IValue>> L
     std::string method_name) {
   auto lowered_mod = mod; // LowerModule(mod);
   auto g = lowered_mod.get_method(method_name).graph();
-  LOG_INFO(*g);
+  Inline(*g);
+  LOG_INFO("========INLINING : " << *g);
 
   // Go through TRTorch Lowering to reformat graph to be conversion friendly
   // and also segment for accelerators and executors (TRT-DLA, TRT-GPU, PYT)
   LOG_GRAPH("TRTorch Graph Lowering");
   lowering::LowerGraph(g);
-  //=[torch::jit::FoldConvBatchNorm2d(lowered_mod);
+
   LOG_GRAPH("LibTorch Lowering");
   auto graph_and_ivalues = torch::jit::LowerGraph(*g, lowered_mod._ivalue());
   // Is this necessary?
+
   lowering::LowerBlock(g->block());
 
   return graph_and_ivalues;
