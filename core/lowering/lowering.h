@@ -17,7 +17,7 @@ struct LowerInfo {
   bool disable_cse = false;
   std::vector<std::string> forced_fallback_modules;
   friend std::ostream& operator<<(std::ostream& os, const LowerInfo& l);
-}
+};
 
 void LowerBlock(torch::jit::Block* b);
 void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, LowerInfo lower_info);

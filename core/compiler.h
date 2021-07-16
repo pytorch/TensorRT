@@ -19,7 +19,7 @@ struct CompileSpec {
   partitioning::PartitionInfo partition_info;
 };
 
-bool CheckMethodOperatorSupport(const torch::jit::script::Module& mod, std::string method_name);
+bool CheckMethodOperatorSupport(const torch::jit::script::Module& mod, std::string method_name, CompileSpec cfg);
 
 std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::string method_name, CompileSpec cfg);
 

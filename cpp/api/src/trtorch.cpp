@@ -11,8 +11,8 @@ namespace trtorch {
 core::CompileSpec to_internal_compile_spec(CompileSpec external);
 core::runtime::CudaDevice to_internal_cuda_device(CompileSpec::Device device);
 
-bool CheckMethodOperatorSupport(const torch::jit::script::Module& module, std::string method_name) {
-  return core::CheckMethodOperatorSupport(module, method_name);
+bool CheckMethodOperatorSupport(const torch::jit::script::Module& module, std::string method_name, CompileSpec info) {
+  return core::CheckMethodOperatorSupport(module, method_name, to_internal_compile_spec(info));
 }
 
 std::string ConvertGraphToTRTEngine(
