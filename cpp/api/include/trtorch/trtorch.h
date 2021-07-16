@@ -399,6 +399,9 @@ struct TRTORCH_API CompileSpec {
     /// A list of names of operations that will explicitly run in PyTorch
     std::vector<std::string> forced_fallback_ops;
 
+    /// A list of names of modules that will explicitly run in PyTorch
+    std::vector<std::string> forced_fallback_modules;
+
     /**
      * @brief Construct a default Torch Fallback object, fallback will be off
      */
@@ -475,7 +478,7 @@ TRTORCH_API void dump_build_info();
  *
  * @returns bool: Method is supported by TRTorch
  */
-TRTORCH_API bool CheckMethodOperatorSupport(const torch::jit::Module& module, std::string method_name);
+TRTORCH_API bool CheckMethodOperatorSupport(const torch::jit::Module& module, std::string method_name, CompileSpec info);
 
 /**
  * @brief Compile a TorchScript module for NVIDIA GPUs using TensorRT

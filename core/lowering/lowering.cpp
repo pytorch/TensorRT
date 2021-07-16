@@ -72,7 +72,7 @@ void NotateModuleForFallback(const torch::jit::script::Module& mod, std::string 
         n->i_(c10::Symbol::attr("to_compile"), (int64_t) false);
       }
     } else if (mod_count > 0) {
-      NotateModuleForFallback(named_submod, method_name, forced_fallback_modules);
+      NotateModuleForFallback(named_submod.value, method_name, forced_fallback_modules);
     }
     mod_count++;
   }

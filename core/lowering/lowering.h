@@ -8,7 +8,7 @@ namespace lowering {
 
 struct LowerInfo {
 	std::vector<std::string> forced_fallback_modules;
-}
+};
 
 void LowerBlock(torch::jit::Block* b);
 void LowerGraph(std::shared_ptr<torch::jit::Graph>& g);

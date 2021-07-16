@@ -112,6 +112,7 @@ core::CompileSpec to_internal_compile_spec(CompileSpec external) {
   internal.partition_info.enabled = external.torch_fallback.enabled;
   internal.partition_info.min_block_size = external.torch_fallback.min_block_size;
   internal.partition_info.forced_fallback_operators = external.torch_fallback.forced_fallback_ops;
+  internal.lower_info.forced_fallback_modules = external.torch_fallback.forced_fallback_modules;
 
   switch (external.device.device_type) {
     case CompileSpec::Device::DeviceType::kDLA:
