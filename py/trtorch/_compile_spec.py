@@ -1,7 +1,10 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Set
 import torch
 import trtorch._C
 from trtorch import _types
+from trtorch.Input import Input
+
+import warnings
 
 
 def _supported_input_size_type(input_size: Any) -> bool:
@@ -26,36 +29,23 @@ def _parse_input_ranges(input_sizes: List) -> List:
     for i in input_sizes:
         if isinstance(i, dict):
             if all(k in i for k in ["min", "opt", "min"]):
-                in_range = trtorch._C.InputRange()
-                in_range.min = i["min"]
-                in_range.opt = i["opt"]
-                in_range.max = i["max"]
-                parsed_input_sizes.append(in_range)
+                parsed_input_sizes.append(Input(min_shape=i["min"], opt_shape=i["opt"], max_shape=i["max"])._to_internal())
 
             elif "opt" in i:
-                in_range = trtorch._C.InputRange()
-                in_range.min = i["opt"]
-                in_range.opt = i["opt"]
-                in_range.max = i["opt"]
-                parsed_input_sizes.append(in_range)
+                parsed_input_sizes.append(Input(shape=i["opt"])._to_internal())
 
             else:
                 raise KeyError(
                     "An input size must either be a static size or a range of three sizes (min, opt, max) as Dict")
 
         elif isinstance(i, list):
-            in_range = trtorch._C.InputRange()
-            in_range.min = i
-            in_range.opt = i
-            in_range.max = i
-            parsed_input_sizes.append(in_range)
+            parsed_input_sizes.append(Input(shape=i)._to_internal())
 
         elif isinstance(i, tuple):
-            in_range = trtorch._C.InputRange()
-            in_range.min = list(i)
-            in_range.opt = list(i)
-            in_range.max = list(i)
-            parsed_input_sizes.append(in_range)
+            parsed_input_sizes.append(Input(shape=i)._to_internal())
+
+        elif isinstance(i, torch.Size):
+            parsed_input_sizes.append(Input(shape=i)._to_internal())
 
     return parsed_input_sizes
 
@@ -79,6 +69,15 @@ def _parse_op_precision(precision: Any) -> _types.dtype:
         raise TypeError("Op precision type needs to be specified with a torch.dtype or a trtorch.dtype, got: " +
                         str(type(precision)))
 
+
+def _parse_enabled_precisions(precisions: Any) -> Set:
+    parsed_precisions = set()
+    if any([isinstance(precisions, type) for type in [list, tuple, set]]):
+        for p in precisions:
+            parsed_precisions.add(_parse_op_precision(p))
+    else:
+        parsed_precisions.add(_parse_op_precision(precisions))
+    return parsed_precisions
 
 def _parse_device_type(device: Any) -> _types.DeviceType:
     if isinstance(device, torch.device):
@@ -140,39 +139,36 @@ def _parse_torch_fallback(fallback_info: Dict[str, Any]) -> trtorch._C.TorchFall
 
     return info
 
-def _parse_input_dtypes(input_dtypes: List) -> List:
-    parsed_input_dtypes = []
-    for dtype in input_dtypes:
-        if isinstance(dtype, torch.dtype):
-            if dtype == torch.int8:
-                parsed_input_dtypes.append(_types.dtype.int8)
-            elif dtype == torch.half:
-                parsed_input_dtypes.append(_types.dtype.half)
-            elif dtype == torch.float:
-                parsed_input_dtypes.append(_types.dtype.float)
-            elif dtype == torch.int32:
-                parsed_input_dtypes.append(_types.dtype.int32)
-            elif dtype == torch.bool:
-                parsed_input_dtypes.append(_types.dtype.bool)
-            else:
-                raise TypeError("Invalid input dtype. Supported input datatypes include float|half|int8|int32|bool), got: " + str(dtype))
-
-    return parsed_input_dtypes
-
 def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
     info = trtorch._C.CompileSpec()
-    if "input_shapes" not in compile_spec:
+    if "input_shapes" not in compile_spec and "inputs" not in compile_spec:
         raise KeyError(
-            "Input shapes for inputs are required as a List, provided as either a static sizes or a range of three sizes (min, opt, max) as Dict"
+            "Module input definitions are requried to compile module. Provide a list of trtorch.Input keyed to \"inputs\" in the compile spec"
         )
 
-    info.input_ranges = _parse_input_ranges(compile_spec["input_shapes"])
+    if "input_shapes" in compile_spec and "inputs" in compile_spec:
+        raise KeyError(
+            "Found both key \"input_shapes\", and \"inputs\" in compile spec, please port forward to using only \"inputs\""
+        )
+
+    if "input_shapes" in compile_spec:
+        warnings.warn("Key \"input_shapes\" is deprecated in favor of \"inputs\". Support for \"input_shapes\" will be removed in TRTorch v0.5.0", DeprecationWarning)
+        info.inputs = _parse_input_ranges(compile_spec["input_shapes"])
+
+    if "inputs" in compile_spec:
+        info.inputs = [ i._to_internal() for i in compile_spec["inputs"] ]
+
+    if "op_precision" in compile_spec and "enabled_precisions" in compile_spec:
+        raise KeyError(
+            "Found both key \"op_precision\", and \"enabled_precisions\" in compile spec, please port forward to using only \"enabled_precisions\""
+        )
 
     if "op_precision" in compile_spec:
-        info.op_precision = _parse_op_precision(compile_spec["op_precision"])
+        warnings.warn("Key \"op_precision\" is being deprecated in favor of \"enabled_precision\" which expects a set of precisions to be enabled during compilation (FP32 will always be enabled), Support for \"op_precision\" will be removed in TRTorch v0.5.0", DeprecationWarning)
+        info.enabled_precisions = _parse_enabled_precisions(compile_spec["op_precision"])
 
-    if "input_dtypes" in compile_spec:
-        info.input_dtypes = _parse_input_dtypes(compile_spec["input_dtypes"])
+    if "enabled_precisions" in compile_spec:
+        info.enabled_precisions = _parse_enabled_precisions(compile_spec["enabled_precisions"])
 
     if "calibrator" in compile_spec:
         info.ptq_calibrator = compile_spec["calibrator"]
@@ -233,7 +229,8 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]) -> torch.classes.tensorrt.
     Args:
         compile_spec (dict): Compilation settings including operating precision, target device, etc.
             One key is required which is ``input_shapes``, describing the input sizes or ranges for inputs
-            to the graph. All other keys are optional. Entries for each method to be compiled.
+            to the graph as well as expect types and formats for those inputs. All other keys are optional.
+            Entries for each method to be compiled.
 
             Note: Partial compilation of TorchScript modules is not supported through the PyTorch TensorRT backend
             If you need this feature, use trtorch.compile to compile your module. Usage of the resulting module is
@@ -243,13 +240,15 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]) -> torch.classes.tensorrt.
 
                 CompileSpec = {
                     "forward" : trtorch.TensorRTCompileSpec({
-                        "input_shapes": [
-                            (1, 3, 224, 224), # Static input shape for input #1
-                            {
-                                "min": (1, 3, 224, 224),
-                                "opt": (1, 3, 512, 512),
-                                "max": (1, 3, 1024, 1024)
-                            } # Dynamic input shape for input #2
+                        "inputs": [
+                            trtorch.Input((1, 3, 224, 224)), # Static input shape for input #1
+                            trtorch.Input(
+                                min_shape=1, 3, 224, 224),
+                                opt_shape=(1, 3, 512, 512),
+                                max_shape=(1, 3, 1024, 1024),
+                                dtype=torch.int32
+                                format=torch.channel_last
+                            ) # Dynamic input shape for input #2
                         ],
                         "device": {
                             "device_type": torch.device("cuda"), # Type of device to run engine on (for DLA use trtorch.DeviceType.DLA)
@@ -284,12 +283,15 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]) -> torch.classes.tensorrt.
 
     backend_spec = torch.classes.tensorrt.CompileSpec()
 
-    for i in parsed_spec.input_ranges:
-        ir = torch.classes.tensorrt._InputRange()
-        ir._set_min(i.min)
-        ir._set_opt(i.opt)
-        ir._set_max(i.max)
-        backend_spec._append_input_range(ir)
+    for i in parsed_spec.inputs:
+        clone = torch.classes.tensorrt._Input()
+        clone._set_min(i.min)
+        clone._set_opt(i.opt)
+        clone._set_max(i.max)
+        clone._set_dtype(i.dtype)
+        clone._set_format(i.format)
+        clone._set_input_is_dynamic(i.input_is_dynamic)
+        backend_spec._append_input(clone)
 
     d = torch.classes.tensorrt._Device()
     d._set_device_type(int(parsed_spec.device.device_type))
@@ -309,9 +311,7 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]) -> torch.classes.tensorrt.
 
     backend_spec._set_device(d)
     backend_spec._set_torch_fallback(torch_fallback)
-    backend_spec._set_op_precision(int(parsed_spec.op_precision))
-    for dtype in parsed_spec.input_dtypes:
-        backend_spec._append_input_dtypes(int64_t(dtype))
+    backend_spec._set_precisions([int(i) for i in parsed_spec.enabled_precisions])
 
     backend_spec._set_disable_tf32(parsed_spec.disable_tf32)
     backend_spec._set_refit(parsed_spec.refit)

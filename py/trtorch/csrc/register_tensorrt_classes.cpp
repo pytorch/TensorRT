@@ -10,13 +10,17 @@ namespace {
 
 void RegisterTRTCompileSpec() {
   static auto TRTORCH_UNUSED TRTInputRangeTSRegistration =
-      torch::class_<trtorch::pyapi::InputRange>("tensorrt", "_InputRange")
+      torch::class_<trtorch::pyapi::Input>("tensorrt", "_Input")
           .def(torch::init<>())
-          .def("__str__", &trtorch::pyapi::InputRange::to_str);
+          .def("__str__", &trtorch::pyapi::Input::to_str);
 
-  ADD_FIELD_GET_SET_REGISTRATION(TRTInputRangeTSRegistration, trtorch::pyapi::InputRange, min);
-  ADD_FIELD_GET_SET_REGISTRATION(TRTInputRangeTSRegistration, trtorch::pyapi::InputRange, opt);
-  ADD_FIELD_GET_SET_REGISTRATION(TRTInputRangeTSRegistration, trtorch::pyapi::InputRange, max);
+  ADD_FIELD_GET_SET_REGISTRATION(TRTInputRangeTSRegistration, trtorch::pyapi::Input, min);
+  ADD_FIELD_GET_SET_REGISTRATION(TRTInputRangeTSRegistration, trtorch::pyapi::Input, opt);
+  ADD_FIELD_GET_SET_REGISTRATION(TRTInputRangeTSRegistration, trtorch::pyapi::Input, max);
+  ADD_FIELD_GET_SET_REGISTRATION(TRTInputRangeTSRegistration, trtorch::pyapi::Input, dtype);
+  ADD_FIELD_GET_SET_REGISTRATION(TRTInputRangeTSRegistration, trtorch::pyapi::Input, format);
+  ADD_FIELD_GET_SET_REGISTRATION(TRTInputRangeTSRegistration, trtorch::pyapi::Input, input_is_dynamic);
+
 
   static auto TRTORCH_UNUSED TRTDeviceTSRegistration = torch::class_<trtorch::pyapi::Device>("tensorrt", "_Device")
                                                            .def(torch::init<>())
@@ -39,14 +43,13 @@ void RegisterTRTCompileSpec() {
   static auto TRTORCH_UNUSED TRTCompileSpecTSRegistration =
       torch::class_<trtorch::pyapi::CompileSpec>("tensorrt", "CompileSpec")
           .def(torch::init<>())
-          .def("_append_input_range", &trtorch::pyapi::CompileSpec::appendInputRange)
+          .def("_append_input", &trtorch::pyapi::CompileSpec::appendInput)
+          .def("_set_precisions", &trtorch::pyapi::CompileSpec::setPrecisions)
           .def("_set_device", &trtorch::pyapi::CompileSpec::setDeviceIntrusive)
           .def("_set_torch_fallback", &trtorch::pyapi::CompileSpec::setTorchFallbackIntrusive)
           .def("_set_ptq_calibrator", &trtorch::pyapi::CompileSpec::setPTQCalibratorViaHandle)
-          .def("_append_input_dtypes", &trtorch::pyapi::CompileSpec::appendInputDtypes)
           .def("__str__", &trtorch::pyapi::CompileSpec::stringify);
 
-  ADD_FIELD_GET_SET_REGISTRATION(TRTCompileSpecTSRegistration, trtorch::pyapi::CompileSpec, op_precision);
   ADD_FIELD_GET_SET_REGISTRATION(TRTCompileSpecTSRegistration, trtorch::pyapi::CompileSpec, disable_tf32);
   ADD_FIELD_GET_SET_REGISTRATION(TRTCompileSpecTSRegistration, trtorch::pyapi::CompileSpec, refit);
   ADD_FIELD_GET_SET_REGISTRATION(TRTCompileSpecTSRegistration, trtorch::pyapi::CompileSpec, debug);

@@ -20,19 +20,21 @@ def compile(module: torch.jit.ScriptModule, compile_spec: Any) -> torch.jit.Scri
         module (torch.jit.ScriptModule): Source module, a result of tracing or scripting a PyTorch
             ``torch.nn.Module``
         compile_spec (dict): Compilation settings including operating precision, target device, etc.
-            One key is required which is ``input_shapes``, describing the input sizes or ranges for inputs
-            to the graph. All other keys are optional
+            One key is required which is ``inputs``, describing the input sizes or ranges for inputs
+            to the graph as well as expect types and formats for those inputs. All other keys are optional
 
             .. code-block:: py
 
                 compile_spec = {
-                    "input_shapes": [
-                        (1, 3, 224, 224), # Static input shape for input #1
-                        {
-                            "min": (1, 3, 224, 224),
-                            "opt": (1, 3, 512, 512),
-                            "max": (1, 3, 1024, 1024)
-                        } # Dynamic input shape for input #2
+                    "inputs": [
+                        trtorch.Input((1, 3, 224, 224)), # Static input shape for input #1
+                        trtorch.Input(
+                            min_shape=1, 3, 224, 224),
+                            opt_shape=(1, 3, 512, 512),
+                            max_shape=(1, 3, 1024, 1024),
+                            dtype=torch.int32
+                            format=torch.channel_last
+                        ) # Dynamic input shape for input #2
                     ],
                     "device": {
                         "device_type": torch.device("cuda"), # Type of device to run engine on (for DLA use trtorch.DeviceType.DLA)
@@ -86,19 +88,21 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule, method_name: st
             ``torch.nn.Module``
         method_name (str): Name of method to convert
         compile_spec (dict): Compilation settings including operating precision, target device, etc.
-            One key is required which is ``input_shapes``, describing the input sizes or ranges for inputs
-            to the graph. All other keys are optional
+            One key is required which is ``inputs``, describing the input sizes or ranges for inputs
+            to the graph as well as expect types and formats for those inputs. All other keys are optional
 
             .. code-block:: py
 
                 CompileSpec = {
-                    "input_shapes": [
-                        (1, 3, 224, 224), # Static input shape for input #1
-                        {
-                            "min": (1, 3, 224, 224),
-                            "opt": (1, 3, 512, 512),
-                            "max": (1, 3, 1024, 1024)
-                        } # Dynamic input shape for input #2
+                    "inputs": [
+                        trtorch.Input((1, 3, 224, 224)), # Static input shape for input #1
+                        trtorch.Input(
+                            min_shape=1, 3, 224, 224),
+                            opt_shape=(1, 3, 512, 512),
+                            max_shape=(1, 3, 1024, 1024),
+                            dtype=torch.int32
+                            format=torch.channel_last
+                        ) # Dynamic input shape for input #2
                     ],
                     "device": {
                         "device_type": torch.device("cuda"), # Type of device to run engine on (for DLA use trtorch.DeviceType.DLA)

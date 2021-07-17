@@ -163,12 +163,15 @@ void log(core::util::logging::LogLevel lvl, const std::string& msg) {
 } // namespace logging
 
 PYBIND11_MODULE(_C, m) {
-  py::class_<InputRange>(m, "InputRange")
+  py::class_<Input>(m, "Input")
       .def(py::init<>())
-      .def("__str__", &trtorch::pyapi::InputRange::to_str)
-      .def_readwrite("min", &InputRange::min)
-      .def_readwrite("opt", &InputRange::opt)
-      .def_readwrite("max", &InputRange::max);
+      .def("__str__", &trtorch::pyapi::Input::to_str)
+      .def_readwrite("min", &Input::min)
+      .def_readwrite("opt", &Input::opt)
+      .def_readwrite("max", &Input::max)
+      .def_readwrite("input_is_dynamic", &Input::input_is_dynamic)
+      .def_readwrite("dtype", &Input::dtype)
+      .def_readwrite("format", &Input::format);
 
   py::enum_<DataType>(m, "dtype", "Enum to specifiy operating precision for engine execution")
       .value("float", DataType::kFloat, "32 bit floating point number")
@@ -192,6 +195,11 @@ PYBIND11_MODULE(_C, m) {
       .value("safe_gpu", EngineCapability::kSAFE_GPU, "Use safety GPU kernels only")
       .value("safe_dla", EngineCapability::kSAFE_DLA, "Use safety DLA kernels only")
       .value("default", EngineCapability::kDEFAULT, "Use default behavior");
+
+  py::enum_<TensorFormat>(m, "TensorFormat", "Enum to specifiy the memory layout of tensors")
+      .value("contiguous", TensorFormat::kContiguous, "Contiguous memory layout (NCHW / Linear)")
+      .value("channel_last", TensorFormat::kChannelLast, "Channel last memory layout (NHWC)")
+      .export_values();
 
   py::enum_<nvinfer1::CalibrationAlgoType>(m, "CalibrationAlgo", py::module_local(), "Type of calibration algorithm")
       .value("LEGACY_CALIBRATION", nvinfer1::CalibrationAlgoType::kLEGACY_CALIBRATION)
@@ -242,9 +250,8 @@ PYBIND11_MODULE(_C, m) {
       .def(py::init<>())
       .def("__str__", &trtorch::pyapi::CompileSpec::stringify)
       .def("_get_calibrator_handle", &CompileSpec::getPTQCalibratorHandle, "[Internal] gets a handle from a calibrator")
-      .def_readwrite("input_ranges", &CompileSpec::input_ranges)
-      .def_readwrite("op_precision", &CompileSpec::op_precision)
-      .def_readwrite("input_dtypes", &CompileSpec::input_dtypes)
+      .def_readwrite("inputs", &CompileSpec::inputs)
+      .def_readwrite("enabled_precisions", &CompileSpec::enabled_precisions)
       .def_readwrite("ptq_calibrator", &CompileSpec::ptq_calibrator)
       .def_readwrite("refit", &CompileSpec::refit)
       .def_readwrite("disable_tf32", &CompileSpec::disable_tf32)

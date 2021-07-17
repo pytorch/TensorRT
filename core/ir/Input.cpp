@@ -129,7 +129,7 @@ Input::Input(std::vector<int64_t> shape, nvinfer1::DataType dtype, nvinfer1::Ten
   input_shape = util::toDims(shape);
   input_is_dynamic = false;
   format = nvinfer1::TensorFormat::kLINEAR;
-  dtype = nvinfer1::DataType::kFLOAT;
+  dtype = dtype;
 
   TRTORCH_CHECK(valid_input_dtype(dtype), "Unsupported input data type: " << dtype);
   this->dtype = dtype;
@@ -165,6 +165,7 @@ Input::Input(std::vector<int64_t> min_shape, std::vector<int64_t> opt_shape, std
     dim.insert(min_shape[i]);
     dim.insert(opt_shape[i]);
     dim.insert(max_shape[i]);
+    LOG_DEBUG(dim.size());
     if (dim.size() != 1) {
       dyn_shape.push_back(-1);
       input_is_dynamic = true;
@@ -182,7 +183,7 @@ Input::Input(std::vector<int64_t> min_shape, std::vector<int64_t> opt_shape, std
 }
 
 std::ostream& operator<<(std::ostream& os, const Input& input) {
-  if (input.input_is_dynamic) {
+  if (!input.input_is_dynamic) {
     os << "Input(shape: " << input.input_shape << ", dtype: " << input.dtype << ", format: " << input.format << ')';
   } else {
     os << "Input(shape: " << input.input_shape << ", min: " << input.min << ", opt: " << input.opt << ", max: " << input.max << ", dtype: " << input.dtype << ", format: " << input.format << ')';

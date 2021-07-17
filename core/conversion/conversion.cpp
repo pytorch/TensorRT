@@ -160,21 +160,21 @@ void AddInputs(
 
   for (size_t i = 0; i < input_tensors.size(); i++) {
     auto in = input_tensors[i];
-    auto dims = input_specs[i];
+    auto spec = input_specs[i];
     std::string name = std::string("input_") + std::to_string(ctx->num_inputs);
     LOG_INFO(
         ctx->logger,
-        "Adding Input " << in->debugName() << " (named: " << name << "): " << dims << " in engine (conversion.AddInputs)");
+        "Adding Input " << in->debugName() << " (named: " << name << "): " << spec << " in engine (conversion.AddInputs)");
 
-    auto trt_in = ctx->net->addInput(name.c_str(), dims.dtype, dims.input_shape);
+    auto trt_in = ctx->net->addInput(name.c_str(), spec.dtype, spec.input_shape);
     TRTORCH_CHECK(trt_in, "Failed to add input node: " << in->debugName() << " (conversion.AddInputs)");
-    trt_in->setAllowedFormats(1U << static_cast<int>(dims.format));
+    trt_in->setAllowedFormats(1U << static_cast<int>(spec.format));
 
-    profile->setDimensions(trt_in->getName(), nvinfer1::OptProfileSelector::kMIN, dims.min);
-    profile->setDimensions(trt_in->getName(), nvinfer1::OptProfileSelector::kOPT, dims.opt);
-    profile->setDimensions(trt_in->getName(), nvinfer1::OptProfileSelector::kMAX, dims.max);
+    profile->setDimensions(trt_in->getName(), nvinfer1::OptProfileSelector::kMIN, spec.min);
+    profile->setDimensions(trt_in->getName(), nvinfer1::OptProfileSelector::kOPT, spec.opt);
+    profile->setDimensions(trt_in->getName(), nvinfer1::OptProfileSelector::kMAX, spec.max);
 
-    if (dims.input_is_dynamic) {
+    if (spec.input_is_dynamic) {
       ctx->input_is_dynamic = true;
     }
 

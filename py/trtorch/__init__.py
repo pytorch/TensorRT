@@ -13,6 +13,7 @@ from trtorch._compile_spec import TensorRTCompileSpec
 from trtorch import ptq
 from trtorch._types import *
 from trtorch import logging
+from trtorch.Input import Input
 
 
 def _register_with_torch():

@@ -4,26 +4,6 @@
 namespace trtorch {
 namespace pyapi {
 
-std::string InputRange::to_str() {
-  auto vec_to_str = [](std::vector<int64_t> shape) -> std::string {
-    std::stringstream ss;
-    ss << '[';
-    for (auto i : shape) {
-      ss << i << ',';
-    }
-    ss << ']';
-    return ss.str();
-  };
-
-  std::stringstream ss;
-  ss << "        {" << std::endl;
-  ss << "            min: " << vec_to_str(min) << ',' << std::endl;
-  ss << "            opt: " << vec_to_str(opt) << ',' << std::endl;
-  ss << "            max: " << vec_to_str(max) << ',' << std::endl;
-  ss << "        }" << std::endl;
-  return ss.str();
-}
-
 std::string to_str(DataType value) {
   switch (value) {
     case DataType::kHalf:
@@ -35,8 +15,9 @@ std::string to_str(DataType value) {
     case DataType::kBool:
       return "Bool";
     case DataType::kFloat:
-    default:
       return "Float";
+    default:
+      return "Unknown data type";
   }
 }
 
@@ -51,9 +32,67 @@ nvinfer1::DataType toTRTDataType(DataType value) {
     case DataType::kBool:
       return nvinfer1::DataType::kBOOL;
     case DataType::kFloat:
-    default:
       return nvinfer1::DataType::kFLOAT;
+    default:
+      TRTORCH_THROW_ERROR("Unknown data type: " << to_str(value));
   }
+}
+
+nvinfer1::TensorFormat toTRTTensorFormat(TensorFormat value) {
+  switch (value) {
+    case TensorFormat::kChannelLast:
+      return nvinfer1::TensorFormat::kHWC;
+    case TensorFormat::kContiguous:
+    default:
+      return nvinfer1::TensorFormat::kLINEAR;
+  }
+}
+
+std::string to_str(TensorFormat value) {
+  switch (value) {
+    case TensorFormat::kContiguous:
+      return "Contiguous/Linear/NCHW";
+    case TensorFormat::kChannelLast:
+      return "Channel Last/NHWC";
+    default:
+      return "UNKNOWN";
+  }
+}
+
+core::ir::Input Input::toInternalInput() {
+  if (!input_is_dynamic) {
+    return core::ir::Input(opt, toTRTDataType(dtype), toTRTTensorFormat(format));
+  } else {
+    return core::ir::Input(min, opt, max, toTRTDataType(dtype), toTRTTensorFormat(format));
+  }
+}
+
+std::string Input::to_str() {
+  auto vec_to_str = [](std::vector<int64_t> shape) -> std::string {
+    std::stringstream ss;
+    ss << '(';
+    for (auto i : shape) {
+      ss << i << ',';
+    }
+    ss << ')';
+    return ss.str();
+  };
+
+  std::stringstream ss;
+  ss << "Input(";
+
+  if (!input_is_dynamic) {
+    ss << "shape=" << vec_to_str(opt) << ", ";
+  } else {
+    ss << "min_shape=" << vec_to_str(min) << ", ";
+    ss << "opt_shape=" << vec_to_str(opt) << ", ";
+    ss << "max_shape=" << vec_to_str(max) << ", ";
+  }
+
+  ss << "dtype=" << pyapi::to_str(dtype) << ", ";
+  ss << "format=" << pyapi::to_str(format) << ')';
+
+  return ss.str();
 }
 
 std::string to_str(DeviceType value) {
@@ -128,19 +167,17 @@ std::string TorchFallback::to_str() {
 }
 
 core::CompileSpec CompileSpec::toInternalCompileSpec() {
-  std::vector<core::ir::InputRange> internal_input_ranges;
-  for (auto i : input_ranges) {
-    internal_input_ranges.push_back(i.toInternalInputRange());
+  std::vector<core::ir::Input> internal_inputs;
+  for (auto i : inputs) {
+    internal_inputs.push_back(i.toInternalInput());
   }
 
-  std::vector<nvinfer1::DataType> trt_input_dtypes;
-  for (auto dtype : input_dtypes) {
-    trt_input_dtypes.push_back(toTRTDataType(dtype));
+  auto info = core::CompileSpec(internal_inputs);
+
+  for (auto p : enabled_precisions) {
+    info.convert_info.engine_settings.enabled_precisions.insert(toTRTDataType(p));
   }
 
-  auto info = core::CompileSpec(internal_input_ranges);
-  info.convert_info.engine_settings.op_precision = toTRTDataType(op_precision);
-  info.convert_info.engine_settings.input_dtypes = trt_input_dtypes;
   info.convert_info.engine_settings.calibrator = ptq_calibrator;
   info.convert_info.engine_settings.disable_tf32 = disable_tf32;
   info.convert_info.engine_settings.refit = refit;
@@ -170,15 +207,14 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
 std::string CompileSpec::stringify() {
   std::stringstream ss;
   ss << "TensorRT Compile Spec: {" << std::endl;
-  ss << "    \"Input Shapes\": [" << std::endl;
-  for (auto i : input_ranges) {
+  ss << "    \"Inputs\": [" << std::endl;
+  for (auto i : inputs) {
     ss << i.to_str();
   }
   ss << "    ]" << std::endl;
-  ss << "    \"Op Precision\": " << to_str(op_precision) << std::endl;
-  ss << "    \"Input dtypes\": [" << std::endl;
-  for (auto i : input_dtypes) {
-    ss << to_str(i);
+  ss << "    \"Enabled Precision\": [" << std::endl;
+  for (auto p : enabled_precisions) {
+    ss << to_str(p);
   }
   ss << "    ]" << std::endl;
   ss << "    \"TF32 Disabled\": " << disable_tf32 << std::endl;
