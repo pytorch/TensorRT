@@ -128,7 +128,7 @@ void AddLayer(ConversionCtx* ctx, const torch::jit::Node* n) {
 void AddInputs(
     ConversionCtx* ctx,
     at::ArrayRef<const torch::jit::Value*> inputs,
-    std::vector<ir::InputRange>& input_dims) {
+    std::vector<ir::Input>& input_specs) {
   std::vector<const torch::jit::Value*> input_tensors;
   for (auto in : inputs) {
     // Disregarding inputs that are not tensors
@@ -142,36 +142,33 @@ void AddInputs(
     }
   }
 
+  std::stringstream ss;
+  ss << "Input Dimension Specs: [\n";
+  for (auto i : input_specs) {
+    ss << "    " << i << ",";
+  }
+  ss << ']';
+  LOG_DEBUG(ss.str());
+
   TRTORCH_CHECK(
-      input_tensors.size() == input_dims.size(),
+      input_tensors.size() == input_specs.size(),
       "Expected dimension specifications for all input tensors"
-          << ", but found " << input_tensors.size() << " input tensors and " << input_dims.size()
+          << ", but found " << input_tensors.size() << " input tensors and " << input_specs.size()
           << " dimension specs (conversion.AddInputs)");
 
   auto profile = ctx->builder->createOptimizationProfile();
 
-  TRTORCH_CHECK(
-      ctx->input_dtypes.size() == 0 || ctx->input_dtypes.size() == input_tensors.size(),
-      "Number of input_dtypes : " << ctx->input_dtypes.size()
-                                  << " should either be 0 or equal to number of input_tensors which is "
-                                  << input_tensors.size() << " (conversion.AddInputs)");
-
-  // If the input_dtypes is not provided, assume all the input tensors to be in float32
-  if (ctx->input_dtypes.size() == 0) {
-    LOG_DEBUG("Input datatypes are not provided explicitly. Default float32 datatype is being used for all inputs");
-    ctx->input_dtypes = std::vector<nvinfer1::DataType>{input_tensors.size(), nvinfer1::DataType::kFLOAT};
-  }
-
   for (size_t i = 0; i < input_tensors.size(); i++) {
     auto in = input_tensors[i];
-    auto dims = input_dims[i];
+    auto dims = input_specs[i];
     std::string name = std::string("input_") + std::to_string(ctx->num_inputs);
     LOG_INFO(
         ctx->logger,
-        "Adding Input " << in->debugName() << " named : " << name << ", shape: " << dims.input_shape
-                        << ", dtype : " << ctx->input_dtypes[i] << " in engine (conversion.AddInputs)");
-    auto trt_in = ctx->net->addInput(name.c_str(), ctx->input_dtypes[i], dims.input_shape);
+        "Adding Input " << in->debugName() << " (named: " << name << "): " << dims << " in engine (conversion.AddInputs)");
+
+    auto trt_in = ctx->net->addInput(name.c_str(), dims.dtype, dims.input_shape);
     TRTORCH_CHECK(trt_in, "Failed to add input node: " << in->debugName() << " (conversion.AddInputs)");
+    trt_in->setAllowedFormats(1U << static_cast<int>(dims.format));
 
     profile->setDimensions(trt_in->getName(), nvinfer1::OptProfileSelector::kMIN, dims.min);
     profile->setDimensions(trt_in->getName(), nvinfer1::OptProfileSelector::kOPT, dims.opt);
@@ -191,7 +188,7 @@ void AddInputs(
 
   ctx->cfg->addOptimizationProfile(profile);
 #if NV_TENSORRT_MAJOR > 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR >= 1)
-  if (ctx->op_precision == nvinfer1::DataType::kINT8) {
+  if (ctx->enabled_precisions.find(nvinfer1::DataType::kINT8) != ctx->enabled_precisions.end()) {
     ctx->cfg->setCalibrationProfile(profile);
   }
 #endif
@@ -363,7 +360,7 @@ void ConvertBlockToNetDef(
 
   auto inputs = b->inputs();
   AddParamsToCtxValueMap(ctx, static_params);
-  AddInputs(ctx, inputs, build_info.input_ranges);
+  AddInputs(ctx, inputs, build_info.inputs);
 
   auto nodes = b->nodes();
 

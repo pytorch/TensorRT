@@ -54,9 +54,9 @@ TEST(Partitioning, ConvertSequentialModelSegmentedBlockCorrectly) {
   }
   g->registerOutput(tensor_to_constant[parsed_g->outputs()[0]]);
 
-  std::vector<trtorch::core::ir::InputRange> input_ranges;
-  input_ranges.push_back(trtorch::core::ir::InputRange({3, 3, 16, 16}));
-  trtorch::core::CompileSpec cfg(input_ranges);
+  std::vector<trtorch::core::ir::Input> inputs;
+  inputs.push_back(trtorch::core::ir::Input({3, 3, 16, 16}));
+  trtorch::core::CompileSpec cfg(inputs);
   cfg.partition_info.enabled = true;
   torch::jit::script::Module mod(c10::QualifiedName("module"));
 
@@ -113,9 +113,9 @@ TEST(Partitioning, ConvertBranchModelSegmentedBlockCorrectly) {
   }
   g->registerOutput(tensor_to_constant[parsed_g->outputs()[0]]);
 
-  std::vector<trtorch::core::ir::InputRange> input_ranges;
-  input_ranges.push_back(trtorch::core::ir::InputRange({3, 3, 16, 16}));
-  trtorch::core::CompileSpec cfg(input_ranges);
+  std::vector<trtorch::core::ir::Input> inputs;
+  inputs.push_back(trtorch::core::ir::Input({3, 3, 16, 16}));
+  trtorch::core::CompileSpec cfg(inputs);
   cfg.partition_info.enabled = true;
   torch::jit::script::Module mod(c10::QualifiedName("module"));
 

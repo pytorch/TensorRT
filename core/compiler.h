@@ -11,7 +11,7 @@ namespace trtorch {
 namespace core {
 
 struct CompileSpec {
-  CompileSpec(std::vector<ir::InputRange> input_ranges) : convert_info(std::move(input_ranges)) {}
+  CompileSpec(std::vector<ir::Input> inputs) : convert_info(std::move(inputs)) {}
   conversion::ConversionInfo convert_info;
   partitioning::PartitionInfo partition_info;
 };

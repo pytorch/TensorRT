@@ -23,7 +23,7 @@ TEST(Partitioning, ComputeResNet50FallbackGraphCorrectly) {
     trt_inputs_ivalues.push_back(in.clone());
   }
 
-  std::vector<trtorch::core::ir::InputRange> input_ranges{trtorch::core::ir::InputRange({1, 3, 224, 224})};
+  std::vector<trtorch::core::ir::Input> input_ranges{trtorch::core::ir::Input({1, 3, 224, 224})};
   trtorch::core::CompileSpec cfg(input_ranges);
   cfg.partition_info.enabled = true;
   cfg.partition_info.forced_fallback_operators.push_back("aten::add");
@@ -52,7 +52,7 @@ TEST(Partitioning, ComputeMobileNetFallbackGraphCorrectly) {
     trt_inputs_ivalues.push_back(in.clone());
   }
 
-  std::vector<trtorch::core::ir::InputRange> input_ranges{trtorch::core::ir::InputRange({1, 3, 224, 224})};
+  std::vector<trtorch::core::ir::Input> input_ranges{trtorch::core::ir::Input({1, 3, 224, 224})};
   trtorch::core::CompileSpec cfg(input_ranges);
   cfg.partition_info.enabled = true;
   cfg.partition_info.forced_fallback_operators.push_back("aten::hardtanh");

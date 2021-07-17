@@ -194,7 +194,7 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
       LOG_INFO(*g << "(LoweringGraph)\n");
 
       // segment the graph and convert segmented TensorRT block
-      auto segmented_blocks = partitioning::Partition(g, convert_cfg.input_ranges, cfg.partition_info);
+      auto segmented_blocks = partitioning::Partition(g, convert_cfg.inputs, cfg.partition_info);
       if (segmented_blocks.size() == 1 && segmented_blocks[0].target() == partitioning::SegmentedBlock::kTorch) {
         LOG_WARNING("Didn't generate any TensorRT engines, the compiler did nothing\n");
         return mod;
@@ -208,16 +208,16 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
       for (auto& seg_block : segmented_blocks) {
         std::string cur_block_target =
             seg_block.target() == partitioning::SegmentedBlock::kTensorRT ? "TensorRT" : "Torch";
-        LOG_INFO(*seg_block.g() << "(MiniGraphIn" << cur_block_target << "Block)\n");
+        LOG_INFO(*seg_block.g() << "(Sub Graph" << cur_block_target << "Block)\n");
         std::ostringstream trt_engine_id;
         trt_engine_id << reinterpret_cast<const int*>(&seg_block);
         if (seg_block.target() == partitioning::SegmentedBlock::kTensorRT) {
-          std::vector<ir::InputRange> input_ranges;
+          std::vector<ir::Input> inputs;
           for (auto& shape : seg_block.in_shape()) {
-            input_ranges.push_back(ir::InputRange(shape));
+            inputs.push_back(ir::Input(shape));
           }
           // update the input ranges for each segments
-          convert_cfg.input_ranges = input_ranges;
+          convert_cfg.inputs = inputs;
           auto engine = conversion::ConvertBlockToEngine(seg_block.block(), convert_cfg, named_params);
           auto temp_g = std::make_shared<torch::jit::Graph>();
           AddEngineToGraph(new_mod, temp_g, engine, trt_engine_id.str(), true);
