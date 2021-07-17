@@ -206,14 +206,24 @@ bool InterpolatePlugin::supportsFormatCombination(
     const nvinfer1::PluginTensorDesc* inOut,
     int nbInputs,
     int nbOutputs) noexcept {
-  TRTORCH_ASSERT(nbInputs == 1, "Expected a single tensor as input to interpolate plugin");
 
+  if (nbInputs != 1) {
+    LOG_ERROR("Expected a single tensor as input to interpolate plugin");
+  }
   if (mode_ == "adaptive_max_pool2d") {
-    TRTORCH_ASSERT(nbOutputs == 2, "Expected 2 tensors as output to interpolate plugin");
-    TRTORCH_ASSERT(0 <= pos && pos <= 2, "There should be exactly 3 connections to the plugin - 1 input, 2 output");
+    if (nbOutputs != 2) {
+      LOG_ERROR("Expected 2 tensors as output to interpolate plugin");
+    }
+    if (pos < 0 || pos > 2) {
+      LOG_ERROR("There should be exactly 3 connections to the plugin - 1 input, 2 output");
+    }
   } else {
-    TRTORCH_ASSERT(nbOutputs == 1, "Expected a single tensor as output to interpolate plugin");
-    TRTORCH_ASSERT(0 <= pos && pos <= 1, "There should be exactly 2 connections to the plugin - 1 input, 1 output");
+    if (nbOutputs != 1) {
+      LOG_ERROR("Expected a single tensor as output to interpolate plugin");
+    }
+    if (pos < 0 || pos > 1) {
+      LOG_ERROR("There should be exactly 2 connections to the plugin - 1 input, 1 output");
+    }
   }
 
   const nvinfer1::PluginTensorDesc& in = inOut[0];

@@ -133,9 +133,15 @@ bool NormalizePlugin::supportsFormatCombination(
     const nvinfer1::PluginTensorDesc* inOut,
     int nbInputs,
     int nbOutputs) noexcept {
-  TRTORCH_ASSERT(0 <= pos && pos <= 1, "There should be exactly 2 connections to the plugin - 1 input, 1 output");
-  TRTORCH_ASSERT(nbInputs == 1, "Expected a single tensor as input to normalize plugin");
-  TRTORCH_ASSERT(nbOutputs == 1, "Expected a single tensor as output to normalize plugin");
+  if (pos < 0 || pos > 1) {
+    LOG_ERROR("There should be exactly 2 connections to the plugin - 1 input, 1 output");
+  }
+  if (nbInputs != 1) {
+    LOG_ERROR("Expected a single tensor as input to normalize plugin");
+  }
+  if (nbOutputs != 1) {
+    LOG_ERROR("Expected a single tensor as output to normalize plugin");
+  }
 
   const nvinfer1::PluginTensorDesc& in = inOut[0];
 

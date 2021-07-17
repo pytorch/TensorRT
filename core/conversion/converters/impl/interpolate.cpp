@@ -109,17 +109,9 @@ void resize_layer_size(
   resize_layer->setResizeMode(mode);
   resize_layer->setName(util::node_info(n).c_str());
 
-  // if interpolation mode is linear, align corners must have been set to true.
-  // else, don't use align corners.
-  if (mode == nvinfer1::ResizeMode::kLINEAR) {
-#if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1) // IF TRT VERSION <= 7.0
-    TRTORCH_CHECK(align_corners, "resize layer (linear) only supports align_corners=True in TensorRT <= 7.0");
-    resize_layer->setAlignCorners(true);
-#else
-    resize_layer->setAlignCorners(align_corners);
-#endif
+  if (align_corners) {
+    resize_layer->setCoordinateTransformation(nvinfer1::ResizeCoordinateTransformation::kALIGN_CORNERS);
   }
-
   auto layer_output = ctx->AssociateValueAndTensor(n->outputs()[0], resize_layer->getOutput(0));
 
   LOG_DEBUG("Output tensor shape: " << layer_output->getDimensions());

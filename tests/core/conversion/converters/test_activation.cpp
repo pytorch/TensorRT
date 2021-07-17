@@ -223,5 +223,5 @@ TEST(Converters, ATenGELUConvertsCorrectly) {
   // c10::cuda::compat::normcdf to compute Phi(x). So there's a difference here and therefore the threshold is slightly
   // higher than other ops. One in ten runs will give you an out of normal threshold result
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 4e-4));
+  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 5e-4));
 }
