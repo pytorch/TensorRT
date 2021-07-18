@@ -164,7 +164,10 @@ int main(int argc, char** argv) {
       {"allow-gpu-fallback"});
 
   args::Flag allow_torch_fallback(
-      parser, "allow-torch-fallback", "Enable layers to run in torch if they are not supported in TensorRT", {"allow-torch-fallback"});
+      parser,
+      "allow-torch-fallback",
+      "Enable layers to run in torch if they are not supported in TensorRT",
+      {"allow-torch-fallback"});
 
   args::Flag disable_tf32(
       parser, "disable-tf32", "Prevent Float32 layers from using the TF32 data format", {"disable-tf32"});
@@ -291,13 +294,13 @@ int main(int argc, char** argv) {
 
   if (forced_fallback_ops) {
     std::string fallback_ops = args::get(forced_fallback_ops);
-    if (!allow_torch_fallback){
+    if (!allow_torch_fallback) {
       trtorch::logging::log(
           trtorch::logging::Level::kERROR,
           "Forced fallback ops provided but allow_torch_fallback is False. Please use --allow_torch_fallback to enable automatic fallback of operators.");
     }
     std::string op;
-    std::stringstream  ss(fallback_ops);
+    std::stringstream ss(fallback_ops);
     while (getline(ss, op, ',')) {
       compile_settings.torch_fallback.forced_fallback_ops.push_back(op);
     }
