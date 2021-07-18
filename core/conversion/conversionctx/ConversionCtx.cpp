@@ -70,11 +70,10 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
         cfg->setFlag(nvinfer1::BuilderFlag::kFP16);
       }
       input_type = nvinfer1::DataType::kFLOAT;
-      // TRTORCH_CHECK(
-      //     settings.calibrator != nullptr,
-      //     "Requested inference in INT8 but no calibrator provided, set the ptq_calibrator field in the CompileSpec
-      //     struct with your calibrator");
-      // cfg->setInt8Calibrator(settings.calibrator);
+      // Networks trained with Quantization aware training approach don't need a calibrator as they have Q/DQ nodes.
+      if (!settings.calibrator){
+        LOG_WARNING("Int8 precision has been enabled but no calibrator provided. This assumes the network has Q/DQ nodes obtained from Quantization aware training. For more details, refer to https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#work-with-qat-networks");
+      }
       break;
     case nvinfer1::DataType::kFLOAT:
     default:

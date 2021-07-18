@@ -64,6 +64,27 @@ auto linear_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().patt
          LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
          return true;
        }
+
+       auto w_tensor = args[1].IValue()->toTensor();
+       Weights w = Weights(ctx, w_tensor);
+
+       nvinfer1::ILayer* new_layer;
+       if (!args[2].IValue()->isNone()) {
+         Weights b(ctx, args[2].IValue()->toTensor());
+         new_layer = ctx->net->addFullyConnected(*in, w.num_output_maps, w.data, b.data);
+       } else {
+         LOG_DEBUG("There is no bias for the linear layer");
+         new_layer = ctx->net->addFullyConnected(*in, w.num_output_maps, w.data, Weights().data);
+       }
+
+       TRTORCH_CHECK(new_layer, "Unable to create linear layer from node: " << *n);
+
+       new_layer->setName(util::node_info(n).c_str());
+       auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
+
+       LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+
+       return true;
      }});
 } // namespace
 } // namespace impl
