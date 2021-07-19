@@ -12,6 +12,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <set>
 
 // Just include the .h?
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
@@ -41,56 +42,6 @@ namespace trtorch {
  *
  */
 struct TRTORCH_API CompileSpec {
-  /**
-   * @brief A struct to hold an input range (used by TensorRT Optimization
-   * profile)
-   *
-   * This struct can either hold a single vector representing an input shape,
-   * signifying a static input shape or a set of three input shapes representing
-   * the min, optiminal and max input shapes allowed for the engine.
-   */
-  struct TRTORCH_API InputRange {
-    /// Minimum acceptable input size into the engine
-    std::vector<int64_t> min;
-    /// Optimal input size into the engine (gets best performace)
-    std::vector<int64_t> opt;
-    /// Maximum acceptable input size into the engine
-    std::vector<int64_t> max;
-    /**
-     * @brief Construct a new Input Range object for static input size from
-     * vector
-     *
-     * @param opt
-     */
-    InputRange(std::vector<int64_t> opt);
-    /**
-     * @brief Construct a new Input Range object static input size from
-     * c10::ArrayRef (the type produced by tensor.sizes())
-     *
-     * @param opt
-     */
-    InputRange(c10::ArrayRef<int64_t> opt);
-    /**
-     * @brief Construct a new Input Range object dynamic input size from vectors
-     * for min, opt, and max supported sizes
-     *
-     * @param min
-     * @param opt
-     * @param max
-     */
-    InputRange(std::vector<int64_t> min, std::vector<int64_t> opt, std::vector<int64_t> max);
-    /**
-     * @brief Construct a new Input Range object dynamic input size from
-     * c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max
-     * supported sizes
-     *
-     * @param min
-     * @param opt
-     * @param max
-     */
-    InputRange(c10::ArrayRef<int64_t> min, c10::ArrayRef<int64_t> opt, c10::ArrayRef<int64_t> max);
-  };
-
   /**
    * Supported Data Types that can be used with TensorRT engines
    *
@@ -190,146 +141,6 @@ struct TRTORCH_API CompileSpec {
    private:
     Value value;
   };
-
-  /**
-   * @brief A struct to hold Input of a network.
-   * This struct has all the info (shape, dtype, name, memory_format) of an input tensor.
-   * The shape field in this struct can either hold a single vector representing an input shape,
-   * signifying a static input shape or a set of three input shapes representing
-   * the min, optiminal and max input shapes allowed for the engine.
-   * dtype : This can take values among values supported by trtorch::DataType
-   */
-  struct TRTORCH_API Input {
-    /// Minimum acceptable input size into the engine
-    std::vector<int64_t> min;
-    /// Optimal input size into the engine (gets best performace)
-    std::vector<int64_t> opt;
-    /// Maximum acceptable input size into the engine
-    std::vector<int64_t> max;
-    /// Data type of the input
-    DataType dtype;
-
-    /**
-     * @brief Construct a new Input Range object for static input size from
-     * vector
-     *
-     * @param opt
-     */
-    Input(std::vector<int64_t> opt, DataType dtype=DataType::kFloat);
-    /**
-     * @brief Construct a new Input Range object static input size from
-     * c10::ArrayRef (the type produced by tensor.sizes())
-     *
-     * @param opt
-     */
-    Input(c10::ArrayRef<int64_t> opt, DataType dtype=DataType::kFloat);
-    /**
-     * @brief Construct a new Input Range object dynamic input size from vectors
-     * for min, opt, and max supported sizes
-     *
-     * @param min
-     * @param opt
-     * @param max
-     */
-    Input(std::vector<int64_t> min, std::vector<int64_t> opt, std::vector<int64_t> max, DataType dtype=DataType::kFloat);
-    /**
-     * @brief Construct a new Input Range object dynamic input size from
-     * c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max
-     * supported sizes
-     *
-     * @param min
-     * @param opt
-     * @param max
-     */
-    Input(c10::ArrayRef<int64_t> min, c10::ArrayRef<int64_t> opt, c10::ArrayRef<int64_t> max, DataType dtype=DataType::kFloat);
-  };
-
-  /**
-   * Emum for selecting engine capability
-   */
-  enum class EngineCapability : int8_t {
-    kDEFAULT,
-    kSAFE_GPU,
-    kSAFE_DLA,
-  };
-
-  /**
-   * @brief Construct a new Extra Info object from input ranges.
-   * Each entry in the vector represents a input and should be provided in call
-   * order.
-   *
-   * Use this constructor if you want to use dynamic shape
-   *
-   * @param input_ranges
-   */
-  CompileSpec(std::vector<InputRange> input_ranges) : input_ranges(std::move(input_ranges)) {}
-  /**
-   * @brief Construct a new Extra Info object
-   * Convienence constructor to set fixed input size from vectors describing
-   * size of input tensors. Each entry in the vector represents a input and
-   * should be provided in call order.
-   *
-   * @param fixed_sizes
-   */
-  CompileSpec(std::vector<std::vector<int64_t>> fixed_sizes);
-  /**
-   * @brief Construct a new Extra Info object
-   * Convienence constructor to set fixed input size from c10::ArrayRef's (the
-   * output of tensor.sizes()) describing size of input tensors. Each entry in
-   * the vector represents a input and should be provided in call order.
-   * @param fixed_sizes
-   */
-  CompileSpec(std::vector<c10::ArrayRef<int64_t>> fixed_sizes);
-
-  // Defaults should reflect TensorRT defaults for BuilderConfig
-
-  /**
-   * Sizes for inputs to engine, can either be a single size or a range
-   * defined by Min, Optimal, Max sizes
-   *
-   * Order is should match call order
-   */
-  std::vector<InputRange> input_ranges;
-
-  /**
-   * Default operating precision for the engine
-   */
-  DataType op_precision = DataType::kFloat;
-
-  /**
-   * Data types for input tensors
-   */
-  std::vector<DataType> input_dtypes;
-
-  /**
-   * Prevent Float32 layers from using TF32 data format
-   *
-   * TF32 computes inner products by rounding the inputs to 10-bit mantissas
-   * before multiplying, but accumulates the sum using 23-bit mantissas.
-   * This is the behavior of FP32 layers by default.
-   */
-  bool disable_tf32 = false;
-
-  /**
-   * Build a refitable engine
-   */
-  bool refit = false;
-
-  /**
-   * Build a debugable engine
-   */
-  bool debug = false;
-
-  /**
-   * Truncate long/double type to int/float type
-   */
-  bool truncate_long_and_double = false;
-
-  /**
-   * Restrict operating type to only set default operation precision
-   * (op_precision)
-   */
-  bool strict_types = false;
 
   /*
    * Setting data structure for Target device
@@ -443,10 +254,225 @@ struct TRTORCH_API CompileSpec {
     Device() : device_type(DeviceType::kGPU), gpu_id(0), dla_core(0), allow_gpu_fallback(false) {}
   };
 
-  /*
-   * Target Device
+  /**
+   * Emum for selecting engine capability
    */
-  Device device;
+  enum class EngineCapability : int8_t {
+    kDEFAULT,
+    kSAFE_GPU,
+    kSAFE_DLA,
+  };
+
+  class TRTORCH_API TensorFormat {
+    public:
+    /**
+     * Underlying enum class to support the TensorFormat Class
+     *
+     * In the case that you need to use the TensorFormat class itself, interface
+     * using this enum vs. normal instatination
+     *
+     * ex. trtorch::TensorFormat type = TensorFormat::kContiguous;
+     */
+    enum Value : int8_t {
+      /// Contiguous / NCHW / Linear
+      kContiguous,
+      /// Channel Last / NHWC
+      kChannelsLast,
+    };
+
+    /**
+     * @brief Construct a new TensorFormat object
+     *
+     */
+    TensorFormat() = default;
+    /**
+     * @brief TensorFormat constructor from enum
+     *
+     */
+    constexpr TensorFormat(Value t) : value(t) {}
+    /**
+     * @brief Construct a new TensorFormat object from torch type enums
+     *
+     * @param t
+     */
+    TensorFormat(at::MemoryFormat t);
+    /**
+     * @brief Get the enum value of the TensorFormat object
+     *
+     * @return Value
+     */
+    operator Value() const {
+      return value;
+    }
+    explicit operator bool() = delete;
+    /**
+     * @brief Comparision operator for TensorFormat
+     *
+     * @param other
+     * @return true
+     * @return false
+     */
+    constexpr bool operator==(TensorFormat other) const {
+      return value == other.value;
+    }
+    /**
+     * @brief Comparision operator for TensorFormat
+     *
+     * @param other
+     * @return true
+     * @return false
+     */
+    constexpr bool operator==(TensorFormat::Value other) const {
+      return value == other;
+    }
+    /**
+     * @brief Comparision operator for TensorFormat
+     *
+     * @param other
+     * @return true
+     * @return false
+     */
+    constexpr bool operator!=(TensorFormat other) const {
+      return value != other.value;
+    }
+    /**
+     * @brief Comparision operator for TensorFormat
+     *
+     * @param other
+     * @return true
+     * @return false
+     */
+    constexpr bool operator!=(TensorFormat::Value other) const {
+      return value != other;
+    }
+
+   private:
+    Value value;
+  };
+
+  /**
+   * @brief A struct to hold an input range (used by TensorRT Optimization
+   * profile)
+   *
+   * This struct can either hold a single vector representing an input shape,
+   * signifying a static input shape or a set of three input shapes representing
+   * the min, optiminal and max input shapes allowed for the engine.
+   */
+  struct TRTORCH_API Input {
+    /// Minimum acceptable input size into the engine
+    std::vector<int64_t> min_shape;
+    /// Optimal input size into the engine (size optimized for given kernels accept any size in min max range)
+    std::vector<int64_t> opt_shape;
+    /// Maximum acceptable input size into the engine
+    std::vector<int64_t> max_shape;
+    /// Input shape to be fed to TensorRT, in the event of a dynamic shape, -1's will hold the place of variable dimensions
+    std::vector<int64_t> shape;
+    /// Expected data type for the input
+    DataType dtype;
+    /// Expected tensor format for the input
+    TensorFormat format;
+    /**
+     * @brief Construct a new Input spec object for static input size from
+     * vector, optional arguments allow the user to configure expected input shape
+     * tensor format
+     *
+     * @param shape Input tensor shape
+     * @param dtype Expected data type for the input (Defaults to Float32)
+     * @param format Expected tensor format for the input (Defaults to contiguous)
+     */
+    Input(std::vector<int64_t> shape, DataType dtype=DataType::kFloat, TensorFormat format=TensorFormat::kContiguous);
+    /**
+     * @brief Construct a new Input spec object for static input size from
+     * c10::ArrayRef (the type produced by tensor.sizes()), vector, optional arguments
+     * allow the user to configure expected input shape tensor format
+     *
+     * @param shape Input tensor shape
+     * @param dtype Expected data type for the input (Defaults to Float32)
+     * @param format Expected tensor format for the input (Defaults to contiguous)
+     */
+    Input(c10::ArrayRef<int64_t> shape, DataType dtype=DataType::kFloat, TensorFormat format=TensorFormat::kContiguous);
+    /**
+     * @brief Construct a new Input spec object for a dynamic input size from vectors
+     * for minimum shape, optimal shape, and max shape supported sizes optional arguments
+     * allow the user to configure expected input shape tensor format
+     *
+     * @param min_shape Minimum shape for input tensor
+     * @param opt_shape Target optimization shape for input tensor
+     * @param max_shape Maximum acceptible shape for input tensor
+     * @param dtype Expected data type for the input (Defaults to Float32)
+     * @param format Expected tensor format for the input (Defaults to contiguous)
+     */
+    Input(std::vector<int64_t> min_shape, std::vector<int64_t> opt_shape, std::vector<int64_t> max_shape, DataType dtype=DataType::kFloat, TensorFormat format=TensorFormat::kContiguous);
+    /**
+     * @brief Construct a new Input Range object dynamic input size from
+     * c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max
+     * supported sizes
+     *
+     * @param min_shape Minimum shape for input tensor
+     * @param opt_shape Target optimization shape for input tensor
+     * @param max_shape Maximum acceptible shape for input tensor
+     * @param dtype Expected data type for the input (Defaults to Float32)
+     * @param format Expected tensor format for the input (Defaults to contiguous)
+     */
+    Input(c10::ArrayRef<int64_t> min_shape, c10::ArrayRef<int64_t> opt_shape, c10::ArrayRef<int64_t> max_shape, DataType dtype=DataType::kFloat, TensorFormat format=TensorFormat::kContiguous);
+
+  private:
+    bool input_is_dynamic;
+  };
+
+  /**
+   * @brief A struct to hold an input range (used by TensorRT Optimization
+   * profile)
+   *
+   * This struct can either hold a single vector representing an input shape,
+   * signifying a static input shape or a set of three input shapes representing
+   * the min, optiminal and max input shapes allowed for the engine.
+   */
+  struct TRTORCH_API InputRange {
+    /// Minimum acceptable input size into the engine
+    std::vector<int64_t> min;
+    /// Optimal input size into the engine (gets best performace)
+    std::vector<int64_t> opt;
+    /// Maximum acceptable input size into the engine
+    std::vector<int64_t> max;
+    /**
+     * @brief Construct a new Input Range object for static input size from
+     * vector
+     *
+     * @param opt
+     */
+    [[deprecated("trtorch::CompileSpec::InputRange is being deprecated in favor of trtorch::CompileSpec::Input. trtorch::CompileSpec::InputRange will be removed in TRTorch v0.5.0")]]
+    InputRange(std::vector<int64_t> opt);
+    /**
+     * @brief Construct a new Input Range object static input size from
+     * c10::ArrayRef (the type produced by tensor.sizes())
+     *
+     * @param opt
+     */
+    [[deprecated("trtorch::CompileSpec::InputRange is being deprecated in favor of trtorch::CompileSpec::Input. trtorch::CompileSpec::InputRange will be removed in TRTorch v0.5.0")]]
+    InputRange(c10::ArrayRef<int64_t> opt);
+    /**
+     * @brief Construct a new Input Range object dynamic input size from vectors
+     * for min, opt, and max supported sizes
+     *
+     * @param min
+     * @param opt
+     * @param max
+     */
+    [[deprecated("trtorch::CompileSpec::InputRange is being deprecated in favor of trtorch::CompileSpec::Input. trtorch::CompileSpec::InputRange will be removed in TRTorch v0.5.0")]]
+    InputRange(std::vector<int64_t> min, std::vector<int64_t> opt, std::vector<int64_t> max);
+    /**
+     * @brief Construct a new Input Range object dynamic input size from
+     * c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max
+     * supported sizes
+     *
+     * @param min
+     * @param opt
+     * @param max
+     */
+    [[deprecated("trtorch::CompileSpec::InputRange is being deprecated in favor of trtorch::CompileSpec::Input. trtorch::CompileSpec::InputRange will be removed in TRTorch v0.5.0")]]
+    InputRange(c10::ArrayRef<int64_t> min, c10::ArrayRef<int64_t> opt, c10::ArrayRef<int64_t> max);
+  };
 
   /**
    * @brief A struct to hold fallback info
@@ -477,6 +503,106 @@ struct TRTORCH_API CompileSpec {
     TorchFallback(bool enabled, uint64_t min_size) : enabled(enabled), min_block_size(min_size) {}
   };
 
+  /**
+   * @brief Construct a new Extra Info object from input ranges.
+   * Each entry in the vector represents a input and should be provided in call
+   * order.
+   *
+   * Use this constructor if you want to use dynamic shape
+   *
+   * @param input_ranges
+   */
+  [[deprecated("trtorch::CompileSpec::CompileSpec(std::vector<InputRange> input_ranges) is being deprecated in favor of trtorch::CompileSpec::CompileSpec(std::vector<Input> inputs). trtorch::CompileSpec::CompileSpec(std::vector<InputRange> input_ranges) will be removed in TRTorch v0.5.0")]]
+  CompileSpec(std::vector<InputRange> input_ranges) : input_ranges(std::move(input_ranges)) {}
+  /**
+   * @brief Construct a new Extra Info object
+   * Convienence constructor to set fixed input size from vectors describing
+   * size of input tensors. Each entry in the vector represents a input and
+   * should be provided in call order.
+   *
+   * @param fixed_sizes
+   */
+  [[deprecated("trtorch::CompileSpec::InputRange is being deprecated in favor of trtorch::CompileSpec::Input. trtorch::CompileSpec::InputRange will be removed in TRTorch v0.5.0")]]
+  CompileSpec(std::vector<std::vector<int64_t>> fixed_sizes);
+  /**
+   * @brief Construct a new Extra Info object
+   * Convienence constructor to set fixed input size from c10::ArrayRef's (the
+   * output of tensor.sizes()) describing size of input tensors. Each entry in
+   * the vector represents a input and should be provided in call order.
+   * @param fixed_sizes
+   */
+  [[deprecated("trtorch::CompileSpec::InputRange is being deprecated in favor of trtorch::CompileSpec::Input. trtorch::CompileSpec::InputRange will be removed in TRTorch v0.5.0")]]
+  CompileSpec(std::vector<c10::ArrayRef<int64_t>> fixed_sizes);
+
+  // Defaults should reflect TensorRT defaults for BuilderConfig
+
+  /**
+   * @brief Specifications for inputs to the engine, can either be a single size or a range defined by min, opt and max sizes
+   * Users can also specify expected input type as well as tensor memory format
+   *
+   * Order in vector should match call order for the function
+   */
+  std::vector<Input> inputs;
+
+  /**
+   * Sizes for inputs to engine, can either be a single size or a range
+   * defined by Min, Optimal, Max sizes
+   *
+   * Order is should match call order
+   */
+  [[deprecated("trtorch::CompileSpec::input_ranges is being deprecated in favor of trtorch::CompileSpec::inputs. trtorch::CompileSpec::input_ranges will be removed in TRTorch v0.5.0")]]
+  std::vector<InputRange> input_ranges;
+
+  /**
+   * Default operating precision for the engine
+   */
+  [[deprecated("trtorch::CompileSpec::op_precision is being deprecated in favor of trtorch::CompileSpec::enabled_precisions, a set of all enabled precisions to use during compilation, trtorch::CompileSpec::op_precision will be removed in TRTorch v0.5.0")]]
+  DataType op_precision = DataType::kFloat;
+
+  /**
+   * @brief The set of precisions TensorRT is allowed to use for kernels during compilation
+   *
+   */
+  std::set<DataType> enabled_precisions = {DataType::kFloat};
+
+  /**
+   * Prevent Float32 layers from using TF32 data format
+   *
+   * TF32 computes inner products by rounding the inputs to 10-bit mantissas
+   * before multiplying, but accumulates the sum using 23-bit mantissas.
+   * This is the behavior of FP32 layers by default.
+   */
+  bool disable_tf32 = false;
+
+  /**
+   * Build a refitable engine
+   */
+  bool refit = false;
+
+  /**
+   * Build a debugable engine
+   */
+  bool debug = false;
+
+  /**
+   * Truncate long/double type to int/float type
+   */
+  bool truncate_long_and_double = false;
+
+  /**
+   * Restrict operating type to only set default operation precision
+   * (op_precision)
+   */
+  bool strict_types = false;
+
+  /**
+   * Target Device
+   */
+  Device device;
+
+  /**
+   * @brief Settings related to partial compilation
+   */
   TorchFallback torch_fallback;
 
   /**
