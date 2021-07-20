@@ -16,6 +16,10 @@ converter_test(
 )
 
 converter_test(
+    name = "test_clone",
+)
+
+converter_test(
     name = "test_concat",
 )
 
@@ -25,6 +29,10 @@ converter_test(
 
 converter_test(
     name = "test_conv_deconv",
+)
+
+converter_test(
+    name = "test_copy",
 )
 
 converter_test(
