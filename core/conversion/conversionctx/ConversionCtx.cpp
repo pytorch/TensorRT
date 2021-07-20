@@ -71,8 +71,9 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
       }
       input_type = nvinfer1::DataType::kFLOAT;
       // Networks trained with Quantization aware training approach don't need a calibrator as they have Q/DQ nodes.
-      if (!settings.calibrator){
-        LOG_WARNING("Int8 precision has been enabled but no calibrator provided. This assumes the network has Q/DQ nodes obtained from Quantization aware training. For more details, refer to https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#work-with-qat-networks");
+      if (!settings.calibrator) {
+        LOG_WARNING(
+            "Int8 precision has been enabled but no calibrator provided. This assumes the network has Q/DQ nodes obtained from Quantization aware training. For more details, refer to https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#work-with-qat-networks");
       }
       break;
     case nvinfer1::DataType::kFLOAT:

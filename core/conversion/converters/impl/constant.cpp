@@ -1,3 +1,4 @@
+#include <torch/torch.h>
 #include "core/conversion/converters/converters.h"
 #include "core/util/prelude.h"
 
@@ -24,6 +25,18 @@ auto constant_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
               auto const_out = ctx->AssociateValueAndTensor(n->outputs()[0], const_layer->getOutput(0));
 
               LOG_DEBUG("Output tensor shape: " << const_out->getDimensions());
+
+              return true;
+            }})
+  .pattern({"aten::full(int[] size, Scalar fill_value, *, int? dtype=None, int? layout=None, Device? device=None, bool? pin_memory=None) -> (Tensor)",
+            [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+              auto size = args[0].unwrapToIntList();
+              auto scalar = args[1].unwrapToScalar().to<float>();
+              auto scalar_tensor = torch::full({5}, scalar);
+              auto full_tensor = tensor_to_const(ctx, scalar_tensor);
+              auto output = ctx->AssociateValueAndTensor(n->outputs()[0], full_tensor);
+
+              LOG_DEBUG("Output tensor shape: " << output->getDimensions());
 
               return true;
             }});

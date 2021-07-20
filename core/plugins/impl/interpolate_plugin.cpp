@@ -206,7 +206,6 @@ bool InterpolatePlugin::supportsFormatCombination(
     const nvinfer1::PluginTensorDesc* inOut,
     int nbInputs,
     int nbOutputs) noexcept {
-
   if (nbInputs != 1) {
     LOG_ERROR("Expected a single tensor as input to interpolate plugin");
   }

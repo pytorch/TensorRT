@@ -63,11 +63,13 @@ std::vector<at::Tensor> RunEngine(std::string& eng, std::vector<at::Tensor> inpu
 std::vector<at::Tensor> RunGraphEngine(
     std::shared_ptr<torch::jit::Graph>& g,
     core::conversion::GraphParams& named_params,
-    std::vector<at::Tensor> inputs) {
+    std::vector<at::Tensor> inputs,
+    nvinfer1::DataType op_precision = nvinfer1::DataType::kFLOAT) {
   LOG_DEBUG("Running TRT version");
   auto in = toInputRanges(inputs);
   auto info = core::conversion::ConversionInfo(in);
   info.engine_settings.workspace_size = 1 << 20;
+  info.engine_settings.op_precision = op_precision;
   std::string eng = core::conversion::ConvertBlockToEngine(g->block(), info, named_params);
   return RunEngine(eng, inputs);
 }

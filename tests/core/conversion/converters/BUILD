@@ -60,6 +60,10 @@ converter_test(
 )
 
 converter_test(
+    name = "test_quantization",
+)
+
+converter_test(
     name = "test_reduce",
 )
 
