@@ -360,23 +360,44 @@ TEST(Evaluators, ATenAppendWithITensorAndTensorEvaluatesCorrectly) {
 TEST(Evaluators, ATenCloneEvaluatesCorrectly) {
   const auto graph = R"IR(
       graph(%0 : Tensor):
-        %1 : None = prim::Constant()
-        %2 : Tensor = aten::clone(%0, %1)
-        %3 : Tensor = aten::relu(%0)
-        %4 : int = prim::Constant[value=1]()
-        %5 : Tensor = aten::add(%3, %2, %4)
+        %4 : None = prim::Constant()
+        %5 : Tensor = aten::clone(%0, %4)
         return (%5))IR";
 
+  auto in = at::randint(1, 10, {1, 3, 10, 10}, {at::kCUDA});
+
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
-  auto in = at::randint(1, 3, {224, 224}, {at::kCUDA});
+  auto jit_results = trtorch::tests::util::EvaluateGraphJIT(g, {in});
+  auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {in});
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
+  ASSERT_TRUE(at::equal(jit_results[0].toTensor().to(at::kCUDA), trt_results[0].toTensor()));
+}
 
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+TEST(Evaluators, ATenCopyEvaluatesCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor):
+        %1 : int = prim::Constant[value=1]()
+        %2 : int = prim::Constant[value=3]()
+        %3 : int = prim::Constant[value=10]()
+        %4 : int = prim::Constant[value=10]()
+        %5 : int[] = prim::ListConstruct(%1, %2, %3, %4)
+        %6 : None = prim::Constant()
+        %7 : Device = prim::Constant[value="cuda"]()
+        %8 : Tensor = aten::ones(%5, %6, %6, %7, %6)
+        %9 : bool = prim::Constant[value=0]()
+        %10 : Tensor = aten::copy_(%8, %0, %9)
+        return (%10))IR";
+
+  auto in = at::randint(1, 10, {1, 3, 10, 10}, {at::kCUDA});
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto jit_results = trtorch::tests::util::EvaluateGraphJIT(g, {in});
+  auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {in});
+
+  ASSERT_TRUE(at::equal(jit_results[0].toTensor().to(at::kCUDA), trt_results[0].toTensor()));
 }

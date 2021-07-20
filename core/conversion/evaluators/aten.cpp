@@ -580,17 +580,37 @@ auto aten_registrations TRTORCH_UNUSED =
         .evaluator({c10::Symbol::fromQualString("aten::clone"),
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                       if (args.at(n->input(0)).isITensor()) {
+                        auto source_tensor = args.at(n->input(0)).ITensor();
                         auto tensor_holder = TensorContainer();
-                        tensor_holder.hold_tensor(args.at(n->input(0)).ITensor());
-                        auto el = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
-                        return std::move(el);
+                        tensor_holder.hold_tensor(source_tensor);
+                        auto clone_tensor = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
+                        return std::move(clone_tensor);
                       } else {
-                        auto el = args.at(n->input(0)).IValue();
-                        return std::move(*el);
-                      }       
+                        auto source_tensor = args.at(n->input(0)).unwrapToTensor();
+                        auto clone_tensor = source_tensor.clone();
+                        return clone_tensor;
+                      }
                     },
                     EvalOptions().validSchemas({
                         R"SIG(aten::clone(Tensor self, *, int? memory_format=None) -> (Tensor))SIG",
+                    })})
+        .evaluator({c10::Symbol::fromQualString("aten::copy_"),
+                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+                      if (args.at(n->input(1)).isITensor()) {
+                        auto source_tensor = args.at(n->input(1)).ITensor();
+                        auto tensor_holder = TensorContainer();
+                        tensor_holder.hold_tensor(source_tensor);
+                        auto clone_tensor = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
+                        return std::move(clone_tensor);
+                      } else {
+                        auto source_tensor = args.at(n->input(1)).unwrapToTensor();
+                        auto self_tensor = args.at(n->input(0)).unwrapToTensor();
+                        self_tensor.copy_(source_tensor);
+                        return self_tensor;
+                      }
+                    },
+                    EvalOptions().validSchemas({
+                        R"SIG(aten::copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> (Tensor(a!)))SIG",
                     })});
 } // namespace
 } // namespace evaluators
