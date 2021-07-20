@@ -148,13 +148,6 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
 #endif
     new_layer = deconv;
   } else {
-    // Weights bias;
-    // if (args[2].IValue()->isTensor()) {
-    //   bias = Weights(ctx, args[2].unwrapToTensor());
-    // } else {
-    //   bias = Weights(ctx, torch::zeros(w.shape.d[0]));
-    // }
-
     // shape of convolution's weight: [out, in/groups, ...]
     auto conv = ctx->net->addConvolutionNd(*in, w.shape.d[0], w.kernel_shape, w.data, bias.data);
     TRTORCH_CHECK(conv, "Unable to create convolution layer from node: " << *n);
