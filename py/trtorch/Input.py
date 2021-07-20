@@ -30,6 +30,7 @@ class Input(object):
     shape_mode = None
     shape = None
     dtype = _types.dtype.float32
+    _explicit_set_dtype = False
     format = _types.TensorFormat.contiguous
 
     def __init__(self, *args, **kwargs):
@@ -105,6 +106,7 @@ class Input(object):
 
         if "dtype" in kwargs:
             self.dtype = Input._parse_dtype(kwargs["dtype"])
+            self._explicit_set_dtype = True
 
         if "format" in kwargs:
             self.format = Input._parse_format(kwargs["format"])
@@ -128,6 +130,7 @@ class Input(object):
             internal_in.opt = self.shape
             internal_in.input_is_dynamic = False
         internal_in.dtype = self.dtype
+        internal_in._explicit_set_dtype = self._explicit_set_dtype
         internal_in.format = self.format
         return internal_in
 

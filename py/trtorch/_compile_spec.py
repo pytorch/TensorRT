@@ -169,6 +169,16 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
 
     if "enabled_precisions" in compile_spec:
         info.enabled_precisions = _parse_enabled_precisions(compile_spec["enabled_precisions"])
+        # We want default behavior to match PyTorch, so in the case the user did not explicitly set the dtype for inputs they
+        # will follow PyTorch convetions
+        for i in info.inputs:
+            if not i._explicit_set_dtype:
+                if _types.dtype.int8 in info.enabled_precisions:
+                    i.dtype = _types.dtype.float32
+                elif _types.dtype.half in info.enabled_precisions:
+                    i.dtype = _types.dtype.float16
+                else:
+                    i.dtype = _types.dtype.float32
 
     if "calibrator" in compile_spec:
         info.ptq_calibrator = compile_spec["calibrator"]
