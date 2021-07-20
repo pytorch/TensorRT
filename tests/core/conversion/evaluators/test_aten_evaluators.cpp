@@ -375,7 +375,6 @@ TEST(Evaluators, ATenCloneEvaluatesCorrectly) {
   ASSERT_TRUE(at::equal(jit_results[0].toTensor().to(at::kCUDA), trt_results[0].toTensor()));
 }
 
-
 TEST(Evaluators, ATenCopyEvaluatesCorrectly) {
   const auto graph = R"IR(
       graph(%0 : Tensor):
