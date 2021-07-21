@@ -46,6 +46,7 @@ trtorchc [input_file_path] [output_file_path]
                                         calibration-cache argument) [ float |
                                         float32 | f32 | half | float16 | f16 |
                                         int8 | i8 ] (default: float)
+      --ffo,
       --forced-fallback-ops             List of operators in the graph that
                                         should be forced to fallback to Pytorch for execution
       -d[type], --device-type=[type]    The type of device the engine should be

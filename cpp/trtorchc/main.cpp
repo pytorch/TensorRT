@@ -197,10 +197,10 @@ int main(int argc, char** argv) {
       "file_path",
       "Path to calibration cache file to use for post training quantization",
       {"calibration-cache-file"});
-  args::ValueFlag<std::string> forced_fallback_ops(
+  args::ValueFlagList<std::string> forced_fallback_ops(
       parser,
       "forced_fallback_ops",
-      "List of operators in the graph that should be forced to fallback to Pytorch for execution.",
+      "(Repeatable) List of operators in the graph that should be forced to fallback to Pytorch for execution.",
       {"ffo", "forced-fallback-ops"});
   args::ValueFlag<int> num_min_timing_iters(
       parser, "num_iters", "Number of minimization timing iterations used to select kernels", {"num-min-timing-iter"});
@@ -293,16 +293,14 @@ int main(int argc, char** argv) {
   auto calibrator = trtorch::ptq::make_int8_cache_calibrator(calibration_cache_file_path);
 
   if (forced_fallback_ops) {
-    std::string fallback_ops = args::get(forced_fallback_ops);
     if (!allow_torch_fallback) {
       trtorch::logging::log(
           trtorch::logging::Level::kERROR,
-          "Forced fallback ops provided but allow_torch_fallback is False. Please use --allow_torch_fallback to enable automatic fallback of operators.");
+          "Forced fallback ops provided but allow_torch_fallback is False. Please use --allow-torch-fallback to enable automatic fallback of operators.");
     }
-    std::string op;
-    std::stringstream ss(fallback_ops);
-    while (getline(ss, op, ',')) {
-      compile_settings.torch_fallback.forced_fallback_ops.push_back(op);
+
+    for (const auto fallback_op : args::get(forced_fallback_ops)) {
+      compile_settings.torch_fallback.forced_fallback_ops.push_back(fallback_op);
     }
   }
 
@@ -401,11 +399,6 @@ int main(int argc, char** argv) {
   } catch (const c10::Error& e) {
     trtorch::logging::log(trtorch::logging::Level::kERROR, "Error loading the model (path may be incorrect)");
     std::cerr << parser;
-    return 1;
-  }
-
-  if (!trtorch::CheckMethodOperatorSupport(mod, "forward")) {
-    trtorch::logging::log(trtorch::logging::Level::kERROR, "Module is not currently supported by TRTorch");
     return 1;
   }
 
