@@ -291,6 +291,19 @@ std::vector<core::ir::Input> to_vec_internal_inputs(std::vector<CompileSpec::Inp
   return internal;
 }
 
+core::runtime::CudaDevice to_internal_cuda_device(CompileSpec::Device device) {
+  auto device_type = nvinfer1::DeviceType::kGPU;
+  switch (device.device_type) {
+    case CompileSpec::Device::DeviceType::kDLA:
+      device_type = nvinfer1::DeviceType::kDLA;
+      break;
+    case CompileSpec::Device::DeviceType::kGPU:
+    default:
+      device_type = nvinfer1::DeviceType::kGPU;
+  }
+  return core::runtime::CudaDevice(device.gpu_id, device_type);
+}
+
 core::CompileSpec to_internal_compile_spec(CompileSpec external) {
   core::CompileSpec internal(to_vec_internal_inputs(external.inputs));
   if (external.input_ranges.size() > 0 ) {

@@ -10,8 +10,11 @@ config_setting(
 cc_library(
     name = "runtime",
     srcs = [
+        "CudaDevice.cpp",
+        "DeviceList.cpp",
         "TRTEngine.cpp",
         "register_trt_op.cpp",
+        "runtime.cpp"
     ],
     hdrs = [
         "runtime.h",

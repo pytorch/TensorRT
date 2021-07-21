@@ -66,8 +66,12 @@ models = {
         "model": models.detection.fasterrcnn_resnet50_fpn(pretrained=True),
         "path": "script"
     },
-    "vit": {
+    "efficientnet_b0": {
         "model": timm.create_model('efficientnet_b0', pretrained=True),
+        "path": "script"
+    },
+    "vit": {
+        "model": timm.create_model('vit_base_patch16_224', pretrained=True),
         "path": "script"
     }
 }

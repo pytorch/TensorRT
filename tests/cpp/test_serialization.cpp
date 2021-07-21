@@ -43,7 +43,7 @@ TEST_P(CppAPITests, SerializedModuleIsStillCorrect) {
 
   for (size_t i = 0; i < pre_serialized_results.size(); i++) {
     ASSERT_TRUE(trtorch::tests::util::almostEqual(
-        post_serialized_results[i], pre_serialized_results[i].reshape_as(post_serialized_results[i]), 2e-5));
+        post_serialized_results[i], pre_serialized_results[i].reshape_as(post_serialized_results[i]), threshold));
   }
 }
 
@@ -72,7 +72,7 @@ TEST_P(CppAPITests, SerializedDynamicModuleIsStillCorrect) {
 
   for (size_t i = 0; i < pre_serialized_results.size(); i++) {
     ASSERT_TRUE(trtorch::tests::util::almostEqual(
-        post_serialized_results[i], pre_serialized_results[i].reshape_as(post_serialized_results[i]), 2e-5));
+        post_serialized_results[i], pre_serialized_results[i].reshape_as(post_serialized_results[i]), threshold));
   }
 }
 
@@ -80,5 +80,5 @@ INSTANTIATE_TEST_SUITE_P(
     CompiledModuleForwardIsCloseSuite,
     CppAPITests,
     testing::Values(
-        PathAndInSize({"tests/modules/resnet18_traced.jit.pt", {{1, 3, 224, 224}}}),
-        PathAndInSize({"tests/modules/pooling_traced.jit.pt", {{1, 3, 10, 10}}})));
+        PathAndInSize({"tests/modules/resnet18_traced.jit.pt", {{1, 3, 224, 224}}, 2e-5}),
+        PathAndInSize({"tests/modules/pooling_traced.jit.pt", {{1, 3, 10, 10}}, 2e-5})));

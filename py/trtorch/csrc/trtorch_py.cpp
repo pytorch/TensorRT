@@ -119,8 +119,8 @@ bool CheckMethodOperatorSupport(const torch::jit::Module& module, const std::str
   return core::CheckMethodOperatorSupport(module, method_name);
 }
 
-torch::jit::Module EmbedEngineInNewModule(const py::bytes& engine) {
-  return core::EmbedEngineInNewModule(engine);
+torch::jit::Module EmbedEngineInNewModule(const py::bytes& engine, core::runtime::CudaDevice& device) {
+  return core::EmbedEngineInNewModule(engine, device);
 }
 
 std::string get_build_info() {
@@ -299,7 +299,7 @@ PYBIND11_MODULE(_C, m) {
   m.def(
       "embed_engine_in_new_module",
       &trtorch::pyapi::EmbedEngineInNewModule,
-      "Takes a serialized TensorRT engine and wraps it in the forward method of a new TorchScript module");
+      "Takes a serialized TensorRT engine and compile spec. Wraps it in the forward method of a new TorchScript module");
   m.def("get_build_info", &get_build_info, "Returns build info about the compiler as a string");
 
   m.def("_get_logging_prefix", &logging::get_logging_prefix, "Get the current prefix for the logging output");
