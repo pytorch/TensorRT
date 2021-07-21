@@ -9,6 +9,7 @@
 #pragma once
 
 #include <cuda_runtime.h>
+#include <iostream>
 #include <memory>
 #include <string>
 #include <vector>
@@ -66,10 +67,12 @@ struct TRTORCH_API CompileSpec {
       kHalf,
       /// INT8
       kChar,
-      /// INT32
-      kInt32,
+      /// INT
+      kInt,
       /// Bool
       kBool,
+      /// Sentinel value
+      kUnknown
     };
 
     /**
@@ -139,6 +142,7 @@ struct TRTORCH_API CompileSpec {
     }
 
    private:
+    friend std::ostream& operator<<(std::ostream& os, const DataType& dtype);
     Value value;
   };
 
@@ -278,6 +282,8 @@ struct TRTORCH_API CompileSpec {
       kContiguous,
       /// Channel Last / NHWC
       kChannelsLast,
+      /// Sentinel value
+      kUnknown,
     };
 
     /**
@@ -346,7 +352,9 @@ struct TRTORCH_API CompileSpec {
       return value != other;
     }
 
+
    private:
+    friend std::ostream& operator<<(std::ostream& os, const TensorFormat& format);
     Value value;
   };
 
@@ -472,6 +480,7 @@ struct TRTORCH_API CompileSpec {
 
     bool get_explicit_set_dtype() {return explicit_set_dtype;}
   private:
+    friend std::ostream& operator<<(std::ostream& os, const Input& input);
     bool input_is_dynamic;
     bool explicit_set_dtype;
   };

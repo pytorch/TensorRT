@@ -9,13 +9,74 @@
 
 namespace trtorch {
 
+std::ostream& operator<<(std::ostream& os, const CompileSpec::DataType& dtype) {
+  switch (dtype) {
+    case CompileSpec::DataType::kChar:
+      os << "char";
+      break;
+    case CompileSpec::DataType::kHalf:
+      os << "half";
+      break;
+    case CompileSpec::DataType::kInt:
+      os << "int";
+      break;
+    case CompileSpec::DataType::kBool:
+      os << "bool";
+      break;
+    case CompileSpec::DataType::kFloat:
+      os << "float";
+      break;
+    case CompileSpec::DataType::kUnknown:
+    default:
+      os << "unknown";
+      break;
+  }
+  return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const CompileSpec::TensorFormat& format) {
+  switch (format) {
+    case CompileSpec::TensorFormat::kChannelsLast:
+      os << "channels last";
+      break;
+    case CompileSpec::TensorFormat::kContiguous:
+      os << "contiguous";
+      break;
+    case CompileSpec::TensorFormat::kUnknown:
+    default:
+      os << "unknown";
+      break;
+  }
+  return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const CompileSpec::Input& input) {
+  auto vec_to_str = [](std::vector<int64_t> shape) -> std::string {
+    std::stringstream ss;
+    ss << '[';
+    for (auto i : shape) {
+      ss << i << ',';
+    }
+    ss << ']';
+    return ss.str();
+  };
+
+  if (!input.input_is_dynamic) {
+    os << "Input(shape: " << vec_to_str(input.shape) << ", dtype: " << input.dtype << ", format: " << input.format << ')';
+  } else {
+    os << "Input(shape: " << vec_to_str(input.shape) << ", min: " << vec_to_str(input.min_shape) << ", opt: " << vec_to_str(input.opt_shape) << ", max: " << vec_to_str(input.max_shape) << ", dtype: " << input.dtype << ", format: " << input.format << ')';
+  }
+  return os;
+}
+
+
 nvinfer1::DataType toTRTDataType(CompileSpec::DataType value) {
   switch (value) {
     case CompileSpec::DataType::kChar:
       return nvinfer1::DataType::kINT8;
     case CompileSpec::DataType::kHalf:
       return nvinfer1::DataType::kHALF;
-    case CompileSpec::DataType::kInt32:
+    case CompileSpec::DataType::kInt:
       return nvinfer1::DataType::kINT32;
     case CompileSpec::DataType::kBool:
       return nvinfer1::DataType::kBOOL;
@@ -47,7 +108,7 @@ CompileSpec::DataType::DataType(c10::ScalarType t) {
       value = DataType::kChar;
       break;
     case at::kInt:
-      value = DataType::kInt32;
+      value = DataType::kInt;
       break;
     case at::kBool:
       value = DataType::kBool;
@@ -250,7 +311,6 @@ core::CompileSpec to_internal_compile_spec(CompileSpec external) {
   /* We want default behavior for types to match PyTorch, so in the case the user did not explicitly set the dtype for
   inputs they will follow PyTorch convetions */
   for (size_t i = 0; i < external.inputs.size(); i++) {
-    std::cout << "EXPLICIT " << external.inputs[i].get_explicit_set_dtype() << std::endl;
     if (!external.inputs[i].get_explicit_set_dtype()) {
       auto& precisions = internal.convert_info.engine_settings.enabled_precisions;
       auto& internal_ins = internal.convert_info.inputs;
@@ -261,9 +321,9 @@ core::CompileSpec to_internal_compile_spec(CompileSpec external) {
       } else {
         internal_ins[i].dtype = nvinfer1::DataType::kFLOAT;
       }
-      std::cout << "internal type: " << internal_ins[i].dtype;
     }
   }
+
   internal.convert_info.engine_settings.disable_tf32 = external.disable_tf32;
   internal.convert_info.engine_settings.refit = external.refit;
   internal.convert_info.engine_settings.debug = external.debug;

@@ -128,8 +128,6 @@ Input::Input(std::vector<int64_t> shape, nvinfer1::DataType dtype, nvinfer1::Ten
   max = util::toDims(shape);
   input_shape = util::toDims(shape);
   input_is_dynamic = false;
-  format = nvinfer1::TensorFormat::kLINEAR;
-  dtype = dtype;
 
   TRTORCH_CHECK(valid_input_dtype(dtype), "Unsupported input data type: " << dtype);
   this->dtype = dtype;
@@ -156,8 +154,6 @@ Input::Input(std::vector<int64_t> min_shape, std::vector<int64_t> opt_shape, std
   min = util::toDims(min_shape);
   opt = util::toDims(opt_shape);
   max = util::toDims(max_shape);
-  format = nvinfer1::TensorFormat::kLINEAR;
-  dtype = nvinfer1::DataType::kFLOAT;
 
   std::vector<int64_t> dyn_shape;
   for (size_t i = 0; i < opt_shape.size(); i++) {
