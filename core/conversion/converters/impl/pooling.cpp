@@ -48,7 +48,7 @@ bool AdaptivePoolingConverter(
 
   auto orig_dims = in->getDimensions();
   bool expandDims = (orig_dims.nbDims < 4);
-
+  TRTORCH_CHECK(orig_dims.nbDims > 2 , "Unable to create pooling layer from node: " << *n);
   if (expandDims) {
     in = addPadding(ctx, n, in, 4, false, false);
   }
@@ -122,6 +122,7 @@ bool PoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& args,
 
   // Max Pool needs at least 4D input
   auto orig_dims = in->getDimensions();
+  TRTORCH_CHECK(orig_dims.nbDims > 2 , "Unable to create pooling layer from node: " << *n);
   bool expandDims = (orig_dims.nbDims < 4);
 
   if (expandDims) {
