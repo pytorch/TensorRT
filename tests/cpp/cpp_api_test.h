@@ -8,7 +8,7 @@
 
 using PathAndInSize = std::pair<std::string, std::vector<std::vector<int64_t>>>;
 
-class ModuleTests : public testing::TestWithParam<PathAndInSize> {
+class CppAPITests : public testing::TestWithParam<PathAndInSize> {
  public:
   void SetUp() override {
     auto params = GetParam();

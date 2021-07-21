@@ -371,6 +371,19 @@ struct TRTORCH_API CompileSpec {
     DataType dtype;
     /// Expected tensor format for the input
     TensorFormat format;
+
+    /**
+     * @brief Construct a new Input spec object for static input size from
+     * vector, optional arguments allow the user to configure expected input shape
+     * tensor format. dtype (Expected data type for the input) defaults to PyTorch
+     * / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8)
+     *
+     * @param shape Input tensor shape
+     * @param dtype Expected data type for the input (Defaults to Float32)
+     * @param format Expected tensor format for the input (Defaults to contiguous)
+     */
+    Input(std::vector<int64_t> shape, TensorFormat format=TensorFormat::kContiguous);
+
     /**
      * @brief Construct a new Input spec object for static input size from
      * vector, optional arguments allow the user to configure expected input shape
@@ -380,7 +393,20 @@ struct TRTORCH_API CompileSpec {
      * @param dtype Expected data type for the input (Defaults to Float32)
      * @param format Expected tensor format for the input (Defaults to contiguous)
      */
-    Input(std::vector<int64_t> shape, DataType dtype=DataType::kFloat, TensorFormat format=TensorFormat::kContiguous);
+    Input(std::vector<int64_t> shape, DataType dtype, TensorFormat format=TensorFormat::kContiguous);
+
+    /**
+     * @brief Construct a new Input spec object for static input size from
+     * c10::ArrayRef (the type produced by tensor.sizes()), vector, optional arguments
+     * allow the user to configure expected input shape tensor format
+     * dtype (Expected data type for the input) defaults to PyTorch
+     * / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8)
+     *
+     * @param shape Input tensor shape
+     * @param format Expected tensor format for the input (Defaults to contiguous)
+     */
+    Input(c10::ArrayRef<int64_t> shape, TensorFormat format=TensorFormat::kContiguous);
+
     /**
      * @brief Construct a new Input spec object for static input size from
      * c10::ArrayRef (the type produced by tensor.sizes()), vector, optional arguments
@@ -390,7 +416,21 @@ struct TRTORCH_API CompileSpec {
      * @param dtype Expected data type for the input (Defaults to Float32)
      * @param format Expected tensor format for the input (Defaults to contiguous)
      */
-    Input(c10::ArrayRef<int64_t> shape, DataType dtype=DataType::kFloat, TensorFormat format=TensorFormat::kContiguous);
+    Input(c10::ArrayRef<int64_t> shape, DataType dtype, TensorFormat format=TensorFormat::kContiguous);
+
+    /**
+     * @brief Construct a new Input Range object dynamic input size from
+     * c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max
+     * supported sizes. dtype (Expected data type for the input) defaults to PyTorch
+     * / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8)
+     *
+     * @param min_shape Minimum shape for input tensor
+     * @param opt_shape Target optimization shape for input tensor
+     * @param max_shape Maximum acceptible shape for input tensor
+     * @param format Expected tensor format for the input (Defaults to contiguous)
+     */
+    Input(std::vector<int64_t> min_shape, std::vector<int64_t> opt_shape, std::vector<int64_t> max_shape, TensorFormat format=TensorFormat::kContiguous);
+
     /**
      * @brief Construct a new Input spec object for a dynamic input size from vectors
      * for minimum shape, optimal shape, and max shape supported sizes optional arguments
@@ -402,7 +442,21 @@ struct TRTORCH_API CompileSpec {
      * @param dtype Expected data type for the input (Defaults to Float32)
      * @param format Expected tensor format for the input (Defaults to contiguous)
      */
-    Input(std::vector<int64_t> min_shape, std::vector<int64_t> opt_shape, std::vector<int64_t> max_shape, DataType dtype=DataType::kFloat, TensorFormat format=TensorFormat::kContiguous);
+    Input(std::vector<int64_t> min_shape, std::vector<int64_t> opt_shape, std::vector<int64_t> max_shape, DataType dtype, TensorFormat format=TensorFormat::kContiguous);
+
+    /**
+     * @brief Construct a new Input Range object dynamic input size from
+     * c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max
+     * supported sizes. dtype (Expected data type for the input) defaults to PyTorch
+     * / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8)
+     *
+     * @param min_shape Minimum shape for input tensor
+     * @param opt_shape Target optimization shape for input tensor
+     * @param max_shape Maximum acceptible shape for input tensor
+     * @param format Expected tensor format for the input (Defaults to contiguous)
+     */
+    Input(c10::ArrayRef<int64_t> min_shape, c10::ArrayRef<int64_t> opt_shape, c10::ArrayRef<int64_t> max_shape, TensorFormat format=TensorFormat::kContiguous);
+
     /**
      * @brief Construct a new Input Range object dynamic input size from
      * c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max
@@ -414,10 +468,12 @@ struct TRTORCH_API CompileSpec {
      * @param dtype Expected data type for the input (Defaults to Float32)
      * @param format Expected tensor format for the input (Defaults to contiguous)
      */
-    Input(c10::ArrayRef<int64_t> min_shape, c10::ArrayRef<int64_t> opt_shape, c10::ArrayRef<int64_t> max_shape, DataType dtype=DataType::kFloat, TensorFormat format=TensorFormat::kContiguous);
+    Input(c10::ArrayRef<int64_t> min_shape, c10::ArrayRef<int64_t> opt_shape, c10::ArrayRef<int64_t> max_shape, DataType dtype, TensorFormat format=TensorFormat::kContiguous);
 
+    bool get_explicit_set_dtype() {return explicit_set_dtype;}
   private:
     bool input_is_dynamic;
+    bool explicit_set_dtype;
   };
 
   /**
@@ -512,7 +568,7 @@ struct TRTORCH_API CompileSpec {
    *
    * @param input_ranges
    */
-  [[deprecated("trtorch::CompileSpec::CompileSpec(std::vector<InputRange> input_ranges) is being deprecated in favor of trtorch::CompileSpec::CompileSpec(std::vector<Input> inputs). trtorch::CompileSpec::CompileSpec(std::vector<InputRange> input_ranges) will be removed in TRTorch v0.5.0")]]
+  [[deprecated("trtorch::CompileSpec::CompileSpec(std::vector<InputRange> input_ranges) is being deprecated in favor of trtorch::CompileSpec::CompileSpec(std::vector<Input> inputs). Please use CompileSpec(std::vector<Input> inputs). trtorch::CompileSpec::CompileSpec(std::vector<InputRange> input_ranges) will be removed in TRTorch v0.5.0")]]
   CompileSpec(std::vector<InputRange> input_ranges) : input_ranges(std::move(input_ranges)) {}
   /**
    * @brief Construct a new Extra Info object
@@ -520,19 +576,36 @@ struct TRTORCH_API CompileSpec {
    * size of input tensors. Each entry in the vector represents a input and
    * should be provided in call order.
    *
+   * This constructor should be use as a convience in the case that all inputs are static sized and
+   * you are okay with default input dtype and formats (FP32 for FP32 and INT8 weights, FP16 for FP16 weights, contiguous)
+   *
    * @param fixed_sizes
    */
-  [[deprecated("trtorch::CompileSpec::InputRange is being deprecated in favor of trtorch::CompileSpec::Input. trtorch::CompileSpec::InputRange will be removed in TRTorch v0.5.0")]]
   CompileSpec(std::vector<std::vector<int64_t>> fixed_sizes);
+
   /**
    * @brief Construct a new Extra Info object
    * Convienence constructor to set fixed input size from c10::ArrayRef's (the
    * output of tensor.sizes()) describing size of input tensors. Each entry in
    * the vector represents a input and should be provided in call order.
+   *
+   * This constructor should be use as a convience in the case that all inputs are static sized and
+   * you are okay with default input dtype and formats (FP32 for FP32 and INT8 weights, FP16 for FP16 weights, contiguous)
+   *
    * @param fixed_sizes
    */
-  [[deprecated("trtorch::CompileSpec::InputRange is being deprecated in favor of trtorch::CompileSpec::Input. trtorch::CompileSpec::InputRange will be removed in TRTorch v0.5.0")]]
   CompileSpec(std::vector<c10::ArrayRef<int64_t>> fixed_sizes);
+
+  /**
+   * @brief Construct a new Extra Info object from input ranges.
+   * Each entry in the vector represents a input and should be provided in call
+   * order.
+   *
+   * Use this constructor to define inputs with dynamic shape, specific input types or tensor formats
+   *
+   * @param inputs
+   */
+  CompileSpec(std::vector<Input> inputs) : inputs(std::move(inputs)) {}
 
   // Defaults should reflect TensorRT defaults for BuilderConfig
 

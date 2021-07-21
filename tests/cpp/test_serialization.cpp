@@ -1,7 +1,7 @@
-#include "module_test.h"
+#include "cpp_api_test.h"
 
-std::vector<trtorch::CompileSpec::InputRange> toInputRangesDynamic(std::vector<std::vector<int64_t>> opts) {
-  std::vector<trtorch::CompileSpec::InputRange> a;
+std::vector<trtorch::CompileSpec::Input> toInputRangesDynamic(std::vector<std::vector<int64_t>> opts) {
+  std::vector<trtorch::CompileSpec::Input> a;
 
   for (auto opt : opts) {
     std::vector<int64_t> min_range(opt);
@@ -12,13 +12,13 @@ std::vector<trtorch::CompileSpec::InputRange> toInputRangesDynamic(std::vector<s
     min_range[2] = ceil(opt[2] / 2.0);
     max_range[2] = 2 * opt[2];
 
-    a.push_back(trtorch::CompileSpec::InputRange(min_range, opt, max_range));
+    a.push_back(trtorch::CompileSpec::Input(min_range, opt, max_range));
   }
 
   return std::move(a);
 }
 
-TEST_P(ModuleTests, SerializedModuleIsStillCorrect) {
+TEST_P(CppAPITests, SerializedModuleIsStillCorrect) {
   std::vector<torch::jit::IValue> post_serialized_inputs_ivalues;
   std::vector<torch::jit::IValue> pre_serialized_inputs_ivalues;
   for (auto in_shape : input_shapes) {
@@ -47,7 +47,7 @@ TEST_P(ModuleTests, SerializedModuleIsStillCorrect) {
   }
 }
 
-TEST_P(ModuleTests, SerializedDynamicModuleIsStillCorrect) {
+TEST_P(CppAPITests, SerializedDynamicModuleIsStillCorrect) {
   std::vector<torch::jit::IValue> post_serialized_inputs_ivalues;
   std::vector<torch::jit::IValue> pre_serialized_inputs_ivalues;
   for (auto in_shape : input_shapes) {
@@ -56,7 +56,7 @@ TEST_P(ModuleTests, SerializedDynamicModuleIsStillCorrect) {
     pre_serialized_inputs_ivalues.push_back(in.clone());
   }
 
-  auto pre_serialized_mod = trtorch::CompileGraph(mod, toInputRangesDynamic(input_shapes));
+  auto pre_serialized_mod = trtorch::CompileGraph(mod, trtorch::CompileSpec(toInputRangesDynamic(input_shapes)));
   torch::jit::IValue pre_serialized_results_ivalues =
       trtorch::tests::util::RunModuleForward(pre_serialized_mod, pre_serialized_inputs_ivalues);
   std::vector<at::Tensor> pre_serialized_results;
@@ -78,7 +78,7 @@ TEST_P(ModuleTests, SerializedDynamicModuleIsStillCorrect) {
 
 INSTANTIATE_TEST_SUITE_P(
     CompiledModuleForwardIsCloseSuite,
-    ModuleTests,
+    CppAPITests,
     testing::Values(
         PathAndInSize({"tests/modules/resnet18_traced.jit.pt", {{1, 3, 224, 224}}}),
         PathAndInSize({"tests/modules/pooling_traced.jit.pt", {{1, 3, 10, 10}}})));

@@ -13,7 +13,7 @@ class TestCompile(ModelTestCase):
         self.traced_model = torch.jit.trace(self.model, [self.input])
         self.scripted_model = torch.jit.script(self.model)
 
-    def test_compile_traced(self):
+    def test_compile_traced_deprecated(self):
         compile_spec = {
             "input_shapes": [self.input.shape],
             "device": {
@@ -29,7 +29,7 @@ class TestCompile(ModelTestCase):
         same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
         self.assertTrue(same < 2e-3)
 
-    def test_compile_script(self):
+    def test_compile_script_deprecated(self):
         compile_spec = {
             "input_shapes": [self.input.shape],
             "device": {
@@ -45,6 +45,75 @@ class TestCompile(ModelTestCase):
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
         self.assertTrue(same < 2e-3)
 
+    def test_compile_traced(self):
+        compile_spec = {
+            "inputs": [trtorch.Input(self.input.shape, dtype=torch.float, format=torch.contiguous_format)],
+            "device": {
+                "device_type": trtorch.DeviceType.GPU,
+                "gpu_id": 0,
+            },
+            "enabled_precisions": {torch.float}
+        }
+
+        trt_mod = trtorch.compile(self.traced_model, compile_spec)
+        same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
+        self.assertTrue(same < 2e-2)
+
+    def test_compile_script(self):
+        compile_spec = {
+            "inputs": [trtorch.Input(shape=self.input.shape)],
+            "device": {
+                "device_type": trtorch.DeviceType.GPU,
+                "gpu_id": 0,
+            },
+            "enabled_precisions": {torch.float}
+        }
+
+        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
+        same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
+        self.assertTrue(same < 2e-2)
+
+class TestCompileHalf(ModelTestCase):
+
+    def setUp(self):
+        self.input = torch.randn((1, 3, 224, 224)).to("cuda")
+        self.scripted_model = torch.jit.script(self.model)
+        self.scripted_model.half()
+
+    def test_compile_script_half(self):
+        compile_spec = {
+            "inputs": [trtorch.Input(shape=self.input.shape, dtype=torch.half)],
+            "device": {
+                "device_type": trtorch.DeviceType.GPU,
+                "gpu_id": 0,
+            },
+            "enabled_precisions": {torch.half}
+        }
+
+        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
+        same = (trt_mod(self.input.half()) - self.scripted_model(self.input.half())).abs().max()
+        self.assertTrue(same < 2e-2)
+
+class TestCompileHalfDefault(ModelTestCase):
+
+    def setUp(self):
+        self.input = torch.randn((1, 3, 224, 224)).to("cuda")
+        self.scripted_model = torch.jit.script(self.model)
+        self.scripted_model.half()
+
+    def test_compile_script_half_by_default(self):
+        compile_spec = {
+            "inputs": [trtorch.Input(shape=self.input.shape)],
+            "device": {
+                "device_type": trtorch.DeviceType.GPU,
+                "gpu_id": 0,
+            },
+            "enabled_precisions": {torch.float, torch.half}
+        }
+
+        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
+        same = (trt_mod(self.input.half()) - self.scripted_model(self.input.half())).abs().max()
+        self.assertTrue(same < 2e-2)
 
 class TestFallbackToTorch(ModelTestCase):
 
@@ -54,7 +123,7 @@ class TestFallbackToTorch(ModelTestCase):
 
     def test_compile_script(self):
         compile_spec = {
-            "input_shapes": [self.input.shape],
+            "inputs": [trtorch.Input(self.input.shape)],
             "device": {
                 "device_type": trtorch.DeviceType.GPU,
                 "gpu_id": 0,
@@ -82,7 +151,7 @@ class TestPTtoTRTtoPT(ModelTestCase):
 
     def test_pt_to_trt_to_pt(self):
         compile_spec = {
-            "input_shapes": [self.input.shape],
+            "inputs": [trtorch.Input(self.input.shape)],
             "device": {
                 "device_type": trtorch.DeviceType.GPU,
                 "gpu_id": 0,
@@ -133,6 +202,8 @@ def test_suite():
     suite.addTest(unittest.makeSuite(TestLoggingAPIs))
     suite.addTest(TestCompile.parametrize(TestCompile, model=models.resnet18(pretrained=True)))
     suite.addTest(TestCompile.parametrize(TestCompile, model=models.mobilenet_v2(pretrained=True)))
+    suite.addTest(TestCompileHalf.parametrize(TestCompileHalf, model=models.resnet18(pretrained=True)))
+    suite.addTest(TestCompileHalfDefault.parametrize(TestCompileHalfDefault, model=models.resnet18(pretrained=True)))
     suite.addTest(TestPTtoTRTtoPT.parametrize(TestPTtoTRTtoPT, model=models.mobilenet_v2(pretrained=True)))
     suite.addTest(TestFallbackToTorch.parametrize(TestFallbackToTorch, model=models.resnet18(pretrained=True)))
     suite.addTest(unittest.makeSuite(TestCheckMethodOpSupport))

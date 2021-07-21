@@ -105,23 +105,46 @@ CompileSpec::InputRange::InputRange(c10::IntArrayRef min, c10::IntArrayRef opt, 
 
 CompileSpec::CompileSpec(std::vector<c10::ArrayRef<int64_t>> fixed_sizes) {
   for (auto in : fixed_sizes) {
-    input_ranges.push_back(InputRange(in));
+    inputs.push_back(Input(in));
   }
 }
 
 CompileSpec::CompileSpec(std::vector<std::vector<int64_t>> fixed_sizes) {
   for (auto in : fixed_sizes) {
-    input_ranges.push_back(InputRange(in));
+    inputs.push_back(Input(in));
   }
 }
 
 /* ====== DEFINE INPUTS CLASS MEMBERS ======*/
+CompileSpec::Input::Input(std::vector<int64_t> shape, TensorFormat format) {
+  this->opt_shape = shape;
+  this->min_shape = shape;
+  this->max_shape = shape;
+  this->shape = shape;
+  this->dtype = dtype;
+  this->explicit_set_dtype = false;
+  this->format = format;
+  this->input_is_dynamic = false;
+}
+
 CompileSpec::Input::Input(std::vector<int64_t> shape, DataType dtype, TensorFormat format) {
   this->opt_shape = shape;
   this->min_shape = shape;
   this->max_shape = shape;
   this->shape = shape;
   this->dtype = dtype;
+  this->explicit_set_dtype = true;
+  this->format = format;
+  this->input_is_dynamic = false;
+}
+
+CompileSpec::Input::Input(c10::IntArrayRef shape, TensorFormat format) {
+  this->opt_shape = core::util::toVec(shape);
+  this->min_shape = core::util::toVec(shape);
+  this->max_shape = core::util::toVec(shape);
+  this->shape = core::util::toVec(shape);
+  this->dtype = DataType::kFloat;
+  this->explicit_set_dtype = false;
   this->format = format;
   this->input_is_dynamic = false;
 }
@@ -132,8 +155,20 @@ CompileSpec::Input::Input(c10::IntArrayRef shape, DataType dtype, TensorFormat f
   this->max_shape = core::util::toVec(shape);
   this->shape = core::util::toVec(shape);
   this->dtype = dtype;
+  this->explicit_set_dtype = true;
   this->format = format;
   this->input_is_dynamic = false;
+}
+
+CompileSpec::Input::Input(std::vector<int64_t> min_shape, std::vector<int64_t> opt_shape, std::vector<int64_t> max_shape, TensorFormat format) {
+  this->opt_shape = opt_shape;
+  this->min_shape = min_shape;
+  this->max_shape = max_shape;
+  this->shape = core::util::toVec(core::ir::Input(this->min_shape, this->opt_shape, this->max_shape).input_shape);
+  this->dtype = dtype;
+  this->explicit_set_dtype = false;
+  this->format = format;
+  this->input_is_dynamic = true;
 }
 
 CompileSpec::Input::Input(std::vector<int64_t> min_shape, std::vector<int64_t> opt_shape, std::vector<int64_t> max_shape, DataType dtype, TensorFormat format) {
@@ -142,6 +177,18 @@ CompileSpec::Input::Input(std::vector<int64_t> min_shape, std::vector<int64_t> o
   this->max_shape = max_shape;
   this->shape = core::util::toVec(core::ir::Input(this->min_shape, this->opt_shape, this->max_shape).input_shape);
   this->dtype = dtype;
+  this->explicit_set_dtype = true;
+  this->format = format;
+  this->input_is_dynamic = true;
+}
+
+CompileSpec::Input::Input(c10::IntArrayRef min_shape, c10::IntArrayRef opt_shape, c10::IntArrayRef max_shape, TensorFormat format) {
+  this->opt_shape = core::util::toVec(opt_shape);
+  this->min_shape = core::util::toVec(min_shape);
+  this->max_shape = core::util::toVec(max_shape);
+  this->shape = core::util::toVec(core::ir::Input(this->min_shape, this->opt_shape, this->max_shape).input_shape);
+  this->dtype = dtype;
+  this->explicit_set_dtype = false;
   this->format = format;
   this->input_is_dynamic = true;
 }
@@ -152,6 +199,7 @@ CompileSpec::Input::Input(c10::IntArrayRef min_shape, c10::IntArrayRef opt_shape
   this->max_shape = core::util::toVec(max_shape);
   this->shape = core::util::toVec(core::ir::Input(this->min_shape, this->opt_shape, this->max_shape).input_shape);
   this->dtype = dtype;
+  this->explicit_set_dtype = true;
   this->format = format;
   this->input_is_dynamic = true;
 }
@@ -191,7 +239,7 @@ core::CompileSpec to_internal_compile_spec(CompileSpec external) {
     internal = core::CompileSpec(to_vec_internal_inputs(external.inputs));
   }
 
-  if (external.enabled_precisions.size() <= 1 && toTRTDataType(external.op_precision) != nvinfer1::DataType::kFLOAT) {
+  if (external.enabled_precisions.size() <= 1 && toTRTDataType(*external.enabled_precisions.begin()) ==  nvinfer1::DataType::kFLOAT && toTRTDataType(external.op_precision) != nvinfer1::DataType::kFLOAT) {
     internal.convert_info.engine_settings.enabled_precisions.insert(toTRTDataType(external.op_precision));
   } else {
     for(auto p : external.enabled_precisions) {
@@ -199,6 +247,23 @@ core::CompileSpec to_internal_compile_spec(CompileSpec external) {
     }
   }
 
+  /* We want default behavior for types to match PyTorch, so in the case the user did not explicitly set the dtype for
+  inputs they will follow PyTorch convetions */
+  for (size_t i = 0; i < external.inputs.size(); i++) {
+    std::cout << "EXPLICIT " << external.inputs[i].get_explicit_set_dtype() << std::endl;
+    if (!external.inputs[i].get_explicit_set_dtype()) {
+      auto& precisions = internal.convert_info.engine_settings.enabled_precisions;
+      auto& internal_ins = internal.convert_info.inputs;
+      if (precisions.find(nvinfer1::DataType::kINT8) != precisions.end()) {
+        internal_ins[i].dtype = nvinfer1::DataType::kFLOAT;
+      } else if (precisions.find(nvinfer1::DataType::kHALF) != precisions.end()) {
+        internal_ins[i].dtype = nvinfer1::DataType::kHALF;
+      } else {
+        internal_ins[i].dtype = nvinfer1::DataType::kFLOAT;
+      }
+      std::cout << "internal type: " << internal_ins[i].dtype;
+    }
+  }
   internal.convert_info.engine_settings.disable_tf32 = external.disable_tf32;
   internal.convert_info.engine_settings.refit = external.refit;
   internal.convert_info.engine_settings.debug = external.debug;
