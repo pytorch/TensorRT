@@ -62,13 +62,15 @@ std::ostream& operator<<(std::ostream& os, const CompileSpec::Input& input) {
   };
 
   if (!input.input_is_dynamic) {
-    os << "Input(shape: " << vec_to_str(input.shape) << ", dtype: " << input.dtype << ", format: " << input.format << ')';
+    os << "Input(shape: " << vec_to_str(input.shape) << ", dtype: " << input.dtype << ", format: " << input.format
+       << ')';
   } else {
-    os << "Input(shape: " << vec_to_str(input.shape) << ", min: " << vec_to_str(input.min_shape) << ", opt: " << vec_to_str(input.opt_shape) << ", max: " << vec_to_str(input.max_shape) << ", dtype: " << input.dtype << ", format: " << input.format << ')';
+    os << "Input(shape: " << vec_to_str(input.shape) << ", min: " << vec_to_str(input.min_shape)
+       << ", opt: " << vec_to_str(input.opt_shape) << ", max: " << vec_to_str(input.max_shape)
+       << ", dtype: " << input.dtype << ", format: " << input.format << ')';
   }
   return os;
 }
-
 
 nvinfer1::DataType toTRTDataType(CompileSpec::DataType value) {
   switch (value) {
@@ -122,8 +124,7 @@ CompileSpec::DataType::DataType(c10::ScalarType t) {
 
 CompileSpec::TensorFormat::TensorFormat(at::MemoryFormat t) {
   TRTORCH_CHECK(
-    t == at::MemoryFormat::Contiguous || t == at::MemoryFormat::ChannelsLast, "Tensor format is unsupported"
-  );
+      t == at::MemoryFormat::Contiguous || t == at::MemoryFormat::ChannelsLast, "Tensor format is unsupported");
 
   switch (t) {
     case at::MemoryFormat::ChannelsLast:
@@ -221,7 +222,11 @@ CompileSpec::Input::Input(c10::IntArrayRef shape, DataType dtype, TensorFormat f
   this->input_is_dynamic = false;
 }
 
-CompileSpec::Input::Input(std::vector<int64_t> min_shape, std::vector<int64_t> opt_shape, std::vector<int64_t> max_shape, TensorFormat format) {
+CompileSpec::Input::Input(
+    std::vector<int64_t> min_shape,
+    std::vector<int64_t> opt_shape,
+    std::vector<int64_t> max_shape,
+    TensorFormat format) {
   this->opt_shape = opt_shape;
   this->min_shape = min_shape;
   this->max_shape = max_shape;
@@ -232,7 +237,12 @@ CompileSpec::Input::Input(std::vector<int64_t> min_shape, std::vector<int64_t> o
   this->input_is_dynamic = true;
 }
 
-CompileSpec::Input::Input(std::vector<int64_t> min_shape, std::vector<int64_t> opt_shape, std::vector<int64_t> max_shape, DataType dtype, TensorFormat format) {
+CompileSpec::Input::Input(
+    std::vector<int64_t> min_shape,
+    std::vector<int64_t> opt_shape,
+    std::vector<int64_t> max_shape,
+    DataType dtype,
+    TensorFormat format) {
   this->opt_shape = opt_shape;
   this->min_shape = min_shape;
   this->max_shape = max_shape;
@@ -243,7 +253,11 @@ CompileSpec::Input::Input(std::vector<int64_t> min_shape, std::vector<int64_t> o
   this->input_is_dynamic = true;
 }
 
-CompileSpec::Input::Input(c10::IntArrayRef min_shape, c10::IntArrayRef opt_shape, c10::IntArrayRef max_shape, TensorFormat format) {
+CompileSpec::Input::Input(
+    c10::IntArrayRef min_shape,
+    c10::IntArrayRef opt_shape,
+    c10::IntArrayRef max_shape,
+    TensorFormat format) {
   this->opt_shape = core::util::toVec(opt_shape);
   this->min_shape = core::util::toVec(min_shape);
   this->max_shape = core::util::toVec(max_shape);
@@ -254,7 +268,12 @@ CompileSpec::Input::Input(c10::IntArrayRef min_shape, c10::IntArrayRef opt_shape
   this->input_is_dynamic = true;
 }
 
-CompileSpec::Input::Input(c10::IntArrayRef min_shape, c10::IntArrayRef opt_shape, c10::IntArrayRef max_shape, DataType dtype, TensorFormat format) {
+CompileSpec::Input::Input(
+    c10::IntArrayRef min_shape,
+    c10::IntArrayRef opt_shape,
+    c10::IntArrayRef max_shape,
+    DataType dtype,
+    TensorFormat format) {
   this->opt_shape = core::util::toVec(opt_shape);
   this->min_shape = core::util::toVec(min_shape);
   this->max_shape = core::util::toVec(max_shape);
@@ -306,17 +325,19 @@ core::runtime::CudaDevice to_internal_cuda_device(CompileSpec::Device device) {
 
 core::CompileSpec to_internal_compile_spec(CompileSpec external) {
   core::CompileSpec internal(to_vec_internal_inputs(external.inputs));
-  if (external.input_ranges.size() > 0 ) {
+  if (external.input_ranges.size() > 0) {
     internal = core::CompileSpec(to_vec_internal_inputs(external.input_ranges));
   } else {
     TRTORCH_CHECK(external.inputs.size() > 0, "Compilation requires at least one input specification");
     internal = core::CompileSpec(to_vec_internal_inputs(external.inputs));
   }
 
-  if (external.enabled_precisions.size() <= 1 && toTRTDataType(*external.enabled_precisions.begin()) ==  nvinfer1::DataType::kFLOAT && toTRTDataType(external.op_precision) != nvinfer1::DataType::kFLOAT) {
+  if (external.enabled_precisions.size() <= 1 &&
+      toTRTDataType(*external.enabled_precisions.begin()) == nvinfer1::DataType::kFLOAT &&
+      toTRTDataType(external.op_precision) != nvinfer1::DataType::kFLOAT) {
     internal.convert_info.engine_settings.enabled_precisions.insert(toTRTDataType(external.op_precision));
   } else {
-    for(auto p : external.enabled_precisions) {
+    for (auto p : external.enabled_precisions) {
       internal.convert_info.engine_settings.enabled_precisions.insert(toTRTDataType(p));
     }
   }
@@ -375,7 +396,8 @@ core::CompileSpec to_internal_compile_spec(CompileSpec external) {
   internal.convert_info.engine_settings.num_avg_timing_iters = external.num_avg_timing_iters;
   internal.convert_info.engine_settings.workspace_size = external.workspace_size;
 
-  if (internal.convert_info.engine_settings.enabled_precisions.find(nvinfer1::DataType::kINT8) != internal.convert_info.engine_settings.enabled_precisions.end()) {
+  if (internal.convert_info.engine_settings.enabled_precisions.find(nvinfer1::DataType::kINT8) !=
+      internal.convert_info.engine_settings.enabled_precisions.end()) {
     internal.convert_info.engine_settings.calibrator = external.ptq_calibrator;
   } else {
     internal.convert_info.engine_settings.calibrator = nullptr;

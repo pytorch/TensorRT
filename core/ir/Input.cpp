@@ -131,11 +131,20 @@ Input::Input(std::vector<int64_t> shape, nvinfer1::DataType dtype, nvinfer1::Ten
 
   TRTORCH_CHECK(valid_input_dtype(dtype), "Unsupported input data type: " << dtype);
   this->dtype = dtype;
-  TRTORCH_CHECK(valid_dtype_format_combo(dtype, format), "Unsupported combination of dtype and tensor format: (" << dtype << ", " << format << "), TRTorch only supports contiguous format (NCHW) except with input type Float32 where channel last (NHWC) is also supported");
+  TRTORCH_CHECK(
+      valid_dtype_format_combo(dtype, format),
+      "Unsupported combination of dtype and tensor format: ("
+          << dtype << ", " << format
+          << "), TRTorch only supports contiguous format (NCHW) except with input type Float32 where channel last (NHWC) is also supported");
   this->format = format;
 }
 
-Input::Input(std::vector<int64_t> min_shape, std::vector<int64_t> opt_shape, std::vector<int64_t> max_shape, nvinfer1::DataType dtype, nvinfer1::TensorFormat format) {
+Input::Input(
+    std::vector<int64_t> min_shape,
+    std::vector<int64_t> opt_shape,
+    std::vector<int64_t> max_shape,
+    nvinfer1::DataType dtype,
+    nvinfer1::TensorFormat format) {
   if (min_shape.size() > 5 || opt_shape.size() > 5 || max_shape.size() > 5) {
     LOG_WARNING("Verify that this dim size is accepted");
   }
@@ -174,7 +183,11 @@ Input::Input(std::vector<int64_t> min_shape, std::vector<int64_t> opt_shape, std
 
   TRTORCH_CHECK(valid_input_dtype(dtype), "Unsupported input data type: " << dtype);
   this->dtype = dtype;
-  TRTORCH_CHECK(valid_dtype_format_combo(dtype, format), "Unsupported combination of dtype and tensor format: (" << dtype << ", " << format << "), TRTorch only supports contiguous format (NCHW) except with input type Float32 where channel last (NHWC) is also supported");
+  TRTORCH_CHECK(
+      valid_dtype_format_combo(dtype, format),
+      "Unsupported combination of dtype and tensor format: ("
+          << dtype << ", " << format
+          << "), TRTorch only supports contiguous format (NCHW) except with input type Float32 where channel last (NHWC) is also supported");
   this->format = format;
 }
 
@@ -182,7 +195,8 @@ std::ostream& operator<<(std::ostream& os, const Input& input) {
   if (!input.input_is_dynamic) {
     os << "Input(shape: " << input.input_shape << ", dtype: " << input.dtype << ", format: " << input.format << ')';
   } else {
-    os << "Input(shape: " << input.input_shape << ", min: " << input.min << ", opt: " << input.opt << ", max: " << input.max << ", dtype: " << input.dtype << ", format: " << input.format << ')';
+    os << "Input(shape: " << input.input_shape << ", min: " << input.min << ", opt: " << input.opt
+       << ", max: " << input.max << ", dtype: " << input.dtype << ", format: " << input.format << ')';
   }
   return os;
 }

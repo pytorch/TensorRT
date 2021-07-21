@@ -6,6 +6,7 @@ import torch
 from trtorch import _types
 import trtorch._C
 
+
 class Input(object):
     """
     Defines an input to a module in terms of expected shape, data type and tensor format.
@@ -60,39 +61,45 @@ class Input(object):
         if len(args) == 1:
             if not Input._supported_input_size_type(args[0]):
                 raise TypeError(
-                "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
-                + str(type(args[0])))
+                    "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
+                    + str(type(args[0])))
             if any(k in kwargs for k in ["min_shape", "opt_shape", "max_shape"]):
-                raise ValueError("Found that both shape (as a positional argument), and one or more of min_shape, opt_shape, max_shape were specified\nclass Input expects that only either shape or all three of min_shape, opt_shape, max_shape are defined")
+                raise ValueError(
+                    "Found that both shape (as a positional argument), and one or more of min_shape, opt_shape, max_shape were specified\nclass Input expects that only either shape or all three of min_shape, opt_shape, max_shape are defined"
+                )
             self.shape = tuple(args[0])
             self.shape_mode = Input._ShapeMode.STATIC
 
         elif len(args) == 0:
-            if not ("shape" in kwargs) and not(all(k in kwargs for k in ["min_shape", "opt_shape", "max_shape"])):
-                raise ValueError("Missing required arguments for class Input\nEither shape or all three of min_shape, opt_shape, max_shape must be defined")
+            if not ("shape" in kwargs) and not (all(k in kwargs for k in ["min_shape", "opt_shape", "max_shape"])):
+                raise ValueError(
+                    "Missing required arguments for class Input\nEither shape or all three of min_shape, opt_shape, max_shape must be defined"
+                )
             elif ("shape" in kwargs) and all(k in kwargs for k in ["min_shape", "opt_shape", "max_shape"]):
-                raise ValueError("Found that both shape, and one or more of min_shape, opt_shape, max_shape were specified\nclass Input expects that only either shape or all three of min_shape, opt_shape, max_shape are defined")
+                raise ValueError(
+                    "Found that both shape, and one or more of min_shape, opt_shape, max_shape were specified\nclass Input expects that only either shape or all three of min_shape, opt_shape, max_shape are defined"
+                )
 
             if "shape" in kwargs:
                 if not Input._supported_input_size_type(kwargs["shape"]):
                     raise TypeError(
-                    "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
-                    + str(type(kwargs["shape"])))
+                        "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
+                        + str(type(kwargs["shape"])))
                 self.shape = tuple(kwargs["shape"])
                 self.shape_mode = Input._ShapeMode.STATIC
             else:
                 if not Input._supported_input_size_type(kwargs["min_shape"]):
                     raise TypeError(
-                    "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
-                    + str(type(kwargs["min_shape"])) + " for min_shape")
+                        "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
+                        + str(type(kwargs["min_shape"])) + " for min_shape")
                 if not Input._supported_input_size_type(kwargs["opt_shape"]):
                     raise TypeError(
-                    "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
-                    + str(type(kwargs["opt_shape"])) + " for opt_shape")
+                        "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
+                        + str(type(kwargs["opt_shape"])) + " for opt_shape")
                 if not Input._supported_input_size_type(kwargs["max_shape"]):
                     raise TypeError(
-                    "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
-                    + str(type(kwargs["max_shape"])) + " for max_shape")
+                        "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
+                        + str(type(kwargs["max_shape"])) + " for max_shape")
 
                 self.shape = {
                     "min_shape": tuple(kwargs["min_shape"]),
@@ -102,7 +109,9 @@ class Input(object):
                 self.shape_mode = Input._ShapeMode.DYNAMIC
 
         else:
-            raise ValueError("Unexpected number of positional arguments for class Input \n    Found {} arguments, expected either zero or a single positional arguments".format(len(args)))
+            raise ValueError(
+                "Unexpected number of positional arguments for class Input \n    Found {} arguments, expected either zero or a single positional arguments"
+                .format(len(args)))
 
         if "dtype" in kwargs:
             self.dtype = Input._parse_dtype(kwargs["dtype"])
@@ -115,7 +124,9 @@ class Input(object):
         if self.shape_mode == Input._ShapeMode.STATIC:
             return "Input(shape={}, dtype={}, format={})".format(self.shape, str(self.dtype), str(self.format))
         elif self.shape_mode == Input._ShapeMode.DYNAMIC:
-            return "Input(min_shape={}, opt_shape={}, max_shape={}, dtype={}, format={})".format(self.shape["min_shape"], self.shape["min_shape"], self.shape["min_shape"], str(self.dtype), str(self.format))
+            return "Input(min_shape={}, opt_shape={}, max_shape={}, dtype={}, format={})".format(
+                self.shape["min_shape"], self.shape["min_shape"], self.shape["min_shape"], str(self.dtype),
+                str(self.format))
         else:
             raise RuntimeError("Unknown input shape mode")
 
@@ -157,8 +168,9 @@ class Input(object):
             elif dtype == torch.bool:
                 return _types.dtype.bool
             else:
-                raise TypeError("Provided an unsupported data type as an input data type (support: bool, int32, half, float), got: " +
-                                str(dtype))
+                raise TypeError(
+                    "Provided an unsupported data type as an input data type (support: bool, int32, half, float), got: "
+                    + str(dtype))
 
         elif isinstance(dtype, _types.DataTypes):
             return dtype
@@ -175,10 +187,12 @@ class Input(object):
             elif format == torch.channels_last:
                 return _types.TensorFormat.channel_last
             else:
-                raise ValueError("Provided an unsupported tensor format (support: NHCW/contiguous_format, NHWC/channel_last)")
+                raise ValueError(
+                    "Provided an unsupported tensor format (support: NHCW/contiguous_format, NHWC/channel_last)")
 
         elif isinstance(format, _types.TensorFormat):
             return format
 
         else:
-            raise TypeError("Tensor format needs to be specified with either torch.memory_format or trtorch.TensorFormat")
+            raise TypeError(
+                "Tensor format needs to be specified with either torch.memory_format or trtorch.TensorFormat")

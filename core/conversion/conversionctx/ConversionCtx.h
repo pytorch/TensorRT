@@ -2,8 +2,8 @@
 
 #include <map>
 #include <memory>
-#include <unordered_map>
 #include <set>
+#include <unordered_map>
 
 #include "NvInfer.h"
 #include "torch/csrc/jit/ir/ir.h"

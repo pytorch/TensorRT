@@ -60,7 +60,7 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
   LOG_DEBUG(build_settings);
   cfg = builder->createBuilderConfig();
 
-  for(auto p = settings.enabled_precisions.begin(); p != settings.enabled_precisions.end(); ++p) {
+  for (auto p = settings.enabled_precisions.begin(); p != settings.enabled_precisions.end(); ++p) {
     switch (*p) {
       case nvinfer1::DataType::kHALF:
         TRTORCH_CHECK(builder->platformHasFastFp16(), "Requested inference in FP16 but platform does not support FP16");
@@ -121,7 +121,9 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
         static_cast<int>(settings.device.dla_core) < nbDLACores,
         "Configured DLA Core ID: " << settings.device.dla_core
                                    << " not available. Total number of available DLA Cores: " << nbDLACores);
-    TRTORCH_CHECK(settings.enabled_precisions.find(nvinfer1::DataType::kFLOAT) == settings.enabled_precisions.end(), "DLA supports only fp16 or int8 precision");
+    TRTORCH_CHECK(
+        settings.enabled_precisions.find(nvinfer1::DataType::kFLOAT) == settings.enabled_precisions.end(),
+        "DLA supports only fp16 or int8 precision");
     cfg->setDLACore(settings.device.dla_core);
   }
 }

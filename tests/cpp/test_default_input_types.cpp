@@ -13,7 +13,6 @@ TEST_P(CppAPITests, InputsUseDefault) {
   auto spec = trtorch::CompileSpec({in});
   spec.enabled_precisions.insert(trtorch::CompileSpec::DataType::kHalf);
 
-
   mod.to(torch::kHalf);
 
   auto trt_mod = trtorch::CompileGraph(mod, spec);
@@ -26,5 +25,4 @@ TEST_P(CppAPITests, InputsUseDefault) {
 INSTANTIATE_TEST_SUITE_P(
     CompiledModuleForwardIsCloseSuite,
     CppAPITests,
-    testing::Values(
-        PathAndInSize({"tests/modules/resnet18_traced.jit.pt", {{1, 3, 224, 224}}})));
+    testing::Values(PathAndInSize({"tests/modules/resnet18_traced.jit.pt", {{1, 3, 224, 224}}})));

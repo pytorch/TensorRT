@@ -29,7 +29,8 @@ def _parse_input_ranges(input_sizes: List) -> List:
     for i in input_sizes:
         if isinstance(i, dict):
             if all(k in i for k in ["min", "opt", "min"]):
-                parsed_input_sizes.append(Input(min_shape=i["min"], opt_shape=i["opt"], max_shape=i["max"])._to_internal())
+                parsed_input_sizes.append(
+                    Input(min_shape=i["min"], opt_shape=i["opt"], max_shape=i["max"])._to_internal())
 
             elif "opt" in i:
                 parsed_input_sizes.append(Input(shape=i["opt"])._to_internal())
@@ -78,6 +79,7 @@ def _parse_enabled_precisions(precisions: Any) -> Set:
     else:
         parsed_precisions.add(_parse_op_precision(precisions))
     return parsed_precisions
+
 
 def _parse_device_type(device: Any) -> _types.DeviceType:
     if isinstance(device, torch.device):
@@ -139,6 +141,7 @@ def _parse_torch_fallback(fallback_info: Dict[str, Any]) -> trtorch._C.TorchFall
 
     return info
 
+
 def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
     info = trtorch._C.CompileSpec()
     if "input_shapes" not in compile_spec and "inputs" not in compile_spec:
@@ -152,11 +155,13 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
         )
 
     if "input_shapes" in compile_spec:
-        warnings.warn("Key \"input_shapes\" is deprecated in favor of \"inputs\". Support for \"input_shapes\" will be removed in TRTorch v0.5.0", DeprecationWarning)
+        warnings.warn(
+            "Key \"input_shapes\" is deprecated in favor of \"inputs\". Support for \"input_shapes\" will be removed in TRTorch v0.5.0",
+            DeprecationWarning)
         info.inputs = _parse_input_ranges(compile_spec["input_shapes"])
 
     if "inputs" in compile_spec:
-        info.inputs = [ i._to_internal() for i in compile_spec["inputs"] ]
+        info.inputs = [i._to_internal() for i in compile_spec["inputs"]]
 
     if "op_precision" in compile_spec and "enabled_precisions" in compile_spec:
         raise KeyError(
@@ -164,7 +169,9 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
         )
 
     if "op_precision" in compile_spec:
-        warnings.warn("Key \"op_precision\" is being deprecated in favor of \"enabled_precision\" which expects a set of precisions to be enabled during compilation (FP32 will always be enabled), Support for \"op_precision\" will be removed in TRTorch v0.5.0", DeprecationWarning)
+        warnings.warn(
+            "Key \"op_precision\" is being deprecated in favor of \"enabled_precision\" which expects a set of precisions to be enabled during compilation (FP32 will always be enabled), Support for \"op_precision\" will be removed in TRTorch v0.5.0",
+            DeprecationWarning)
         info.enabled_precisions = _parse_enabled_precisions(compile_spec["op_precision"])
 
     if "enabled_precisions" in compile_spec:

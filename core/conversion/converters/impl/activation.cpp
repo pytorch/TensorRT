@@ -177,8 +177,9 @@ auto acthardtanh TRTORCH_UNUSED =
                     std::string pluginName = "CustomGeluPluginDynamic";
                     nvinfer1::PluginFieldCollection fc;
                     std::vector<nvinfer1::PluginField> f;
-                    //REVIEW is this right?
-                    int type_id = ctx->settings.enabled_precisions.find(nvinfer1::DataType::kHALF) == ctx->settings.enabled_precisions.end()
+                    // REVIEW is this right?
+                    int type_id = ctx->settings.enabled_precisions.find(nvinfer1::DataType::kHALF) ==
+                            ctx->settings.enabled_precisions.end()
                         ? 0
                         : 1; // Integer encoding the DataType (0: FP32, 1: FP16)
                     f.emplace_back(nvinfer1::PluginField("type_id", &type_id, nvinfer1::PluginFieldType::kINT32, 1));

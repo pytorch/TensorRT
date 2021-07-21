@@ -14,8 +14,7 @@ namespace conversion {
 struct ConversionInfo {
   std::vector<ir::Input> inputs;
   BuilderSettings engine_settings;
-  ConversionInfo(std::vector<ir::Input> inputs)
-      : inputs(std::move(inputs)), engine_settings(BuilderSettings()) {}
+  ConversionInfo(std::vector<ir::Input> inputs) : inputs(std::move(inputs)), engine_settings(BuilderSettings()) {}
 };
 
 // TODO: REMOVE GRAPH AND PARAMS AND MOVE FULLY TO INLINED CONSTANTS

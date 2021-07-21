@@ -1,5 +1,5 @@
-#include "cpp_api_test.h"
 #include "core/runtime/runtime.h"
+#include "cpp_api_test.h"
 
 TEST_P(CppAPITests, ModuleAsEngineIsClose) {
   std::vector<at::Tensor> inputs;

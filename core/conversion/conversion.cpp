@@ -125,10 +125,7 @@ void AddLayer(ConversionCtx* ctx, const torch::jit::Node* n) {
                        << "please report this error to https://www.github.com/NVIDIA/TRTorch/issues");
 }
 
-void AddInputs(
-    ConversionCtx* ctx,
-    at::ArrayRef<const torch::jit::Value*> inputs,
-    std::vector<ir::Input>& input_specs) {
+void AddInputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> inputs, std::vector<ir::Input>& input_specs) {
   std::vector<const torch::jit::Value*> input_tensors;
   for (auto in : inputs) {
     // Disregarding inputs that are not tensors
@@ -164,7 +161,8 @@ void AddInputs(
     std::string name = std::string("input_") + std::to_string(ctx->num_inputs);
     LOG_INFO(
         ctx->logger,
-        "Adding Input " << in->debugName() << " (named: " << name << "): " << spec << " in engine (conversion.AddInputs)");
+        "Adding Input " << in->debugName() << " (named: " << name << "): " << spec
+                        << " in engine (conversion.AddInputs)");
 
     auto trt_in = ctx->net->addInput(name.c_str(), spec.dtype, spec.input_shape);
     TRTORCH_CHECK(trt_in, "Failed to add input node: " << in->debugName() << " (conversion.AddInputs)");

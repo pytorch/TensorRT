@@ -43,8 +43,7 @@ bool almostEqual(const at::Tensor& a, const at::Tensor& b, float threshold) {
 }
 
 trtorch::CompileSpec::TensorFormat parseTensorFormat(std::string str) {
-  std::transform(
-    str.begin(), str.end(), str.begin(), [](unsigned char c) { return std::tolower(c); });
+  std::transform(str.begin(), str.end(), str.begin(), [](unsigned char c) { return std::tolower(c); });
 
   if (str == "linear" || str == "nchw" || str == "chw" || str == "contiguous") {
     return trtorch::CompileSpec::TensorFormat::kContiguous;
@@ -52,8 +51,8 @@ trtorch::CompileSpec::TensorFormat parseTensorFormat(std::string str) {
     return trtorch::CompileSpec::TensorFormat::kChannelsLast;
   } else {
     trtorch::logging::log(
-          trtorch::logging::Level::kERROR,
-          "Invalid tensor format, options are [ linear | nchw | chw | contiguous | nhwc | hwc | channels_last ]");
+        trtorch::logging::Level::kERROR,
+        "Invalid tensor format, options are [ linear | nchw | chw | contiguous | nhwc | hwc | channels_last ]");
     return trtorch::CompileSpec::TensorFormat::kUnknown;
   }
 }
@@ -73,8 +72,8 @@ trtorch::CompileSpec::DataType parseDataType(std::string dtype_str) {
     return trtorch::CompileSpec::DataType::kBool;
   } else {
     trtorch::logging::log(
-          trtorch::logging::Level::kERROR,
-          "Invalid precision, options are [ float | float32 | f32 | half | float16 | f16 | char | int8 | i8 | int | int32 | i32 | bool | b]");
+        trtorch::logging::Level::kERROR,
+        "Invalid precision, options are [ float | float32 | f32 | half | float16 | f16 | char | int8 | i8 | int | int32 | i32 | bool | b]");
     return trtorch::CompileSpec::DataType::kUnknown;
   }
 }
@@ -190,10 +189,7 @@ int main(int argc, char** argv) {
   args::Flag build_debuggable_engine(
       parser, "build-debuggable-engine", "Creates a debuggable engine", {"build-debuggable-engine"});
   args::Flag use_strict_types(
-      parser,
-      "use-strict-types",
-      "Restrict operating type to only use set operation precision",
-      {"use-strict-types"});
+      parser, "use-strict-types", "Restrict operating type to only use set operation precision", {"use-strict-types"});
   args::Flag allow_gpu_fallback(
       parser,
       "allow-gpu-fallback",
@@ -275,7 +271,8 @@ int main(int argc, char** argv) {
   }
 
   std::vector<trtorch::CompileSpec::Input> ranges;
-  const std::string spec_err_str = "Dimensions should be specified in one of these types \"(N,..,C,H,W)\" \"[(MIN_N,..,MIN_C,MIN_H,MIN_W);(OPT_N,..,OPT_C,OPT_H,OPT_W);(MAX_N,..,MAX_C,MAX_H,MAX_W)]\"\n e.g \"(3,3,300,300)\" \"[(3,3,100,100);(3,3,200,200);(3,3,300,300)]\"\nTo specify input type append an @ followed by the precision\n e.g. \"(3,3,300,300)@f32\"\nTo specify input format append an \% followed by the format [contiguous | channel_last]\n e.g. \"(3,3,300,300)@f32\%channel_last\"";
+  const std::string spec_err_str =
+      "Dimensions should be specified in one of these types \"(N,..,C,H,W)\" \"[(MIN_N,..,MIN_C,MIN_H,MIN_W);(OPT_N,..,OPT_C,OPT_H,OPT_W);(MAX_N,..,MAX_C,MAX_H,MAX_W)]\"\n e.g \"(3,3,300,300)\" \"[(3,3,100,100);(3,3,200,200);(3,3,300,300)]\"\nTo specify input type append an @ followed by the precision\n e.g. \"(3,3,300,300)@f32\"\nTo specify input format append an \% followed by the format [contiguous | channel_last]\n e.g. \"(3,3,300,300)@f32\%channel_last\"";
   for (const auto spec : args::get(input_shapes)) {
     std::string shapes;
     std::string dtype;
@@ -306,13 +303,14 @@ int main(int argc, char** argv) {
           ranges.push_back(trtorch::CompileSpec::Input(parseSingleDim(shapes), parsed_dtype, parsed_format));
         } else if (shapes.rfind("[", 0) == 0) {
           auto dyn_shapes = parseDynamicDim(shapes);
-          ranges.push_back(trtorch::CompileSpec::Input(dyn_shapes[0], dyn_shapes[1], dyn_shapes[2], parsed_dtype, parsed_format));
+          ranges.push_back(
+              trtorch::CompileSpec::Input(dyn_shapes[0], dyn_shapes[1], dyn_shapes[2], parsed_dtype, parsed_format));
         } else {
           trtorch::logging::log(trtorch::logging::Level::kERROR, spec_err_str);
           std::cerr << parser;
           exit(1);
         }
-      // THERE IS NO SPEC FOR FORMAT
+        // THERE IS NO SPEC FOR FORMAT
       } else {
         std::string shapes = spec.substr(0, spec.find('@'));
         std::string dtype = spec.substr(spec.find('@') + 1, spec.size());
@@ -334,7 +332,7 @@ int main(int argc, char** argv) {
           exit(1);
         }
       }
-    // THERE IS A SPEC FOR FORMAT BUT NOT DTYPE
+      // THERE IS A SPEC FOR FORMAT BUT NOT DTYPE
     } else if (spec.find('%') != std::string::npos) {
       std::string shapes = spec.substr(0, spec.find('%'));
       std::string format = spec.substr(spec.find('%') + 1, spec.size());
@@ -355,7 +353,7 @@ int main(int argc, char** argv) {
         std::cerr << parser;
         exit(1);
       }
-    // JUST SHAPE USE DEFAULT DTYPE
+      // JUST SHAPE USE DEFAULT DTYPE
     } else {
       if (spec.rfind("(", 0) == 0) {
         ranges.push_back(trtorch::CompileSpec::Input(parseSingleDim(spec)));
@@ -449,7 +447,6 @@ int main(int argc, char** argv) {
     }
   }
 
-
   if (engine_capability) {
     auto capability = args::get(engine_capability);
     std::transform(
@@ -510,7 +507,9 @@ int main(int argc, char** argv) {
   } else {
     auto trt_mod = trtorch::CompileGraph(mod, compile_settings);
 
-    if (compile_settings.enabled_precisions.size() == 1 && compile_settings.enabled_precisions.find(trtorch::CompileSpec::DataType::kFloat) != compile_settings.enabled_precisions.end()) {
+    if (compile_settings.enabled_precisions.size() == 1 &&
+        compile_settings.enabled_precisions.find(trtorch::CompileSpec::DataType::kFloat) !=
+            compile_settings.enabled_precisions.end()) {
       double threshold_val = 2e-5;
       if (threshold) {
         threshold_val = args::get(threshold);
