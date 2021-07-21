@@ -20,7 +20,6 @@ namespace impl {
 
 class InterpolatePlugin : public nvinfer1::IPluginV2DynamicExt {
  private:
-  at::TensorOptions tensor_options_;
   nvinfer1::DataType dtype_;
 
   std::vector<int64_t> in_shape_;

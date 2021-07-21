@@ -44,6 +44,17 @@ cc_test(
 )
 
 cc_test(
+    name = "test_multi_gpu_serdes",
+    srcs = ["test_multi_gpu_serdes.cpp"],
+    data = [
+        ":jit_models",
+    ],
+    deps = [
+        ":module_test",
+    ],
+)
+
+cc_test(
     name = "test_multiple_registered_engines",
     srcs = ["test_multiple_registered_engines.cpp"],
     data = [

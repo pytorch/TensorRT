@@ -413,8 +413,8 @@ TEST(Converters, ATenAvgPool3DNoCountPadConvertsCorrectly) {
 TEST(Converters, ATenAdaptiveAvgPool2DConvertsCorrectly) {
   const auto graph = R"IR(
       graph(%0 : Tensor):
-        %2 : int = prim::Constant[value=3]()
-        %3 : int = prim::Constant[value=4]()
+        %2 : int = prim::Constant[value=7]()
+        %3 : int = prim::Constant[value=7]()
         %6 : int[] = prim::ListConstruct(%2, %3)
         %10 : Tensor = aten::adaptive_avg_pool2d(%0, %6)
         return (%10))IR";
@@ -423,7 +423,7 @@ TEST(Converters, ATenAdaptiveAvgPool2DConvertsCorrectly) {
   torch::jit::parseIR(graph, g.get());
 
   // PyTorch MaxPool needs a 3D input
-  auto in = at::randint(-5, 5, {1, 12, 16}, at::kCUDA);
+  auto in = at::randint(-5, 5, {512, 32, 32}, at::kCUDA);
 
   auto jit_in = at::clone(in);
   auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
@@ -449,7 +449,7 @@ TEST(Converters, ATenAdaptiveAvgPool2DConvertsCorrectlyWithDynamicInput) {
   torch::jit::parseIR(graph, g.get());
 
   // PyTorch MaxPool needs a 3D input
-  auto in = at::randint(-5, 5, {10, 18, 36}, at::kCUDA);
+  auto in = at::randint(-5, 5, {512, 32, 32}, at::kCUDA);
 
   auto jit_in = at::clone(in);
   auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
@@ -464,11 +464,11 @@ TEST(Converters, ATenAdaptiveAvgPool2DConvertsCorrectlyWithDynamicInput) {
 
 TEST(Converters, ATenAdaptiveAvgPool1DConvertsCorrectly) {
   const auto graph =
-      R"IR(                                                                                                                                                                                                                        
-      graph(%0 : Tensor):                                                                                                                                                                                                                         
-        %2 : int = prim::Constant[value=1]()                                                                                                                                                                                                      
-        %6 : int[] = prim::ListConstruct(%2)                                                                                                                                                                                                      
-        %10 : Tensor = aten::adaptive_avg_pool1d(%0, %6)                                                                                                                                                                                          
+      R"IR(
+      graph(%0 : Tensor):
+        %2 : int = prim::Constant[value=1]()
+        %6 : int[] = prim::ListConstruct(%2)
+        %10 : Tensor = aten::adaptive_avg_pool1d(%0, %6)
         return (%10))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
@@ -486,4 +486,56 @@ TEST(Converters, ATenAdaptiveAvgPool1DConvertsCorrectly) {
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 1.0));
+}
+
+TEST(Converters, ATenAdaptiveMaxPool2DConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor):
+        %2 : int = prim::Constant[value=7]()
+        %3 : int = prim::Constant[value=7]()
+        %6 : int[] = prim::ListConstruct(%2, %3)
+        %10 : Tensor, %11 : Tensor = aten::adaptive_max_pool2d(%0, %6)
+        return (%10, %11))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, &*g);
+
+  // PyTorch MaxPool needs a 3D input
+  auto in = at::randint(-5, 5, {512, 32, 32}, at::kCUDA);
+
+  auto jit_in = at::clone(in);
+  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
+
+  auto trt_in = at::clone(in);
+  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
+
+  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+}
+
+TEST(Converters, ATenAdaptiveMaxPool2DConvertsCorrectlyWithDynamicInput) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor):
+        %2 : int = prim::Constant[value=7]()
+        %3 : int = prim::Constant[value=7]()
+        %6 : int[] = prim::ListConstruct(%2, %3)
+        %10 : Tensor, %11 : Tensor = aten::adaptive_max_pool2d(%0, %6)
+        return (%10, %11))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, &*g);
+
+  // PyTorch MaxPool needs a 3D input
+  auto in = at::rand({512, 32, 32}, at::kCUDA);
+
+  auto jit_in = at::clone(in);
+  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
+
+  auto trt_in = at::clone(in);
+  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto trt_results = trtorch::tests::util::RunGraphEngineDynamic(g, params, {trt_in}, false);
+
+  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }

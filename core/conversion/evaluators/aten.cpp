@@ -128,6 +128,20 @@ auto aten_registrations TRTORCH_UNUSED =
                       auto out_tensor = torch::zeros(args.at(n->input(0)).unwrapToIntList().vec(), options);
                       return out_tensor;
                     }})
+        .evaluator({c10::Symbol::fromQualString("aten::ones"),
+                    // aten::ones(int[] size, *, int? dtype=None, int? layout=None,
+                    // Device? device=None, bool? pin_memory=None) -> (Tensor)
+                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+                      auto options = torch::TensorOptions().layout(torch::kStrided).device(torch::kCUDA);
+
+                      // Input 1 here is the dtype
+                      if (!args.at(n->input(1)).isNone() && !args.at(n->input(1)).IValue()->isNone()) {
+                        options = options.dtype(c10::ScalarType(args.at(n->input(1)).unwrapToInt()));
+                      }
+
+                      auto out_tensor = torch::ones(args.at(n->input(0)).unwrapToIntList().vec(), options);
+                      return out_tensor;
+                    }})
         .evaluator({c10::Symbol::fromQualString("aten::slice"),
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                       c10::List<c10::IValue> list = args.at(n->input(0)).IValue()->to<c10::List<c10::IValue>>();
@@ -216,9 +230,17 @@ auto aten_registrations TRTORCH_UNUSED =
         .evaluator({c10::Symbol::fromQualString("aten::append"),
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                       auto list = args.at(n->input(0)).IValue()->to<c10::List<c10::IValue>>();
-                      auto el = args.at(n->input(1)).IValue();
 
-                      list.push_back(std::move(*el));
+                      if (args.at(n->input(1)).isITensor()) {
+                        auto tensor_holder = TensorContainer();
+                        tensor_holder.hold_tensor(args.at(n->input(1)).ITensor());
+                        auto el = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
+                        list.push_back(std::move(el));
+                      } else {
+                        auto el = args.at(n->input(1)).IValue();
+                        list.push_back(std::move(*el));
+                      }
+
                       return list;
                     },
                     EvalOptions().validSchemas({

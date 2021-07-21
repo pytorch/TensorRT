@@ -32,9 +32,11 @@ void AddEngineToGraph(
     torch::jit::script::Module mod,
     std::shared_ptr<torch::jit::Graph>& g,
     const std::string& serialized_engine,
+    runtime::CudaDevice& device_info,
     std::string engine_id = "",
     bool fallback = false) {
-  auto engine_ptr = c10::make_intrusive<runtime::TRTEngine>(mod._ivalue()->name() + engine_id, serialized_engine);
+  auto engine_ptr =
+      c10::make_intrusive<runtime::TRTEngine>(mod._ivalue()->name() + engine_id, serialized_engine, device_info);
   // Get required metadata about the engine out
   auto num_io = engine_ptr->num_io;
   auto name = engine_ptr->name;
@@ -265,7 +267,9 @@ GraphAndMapping ConstructFallbackGraph(
       convert_cfg.input_ranges = input_ranges;
       auto engine = conversion::ConvertBlockToEngine(seg_block.block(), convert_cfg, named_params);
       auto temp_g = std::make_shared<torch::jit::Graph>();
-      AddEngineToGraph(new_mod, temp_g, engine, trt_engine_id.str(), true);
+      auto device_spec = convert_cfg.engine_settings.device;
+      auto cuda_device = runtime::CudaDevice(device_spec.gpu_id, device_spec.device_type);
+      AddEngineToGraph(new_mod, temp_g, engine, cuda_device, trt_engine_id.str(), true);
 
       seg_block.update_graph(temp_g);
       AddSegmentedBlockToGraph(new_g, seg_block, old_to_new_g);
@@ -302,15 +306,15 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
   torch::jit::script::Module new_mod(mod._ivalue()->name() + "_trt");
   std::vector<std::shared_ptr<torch::jit::Graph>> graphs;
   for (const torch::jit::script::Method& method : mod.get_methods()) {
-    // Don't convert hidden methods
-    if (method.name().rfind("_", 0)) {
+    // Compile only forward methods. forward method contains the entire graph.
+    if (method.name().compare("forward") == 0) {
       auto new_g = std::make_shared<torch::jit::Graph>();
       auto graph_and_parameters = lowering::Lower(mod, method.name());
 
       auto g = graph_and_parameters.first;
       auto params = graph_and_parameters.second;
       auto named_params = conversion::get_named_params(g->inputs(), params);
-      LOG_INFO(*g << "(LoweringGraph)\n");
+      LOG_INFO("(LoweredGraph)\n" << *g);
 
       std::unordered_map<torch::jit::Value*, ir::InputRange> input_ranges;
       for (size_t i = 0; i < g->inputs().size(); ++i) {
@@ -319,7 +323,7 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
       auto input_ivalues_map = partitioning::generateRandomInputs(input_ranges);
       auto graph_and_mapping = ConstructFallbackGraph(new_mod, g->block(), input_ivalues_map, cfg, named_params);
       new_g = graph_and_mapping.first;
-      LOG_INFO(*new_g << "(FallbackGraph)\n");
+      LOG_INFO("(FallbackGraph)\n" << *new_g);
 
       // if there is no tensorrt engine self in fallback graph, there is no conversion, we just return the initial
       // module
@@ -349,11 +353,13 @@ torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod, C
   torch::jit::script::Module new_mod(mod._ivalue()->name() + "_trt");
   std::vector<std::shared_ptr<torch::jit::Graph>> graphs;
   for (const torch::jit::script::Method& method : mod.get_methods()) {
-    // Don't convert hidden methods
-    if (method.name().rfind("_", 0)) {
+    // Compile only forward methods. forward method contains the entire graph.
+    if (method.name().compare("forward") == 0) {
       auto engine = ConvertGraphToTRTEngine(mod, method.name(), cfg);
       auto new_g = std::make_shared<torch::jit::Graph>();
-      AddEngineToGraph(new_mod, new_g, engine);
+      auto device_spec = cfg.convert_info.engine_settings.device;
+      auto cuda_device = runtime::CudaDevice(device_spec.gpu_id, device_spec.device_type);
+      AddEngineToGraph(new_mod, new_g, engine, cuda_device);
       auto new_method = new_mod._ivalue()->compilation_unit()->create_function(method.name(), new_g);
       auto schema = util::GenerateGraphSchema(new_method->name(), new_g);
       new_mod.type()->addMethod(new_method);
@@ -364,12 +370,12 @@ torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod, C
   return new_mod;
 }
 
-torch::jit::script::Module EmbedEngineInNewModule(const std::string& engine) {
+torch::jit::script::Module EmbedEngineInNewModule(const std::string& engine, runtime::CudaDevice cuda_device) {
   std::ostringstream engine_id;
   engine_id << reinterpret_cast<const int*>(&engine);
   torch::jit::script::Module new_mod("tensorrt_engine_mod_" + engine_id.str());
   auto new_g = std::make_shared<torch::jit::Graph>();
-  AddEngineToGraph(new_mod, new_g, engine);
+  AddEngineToGraph(new_mod, new_g, engine, cuda_device);
   auto new_method = new_mod._ivalue()->compilation_unit()->create_function("forward", new_g);
   auto schema = util::GenerateGraphSchema(new_method->name(), new_g);
   new_mod.type()->addMethod(new_method);

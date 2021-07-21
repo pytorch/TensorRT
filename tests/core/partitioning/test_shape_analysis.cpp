@@ -59,8 +59,13 @@ TEST(Partitioning, InferSequentialModelSegmentedBlockShapeCorrectly) {
   input_ranges.push_back(trtorch::core::ir::InputRange({8, 16, 3, 3}));
   input_ranges.push_back(trtorch::core::ir::InputRange({8}));
 
+  std::unordered_map<torch::jit::Value*, trtorch::core::ir::InputRange> input_ranges_map;
+  for (size_t i = 0; i < g->inputs().size(); ++i) {
+    input_ranges_map.insert({g->inputs()[i], input_ranges[i]});
+  }
+  auto input_ivalues_map = trtorch::core::partitioning::generateRandomInputs(input_ranges_map);
   std::vector<trtorch::core::partitioning::SegmentedBlock> segmented_blocks =
-      trtorch::core::partitioning::Partition(g, input_ranges, partition_info);
+      trtorch::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info);
   ASSERT_TRUE(checkSegmentedBlockInputShape(
       segmented_blocks,
       {{{3, 3, 16, 16}, {32, 3, 3, 3}, {32}, {16, 32, 3, 3}, {16}},
@@ -101,8 +106,13 @@ TEST(Partitioning, InferBranchModelSegmentedBlockShapeCorrectly) {
   input_ranges.push_back(trtorch::core::ir::InputRange({16, 32, 3, 3}));
   input_ranges.push_back(trtorch::core::ir::InputRange({16}));
 
+  std::unordered_map<torch::jit::Value*, trtorch::core::ir::InputRange> input_ranges_map;
+  for (size_t i = 0; i < g->inputs().size(); ++i) {
+    input_ranges_map.insert({g->inputs()[i], input_ranges[i]});
+  }
+  auto input_ivalues_map = trtorch::core::partitioning::generateRandomInputs(input_ranges_map);
   std::vector<trtorch::core::partitioning::SegmentedBlock> segmented_blocks =
-      trtorch::core::partitioning::Partition(g, input_ranges, partition_info);
+      trtorch::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info);
   ASSERT_TRUE(checkSegmentedBlockInputShape(
       segmented_blocks,
       {{{3, 3, 16, 16}, {32, 3, 3, 3}, {32}, {16, 32, 3, 3}, {16}},
