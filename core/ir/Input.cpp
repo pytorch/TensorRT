@@ -12,7 +12,6 @@ bool valid_dtype_format_combo(nvinfer1::DataType dtype, nvinfer1::TensorFormat f
         case nvinfer1::TensorFormat::kLINEAR:
           return true;
         case nvinfer1::TensorFormat::kHWC:
-          return false;
         default:
           return false;
       }
@@ -21,7 +20,6 @@ bool valid_dtype_format_combo(nvinfer1::DataType dtype, nvinfer1::TensorFormat f
         case nvinfer1::TensorFormat::kLINEAR:
           return true;
         case nvinfer1::TensorFormat::kHWC:
-          return false;
         default:
           return false;
       }
@@ -30,7 +28,6 @@ bool valid_dtype_format_combo(nvinfer1::DataType dtype, nvinfer1::TensorFormat f
         case nvinfer1::TensorFormat::kLINEAR:
           return true;
         case nvinfer1::TensorFormat::kHWC:
-          return false;
         default:
           return false;
       }
