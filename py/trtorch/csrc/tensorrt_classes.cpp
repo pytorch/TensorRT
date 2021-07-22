@@ -115,6 +115,10 @@ nvinfer1::DeviceType toTRTDeviceType(DeviceType value) {
   }
 }
 
+core::runtime::CudaDevice Device::toInternalRuntimeDevice() {
+  return core::runtime::CudaDevice(gpu_id, toTRTDeviceType(device_type));
+}
+
 std::string Device::to_str() {
   std::stringstream ss;
   std::string fallback = allow_gpu_fallback ? "True" : "False";
