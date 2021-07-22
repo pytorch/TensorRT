@@ -73,6 +73,7 @@ class TestCompile(ModelTestCase):
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
         self.assertTrue(same < 2e-2)
 
+
 class TestCompileHalf(ModelTestCase):
 
     def setUp(self):
@@ -94,6 +95,7 @@ class TestCompileHalf(ModelTestCase):
         same = (trt_mod(self.input.half()) - self.scripted_model(self.input.half())).abs().max()
         self.assertTrue(same < 2e-2)
 
+
 class TestCompileHalfDefault(ModelTestCase):
 
     def setUp(self):
@@ -114,6 +116,7 @@ class TestCompileHalfDefault(ModelTestCase):
         trt_mod = trtorch.compile(self.scripted_model, compile_spec)
         same = (trt_mod(self.input.half()) - self.scripted_model(self.input.half())).abs().max()
         self.assertTrue(same < 2e-2)
+
 
 class TestFallbackToTorch(ModelTestCase):
 
