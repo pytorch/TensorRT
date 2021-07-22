@@ -18,13 +18,13 @@ More Information / System Architecture:
 #include "trtorch/trtorch.h"
 
 ...
-auto compile_settings = trtorch::CompileSpec(dims);
-// FP16 execution
-compile_settings.op_precision = torch::kHalf;
 // Set input datatypes. Allowerd options torch::{kFloat, kHalf, kChar, kInt32, kBool}
 // Size of input_dtypes should match number of inputs to the network.
-// If input_dtypes is not set, default precision for input tensors would be float32
-compile_spec.input_dtypes = {torch::kHalf};
+// If input_dtypes is not set, default precision follows traditional PyT / TRT rules
+auto input = trtorch::CompileSpec::Input(dims, torch::kHalf)
+auto compile_settings = trtorch::CompileSpec({input});
+// FP16 execution
+compile_settings.enabled_precisions = {torch::kHalf};
 // Compile module
 auto trt_mod = trtorch::CompileGraph(ts_mod, compile_settings);
 // Run like normal
@@ -40,15 +40,14 @@ import trtorch
 
 ...
 compile_settings = {
-    "input_shapes": [
-        {
-            "min": [1, 3, 224, 224],
-            "opt": [1, 3, 512, 512],
-            "max": [1, 3, 1024, 1024]
-        }, # For static size [1, 3, 224, 224]
-    ],
-    "op_precision": torch.half, # Run with FP16
-    "input_dtypes": [torch.half] # Datatype of input tensor. Allowed options torch.(float|half|int8|int32|bool)
+    "inputs": [trtorch.Input(
+        min_shape=[1, 3, 224, 224],
+        opt_shape=[1, 3, 512, 512],
+        max_shape=[1, 3, 1024, 1024]
+        # For static size shape=[1, 3, 224, 224]
+        dtype=torch.half, # Datatype of input tensor. Allowed options torch.(float|half|int8|int32|bool)
+    )],
+    "enabled_precision": {torch.half}, # Run with FP16
 }
 
 trt_ts_module = trtorch.compile(torch_script_module, compile_settings)
@@ -59,9 +58,9 @@ torch.jit.save(trt_ts_module, "trt_torchscript_module.ts")
 ```
 
 > Notes on running in lower precisions:
-> - Set precision with compile_spec.op_precision
+> - Enabled lower precisions with compile_spec.enabled_precisions
 > - The module should be left in FP32 before compilation (FP16 can support half tensor models)
-> - In FP16 only input tensors should be converted to FP16, other precisions use FP32
+> - In FP16 only input tensors by default should be FP16, other precisions use FP32. This can be overrided by setting Input::dtype
 
 ## Platform Support
 

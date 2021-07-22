@@ -27,13 +27,12 @@ def main():
 
     scripted_model = torch.jit.script(model)
     compile_settings = {
-        "input_shapes": [{
-            "min": [1024, 1, 32, 32],
-            "opt": [1024, 1, 33, 33],
-            "max": [1024, 1, 34, 34],
-        }],
-        "op_precision":
-            torch.half  # Run with FP16
+        "inputs": [trtorch.Input(
+            min_shape=[1024, 1, 32, 32],
+            opt_shape=[1024, 1, 33, 33],
+            max_shape=[1024, 1, 34, 34],
+        )],
+        "enabled_precisions": {torch.float, torch.half}  # Run with FP16
     }
     trt_ts_module = trtorch.compile(scripted_model, compile_settings)
     input_data = torch.randn((1024, 1, 32, 32))
