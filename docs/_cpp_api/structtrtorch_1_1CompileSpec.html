@@ -463,9 +463,27 @@
         </li>
         <li>
          <p>
+          <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Input.html#exhale-struct-structtrtorch-1-1compilespec-1-1input">
+           <span class="std std-ref">
+            Struct CompileSpec::Input
+           </span>
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
           <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1InputRange.html#exhale-struct-structtrtorch-1-1compilespec-1-1inputrange">
            <span class="std std-ref">
             Struct CompileSpec::InputRange
+           </span>
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#exhale-class-classtrtorch-1-1compilespec-1-1tensorformat">
+           <span class="std std-ref">
+            Class CompileSpec::TensorFormat
            </span>
           </a>
          </p>
@@ -685,6 +703,9 @@
              Construct a new Extra Info object Convienence constructor to set fixed input size from vectors describing size of input tensors. Each entry in the vector represents a input and should be provided in call order.
             </p>
             <p>
+             This constructor should be use as a convience in the case that all inputs are static sized and you are okay with default input dtype and formats (FP32 for FP32 and INT8 weights, FP16 for FP16 weights, contiguous)
+            </p>
+            <p>
             </p>
             <dl class="simple">
              <dt>
@@ -736,6 +757,9 @@
              Construct a new Extra Info object Convienence constructor to set fixed input size from c10::ArrayRef’s (the output of tensor.sizes()) describing size of input tensors. Each entry in the vector represents a input and should be provided in call order.
             </p>
             <p>
+             This constructor should be use as a convience in the case that all inputs are static sized and you are okay with default input dtype and formats (FP32 for FP32 and INT8 weights, FP16 for FP16 weights, contiguous)
+            </p>
+            <p>
             </p>
             <dl class="simple">
              <dt>
@@ -760,14 +784,98 @@
             </dl>
            </dd>
           </dl>
+          <dl class="cpp function">
+           <dt id="_CPPv4N7trtorch11CompileSpec11CompileSpecENSt6vectorI5InputEE">
+            <span class="target" id="structtrtorch_1_1CompileSpec_1a2422abcef43593cd84c5c5c1ae336726">
+            </span>
+            <code class="sig-name descname">
+             CompileSpec
+            </code>
+            <span class="sig-paren">
+             (
+            </span>
+            std::vector&lt;
+            <a class="reference internal" href="#_CPPv4N7trtorch11CompileSpec5InputE" title="trtorch::CompileSpec::Input">
+             Input
+            </a>
+            &gt;
+            <em>
+             inputs
+            </em>
+            <span class="sig-paren">
+             )
+            </span>
+            <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec11CompileSpecENSt6vectorI5InputEE" title="Permalink to this definition">
+             ¶
+            </a>
+            <br/>
+           </dt>
+           <dd>
+            <p>
+             Construct a new Extra Info object from input ranges. Each entry in the vector represents a input and should be provided in call order.
+            </p>
+            <p>
+             Use this constructor to define inputs with dynamic shape, specific input types or tensor formats
+            </p>
+            <p>
+            </p>
+            <dl class="simple">
+             <dt>
+              <strong>
+               Parameters
+              </strong>
+             </dt>
+             <dd>
+              <ul class="breatheparameterlist simple">
+               <li>
+                <p>
+                 <code class="docutils literal notranslate">
+                  <span class="pre">
+                   inputs
+                  </span>
+                 </code>
+                 :
+                </p>
+               </li>
+              </ul>
+             </dd>
+            </dl>
+           </dd>
+          </dl>
          </div>
          <div class="breathe-sectiondef docutils container">
           <p class="breathe-sectiondef-title rubric">
            Public Members
           </p>
           <dl class="cpp var">
+           <dt id="_CPPv4N7trtorch11CompileSpec6inputsE">
+            <span class="target" id="structtrtorch_1_1CompileSpec_1addda935cf5dc110f75b1c24dca0e89d9">
+            </span>
+            std::vector&lt;
+            <a class="reference internal" href="#_CPPv4N7trtorch11CompileSpec5InputE" title="trtorch::CompileSpec::Input">
+             Input
+            </a>
+            &gt;
+            <code class="sig-name descname">
+             inputs
+            </code>
+            <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec6inputsE" title="Permalink to this definition">
+             ¶
+            </a>
+            <br/>
+           </dt>
+           <dd>
+            <p>
+             Specifications for inputs to the engine, can either be a single size or a range defined by min, opt and max sizes Users can also specify expected input type as well as tensor memory format.
+            </p>
+            <p>
+             Order in vector should match call order for the function
+            </p>
+           </dd>
+          </dl>
+          <dl class="cpp var">
            <dt id="_CPPv4N7trtorch11CompileSpec12input_rangesE">
-            <span class="target" id="structtrtorch_1_1CompileSpec_1aff5c962f8825da28665369ed23819973">
+            <span class="target" id="structtrtorch_1_1CompileSpec_1adda1666b38d9194bd69cf11b686bd149">
             </span>
             std::vector&lt;
             <a class="reference internal" href="#_CPPv4N7trtorch11CompileSpec10InputRangeE" title="trtorch::CompileSpec::InputRange">
@@ -817,6 +925,38 @@
            <dd>
             <p>
              Default operating precision for the engine
+            </p>
+           </dd>
+          </dl>
+          <dl class="cpp var">
+           <dt id="_CPPv4N7trtorch11CompileSpec18enabled_precisionsE">
+            <span class="target" id="structtrtorch_1_1CompileSpec_1a42cd4c335592457330c1a72ca62f5317">
+            </span>
+            std::set&lt;
+            <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1DataType.html#_CPPv4N7trtorch11CompileSpec8DataTypeE" title="trtorch::CompileSpec::DataType">
+             DataType
+            </a>
+            &gt;
+            <code class="sig-name descname">
+             enabled_precisions
+            </code>
+            = {
+            <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1DataType.html#_CPPv4N7trtorch11CompileSpec8DataTypeE" title="trtorch::CompileSpec::DataType">
+             DataType
+            </a>
+            ::
+            <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1DataType.html#_CPPv4N7trtorch11CompileSpec8DataType5Value6kFloatE" title="trtorch::CompileSpec::DataType::kFloat">
+             kFloat
+            </a>
+            }
+            <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec18enabled_precisionsE" title="Permalink to this definition">
+             ¶
+            </a>
+            <br/>
+           </dt>
+           <dd>
+            <p>
+             The set of precisions TensorRT is allowed to use for kernels during compilation.
             </p>
            </dd>
           </dl>
@@ -919,7 +1059,7 @@
            </dt>
            <dd>
             <p>
-             Restrict operating type to only set default operation precision (op_precision)
+             Restrict operating type to only the lowest enabled operation precision (enabled_precisions)
             </p>
            </dd>
           </dl>
@@ -939,6 +1079,14 @@
             <br/>
            </dt>
            <dd>
+            <p>
+             Target
+             <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Device.html#structtrtorch_1_1CompileSpec_1_1Device">
+              <span class="std std-ref">
+               Device
+              </span>
+             </a>
+            </p>
            </dd>
           </dl>
           <dl class="cpp var">
@@ -957,6 +1105,9 @@
             <br/>
            </dt>
            <dd>
+            <p>
+             Settings related to partial compilation.
+            </p>
            </dd>
           </dl>
           <dl class="cpp var">
@@ -1208,6 +1359,60 @@
                <dd>
                 <p>
                  INT8.
+                </p>
+               </dd>
+              </dl>
+              <dl class="cpp enumerator">
+               <dt id="_CPPv4N7trtorch11CompileSpec8DataType5Value4kIntE">
+                <span class="target" id="classtrtorch_1_1CompileSpec_1_1DataType_1ac08f05731101a2949ebbe6c04ca32e88a9a69d22e556a924ecc8aaa1797e09307">
+                </span>
+                <em class="property">
+                 enumerator
+                </em>
+                <code class="sig-name descname">
+                 kInt
+                </code>
+                <br/>
+               </dt>
+               <dd>
+                <p>
+                 INT.
+                </p>
+               </dd>
+              </dl>
+              <dl class="cpp enumerator">
+               <dt id="_CPPv4N7trtorch11CompileSpec8DataType5Value5kBoolE">
+                <span class="target" id="classtrtorch_1_1CompileSpec_1_1DataType_1ac08f05731101a2949ebbe6c04ca32e88ab246f2591f368dc8ca2ba4f808306a11">
+                </span>
+                <em class="property">
+                 enumerator
+                </em>
+                <code class="sig-name descname">
+                 kBool
+                </code>
+                <br/>
+               </dt>
+               <dd>
+                <p>
+                 Bool.
+                </p>
+               </dd>
+              </dl>
+              <dl class="cpp enumerator">
+               <dt id="_CPPv4N7trtorch11CompileSpec8DataType5Value8kUnknownE">
+                <span class="target" id="classtrtorch_1_1CompileSpec_1_1DataType_1ac08f05731101a2949ebbe6c04ca32e88a749164af00b30ba753f6a6113b239e97">
+                </span>
+                <em class="property">
+                 enumerator
+                </em>
+                <code class="sig-name descname">
+                 kUnknown
+                </code>
+                <br/>
+               </dt>
+               <dd>
+                <p>
+                 Sentinel value.
                 </p>
                </dd>
               </dl>
@@ -2350,6 +2555,1055 @@
           </dd>
          </dl>
          <dl class="cpp struct">
+          <dt id="_CPPv4N7trtorch11CompileSpec5InputE">
+           <span class="target" id="structtrtorch_1_1CompileSpec_1_1Input">
+           </span>
+           <em class="property">
+            struct
+           </em>
+           <code class="sig-name descname">
+            Input
+           </code>
+           <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec5InputE" title="Permalink to this definition">
+            ¶
+           </a>
+           <br/>
+          </dt>
+          <dd>
+           <p>
+            A struct to hold an input range (used by TensorRT Optimization profile)
+           </p>
+           <p>
+            This struct can either hold a single vector representing an input shape, signifying a static input shape or a set of three input shapes representing the min, optiminal and max input shapes allowed for the engine.
+           </p>
+           <div class="breathe-sectiondef docutils container">
+            <p class="breathe-sectiondef-title rubric">
+             Public Functions
+            </p>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec5Input5InputENSt6vectorI7int64_tEE12TensorFormat">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1Input_1a8b81b007cfac81675c5e46e94205f5fb">
+              </span>
+              <code class="sig-name descname">
+               Input
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              std::vector&lt;int64_t&gt;
+              <em>
+               shape
+              </em>
+              ,
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormatE" title="trtorch::CompileSpec::TensorFormat">
+               TensorFormat
+              </a>
+              <em>
+               format
+              </em>
+              =
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormatE" title="trtorch::CompileSpec::TensorFormat">
+               TensorFormat
+              </a>
+              ::
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormat5Value11kContiguousE" title="trtorch::CompileSpec::TensorFormat::kContiguous">
+               kContiguous
+              </a>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec5Input5InputENSt6vectorI7int64_tEE12TensorFormat" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Construct a new
+               <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Input.html#structtrtorch_1_1CompileSpec_1_1Input">
+                <span class="std std-ref">
+                 Input
+                </span>
+               </a>
+               spec object for static input size from vector, optional arguments allow the user to configure expected input shape tensor format. dtype (Expected data type for the input) defaults to PyTorch / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8)
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     shape
+                    </span>
+                   </code>
+                   :
+                   <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Input.html#structtrtorch_1_1CompileSpec_1_1Input">
+                    <span class="std std-ref">
+                     Input
+                    </span>
+                   </a>
+                   tensor shape
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     dtype
+                    </span>
+                   </code>
+                   : Expected data type for the input (Defaults to Float32)
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     format
+                    </span>
+                   </code>
+                   : Expected tensor format for the input (Defaults to contiguous)
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec5Input5InputENSt6vectorI7int64_tEE8DataType12TensorFormat">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1Input_1a894f30ce28976f6da26f03b59ee5eb97">
+              </span>
+              <code class="sig-name descname">
+               Input
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              std::vector&lt;int64_t&gt;
+              <em>
+               shape
+              </em>
+              ,
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1DataType.html#_CPPv4N7trtorch11CompileSpec8DataTypeE" title="trtorch::CompileSpec::DataType">
+               DataType
+              </a>
+              <em>
+               dtype
+              </em>
+              ,
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormatE" title="trtorch::CompileSpec::TensorFormat">
+               TensorFormat
+              </a>
+              <em>
+               format
+              </em>
+              =
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormatE" title="trtorch::CompileSpec::TensorFormat">
+               TensorFormat
+              </a>
+              ::
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormat5Value11kContiguousE" title="trtorch::CompileSpec::TensorFormat::kContiguous">
+               kContiguous
+              </a>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec5Input5InputENSt6vectorI7int64_tEE8DataType12TensorFormat" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Construct a new
+               <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Input.html#structtrtorch_1_1CompileSpec_1_1Input">
+                <span class="std std-ref">
+                 Input
+                </span>
+               </a>
+               spec object for static input size from vector, optional arguments allow the user to configure expected input shape tensor format.
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     shape
+                    </span>
+                   </code>
+                   :
+                   <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Input.html#structtrtorch_1_1CompileSpec_1_1Input">
+                    <span class="std std-ref">
+                     Input
+                    </span>
+                   </a>
+                   tensor shape
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     dtype
+                    </span>
+                   </code>
+                   : Expected data type for the input (Defaults to Float32)
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     format
+                    </span>
+                   </code>
+                   : Expected tensor format for the input (Defaults to contiguous)
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec5Input5InputEN3c108ArrayRefI7int64_tEE12TensorFormat">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1Input_1a46b788f54d03e1a8904f181f6caf5691">
+              </span>
+              <code class="sig-name descname">
+               Input
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              c10::ArrayRef&lt;int64_t&gt;
+              <em>
+               shape
+              </em>
+              ,
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormatE" title="trtorch::CompileSpec::TensorFormat">
+               TensorFormat
+              </a>
+              <em>
+               format
+              </em>
+              =
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormatE" title="trtorch::CompileSpec::TensorFormat">
+               TensorFormat
+              </a>
+              ::
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormat5Value11kContiguousE" title="trtorch::CompileSpec::TensorFormat::kContiguous">
+               kContiguous
+              </a>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec5Input5InputEN3c108ArrayRefI7int64_tEE12TensorFormat" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Construct a new
+               <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Input.html#structtrtorch_1_1CompileSpec_1_1Input">
+                <span class="std std-ref">
+                 Input
+                </span>
+               </a>
+               spec object for static input size from c10::ArrayRef (the type produced by tensor.sizes()), vector, optional arguments allow the user to configure expected input shape tensor format dtype (Expected data type for the input) defaults to PyTorch / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8)
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     shape
+                    </span>
+                   </code>
+                   :
+                   <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Input.html#structtrtorch_1_1CompileSpec_1_1Input">
+                    <span class="std std-ref">
+                     Input
+                    </span>
+                   </a>
+                   tensor shape
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     format
+                    </span>
+                   </code>
+                   : Expected tensor format for the input (Defaults to contiguous)
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec5Input5InputEN3c108ArrayRefI7int64_tEE8DataType12TensorFormat">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1Input_1afbdd8ef8564e5bbdda2837e0f9057d6f">
+              </span>
+              <code class="sig-name descname">
+               Input
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              c10::ArrayRef&lt;int64_t&gt;
+              <em>
+               shape
+              </em>
+              ,
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1DataType.html#_CPPv4N7trtorch11CompileSpec8DataTypeE" title="trtorch::CompileSpec::DataType">
+               DataType
+              </a>
+              <em>
+               dtype
+              </em>
+              ,
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormatE" title="trtorch::CompileSpec::TensorFormat">
+               TensorFormat
+              </a>
+              <em>
+               format
+              </em>
+              =
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormatE" title="trtorch::CompileSpec::TensorFormat">
+               TensorFormat
+              </a>
+              ::
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormat5Value11kContiguousE" title="trtorch::CompileSpec::TensorFormat::kContiguous">
+               kContiguous
+              </a>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec5Input5InputEN3c108ArrayRefI7int64_tEE8DataType12TensorFormat" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Construct a new
+               <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Input.html#structtrtorch_1_1CompileSpec_1_1Input">
+                <span class="std std-ref">
+                 Input
+                </span>
+               </a>
+               spec object for static input size from c10::ArrayRef (the type produced by tensor.sizes()), vector, optional arguments allow the user to configure expected input shape tensor format.
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     shape
+                    </span>
+                   </code>
+                   :
+                   <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Input.html#structtrtorch_1_1CompileSpec_1_1Input">
+                    <span class="std std-ref">
+                     Input
+                    </span>
+                   </a>
+                   tensor shape
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     dtype
+                    </span>
+                   </code>
+                   : Expected data type for the input (Defaults to Float32)
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     format
+                    </span>
+                   </code>
+                   : Expected tensor format for the input (Defaults to contiguous)
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec5Input5InputENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE12TensorFormat">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1Input_1afa147290da495b869c4b60b1f2684de1">
+              </span>
+              <code class="sig-name descname">
+               Input
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              std::vector&lt;int64_t&gt;
+              <em>
+               min_shape
+              </em>
+              , std::vector&lt;int64_t&gt;
+              <em>
+               opt_shape
+              </em>
+              , std::vector&lt;int64_t&gt;
+              <em>
+               max_shape
+              </em>
+              ,
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormatE" title="trtorch::CompileSpec::TensorFormat">
+               TensorFormat
+              </a>
+              <em>
+               format
+              </em>
+              =
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormatE" title="trtorch::CompileSpec::TensorFormat">
+               TensorFormat
+              </a>
+              ::
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormat5Value11kContiguousE" title="trtorch::CompileSpec::TensorFormat::kContiguous">
+               kContiguous
+              </a>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec5Input5InputENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE12TensorFormat" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Construct a new
+               <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Input.html#structtrtorch_1_1CompileSpec_1_1Input">
+                <span class="std std-ref">
+                 Input
+                </span>
+               </a>
+               Range object dynamic input size from c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max supported sizes. dtype (Expected data type for the input) defaults to PyTorch / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8)
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     min_shape
+                    </span>
+                   </code>
+                   : Minimum shape for input tensor
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     opt_shape
+                    </span>
+                   </code>
+                   : Target optimization shape for input tensor
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     max_shape
+                    </span>
+                   </code>
+                   : Maximum acceptible shape for input tensor
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     format
+                    </span>
+                   </code>
+                   : Expected tensor format for the input (Defaults to contiguous)
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec5Input5InputENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE8DataType12TensorFormat">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1Input_1afa5045e6267d25dfd9781999f8d0a3dc">
+              </span>
+              <code class="sig-name descname">
+               Input
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              std::vector&lt;int64_t&gt;
+              <em>
+               min_shape
+              </em>
+              , std::vector&lt;int64_t&gt;
+              <em>
+               opt_shape
+              </em>
+              , std::vector&lt;int64_t&gt;
+              <em>
+               max_shape
+              </em>
+              ,
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1DataType.html#_CPPv4N7trtorch11CompileSpec8DataTypeE" title="trtorch::CompileSpec::DataType">
+               DataType
+              </a>
+              <em>
+               dtype
+              </em>
+              ,
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormatE" title="trtorch::CompileSpec::TensorFormat">
+               TensorFormat
+              </a>
+              <em>
+               format
+              </em>
+              =
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormatE" title="trtorch::CompileSpec::TensorFormat">
+               TensorFormat
+              </a>
+              ::
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormat5Value11kContiguousE" title="trtorch::CompileSpec::TensorFormat::kContiguous">
+               kContiguous
+              </a>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec5Input5InputENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE8DataType12TensorFormat" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Construct a new
+               <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Input.html#structtrtorch_1_1CompileSpec_1_1Input">
+                <span class="std std-ref">
+                 Input
+                </span>
+               </a>
+               spec object for a dynamic input size from vectors for minimum shape, optimal shape, and max shape supported sizes optional arguments allow the user to configure expected input shape tensor format.
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     min_shape
+                    </span>
+                   </code>
+                   : Minimum shape for input tensor
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     opt_shape
+                    </span>
+                   </code>
+                   : Target optimization shape for input tensor
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     max_shape
+                    </span>
+                   </code>
+                   : Maximum acceptible shape for input tensor
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     dtype
+                    </span>
+                   </code>
+                   : Expected data type for the input (Defaults to Float32)
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     format
+                    </span>
+                   </code>
+                   : Expected tensor format for the input (Defaults to contiguous)
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec5Input5InputEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE12TensorFormat">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1Input_1a0eb9533f5c866e6503559ec855579f26">
+              </span>
+              <code class="sig-name descname">
+               Input
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              c10::ArrayRef&lt;int64_t&gt;
+              <em>
+               min_shape
+              </em>
+              , c10::ArrayRef&lt;int64_t&gt;
+              <em>
+               opt_shape
+              </em>
+              , c10::ArrayRef&lt;int64_t&gt;
+              <em>
+               max_shape
+              </em>
+              ,
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormatE" title="trtorch::CompileSpec::TensorFormat">
+               TensorFormat
+              </a>
+              <em>
+               format
+              </em>
+              =
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormatE" title="trtorch::CompileSpec::TensorFormat">
+               TensorFormat
+              </a>
+              ::
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormat5Value11kContiguousE" title="trtorch::CompileSpec::TensorFormat::kContiguous">
+               kContiguous
+              </a>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec5Input5InputEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE12TensorFormat" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Construct a new
+               <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Input.html#structtrtorch_1_1CompileSpec_1_1Input">
+                <span class="std std-ref">
+                 Input
+                </span>
+               </a>
+               Range object dynamic input size from c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max supported sizes. dtype (Expected data type for the input) defaults to PyTorch / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8)
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     min_shape
+                    </span>
+                   </code>
+                   : Minimum shape for input tensor
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     opt_shape
+                    </span>
+                   </code>
+                   : Target optimization shape for input tensor
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     max_shape
+                    </span>
+                   </code>
+                   : Maximum acceptible shape for input tensor
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     format
+                    </span>
+                   </code>
+                   : Expected tensor format for the input (Defaults to contiguous)
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec5Input5InputEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE8DataType12TensorFormat">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1Input_1ae3f2650bd4ba4274fb7aaf042a35bc9b">
+              </span>
+              <code class="sig-name descname">
+               Input
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              c10::ArrayRef&lt;int64_t&gt;
+              <em>
+               min_shape
+              </em>
+              , c10::ArrayRef&lt;int64_t&gt;
+              <em>
+               opt_shape
+              </em>
+              , c10::ArrayRef&lt;int64_t&gt;
+              <em>
+               max_shape
+              </em>
+              ,
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1DataType.html#_CPPv4N7trtorch11CompileSpec8DataTypeE" title="trtorch::CompileSpec::DataType">
+               DataType
+              </a>
+              <em>
+               dtype
+              </em>
+              ,
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormatE" title="trtorch::CompileSpec::TensorFormat">
+               TensorFormat
+              </a>
+              <em>
+               format
+              </em>
+              =
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormatE" title="trtorch::CompileSpec::TensorFormat">
+               TensorFormat
+              </a>
+              ::
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormat5Value11kContiguousE" title="trtorch::CompileSpec::TensorFormat::kContiguous">
+               kContiguous
+              </a>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec5Input5InputEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE8DataType12TensorFormat" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Construct a new
+               <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Input.html#structtrtorch_1_1CompileSpec_1_1Input">
+                <span class="std std-ref">
+                 Input
+                </span>
+               </a>
+               Range object dynamic input size from c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max supported sizes.
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     min_shape
+                    </span>
+                   </code>
+                   : Minimum shape for input tensor
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     opt_shape
+                    </span>
+                   </code>
+                   : Target optimization shape for input tensor
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     max_shape
+                    </span>
+                   </code>
+                   : Maximum acceptible shape for input tensor
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     dtype
+                    </span>
+                   </code>
+                   : Expected data type for the input (Defaults to Float32)
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     format
+                    </span>
+                   </code>
+                   : Expected tensor format for the input (Defaults to contiguous)
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec5Input22get_explicit_set_dtypeEv">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1Input_1aa2cbd99e4dffe526eb00b45cb700dd9b">
+              </span>
+              bool
+              <code class="sig-name descname">
+               get_explicit_set_dtype
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec5Input22get_explicit_set_dtypeEv" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+             </dd>
+            </dl>
+           </div>
+           <div class="breathe-sectiondef docutils container">
+            <p class="breathe-sectiondef-title rubric">
+             Public Members
+            </p>
+            <dl class="cpp var">
+             <dt id="_CPPv4N7trtorch11CompileSpec5Input9min_shapeE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1Input_1a1e6288f3492c959549d3dfccb70cff81">
+              </span>
+              std::vector&lt;int64_t&gt;
+              <code class="sig-name descname">
+               min_shape
+              </code>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec5Input9min_shapeE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Minimum acceptable input size into the engine.
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp var">
+             <dt id="_CPPv4N7trtorch11CompileSpec5Input9opt_shapeE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1Input_1a8a40ae43705d27d57ae6e66119e6c630">
+              </span>
+              std::vector&lt;int64_t&gt;
+              <code class="sig-name descname">
+               opt_shape
+              </code>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec5Input9opt_shapeE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Optimal input size into the engine (size optimized for given kernels accept any size in min max range)
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp var">
+             <dt id="_CPPv4N7trtorch11CompileSpec5Input9max_shapeE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1Input_1a644adba64b74baa0cde25107840c6b6d">
+              </span>
+              std::vector&lt;int64_t&gt;
+              <code class="sig-name descname">
+               max_shape
+              </code>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec5Input9max_shapeE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Maximum acceptable input size into the engine.
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp var">
+             <dt id="_CPPv4N7trtorch11CompileSpec5Input5shapeE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1Input_1a821ea2b10cf3fe9a1f7b329c40c2b1ce">
+              </span>
+              std::vector&lt;int64_t&gt;
+              <code class="sig-name descname">
+               shape
+              </code>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec5Input5shapeE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Input.html#structtrtorch_1_1CompileSpec_1_1Input">
+                <span class="std std-ref">
+                 Input
+                </span>
+               </a>
+               shape to be fed to TensorRT, in the event of a dynamic shape, -1’s will hold the place of variable dimensions
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp var">
+             <dt id="_CPPv4N7trtorch11CompileSpec5Input5dtypeE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1Input_1a8050e12b0508386b8dfd08afe25a754c">
+              </span>
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1DataType.html#_CPPv4N7trtorch11CompileSpec8DataTypeE" title="trtorch::CompileSpec::DataType">
+               DataType
+              </a>
+              <code class="sig-name descname">
+               dtype
+              </code>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec5Input5dtypeE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Expected data type for the input.
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp var">
+             <dt id="_CPPv4N7trtorch11CompileSpec5Input6formatE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1Input_1a6f48fa2c9104b85fa3efc1f689354d27">
+              </span>
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormatE" title="trtorch::CompileSpec::TensorFormat">
+               TensorFormat
+              </a>
+              <code class="sig-name descname">
+               format
+              </code>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec5Input6formatE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Expected tensor format for the input.
+              </p>
+             </dd>
+            </dl>
+           </div>
+          </dd>
+         </dl>
+         <dl class="cpp struct">
           <dt id="_CPPv4N7trtorch11CompileSpec10InputRangeE">
            <span class="target" id="structtrtorch_1_1CompileSpec_1_1InputRange">
            </span>
@@ -2399,7 +3653,13 @@
              </dt>
              <dd>
               <p>
-               Construct a new Input Range object for static input size from vector.
+               Construct a new
+               <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Input.html#structtrtorch_1_1CompileSpec_1_1Input">
+                <span class="std std-ref">
+                 Input
+                </span>
+               </a>
+               Range object for static input size from vector.
               </p>
               <p>
               </p>
@@ -2450,7 +3710,13 @@
              </dt>
              <dd>
               <p>
-               Construct a new Input Range object static input size from c10::ArrayRef (the type produced by tensor.sizes())
+               Construct a new
+               <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Input.html#structtrtorch_1_1CompileSpec_1_1Input">
+                <span class="std std-ref">
+                 Input
+                </span>
+               </a>
+               Range object static input size from c10::ArrayRef (the type produced by tensor.sizes())
               </p>
               <p>
               </p>
@@ -2509,7 +3775,13 @@
              </dt>
              <dd>
               <p>
-               Construct a new Input Range object dynamic input size from vectors for min, opt, and max supported sizes.
+               Construct a new
+               <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Input.html#structtrtorch_1_1CompileSpec_1_1Input">
+                <span class="std std-ref">
+                 Input
+                </span>
+               </a>
+               Range object dynamic input size from vectors for min, opt, and max supported sizes.
               </p>
               <p>
               </p>
@@ -2588,7 +3860,13 @@
              </dt>
              <dd>
               <p>
-               Construct a new Input Range object dynamic input size from c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max supported sizes.
+               Construct a new
+               <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Input.html#structtrtorch_1_1CompileSpec_1_1Input">
+                <span class="std std-ref">
+                 Input
+                </span>
+               </a>
+               Range object dynamic input size from c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max supported sizes.
               </p>
               <p>
               </p>
@@ -2695,6 +3973,652 @@
               <p>
                Maximum acceptable input size into the engine.
               </p>
+             </dd>
+            </dl>
+           </div>
+          </dd>
+         </dl>
+         <dl class="cpp class">
+          <dt id="_CPPv4N7trtorch11CompileSpec12TensorFormatE">
+           <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat">
+           </span>
+           <em class="property">
+            class
+           </em>
+           <code class="sig-name descname">
+            TensorFormat
+           </code>
+           <br/>
+          </dt>
+          <dd>
+           <div class="breathe-sectiondef docutils container">
+            <p class="breathe-sectiondef-title rubric">
+             Public Types
+            </p>
+            <dl class="cpp enum">
+             <dt id="_CPPv4N7trtorch11CompileSpec12TensorFormat5ValueE">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1a40bc29d3d3370cd10b199bd1a002746e">
+              </span>
+              <em class="property">
+               enum
+              </em>
+              <code class="sig-name descname">
+               Value
+              </code>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Underlying enum class to support the
+               <a class="reference internal" href="#classtrtorch_1_1CompileSpec_1_1TensorFormat">
+                <span class="std std-ref">
+                 TensorFormat
+                </span>
+               </a>
+               Class
+              </p>
+              <p>
+               In the case that you need to use the
+               <a class="reference internal" href="#classtrtorch_1_1CompileSpec_1_1TensorFormat">
+                <span class="std std-ref">
+                 TensorFormat
+                </span>
+               </a>
+               class itself, interface using this enum vs. normal instatination
+              </p>
+              <p>
+               ex. trtorch::TensorFormat type =
+               <a class="reference internal" href="#classtrtorch_1_1CompileSpec_1_1TensorFormat_1a40bc29d3d3370cd10b199bd1a002746eadfd796c5cf8abd2c5c3d540351fe6daa">
+                <span class="std std-ref">
+                 TensorFormat::kContiguous
+                </span>
+               </a>
+               ;
+              </p>
+              <p>
+               <em>
+                Values:
+               </em>
+              </p>
+              <dl class="cpp enumerator">
+               <dt id="_CPPv4N7trtorch11CompileSpec12TensorFormat5Value11kContiguousE">
+                <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1a40bc29d3d3370cd10b199bd1a002746eadfd796c5cf8abd2c5c3d540351fe6daa">
+                </span>
+                <em class="property">
+                 enumerator
+                </em>
+                <code class="sig-name descname">
+                 kContiguous
+                </code>
+                <br/>
+               </dt>
+               <dd>
+                <p>
+                 Contiguous / NCHW / Linear.
+                </p>
+               </dd>
+              </dl>
+              <dl class="cpp enumerator">
+               <dt id="_CPPv4N7trtorch11CompileSpec12TensorFormat5Value13kChannelsLastE">
+                <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1a40bc29d3d3370cd10b199bd1a002746ea95eb1e564cf5d275fc496e8b1d598e6a">
+                </span>
+                <em class="property">
+                 enumerator
+                </em>
+                <code class="sig-name descname">
+                 kChannelsLast
+                </code>
+                <br/>
+               </dt>
+               <dd>
+                <p>
+                 Channel Last / NHWC.
+                </p>
+               </dd>
+              </dl>
+              <dl class="cpp enumerator">
+               <dt id="_CPPv4N7trtorch11CompileSpec12TensorFormat5Value8kUnknownE">
+                <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1a40bc29d3d3370cd10b199bd1a002746ea7bc1db7ea523d383ce35e45fc3d1b724">
+                </span>
+                <em class="property">
+                 enumerator
+                </em>
+                <code class="sig-name descname">
+                 kUnknown
+                </code>
+                <br/>
+               </dt>
+               <dd>
+                <p>
+                 Sentinel value.
+                </p>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+           </div>
+           <div class="breathe-sectiondef docutils container">
+            <p class="breathe-sectiondef-title rubric">
+             Public Functions
+            </p>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec12TensorFormat12TensorFormatEv">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1aaa99ac2140b735a0287e10541df331a2">
+              </span>
+              <code class="sig-name descname">
+               TensorFormat
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <span class="sig-paren">
+               )
+              </span>
+              = default
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Construct a new
+               <a class="reference internal" href="#classtrtorch_1_1CompileSpec_1_1TensorFormat">
+                <span class="std std-ref">
+                 TensorFormat
+                </span>
+               </a>
+               object.
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec12TensorFormat12TensorFormatE5Value">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1a67ec3b69995748b4695c2a598d7ba6db">
+              </span>
+              <em class="property">
+               constexpr
+              </em>
+              <code class="sig-name descname">
+               TensorFormat
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormat5ValueE" title="trtorch::CompileSpec::TensorFormat::Value">
+               Value
+              </a>
+              <em>
+               t
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               <a class="reference internal" href="#classtrtorch_1_1CompileSpec_1_1TensorFormat">
+                <span class="std std-ref">
+                 TensorFormat
+                </span>
+               </a>
+               constructor from enum.
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec12TensorFormat12TensorFormatEN2at12MemoryFormatE">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1abb68e76c781406b11876a88dcf64b637">
+              </span>
+              <code class="sig-name descname">
+               TensorFormat
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              at::MemoryFormat
+              <em>
+               t
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Construct a new
+               <a class="reference internal" href="#classtrtorch_1_1CompileSpec_1_1TensorFormat">
+                <span class="std std-ref">
+                 TensorFormat
+                </span>
+               </a>
+               object from torch type enums.
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     t
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4NK7trtorch11CompileSpec12TensorFormatcv5ValueEv">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1a3fe8578b4fdc93a4aef236344b6546ae">
+              </span>
+              <code class="sig-name descname">
+               operator Value
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <span class="sig-paren">
+               )
+              </span>
+              <em class="property">
+               const
+              </em>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Get the enum value of the
+               <a class="reference internal" href="#classtrtorch_1_1CompileSpec_1_1TensorFormat">
+                <span class="std std-ref">
+                 TensorFormat
+                </span>
+               </a>
+               object.
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 Value
+                </p>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec12TensorFormatcvbEv">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1ad0e2a9e3da4d7c07258d84cd0b4b5064">
+              </span>
+              <code class="sig-name descname">
+               operator bool
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <span class="sig-paren">
+               )
+              </span>
+              = delete
+              <br/>
+             </dt>
+             <dd>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4NK7trtorch11CompileSpec12TensorFormateqE12TensorFormat">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1af574ba887a2d2da0b5d04477ef715b80">
+              </span>
+              <em class="property">
+               constexpr
+              </em>
+              bool
+              <code class="sig-name descname">
+               operator==
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormatE" title="trtorch::CompileSpec::TensorFormat">
+               TensorFormat
+              </a>
+              <em>
+               other
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <em class="property">
+               const
+              </em>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Comparision operator for
+               <a class="reference internal" href="#classtrtorch_1_1CompileSpec_1_1TensorFormat">
+                <span class="std std-ref">
+                 TensorFormat
+                </span>
+               </a>
+               .
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 true
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 false
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     other
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4NK7trtorch11CompileSpec12TensorFormateqEN12TensorFormat5ValueE">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1a506b32e7938a11eb39e589931292d3e8">
+              </span>
+              <em class="property">
+               constexpr
+              </em>
+              bool
+              <code class="sig-name descname">
+               operator==
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormatE" title="trtorch::CompileSpec::TensorFormat">
+               TensorFormat
+              </a>
+              ::
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormat5ValueE" title="trtorch::CompileSpec::TensorFormat::Value">
+               Value
+              </a>
+              <em>
+               other
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <em class="property">
+               const
+              </em>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Comparision operator for
+               <a class="reference internal" href="#classtrtorch_1_1CompileSpec_1_1TensorFormat">
+                <span class="std std-ref">
+                 TensorFormat
+                </span>
+               </a>
+               .
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 true
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 false
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     other
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4NK7trtorch11CompileSpec12TensorFormatneE12TensorFormat">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1a0e29c3bde6d62005ea7e1948e378bd32">
+              </span>
+              <em class="property">
+               constexpr
+              </em>
+              bool
+              <code class="sig-name descname">
+               operator!=
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormatE" title="trtorch::CompileSpec::TensorFormat">
+               TensorFormat
+              </a>
+              <em>
+               other
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <em class="property">
+               const
+              </em>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Comparision operator for
+               <a class="reference internal" href="#classtrtorch_1_1CompileSpec_1_1TensorFormat">
+                <span class="std std-ref">
+                 TensorFormat
+                </span>
+               </a>
+               .
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 true
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 false
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     other
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4NK7trtorch11CompileSpec12TensorFormatneEN12TensorFormat5ValueE">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1a89bb4c31ad83b2fec5d2839028cd2a83">
+              </span>
+              <em class="property">
+               constexpr
+              </em>
+              bool
+              <code class="sig-name descname">
+               operator!=
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormatE" title="trtorch::CompileSpec::TensorFormat">
+               TensorFormat
+              </a>
+              ::
+              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#_CPPv4N7trtorch11CompileSpec12TensorFormat5ValueE" title="trtorch::CompileSpec::TensorFormat::Value">
+               Value
+              </a>
+              <em>
+               other
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <em class="property">
+               const
+              </em>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Comparision operator for
+               <a class="reference internal" href="#classtrtorch_1_1CompileSpec_1_1TensorFormat">
+                <span class="std std-ref">
+                 TensorFormat
+                </span>
+               </a>
+               .
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 true
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 false
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     other
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
              </dd>
             </dl>
            </div>

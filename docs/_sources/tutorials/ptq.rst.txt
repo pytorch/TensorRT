@@ -126,7 +126,8 @@ Then all thats required to setup the module for INT8 calibration is to set the f
     /// Configure settings for compilation
     auto compile_spec = trtorch::CompileSpec({input_shape});
     /// Set operating precision to INT8
-    compile_spec.op_precision = torch::kI8;
+    compile_spec.enabled_precisions.insert(torch::kF16);
+    compile_spec.enabled_precisions.insert(torch::kI8);
     /// Use the TensorRT Entropy Calibrator
     compile_spec.ptq_calibrator = calibrator;
     /// Set a larger workspace (you may get better performace from doing so)
@@ -169,8 +170,8 @@ a TensorRT calibrator by providing desired configuration. The following code dem
                                                   device=torch.device('cuda:0'))
 
     compile_spec = {
-             "input_shapes": [[1, 3, 32, 32]],
-             "op_precision": torch.int8,
+             "inputs": [trtorch.Input((1, 3, 32, 32))],
+             "enabled_precisions": {torch.float, torch.half, torch.int8},
              "calibrator": calibrator,
              "device": {
                  "device_type": trtorch.DeviceType.GPU,
@@ -190,8 +191,8 @@ to use ``CacheCalibrator`` to use in INT8 mode.
   calibrator = trtorch.ptq.CacheCalibrator("./calibration.cache")
 
   compile_settings = {
-        "input_shapes": [[1, 3, 32, 32]],
-        "op_precision": torch.int8,
+        "inputs": [trtorch.Input([1, 3, 32, 32])],
+        "enabled_precisions": {torch.float, torch.half, torch.int8},
         "calibrator": calibrator,
         "max_batch_size": 32,
     }
