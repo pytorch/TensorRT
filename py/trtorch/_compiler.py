@@ -5,6 +5,7 @@ from torch import nn
 import trtorch._C
 from trtorch._compile_spec import _parse_compile_spec
 from trtorch._version import __version__
+from trtorch.Device import Device
 from types import FunctionType
 
 
@@ -42,8 +43,7 @@ def compile(module: torch.jit.ScriptModule, compile_spec: Any) -> torch.jit.Scri
                         "dla_core": 0, # (DLA only) Target dla core id to run engine
                         "allow_gpu_fallback": false, # (DLA only) Allow layers unsupported on DLA to run on GPU
                     },
-                    "op_precision": torch.half, # Operating precision set to FP16
-                    "input_dtypes": [torch.float32] # List of datatypes that should be configured for each input. Supported options torch.{float|half|int8|int32|bool}.
+                    "enabled_precisions": {torch.float, torch.half}, # Enabling FP16 kernels
                     "refit": false, # enable refit
                     "debug": false, # enable debuggable engine
                     "strict_types": false, # kernels should strictly run in operating precision
@@ -61,7 +61,7 @@ def compile(module: torch.jit.ScriptModule, compile_spec: Any) -> torch.jit.Scri
                     }
                 }
 
-            Input Sizes can be specified as torch sizes, tuples or lists. Op precisions can be specified using
+            Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
             torch datatypes or trtorch datatypes and you can use either torch devices or the trtorch device type enum
             to select device type.
 
@@ -110,7 +110,7 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule, method_name: st
                         "dla_core": 0, # (DLA only) Target dla core id to run engine
                         "allow_gpu_fallback": false, # (DLA only) Allow layers unsupported on DLA to run on GPU
                     },
-                    "op_precision": torch.half, # Operating precision set to FP16
+                    "enabled_precisions": {torch.float, torch.half}, # Enabling FP16 kernels
                     # List of datatypes that should be configured for each input. Supported options torch.{float|half|int8|int32|bool}.
                     "disable_tf32": False, # Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
                     "refit": false, # enable refit
@@ -123,7 +123,7 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule, method_name: st
                     "max_batch_size": 0, # Maximum batch size (must be >= 1 to be set, 0 means not set)
                 }
 
-            Input Sizes can be specified as torch sizes, tuples or lists. Op precisions can be specified using
+            Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
             torch datatypes or trtorch datatypes and you can use either torch devices or the trtorch device type enum
             to select device type.
 
@@ -137,7 +137,7 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule, method_name: st
     return trtorch._C.convert_graph_to_trt_engine(module._c, method_name, _parse_compile_spec(compile_spec))
 
 
-def embed_engine_in_new_module(serialized_engine: bytes) -> torch.jit.ScriptModule:
+def embed_engine_in_new_module(serialized_engine: bytes, device: Device) -> torch.jit.ScriptModule:
     """Takes a pre-built serialized TensorRT engine and embeds it within a TorchScript module
 
     Takes a pre-built serialied TensorRT engine (as bytes) and embeds it within a TorchScript module.
@@ -153,7 +153,7 @@ def embed_engine_in_new_module(serialized_engine: bytes) -> torch.jit.ScriptModu
     Returns:
         torch.jit.ScriptModule: New TorchScript module with engine embedded
     """
-    cpp_mod = trtorch._C.embed_engine_in_new_module(serialized_engine)
+    cpp_mod = trtorch._C.embed_engine_in_new_module(serialized_engine, device._to_internal())
     return torch.jit._recursive.wrap_cpp_module(cpp_mod)
 
 

@@ -162,7 +162,7 @@ class TestPTtoTRTtoPT(ModelTestCase):
         }
 
         trt_engine = trtorch.convert_method_to_trt_engine(self.ts_model, "forward", compile_spec)
-        trt_mod = trtorch.embed_engine_in_new_module(trt_engine)
+        trt_mod = trtorch.embed_engine_in_new_module(trt_engine, trtorch.Device("cuda:0"))
         same = (trt_mod(self.input) - self.ts_model(self.input)).abs().max()
         self.assertTrue(same < 2e-3)
 

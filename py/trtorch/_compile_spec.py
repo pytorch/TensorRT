@@ -3,6 +3,7 @@ import torch
 import trtorch._C
 from trtorch import _types
 from trtorch.Input import Input
+from trtorch.Device import Device
 
 import warnings
 
@@ -101,27 +102,35 @@ def _parse_device_type(device: Any) -> _types.DeviceType:
                         str(type(device)))
 
 
-def _parse_device(device_info: Dict[str, Any]) -> trtorch._C.Device:
-    info = trtorch._C.Device()
-    if "device_type" not in device_info:
-        raise KeyError("Device type is required parameter")
+def _parse_device(device_info: Any) -> trtorch._C.Device:
+    if isinstance(device_info, dict):
+        info = trtorch._C.Device()
+        if "device_type" not in device_info:
+            raise KeyError("Device type is required parameter")
+        else:
+            assert isinstance(device_info["device_type"], _types.DeviceType)
+            info.device_type = _parse_device_type(device_info["device_type"])
+
+        if "gpu_id" in device_info:
+            assert isinstance(device_info["gpu_id"], int)
+            info.gpu_id = device_info["gpu_id"]
+
+        if "dla_core" in device_info:
+            assert isinstance(device_info["dla_core"], int)
+            info.dla_core = device_info["dla_core"]
+
+        if "allow_gpu_fallback" in device_info:
+            assert isinstance(device_info["allow_gpu_fallback"], bool)
+            info.allow_gpu_fallback = device_info["allow_gpu_fallback"]
+
+        return info
+    elif isinstance(device_info, Device):
+        return device_info._to_internal()
+    elif isinstance(device_info, torch.device):
+        return (Device._from_torch_device(device_info))._to_internal()
     else:
-        assert isinstance(device_info["device_type"], _types.DeviceType)
-        info.device_type = _parse_device_type(device_info["device_type"])
-
-    if "gpu_id" in device_info:
-        assert isinstance(device_info["gpu_id"], int)
-        info.gpu_id = device_info["gpu_id"]
-
-    if "dla_core" in device_info:
-        assert isinstance(device_info["dla_core"], int)
-        info.dla_core = device_info["dla_core"]
-
-    if "allow_gpu_fallback" in device_info:
-        assert isinstance(device_info["allow_gpu_fallback"], bool)
-        info.allow_gpu_fallback = device_info["allow_gpu_fallback"]
-
-    return info
+        raise ValueError(
+            "Unsupported data for device specification. Expected either a dict, trtorch.Device or torch.Device")
 
 
 def _parse_torch_fallback(fallback_info: Dict[str, Any]) -> trtorch._C.TorchFallback:
