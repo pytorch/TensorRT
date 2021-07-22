@@ -73,6 +73,7 @@ std::ostream& operator<<(std::ostream& os, const CompileSpec::Input& input) {
 }
 
 nvinfer1::DataType toTRTDataType(CompileSpec::DataType value) {
+  TRTORCH_CHECK(!(value == CompileSpec::DataType::kUnknown), "Data type is unknown");
   switch (value) {
     case CompileSpec::DataType::kChar:
       return nvinfer1::DataType::kINT8;
@@ -89,6 +90,7 @@ nvinfer1::DataType toTRTDataType(CompileSpec::DataType value) {
 }
 
 nvinfer1::TensorFormat toTRTTensorFormat(CompileSpec::TensorFormat value) {
+  TRTORCH_CHECK(!(value == CompileSpec::TensorFormat::kUnknown), "Tensor format is unknown");
   switch (value) {
     case CompileSpec::TensorFormat::kChannelsLast:
       return nvinfer1::TensorFormat::kHWC;
@@ -101,7 +103,7 @@ nvinfer1::TensorFormat toTRTTensorFormat(CompileSpec::TensorFormat value) {
 CompileSpec::DataType::DataType(c10::ScalarType t) {
   TRTORCH_CHECK(
       t == at::kHalf || t == at::kFloat || t == at::kChar || t == at::kInt || t == at::kBool,
-      "Data type is unsupported");
+      "Data type is unsupported (" << t << ")");
   switch (t) {
     case at::kHalf:
       value = DataType::kHalf;
@@ -124,7 +126,7 @@ CompileSpec::DataType::DataType(c10::ScalarType t) {
 
 CompileSpec::TensorFormat::TensorFormat(at::MemoryFormat t) {
   TRTORCH_CHECK(
-      t == at::MemoryFormat::Contiguous || t == at::MemoryFormat::ChannelsLast, "Tensor format is unsupported");
+      t == at::MemoryFormat::Contiguous || t == at::MemoryFormat::ChannelsLast, "Tensor format is unsupported (" << t << ")");
 
   switch (t) {
     case at::MemoryFormat::ChannelsLast:
@@ -325,14 +327,16 @@ core::runtime::CudaDevice to_internal_cuda_device(CompileSpec::Device device) {
 
 core::CompileSpec to_internal_compile_spec(CompileSpec external) {
   core::CompileSpec internal(to_vec_internal_inputs(external.inputs));
-  if (external.input_ranges.size() > 0) {
+  if (external.input_ranges.size() > 0 && external.inputs.size() > 0) {
+    TRTORCH_THROW_ERROR("Saw both input specs listed for inputs and input_ranges in CompileSpec. input_ranges is deprecated and will be removed in v0.5.0. Please port forward to using inputs");
+  } else if (external.input_ranges.size() > 0) {
     internal = core::CompileSpec(to_vec_internal_inputs(external.input_ranges));
   } else {
     TRTORCH_CHECK(external.inputs.size() > 0, "Compilation requires at least one input specification");
     internal = core::CompileSpec(to_vec_internal_inputs(external.inputs));
   }
 
-  if (external.enabled_precisions.size() <= 1 &&
+  if (external.enabled_precisions.size() == 1 &&
       toTRTDataType(*external.enabled_precisions.begin()) == nvinfer1::DataType::kFLOAT &&
       toTRTDataType(external.op_precision) != nvinfer1::DataType::kFLOAT) {
     internal.convert_info.engine_settings.enabled_precisions.insert(toTRTDataType(external.op_precision));

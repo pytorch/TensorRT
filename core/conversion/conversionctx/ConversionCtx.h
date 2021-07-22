@@ -59,7 +59,6 @@ struct ConversionCtx {
   nvinfer1::IBuilder* builder;
   nvinfer1::INetworkDefinition* net;
   nvinfer1::IBuilderConfig* cfg;
-  std::vector<nvinfer1::DataType> input_dtypes;
   std::set<nvinfer1::DataType> enabled_precisions;
   BuilderSettings settings;
   util::logging::TRTorchLogger logger;

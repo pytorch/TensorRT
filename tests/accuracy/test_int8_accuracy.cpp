@@ -21,7 +21,7 @@ TEST_P(AccuracyTests, INT8AccuracyIsClose) {
   // Configure settings for compilation
   auto compile_spec = trtorch::CompileSpec({input_shape});
   // Set operating precision to INT8
-  compile_spec.op_precision = torch::kI8;
+  compile_spec.enabled_precisions.insert(torch::kI8);
   // Use the TensorRT Entropy Calibrator
   compile_spec.ptq_calibrator = calibrator;
   // Set max batch size for the engine

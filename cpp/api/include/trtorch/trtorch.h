@@ -703,8 +703,8 @@ struct TRTORCH_API CompileSpec {
   bool truncate_long_and_double = false;
 
   /**
-   * Restrict operating type to only set default operation precision
-   * (op_precision)
+   * Restrict operating type to only the lowest enabled operation precision
+   * (enabled_precisions)
    */
   bool strict_types = false;
 

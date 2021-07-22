@@ -145,7 +145,7 @@ void AddInputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> inputs
     ss << "    " << i << ",";
   }
   ss << ']';
-  LOG_DEBUG(ss.str());
+  LOG_DEBUG(ctx->logger, ss.str());
 
   TRTORCH_CHECK(
       input_tensors.size() == input_specs.size(),

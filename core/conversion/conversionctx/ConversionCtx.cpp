@@ -75,15 +75,15 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
         cfg->setInt8Calibrator(settings.calibrator);
         break;
       case nvinfer1::DataType::kFLOAT:
+        break;
       case nvinfer1::DataType::kINT32:
       case nvinfer1::DataType::kBOOL:
       default:
-        break;
+        TRTORCH_THROW_ERROR("Requested kernel precision that is unsupported: " << *p << " options are float, half, int8");
     }
   }
 
   enabled_precisions = settings.enabled_precisions;
-  input_dtypes = settings.input_dtypes;
 
   if (settings.disable_tf32) {
     cfg->clearFlag(nvinfer1::BuilderFlag::kTF32);

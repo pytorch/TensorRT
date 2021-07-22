@@ -25,4 +25,4 @@ TEST_P(CppAPITests, InputsUseDefault) {
 INSTANTIATE_TEST_SUITE_P(
     CompiledModuleForwardIsCloseSuite,
     CppAPITests,
-    testing::Values(PathAndInSize({"tests/modules/resnet18_traced.jit.pt", {{1, 3, 224, 224}}})));
+    testing::Values(PathAndInSize({"tests/modules/resnet18_traced.jit.pt", {{1, 3, 224, 224}}, 2e-5})));
