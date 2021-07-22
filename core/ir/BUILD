@@ -13,7 +13,7 @@ cc_library(
         "ir.h"
     ],
     srcs = [
-        "InputRange.cpp",
+        "Input.cpp"
     ],
     deps = [
         "@tensorrt//:nvinfer",

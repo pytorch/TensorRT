@@ -6,11 +6,11 @@ namespace trtorch {
 namespace core {
 namespace partitioning {
 
-std::vector<torch::jit::IValue> generateRandomInputs(std::vector<ir::InputRange>& input_ranges);
+std::vector<torch::jit::IValue> generateRandomInputs(std::vector<ir::Input>& inputs);
 
 void runShapeAnalysis(
     std::vector<SegmentedBlock>& segmented_blocks,
-    std::vector<ir::InputRange>& input_ranges,
+    std::vector<ir::Input>& inputs,
     std::shared_ptr<torch::jit::Graph> g);
 
 } // namespace partitioning

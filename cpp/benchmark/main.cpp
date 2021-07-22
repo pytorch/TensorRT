@@ -124,7 +124,7 @@ int main(int argc, const char* argv[]) {
   compile_spec.workspace_size = 1 << 20;
 
 #ifdef HALF
-  compile_spec.op_precision = torch::kF16;
+  compile_spec.enabled_precisions.insert(torch::kF16);
 #endif
 
   auto trt_mod = trtorch::CompileGraph(mod, compile_spec);

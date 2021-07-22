@@ -8,7 +8,7 @@
 
 using PathAndInSize = std::tuple<std::string, std::vector<std::vector<int64_t>>, float>;
 
-class ModuleTests : public testing::TestWithParam<PathAndInSize> {
+class CppAPITests : public testing::TestWithParam<PathAndInSize> {
  public:
   void SetUp() override {
     PathAndInSize params = GetParam();

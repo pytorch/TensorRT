@@ -1,1 +1,1 @@
-from trtorch._C import dtype, DeviceType, EngineCapability
+from trtorch._C import dtype, DeviceType, EngineCapability, TensorFormat

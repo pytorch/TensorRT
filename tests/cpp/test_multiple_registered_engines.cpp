@@ -4,7 +4,7 @@
 #include "torch/script.h"
 #include "trtorch/trtorch.h"
 
-TEST(ModuleTests, CanRunMultipleEngines) {
+TEST(CppAPITest, CanRunMultipleEngines) {
   torch::jit::script::Module mod1;
   torch::jit::script::Module mod2;
   try {
