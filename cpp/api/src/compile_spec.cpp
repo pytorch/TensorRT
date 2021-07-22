@@ -126,7 +126,8 @@ CompileSpec::DataType::DataType(c10::ScalarType t) {
 
 CompileSpec::TensorFormat::TensorFormat(at::MemoryFormat t) {
   TRTORCH_CHECK(
-      t == at::MemoryFormat::Contiguous || t == at::MemoryFormat::ChannelsLast, "Tensor format is unsupported (" << t << ")");
+      t == at::MemoryFormat::Contiguous || t == at::MemoryFormat::ChannelsLast,
+      "Tensor format is unsupported (" << t << ")");
 
   switch (t) {
     case at::MemoryFormat::ChannelsLast:
@@ -328,7 +329,8 @@ core::runtime::CudaDevice to_internal_cuda_device(CompileSpec::Device device) {
 core::CompileSpec to_internal_compile_spec(CompileSpec external) {
   core::CompileSpec internal(to_vec_internal_inputs(external.inputs));
   if (external.input_ranges.size() > 0 && external.inputs.size() > 0) {
-    TRTORCH_THROW_ERROR("Saw both input specs listed for inputs and input_ranges in CompileSpec. input_ranges is deprecated and will be removed in v0.5.0. Please port forward to using inputs");
+    TRTORCH_THROW_ERROR(
+        "Saw both input specs listed for inputs and input_ranges in CompileSpec. input_ranges is deprecated and will be removed in v0.5.0. Please port forward to using inputs");
   } else if (external.input_ranges.size() > 0) {
     internal = core::CompileSpec(to_vec_internal_inputs(external.input_ranges));
   } else {

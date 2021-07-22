@@ -79,7 +79,8 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
       case nvinfer1::DataType::kINT32:
       case nvinfer1::DataType::kBOOL:
       default:
-        TRTORCH_THROW_ERROR("Requested kernel precision that is unsupported: " << *p << " options are float, half, int8");
+        TRTORCH_THROW_ERROR(
+            "Requested kernel precision that is unsupported: " << *p << " options are float, half, int8");
     }
   }
 
