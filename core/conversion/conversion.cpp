@@ -487,18 +487,20 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b) {
     unsupported_msg << "https://www.github.com/nvidia/TRTorch/issues" << std::endl;
     unsupported_msg << std::endl << "In Module:" << std::endl;
 
+    LOG_ERROR(unsupported_msg.str());
+
     for (const auto n : b->nodes()) {
       auto schema = n->maybeSchema();
       if (schema) {
         for (const auto& x : unsupported_ops) {
           if (x.first == schema->operator_name()) {
-            unsupported_msg << "  Unsupported operator: " << *schema << std::endl;
-            unsupported_msg << trtorch::core::util::GetPyTorchSourceCode(n) << std::endl;
+            LOG_ERROR(
+                "Unsupported operator: " << *schema << std::endl
+                                         << trtorch::core::util::GetPyTorchSourceCode(n) << std::endl);
           }
         }
       }
     }
-    LOG_ERROR(unsupported_msg.str());
     return false;
   }
 
