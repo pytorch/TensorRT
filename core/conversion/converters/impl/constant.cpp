@@ -30,9 +30,9 @@ auto constant_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
             }})
   .pattern({"aten::full(int[] size, Scalar fill_value, *, int? dtype=None, int? layout=None, Device? device=None, bool? pin_memory=None) -> (Tensor)",
             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-              auto size = args[0].unwrapToIntList();
+              auto size = util::toVec(util::toDims(args[0].unwrapToIntList()));
               auto scalar = args[1].unwrapToScalar().to<float>();
-              auto scalar_tensor = torch::full({5}, scalar);
+              auto scalar_tensor = torch::full(size, scalar);
               auto full_tensor = tensor_to_const(ctx, scalar_tensor);
               auto output = ctx->AssociateValueAndTensor(n->outputs()[0], full_tensor);
 
