@@ -40,6 +40,7 @@ auto batch_norm_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().
       LOG_DEBUG("momentum disregarded");
       LOG_DEBUG("training disregarded");
       LOG_DEBUG("cudnn disregarded");
+      TRTORCH_CHECK(orig_shape.nbDims > 2 , "Unable to create batch normalization layer from node: " << *n);
 
       // Expand spatial dims from 1D to 2D if needed
       bool expandDims = (orig_shape.nbDims < 4);
