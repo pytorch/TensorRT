@@ -57,12 +57,13 @@ int main(int argc, const char* argv[]) {
 
   auto compile_spec = trtorch::CompileSpec(dims);
   compile_spec.workspace_size = 1 << 24;
+  compile_spec.sparse_weights = true;
 
-  std::cout << "Checking operator support" << std::endl;
-  if (!trtorch::CheckMethodOperatorSupport(mod, "forward")) {
-    std::cerr << "Method is not currently supported by TRTorch" << std::endl;
-    return -1;
-  }
+  // std::cout << "Checking operator support" << std::endl;
+  // if (!trtorch::CheckMethodOperatorSupport(mod, "forward")) {
+  //   std::cerr << "Method is not currently supported by TRTorch" << std::endl;
+  //   return -1;
+  // }
 
   std::cout << "Compiling graph to save as TRT engine (/tmp/engine_converted_from_jit.trt)" << std::endl;
   auto engine = trtorch::ConvertGraphToTRTEngine(mod, "forward", compile_spec);

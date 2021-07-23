@@ -156,6 +156,10 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
     if "calibrator" in compile_spec:
         info.ptq_calibrator = compile_spec["calibrator"]
 
+    if "sparse_weights" in compile_spec:
+        assert isinstance(compile_spec["sparse_weights"], bool)
+        info.sparse_weights = compile_spec["sparse_weights"]
+
     if "disable_tf32" in compile_spec:
         assert isinstance(compile_spec["disable_tf32"], bool)
         info.disable_tf32 = compile_spec["disable_tf32"]
@@ -237,6 +241,7 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]) -> torch.classes.tensorrt.
                             "allow_gpu_fallback": false, # (DLA only) Allow layers unsupported on DLA to run on GPU
                         },
                         "op_precision": torch.half, # Operating precision set to FP16
+                        "sparse_weights": Enable sparsity for convolution and fully connected layers.
                         "disable_tf32": False, # Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
                         "refit": False, # enable refit
                         "debug": False, # enable debuggable engine

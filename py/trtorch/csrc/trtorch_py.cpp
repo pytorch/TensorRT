@@ -244,6 +244,7 @@ PYBIND11_MODULE(_C, m) {
       .def_readwrite("op_precision", &CompileSpec::op_precision)
       .def_readwrite("ptq_calibrator", &CompileSpec::ptq_calibrator)
       .def_readwrite("refit", &CompileSpec::refit)
+      .def_readwrite("sparse_weights", &CompileSpec::sparse_weights)
       .def_readwrite("disable_tf32", &CompileSpec::disable_tf32)
       .def_readwrite("debug", &CompileSpec::debug)
       .def_readwrite("strict_types", &CompileSpec::strict_types)

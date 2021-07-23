@@ -249,6 +249,11 @@ struct TRTORCH_API CompileSpec {
   bool disable_tf32 = false;
 
   /**
+   * Enable sparsity for weights of conv and FC layers
+   */
+  bool sparse_weights = false;
+
+  /**
    * Build a refitable engine
    */
   bool refit = false;

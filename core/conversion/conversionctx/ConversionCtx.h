@@ -24,6 +24,7 @@ struct Device {
 
 struct BuilderSettings {
   nvinfer1::DataType op_precision = nvinfer1::DataType::kFLOAT;
+  bool sparse_weights = false;
   bool disable_tf32 = false;
   bool refit = false;
   bool debug = false;
