@@ -15,13 +15,13 @@ Using DLA with trtorchc
 
 Using DLA in a C++ application
 
-.. code-block:: shell
+.. code-block:: c++
 
     std::vector<std::vector<int64_t>> input_shape = {{32, 3, 32, 32}};
     auto compile_spec = trtorch::CompileSpec({input_shape});
 
     # Set a precision. DLA supports fp16 or int8 only
-    compile_spec.op_precision = torch::kF16;
+    compile_spec.enabled_precisions = {torch::kF16};
     compile_spec.device.device_type = trtorch::CompileSpec::DeviceType::kDLA;
 
     # Make sure the gpu id is set to Xavier id for DLA
@@ -42,14 +42,14 @@ Using DLA in a python application
 .. code-block:: shell
 
     compile_spec = {
-            "input_shapes": [self.input.shape],
+            "inputs": [trtorch.Input(self.input.shape)],
             "device": {
                 "device_type": trtorch.DeviceType.DLA,
                 "gpu_id": 0,
                 "dla_core": 0,
                 "allow_gpu_fallback": True
             },
-            "op_precision": torch.half
+            "enalbed_precisions": {torch.half}
     }
 
     trt_mod = trtorch.compile(self.scripted_model, compile_spec)

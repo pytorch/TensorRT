@@ -31,7 +31,11 @@ Includes
 
 - ``cuda_runtime.h``
 
+- ``iostream``
+
 - ``memory``
+
+- ``set``
 
 - ``string``
 
@@ -59,6 +63,8 @@ Classes
 
 - :ref:`exhale_struct_structtrtorch_1_1CompileSpec_1_1Device`
 
+- :ref:`exhale_struct_structtrtorch_1_1CompileSpec_1_1Input`
+
 - :ref:`exhale_struct_structtrtorch_1_1CompileSpec_1_1InputRange`
 
 - :ref:`exhale_struct_structtrtorch_1_1CompileSpec_1_1TorchFallback`
@@ -66,6 +72,8 @@ Classes
 - :ref:`exhale_class_classtrtorch_1_1CompileSpec_1_1DataType`
 
 - :ref:`exhale_class_classtrtorch_1_1CompileSpec_1_1Device_1_1DeviceType`
+
+- :ref:`exhale_class_classtrtorch_1_1CompileSpec_1_1TensorFormat`
 
 
 Functions

@@ -7,8 +7,22 @@
 #include "torch/csrc/jit/ir/ir.h"
 
 namespace nvinfer1 {
+
+inline std::ostream& operator<<(std::ostream& os, const nvinfer1::TensorFormat& format) {
+  switch (format) {
+    case nvinfer1::TensorFormat::kLINEAR:
+      return os << "NCHW\\Contiguous\\Linear";
+    case nvinfer1::TensorFormat::kHWC:
+      return os << "NHWC\\Channel Last";
+    default:
+      return os << "Unknown Tensor Format";
+  }
+}
+
 inline std::ostream& operator<<(std::ostream& stream, const nvinfer1::DataType& dtype) {
   switch (dtype) {
+    case nvinfer1::DataType::kBOOL:
+      return stream << "Bool";
     case nvinfer1::DataType::kFLOAT:
       return stream << "Float32";
     case nvinfer1::DataType::kHALF:

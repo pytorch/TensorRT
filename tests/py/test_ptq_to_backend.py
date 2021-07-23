@@ -35,8 +35,8 @@ class TestAccuracy(ModelTestCase):
         self.spec = {
             "forward":
                 trtorch.TensorRTCompileSpec({
-                    "input_shapes": [[1, 3, 32, 32]],
-                    "op_precision": torch.int8,
+                    "inputs": [trtorch.Input([1, 3, 32, 32])],
+                    "enabled_precision": {torch.float, torch.int8},
                     "calibrator": self.calibrator,
                     "device": {
                         "device_type": trtorch.DeviceType.GPU,
