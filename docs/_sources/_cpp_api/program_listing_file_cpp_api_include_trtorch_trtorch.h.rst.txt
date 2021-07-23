@@ -209,7 +209,7 @@ Program Listing for File trtorch.h
        std::string method_name,
        CompileSpec info);
    
-   TRTORCH_API torch::jit::Module EmbedEngineInNewModule(const std::string& engine);
+   TRTORCH_API torch::jit::Module EmbedEngineInNewModule(const std::string& engine, CompileSpec::Device device);
    
    TRTORCH_API void set_device(const int gpu_id);
    

@@ -10,7 +10,10 @@ namespace runtime {
 DeviceList::DeviceList() {
   int num_devices = 0;
   auto status = cudaGetDeviceCount(&num_devices);
-  TRTORCH_ASSERT((status == cudaSuccess), "Unable to read CUDA capable devices. Return status: " << status);
+  if (status != cudaSuccess) {
+    LOG_WARNING("Unable to read CUDA capable devices. Return status: " << status);
+  }
+
   for (int i = 0; i < num_devices; i++) {
     device_list[i] = CudaDevice(i, nvinfer1::DeviceType::kGPU);
   }
