@@ -38,6 +38,11 @@ Classes and Structs
 .. toctree::
    :maxdepth: 5
 
+   structtrtorch_1_1CompileSpec_1_1Input.rst
+
+.. toctree::
+   :maxdepth: 5
+
    structtrtorch_1_1CompileSpec_1_1InputRange.rst
 
 .. toctree::
@@ -54,6 +59,11 @@ Classes and Structs
    :maxdepth: 5
 
    classtrtorch_1_1CompileSpec_1_1Device_1_1DeviceType.rst
+
+.. toctree::
+   :maxdepth: 5
+
+   classtrtorch_1_1CompileSpec_1_1TensorFormat.rst
 
 .. toctree::
    :maxdepth: 5

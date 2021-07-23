@@ -1,7 +1,7 @@
 #include "core/runtime/runtime.h"
-#include "module_test.h"
+#include "cpp_api_test.h"
 
-TEST_P(ModuleTests, ModuleAsEngineIsClose) {
+TEST_P(CppAPITests, ModuleAsEngineIsClose) {
   std::vector<at::Tensor> inputs;
   std::vector<torch::jit::IValue> inputs_ivalues;
   for (auto in_shape : input_shapes) {
@@ -17,7 +17,7 @@ TEST_P(ModuleTests, ModuleAsEngineIsClose) {
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), threshold));
 }
 
-TEST_P(ModuleTests, ModuleToEngineToModuleIsClose) {
+TEST_P(CppAPITests, ModuleToEngineToModuleIsClose) {
   std::vector<at::Tensor> inputs;
   std::vector<torch::jit::IValue> inputs_ivalues;
   for (auto in_shape : input_shapes) {
@@ -52,7 +52,7 @@ TEST_P(ModuleTests, ModuleToEngineToModuleIsClose) {
 
 INSTANTIATE_TEST_SUITE_P(
     ModuleAsEngineForwardIsCloseSuite,
-    ModuleTests,
+    CppAPITests,
     testing::Values(
         PathAndInSize({"tests/modules/resnet18_traced.jit.pt", {{1, 3, 224, 224}}, 2e-5}),
         PathAndInSize({"tests/modules/resnet50_traced.jit.pt", {{1, 3, 224, 224}}, 2e-5}),

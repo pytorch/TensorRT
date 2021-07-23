@@ -125,10 +125,7 @@ void AddLayer(ConversionCtx* ctx, const torch::jit::Node* n) {
                        << "please report this error to https://www.github.com/NVIDIA/TRTorch/issues");
 }
 
-void AddInputs(
-    ConversionCtx* ctx,
-    at::ArrayRef<const torch::jit::Value*> inputs,
-    std::vector<ir::InputRange>& input_dims) {
+void AddInputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> inputs, std::vector<ir::Input>& input_specs) {
   std::vector<const torch::jit::Value*> input_tensors;
   for (auto in : inputs) {
     // Disregarding inputs that are not tensors
@@ -142,29 +139,40 @@ void AddInputs(
     }
   }
 
+  std::stringstream ss;
+  ss << "Input Dimension Specs: [\n";
+  for (auto i : input_specs) {
+    ss << "    " << i << ",";
+  }
+  ss << ']';
+  LOG_DEBUG(ctx->logger, ss.str());
+
   TRTORCH_CHECK(
-      input_tensors.size() == input_dims.size(),
+      input_tensors.size() == input_specs.size(),
       "Expected dimension specifications for all input tensors"
-          << ", but found " << input_tensors.size() << " input tensors and " << input_dims.size()
+          << ", but found " << input_tensors.size() << " input tensors and " << input_specs.size()
           << " dimension specs (conversion.AddInputs)");
 
   auto profile = ctx->builder->createOptimizationProfile();
 
   for (size_t i = 0; i < input_tensors.size(); i++) {
     auto in = input_tensors[i];
-    auto dims = input_dims[i];
+    auto spec = input_specs[i];
     std::string name = std::string("input_") + std::to_string(ctx->num_inputs);
     LOG_INFO(
-        ctx->logger, "Adding Input " << in->debugName() << " named " << name << " in engine (conversion.AddInputs)");
-    LOG_DEBUG(ctx->logger, "Input shape set to " << dims.input_shape);
-    auto trt_in = ctx->net->addInput(name.c_str(), ctx->input_type, dims.input_shape);
+        ctx->logger,
+        "Adding Input " << in->debugName() << " (named: " << name << "): " << spec
+                        << " in engine (conversion.AddInputs)");
+
+    auto trt_in = ctx->net->addInput(name.c_str(), spec.dtype, spec.input_shape);
     TRTORCH_CHECK(trt_in, "Failed to add input node: " << in->debugName() << " (conversion.AddInputs)");
+    trt_in->setAllowedFormats(1U << static_cast<int>(spec.format));
 
-    profile->setDimensions(trt_in->getName(), nvinfer1::OptProfileSelector::kMIN, dims.min);
-    profile->setDimensions(trt_in->getName(), nvinfer1::OptProfileSelector::kOPT, dims.opt);
-    profile->setDimensions(trt_in->getName(), nvinfer1::OptProfileSelector::kMAX, dims.max);
+    profile->setDimensions(trt_in->getName(), nvinfer1::OptProfileSelector::kMIN, spec.min);
+    profile->setDimensions(trt_in->getName(), nvinfer1::OptProfileSelector::kOPT, spec.opt);
+    profile->setDimensions(trt_in->getName(), nvinfer1::OptProfileSelector::kMAX, spec.max);
 
-    if (dims.input_is_dynamic) {
+    if (spec.input_is_dynamic) {
       ctx->input_is_dynamic = true;
     }
 
@@ -178,7 +186,7 @@ void AddInputs(
 
   ctx->cfg->addOptimizationProfile(profile);
 #if NV_TENSORRT_MAJOR > 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR >= 1)
-  if (ctx->op_precision == nvinfer1::DataType::kINT8) {
+  if (ctx->enabled_precisions.find(nvinfer1::DataType::kINT8) != ctx->enabled_precisions.end()) {
     ctx->cfg->setCalibrationProfile(profile);
   }
 #endif
@@ -350,7 +358,7 @@ void ConvertBlockToNetDef(
 
   auto inputs = b->inputs();
   AddParamsToCtxValueMap(ctx, static_params);
-  AddInputs(ctx, inputs, build_info.input_ranges);
+  AddInputs(ctx, inputs, build_info.inputs);
 
   auto nodes = b->nodes();
 
@@ -428,8 +436,8 @@ std::string ConvertBlockToEngine(const torch::jit::Block* b, ConversionInfo buil
   return engine;
 }
 
-std::set<std::string> GetUnsupportedOpsInBlock(const torch::jit::Block* b) {
-  std::set<std::string> unsupported_ops;
+std::unordered_map<c10::OperatorName, std::string> GetUnsupportedOpsInBlock(const torch::jit::Block* b) {
+  std::unordered_map<c10::OperatorName, std::string> unsupported_ops;
   for (const auto n : b->nodes()) {
     if (n->kind() != torch::jit::prim::Loop && n->kind() != torch::jit::prim::If && !OpSupported(n)) {
       auto schema = n->maybeSchema();
@@ -438,7 +446,7 @@ std::set<std::string> GetUnsupportedOpsInBlock(const torch::jit::Block* b) {
           "Unable to get schema for Node " << util::node_info(n) << " (conversion.VerifyCoverterSupportForBlock)");
       std::stringstream ss;
       ss << *schema;
-      unsupported_ops.insert(ss.str());
+      unsupported_ops[schema->operator_name()] = ss.str();
     }
     for (const auto sub_b : n->blocks()) {
       auto sub_b_unsupported_ops = GetUnsupportedOpsInBlock(sub_b);
@@ -480,12 +488,27 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b) {
     unsupported_msg << "Method requested cannot be compiled by TRTorch.\nUnsupported operators listed below:"
                     << std::endl;
     for (auto s : unsupported_ops) {
-      unsupported_msg << "  -  " << s << std::endl;
+      unsupported_msg << "  - " << s.second << std::endl;
     }
     unsupported_msg << "You can either implement converters for these ops in your application or request implementation"
                     << std::endl;
     unsupported_msg << "https://www.github.com/nvidia/TRTorch/issues" << std::endl;
+    unsupported_msg << std::endl << "In Module:" << std::endl;
+
     LOG_ERROR(unsupported_msg.str());
+
+    for (const auto n : b->nodes()) {
+      auto schema = n->maybeSchema();
+      if (schema) {
+        for (const auto& x : unsupported_ops) {
+          if (x.first == schema->operator_name()) {
+            LOG_ERROR(
+                "Unsupported operator: " << *schema << std::endl
+                                         << trtorch::core::util::GetPyTorchSourceCode(n) << std::endl);
+          }
+        }
+      }
+    }
     return false;
   }
 

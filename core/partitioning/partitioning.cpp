@@ -296,7 +296,7 @@ std::vector<SegmentedBlock> segment_graph(std::shared_ptr<torch::jit::Graph> g, 
 
 std::vector<SegmentedBlock> Partition(
     std::shared_ptr<torch::jit::Graph> g,
-    std::vector<ir::InputRange>& input_ranges,
+    std::vector<ir::Input>& inputs,
     const PartitionInfo& partition_info) {
   LOG_DEBUG(partition_info);
   // segment lowering global graph into blocks
@@ -309,7 +309,7 @@ std::vector<SegmentedBlock> Partition(
   registerSegmentsOutputs(segmented_blocks, g);
 
   // run shape analysis on each segmented block
-  runShapeAnalysis(segmented_blocks, input_ranges, g);
+  runShapeAnalysis(segmented_blocks, inputs, g);
 
   return segmented_blocks;
 }

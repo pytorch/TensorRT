@@ -22,8 +22,8 @@ traced_model = torch.jit.trace(model, [data])
 
 # Compile module
 compiled_trt_model = trtorch.compile(traced_model, {
-    "input_shapes": [data.shape],
-    "op_precision": torch.half, # Run in FP16
+    "inputs": [trtorch.Input(data.shape)],
+    "enabled_precisions": {torch.float, torch.half}, # Run with FP16
 })
 
 results = compiled_trt_model(data.half())

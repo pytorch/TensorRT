@@ -7,11 +7,11 @@ namespace trtorch {
 namespace core {
 namespace partitioning {
 
-std::vector<torch::jit::IValue> generateRandomInputs(std::vector<ir::InputRange>& input_ranges) {
+std::vector<torch::jit::IValue> generateRandomInputs(std::vector<ir::Input>& inputs) {
   // generate random inputs for running pytorch segments
   std::vector<torch::jit::IValue> random_inputs;
-  for (auto& input_range : input_ranges) {
-    auto cur_shape = input_range.input_shape;
+  for (auto& input : inputs) {
+    auto cur_shape = input.input_shape;
     std::vector<int64_t> shape;
     shape.insert(shape.begin(), std::begin(cur_shape.d), std::begin(cur_shape.d) + cur_shape.nbDims);
     auto in = at::randint(5, shape, {at::kCUDA});
@@ -88,7 +88,7 @@ void getSegmentsOutputByRunning(
   }
 
   // set input shape for each segmented block so we wil use it in conversion process
-  std::vector<ir::InputRange> input_shape;
+  std::vector<ir::Input> input_shape;
   for (auto& i : seg_block.raw_inputs()) {
     if (ivalues_maps[i].isTensor()) {
       input_shape.push_back(util::toVec(util::toDims(ivalues_maps[i].toTensor().sizes())));
@@ -100,11 +100,11 @@ void getSegmentsOutputByRunning(
 
 void runShapeAnalysis(
     std::vector<SegmentedBlock>& segmented_blocks,
-    std::vector<ir::InputRange>& input_ranges,
+    std::vector<ir::Input>& inputs,
     std::shared_ptr<torch::jit::Graph> g) {
   // store the mapping from lowering graph torch::jit::Value => torch::jit::IValue that we get by running segments
   std::unordered_map<torch::jit::Value*, torch::jit::IValue> ivalues_maps;
-  std::vector<torch::jit::IValue> random_inputs = generateRandomInputs(input_ranges);
+  std::vector<torch::jit::IValue> random_inputs = generateRandomInputs(inputs);
   for (size_t i = 0; i < g->inputs().size(); ++i) {
     ivalues_maps[g->inputs()[i]] = random_inputs[i];
   }

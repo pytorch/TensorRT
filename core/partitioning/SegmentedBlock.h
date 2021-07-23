@@ -61,10 +61,10 @@ struct SegmentedBlock {
   bool contain_raw_value(torch::jit::Value* input) {
     return old_to_new_.count(input);
   }
-  void register_inshape(std::vector<ir::InputRange>& in_shape) {
+  void register_inshape(std::vector<ir::Input>& in_shape) {
     in_shape_ = in_shape;
   }
-  const std::vector<ir::InputRange>& in_shape() const {
+  const std::vector<ir::Input>& in_shape() const {
     return in_shape_;
   }
   void update_target(SegmentedBlockTarget new_target) {
@@ -76,7 +76,7 @@ struct SegmentedBlock {
 
  private:
   SegmentedBlockTarget target_;
-  std::vector<ir::InputRange> in_shape_;
+  std::vector<ir::Input> in_shape_;
   std::vector<torch::jit::Value*> inputs_;
   std::vector<torch::jit::Value*> outputs_;
   std::vector<torch::jit::Node*> nodes_;
