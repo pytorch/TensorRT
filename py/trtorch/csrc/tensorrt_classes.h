@@ -27,30 +27,35 @@ namespace pyapi {
     return static_cast<int64_t>(field_name);                                   \
   }
 
-struct InputRange : torch::CustomClassHolder {
+enum class DataType : int8_t { kFloat, kHalf, kChar, kInt32, kBool };
+std::string to_str(DataType value);
+nvinfer1::DataType toTRTDataType(DataType value);
+
+enum class TensorFormat : int8_t { kContiguous, kChannelLast };
+std::string to_str(TensorFormat value);
+nvinfer1::TensorFormat toTRTTensorFormat(TensorFormat value);
+
+struct Input : torch::CustomClassHolder {
   std::vector<int64_t> min;
   std::vector<int64_t> opt;
   std::vector<int64_t> max;
 
-  core::ir::InputRange toInternalInputRange() {
-    return core::ir::InputRange(min, opt, max);
-  }
+  bool input_is_dynamic;
+  bool explicit_set_dtype;
+  DataType dtype;
+  TensorFormat format;
 
   ADD_FIELD_GET_SET(min, std::vector<int64_t>);
   ADD_FIELD_GET_SET(opt, std::vector<int64_t>);
   ADD_FIELD_GET_SET(max, std::vector<int64_t>);
+  ADD_FIELD_GET_SET(input_is_dynamic, bool);
+  ADD_FIELD_GET_SET(explicit_set_dtype, bool);
+  ADD_ENUM_GET_SET(dtype, DataType, static_cast<int64_t>(DataType::kBool));
+  ADD_ENUM_GET_SET(format, TensorFormat, static_cast<int64_t>(TensorFormat::kContiguous));
 
+  core::ir::Input toInternalInput();
   std::string to_str();
 };
-
-enum class DataType : int8_t {
-  kFloat,
-  kHalf,
-  kChar,
-};
-
-std::string to_str(DataType value);
-nvinfer1::DataType toTRTDataType(DataType value);
 
 enum DeviceType : int8_t {
   kGPU,
@@ -74,6 +79,7 @@ struct Device : torch::CustomClassHolder {
   ADD_FIELD_GET_SET(dla_core, int64_t);
   ADD_FIELD_GET_SET(allow_gpu_fallback, bool);
 
+  core::runtime::CudaDevice toInternalRuntimeDevice();
   std::string to_str();
 };
 
@@ -105,8 +111,15 @@ nvinfer1::EngineCapability toTRTEngineCapability(EngineCapability value);
 struct CompileSpec : torch::CustomClassHolder {
   core::CompileSpec toInternalCompileSpec();
   std::string stringify();
-  void appendInputRange(const c10::intrusive_ptr<InputRange>& ir) {
-    input_ranges.push_back(*ir);
+  void appendInput(const c10::intrusive_ptr<Input>& ir) {
+    inputs.push_back(*ir);
+  }
+
+  void setPrecisions(const std::vector<int64_t>& precisions_raw) {
+    for (auto p : precisions_raw) {
+      TRTORCH_CHECK(p >= 0 && p <= static_cast<int64_t>(DataType::kBool), "Invalid enum value for field");
+      enabled_precisions.insert(static_cast<DataType>(p));
+    }
   }
 
   int64_t getPTQCalibratorHandle() {
@@ -120,12 +133,13 @@ struct CompileSpec : torch::CustomClassHolder {
   void setTorchFallbackIntrusive(const c10::intrusive_ptr<TorchFallback>& fb) {
     torch_fallback = *fb;
   }
+
   void setPTQCalibratorViaHandle(int64_t handle) {
     ptq_calibrator = (nvinfer1::IInt8Calibrator*)handle;
   }
 
-  ADD_ENUM_GET_SET(op_precision, DataType, static_cast<int64_t>(DataType::kChar));
   ADD_FIELD_GET_SET(disable_tf32, bool);
+  ADD_FIELD_GET_SET(sparse_weights, bool);
   ADD_FIELD_GET_SET(refit, bool);
   ADD_FIELD_GET_SET(debug, bool);
   ADD_FIELD_GET_SET(strict_types, bool);
@@ -139,9 +153,11 @@ struct CompileSpec : torch::CustomClassHolder {
   ADD_FIELD_GET_SET(torch_fallback, TorchFallback);
   ADD_FIELD_GET_SET(ptq_calibrator, nvinfer1::IInt8Calibrator*);
 
-  std::vector<InputRange> input_ranges;
+  std::vector<Input> inputs;
   nvinfer1::IInt8Calibrator* ptq_calibrator = nullptr;
-  DataType op_precision = DataType::kFloat;
+
+  bool sparse_weights = false;
+  std::set<DataType> enabled_precisions = {DataType::kFloat};
   bool disable_tf32 = false;
   bool refit = false;
   bool debug = false;

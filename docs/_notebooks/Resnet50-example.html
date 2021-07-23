@@ -693,7 +693,7 @@ div.rendered_html tbody tr:hover {
         </div>
        </div>
        <p>
-        <img alt="e8e3fc150e784b2c83b8bc49bcc54cb8" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
+        <img alt="382e44d4ef904b99b64e9a6559c4f4d0" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
        </p>
        <h1 id="notebooks-resnet50-example--page-root">
         TRTorch Getting Started - ResNet 50
@@ -1718,8 +1718,8 @@ Average batch time: 162.96 ms
 # The compiled module will have precision as specified by "op_precision".
 # Here, it will have FP16 precision.
 trt_model_fp32 = trtorch.compile(traced_model, {
-    "input_shapes": [(128, 3, 224, 224)],
-    "op_precision": torch.float32, # Run with FP32
+    "inputs": [trtorch.Input((128, 3, 224, 224))],
+    "enabled_precisions": {torch.float32}, # Run with FP32
     "workspace_size": 1 &lt;&lt; 20
 })
 
@@ -1790,8 +1790,8 @@ Average batch time: 117.41 ms
 # The compiled module will have precision as specified by "op_precision".
 # Here, it will have FP16 precision.
 trt_model = trtorch.compile(traced_model, {
-    "input_shapes": [(128, 3, 224, 224)],
-    "op_precision": torch.half, # Run with FP16
+    "inputs": [trtorch.Input((128, 3, 224, 224))],
+    "enabled_precisions": {torch.float, torch.half}, # Run with FP16
     "workspace_size": 1 &lt;&lt; 20
 })
 

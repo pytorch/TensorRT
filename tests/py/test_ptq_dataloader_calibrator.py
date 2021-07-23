@@ -61,8 +61,8 @@ class TestAccuracy(ModelTestCase):
         log(Level.Info, "[Pyt FP32] Test Acc: {:.2f}%".format(100 * fp32_test_acc))
 
         compile_spec = {
-            "input_shapes": [[1, 3, 32, 32]],
-            "op_precision": torch.int8,
+            "inputs": [trtorch.Input([1, 3, 32, 32])],
+            "enabled_precision": {torch.float, torch.int8},
             "calibrator": self.calibrator,
             "device": {
                 "device_type": trtorch.DeviceType.GPU,

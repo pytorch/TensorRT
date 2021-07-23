@@ -399,7 +399,9 @@
 <span class="cp">#pragma once</span>
 
 <span class="cp">#include</span> <span class="cpf">&lt;cuda_runtime.h&gt;</span><span class="cp"></span>
+<span class="cp">#include</span> <span class="cpf">&lt;iostream&gt;</span><span class="cp"></span>
 <span class="cp">#include</span> <span class="cpf">&lt;memory&gt;</span><span class="cp"></span>
+<span class="cp">#include</span> <span class="cpf">&lt;set&gt;</span><span class="cp"></span>
 <span class="cp">#include</span> <span class="cpf">&lt;string&gt;</span><span class="cp"></span>
 <span class="cp">#include</span> <span class="cpf">&lt;vector&gt;</span><span class="cp"></span>
 
@@ -427,22 +429,15 @@
 <span class="cp">#include</span> <span class="cpf">"trtorch/macros.h"</span><span class="cp"></span>
 <span class="k">namespace</span> <span class="n">trtorch</span> <span class="p">{</span>
 <span class="k">struct</span> <span class="nc">TRTORCH_API</span> <span class="n">CompileSpec</span> <span class="p">{</span>
-  <span class="k">struct</span> <span class="nc">TRTORCH_API</span> <span class="n">InputRange</span> <span class="p">{</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">min</span><span class="p">;</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">opt</span><span class="p">;</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">max</span><span class="p">;</span>
-    <span class="n">InputRange</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">opt</span><span class="p">);</span>
-    <span class="n">InputRange</span><span class="p">(</span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">opt</span><span class="p">);</span>
-    <span class="n">InputRange</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">min</span><span class="p">,</span> <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">opt</span><span class="p">,</span> <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">max</span><span class="p">);</span>
-    <span class="n">InputRange</span><span class="p">(</span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">min</span><span class="p">,</span> <span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">opt</span><span class="p">,</span> <span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">max</span><span class="p">);</span>
-  <span class="p">};</span>
-
   <span class="k">class</span> <span class="nc">TRTORCH_API</span> <span class="n">DataType</span> <span class="p">{</span>
    <span class="k">public</span><span class="o">:</span>
     <span class="k">enum</span> <span class="nc">Value</span> <span class="o">:</span> <span class="kt">int8_t</span> <span class="p">{</span>
       <span class="n">kFloat</span><span class="p">,</span>
       <span class="n">kHalf</span><span class="p">,</span>
       <span class="n">kChar</span><span class="p">,</span>
+      <span class="n">kInt</span><span class="p">,</span>
+      <span class="n">kBool</span><span class="p">,</span>
+      <span class="n">kUnknown</span>
     <span class="p">};</span>
 
     <span class="n">DataType</span><span class="p">()</span> <span class="o">=</span> <span class="k">default</span><span class="p">;</span>
@@ -466,34 +461,9 @@
     <span class="p">}</span>
 
    <span class="k">private</span><span class="o">:</span>
+    <span class="k">friend</span> <span class="n">std</span><span class="o">::</span><span class="n">ostream</span><span class="o">&amp;</span> <span class="k">operator</span><span class="o">&lt;&lt;</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">ostream</span><span class="o">&amp;</span> <span class="n">os</span><span class="p">,</span> <span class="k">const</span> <span class="n">DataType</span><span class="o">&amp;</span> <span class="n">dtype</span><span class="p">);</span>
     <span class="n">Value</span> <span class="n">value</span><span class="p">;</span>
   <span class="p">};</span>
-
-  <span class="k">enum</span> <span class="k">class</span> <span class="nc">EngineCapability</span> <span class="o">:</span> <span class="kt">int8_t</span> <span class="p">{</span>
-    <span class="n">kDEFAULT</span><span class="p">,</span>
-    <span class="n">kSAFE_GPU</span><span class="p">,</span>
-    <span class="n">kSAFE_DLA</span><span class="p">,</span>
-  <span class="p">};</span>
-
-  <span class="n">CompileSpec</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">InputRange</span><span class="o">&gt;</span> <span class="n">input_ranges</span><span class="p">)</span> <span class="o">:</span> <span class="n">input_ranges</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">input_ranges</span><span class="p">))</span> <span class="p">{}</span>
-  <span class="n">CompileSpec</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;&gt;</span> <span class="n">fixed_sizes</span><span class="p">);</span>
-  <span class="n">CompileSpec</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;&gt;</span> <span class="n">fixed_sizes</span><span class="p">);</span>
-
-  <span class="c1">// Defaults should reflect TensorRT defaults for BuilderConfig</span>
-
-  <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">InputRange</span><span class="o">&gt;</span> <span class="n">input_ranges</span><span class="p">;</span>
-
-  <span class="n">DataType</span> <span class="n">op_precision</span> <span class="o">=</span> <span class="n">DataType</span><span class="o">::</span><span class="n">kFloat</span><span class="p">;</span>
-
-  <span class="kt">bool</span> <span class="n">disable_tf32</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
-
-  <span class="kt">bool</span> <span class="n">refit</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
-
-  <span class="kt">bool</span> <span class="n">debug</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
-
-  <span class="kt">bool</span> <span class="n">truncate_long_and_double</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
-
-  <span class="kt">bool</span> <span class="n">strict_types</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
 
   <span class="cm">/*</span>
 <span class="cm">   * Setting data structure for Target device</span>
@@ -541,10 +511,114 @@
     <span class="n">Device</span><span class="p">()</span> <span class="o">:</span> <span class="n">device_type</span><span class="p">(</span><span class="n">DeviceType</span><span class="o">::</span><span class="n">kGPU</span><span class="p">),</span> <span class="n">gpu_id</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="n">dla_core</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="n">allow_gpu_fallback</span><span class="p">(</span><span class="nb">false</span><span class="p">)</span> <span class="p">{}</span>
   <span class="p">};</span>
 
-  <span class="cm">/*</span>
-<span class="cm">   * Target Device</span>
-<span class="cm">   */</span>
-  <span class="n">Device</span> <span class="n">device</span><span class="p">;</span>
+  <span class="k">enum</span> <span class="k">class</span> <span class="nc">EngineCapability</span> <span class="o">:</span> <span class="kt">int8_t</span> <span class="p">{</span>
+    <span class="n">kDEFAULT</span><span class="p">,</span>
+    <span class="n">kSAFE_GPU</span><span class="p">,</span>
+    <span class="n">kSAFE_DLA</span><span class="p">,</span>
+  <span class="p">};</span>
+
+  <span class="k">class</span> <span class="nc">TRTORCH_API</span> <span class="n">TensorFormat</span> <span class="p">{</span>
+   <span class="k">public</span><span class="o">:</span>
+    <span class="k">enum</span> <span class="nc">Value</span> <span class="o">:</span> <span class="kt">int8_t</span> <span class="p">{</span>
+      <span class="n">kContiguous</span><span class="p">,</span>
+      <span class="n">kChannelsLast</span><span class="p">,</span>
+      <span class="n">kUnknown</span><span class="p">,</span>
+    <span class="p">};</span>
+
+    <span class="n">TensorFormat</span><span class="p">()</span> <span class="o">=</span> <span class="k">default</span><span class="p">;</span>
+    <span class="k">constexpr</span> <span class="nf">TensorFormat</span><span class="p">(</span><span class="n">Value</span> <span class="n">t</span><span class="p">)</span> <span class="o">:</span> <span class="n">value</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="p">{}</span>
+    <span class="n">TensorFormat</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">MemoryFormat</span> <span class="n">t</span><span class="p">);</span>
+    <span class="k">operator</span> <span class="nf">Value</span><span class="p">()</span> <span class="k">const</span> <span class="p">{</span>
+      <span class="k">return</span> <span class="n">value</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">explicit</span> <span class="k">operator</span> <span class="kt">bool</span><span class="p">()</span> <span class="o">=</span> <span class="k">delete</span><span class="p">;</span>
+    <span class="k">constexpr</span> <span class="kt">bool</span> <span class="k">operator</span><span class="o">==</span><span class="p">(</span><span class="n">TensorFormat</span> <span class="n">other</span><span class="p">)</span> <span class="k">const</span> <span class="p">{</span>
+      <span class="k">return</span> <span class="n">value</span> <span class="o">==</span> <span class="n">other</span><span class="p">.</span><span class="n">value</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">constexpr</span> <span class="kt">bool</span> <span class="k">operator</span><span class="o">==</span><span class="p">(</span><span class="n">TensorFormat</span><span class="o">::</span><span class="n">Value</span> <span class="n">other</span><span class="p">)</span> <span class="k">const</span> <span class="p">{</span>
+      <span class="k">return</span> <span class="n">value</span> <span class="o">==</span> <span class="n">other</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">constexpr</span> <span class="kt">bool</span> <span class="k">operator</span><span class="o">!=</span><span class="p">(</span><span class="n">TensorFormat</span> <span class="n">other</span><span class="p">)</span> <span class="k">const</span> <span class="p">{</span>
+      <span class="k">return</span> <span class="n">value</span> <span class="o">!=</span> <span class="n">other</span><span class="p">.</span><span class="n">value</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">constexpr</span> <span class="kt">bool</span> <span class="k">operator</span><span class="o">!=</span><span class="p">(</span><span class="n">TensorFormat</span><span class="o">::</span><span class="n">Value</span> <span class="n">other</span><span class="p">)</span> <span class="k">const</span> <span class="p">{</span>
+      <span class="k">return</span> <span class="n">value</span> <span class="o">!=</span> <span class="n">other</span><span class="p">;</span>
+    <span class="p">}</span>
+
+   <span class="k">private</span><span class="o">:</span>
+    <span class="k">friend</span> <span class="n">std</span><span class="o">::</span><span class="n">ostream</span><span class="o">&amp;</span> <span class="k">operator</span><span class="o">&lt;&lt;</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">ostream</span><span class="o">&amp;</span> <span class="n">os</span><span class="p">,</span> <span class="k">const</span> <span class="n">TensorFormat</span><span class="o">&amp;</span> <span class="n">format</span><span class="p">);</span>
+    <span class="n">Value</span> <span class="n">value</span><span class="p">;</span>
+  <span class="p">};</span>
+
+  <span class="k">struct</span> <span class="nc">TRTORCH_API</span> <span class="n">Input</span> <span class="p">{</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">min_shape</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">opt_shape</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">max_shape</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">shape</span><span class="p">;</span>
+    <span class="n">DataType</span> <span class="n">dtype</span><span class="p">;</span>
+    <span class="n">TensorFormat</span> <span class="n">format</span><span class="p">;</span>
+
+    <span class="n">Input</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">shape</span><span class="p">,</span> <span class="n">TensorFormat</span> <span class="n">format</span> <span class="o">=</span> <span class="n">TensorFormat</span><span class="o">::</span><span class="n">kContiguous</span><span class="p">);</span>
+
+    <span class="n">Input</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">shape</span><span class="p">,</span> <span class="n">DataType</span> <span class="n">dtype</span><span class="p">,</span> <span class="n">TensorFormat</span> <span class="n">format</span> <span class="o">=</span> <span class="n">TensorFormat</span><span class="o">::</span><span class="n">kContiguous</span><span class="p">);</span>
+
+    <span class="n">Input</span><span class="p">(</span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">shape</span><span class="p">,</span> <span class="n">TensorFormat</span> <span class="n">format</span> <span class="o">=</span> <span class="n">TensorFormat</span><span class="o">::</span><span class="n">kContiguous</span><span class="p">);</span>
+
+    <span class="n">Input</span><span class="p">(</span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">shape</span><span class="p">,</span> <span class="n">DataType</span> <span class="n">dtype</span><span class="p">,</span> <span class="n">TensorFormat</span> <span class="n">format</span> <span class="o">=</span> <span class="n">TensorFormat</span><span class="o">::</span><span class="n">kContiguous</span><span class="p">);</span>
+
+    <span class="n">Input</span><span class="p">(</span>
+        <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">min_shape</span><span class="p">,</span>
+        <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">opt_shape</span><span class="p">,</span>
+        <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">max_shape</span><span class="p">,</span>
+        <span class="n">TensorFormat</span> <span class="n">format</span> <span class="o">=</span> <span class="n">TensorFormat</span><span class="o">::</span><span class="n">kContiguous</span><span class="p">);</span>
+
+    <span class="n">Input</span><span class="p">(</span>
+        <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">min_shape</span><span class="p">,</span>
+        <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">opt_shape</span><span class="p">,</span>
+        <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">max_shape</span><span class="p">,</span>
+        <span class="n">DataType</span> <span class="n">dtype</span><span class="p">,</span>
+        <span class="n">TensorFormat</span> <span class="n">format</span> <span class="o">=</span> <span class="n">TensorFormat</span><span class="o">::</span><span class="n">kContiguous</span><span class="p">);</span>
+
+    <span class="n">Input</span><span class="p">(</span>
+        <span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">min_shape</span><span class="p">,</span>
+        <span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">opt_shape</span><span class="p">,</span>
+        <span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">max_shape</span><span class="p">,</span>
+        <span class="n">TensorFormat</span> <span class="n">format</span> <span class="o">=</span> <span class="n">TensorFormat</span><span class="o">::</span><span class="n">kContiguous</span><span class="p">);</span>
+
+    <span class="n">Input</span><span class="p">(</span>
+        <span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">min_shape</span><span class="p">,</span>
+        <span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">opt_shape</span><span class="p">,</span>
+        <span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">max_shape</span><span class="p">,</span>
+        <span class="n">DataType</span> <span class="n">dtype</span><span class="p">,</span>
+        <span class="n">TensorFormat</span> <span class="n">format</span> <span class="o">=</span> <span class="n">TensorFormat</span><span class="o">::</span><span class="n">kContiguous</span><span class="p">);</span>
+
+    <span class="kt">bool</span> <span class="nf">get_explicit_set_dtype</span><span class="p">()</span> <span class="p">{</span>
+      <span class="k">return</span> <span class="n">explicit_set_dtype</span><span class="p">;</span>
+    <span class="p">}</span>
+
+   <span class="k">private</span><span class="o">:</span>
+    <span class="k">friend</span> <span class="n">std</span><span class="o">::</span><span class="n">ostream</span><span class="o">&amp;</span> <span class="k">operator</span><span class="o">&lt;&lt;</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">ostream</span><span class="o">&amp;</span> <span class="n">os</span><span class="p">,</span> <span class="k">const</span> <span class="n">Input</span><span class="o">&amp;</span> <span class="n">input</span><span class="p">);</span>
+    <span class="kt">bool</span> <span class="n">input_is_dynamic</span><span class="p">;</span>
+    <span class="kt">bool</span> <span class="n">explicit_set_dtype</span><span class="p">;</span>
+  <span class="p">};</span>
+
+  <span class="k">struct</span> <span class="nc">TRTORCH_API</span> <span class="n">InputRange</span> <span class="p">{</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">min</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">opt</span><span class="p">;</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">max</span><span class="p">;</span>
+    <span class="p">[[</span><span class="n">deprecated</span><span class="p">(</span><span class="s">"trtorch::CompileSpec::InputRange is being deprecated in favor of trtorch::CompileSpec::Input. trtorch::CompileSpec::InputRange will be removed in TRTorch v0.5.0"</span><span class="p">)]]</span> <span class="n">InputRange</span><span class="p">(</span>
+        <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">opt</span><span class="p">);</span>
+    <span class="p">[[</span><span class="n">deprecated</span><span class="p">(</span><span class="s">"trtorch::CompileSpec::InputRange is being deprecated in favor of trtorch::CompileSpec::Input. trtorch::CompileSpec::InputRange will be removed in TRTorch v0.5.0"</span><span class="p">)]]</span> <span class="n">InputRange</span><span class="p">(</span>
+        <span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">opt</span><span class="p">);</span>
+    <span class="p">[[</span><span class="n">deprecated</span><span class="p">(</span><span class="s">"trtorch::CompileSpec::InputRange is being deprecated in favor of trtorch::CompileSpec::Input. trtorch::CompileSpec::InputRange will be removed in TRTorch v0.5.0"</span><span class="p">)]]</span> <span class="n">InputRange</span><span class="p">(</span>
+        <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">min</span><span class="p">,</span>
+        <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">opt</span><span class="p">,</span>
+        <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">max</span><span class="p">);</span>
+    <span class="p">[[</span><span class="n">deprecated</span><span class="p">(</span><span class="s">"trtorch::CompileSpec::InputRange is being deprecated in favor of trtorch::CompileSpec::Input. trtorch::CompileSpec::InputRange will be removed in TRTorch v0.5.0"</span><span class="p">)]]</span> <span class="n">InputRange</span><span class="p">(</span>
+        <span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">min</span><span class="p">,</span>
+        <span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">opt</span><span class="p">,</span>
+        <span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">max</span><span class="p">);</span>
+  <span class="p">};</span>
 
   <span class="k">struct</span> <span class="nc">TRTORCH_API</span> <span class="n">TorchFallback</span> <span class="p">{</span>
     <span class="kt">bool</span> <span class="n">enabled</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
@@ -559,6 +633,42 @@
 
     <span class="n">TorchFallback</span><span class="p">(</span><span class="kt">bool</span> <span class="n">enabled</span><span class="p">,</span> <span class="kt">uint64_t</span> <span class="n">min_size</span><span class="p">)</span> <span class="o">:</span> <span class="n">enabled</span><span class="p">(</span><span class="n">enabled</span><span class="p">),</span> <span class="n">min_block_size</span><span class="p">(</span><span class="n">min_size</span><span class="p">)</span> <span class="p">{}</span>
   <span class="p">};</span>
+
+  <span class="p">[[</span><span class="n">deprecated</span><span class="p">(</span><span class="s">"trtorch::CompileSpec::CompileSpec(std::vector&lt;InputRange&gt; input_ranges) is being deprecated in favor of trtorch::CompileSpec::CompileSpec(std::vector&lt;Input&gt; inputs). Please use CompileSpec(std::vector&lt;Input&gt; inputs). trtorch::CompileSpec::CompileSpec(std::vector&lt;InputRange&gt; input_ranges) will be removed in TRTorch v0.5.0"</span><span class="p">)]]</span> <span class="n">CompileSpec</span><span class="p">(</span>
+      <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">InputRange</span><span class="o">&gt;</span> <span class="n">input_ranges</span><span class="p">)</span>
+      <span class="o">:</span> <span class="n">input_ranges</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">input_ranges</span><span class="p">))</span> <span class="p">{}</span>
+  <span class="n">CompileSpec</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;&gt;</span> <span class="n">fixed_sizes</span><span class="p">);</span>
+
+  <span class="n">CompileSpec</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;&gt;</span> <span class="n">fixed_sizes</span><span class="p">);</span>
+
+  <span class="n">CompileSpec</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Input</span><span class="o">&gt;</span> <span class="n">inputs</span><span class="p">)</span> <span class="o">:</span> <span class="n">inputs</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">inputs</span><span class="p">))</span> <span class="p">{}</span>
+
+  <span class="c1">// Defaults should reflect TensorRT defaults for BuilderConfig</span>
+
+  <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Input</span><span class="o">&gt;</span> <span class="n">inputs</span><span class="p">;</span>
+
+  <span class="p">[[</span><span class="n">deprecated</span><span class="p">(</span>
+      <span class="s">"trtorch::CompileSpec::input_ranges is being deprecated in favor of trtorch::CompileSpec::inputs. trtorch::CompileSpec::input_ranges will be removed in TRTorch v0.5.0"</span><span class="p">)]]</span> <span class="n">std</span><span class="o">::</span>
+      <span class="n">vector</span><span class="o">&lt;</span><span class="n">InputRange</span><span class="o">&gt;</span>
+          <span class="n">input_ranges</span><span class="p">;</span>
+
+  <span class="p">[[</span><span class="n">deprecated</span><span class="p">(</span>
+      <span class="s">"trtorch::CompileSpec::op_precision is being deprecated in favor of trtorch::CompileSpec::enabled_precisions, a set of all enabled precisions to use during compilation, trtorch::CompileSpec::op_precision will be removed in TRTorch v0.5.0"</span><span class="p">)]]</span> <span class="n">DataType</span>
+      <span class="n">op_precision</span> <span class="o">=</span> <span class="n">DataType</span><span class="o">::</span><span class="n">kFloat</span><span class="p">;</span>
+
+  <span class="n">std</span><span class="o">::</span><span class="n">set</span><span class="o">&lt;</span><span class="n">DataType</span><span class="o">&gt;</span> <span class="n">enabled_precisions</span> <span class="o">=</span> <span class="p">{</span><span class="n">DataType</span><span class="o">::</span><span class="n">kFloat</span><span class="p">};</span>
+
+  <span class="kt">bool</span> <span class="n">disable_tf32</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
+
+  <span class="kt">bool</span> <span class="n">refit</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
+
+  <span class="kt">bool</span> <span class="n">debug</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
+
+  <span class="kt">bool</span> <span class="n">truncate_long_and_double</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
+
+  <span class="kt">bool</span> <span class="n">strict_types</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
+
+  <span class="n">Device</span> <span class="n">device</span><span class="p">;</span>
 
   <span class="n">TorchFallback</span> <span class="n">torch_fallback</span><span class="p">;</span>
 
@@ -587,7 +697,7 @@
     <span class="n">std</span><span class="o">::</span><span class="n">string</span> <span class="n">method_name</span><span class="p">,</span>
     <span class="n">CompileSpec</span> <span class="n">info</span><span class="p">);</span>
 
-<span class="n">TRTORCH_API</span> <span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Module</span> <span class="n">EmbedEngineInNewModule</span><span class="p">(</span><span class="k">const</span> <span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span> <span class="n">engine</span><span class="p">);</span>
+<span class="n">TRTORCH_API</span> <span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Module</span> <span class="n">EmbedEngineInNewModule</span><span class="p">(</span><span class="k">const</span> <span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span> <span class="n">engine</span><span class="p">,</span> <span class="n">CompileSpec</span><span class="o">::</span><span class="n">Device</span> <span class="n">device</span><span class="p">);</span>
 
 <span class="n">TRTORCH_API</span> <span class="kt">void</span> <span class="n">set_device</span><span class="p">(</span><span class="k">const</span> <span class="kt">int</span> <span class="n">gpu_id</span><span class="p">);</span>
 

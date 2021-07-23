@@ -1,6 +1,6 @@
-#include "module_test.h"
+#include "cpp_api_test.h"
 
-TEST_P(ModuleTests, CompiledModuleIsClose) {
+TEST_P(CppAPITests, CompiledModuleIsClose) {
   std::vector<torch::jit::IValue> jit_inputs_ivalues;
   std::vector<torch::jit::IValue> trt_inputs_ivalues;
   for (auto in_shape : input_shapes) {
@@ -26,7 +26,7 @@ TEST_P(ModuleTests, CompiledModuleIsClose) {
 
 INSTANTIATE_TEST_SUITE_P(
     CompiledModuleForwardIsCloseSuite,
-    ModuleTests,
+    CppAPITests,
     testing::Values(
         PathAndInSize({"tests/modules/resnet18_traced.jit.pt", {{1, 3, 224, 224}}, 2e-5}),
         PathAndInSize({"tests/modules/resnet50_traced.jit.pt", {{1, 3, 224, 224}}, 2e-5}),

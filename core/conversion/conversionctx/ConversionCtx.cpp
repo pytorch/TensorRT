@@ -10,8 +10,11 @@ namespace conversion {
 // clang-format off
 std::ostream& operator<<(std::ostream& os, const BuilderSettings& s) {
     os << "Settings requested for TensorRT engine:"                                        \
-       << "\n    Operating Precision: " << s.op_precision                                  \
-       << "\n    TF32 Floating Point Computation Enabled: " << !s.disable_tf32             \
+       << "\n    Enabled Precisions: ";
+       for (auto p = s.enabled_precisions.begin(); p != s.enabled_precisions.end(); ++p) {
+        os << *p << ' ';
+       }
+    os << "\n    TF32 Floating Point Computation Enabled: " << !s.disable_tf32             \
        << "\n    Truncate Long and Double: " << s.truncate_long_and_double                 \
        << "\n    Make Refittable Engine: " << s.refit                                      \
        << "\n    Debuggable Engine: " << s.debug                                           \
@@ -57,34 +60,40 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
   LOG_DEBUG(build_settings);
   cfg = builder->createBuilderConfig();
 
-  switch (settings.op_precision) {
-    case nvinfer1::DataType::kHALF:
-      TRTORCH_CHECK(builder->platformHasFastFp16(), "Requested inference in FP16 but platform does not support FP16");
-      cfg->setFlag(nvinfer1::BuilderFlag::kFP16);
-      input_type = nvinfer1::DataType::kHALF;
-      break;
-    case nvinfer1::DataType::kINT8:
-      TRTORCH_CHECK(builder->platformHasFastInt8(), "Requested inference in INT8 but platform does not support INT8");
-      cfg->setFlag(nvinfer1::BuilderFlag::kINT8);
-      if (!settings.strict_types) {
+  for (auto p = settings.enabled_precisions.begin(); p != settings.enabled_precisions.end(); ++p) {
+    switch (*p) {
+      case nvinfer1::DataType::kHALF:
+        TRTORCH_CHECK(builder->platformHasFastFp16(), "Requested inference in FP16 but platform does not support FP16");
         cfg->setFlag(nvinfer1::BuilderFlag::kFP16);
-      }
-      input_type = nvinfer1::DataType::kFLOAT;
-      // Networks trained with Quantization aware training approach don't need a calibrator as they have Q/DQ nodes.
-      if (!settings.calibrator) {
-        LOG_WARNING(
-            "Int8 precision has been enabled but no calibrator provided. This assumes the network has Q/DQ nodes obtained from Quantization aware training. For more details, refer to https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#work-with-qat-networks");
-      }
-      break;
-    case nvinfer1::DataType::kFLOAT:
-    default:
-      input_type = nvinfer1::DataType::kFLOAT;
-      break;
+        break;
+      case nvinfer1::DataType::kINT8:
+        TRTORCH_CHECK(builder->platformHasFastInt8(), "Requested inference in INT8 but platform does not support INT8");
+        cfg->setFlag(nvinfer1::BuilderFlag::kINT8);
+        if (!settings.calibrator) {
+          LOG_WARNING(
+              "Int8 precision has been enabled but no calibrator provided. This assumes the network has Q/DQ nodes obtained from Quantization aware training. For more details, refer to https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#work-with-qat-networks");
+        } else{
+          cfg->setInt8Calibrator(settings.calibrator);
+        }
+        break;
+      case nvinfer1::DataType::kFLOAT:
+        break;
+      case nvinfer1::DataType::kINT32:
+      case nvinfer1::DataType::kBOOL:
+      default:
+        TRTORCH_THROW_ERROR(
+            "Requested kernel precision that is unsupported: " << *p << " options are float, half, int8");
+    }
   }
-  op_precision = settings.op_precision;
+
+  enabled_precisions = settings.enabled_precisions;
 
   if (settings.disable_tf32) {
     cfg->clearFlag(nvinfer1::BuilderFlag::kTF32);
+  }
+
+  if (settings.sparse_weights) {
+    cfg->setFlag(nvinfer1::BuilderFlag::kSPARSE_WEIGHTS);
   }
 
   if (settings.refit) {
@@ -119,7 +128,9 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
         static_cast<int>(settings.device.dla_core) < nbDLACores,
         "Configured DLA Core ID: " << settings.device.dla_core
                                    << " not available. Total number of available DLA Cores: " << nbDLACores);
-    TRTORCH_CHECK(settings.op_precision != nvinfer1::DataType::kFLOAT, "DLA supports only fp16 or int8 precision");
+    TRTORCH_CHECK(
+        settings.enabled_precisions.find(nvinfer1::DataType::kFLOAT) == settings.enabled_precisions.end(),
+        "DLA supports only fp16 or int8 precision");
     cfg->setDLACore(settings.device.dla_core);
   }
 }

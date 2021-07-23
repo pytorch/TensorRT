@@ -58,18 +58,21 @@ int main(int argc, const char* argv[]) {
   auto compile_spec = trtorch::CompileSpec(dims);
   // compile_spec.torch_fallback = trtorch::CompileSpec::TorchFallback(true);
   compile_spec.workspace_size = 1 << 24;
+
   compile_spec.op_precision = torch::kChar;
   // compile_spec.input_dtypes = {torch::kInt32, torch::kInt32};
   // std::cout << "===Compile Spec: " << compile_spec << std::endl;
   // compile_spec.torch_fallback = trtorch::CompileSpec::TorchFallback(true);
   // compile_spec.torch_fallback.min_block_size = 1;
+
   // std::cout << "Checking operator support" << std::endl;
   // if (!trtorch::CheckMethodOperatorSupport(mod, "forward")) {
   //   std::cerr << "Method is not currently supported by TRTorch" << std::endl;
   //   return -1;
   // }
-  //
-  // std::cout << "Compiling graph to save as TRT engine (/tmp/engine_converted_from_jit.trt)" << std::endl;
+  
+  std::cout << "Compiling graph to save as TRT engine (/tmp/engine_converted_from_jit.trt)" << std::endl;
+
   auto engine = trtorch::ConvertGraphToTRTEngine(mod, "forward", compile_spec);
   std::ofstream out("/tmp/engine_converted_from_jit.trt");
   out << engine;

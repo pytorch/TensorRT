@@ -81,7 +81,7 @@ http_archive(
     name = "tensorrt",
     build_file = "@//third_party/tensorrt/archive:BUILD",
     sha256 = "def6a5ee50bed25a68a9c9e22ec671a8f29ee5414bde47c5767bd279e5596f88",
-    strip_prefix = "TensorRT-7.2.3.4",
+    strip_prefix = "TensorRT-8.0.1.6",
     urls = [
         "https://developer.nvidia.com/compute/machine-learning/tensorrt/secure/8.0.1/tars/tensorrt-8.0.1.6.linux.x86_64-gnu.cuda-11.3.cudnn8.2.tar.gz",
     ],
