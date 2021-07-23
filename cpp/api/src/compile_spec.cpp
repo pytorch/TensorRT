@@ -364,6 +364,7 @@ core::CompileSpec to_internal_compile_spec(CompileSpec external) {
     }
   }
 
+  internal.convert_info.engine_settings.sparse_weights = external.sparse_weights;
   internal.convert_info.engine_settings.disable_tf32 = external.disable_tf32;
   internal.convert_info.engine_settings.refit = external.refit;
   internal.convert_info.engine_settings.debug = external.debug;

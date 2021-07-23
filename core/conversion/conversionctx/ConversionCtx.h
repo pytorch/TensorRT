@@ -25,7 +25,7 @@ struct Device {
 
 struct BuilderSettings {
   std::set<nvinfer1::DataType> enabled_precisions = {nvinfer1::DataType::kFLOAT};
-  std::vector<nvinfer1::DataType> input_dtypes;
+  bool sparse_weights = false;
   bool disable_tf32 = false;
   bool refit = false;
   bool debug = false;

@@ -89,6 +89,10 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
     cfg->clearFlag(nvinfer1::BuilderFlag::kTF32);
   }
 
+  if (settings.sparse_weights) {
+    cfg->setFlag(nvinfer1::BuilderFlag::kSPARSE_WEIGHTS);
+  }
+
   if (settings.refit) {
     cfg->setFlag(nvinfer1::BuilderFlag::kREFIT);
   }
