@@ -8,16 +8,17 @@ namespace core {
 namespace partitioning {
 
 std::unordered_map<torch::jit::Value*, torch::jit::IValue> generateRandomInputs(
-    std::unordered_map<torch::jit::Value*, ir::InputRange>& input_ranges) {
+    std::unordered_map<torch::jit::Value*, ir::Input>& inputs) {
   // generate random inputs for running pytorch segments
   std::unordered_map<torch::jit::Value*, torch::jit::IValue> ivalue_maps;
   std::vector<torch::jit::IValue> random_inputs;
-  for (auto& input_range : input_ranges) {
-    auto cur_shape = input_range.second.input_shape;
+
+  for (auto& input : inputs) {
+    auto cur_shape = input.second.input_shape;
     std::vector<int64_t> shape;
     shape.insert(shape.begin(), std::begin(cur_shape.d), std::begin(cur_shape.d) + cur_shape.nbDims);
     auto in = at::randint(5, shape, {at::kCUDA});
-    ivalue_maps[input_range.first] = in.clone();
+    ivalue_maps[input.first] = in.clone();
   }
   return ivalue_maps;
 }
@@ -92,7 +93,7 @@ void getSegmentsOutputByRunning(
   }
 
   // set input shape for each segmented block so we wil use it in conversion process
-  std::vector<ir::InputRange> input_shape;
+  std::vector<ir::Input> input_shape;
   for (auto& i : seg_block.raw_inputs()) {
     if (ivalues_maps[i].isTensor()) {
       input_shape.push_back(util::toVec(util::toDims(ivalues_maps[i].toTensor().sizes())));

@@ -22,7 +22,7 @@ class TestMultiGpuSwitching(ModelTestCase):
     def test_compile_traced(self):
         trtorch.set_device(0)
         compile_spec = {
-            "input_shapes": [self.input.shape],
+            "inputs": [trtorch.Input(self.input.shape)],
             "device": {
                 "device_type": trtorch.DeviceType.GPU,
                 "gpu_id": self.target_gpu,
@@ -41,7 +41,7 @@ class TestMultiGpuSwitching(ModelTestCase):
     def test_compile_script(self):
         trtorch.set_device(0)
         compile_spec = {
-            "input_shapes": [self.input.shape],
+            "inputs": [trtorch.Input(self.input.shape)],
             "device": {
                 "device_type": trtorch.DeviceType.GPU,
                 "gpu_id": self.target_gpu,
@@ -74,7 +74,7 @@ class TestMultiGpuSerializeDeserializeSwitching(ModelTestCase):
     def test_compile_traced(self):
         trtorch.set_device(0)
         compile_spec = {
-            "input_shapes": [self.input.shape],
+            "inputs": [trtorch.Input(self.input.shape)],
             "device": {
                 "device_type": trtorch.DeviceType.GPU,
                 "gpu_id": self.target_gpu,
@@ -93,7 +93,7 @@ class TestMultiGpuSerializeDeserializeSwitching(ModelTestCase):
     def test_compile_script(self):
         trtorch.set_device(0)
         compile_spec = {
-            "input_shapes": [self.input.shape],
+            "inputs": [trtorch.Input(self.input.shape)],
             "device": {
                 "device_type": trtorch.DeviceType.GPU,
                 "gpu_id": self.target_gpu,

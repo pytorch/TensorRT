@@ -735,7 +735,8 @@ defines the calibration algorithm used when calibrating. You can explicitly make
 <span class="c1">/// Configure settings for compilation</span>
 <span class="k">auto</span> <span class="n">compile_spec</span> <span class="o">=</span> <span class="n">trtorch</span><span class="o">::</span><span class="n">CompileSpec</span><span class="p">({</span><span class="n">input_shape</span><span class="p">});</span>
 <span class="c1">/// Set operating precision to INT8</span>
-<span class="n">compile_spec</span><span class="p">.</span><span class="n">op_precision</span> <span class="o">=</span> <span class="n">torch</span><span class="o">::</span><span class="n">kI8</span><span class="p">;</span>
+<span class="n">compile_spec</span><span class="p">.</span><span class="n">enabled_precisions</span><span class="p">.</span><span class="n">insert</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">kF16</span><span class="p">);</span>
+<span class="n">compile_spec</span><span class="p">.</span><span class="n">enabled_precisions</span><span class="p">.</span><span class="n">insert</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">kI8</span><span class="p">);</span>
 <span class="c1">/// Use the TensorRT Entropy Calibrator</span>
 <span class="n">compile_spec</span><span class="p">.</span><span class="n">ptq_calibrator</span> <span class="o">=</span> <span class="n">calibrator</span><span class="p">;</span>
 <span class="c1">/// Set a larger workspace (you may get better performace from doing so)</span>
@@ -804,8 +805,8 @@ a TensorRT calibrator by providing desired configuration. The following code dem
                                               <span class="n">device</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s1">'cuda:0'</span><span class="p">))</span>
 
 <span class="n">compile_spec</span> <span class="o">=</span> <span class="p">{</span>
-         <span class="s2">"input_shapes"</span><span class="p">:</span> <span class="p">[[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">]],</span>
-         <span class="s2">"op_precision"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">int8</span><span class="p">,</span>
+         <span class="s2">"inputs"</span><span class="p">:</span> <span class="p">[</span><span class="n">trtorch</span><span class="o">.</span><span class="n">Input</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">))],</span>
+         <span class="s2">"enabled_precisions"</span><span class="p">:</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">int8</span><span class="p">},</span>
          <span class="s2">"calibrator"</span><span class="p">:</span> <span class="n">calibrator</span><span class="p">,</span>
          <span class="s2">"device"</span><span class="p">:</span> <span class="p">{</span>
              <span class="s2">"device_type"</span><span class="p">:</span> <span class="n">trtorch</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span><span class="p">,</span>
@@ -840,8 +841,8 @@ to use
          <pre><span></span><span class="n">calibrator</span> <span class="o">=</span> <span class="n">trtorch</span><span class="o">.</span><span class="n">ptq</span><span class="o">.</span><span class="n">CacheCalibrator</span><span class="p">(</span><span class="s2">"./calibration.cache"</span><span class="p">)</span>
 
 <span class="n">compile_settings</span> <span class="o">=</span> <span class="p">{</span>
-      <span class="s2">"input_shapes"</span><span class="p">:</span> <span class="p">[[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">]],</span>
-      <span class="s2">"op_precision"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">int8</span><span class="p">,</span>
+      <span class="s2">"inputs"</span><span class="p">:</span> <span class="p">[</span><span class="n">trtorch</span><span class="o">.</span><span class="n">Input</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">])],</span>
+      <span class="s2">"enabled_precisions"</span><span class="p">:</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">int8</span><span class="p">},</span>
       <span class="s2">"calibrator"</span><span class="p">:</span> <span class="n">calibrator</span><span class="p">,</span>
       <span class="s2">"max_batch_size"</span><span class="p">:</span> <span class="mi">32</span><span class="p">,</span>
   <span class="p">}</span>

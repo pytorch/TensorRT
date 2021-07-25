@@ -47,6 +47,11 @@ inline c10::FunctionSchema GenerateGraphSchema(std::string method_name, std::sha
   return c10::FunctionSchema(method_name, method_name, args, returns);
 }
 
+inline std::string GetPyTorchSourceCode(const torch::jit::Node* n) {
+  std::string source_code = n->sourceRange().str();
+  return source_code;
+}
+
 } // namespace util
 } // namespace core
 } // namespace trtorch

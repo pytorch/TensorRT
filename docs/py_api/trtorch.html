@@ -566,22 +566,24 @@ and will convert methods to JIT Graphs which call equivalent TensorRT engines
 One key is required which is
               <code class="docutils literal notranslate">
                <span class="pre">
-                input_shapes
+                inputs
                </span>
               </code>
               , describing the input sizes or ranges for inputs
-to the graph. All other keys are optional
+to the graph as well as expect types and formats for those inputs. All other keys are optional
              </p>
              <div class="highlight-py notranslate">
               <div class="highlight">
                <pre><span></span><span class="n">compile_spec</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">"input_shapes"</span><span class="p">:</span> <span class="p">[</span>
-        <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span> <span class="c1"># Static input shape for input #1</span>
-        <span class="p">{</span>
-            <span class="s2">"min"</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span>
-            <span class="s2">"opt"</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">512</span><span class="p">,</span> <span class="mi">512</span><span class="p">),</span>
-            <span class="s2">"max"</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">1024</span><span class="p">,</span> <span class="mi">1024</span><span class="p">)</span>
-        <span class="p">}</span> <span class="c1"># Dynamic input shape for input #2</span>
+    <span class="s2">"inputs"</span><span class="p">:</span> <span class="p">[</span>
+        <span class="n">trtorch</span><span class="o">.</span><span class="n">Input</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)),</span> <span class="c1"># Static input shape for input #1</span>
+        <span class="n">trtorch</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span>
+            <span class="n">min_shape</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span>
+            <span class="n">opt_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">512</span><span class="p">,</span> <span class="mi">512</span><span class="p">),</span>
+            <span class="n">max_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">1024</span><span class="p">,</span> <span class="mi">1024</span><span class="p">),</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int32</span>
+            <span class="nb">format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channel_last</span>
+        <span class="p">)</span> <span class="c1"># Dynamic input shape for input #2</span>
     <span class="p">],</span>
     <span class="s2">"device"</span><span class="p">:</span> <span class="p">{</span>
         <span class="s2">"device_type"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">),</span> <span class="c1"># Type of device to run engine on (for DLA use trtorch.DeviceType.DLA)</span>
@@ -589,7 +591,7 @@ to the graph. All other keys are optional
         <span class="s2">"dla_core"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="c1"># (DLA only) Target dla core id to run engine</span>
         <span class="s2">"allow_gpu_fallback"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># (DLA only) Allow layers unsupported on DLA to run on GPU</span>
     <span class="p">},</span>
-    <span class="s2">"op_precision"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">,</span> <span class="c1"># Operating precision set to FP16</span>
+    <span class="s2">"enabled_precisions"</span><span class="p">:</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">},</span> <span class="c1"># Enabling FP16 kernels</span>
     <span class="s2">"refit"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># enable refit</span>
     <span class="s2">"debug"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># enable debuggable engine</span>
     <span class="s2">"strict_types"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># kernels should strictly run in operating precision</span>
@@ -610,7 +612,7 @@ to the graph. All other keys are optional
               </div>
              </div>
              <p>
-              Input Sizes can be specified as torch sizes, tuples or lists. Op precisions can be specified using
+              Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
 torch datatypes or trtorch datatypes and you can use either torch devices or the trtorch device type enum
 to select device type.
              </p>
@@ -748,22 +750,24 @@ to select device type.
 One key is required which is
               <code class="docutils literal notranslate">
                <span class="pre">
-                input_shapes
+                inputs
                </span>
               </code>
               , describing the input sizes or ranges for inputs
-to the graph. All other keys are optional
+to the graph as well as expect types and formats for those inputs. All other keys are optional
              </p>
              <div class="highlight-py notranslate">
               <div class="highlight">
                <pre><span></span><span class="n">CompileSpec</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">"input_shapes"</span><span class="p">:</span> <span class="p">[</span>
-        <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span> <span class="c1"># Static input shape for input #1</span>
-        <span class="p">{</span>
-            <span class="s2">"min"</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span>
-            <span class="s2">"opt"</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">512</span><span class="p">,</span> <span class="mi">512</span><span class="p">),</span>
-            <span class="s2">"max"</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">1024</span><span class="p">,</span> <span class="mi">1024</span><span class="p">)</span>
-        <span class="p">}</span> <span class="c1"># Dynamic input shape for input #2</span>
+    <span class="s2">"inputs"</span><span class="p">:</span> <span class="p">[</span>
+        <span class="n">trtorch</span><span class="o">.</span><span class="n">Input</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)),</span> <span class="c1"># Static input shape for input #1</span>
+        <span class="n">trtorch</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span>
+            <span class="n">min_shape</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span>
+            <span class="n">opt_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">512</span><span class="p">,</span> <span class="mi">512</span><span class="p">),</span>
+            <span class="n">max_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">1024</span><span class="p">,</span> <span class="mi">1024</span><span class="p">),</span>
+            <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int32</span>
+            <span class="nb">format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channel_last</span>
+        <span class="p">)</span> <span class="c1"># Dynamic input shape for input #2</span>
     <span class="p">],</span>
     <span class="s2">"device"</span><span class="p">:</span> <span class="p">{</span>
         <span class="s2">"device_type"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">),</span> <span class="c1"># Type of device to run engine on (for DLA use trtorch.DeviceType.DLA)</span>
@@ -771,7 +775,8 @@ to the graph. All other keys are optional
         <span class="s2">"dla_core"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="c1"># (DLA only) Target dla core id to run engine</span>
         <span class="s2">"allow_gpu_fallback"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># (DLA only) Allow layers unsupported on DLA to run on GPU</span>
     <span class="p">},</span>
-    <span class="s2">"op_precision"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">,</span> <span class="c1"># Operating precision set to FP16</span>
+    <span class="s2">"enabled_precisions"</span><span class="p">:</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">},</span> <span class="c1"># Enabling FP16 kernels</span>
+    <span class="c1"># List of datatypes that should be configured for each input. Supported options torch.{float|half|int8|int32|bool}.</span>
     <span class="s2">"disable_tf32"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="c1"># Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas</span>
     <span class="s2">"refit"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># enable refit</span>
     <span class="s2">"debug"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># enable debuggable engine</span>
@@ -786,7 +791,7 @@ to the graph. All other keys are optional
               </div>
              </div>
              <p>
-              Input Sizes can be specified as torch sizes, tuples or lists. Op precisions can be specified using
+              Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
 torch datatypes or trtorch datatypes and you can use either torch devices or the trtorch device type enum
 to select device type.
              </p>
@@ -938,6 +943,18 @@ that are not supported are printed out and the function returns false, else true
           </span>
           <span class="n">
            bytes
+          </span>
+         </em>
+         ,
+         <em class="sig-param">
+          <span class="n">
+           device
+          </span>
+          <span class="p">
+           :
+          </span>
+          <span class="n">
+           trtorch.Device.Device
           </span>
          </em>
          <span class="sig-paren">
@@ -1104,7 +1121,7 @@ Registers the forward method to execute the TensorRT engine with the function si
          <span class="sig-paren">
           )
          </span>
-         → &lt;torch._C.ScriptClass object at 0x7fdd04abca70&gt;
+         → &lt;torch._C.ScriptClass object at 0x7fe1cca154b0&gt;
          <a class="headerlink" href="#trtorch.TensorRTCompileSpec" title="Permalink to this definition">
           ¶
          </a>
@@ -1137,7 +1154,8 @@ One key is required which is
              </span>
             </code>
             , describing the input sizes or ranges for inputs
-to the graph. All other keys are optional. Entries for each method to be compiled.
+to the graph as well as expect types and formats for those inputs. All other keys are optional.
+Entries for each method to be compiled.
            </p>
            <p>
             Note: Partial compilation of TorchScript modules is not supported through the PyTorch TensorRT backend
@@ -1148,13 +1166,15 @@ as if you were using the TensorRT integration.
             <div class="highlight">
              <pre><span></span><span class="n">CompileSpec</span> <span class="o">=</span> <span class="p">{</span>
     <span class="s2">"forward"</span> <span class="p">:</span> <span class="n">trtorch</span><span class="o">.</span><span class="n">TensorRTCompileSpec</span><span class="p">({</span>
-        <span class="s2">"input_shapes"</span><span class="p">:</span> <span class="p">[</span>
-            <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span> <span class="c1"># Static input shape for input #1</span>
-            <span class="p">{</span>
-                <span class="s2">"min"</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span>
-                <span class="s2">"opt"</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">512</span><span class="p">,</span> <span class="mi">512</span><span class="p">),</span>
-                <span class="s2">"max"</span><span class="p">:</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">1024</span><span class="p">,</span> <span class="mi">1024</span><span class="p">)</span>
-            <span class="p">}</span> <span class="c1"># Dynamic input shape for input #2</span>
+        <span class="s2">"inputs"</span><span class="p">:</span> <span class="p">[</span>
+            <span class="n">trtorch</span><span class="o">.</span><span class="n">Input</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)),</span> <span class="c1"># Static input shape for input #1</span>
+            <span class="n">trtorch</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span>
+                <span class="n">min_shape</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span>
+                <span class="n">opt_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">512</span><span class="p">,</span> <span class="mi">512</span><span class="p">),</span>
+                <span class="n">max_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">1024</span><span class="p">,</span> <span class="mi">1024</span><span class="p">),</span>
+                <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int32</span>
+                <span class="nb">format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channel_last</span>
+            <span class="p">)</span> <span class="c1"># Dynamic input shape for input #2</span>
         <span class="p">],</span>
         <span class="s2">"device"</span><span class="p">:</span> <span class="p">{</span>
             <span class="s2">"device_type"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">),</span> <span class="c1"># Type of device to run engine on (for DLA use trtorch.DeviceType.DLA)</span>
@@ -1163,6 +1183,7 @@ as if you were using the TensorRT integration.
             <span class="s2">"allow_gpu_fallback"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># (DLA only) Allow layers unsupported on DLA to run on GPU</span>
         <span class="p">},</span>
         <span class="s2">"op_precision"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">,</span> <span class="c1"># Operating precision set to FP16</span>
+        <span class="c1"># List of datatypes that should be configured for each input. Supported options torch.{float|half|int8|int32|bool}.</span>
         <span class="s2">"disable_tf32"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="c1"># Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas</span>
         <span class="s2">"refit"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="c1"># enable refit</span>
         <span class="s2">"debug"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="c1"># enable debuggable engine</span>
@@ -1252,6 +1273,12 @@ to select device type.
            </p>
            <p>
             int8 : 8 bit integer number
+           </p>
+           <p>
+            int32 : 32 bit integer number
+           </p>
+           <p>
+            bool : Boolean value
            </p>
           </div>
          </blockquote>

@@ -98,8 +98,8 @@ Then all thats required to setup the module for INT8 calibration is to set the f
     std::vector<std::vector<int64_t>> input_shape = {{32, 3, 32, 32}};
     /// Configure settings for compilation
     auto compile_spec = trtorch::CompileSpec({input_shape});
-    /// Set operating precision to INT8
-    compile_spec.op_precision = torch::kI8;
+    /// Set enable INT8 precision
+    compile_spec.enabled_precisions.insert(torch::kI8);
     /// Use the TensorRT Entropy Calibrator
     compile_spec.ptq_calibrator = calibrator;
     /// Set a larger workspace (you may get better performace from doing so)

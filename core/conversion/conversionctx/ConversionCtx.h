@@ -2,6 +2,7 @@
 
 #include <map>
 #include <memory>
+#include <set>
 #include <unordered_map>
 
 #include "NvInfer.h"
@@ -23,7 +24,8 @@ struct Device {
 };
 
 struct BuilderSettings {
-  nvinfer1::DataType op_precision = nvinfer1::DataType::kFLOAT;
+  std::set<nvinfer1::DataType> enabled_precisions = {nvinfer1::DataType::kFLOAT};
+  std::vector<nvinfer1::DataType> input_dtypes;
   bool disable_tf32 = false;
   bool refit = false;
   bool debug = false;
@@ -57,8 +59,7 @@ struct ConversionCtx {
   nvinfer1::IBuilder* builder;
   nvinfer1::INetworkDefinition* net;
   nvinfer1::IBuilderConfig* cfg;
-  nvinfer1::DataType input_type;
-  nvinfer1::DataType op_precision;
+  std::set<nvinfer1::DataType> enabled_precisions;
   BuilderSettings settings;
   util::logging::TRTorchLogger logger;
   // Pointers to data that needs to remain alive until conversion is done
