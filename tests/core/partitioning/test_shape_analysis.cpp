@@ -107,7 +107,7 @@ TEST(Partitioning, InferBranchModelSegmentedBlockShapeCorrectly) {
   inputs.push_back(trtorch::core::ir::Input({16, 32, 3, 3}));
   inputs.push_back(trtorch::core::ir::Input({16}));
 
-  std::unordered_map<torch::jit::Value*, trtorch::core::ir::InputRange> inputs_map;
+  std::unordered_map<torch::jit::Value*, trtorch::core::ir::Input> inputs_map;
   for (size_t i = 0; i < g->inputs().size(); ++i) {
     inputs_map.insert({g->inputs()[i], inputs[i]});
   }

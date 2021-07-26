@@ -261,7 +261,7 @@ GraphAndMapping ConstructFallbackGraph(
     if (seg_block.target() == partitioning::SegmentedBlock::kTensorRT) {
       std::vector<ir::Input> inputs;
       for (auto& shape : seg_block.in_shape()) {
-        inputs.push_back(ir::InputRange(shape));
+        inputs.push_back(ir::Input(shape));
       }
       // update the input ranges for each segments
       convert_cfg.inputs = inputs;
@@ -332,46 +332,6 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
         return mod;
       }
 
-// <<<<<<< HEAD
-// =======
-//       std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_g;
-//       // add global graph's input to old_to_new_g mapping
-//       for (auto input : g->inputs()) {
-//         util::getOrAddInputForValue(input, new_g, old_to_new_g);
-//       }
-//       for (auto& seg_block : segmented_blocks) {
-//         std::string cur_block_target =
-//             seg_block.target() == partitioning::SegmentedBlock::kTensorRT ? "TensorRT" : "Torch";
-//         LOG_INFO(*seg_block.g() << "(Sub Graph" << cur_block_target << "Block)\n");
-//         std::ostringstream trt_engine_id;
-//         trt_engine_id << reinterpret_cast<const int*>(&seg_block);
-//         if (seg_block.target() == partitioning::SegmentedBlock::kTensorRT) {
-//           std::vector<ir::Input> inputs;
-//           for (auto& shape : seg_block.in_shape()) {
-//             inputs.push_back(ir::Input(shape));
-//           }
-//           // update the input ranges for each segments
-//           convert_cfg.inputs = inputs;
-//           auto engine = conversion::ConvertBlockToEngine(seg_block.block(), convert_cfg, named_params);
-//           auto temp_g = std::make_shared<torch::jit::Graph>();
-//           auto device_spec = convert_cfg.engine_settings.device;
-//           auto cuda_device = runtime::CudaDevice(device_spec.gpu_id, device_spec.device_type);
-//           AddEngineToGraph(new_mod, temp_g, engine, cuda_device, trt_engine_id.str(), true);
-//
-//           seg_block.update_graph(temp_g);
-//           AddSegmentedBlockToGraph(new_g, seg_block, old_to_new_g);
-//         } else {
-//           AddSegmentedBlockToGraph(new_g, seg_block, old_to_new_g);
-//         }
-//       }
-//
-//       for (auto& output : g->outputs()) {
-//         new_g->registerOutput(old_to_new_g[output]);
-//       }
-//
-//       LOG_INFO(*new_g << "(FallbackGraph)\n");
-//
-// >>>>>>> master
       auto new_method = new_mod._ivalue()->compilation_unit()->create_function(method.name(), new_g);
       auto schema = util::GenerateGraphSchema(new_method->name(), new_g);
       new_mod.type()->addMethod(new_method);

@@ -31,8 +31,8 @@ TEST(Partitioning, FallbackOnConditionalsCorrectly) {
     return;
   }
 
-  std::vector<trtorch::core::ir::InputRange> input_ranges{trtorch::core::ir::InputRange({3, 3, 16, 16})};
-  trtorch::core::CompileSpec cfg(input_ranges);
+  std::vector<trtorch::core::ir::Input> inputs{trtorch::core::ir::Input({3, 3, 16, 16})};
+  trtorch::core::CompileSpec cfg(inputs);
   cfg.partition_info.enabled = true;
   torch::jit::script::Module new_mod = trtorch::core::CompileGraph(mod, cfg);
   auto g = new_mod.get_method("forward").graph();
