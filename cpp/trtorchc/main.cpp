@@ -402,6 +402,13 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  if (!allow_torch_fallback) {
+    if (!trtorch::CheckMethodOperatorSupport(mod, "forward")) {
+      trtorch::logging::log(trtorch::logging::Level::kERROR, "Module is not currently supported by TRTorch");
+      return 1;
+    }
+  }
+
   if (save_engine) {
     auto engine = trtorch::ConvertGraphToTRTEngine(mod, "forward", compile_settings);
     std::ofstream out(real_output_path);
