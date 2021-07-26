@@ -70,7 +70,7 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
         TRTORCH_CHECK(builder->platformHasFastInt8(), "Requested inference in INT8 but platform does not support INT8");
         cfg->setFlag(nvinfer1::BuilderFlag::kINT8);
         if (!settings.calibrator) {
-          LOG_WARNING(
+          LOG_INFO(
               "Int8 precision has been enabled but no calibrator provided. This assumes the network has Q/DQ nodes obtained from Quantization aware training. For more details, refer to https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#work-with-qat-networks");
         } else {
           cfg->setInt8Calibrator(settings.calibrator);
