@@ -25,6 +25,7 @@ void LowerBlock(torch::jit::Block* b) {
 }
 
 void LowerGraph(std::shared_ptr<torch::jit::Graph>& g) {
+  passes::UnpackHardSwish(g);
   torch::jit::EliminateRedundantGuards(g);
   torch::jit::RemoveListMutation(g);
   torch::jit::RemoveTensorMutation(g);

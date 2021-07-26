@@ -56,7 +56,6 @@ nvinfer1::ILayer* add_elementwise(
     nvinfer1::ITensor* other,
     const std::string& name);
 
-
 } // namespace converters
 } // namespace conversion
 } // namespace core

@@ -6,13 +6,13 @@
 #include "torch/script.h"
 #include "trtorch/trtorch.h"
 
-using PathAndInSize = std::pair<std::string, std::vector<std::vector<int64_t>>>;
+using PathAndInSize = std::tuple<std::string, std::vector<std::vector<int64_t>>, float>;
 
-class ModuleTests : public testing::TestWithParam<PathAndInSize> {
+class CppAPITests : public testing::TestWithParam<PathAndInSize> {
  public:
   void SetUp() override {
-    auto params = GetParam();
-    auto path = params.first;
+    PathAndInSize params = GetParam();
+    std::string path = std::get<0>(params);
     try {
       // Deserialize the ScriptModule from a file using torch::jit::load().
       mod = torch::jit::load(path);
@@ -20,7 +20,8 @@ class ModuleTests : public testing::TestWithParam<PathAndInSize> {
       std::cerr << "error loading the model\n";
       return;
     }
-    input_shapes = params.second;
+    input_shapes = std::get<1>(params);
+    threshold = std::get<2>(params);
   }
 
   void TearDown() {
@@ -31,4 +32,5 @@ class ModuleTests : public testing::TestWithParam<PathAndInSize> {
  protected:
   torch::jit::script::Module mod;
   std::vector<std::vector<int64_t>> input_shapes;
+  float threshold;
 };

@@ -30,14 +30,14 @@ class TestCompile(ModelTestCaseOnDLA):
 
     def test_compile_traced(self):
         compile_spec = {
-            "input_shapes": [self.input.shape],
+            "inputs": [trtorch.Input(self.input.shape)],
             "device": {
                 "device_type": trtorch.DeviceType.DLA,
                 "gpu_id": 0,
                 "dla_core": 0,
                 "allow_gpu_fallback": True
             },
-            "op_precision": torch.half
+            "enabled_precision": {torch.float, torch.half}
         }
 
         trt_mod = trtorch.compile(self.traced_model, compile_spec)
@@ -46,14 +46,14 @@ class TestCompile(ModelTestCaseOnDLA):
 
     def test_compile_script(self):
         compile_spec = {
-            "input_shapes": [self.input.shape],
+            "inputs": [trtorch.Input(self.input.shape)],
             "device": {
                 "device_type": trtorch.DeviceType.DLA,
                 "gpu_id": 0,
                 "dla_core": 0,
                 "allow_gpu_fallback": True
             },
-            "op_precision": torch.half
+            "enabled_precision": {torch.float, torch.half}
         }
 
         trt_mod = trtorch.compile(self.scripted_model, compile_spec)

@@ -807,7 +807,7 @@ div.rendered_html tbody tr:hover {
         </div>
        </div>
        <p>
-        <img alt="965dc6a6673e4ac5b13efff3572f46ab" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
+        <img alt="d922b17b43a04503b0a462c10e1f3a91" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
        </p>
        <h1 id="notebooks-ssd-object-detection-demo--page-root">
         Object Detection with TRTorch (SSD)
@@ -1499,8 +1499,8 @@ Average batch time: 363.08 ms
 # The compiled module will have precision as specified by "op_precision".
 # Here, it will have FP16 precision.
 trt_model = trtorch.compile(traced_model, {
-    "input_shapes": [(3, 3, 300, 300)],
-    "op_precision": torch.half, # Run with FP16
+    "inputs": [trtorch.Input((3, 3, 300, 300))],
+    "enabled_precisions": {torch.float, torch.half}, # Run with FP16
     "workspace_size": 1 &lt;&lt; 20
 })
 </pre>
@@ -1603,8 +1603,8 @@ plot_results(best_results_per_input_trt)
 
 # Recompiling with batch_size we use for evaluating performance
 trt_model = trtorch.compile(traced_model, {
-    "input_shapes": [(batch_size, 3, 300, 300)],
-    "op_precision": torch.half, # Run with FP16
+    "inputs": [trtorch.Input((batch_size, 3, 300, 300))],
+    "enabled_precisions": {torch.float, torch.half}, # Run with FP16
     "workspace_size": 1 &lt;&lt; 20
 })
 

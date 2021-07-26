@@ -17,6 +17,11 @@ jobs:
         username: $GITHUB_ACTOR
         password: ${{secrets.GITHUB_TOKEN}}
     steps:
+      - name: Reclaim space
+        run: |
+          rm -rf /usr/share/dotnet
+          rm -rf /opt/ghc
+          rm -rf "/usr/local/share/boost"
       - uses: actions/checkout@v2
         with:
           ref: ${{github.head_ref}}

@@ -14,7 +14,7 @@ to standard TorchScript. Load with `torch.jit.load()` and run like you would run
 
 ```
 trtorchc [input_file_path] [output_file_path]
-    [input_shapes...] {OPTIONS}
+    [input_specs...] {OPTIONS}
 
     TRTorch is a compiler for TorchScript, it will compile and optimize
     TorchScript programs to run on NVIDIA GPUs using TensorRT
@@ -28,24 +28,29 @@ trtorchc [input_file_path] [output_file_path]
         -w, --warnings                    Disables warnings generated during
                                           compilation onto the console (warnings
                                           are on by default)
-        --info                            Dumps info messages generated during
+        --i, --info                       Dumps info messages generated during
                                           compilation onto the console
       --build-debuggable-engine         Creates a debuggable engine
       --use-strict-types                Restrict operating type to only use set
-                                        default operation precision
-                                        (op_precision)
+                                        operation precision
       --allow-gpu-fallback              (Only used when targeting DLA
                                         (device-type)) Lets engine run layers on
                                         GPU if they are not supported on DLA
-      -p[precision],
-      --default-op-precision=[precision]
-                                        Default operating precision for the
-                                        engine (Int8 requires a
+      --disable-tf32                    Prevent Float32 layers from using the
+                                        TF32 data format
+      -p[precision...],
+      --enabled-precison=[precision...] (Repeatable) Enabling an operating
+                                        precision for kernels to use when
+                                        building the engine (Int8 requires a
                                         calibration-cache argument) [ float |
                                         float32 | f32 | half | float16 | f16 |
                                         int8 | i8 ] (default: float)
       -d[type], --device-type=[type]    The type of device the engine should be
                                         built for [ gpu | dla ] (default: gpu)
+      --gpu-id=[gpu_id]                 GPU id if running on multi-GPU platform
+                                        (defaults to 0)
+      --dla-core=[dla_core]             DLACore id if running on available DLA
+                                        (defaults to 0)
       --engine-capability=[capability]  The type of device the engine should be
                                         built for [ default | safe_gpu |
                                         safe_dla ]
@@ -72,16 +77,21 @@ trtorchc [input_file_path] [output_file_path]
       input_file_path                   Path to input TorchScript file
       output_file_path                  Path for compiled TorchScript (or
                                         TensorRT engine) file
-      input_shapes...                   Sizes for inputs to engine, can either
+      input_specs...                    Specs for inputs to engine, can either
                                         be a single size or a range defined by
                                         Min, Optimal, Max sizes, e.g.
                                         "(N,..,C,H,W)"
-                                        "[(MIN_N,..,MIN_C,MIN_H,MIN_W);(OPT_N,..,OPT_C,OPT_H,OPT_W);(MAX_N,..,MAX_C,MAX_H,MAX_W)]"
+                                        "[(MIN_N,..,MIN_C,MIN_H,MIN_W);(OPT_N,..,OPT_C,OPT_H,OPT_W);(MAX_N,..,MAX_C,MAX_H,MAX_W)]".
+                                        Data Type and format can be specified by
+                                        adding an "@" followed by dtype and "%"
+                                        followed by format to the end of the
+                                        shape spec. e.g. "(3, 3, 32,
+                                        32)@f16%NHWC"
       "--" can be used to terminate flag options and force all following
       arguments to be treated as positional options
 ```
 
 e.g.
 ```
-trtorchc tests/modules/ssd_traced.jit.pt ssd_trt.ts "[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]" -p f16
+trtorchc tests/modules/ssd_traced.jit.pt ssd_trt.ts "[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@fp16%contiguous" -p f16
 ```

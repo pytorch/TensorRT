@@ -26,7 +26,7 @@ def get_batch_size(self):
 
 
 def get_batch(self, names):
-    if self.current_batch_idx + self.batch_size > self.data_loader.dataset.data.shape[0]:
+    if self.current_batch_idx + self.batch_size > len(self.data_loader.dataset):
         return None
 
     batch = self.dataset_iterator.next()
@@ -34,6 +34,8 @@ def get_batch(self, names):
     # Treat the first element as input and others as targets.
     if isinstance(batch, list):
         batch = batch[0].to(self.device)
+    else:
+        batch = batch.to(self.device)
     return [batch.data_ptr()]
 
 

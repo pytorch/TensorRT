@@ -16,16 +16,16 @@ namespace trtorch {
 namespace tests {
 namespace util {
 
-std::vector<core::ir::InputRange> toInputRanges(std::vector<at::Tensor> ten) {
-  std::vector<core::ir::InputRange> a;
+std::vector<core::ir::Input> toInputs(std::vector<at::Tensor> ten) {
+  std::vector<core::ir::Input> a;
   for (auto i : ten) {
-    a.push_back(core::ir::InputRange(core::util::toVec(i.sizes())));
+    a.push_back(core::ir::Input(core::util::toVec(i.sizes())));
   }
   return std::move(a);
 }
 
-std::vector<core::ir::InputRange> toInputRangesDynamic(std::vector<at::Tensor> ten, bool dynamic_batch) {
-  std::vector<core::ir::InputRange> a;
+std::vector<core::ir::Input> toInputsDynamic(std::vector<at::Tensor> ten, bool dynamic_batch) {
+  std::vector<core::ir::Input> a;
 
   for (auto i : ten) {
     auto opt = core::util::toVec(i.sizes());
@@ -37,7 +37,7 @@ std::vector<core::ir::InputRange> toInputRangesDynamic(std::vector<at::Tensor> t
       min_range[0] = ceil(opt[0] / 2.0);
       max_range[0] = 2 * opt[0];
 
-      a.push_back(core::ir::InputRange(min_range, opt, max_range));
+      a.push_back(core::ir::Input(min_range, opt, max_range));
     } else {
       std::vector<int64_t> min_range(opt);
       std::vector<int64_t> max_range(opt);
@@ -45,7 +45,7 @@ std::vector<core::ir::InputRange> toInputRangesDynamic(std::vector<at::Tensor> t
       min_range[1] = ceil(opt[1] / 2.0);
       max_range[1] = 2 * opt[1];
 
-      a.push_back(core::ir::InputRange(min_range, opt, max_range));
+      a.push_back(core::ir::Input(min_range, opt, max_range));
     }
   }
 
@@ -54,7 +54,8 @@ std::vector<core::ir::InputRange> toInputRangesDynamic(std::vector<at::Tensor> t
 
 std::vector<at::Tensor> RunEngine(std::string& eng, std::vector<at::Tensor> inputs) {
   LOG_DEBUG("Running TRT version");
-  auto engine_ptr = c10::make_intrusive<trtorch::core::runtime::TRTEngine>("test_engine", eng);
+  auto cuda_device = core::runtime::CudaDevice(0, nvinfer1::DeviceType::kGPU);
+  auto engine_ptr = c10::make_intrusive<trtorch::core::runtime::TRTEngine>("test_engine", eng, cuda_device);
   auto outputs = trtorch::core::runtime::execute_engine(inputs, engine_ptr);
   return outputs;
 }
@@ -64,7 +65,7 @@ std::vector<at::Tensor> RunGraphEngine(
     core::conversion::GraphParams& named_params,
     std::vector<at::Tensor> inputs) {
   LOG_DEBUG("Running TRT version");
-  auto in = toInputRanges(inputs);
+  auto in = toInputs(inputs);
   auto info = core::conversion::ConversionInfo(in);
   info.engine_settings.workspace_size = 1 << 20;
   std::string eng = core::conversion::ConvertBlockToEngine(g->block(), info, named_params);
@@ -77,7 +78,7 @@ std::vector<at::Tensor> RunGraphEngineDynamic(
     std::vector<at::Tensor> inputs,
     bool dynamic_batch) {
   LOG_DEBUG("Running TRT version");
-  auto in = toInputRangesDynamic(inputs, dynamic_batch);
+  auto in = toInputsDynamic(inputs, dynamic_batch);
   auto info = core::conversion::ConversionInfo(in);
   info.engine_settings.workspace_size = 1 << 20;
   std::string eng = core::conversion::ConvertBlockToEngine(g->block(), info, named_params);

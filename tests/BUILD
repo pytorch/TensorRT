@@ -1,8 +1,8 @@
 test_suite(
     name = "tests",
     tests = [
+        ":cpp_api_tests",
         "//tests/core:core_tests",
-        "//tests/modules:module_tests",
     ],
 )
 
@@ -28,6 +28,13 @@ test_suite(
         ":aarch64_tests",
         "//tests/accuracy:aarch64_accuracy_tests",
     ],
+)
+
+test_suite(
+    name = "cpp_api_tests",
+    tests = [
+        "//tests/cpp:api_tests"
+    ]
 )
 
 test_suite(

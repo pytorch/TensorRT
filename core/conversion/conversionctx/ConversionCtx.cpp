@@ -1,8 +1,8 @@
 #include "core/conversion/conversionctx/ConversionCtx.h"
+#include <string.h>
 #include <iostream>
 #include <sstream>
 #include <utility>
-#include <string.h>
 
 namespace trtorch {
 namespace core {
@@ -10,33 +10,33 @@ namespace conversion {
 
 // clang-format off
 std::ostream& operator<<(std::ostream& os, const BuilderSettings& s) {
-  os << "Settings requested for TensorRT engine:";
-  os << "\n    Enabled precisions : ";
-  for (auto precision : s.enabled_precisions){
-    os << precision << ", ";
-  }
-  os << "\n    TF32 Floating Point Computation Enabled: " << !s.disable_tf32           \
-     << "\n    Truncate Long and Double: " << s.truncate_long_and_double                 \
-     << "\n    Make Refittable Engine: " << s.refit                                      \
-     << "\n    Debuggable Engine: " << s.debug                                           \
-     << "\n    Strict Types: " << s.strict_types                                         \
-     << "\n    GPU ID: " << s.device.gpu_id                                              \
-     << "\n    Allow GPU Fallback (if running on DLA): " << s.device.allow_gpu_fallback  \
-     << "\n    Min Timing Iterations: " << s.num_min_timing_iters                        \
-     << "\n    Avg Timing Iterations: " << s.num_avg_timing_iters                        \
-     << "\n    Max Workspace Size: " << s.workspace_size;
+
+    os << "Settings requested for TensorRT engine:"                                        \
+       << "\n    Enabled Precisions: ";
+       for (auto p = s.enabled_precisions.begin(); p != s.enabled_precisions.end(); ++p) {
+        os << *p << ' ';
+       }
+    os << "\n    TF32 Floating Point Computation Enabled: " << !s.disable_tf32             \
+       << "\n    Truncate Long and Double: " << s.truncate_long_and_double                 \
+       << "\n    Make Refittable Engine: " << s.refit                                      \
+       << "\n    Debuggable Engine: " << s.debug                                           \
+       << "\n    Strict Types: " << s.strict_types                                         \
+       << "\n    GPU ID: " << s.device.gpu_id                                              \
+       << "\n    Allow GPU Fallback (if running on DLA): " << s.device.allow_gpu_fallback  \
+       << "\n    Min Timing Iterations: " << s.num_min_timing_iters                        \
+       << "\n    Avg Timing Iterations: " << s.num_avg_timing_iters                        \
+       << "\n    Max Workspace Size: " << s.workspace_size;
 
     if (s.max_batch_size != 0) {
-        os << "\n    Max Batch Size: " << s.max_batch_size;
+    os << "\n    Max Batch Size: " << s.max_batch_size;
     } else {
-        os << "\n    Max Batch Size: Not set";
+    os << "\n    Max Batch Size: Not set";
     }
 
     os << "\n    Device Type: " << s.device.device_type                                    \
        << "\n    GPU ID: " << s.device.gpu_id;
-    if (s.device.device_type == nvinfer1::DeviceType::kDLA)
-    {
-        os << "\n    DLACore: " << s.device.dla_core;
+    if (s.device.device_type == nvinfer1::DeviceType::kDLA) {
+    os << "\n    DLACore: " << s.device.dla_core;
     }
     os << "\n    Engine Capability: " << s.capability                                      \
        << "\n    Calibrator Created: " << (s.calibrator != nullptr);
@@ -62,23 +62,31 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
   LOG_DEBUG(build_settings);
   cfg = builder->createBuilderConfig();
 
-  TRTORCH_CHECK(
-      !(settings.strict_types  && settings.enabled_precisions.size() > 1), "When strict_types is True, enabled_precisions \
-                                                                            can only be set to 1 value but received " << settings.enabled_precisions.size() << " values.");
-
-  for (auto precision : settings.enabled_precisions){
-    if(precision == nvinfer1::DataType::kHALF){
-      TRTORCH_CHECK(builder->platformHasFastFp16(), "Requested inference in FP16 but platform does not support FP16");
-      cfg->setFlag(nvinfer1::BuilderFlag::kFP16);
-      input_type = nvinfer1::DataType::kHALF;
-    }else if(precision == nvinfer1::DataType::kINT8){
-      TRTORCH_CHECK(builder->platformHasFastInt8(), "Requested inference in INT8 but platform does not support INT8");
-      cfg->setFlag(nvinfer1::BuilderFlag::kINT8);
+  for (auto p = settings.enabled_precisions.begin(); p != settings.enabled_precisions.end(); ++p) {
+    switch (*p) {
+      case nvinfer1::DataType::kHALF:
+        TRTORCH_CHECK(builder->platformHasFastFp16(), "Requested inference in FP16 but platform does not support FP16");
+        cfg->setFlag(nvinfer1::BuilderFlag::kFP16);
+        break;
+      case nvinfer1::DataType::kINT8:
+        TRTORCH_CHECK(builder->platformHasFastInt8(), "Requested inference in INT8 but platform does not support INT8");
+        cfg->setFlag(nvinfer1::BuilderFlag::kINT8);
+        TRTORCH_CHECK(
+            settings.calibrator != nullptr,
+            "Requested inference in INT8 but no calibrator provided, set the ptq_calibrator field in the CompileSpec struct with your calibrator");
+        cfg->setInt8Calibrator(settings.calibrator);
+        break;
+      case nvinfer1::DataType::kFLOAT:
+        break;
+      case nvinfer1::DataType::kINT32:
+      case nvinfer1::DataType::kBOOL:
+      default:
+        TRTORCH_THROW_ERROR(
+            "Requested kernel precision that is unsupported: " << *p << " options are float, half, int8");
     }
   }
 
-  input_type = nvinfer1::DataType::kHALF;
-  op_precision = settings.op_precision;
+  enabled_precisions = settings.enabled_precisions;
 
   if (settings.disable_tf32) {
     cfg->clearFlag(nvinfer1::BuilderFlag::kTF32);
@@ -116,7 +124,9 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
         static_cast<int>(settings.device.dla_core) < nbDLACores,
         "Configured DLA Core ID: " << settings.device.dla_core
                                    << " not available. Total number of available DLA Cores: " << nbDLACores);
-    TRTORCH_CHECK(settings.op_precision != nvinfer1::DataType::kFLOAT, "DLA supports only fp16 or int8 precision");
+    TRTORCH_CHECK(
+        settings.enabled_precisions.find(nvinfer1::DataType::kFLOAT) == settings.enabled_precisions.end(),
+        "DLA supports only fp16 or int8 precision");
     cfg->setDLACore(settings.device.dla_core);
   }
 }
@@ -143,6 +153,9 @@ torch::jit::IValue* ConversionCtx::AssociateValueAndIValue(const torch::jit::Val
 
 std::string ConversionCtx::SerializeEngine() {
   auto engine = builder->buildEngineWithConfig(*net, *cfg);
+  if (!engine) {
+    TRTORCH_THROW_ERROR("Building TensorRT engine failed");
+  }
   auto serialized_engine = engine->serialize();
   engine->destroy();
   auto engine_str = std::string((const char*)serialized_engine->data(), serialized_engine->size());
