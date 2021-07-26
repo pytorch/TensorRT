@@ -20,6 +20,10 @@ converter_test(
 )
 
 converter_test(
+    name = "test_clone",
+)
+
+converter_test(
     name = "test_concat",
 )
 
@@ -29,6 +33,10 @@ converter_test(
 
 converter_test(
     name = "test_conv_deconv",
+)
+
+converter_test(
+    name = "test_copy",
 )
 
 converter_test(
@@ -116,9 +124,12 @@ test_suite(
     tests = [
         ":test_activation",
         ":test_batch_norm",
+        ":test_cast",
+        ":test_clone",
         ":test_concat",
         ":test_constant_pad",
         ":test_conv_deconv",
+        ":test_copy",
         ":test_cumsum",
         ":test_element_wise",
         ":test_expand",
