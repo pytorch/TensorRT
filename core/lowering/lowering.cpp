@@ -24,7 +24,7 @@ void LowerBlock(torch::jit::Block* b) {
   DropUnusedNodes(b);
 }
 
-void LowerGraph(std::shared_ptr<torch::jit::Graph>& g) {
+void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, bool disable_cse) {
   passes::UnpackHardSwish(g);
   torch::jit::EliminateRedundantGuards(g);
   torch::jit::RemoveListMutation(g);
@@ -42,9 +42,9 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g) {
   passes::Conv3DToConvolution(g);
   passes::FuseAddMMBranches(g);
   passes::RemoveBNDimCheck(g);
-  LOG_INFO("====PRE CSE =====" << *g);
-  // torch::jit::EliminateCommonSubexpression(g);
-  LOG_INFO("====POST CSE =====" << *g);
+  if (!disable_cse) {
+    torch::jit::EliminateCommonSubexpression(g);
+  }
   // torch::jit::UnrollLoops(g);
   passes::UnpackAddMM(g);
   // passes::UnpackBatchNorm(g);
@@ -57,25 +57,36 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g) {
 }
 
 torch::jit::Module LowerModule(const torch::jit::script::Module& mod) {
+  LOG_DEBUG("Input module is being frozen by torch::jit::freeze_module");
   auto mod_ = torch::jit::freeze_module(mod);
   return mod_;
 }
 
 std::pair<std::shared_ptr<torch::jit::Graph>, std::vector<torch::jit::IValue>> Lower(
     const torch::jit::script::Module& mod,
-    std::string method_name) {
-  auto lowered_mod = mod; // LowerModule(mod);
+    std::string method_name,
+    bool unfreeze_module = false) {
+  auto lowered_mod = unfreeze_module ? mod : LowerModule(mod);
   auto g = lowered_mod.get_method(method_name).graph();
   LOG_GRAPH(*g);
 
   // Go through TRTorch Lowering to reformat graph to be conversion friendly
   // and also segment for accelerators and executors (TRT-DLA, TRT-GPU, PYT)
-  LOG_GRAPH("TRTorch Graph Lowering");
-  // lowering::LowerGraph(g);
+  // unfreeze_module is used to not perform constant folding on weights in the network.
+  // In quantization aware trained (QAT) models, weights are passed through quantize and
+  // dequantize nodes which should not be folded. So unfreeze_module is set to True for QAT models.
+  if (!unfreeze_module) {
+    LOG_GRAPH("TRTorch Graph Lowering");
+    lowering::LowerGraph(g, false);
+  }
 
   LOG_GRAPH("LibTorch Lowering");
   auto graph_and_ivalues = torch::jit::LowerGraph(*g, lowered_mod._ivalue());
-  lowering::LowerGraph(graph_and_ivalues.first);
+
+  if (unfreeze_module) {
+    LOG_GRAPH("TRTorch Graph Lowering");
+    lowering::LowerGraph(graph_and_ivalues.first, true);
+  }
   // Is this necessary?
   lowering::LowerBlock(g->block());
 

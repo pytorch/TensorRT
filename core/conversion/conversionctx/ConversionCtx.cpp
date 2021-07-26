@@ -72,7 +72,7 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
         if (!settings.calibrator) {
           LOG_WARNING(
               "Int8 precision has been enabled but no calibrator provided. This assumes the network has Q/DQ nodes obtained from Quantization aware training. For more details, refer to https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#work-with-qat-networks");
-        } else{
+        } else {
           cfg->setInt8Calibrator(settings.calibrator);
         }
         break;

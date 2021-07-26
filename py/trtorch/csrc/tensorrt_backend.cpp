@@ -32,7 +32,7 @@ c10::impl::GenericDict TensorRTBackend::compile(c10::IValue mod_val, c10::impl::
     const auto& method_name = it->key();
     auto method = mod.get_method(method_name);
     auto graph = method.graph();
-    core::lowering::LowerGraph(graph);
+    core::lowering::LowerGraph(graph, false);
   }
 
   auto handles = c10::impl::GenericDict(

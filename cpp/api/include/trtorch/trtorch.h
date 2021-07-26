@@ -262,9 +262,9 @@ struct TRTORCH_API CompileSpec {
    * Emum for selecting engine capability
    */
   enum class EngineCapability : int8_t {
-    kDEFAULT,
-    kSAFE_GPU,
-    kSAFE_DLA,
+    kSTANDARD,
+    kSAFETY,
+    kDLA_STANDALONE,
   };
 
   class TRTORCH_API TensorFormat {
@@ -686,12 +686,12 @@ struct TRTORCH_API CompileSpec {
    * This is the behavior of FP32 layers by default.
    */
   bool disable_tf32 = false;
-  
-   /**
+
+  /**
    * Enable sparsity for weights of conv and FC layers
    */
   bool sparse_weights = false;
-  
+
   /**
    * Build a refitable engine
    */

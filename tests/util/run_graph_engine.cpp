@@ -69,7 +69,7 @@ std::vector<at::Tensor> RunGraphEngine(
   auto in = toInputs(inputs);
   auto info = core::conversion::ConversionInfo(in);
   info.engine_settings.workspace_size = 1 << 20;
-  info.engine_settings.op_precision = op_precision;
+  info.engine_settings.enabled_precisions.insert(op_precision);
   std::string eng = core::conversion::ConvertBlockToEngine(g->block(), info, named_params);
   return RunEngine(eng, inputs);
 }
