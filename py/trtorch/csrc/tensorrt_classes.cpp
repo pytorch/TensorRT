@@ -186,7 +186,6 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
   } else {
     if (info.convert_info.engine_settings.enabled_precisions.find(nvinfer1::DataType::kINT8) !=
         info.convert_info.engine_settings.enabled_precisions.end()) {
-      std::cout << "===INTERNAL UNFREEZE MODULE TRUE===" << std::endl;
       info.convert_info.engine_settings.unfreeze_module = true;
     }
   }
