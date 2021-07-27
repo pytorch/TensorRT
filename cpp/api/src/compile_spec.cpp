@@ -1,8 +1,5 @@
 #include <algorithm>
-
 #include "torch/csrc/jit/api/module.h"
-
-#include "NvInfer.h"
 #include "core/compiler.h"
 #include "core/util/prelude.h"
 #include "trtorch/trtorch.h"

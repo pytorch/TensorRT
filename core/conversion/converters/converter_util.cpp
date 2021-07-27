@@ -154,6 +154,6 @@ nvinfer1::ILayer* add_elementwise(
   }
 
 } // namespace converters
-} // namespace converters
+} // namespace conversion
 } // namespace core
 } // namespace trtorch

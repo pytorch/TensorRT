@@ -1,5 +1,4 @@
 #include "core/conversion/conversionctx/ConversionCtx.h"
-#include <string.h>
 #include <iostream>
 #include <sstream>
 #include <utility>
@@ -10,7 +9,6 @@ namespace conversion {
 
 // clang-format off
 std::ostream& operator<<(std::ostream& os, const BuilderSettings& s) {
-
     os << "Settings requested for TensorRT engine:"                                        \
        << "\n    Enabled Precisions: ";
        for (auto p = s.enabled_precisions.begin(); p != s.enabled_precisions.end(); ++p) {
