@@ -364,21 +364,6 @@ core::CompileSpec to_internal_compile_spec(CompileSpec external) {
     }
   }
 
-  std::vector<nvinfer1::DataType> enabled_precisions;
-  for (std::string precision : external.enabled_precisions) {
-    if (precision.compare("fp32") == 0) {
-      enabled_precisions.push_back(nvinfer1::DataType::kFLOAT);
-    } else if (precision.compare("fp16") == 0) {
-      enabled_precisions.push_back(nvinfer1::DataType::kHALF);
-    } else if (precision.compare("int8") == 0) {
-      enabled_precisions.push_back(nvinfer1::DataType::kINT8);
-    } else {
-      TRTORCH_THROW_ERROR(
-          "Invalid precision provided. The choices of enabled_precisions can only be among these values fp32, fp16 or int8.");
-    }
-  }
-
-  internal.convert_info.engine_settings.enabled_precisions = enabled_precisions;
   internal.convert_info.engine_settings.disable_tf32 = external.disable_tf32;
   internal.convert_info.engine_settings.refit = external.refit;
   internal.convert_info.engine_settings.debug = external.debug;
