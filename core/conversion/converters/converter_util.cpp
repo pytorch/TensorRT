@@ -89,13 +89,14 @@ bool register_cast_layer(
   LOG_DEBUG("Cast layer output tensor shape: " << input->getDimensions());
 
   return true;
+}
 
-  nvinfer1::ILayer* add_elementwise(
-      ConversionCtx * ctx,
-      nvinfer1::ElementWiseOperation op,
-      nvinfer1::ITensor * self,
-      nvinfer1::ITensor * other,
-      const std::string& name) {
+nvinfer1::ILayer* add_elementwise(
+    ConversionCtx * ctx,
+    nvinfer1::ElementWiseOperation op,
+    nvinfer1::ITensor * self,
+    nvinfer1::ITensor * other,
+    const std::string& name) {
     // ensure self to have larger number of dimension
     bool swapSelfOther = false;
     if (self->getDimensions().nbDims < other->getDimensions().nbDims) {
@@ -154,5 +155,5 @@ bool register_cast_layer(
 
 } // namespace converters
 } // namespace converters
-} // namespace conversion
 } // namespace core
+} // namespace trtorch

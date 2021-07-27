@@ -76,16 +76,16 @@ int main(int argc, const char* argv[]) {
   jit_inputs_ivalues.push_back(in.clone());
   trt_inputs_ivalues.push_back(in.clone());
 
-  torch::jit::IValue jit_results_ivalues = mod.forward(jit_inputs_ivalues);
+  // torch::jit::IValue jit_results_ivalues = mod.forward(jit_inputs_ivalues);
   std::vector<at::Tensor> jit_results;
-  if (jit_results_ivalues.isTensor()) {
-    jit_results.push_back(jit_results_ivalues.toTensor());
-  } else {
-    auto results = jit_results_ivalues.toTuple()->elements();
-    for (auto r : results) {
-      jit_results.push_back(r.toTensor());
-    }
-  }
+  // if (jit_results_ivalues.isTensor()) {
+  //   jit_results.push_back(jit_results_ivalues.toTensor());
+  // } else {
+  //   auto results = jit_results_ivalues.toTuple()->elements();
+  //   for (auto r : results) {
+  //     jit_results.push_back(r.toTensor());
+  //   }
+  // }
 
   std::cout << "Compiling graph as module" << std::endl;
   auto trt_mod = trtorch::CompileGraph(mod, compile_spec);

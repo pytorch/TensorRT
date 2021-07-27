@@ -58,12 +58,10 @@ cc_library(
         "impl/topk.cpp",
         "impl/unary.cpp",
         "impl/unsqueeze.cpp",
-        "precision_handler.cpp",
     ],
     hdrs = [
         "converter_util.h",
         "converters.h",
-        "precision_handler.h",
     ],
     deps = [
         "@tensorrt//:nvinfer",
