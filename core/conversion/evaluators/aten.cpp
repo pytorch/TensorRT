@@ -114,6 +114,12 @@ DEFINE_TWO_INPUT_SIMPLE_EVALUATOR(
 
 auto aten_registrations TRTORCH_UNUSED =
     RegisterNodeEvaluators()
+      .evaluator({c10::Symbol::fromQualString("aten::bitwise_not"),
+                  [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+
+                    auto out_tensor = torch::bitwise_not(args.at(n->input(0)).unwrapToTensor());
+                    return out_tensor;
+                  }})
         .evaluator({c10::Symbol::fromQualString("aten::zeros"),
                     // aten::zeros(int[] size, *, int? dtype=None, int? layout=None,
                     // Device? device=None, bool? pin_memory=None) -> (Tensor)

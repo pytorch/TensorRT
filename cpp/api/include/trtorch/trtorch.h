@@ -262,9 +262,9 @@ struct TRTORCH_API CompileSpec {
    * Emum for selecting engine capability
    */
   enum class EngineCapability : int8_t {
-    kDEFAULT,
-    kSAFE_GPU,
-    kSAFE_DLA,
+    kSTANDARD,
+    kSAFETY,
+    kDLA_STANDALONE,
   };
 
   class TRTORCH_API TensorFormat {
