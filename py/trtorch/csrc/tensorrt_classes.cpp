@@ -125,6 +125,7 @@ std::string TorchFallback::to_str() {
 }
 
 core::CompileSpec CompileSpec::toInternalCompileSpec() {
+  LOG_DEBUG("Python compile spec: " << this->stringify());
   std::vector<core::ir::InputRange> internal_input_ranges;
   for (auto i : input_ranges) {
     internal_input_ranges.push_back(i.toInternalInputRange());
