@@ -573,10 +573,10 @@ auto aten_registrations TRTORCH_UNUSED =
                       auto dtype = args.at(n->input(1)).IValue();
                       auto device = args.at(n->input(2)).IValue();
                       auto tensor =  createTensorFromList(*data, *dtype, *device);
-                      LOG_DEBUG(tensor);
                       if (tensor.dtype() == at::kByte) {
-                        return tensor.to(at::kInt);
+                        return tensor.to(at::kFloat);
                       }
+                      std::cout << tensor << std::endl;
                       return tensor;
                     },
                     EvalOptions().validSchemas({

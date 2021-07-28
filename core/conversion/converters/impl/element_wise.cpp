@@ -185,6 +185,30 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     LOG_DEBUG("Output tensor shape: " << out->getDimensions());
                     return true;
                   }})
+        .pattern({"aten::sub.Scalar(Tensor self, Scalar other, Scalar alpha=1) -> (Tensor)",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    // Should implement self - alpha * other
+                    auto self = args[0].ITensorOrFreeze(ctx);
+                    auto other = args[1].unwrapToScalar().to<float>();
+                    auto alpha = args[2].unwrapToScalar().to<float>();
+
+                    auto rhs = other * alpha;
+                    if (1 != rhs) {
+                      auto rhs_tensor = tensor_to_const(ctx, torch::tensor({rhs}));
+                      auto sub = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUB, self, rhs_tensor, util::node_info(n));
+                      TRTORCH_CHECK(sub, "Unable to create sub layer from node: " << *n);
+                      sub->setName(util::node_info(n).c_str());
+                      LOG_DEBUG("Output tensor shape: " << sub->getOutput(0)->getDimensions());
+                      ctx->AssociateValueAndTensor(n->outputs()[0], sub->getOutput(0));
+                      return true;
+                    } else {
+                      LOG_DEBUG("Nothing to be done this layer, passing through input");
+                      LOG_DEBUG("Output tensor shape: " << self->getDimensions());
+
+                      ctx->AssociateValueAndTensor(n->outputs()[0], self);
+                      return true;
+                    }
+                  }})
         .pattern({"aten::sub_.Tensor(Tensor(a!) self, Tensor other, *, Scalar "
                   "alpha=1) -> (Tensor(a!))",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {

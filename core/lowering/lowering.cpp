@@ -48,6 +48,8 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g) {
   passes::UnpackAddMM(g);
   // passes::UnpackBatchNorm(g);
   passes::UnpackLogSoftmax(g);
+  passes::UnpackStd(g);
+  passes::UnpackVar(g);
   passes::RemoveNOPs(g);
   passes::AliasOperators(g);
   passes::SiluToSigmoidMultipication(g);

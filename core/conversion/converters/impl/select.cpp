@@ -71,7 +71,7 @@ auto select_registrations TRTORCH_UNUSED =
     RegisterNodeConversionPatterns()
         .pattern({"aten::select.int(Tensor(a) self, int dim, int index) -> (Tensor(a))",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    auto in = args[0].ITensor();
+                    auto in = args[0].ITensorOrFreeze(ctx);
                     auto maxDim = static_cast<int64_t>(in->getDimensions().nbDims);
                     auto axis = args[1].unwrapToInt();
                     axis = axis < 0 ? axis + maxDim : axis;
@@ -79,27 +79,26 @@ auto select_registrations TRTORCH_UNUSED =
 
                     // index to access needs to be an at::Tensor
                     at::Tensor indices = torch::tensor({ind}).to(torch::kI32);
-                    auto weights = Weights(ctx, indices);
-
-                    // IConstantLayer to convert indices from Weights to ITensor
-                    auto const_layer = ctx->net->addConstant(weights.shape, weights.data);
-                    TRTORCH_CHECK(const_layer, "Unable to create constant layer from node: " << *n);
-                    auto const_out = const_layer->getOutput(0);
+                    auto const_out = tensor_to_const(ctx, indices);
 
                     // IGatherLayer takes in input tensor, the indices, and the axis
                     // of input tensor to take indices from
                     auto gather_layer = ctx->net->addGather(*in, *const_out, axis);
                     TRTORCH_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
-                    auto gather_out = gather_layer->getOutput(0);
+                    auto out = gather_layer->getOutput(0);
 
-                    // IShuffleLayer removes redundant dimensions
-                    auto shuffle_layer = ctx->net->addShuffle(*gather_out);
-                    TRTORCH_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
-                    shuffle_layer->setReshapeDimensions(util::squeezeDims(gather_out->getDimensions(), axis));
-                    shuffle_layer->setName(util::node_info(n).c_str());
-                    auto shuffle_out = shuffle_layer->getOutput(0);
+                    LOG_DEBUG("Gather tensor shape: " << out->getDimensions());
 
-                    auto out = ctx->AssociateValueAndTensor(n->outputs()[0], shuffle_out);
+                    if (out->getDimensions().nbDims != 1) {
+                      // IShuffleLayer removes redundant dimensions
+                      auto shuffle_layer = ctx->net->addShuffle(*out);
+                      TRTORCH_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
+                      shuffle_layer->setReshapeDimensions(util::squeezeDims(out->getDimensions(), axis));
+                      shuffle_layer->setName(util::node_info(n).c_str());
+                      out = shuffle_layer->getOutput(0);
+                    }
+
+                    out = ctx->AssociateValueAndTensor(n->outputs()[0], out);
 
                     LOG_DEBUG("Output tensor shape: " << out->getDimensions());
 
@@ -253,15 +252,14 @@ auto select_registrations TRTORCH_UNUSED =
           "aten::masked_fill.Scalar(Tensor self, Tensor mask, Scalar value) -> (Tensor)",
           [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
             auto self = args[0].ITensorOrFreeze(ctx);
-            LOG_DEBUG(args[1].unwrapToTensor());
             auto mask = castITensor(ctx, args[1].ITensorOrFreeze(ctx), nvinfer1::DataType::kBOOL);
+            mask = addPadding(ctx, n, mask, self->getDimensions().nbDims, false, true);
             auto val = args[2].unwrapToScalar().to<float>();
-            LOG_DEBUG(torch::full(util::toVec(self->getDimensions()), val));
             auto val_t = tensor_to_const(ctx, torch::full(util::toVec(self->getDimensions()), val));
 
             TRTORCH_CHECK(util::broadcastable(self->getDimensions(), mask->getDimensions(), /*multidirectional=*/false), "Self and mask tensors are not broadcastable");
 
-            auto new_layer = ctx->net->addSelect(*mask, *self, *val_t);
+            auto new_layer = ctx->net->addSelect(*mask, *val_t, *self);
             TRTORCH_CHECK(new_layer, "Unable to create layer for aten::masked_fill");
 
             new_layer->setName(util::node_info(n).c_str());

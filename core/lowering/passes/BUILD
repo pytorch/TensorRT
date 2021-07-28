@@ -24,7 +24,9 @@ cc_library(
         "unpack_addmm.cpp",
         "unpack_batch_norm.cpp",
         "unpack_log_softmax.cpp",
-        "unpack_hardswish.cpp"
+        "unpack_hardswish.cpp",
+        "unpack_std.cpp",
+        "unpack_var.cpp",
     ],
     hdrs = [
         "passes.h",

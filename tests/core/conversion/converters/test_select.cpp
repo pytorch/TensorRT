@@ -413,7 +413,6 @@ TEST(Converters, ATenMaskedFillZerosConvertsCorrectly) {
       %3 : int[] = prim::ListConstruct(%1, %1, %2)
       %4 : int[] = prim::ListConstruct(%2, %2, %1)
       %5 : int[][] = prim::ListConstruct(%3, %4)
-      %5 : int[][][] = prim::ListConstruct(%5)
       %9 : Tensor = aten::tensor(%5, %1, %7, %8) # bert.py:5:11
       %mask.1 : Tensor = aten::to(%9, %44, %7, %8, %8) # bert.py:5:11
       %mask.2 : Tensor = trt::const(%mask.1)
