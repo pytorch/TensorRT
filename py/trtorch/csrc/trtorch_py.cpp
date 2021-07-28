@@ -269,7 +269,8 @@ PYBIND11_MODULE(_C, m) {
       .def("__str__", &trtorch::pyapi::TorchFallback::to_str)
       .def_readwrite("enabled", &TorchFallback::enabled)
       .def_readwrite("min_block_size", &TorchFallback::min_block_size)
-      .def_readwrite("forced_fallback_operators", &TorchFallback::forced_fallback_operators);
+      .def_readwrite("forced_fallback_operators", &TorchFallback::forced_fallback_operators)
+      .def_readwrite("forced_fallback_modules", &TorchFallback::forced_fallback_modules);
 
   m.doc() =
       "TRTorch Internal C Bindings: Ahead of Time compilation for PyTorch JIT. A tool to convert PyTorch JIT to TensorRT";

@@ -375,7 +375,7 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  if (!trtorch::CheckMethodOperatorSupport(mod, "forward", compile_settings)) {
+  if (!trtorch::CheckMethodOperatorSupport(mod, "forward")) {
     trtorch::logging::log(trtorch::logging::Level::kERROR, "Module is not currently supported by TRTorch");
     return 1;
   }
