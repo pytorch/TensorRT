@@ -166,6 +166,11 @@ std::string TorchFallback::to_str() {
     ss << "            " << i << ',' << std::endl;
   }
   ss << "        ]" << std::endl;
+  ss << "        \"forced_fallback_modules\": [" << std::endl;
+  for (auto i : forced_fallback_modules) {
+    ss << "            " << i << ',' << std::endl;
+  }
+  ss << "        ]" << std::endl;
   ss << "    }" << std::endl;
   return ss.str();
 }
@@ -203,6 +208,7 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
   info.partition_info.enabled = torch_fallback.enabled;
   info.partition_info.min_block_size = torch_fallback.min_block_size;
   info.partition_info.forced_fallback_operators = torch_fallback.forced_fallback_operators;
+  info.lower_info.forced_fallback_modules = torch_fallback.forced_fallback_modules;
   info.convert_info.engine_settings.truncate_long_and_double = truncate_long_and_double;
 
   info.convert_info.engine_settings.capability = toTRTEngineCapability(capability);
