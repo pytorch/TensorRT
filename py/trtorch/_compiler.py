@@ -59,6 +59,9 @@ def compile(module: torch.jit.ScriptModule, compile_spec: Any) -> torch.jit.Scri
                         "force_fallback_ops": [
                             "aten::max_pool2d" # List of specific ops to require running in PyTorch
                         ],
+                        "force_fallback_modules": [
+                            "mypymod.mytorchmod" # List of specific torch modules to require running in PyTorch
+                        ],
                         "min_block_size": 3 # Minimum number of ops an engine must incapsulate to be run in TensorRT
                     }
                 }
