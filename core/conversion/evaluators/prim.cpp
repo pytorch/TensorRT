@@ -12,6 +12,7 @@
 #include "core/conversion/evaluators/eval_macros.h"
 #include "core/conversion/evaluators/eval_util.h"
 #include "core/conversion/evaluators/evaluators.h"
+#include "core/util/trt_util.h"
 
 namespace trtorch {
 namespace core {
@@ -101,6 +102,34 @@ auto prim_registrations =
                         return c10::optional<torch::jit::IValue>(std::move(torch::jit::IValue(list)));
                       }
                     }})
+        .evaluator({c10::Symbol::fromQualString("prim::dtype"),
+                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+                      auto input = args.at(n->input(0));
+                      if (input.isITensor()) {
+                        auto trt_dtype = input.ITensor()->getType();
+                        auto trt_aten_type_map = util::get_trt_aten_type_map();
+                        if (trt_aten_type_map.find(trt_dtype) != trt_aten_type_map.end()) {
+                          return static_cast<int>(trt_aten_type_map.at(trt_dtype));
+                        } else {
+                          TRTORCH_THROW_ERROR("Unsupported input type in prim::dtype operator");
+                          return {};
+                        }
+                      } else if (input.isIValue()) {
+                        if (input.IValue()->isTensor()) {
+                          auto pyt_input = input.IValue()->toTensor();
+                          return static_cast<int>(c10::typeMetaToScalarType(pyt_input.dtype()));
+                        } else {
+                          TRTORCH_THROW_ERROR("Unsupported input type in prim::dtype operator");
+                          return {};
+                        }
+                      } else {
+                        TRTORCH_THROW_ERROR("Unsupported input type in prim::dtype operator");
+                        return {};
+                      }
+                    },
+                    EvalOptions().validSchemas({
+                        "prim::dtype(Tensor a) -> (int)",
+                    })})
         .evaluator({c10::Symbol::fromQualString("prim::min"),
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                       if (n->inputs().size() == 1) {

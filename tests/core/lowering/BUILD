@@ -20,7 +20,7 @@ lowering_test(
 )
 
 lowering_test(
-    name = "test_reduce_to",
+    name = "test_reduce_to_pass",
 )
 
 lowering_test(
