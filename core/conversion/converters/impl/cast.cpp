@@ -22,7 +22,7 @@ auto cast_registrations TRTORCH_UNUSED =
                TRTORCH_CHECK(
                    aten_to_trt_dtype_map.find(static_cast<at::ScalarType>(output_dtype)) != aten_to_trt_dtype_map.end(),
                    "Conversion to desired datatype is not supported");
-               return register_cast_layer_orig(
+               return register_cast_layer(
                    ctx, n, self, aten_to_trt_dtype_map.at(static_cast<at::ScalarType>(output_dtype)));
              }})
         .pattern(
@@ -38,7 +38,7 @@ auto cast_registrations TRTORCH_UNUSED =
                  }
                }
                TRTORCH_CHECK(is_datatype_supported, "Conversion to desired datatype is not supported");
-               return register_cast_layer_orig(ctx, n, self, other_dtype);
+               return register_cast_layer(ctx, n, self, other_dtype);
              }});
 // clang-format on
 } // namespace

@@ -60,7 +60,7 @@ nvinfer1::ITensor* addUnpadding(
   }
 }
 
-bool register_cast_layer_orig(
+bool register_cast_layer(
     ConversionCtx* ctx,
     const torch::jit::Node* n,
     nvinfer1::ITensor* input,
