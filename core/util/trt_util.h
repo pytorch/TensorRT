@@ -21,8 +21,6 @@ inline std::ostream& operator<<(std::ostream& os, const nvinfer1::TensorFormat& 
 
 inline std::ostream& operator<<(std::ostream& stream, const nvinfer1::DataType& dtype) {
   switch (dtype) {
-    case nvinfer1::DataType::kBOOL:
-      return stream << "Bool";
     case nvinfer1::DataType::kFLOAT:
       return stream << "Float32";
     case nvinfer1::DataType::kHALF:

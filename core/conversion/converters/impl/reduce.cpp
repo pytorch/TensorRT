@@ -106,10 +106,10 @@ auto reduce_registrations TRTORCH_UNUSED =
                for (size_t d = 0; d < calculated_dims.size(); d++) {
                  axis_mask |= 1 << calculated_dims[d];
                }
-               LOG_DEBUG("Axis Mask" << std::bitset<32>(axis_mask));
+               LOG_DEBUG("Axis Mask: " << std::bitset<32>(axis_mask));
 
                auto keepdim = args[2].unwrapToBool();
-               LOG_DEBUG("Keep dims :" << keepdim);
+               LOG_DEBUG("Keep dims: " << keepdim);
 
                LOG_WARNING("Sum converter disregards dtype");
                auto sum_layer = ctx->net->addReduce(*in_tensor, nvinfer1::ReduceOperation::kSUM, axis_mask, keepdim);
@@ -145,13 +145,13 @@ auto reduce_registrations TRTORCH_UNUSED =
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                     auto in_tensor = args[0].ITensorOrFreeze(ctx);
                     auto dim = args[1].unwrapToInt();
-                    LOG_DEBUG("Dim to reduce:" << dim); // Some abuse of toDim but just for debug info
+                    LOG_DEBUG("Dim to reduce: " << dim); // Some abuse of toDim but just for debug info
 
                     uint32_t axis_mask = 1 << dim;
-                    LOG_DEBUG("Axis Mask" << std::bitset<32>(axis_mask));
+                    LOG_DEBUG("Axis Mask: " << std::bitset<32>(axis_mask));
 
                     auto keepdim = args[2].unwrapToBool();
-                    LOG_DEBUG("Keep dims :" << keepdim);
+                    LOG_DEBUG("Keep dims: " << keepdim);
 
                     LOG_WARNING("Prod converter disregards dtype");
                     auto prod_layer =
