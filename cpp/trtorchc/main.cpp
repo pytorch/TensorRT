@@ -135,6 +135,18 @@ std::vector<std::vector<int64_t>> parseDynamicDim(std::string shape_str) {
   return shape;
 }
 
+std::string read_buf(std::string const& path) {
+  std::string buf;
+  std::ifstream stream(path.c_str(), std::ios::binary);
+
+  if (stream) {
+    stream >> std::noskipws;
+    std::copy(std::istream_iterator<char>(stream), std::istream_iterator<char>(), std::back_inserter(buf));
+  }
+
+  return buf;
+}
+
 std::string get_cwd() {
   char buff[FILENAME_MAX]; // create string buffer to hold path
   if (getcwd(buff, FILENAME_MAX)) {
@@ -224,6 +236,13 @@ int main(int argc, char** argv) {
       "file_path",
       "Path to calibration cache file to use for post training quantization",
       {"calibration-cache-file"});
+
+  args::Flag embed_engine(
+      parser,
+      "embed-engine",
+      "Whether to treat input file as a serialized TensorRT engine and embed it into a TorchScript module (device spec must be provided)",
+      {"embed-engine"});
+
   args::ValueFlag<int> num_min_timing_iters(
       parser, "num_iters", "Number of minimization timing iterations used to select kernels", {"num-min-timing-iter"});
   args::ValueFlag<int> num_avg_timing_iters(
@@ -483,6 +502,14 @@ int main(int argc, char** argv) {
 
   auto real_input_path = resolve_path(args::get(input_path));
   auto real_output_path = resolve_path(args::get(output_path));
+
+  // Instead of compiling, just embed engine in a PyTorch module
+  if (embed_engine) {
+    std::string serialized_engine = read_buf(real_input_path);
+    auto trt_mod = trtorch::EmbedEngineInNewModule(serialized_engine, compile_settings.device);
+    trt_mod.save(real_output_path);
+    return 0;
+  }
 
   torch::jit::Module mod;
   try {

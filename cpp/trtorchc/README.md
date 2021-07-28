@@ -57,6 +57,10 @@ trtorchc [input_file_path] [output_file_path]
       --calibration-cache-file=[file_path]
                                         Path to calibration cache file to use
                                         for post training quantization
+      --embed-engine                    Whether to treat input file as a
+                                        serialized TensorRT engine and embed it
+                                        into a TorchScript module (device spec
+                                        must be provided)
       --num-min-timing-iter=[num_iters] Number of minimization timing iterations
                                         used to select kernels
       --num-avg-timing-iters=[num_iters]
