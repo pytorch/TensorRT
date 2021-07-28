@@ -100,6 +100,7 @@ torch.jit.save(trace_model, "pooling_traced.jit.pt")
 
 # Sample Conditional Model (for testing partitioning and fallback in conditionals)
 class FallbackIf(torch.nn.Module):
+
     def __init__(self):
         super(FallbackIf, self).__init__()
         self.relu1 = torch.nn.ReLU()
@@ -120,6 +121,7 @@ class FallbackIf(torch.nn.Module):
             x = self.log_sig(x)
         x = self.conv1(x)
         return x
+
 
 conditional_model = FallbackIf().eval().cuda()
 conditional_script_model = torch.jit.script(conditional_model)
