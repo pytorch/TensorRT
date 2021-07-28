@@ -36,16 +36,9 @@ nvinfer1::ITensor* addUnpadding(
     bool use_zeros = true);
 
 // Insert a cast layer and cast the input to the output_dtype
-bool register_cast_layer_orig(
-    ConversionCtx* ctx,
-    const torch::jit::Node* n,
-    nvinfer1::ITensor* input,
-    nvinfer1::DataType output_dtype);
-
-// Insert a cast layer and cast the input to the output_dtype
 bool register_cast_layer(
     ConversionCtx* ctx,
-    const std::string layer_name,
+    const torch::jit::Node* n,
     nvinfer1::ITensor* input,
     nvinfer1::DataType output_dtype);
 
