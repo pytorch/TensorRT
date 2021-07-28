@@ -784,7 +784,7 @@ TRTORCH_API void dump_build_info();
  *
  * @returns bool: Method is supported by TRTorch
  */
-TRTORCH_API bool CheckMethodOperatorSupport(const torch::jit::Module& module, std::string method_name, CompileSpec info);
+TRTORCH_API bool CheckMethodOperatorSupport(const torch::jit::Module& module, std::string method_name);
 
 /**
  * @brief Compile a TorchScript module for NVIDIA GPUs using TensorRT
