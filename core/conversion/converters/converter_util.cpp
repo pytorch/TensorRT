@@ -122,6 +122,27 @@ nvinfer1::ILayer* add_elementwise(
   return ele;
 }
 
+nvinfer1::ITensor* castITensor(ConversionCtx* ctx, nvinfer1::ITensor* tensor, nvinfer1::DataType dtype) {
+  if (tensor->getType() != dtype) {
+    std::ostringstream tensor_id;
+    tensor_id << reinterpret_cast<int*>(tensor);
+
+    auto id_layer = ctx->net->addIdentity(*tensor);
+    TRTORCH_CHECK(id_layer, "Unable to create identity layer for ITensor: " << tensor_id.str());
+    auto casted_tensor = id_layer->getOutput(0);
+    casted_tensor->setType(dtype);
+
+    LOG_DEBUG(ctx->logger, "Casting ITensor " << tensor_id.str() << " from " << tensor->getType() << " to " << dtype);
+
+    std::stringstream ss;
+    ss << "[Cast ITensor " << tensor_id.str() << " from " << tensor->getType() << " to " << dtype << "]";
+    id_layer->setName(ss.str().c_str());
+    return casted_tensor;
+  } else {
+    return tensor;
+  }
+}
+
 } // namespace converters
 } // namespace conversion
 } // namespace core

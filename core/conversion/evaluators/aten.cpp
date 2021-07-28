@@ -8,6 +8,7 @@
 #include "torch/torch.h"
 
 #include "core/conversion/evaluators/eval_macros.h"
+#include "core/conversion/evaluators/eval_util.h"
 #include "core/conversion/evaluators/evaluators.h"
 
 namespace trtorch {
@@ -566,6 +567,21 @@ auto aten_registrations TRTORCH_UNUSED =
                       return {};
                     },
                     EvalOptions()})
+        .evaluator({c10::Symbol::fromQualString("aten::tensor"),
+                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+                      auto data = args.at(n->input(0)).IValue();
+                      auto dtype = args.at(n->input(1)).IValue();
+                      auto device = args.at(n->input(2)).IValue();
+                      auto tensor =  createTensorFromList(*data, *dtype, *device);
+                      LOG_DEBUG(tensor);
+                      if (tensor.dtype() == at::kByte) {
+                        return tensor.to(at::kInt);
+                      }
+                      return tensor;
+                    },
+                    EvalOptions().validSchemas({
+                      "aten::tensor(t[] data, *, int? dtype=None, Device? device=None, bool requires_grad=False) -> (Tensor)"
+                    })})
         .evaluator({c10::Symbol::fromQualString("aten::arange"),
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                       int input_size = n->inputs().size();

@@ -3,6 +3,7 @@
 #include "NvInfer.h"
 #include "c10/util/intrusive_ptr.h"
 #include "core/conversion/converters/converters.h"
+#include "core/conversion/converters/converter_util.h"
 #include "core/conversion/tensorcontainer/TensorContainer.h"
 #include "core/util/prelude.h"
 #include "torch/torch.h"
@@ -247,7 +248,28 @@ auto select_registrations TRTORCH_UNUSED =
                     add_split(ctx, n, args, true);
                     LOG_DEBUG("Converted split op into a list of IValues");
                     return true;
-                  }});
+                  }})
+        .pattern({
+          "aten::masked_fill.Scalar(Tensor self, Tensor mask, Scalar value) -> (Tensor)",
+          [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+            auto self = args[0].ITensorOrFreeze(ctx);
+            LOG_DEBUG(args[1].unwrapToTensor());
+            auto mask = castITensor(ctx, args[1].ITensorOrFreeze(ctx), nvinfer1::DataType::kBOOL);
+            auto val = args[2].unwrapToScalar().to<float>();
+            LOG_DEBUG(torch::full(util::toVec(self->getDimensions()), val));
+            auto val_t = tensor_to_const(ctx, torch::full(util::toVec(self->getDimensions()), val));
+
+            TRTORCH_CHECK(util::broadcastable(self->getDimensions(), mask->getDimensions(), /*multidirectional=*/false), "Self and mask tensors are not broadcastable");
+
+            auto new_layer = ctx->net->addSelect(*mask, *self, *val_t);
+            TRTORCH_CHECK(new_layer, "Unable to create layer for aten::masked_fill");
+
+            new_layer->setName(util::node_info(n).c_str());
+
+            auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
+            LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+            return true;
+          }});
 
 } // namespace
 } // namespace impl

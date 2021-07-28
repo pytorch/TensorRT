@@ -42,6 +42,9 @@ nvinfer1::ILayer* add_elementwise(
     nvinfer1::ITensor* other,
     const std::string& name);
 
+// If an ITensor is of a type not dtype, add an Identity layer to cast it to dtype
+nvinfer1::ITensor* castITensor(ConversionCtx* ctx, nvinfer1::ITensor* tensor, nvinfer1::DataType dtype);
+
 } // namespace converters
 } // namespace conversion
 } // namespace core

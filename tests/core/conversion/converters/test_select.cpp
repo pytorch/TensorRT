@@ -4,6 +4,8 @@
 #include "gtest/gtest.h"
 #include "tests/util/util.h"
 #include "torch/csrc/jit/ir/irparser.h"
+#include "core/lowering/passes/passes.h"
+
 
 TEST(Converters, ATenSelectIntConvertsCorrectly) {
   const auto graph = R"IR(
@@ -397,4 +399,45 @@ TEST(Converters, ATenSplitAndAddConvertsCorrectly) {
     auto trt = trt_results[i].reshape(jit_results[i].sizes());
     ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[i], trt, 2e-6));
   }
+}
+
+TEST(Converters, ATenMaskedFillZerosConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%x.1 : Tensor):
+      %44 : Device = prim::Constant[value="cuda"]()
+      %8 : bool = prim::Constant[value=0]()
+      %7 : None = prim::Constant()
+      %1 : int = prim::Constant[value=0]() # bert.py:5:26
+      %2 : int = prim::Constant[value=1]() # bert.py:5:32
+      %33 : int = prim::Constant[value=2]() # bert.py:6:31
+      %3 : int[] = prim::ListConstruct(%1, %1, %2)
+      %4 : int[] = prim::ListConstruct(%2, %2, %1)
+      %5 : int[][] = prim::ListConstruct(%3, %4)
+      %5 : int[][][] = prim::ListConstruct(%5)
+      %9 : Tensor = aten::tensor(%5, %1, %7, %8) # bert.py:5:11
+      %mask.1 : Tensor = aten::to(%9, %44, %7, %8, %8) # bert.py:5:11
+      %mask.2 : Tensor = trt::const(%mask.1)
+      %34 : Tensor = aten::masked_fill(%x.1, %mask.1, %33) # bert.py:6:11
+      return (%34, %mask.2))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+
+  torch::jit::parseIR(graph, &*g);
+
+  auto in = at::zeros({1, 2, 3}, {at::kCUDA});
+
+
+  auto jit_in = at::clone(in);
+  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
+
+  auto trt_in = at::clone(in);
+  trtorch::core::lowering::passes::RemoveNOPs(g);
+  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
+
+  std::cout << jit_results[0] << trt_results[0].reshape_as(jit_results[0]) << std::endl;
+
+  std::cout << trt_results[1].reshape_as(jit_results[0]) << std::endl;
+
+  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
 }

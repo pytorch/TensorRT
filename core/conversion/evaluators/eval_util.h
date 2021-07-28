@@ -8,6 +8,7 @@ namespace conversion {
 namespace evaluators {
 
 c10::optional<torch::jit::IValue> toIValue(const torch::jit::Value* v);
+at::Tensor createTensorFromList(const torch::jit::IValue& data, const torch::jit::IValue& dtype, const torch::jit::IValue& device);
 
 } // namespace evaluators
 } // namespace conversion
