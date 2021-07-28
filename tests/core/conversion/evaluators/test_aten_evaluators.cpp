@@ -400,3 +400,19 @@ TEST(Evaluators, ATenCopyEvaluatesCorrectly) {
 
   ASSERT_TRUE(at::equal(jit_results[0].toTensor().to(at::kCUDA), trt_results[0].toTensor()));
 }
+
+TEST(Evaluators, IntFloatEvaluatesCorrectly) {
+  const auto graph = R"IR(
+      graph():
+        %1 : float = prim::Constant[value=9.3]()
+        %2 : int = aten::Int(%1)
+        return (%2))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto jit_results = trtorch::tests::util::EvaluateGraphJIT(g, {});
+  auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {});
+
+  ASSERT_TRUE(jit_results[0] == trt_results[0]);
+}

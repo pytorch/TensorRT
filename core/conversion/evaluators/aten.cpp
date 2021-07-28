@@ -383,6 +383,30 @@ auto aten_registrations TRTORCH_UNUSED =
                         "aten::Float.int(int a) -> float",
                         "aten::Float.bool(bool a) -> float",
                     })})
+        .evaluator({c10::Symbol::fromQualString("aten::Int"),
+                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+                      if (args.at(n->input(0)).IValue()->isInt()) {
+                        auto a = args.at(n->input(0)).unwrapToInt();
+                        return (int)a;
+                      } else if (args.at(n->input(0)).IValue()->isDouble()) {
+                        auto a = args.at(n->input(0)).unwrapToDouble();
+                        return (int)a;
+                      } else if (args.at(n->input(0)).IValue()->isBool()) {
+                        auto a = args.at(n->input(0)).unwrapToBool();
+                        return (int)a;
+                      } else {
+                        TRTORCH_THROW_ERROR(
+                            "Unimplemented data type for aten::Int evaluator: "
+                            << args.at(n->input(0)).IValue()->type()->str());
+                        return {};
+                      }
+                    },
+                    EvalOptions().validSchemas({
+                        "aten::Int.Scalar(Scalar a) -> int",
+                        "aten::Int.int(int a) -> int",
+                        "aten::Int.bool(bool a) -> int",
+                        "aten::Int.float(float a) -> int",
+                    })})
         .evaluator({c10::Symbol::fromQualString("aten::__not__"),
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                       auto el = args.at(n->input(0)).unwrapToBool();
