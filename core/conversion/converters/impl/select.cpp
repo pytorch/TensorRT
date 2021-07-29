@@ -2,8 +2,8 @@
 #include <vector>
 #include "NvInfer.h"
 #include "c10/util/intrusive_ptr.h"
-#include "core/conversion/converters/converters.h"
 #include "core/conversion/converters/converter_util.h"
+#include "core/conversion/converters/converters.h"
 #include "core/conversion/tensorcontainer/TensorContainer.h"
 #include "core/util/prelude.h"
 #include "torch/torch.h"
@@ -248,26 +248,27 @@ auto select_registrations TRTORCH_UNUSED =
                     LOG_DEBUG("Converted split op into a list of IValues");
                     return true;
                   }})
-        .pattern({
-          "aten::masked_fill.Scalar(Tensor self, Tensor mask, Scalar value) -> (Tensor)",
-          [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-            auto self = args[0].ITensorOrFreeze(ctx);
-            auto mask = castITensor(ctx, args[1].ITensorOrFreeze(ctx), nvinfer1::DataType::kBOOL);
-            mask = addPadding(ctx, n, mask, self->getDimensions().nbDims, false, true);
-            auto val = args[2].unwrapToScalar().to<float>();
-            auto val_t = tensor_to_const(ctx, torch::full(util::toVec(self->getDimensions()), val));
+        .pattern({"aten::masked_fill.Scalar(Tensor self, Tensor mask, Scalar value) -> (Tensor)",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    auto self = args[0].ITensorOrFreeze(ctx);
+                    auto mask = castITensor(ctx, args[1].ITensorOrFreeze(ctx), nvinfer1::DataType::kBOOL);
+                    mask = addPadding(ctx, n, mask, self->getDimensions().nbDims, false, true);
+                    auto val = args[2].unwrapToScalar().to<float>();
+                    auto val_t = tensor_to_const(ctx, torch::full(util::toVec(self->getDimensions()), val));
 
-            TRTORCH_CHECK(util::broadcastable(self->getDimensions(), mask->getDimensions(), /*multidirectional=*/false), "Self and mask tensors are not broadcastable");
+                    TRTORCH_CHECK(
+                        util::broadcastable(self->getDimensions(), mask->getDimensions(), /*multidirectional=*/false),
+                        "Self and mask tensors are not broadcastable");
 
-            auto new_layer = ctx->net->addSelect(*mask, *val_t, *self);
-            TRTORCH_CHECK(new_layer, "Unable to create layer for aten::masked_fill");
+                    auto new_layer = ctx->net->addSelect(*mask, *val_t, *self);
+                    TRTORCH_CHECK(new_layer, "Unable to create layer for aten::masked_fill");
 
-            new_layer->setName(util::node_info(n).c_str());
+                    new_layer->setName(util::node_info(n).c_str());
 
-            auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
-            LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
-            return true;
-          }});
+                    auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
+                    LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+                    return true;
+                  }});
 
 } // namespace
 } // namespace impl

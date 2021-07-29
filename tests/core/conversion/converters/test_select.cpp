@@ -1,11 +1,10 @@
 #include <torch/torch.h>
 #include <string>
 #include "core/compiler.h"
+#include "core/lowering/passes/passes.h"
 #include "gtest/gtest.h"
 #include "tests/util/util.h"
 #include "torch/csrc/jit/ir/irparser.h"
-#include "core/lowering/passes/passes.h"
-
 
 TEST(Converters, ATenSelectIntConvertsCorrectly) {
   const auto graph = R"IR(
@@ -424,7 +423,6 @@ TEST(Converters, ATenMaskedFillZerosConvertsCorrectly) {
   torch::jit::parseIR(graph, &*g);
 
   auto in = at::zeros({1, 2, 3}, {at::kCUDA});
-
 
   auto jit_in = at::clone(in);
   auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});

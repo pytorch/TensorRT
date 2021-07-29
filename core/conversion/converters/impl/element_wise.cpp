@@ -194,7 +194,8 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     auto scaled_val = other * alpha;
 
                     auto scaled_other_tensor = tensor_to_const(ctx, torch::tensor({scaled_val}));
-                    auto sub = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUB, self, scaled_other_tensor, util::node_info(n));
+                    auto sub = add_elementwise(
+                        ctx, nvinfer1::ElementWiseOperation::kSUB, self, scaled_other_tensor, util::node_info(n));
                     TRTORCH_CHECK(sub, "Unable to create sub layer from node: " << *n);
                     sub->setName(util::node_info(n).c_str());
                     LOG_DEBUG("Output tensor shape: " << sub->getOutput(0)->getDimensions());

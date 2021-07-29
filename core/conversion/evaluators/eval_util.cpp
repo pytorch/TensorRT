@@ -95,8 +95,7 @@ c10::optional<torch::jit::IValue> toIValue(const torch::jit::Value* v) {
 }
 
 void checkListInputType(const c10::TypePtr& elem_type, bool empty_list) {
-  if (!elem_type->isSubtypeOf(c10::NumberType::get()) &&
-      elem_type != c10::BoolType::get()) {
+  if (!elem_type->isSubtypeOf(c10::NumberType::get()) && elem_type != c10::BoolType::get()) {
     std::stringstream error;
     error << "Input must be of ints, floats, or bools, "
           << "got " << elem_type->repr_str();
@@ -115,18 +114,9 @@ void checkListInputType(const c10::TypePtr& elem_type, bool empty_list) {
 
 void checkSequenceSize(int64_t n, int64_t dim, int64_t seq_size) {
   if (seq_size != n) {
-    TRTORCH_THROW_ERROR(
-        "Expected sequence of length "
-        << n
-        << " at dim "
-        << dim
-        << " (got "
-        << seq_size
-        << ")");
+    TRTORCH_THROW_ERROR("Expected sequence of length " << n << " at dim " << dim << " (got " << seq_size << ")");
   }
 }
-
-
 
 template <typename DTYPE>
 void storeLastDimension(
@@ -144,7 +134,6 @@ void storeLastDimension(
     data += strides[dim] * elementSize;
   }
 }
-
 
 void storeLastDimensionFloat(
     char* data,
@@ -196,22 +185,15 @@ void recursiveStore(
     }
   } else {
     if (obj.isIntList()) {
-      storeLastDimension<int64_t>(
-          data, sizes, strides, dim, tenElementSize, seq);
+      storeLastDimension<int64_t>(data, sizes, strides, dim, tenElementSize, seq);
     } else if (obj.isBoolList()) {
       storeLastDimension<bool>(data, sizes, strides, dim, tenElementSize, seq);
     } else if (obj.isDoubleList()) {
-      if (tenElementSize ==
-          static_cast<int>(elementSize(at::ScalarType::Double))) {
-        storeLastDimension<double>(
-            data, sizes, strides, dim, tenElementSize, seq);
-      } else if (
-          tenElementSize ==
-          static_cast<int>(elementSize(at::ScalarType::Float))) {
+      if (tenElementSize == static_cast<int>(elementSize(at::ScalarType::Double))) {
+        storeLastDimension<double>(data, sizes, strides, dim, tenElementSize, seq);
+      } else if (tenElementSize == static_cast<int>(elementSize(at::ScalarType::Float))) {
         storeLastDimensionFloat(data, sizes, strides, dim, tenElementSize, seq);
-      } else if (
-          tenElementSize ==
-          static_cast<int>(elementSize(at::ScalarType::Half))) {
+      } else if (tenElementSize == static_cast<int>(elementSize(at::ScalarType::Half))) {
         storeLastDimensionHalf(data, sizes, strides, dim, tenElementSize, seq);
       } else {
         TORCH_INTERNAL_ASSERT(false);
@@ -222,12 +204,8 @@ void recursiveStore(
   }
 }
 
-at::Tensor castTensorTo(
-    at::Tensor self,
-    const torch::jit::IValue& dtype,
-    const torch::jit::IValue& device) {
-  at::ScalarType scalar_type =
-      dtype.isNone() ? self.scalar_type() : dtype.toScalarType();
+at::Tensor castTensorTo(at::Tensor self, const torch::jit::IValue& dtype, const torch::jit::IValue& device) {
+  at::ScalarType scalar_type = dtype.isNone() ? self.scalar_type() : dtype.toScalarType();
   c10::Device dev = device.isNone() ? self.device() : device.toDevice();
   if (scalar_type != self.scalar_type() || dev != self.device()) {
     self = self.to(dev, scalar_type);
@@ -248,7 +226,10 @@ std::vector<int64_t> compute_sizes(const torch::jit::IValue& seq) {
   return sizes;
 }
 
-at::Tensor createTensorFromList(const torch::jit::IValue& data, const torch::jit::IValue& dtype, const torch::jit::IValue& device) {
+at::Tensor createTensorFromList(
+    const torch::jit::IValue& data,
+    const torch::jit::IValue& dtype,
+    const torch::jit::IValue& device) {
   auto elem_type = data.type();
   while (auto list_type = elem_type->cast<c10::ListType>()) {
     elem_type = list_type->getElementType();
@@ -260,32 +241,20 @@ at::Tensor createTensorFromList(const torch::jit::IValue& data, const torch::jit
     initial_scalar_type = at::typeMetaToScalarType(c10::get_default_dtype());
   }
 
-  auto tensor =
-      at::empty(sizes, at::initialTensorOptions().dtype(initial_scalar_type));
+  auto tensor = at::empty(sizes, at::initialTensorOptions().dtype(initial_scalar_type));
 
   if (tensor.numel() != 0) {
-    recursiveStore(
-        (char*)tensor.data_ptr(),
-        sizes,
-        tensor.strides(),
-        0,
-        tensor.element_size(),
-        data);
+    recursiveStore((char*)tensor.data_ptr(), sizes, tensor.strides(), 0, tensor.element_size(), data);
   }
 
   tensor = castTensorTo(tensor, dtype, device);
   auto default_type = at::typeMetaToScalarType(at::get_default_dtype());
 
-  if (dtype.isNone() && tensor.scalar_type() != default_type &&
-      tensor.numel() == 0) {
+  if (dtype.isNone() && tensor.scalar_type() != default_type && tensor.numel() == 0) {
     LOG_WARNING(
         "Creating a tensor from an empty "
-        << elem_type->repr_str()
-        << "list will create a tensor of default floating point type  (currently "
-        << default_type
-        << ") in python but a tensor of type "
-        << elem_type->repr_str()
-        << " in torchscript.\n"
+        << elem_type->repr_str() << "list will create a tensor of default floating point type  (currently "
+        << default_type << ") in python but a tensor of type " << elem_type->repr_str() << " in torchscript.\n"
         << "Pass in a dtype argument to ensure consistent behavior");
   }
 

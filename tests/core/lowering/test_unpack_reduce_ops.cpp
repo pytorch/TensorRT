@@ -1,12 +1,11 @@
 #include <string>
 #include "core/compiler.h"
+#include "core/lowering/passes/passes.h"
+#include "core/util/prelude.h"
 #include "gtest/gtest.h"
 #include "tests/util/util.h"
 #include "torch/csrc/jit/ir/irparser.h"
-#include "core/lowering/passes/passes.h"
-#include "core/util/prelude.h"
 #include "torch/csrc/jit/passes/common_subexpression_elimination.h"
-
 
 TEST(LoweringPasses, UnpackVarLowersCorrectly) {
   const auto graph = R"IR(

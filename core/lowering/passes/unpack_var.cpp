@@ -42,7 +42,6 @@ void UnpackVar(std::shared_ptr<torch::jit::Graph>& graph) {
   var_rewriter.RegisterRewritePattern(var_pattern, unpacked_pattern);
   var_rewriter.runOnGraph(graph);
   LOG_DEBUG("Post unpack var: " << *graph);
-
 }
 
 } // namespace passes
