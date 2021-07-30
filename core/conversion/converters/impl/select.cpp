@@ -197,18 +197,29 @@ auto select_registrations TRTORCH_UNUSED =
                return true;
              }})
         .pattern(
-            {"aten::slice.Tensor(Tensor(a) self, int dim=0, int start=0, int end=9223372036854775807, int step=1) -> Tensor(a)",
+            {"aten::slice.Tensor(Tensor(a) self, int dim=0, int? start=None, int? end=None, int step=1) -> Tensor(a)",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                auto in = args[0].ITensor();
                auto axis = args[1].unwrapToInt();
                auto maxDim = static_cast<int64_t>(in->getDimensions().d[axis]);
+               auto startIdx = 0;
+               auto startIdxIVal = args[2].IValue();
+               if (!startIdxIVal->isNone()) {
+                 startIdx = startIdxIVal->toInt();
+               }
                // Handle case when given tensor index is negative
-               auto startIdx = args[2].unwrapToInt();
                auto start = (startIdx < 0) ? (maxDim + startIdx) : startIdx;
                // Bound the end index to input tensor dimensions at specified axis
-               auto endIdx = std::min(args[3].unwrapToInt(), maxDim);
+               auto endIdx = maxDim;
+               auto endIdxIVal = args[3].IValue();
+               if (!endIdxIVal->isNone()) {
+                 endIdx = std::min(endIdxIVal->toInt(), maxDim);
+               }
                auto end = (endIdx < 0) ? (maxDim + endIdx) : endIdx;
                auto step = args[4].unwrapToInt();
+
+               LOG_DEBUG("Start idx: " << start);
+               LOG_DEBUG("End idx: " << end);
 
                // indices to be accessed need to be an at::Tensor
                at::Tensor indices = torch::arange(start, end, step).to(torch::kI32);
