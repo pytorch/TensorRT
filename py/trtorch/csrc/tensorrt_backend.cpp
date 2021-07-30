@@ -10,17 +10,17 @@
 namespace trtorch {
 namespace backend {
 
-c10::IValue TensorRTBackend::preprocess(c10::IValue mod, c10::impl::GenericDict method_compile_spec) {
-  auto spec = c10::impl::toTypedDict<std::string, at::IValue>(method_compile_spec);
-
-  for (auto it = spec.begin(), end = spec.end(); it != end; ++it) {
+namespace {
+c10::IValue preprocess(const torch::jit::Module& mod, const c10::Dict<c10::IValue, c10::IValue>& method_compile_spec) {
+  for (auto it = method_compile_spec.begin(), end = method_compile_spec.end(); it != end; ++it) {
     TRTORCH_CHECK(
-        core::CheckMethodOperatorSupport(mod.toModule(), it->key()),
-        "Method " << it->key() << "cannot be compiled by TRTorch");
+        core::CheckMethodOperatorSupport(mod, it->key().toStringRef()),
+        "Method " << it->key().toStringRef() << "cannot be compiled by TRTorch");
   }
 
-  return mod;
+  return mod._ivalue();
 }
+} // namespace
 
 c10::impl::GenericDict TensorRTBackend::compile(c10::IValue mod_val, c10::impl::GenericDict method_compile_spec) {
   auto mod = mod_val.toModule();
@@ -78,6 +78,7 @@ c10::impl::GenericList TensorRTBackend::execute(c10::IValue handle, c10::impl::G
 
 namespace {
 static auto reg = torch::jit::backend<TensorRTBackend>("tensorrt");
+static auto preproc_reg = torch::jit::backend_preprocess_register("tensorrt", &preprocess);
 }
 
 } // namespace backend
