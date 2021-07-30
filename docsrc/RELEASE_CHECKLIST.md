@@ -21,7 +21,7 @@ will result in a minor version bump and sigificant bug fixes will result in a pa
     - All checked in applications (cpp and python) should compile and work
 3. Generate new index of converters and evalutators
     - `bazel run //tools/supportedops -- <PATH TO TRTORCH>/docsrc/indices/supported_ops.rst`
-3. Version bump PR
+4. Version bump PR
     - There should be a PR which will be the PR that bumps the actual version of the library, this PR should contain the following
         - Bump version in `py/setup.py`
         - Make sure dependency versions are updated in `py/requirements.txt`, `tests/py/requirements.txt` and `py/setup.py`
@@ -34,7 +34,22 @@ will result in a minor version bump and sigificant bug fixes will result in a pa
             - `make html`
         - Generate changelog
             - `conventional-changelog -p angular -s -i CHANGELOG.md -t <last version tag> -a`
-4. Once PR is merged tag commit and start creating release on GitHub
+
+5. Run performance tests:
+    - Models: 
+        - Torchbench BERT
+        - EfficientNet B0
+        - ViT
+        - ResNet50 (v1.5 ?)
+    - Batch Sizes: 1, 4, 8, 16, 32
+    - Frameworks: PyTorch, TRTorch, ONNX + TRT
+        - If any models do not convert to ONNX / TRT, that is fine. Mark them as failling / no result
+    - Devices: 
+        - A100 (P0)
+        - T4 is a nice to have (P2)
+        - Jetson also nice to have (P4) 
+
+6. Once PR is merged tag commit and start creating release on GitHub
     - Paste in Milestone information and Changelog information into release notes
     - Generate libtrtorch.tar.gz for the following platforms:
         - x86_64 cxx11-abi
