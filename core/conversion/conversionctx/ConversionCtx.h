@@ -27,8 +27,6 @@ struct BuilderSettings {
   bool sparse_weights = false;
   std::set<nvinfer1::DataType> enabled_precisions = {nvinfer1::DataType::kFLOAT};
   bool disable_tf32 = false;
-  // Internal flag to ensure torch.jit.Module does not get freezed in lowering.cpp. This is required for QAT models.
-  bool unfreeze_module = false;
   bool refit = false;
   bool debug = false;
   bool strict_types = false;

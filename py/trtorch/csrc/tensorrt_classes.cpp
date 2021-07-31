@@ -186,7 +186,7 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
   } else {
     if (info.convert_info.engine_settings.enabled_precisions.find(nvinfer1::DataType::kINT8) !=
         info.convert_info.engine_settings.enabled_precisions.end()) {
-      info.convert_info.engine_settings.unfreeze_module = true;
+      info.lower_info.unfreeze_module = true;
     }
   }
   info.convert_info.engine_settings.sparse_weights = sparse_weights;

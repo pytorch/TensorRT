@@ -129,7 +129,7 @@ bool CheckMethodOperatorSupport(const torch::jit::script::Module& mod, std::stri
 
 std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::string method_name, CompileSpec cfg) {
   // Go through Lowering to simplify graph and extract weight parameters
-  auto graph_and_parameters = lowering::Lower(mod, method_name, cfg.convert_info.engine_settings.unfreeze_module);
+  auto graph_and_parameters = lowering::Lower(mod, method_name, cfg.lower_info.unfreeze_module);
 
   auto convert_cfg = std::move(cfg.convert_info);
   auto g = graph_and_parameters.first;
@@ -187,7 +187,7 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
     // Compile only forward methods. forward method contains the entire graph.
     if (method.name().compare("forward") == 0) {
       auto new_g = std::make_shared<torch::jit::Graph>();
-      auto graph_and_parameters = lowering::Lower(mod, method.name(), cfg.convert_info.engine_settings.unfreeze_module);
+      auto graph_and_parameters = lowering::Lower(mod, method.name(), cfg.lower_info.unfreeze_module);
 
       auto g = graph_and_parameters.first;
       auto params = graph_and_parameters.second;
