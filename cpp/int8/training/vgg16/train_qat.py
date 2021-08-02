@@ -183,7 +183,7 @@ def main():
 
     crit = nn.CrossEntropyLoss()
     opt = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
-
+    import pdb; pdb.set_trace()
     if args.start_from != 0:
         ckpt_file = args.ckpt_dir + '/ckpt_epoch' + str(args.start_from) + '.pth'
         print('Loading from checkpoint {}'.format(ckpt_file))
@@ -205,15 +205,15 @@ def main():
     writer.close()
 
     # ## Calibrate the model
-    # with torch.no_grad():
-    #     calibrate_model(
-    #         model=model,
-    #         model_name="vgg16",
-    #         data_loader=training_dataloader,
-    #         num_calib_batch=32,
-    #         calibrator="max",
-    #         hist_percentile=[99.9, 99.99, 99.999, 99.9999],
-    #         out_dir="./")
+    with torch.no_grad():
+        calibrate_model(
+            model=model,
+            model_name="vgg16",
+            data_loader=training_dataloader,
+            num_calib_batch=32,
+            calibrator="max",
+            hist_percentile=[99.9, 99.99, 99.999, 99.9999],
+            out_dir="./")
 
     if torch.cuda.device_count() > 1:
         model = nn.DataParallel(model)

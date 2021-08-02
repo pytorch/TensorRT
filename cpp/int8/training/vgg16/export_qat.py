@@ -52,17 +52,9 @@ model = model.cuda()
 ckpt = torch.load(args.ckpt)
 weights = ckpt["model_state_dict"]
 
-# if torch.cuda.device_count() > 1:
-#     from collections import OrderedDict
-#     new_state_dict = OrderedDict()
-#     for k, v in weights.items():
-#         name = k[7:]  # remove `module.`
-#         new_state_dict[name] = v
-#     weights = new_state_dict
+model.load_state_dict(weights)
+model.eval()
 
-# model.load_state_dict(weights)
-# model.eval()
-jit_model = torch.jit.load('trained_vgg16_qat.jit.pt')
 testing_dataset = datasets.CIFAR10(root='./data',
                                    train=False,
                                    download=True,
@@ -75,29 +67,12 @@ testing_dataloader = torch.utils.data.DataLoader(testing_dataset, batch_size=32,
 
 crit = torch.nn.CrossEntropyLoss()
 
-#
-# quant_nn.TensorQuantizer.use_fb_fake_quant = True
-# with torch.no_grad():
-#     data = iter(testing_dataloader)
-#     images, _ = data.next()
-#     jit_model = torch.jit.trace(model, images.to("cuda"))
-#     # jit_model.eval()
-#     torch.jit.save(jit_model, "trained_vgg16_qat.jit.pt")
-#
-test_loss, test_acc = test(jit_model, testing_dataloader, crit)
-print("[JIT] Test Loss: {:.5f} Test Acc: {:.2f}%".format(test_loss, 100 * test_acc))
-#
-# if args.enable_qat:
-#     quant_nn.TensorQuantizer.use_fb_fake_quant = True
+quant_nn.TensorQuantizer.use_fb_fake_quant = True
+with torch.no_grad():
+    data = iter(testing_dataloader)
+    images, _ = data.next()
+    jit_model = torch.jit.trace(model, images.to("cuda"))
+    torch.jit.save(jit_model, "trained_vgg16_qat.jit.pt")
 
-import trtorch
-# trtorch.logging.set_reportable_log_level(trtorch.logging.Level.Debug)
-compile_settings = {
-"input_shapes": [[1, 3, 32, 32]],
-"op_precision": torch.int8 # Run with FP16
-}
-new_mod = torch.jit.load('trained_vgg16_qat.jit.pt')
-trt_ts_module = trtorch.compile(new_mod, compile_settings)
-testing_dataloader = torch.utils.data.DataLoader(testing_dataset, batch_size=1, shuffle=False, num_workers=2)
-test_loss, test_acc = test(trt_ts_module, testing_dataloader, crit)
+test_loss, test_acc = test(jit_model, testing_dataloader, crit)
 print("[JIT] Test Loss: {:.5f} Test Acc: {:.2f}%".format(test_loss, 100 * test_acc))
