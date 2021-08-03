@@ -132,7 +132,8 @@ nvinfer1::ITensor* Var::ITensorOrFreeze(ConversionCtx* ctx) {
     out = ptr_.tensor;
   }
 
-  LOG_DEBUG("Frozen tensor shape: " << out->getDimensions());
+  LOG_DEBUG("ITensor shape: " << out->getDimensions());
+  LOG_DEBUG("ITensor type: " << out->getType());
   return out;
 }
 

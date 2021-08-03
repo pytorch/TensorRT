@@ -144,8 +144,11 @@ auto reduce_registrations TRTORCH_UNUSED =
         .pattern({"aten::prod.dim_int(Tensor self, int dim, bool keepdim=False, *, ScalarType? dtype=None) -> Tensor",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                     auto in_tensor = args[0].ITensorOrFreeze(ctx);
+                    auto in_dims = in_tensor->getDimensions();
                     auto dim = args[1].unwrapToInt();
-                    LOG_DEBUG("Dim to reduce: " << dim); // Some abuse of toDim but just for debug info
+                    LOG_DEBUG("Dim to reduce (original): " << dim);
+                    dim = dim < 0 ? (in_dims.nbDims + dim) : dim;
+                    LOG_DEBUG("Dim to reduce (converted): " << dim);
 
                     uint32_t axis_mask = 1 << dim;
                     LOG_DEBUG("Axis Mask: " << std::bitset<32>(axis_mask));

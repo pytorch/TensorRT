@@ -187,9 +187,14 @@ auto aten_registrations TRTORCH_UNUSED =
                         if (tensor_var.isITensor()) {
                           auto tensor = tensor_var.ITensor();
                           return util::toVec(tensor->getDimensions());
-                        } else {
+                        } else if (tensor_var.IValue()->isTensor()) {
                           auto tensor = tensor_var.unwrapToTensor();
                           return tensor.sizes();
+                        } else if (tensor_var.IValue()->isCustomClass()) {
+                          auto tensor = tensor_var.IValue()->toCustomClass<TensorContainer>()->tensor();
+                          return util::toVec(tensor->getDimensions());
+                        } else {
+                          TRTORCH_THROW_ERROR("IValue is not some class of Tensor. Found: " << tensor_var.IValue()->type());
                         }
                       } else {
                         auto dim = args.at(n->input(1)).unwrapToInt();
@@ -201,13 +206,23 @@ auto aten_registrations TRTORCH_UNUSED =
                             dim += nbDims;
                           }
                           return dims[dim];
-                        } else {
+                        } else if (tensor_var.IValue()->isTensor()) {
                           auto tensor = tensor_var.unwrapToTensor();
                           auto nbDims = tensor.sizes().size();
                           if (dim < 0) {
                             dim += nbDims;
                           }
                           return tensor.sizes()[dim];
+                        } else if (tensor_var.IValue()->isCustomClass()) {
+                          auto tensor = tensor_var.IValue()->toCustomClass<TensorContainer>()->tensor();
+                          auto dims = util::toVec(tensor->getDimensions());
+                          auto nbDims = tensor->getDimensions().nbDims;
+                          if (dim < 0) {
+                            dim += nbDims;
+                          }
+                          return dims[dim];
+                        } else {
+                          TRTORCH_THROW_ERROR("IValue is not some class of Tensor. Found: " << tensor_var.IValue()->type());
                         }
                       }
                     },

@@ -114,6 +114,7 @@ Weights::Weights(ConversionCtx* ctx, at::Tensor t) {
 // clang-format off
 std::ostream& operator<<(std::ostream& os, const Weights& w) {
   os << "Weights: " << w.shape
+     << "\n    Data Type: " << w.data.type
      << "\n    Number of input maps: " << w.num_input_maps
      << "\n    Number of output maps: " << w.num_output_maps
      << "\n    Element shape: [";
