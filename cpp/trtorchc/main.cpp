@@ -52,7 +52,8 @@ trtorch::CompileSpec::TensorFormat parseTensorFormat(std::string str) {
   } else {
     trtorch::logging::log(
         trtorch::logging::Level::kERROR,
-        "Invalid tensor format, options are [ linear | nchw | chw | contiguous | nhwc | hwc | channels_last ], found: " + str);
+        "Invalid tensor format, options are [ linear | nchw | chw | contiguous | nhwc | hwc | channels_last ], found: " +
+            str);
     return trtorch::CompileSpec::TensorFormat::kUnknown;
   }
 }
@@ -73,7 +74,8 @@ trtorch::CompileSpec::DataType parseDataType(std::string dtype_str) {
   } else {
     trtorch::logging::log(
         trtorch::logging::Level::kERROR,
-        "Invalid precision, options are [ float | float32 | fp32 | f32 | half | float16 | fp16 | f16 | char | int8 | i8 | int | int32 | i32 | bool | b], found: " + dtype_str);
+        "Invalid precision, options are [ float | float32 | fp32 | f32 | half | float16 | fp16 | f16 | char | int8 | i8 | int | int32 | i32 | bool | b], found: " +
+            dtype_str);
     return trtorch::CompileSpec::DataType::kUnknown;
   }
 }
@@ -221,7 +223,8 @@ int main(int argc, char** argv) {
       "type",
       "The type of device the engine should be built for [ gpu | dla ] (default: gpu)",
       {'d', "device-type"});
-  args::ValueFlag<uint64_t> gpu_id(parser, "gpu_id", "GPU id if running on multi-GPU platform (defaults to 0)", {"gpu-id"});
+  args::ValueFlag<uint64_t> gpu_id(
+      parser, "gpu_id", "GPU id if running on multi-GPU platform (defaults to 0)", {"gpu-id"});
   args::ValueFlag<uint64_t> dla_core(
       parser, "dla_core", "DLACore id if running on available DLA (defaults to 0)", {"dla-core"});
 
@@ -436,8 +439,7 @@ int main(int argc, char** argv) {
         std::stringstream ss;
         ss << "Invalid precision given for enabled kernel precision, options are [ float | float32 | f32 | fp32 | half | float16 | f16 | fp16 | char | int8 | i8 ], found: ";
         ss << dtype;
-        trtorch::logging::log(
-            trtorch::logging::Level::kERROR, ss.str());
+        trtorch::logging::log(trtorch::logging::Level::kERROR, ss.str());
         std::cerr << std::endl << parser;
         return 1;
       }
@@ -461,7 +463,8 @@ int main(int argc, char** argv) {
         compile_settings.device.dla_core = args::get(dla_core);
       }
     } else {
-      trtorch::logging::log(trtorch::logging::Level::kERROR, "Invalid device type, options are [ gpu | dla ] found: " + device);
+      trtorch::logging::log(
+          trtorch::logging::Level::kERROR, "Invalid device type, options are [ gpu | dla ] found: " + device);
       std::cerr << std::endl << parser;
       return 1;
     }
