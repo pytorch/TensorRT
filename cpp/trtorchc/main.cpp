@@ -409,10 +409,8 @@ int main(int argc, char** argv) {
           compile_settings.ptq_calibrator = calibrator;
         } else {
           trtorch::logging::log(
-              trtorch::logging::Level::kERROR,
-              "If targeting INT8 default operating precision with trtorchc, a calibration cache file must be provided");
-          std::cerr << parser;
-          return 1;
+              trtorch::logging::Level::kINFO,
+              "Int8 precision has been enabled but no calibrator provided. This assumes the network has Q/DQ nodes obtained from Quantization aware training. For more details, refer to https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#work-with-qat-networks");
         }
       } else {
         trtorch::logging::log(
@@ -451,12 +449,12 @@ int main(int argc, char** argv) {
     auto capability = args::get(engine_capability);
     std::transform(
         capability.begin(), capability.end(), capability.begin(), [](unsigned char c) { return std::tolower(c); });
-    if (capability == "default") {
-      compile_settings.capability = trtorch::CompileSpec::EngineCapability::kDEFAULT;
-    } else if (capability == "safe_gpu") {
-      compile_settings.capability = trtorch::CompileSpec::EngineCapability::kSAFE_GPU;
-    } else if (capability == "safe_dla") {
-      compile_settings.capability = trtorch::CompileSpec::EngineCapability::kSAFE_DLA;
+    if (capability == "standard") {
+      compile_settings.capability = trtorch::CompileSpec::EngineCapability::kSTANDARD;
+    } else if (capability == "safety") {
+      compile_settings.capability = trtorch::CompileSpec::EngineCapability::kSAFETY;
+    } else if (capability == "dla_standalone") {
+      compile_settings.capability = trtorch::CompileSpec::EngineCapability::kDLA_STANDALONE;
     } else {
       trtorch::logging::log(
           trtorch::logging::Level::kERROR, "Invalid engine capability, options are [ default | safe_gpu | safe_dla ]");
@@ -506,7 +504,6 @@ int main(int argc, char** argv) {
     out.close();
   } else {
     auto trt_mod = trtorch::CompileGraph(mod, compile_settings);
-
     if (compile_settings.enabled_precisions.size() == 1 &&
         compile_settings.enabled_precisions.find(trtorch::CompileSpec::DataType::kFloat) !=
             compile_settings.enabled_precisions.end()) {
