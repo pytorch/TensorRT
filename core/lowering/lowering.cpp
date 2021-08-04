@@ -25,6 +25,7 @@ void LowerBlock(torch::jit::Block* b) {
 }
 
 void LowerGraph(std::shared_ptr<torch::jit::Graph>& g) {
+  passes::MarkNodesForFallback(g);
   passes::UnpackHardSwish(g);
   torch::jit::EliminateRedundantGuards(g);
   torch::jit::RemoveListMutation(g);
@@ -55,48 +56,23 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g) {
   LOG_GRAPH(*g);
 }
 
-torch::jit::Module LowerModule(const torch::jit::Module& mod) {
+torch::jit::Module LowerModule(const torch::jit::Module& mod, const std::string& method_name, std::unordered_set<std::string> forced_fallback_modules) {
+  passes::NotateModuleForFallback(mod, "", method_name, forced_fallback_modules);
+  LOG_GRAPH("Post notation pass: " << *mod.get_method(method_name).graph());
   auto mod_ = torch::jit::freeze_module(mod);
+  LOG_GRAPH("Post freeze: " << *mod_.get_method(method_name).graph());
   return mod_;
-}
-
-void NotateModuleForFallback(const torch::jit::Module& mod, std::string method_name, std::unordered_set<std::string> forced_fallback_modules) {
-  auto named_submods = mod.modules();
-  int mod_count = 0;
-  for (const auto named_submod : named_submods) {
-    auto mod_name = named_submod.type()->name()->qualifiedName().substr(10);
-    std::size_t mangle_pos = mod_name.find("___torch_mangle_");
-    if (mangle_pos != std::string::npos) {
-      mod_name.erase(mangle_pos, 21);
-    }
-    if (mod_count == 0 && forced_fallback_modules.find(mod_name) != forced_fallback_modules.end()) {
-      LOG_DEBUG("Marking module for fallback: " << mod_name);
-      auto g = named_submod.get_method(method_name).graph();
-      LOG_DEBUG(*g);
-      auto nodes = g->block()->nodes();
-      for (const auto n : nodes) {
-        n->i_(c10::Symbol::attr("to_compile"), (int64_t) false);
-      }
-    } else if (mod_count > 0) {
-      NotateModuleForFallback(named_submod, method_name, forced_fallback_modules);
-    }
-    mod_count++;
-  }
 }
 
 std::pair<std::shared_ptr<torch::jit::Graph>, std::vector<torch::jit::IValue>> Lower(
     const torch::jit::Module& mod,
     std::string method_name, const LowerInfo& lower_info) {
     LOG_DEBUG(lower_info);
+    LOG_GRAPH(*mod.get_method(method_name).graph());
   std::unordered_set<std::string> forced_fallback_modules(
       lower_info.forced_fallback_modules.begin(), lower_info.forced_fallback_modules.end());
-  NotateModuleForFallback(mod, method_name, forced_fallback_modules);
-  auto g = mod.get_method(method_name).graph();
-  LOG_DEBUG("ARVIND before freeze: " << *g);
-  auto lowered_mod = LowerModule(mod);
-  g = lowered_mod.get_method(method_name).graph();
-  LOG_DEBUG("ARVIND after freeze: " << *g);
-
+  auto lowered_mod = LowerModule(mod, method_name, forced_fallback_modules);
+  auto g = lowered_mod.get_method(method_name).graph();
   // Go through TRTorch Lowering to reformat graph to be conversion friendly
   // and also segment for accelerators and executors (TRT-DLA, TRT-GPU, PYT)
   LOG_GRAPH("TRTorch Graph Lowering");
