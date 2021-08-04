@@ -45,7 +45,9 @@ trtorchc [input_file_path] [output_file_path]
       -p[precision...],
       --enabled-precison=[precision...] (Repeatable) Enabling an operating
                                         precision for kernels to use when
-                                        building the engine (Int8 requires a
+                                        building the engine [ float |
+                                        float32 | f32 | half | float16 | f16 |
+                                        int8 | i8 ] (default: float)
 
       --ffo,
       --forced-fallback-ops             List of operators in the graph that
@@ -101,7 +103,6 @@ trtorchc [input_file_path] [output_file_path]
 ```
 
 e.g.
-```
 
 ```
 trtorchc tests/modules/ssd_traced.jit.pt ssd_trt.ts "[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@fp16%contiguous" -p f16
