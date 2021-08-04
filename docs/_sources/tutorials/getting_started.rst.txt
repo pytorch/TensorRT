@@ -204,14 +204,14 @@ to load in a deployment application. In order to load a TensorRT/TorchScript mod
     script_model.eval() # torch module needs to be in eval (not training) mode
 
     compile_settings = {
-        "input_shapes": [
-            {
-                "min": [1, 1, 16, 16],
-                "opt": [1, 1, 32, 32],
-                "max": [1, 1, 64, 64]
-            },
+        "inputs": [trtorch.Input(
+                min_shape=[1, 1, 16, 16],
+                opt_shape=[1, 1, 32, 32],
+                max_shape=[1, 1, 64, 64]
+                dtype=torch.half,
+            ),
         ],
-        "op_precision": torch.half # Run with fp16
+        "enable_precisions": {torch.float, torch.half} # Run with fp16
     }
 
     trt_ts_module = trtorch.compile(script_model, compile_settings)
@@ -324,7 +324,7 @@ We can also set settings like operating precision to run in FP16.
         auto in = torch::randn({1, 1, 32, 32}, {torch::kCUDA}).to(torch::kHALF);
         auto input_sizes = std::vector<trtorch::CompileSpec::InputRange>({in.sizes()});
         trtorch::CompileSpec info(input_sizes);
-        info.op_precision = torch::kHALF;
+        info.enable_precisions.insert(torch::kHALF);
         auto trt_mod = trtorch::CompileGraph(mod, info);
         auto out = trt_mod.forward({in});
 
@@ -372,7 +372,7 @@ If you want to save the engine produced by TRTorch to use in a TensorRT applicat
         auto in = torch::randn({1, 1, 32, 32}, {torch::kCUDA}).to(torch::kHALF);
         auto input_sizes = std::vector<trtorch::CompileSpec::InputRange>({in.sizes()});
         trtorch::CompileSpec info(input_sizes);
-        info.op_precision = torch::kHALF;
+        info.enabled_precisions.insert(torch::kHALF);
         auto trt_mod = trtorch::ConvertGraphToTRTEngine(mod, "forward", info);
         std::ofstream out("/tmp/engine_converted_from_jit.trt");
         out << engine;

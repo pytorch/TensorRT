@@ -27,7 +27,7 @@ TEST_P(AccuracyTests, FP16AccuracyIsClose) {
 
   std::vector<std::vector<int64_t>> input_shape = {{32, 3, 32, 32}};
   auto compile_spec = trtorch::CompileSpec({input_shape});
-  compile_spec.op_precision = torch::kF16;
+  compile_spec.enabled_precisions.insert(torch::kF16);
 
   auto trt_mod = trtorch::CompileGraph(mod, compile_spec);
 

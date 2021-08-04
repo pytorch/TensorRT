@@ -1,9 +1,9 @@
 # Create a new op in C++, compile it to .so library and load it in Python
 
-There are some operators in PyTorch library which are not supported in TRTorch. 
+There are some operators in PyTorch library which are not supported in TRTorch.
 To support these ops, users can register converters for missing ops. For example,
-if we try to compile a graph with a build of TRTorch that doesn't support the 
-[ELU](https://pytorch.org/docs/stable/generated/torch.nn.ELU.html) operation, 
+if we try to compile a graph with a build of TRTorch that doesn't support the
+[ELU](https://pytorch.org/docs/stable/generated/torch.nn.ELU.html) operation,
 we will get following error:
 
 > Unable to convert node: %result.2 : Tensor = aten::elu(%x.1, %2, %3, %3) # /home/bowa/.local/lib/python3.6/site-packages/torch/nn/functional.py:1227:17 (conversion.AddLayer)
@@ -16,11 +16,11 @@ Note that ELU converter is now supported in our library. If you want to get abov
 error and run the example in this document, you can either:
 1. get the source code, go to root directory, then run: <br />
   `git apply ./examples/custom_converters/elu_converter/disable_core_elu.patch`
-2. If you are using a pre-downloaded release of TRTorch, you need to make sure that 
+2. If you are using a pre-downloaded release of TRTorch, you need to make sure that
 it doesn't support elu operator in default. (TRTorch <= v0.1.0)
-   
+
 ## Writing Converter in C++
-We can register a converter for this operator in our application. You can find more 
+We can register a converter for this operator in our application. You can find more
 information on all the details of writing converters in the contributors documentation
 ([Writing Converters](https://nvidia.github.io/TRTorch/contributors/writing_converters.html)).
 Once we are clear about these rules and writing patterns, we can create a seperate new C++ source file as:
@@ -58,7 +58,7 @@ auto actelu = trtorch::core::conversion::converters::RegisterNodeConversionPatte
 To use this converter in Python, it is recommended to use PyTorch's
 [C++/CUDA Extension](https://pytorch.org/tutorials/advanced/cpp_extension.html#custom-c-and-cuda-extensions).
 We give an example here about how to wrap the converter into a `.so`
-library so that you can load it to use in Python applicaton. 
+library so that you can load it to use in Python applicaton.
 ```python
 import os
 from setuptools import setup, Extension
@@ -85,22 +85,22 @@ setup(
     cmdclass={'build_ext': cpp_extension.BuildExtension},
 )
 ```
-Make sure to include the path for header files in `include_dirs` and the path 
-for dependent libraries in `library_dirs`. Generally speaking, you should download 
+Make sure to include the path for header files in `include_dirs` and the path
+for dependent libraries in `library_dirs`. Generally speaking, you should download
 the latest package from [here](https://github.com/NVIDIA/TRTorch/releases), extract
-the files, and the set the `trtorch_path` to it. You could also add other compilation 
+the files, and the set the `trtorch_path` to it. You could also add other compilation
 flags in cpp_extension if you need. Then, run above python scripts as:
 ```shell
 python3 setup.py install --user
 ```
 You should see the output similar to the contents indicated [here](https://pytorch.org/tutorials/advanced/cpp_extension.html#custom-c-and-cuda-extensions)   after running
 `python setup.py install`. You should find a couple of new folders generated
-by the command above. In build folder, you can find the generated `.so` library, 
-which could be loaded in our Python application. 
+by the command above. In build folder, you can find the generated `.so` library,
+which could be loaded in our Python application.
 
 ## Load `.so` in Python Application
-With the new generated library, TRTorch now support the new developed converter. 
-We use `torch.ops.load_library` to load `.so`. For example, we could load the ELU 
+With the new generated library, TRTorch now support the new developed converter.
+We use `torch.ops.load_library` to load `.so`. For example, we could load the ELU
 converter and use it in our application:
 ```python
 import torch
@@ -132,13 +132,12 @@ def main():
 
     scripted_model = torch.jit.script(model)
     compile_settings = {
-        "input_shapes": [{
-            "min": [1024, 1, 32, 32],
-            "opt": [1024, 1, 33, 33],
-            "max": [1024, 1, 34, 34],
+        "inputs": [trtorch.Input(
+            min_shape=[1024, 1, 32, 32],
+            opt_shape=[1024, 1, 33, 33],
+            max_shape=[1024, 1, 34, 34],
         }],
-        "op_precision":
-            torch.half  # Run with FP16
+        "enabled_precisions": {torch.float, torch.half}  # Run with FP16
     }
     trt_ts_module = trtorch.compile(scripted_model, compile_settings)
     input_data = torch.randn((1024, 1, 32, 32))
@@ -155,4 +154,4 @@ if __name__ == "__main__":
     main()
 
 ```
-Run this script, we can get the different outputs from PyTorch and TRTorch. 
+Run this script, we can get the different outputs from PyTorch and TRTorch.

@@ -474,8 +474,8 @@ at the documentation for the TRTorch
          <pre><span></span><span class="n">spec</span> <span class="o">=</span> <span class="p">{</span>
     <span class="s2">"forward"</span><span class="p">:</span>
         <span class="n">trtorch</span><span class="o">.</span><span class="n">TensorRTCompileSpec</span><span class="p">({</span>
-            <span class="s2">"input_shapes"</span><span class="p">:</span> <span class="p">[[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">300</span><span class="p">]],</span>
-            <span class="s2">"op_precision"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">,</span>
+            <span class="s2">"inputs"</span><span class="p">:</span> <span class="p">[</span><span class="n">trtorch</span><span class="o">.</span><span class="n">Input</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">300</span><span class="p">])],</span>
+            <span class="s2">"enabled_precisions"</span><span class="p">:</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">},</span>
             <span class="s2">"refit"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
             <span class="s2">"debug"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
             <span class="s2">"strict_types"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>

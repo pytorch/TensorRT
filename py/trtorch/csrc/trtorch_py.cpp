@@ -119,8 +119,8 @@ bool CheckMethodOperatorSupport(const torch::jit::Module& module, const std::str
   return core::CheckMethodOperatorSupport(module, method_name);
 }
 
-torch::jit::Module EmbedEngineInNewModule(const py::bytes& engine, core::runtime::CudaDevice& device) {
-  return core::EmbedEngineInNewModule(engine, device);
+torch::jit::Module EmbedEngineInNewModule(const py::bytes& engine, Device& device) {
+  return core::EmbedEngineInNewModule(engine, device.toInternalRuntimeDevice());
 }
 
 std::string get_build_info() {
@@ -163,12 +163,16 @@ void log(core::util::logging::LogLevel lvl, const std::string& msg) {
 } // namespace logging
 
 PYBIND11_MODULE(_C, m) {
-  py::class_<InputRange>(m, "InputRange")
+  py::class_<Input>(m, "Input")
       .def(py::init<>())
-      .def("__str__", &trtorch::pyapi::InputRange::to_str)
-      .def_readwrite("min", &InputRange::min)
-      .def_readwrite("opt", &InputRange::opt)
-      .def_readwrite("max", &InputRange::max);
+      .def("__str__", &trtorch::pyapi::Input::to_str)
+      .def_readwrite("min", &Input::min)
+      .def_readwrite("opt", &Input::opt)
+      .def_readwrite("max", &Input::max)
+      .def_readwrite("input_is_dynamic", &Input::input_is_dynamic)
+      .def_readwrite("_explicit_set_dtype", &Input::explicit_set_dtype)
+      .def_readwrite("dtype", &Input::dtype)
+      .def_readwrite("format", &Input::format);
 
   py::enum_<DataType>(m, "dtype", "Enum to specifiy operating precision for engine execution")
       .value("float", DataType::kFloat, "32 bit floating point number")
@@ -176,6 +180,8 @@ PYBIND11_MODULE(_C, m) {
       .value("half", DataType::kHalf, "16 bit floating point number")
       .value("float16", DataType::kHalf, "16 bit floating point number")
       .value("int8", DataType::kChar, "8 bit integer number")
+      .value("int32", DataType::kInt32, "32 bit integer number")
+      .value("bool", DataType::kChar, "Boolean value")
       .export_values();
 
   py::enum_<DeviceType>(m, "DeviceType", "Enum to specify device kinds to build TensorRT engines for")
@@ -190,6 +196,11 @@ PYBIND11_MODULE(_C, m) {
       .value("safe_gpu", EngineCapability::kSAFE_GPU, "Use safety GPU kernels only")
       .value("safe_dla", EngineCapability::kSAFE_DLA, "Use safety DLA kernels only")
       .value("default", EngineCapability::kDEFAULT, "Use default behavior");
+
+  py::enum_<TensorFormat>(m, "TensorFormat", "Enum to specifiy the memory layout of tensors")
+      .value("contiguous", TensorFormat::kContiguous, "Contiguous memory layout (NCHW / Linear)")
+      .value("channel_last", TensorFormat::kChannelLast, "Channel last memory layout (NHWC)")
+      .export_values();
 
   py::enum_<nvinfer1::CalibrationAlgoType>(m, "CalibrationAlgo", py::module_local(), "Type of calibration algorithm")
       .value("LEGACY_CALIBRATION", nvinfer1::CalibrationAlgoType::kLEGACY_CALIBRATION)
@@ -240,8 +251,8 @@ PYBIND11_MODULE(_C, m) {
       .def(py::init<>())
       .def("__str__", &trtorch::pyapi::CompileSpec::stringify)
       .def("_get_calibrator_handle", &CompileSpec::getPTQCalibratorHandle, "[Internal] gets a handle from a calibrator")
-      .def_readwrite("input_ranges", &CompileSpec::input_ranges)
-      .def_readwrite("op_precision", &CompileSpec::op_precision)
+      .def_readwrite("inputs", &CompileSpec::inputs)
+      .def_readwrite("enabled_precisions", &CompileSpec::enabled_precisions)
       .def_readwrite("ptq_calibrator", &CompileSpec::ptq_calibrator)
       .def_readwrite("refit", &CompileSpec::refit)
       .def_readwrite("disable_tf32", &CompileSpec::disable_tf32)
@@ -309,6 +320,7 @@ PYBIND11_MODULE(_C, m) {
       .value("WARNING", core::util::logging::LogLevel::kWARNING)
       .value("INFO", core::util::logging::LogLevel::kINFO)
       .value("DEBUG", core::util::logging::LogLevel::kDEBUG)
+      .value("GRAPH", core::util::logging::LogLevel::kGRAPH)
       .export_values();
 }
 

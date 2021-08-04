@@ -3,6 +3,7 @@
 #include <queue>
 #include "core/conversion/conversion.h"
 #include "core/partitioning/shape_analysis.h"
+#include "torch/csrc/jit/passes/constant_pooling.h"
 #include "torch/csrc/jit/passes/dead_code_elimination.h"
 
 namespace trtorch {
@@ -85,8 +86,14 @@ std::vector<SegmentedBlock> segmentBlocksWithNonTensorInputs(SegmentedBlock& seg
   // if current block is kTorch or current block is TensorRT and all dependent nodes are also supported, merge the
   // dependency nodes at the beginning of the current segmented_block and return this merged segmented_block
   if (seg_block.target() == SegmentedBlock::kTorch || isAllNodesSupported(dependency_nodes)) {
-    dependency_nodes.insert(dependency_nodes.end(), seg_block.raw_nodes().begin(), seg_block.raw_nodes().end());
-    new_seg_blocks.emplace_back(seg_block.target(), dependency_nodes);
+    // if current node is prim::If, just ensure that we have all required input in kTorch
+    if (seg_block.raw_nodes()[0]->kind() == torch::jit::prim::If) {
+      new_seg_blocks.emplace_back(seg_block.target(), dependency_nodes);
+      new_seg_blocks.push_back(seg_block);
+    } else {
+      dependency_nodes.insert(dependency_nodes.end(), seg_block.raw_nodes().begin(), seg_block.raw_nodes().end());
+      new_seg_blocks.emplace_back(seg_block.target(), dependency_nodes);
+    }
   } else {
     // if current block is kTensorRT but the dependency nodes contain unsupported node, then we have to segment again
     std::unordered_set<torch::jit::Value*> nontensor_inputs_set(nontensor_inputs.begin(), nontensor_inputs.end());
@@ -127,7 +134,7 @@ std::vector<SegmentedBlock> segmentBlocksWithNonTensorInputs(SegmentedBlock& seg
   return std::move(new_seg_blocks);
 }
 
-void resolveNonTensorInputs(PartitionedGraph& segmented_blocks, std::shared_ptr<torch::jit::Graph> g) {
+void resolveNonTensorInputs(PartitionedGraph& segmented_blocks) { // , std::shared_ptr<torch::jit::Graph> g
   // create a list so we can insert SegmentedBlock without losing the iterators
   std::list<SegmentedBlock> segmented_blocks_list(segmented_blocks.begin(), segmented_blocks.end());
   std::unordered_map<size_t, std::list<SegmentedBlock>::iterator> idx_to_iter;
@@ -169,8 +176,10 @@ void resolveNonTensorInputs(PartitionedGraph& segmented_blocks, std::shared_ptr<
       if (!updated_segments.count(first_torch_id)) {
         // Segmented Blocks with non-tensor inputs will have to be re-segmented as
         // TRTorch doesn't support non-tensor inputs for a module.
-        auto new_torch_block = segmentBlocksWithNonTensorInputs(segmented_blocks[first_torch_id]).front();
-        *idx_to_iter[first_torch_id] = new_torch_block;
+        auto to_inject_blocks = segmentBlocksWithNonTensorInputs(segmented_blocks[first_torch_id]);
+        segmented_blocks.erase(segmented_blocks.begin() + first_torch_id);
+        segmented_blocks.insert(
+            segmented_blocks.begin() + first_torch_id, to_inject_blocks.begin(), to_inject_blocks.end());
         updated_segments.insert(first_torch_id);
       }
     }
@@ -191,7 +200,7 @@ void resolveNonTensorInputs(PartitionedGraph& segmented_blocks, std::shared_ptr<
   return;
 }
 
-void registerSegmentsOutputs(PartitionedGraph& segmented_blocks, std::shared_ptr<torch::jit::Graph> g) {
+void registerSegmentsOutputs(PartitionedGraph& segmented_blocks, torch::jit::Block* block) {
   // find the corresponding raw values in original global graph for this segmented block's inputs/outputs
   std::set<torch::jit::Value*> input_values;
   for (auto& seg_block : segmented_blocks) {
@@ -200,7 +209,7 @@ void registerSegmentsOutputs(PartitionedGraph& segmented_blocks, std::shared_ptr
     }
   }
 
-  for (auto& graph_output : g->outputs()) {
+  for (auto& graph_output : block->outputs()) {
     input_values.insert(graph_output);
   }
 
@@ -249,12 +258,12 @@ void registerSegmentsOutputs(PartitionedGraph& segmented_blocks, std::shared_ptr
   return;
 }
 
-std::vector<SegmentedBlock> segment_graph(std::shared_ptr<torch::jit::Graph> g, const PartitionInfo& partition_info) {
+std::vector<SegmentedBlock> segment_graph(torch::jit::Block* block, const PartitionInfo& partition_info) {
   auto min_block_size = partition_info.min_block_size;
   std::unordered_set<std::string> forced_fallback_operators(
       partition_info.forced_fallback_operators.begin(), partition_info.forced_fallback_operators.end());
 
-  auto nodes = g->block()->nodes();
+  auto nodes = block->nodes();
   std::vector<SegmentedBlock> segmented_blocks;
 
   // segment the nodes
@@ -278,6 +287,16 @@ std::vector<SegmentedBlock> segment_graph(std::shared_ptr<torch::jit::Graph> g, 
         pytorch_nodes.insert(pytorch_nodes.end(), tensorrt_nodes.begin(), tensorrt_nodes.end());
       }
       tensorrt_nodes.clear();
+      // if there is a prim::If then this if node will be encapsulated in a SegmentedBlock
+      // we shouldn't inject node for this block in dependency analysis process
+      if (n->kind() == torch::jit::prim::If) {
+        if (!pytorch_nodes.empty()) {
+          segmented_blocks.emplace_back(SegmentedBlock::kTorch, pytorch_nodes);
+          pytorch_nodes.clear();
+        }
+        segmented_blocks.emplace_back(SegmentedBlock::kTorch, std::vector<torch::jit::Node*>{n});
+        continue;
+      }
       pytorch_nodes.push_back(n);
     }
   }
@@ -295,21 +314,21 @@ std::vector<SegmentedBlock> segment_graph(std::shared_ptr<torch::jit::Graph> g, 
 }
 
 std::vector<SegmentedBlock> Partition(
-    std::shared_ptr<torch::jit::Graph> g,
-    std::vector<ir::InputRange>& input_ranges,
+    torch::jit::Block* block,
+    std::unordered_map<torch::jit::Value*, torch::jit::IValue>& input_ivalues_map,
     const PartitionInfo& partition_info) {
   LOG_DEBUG(partition_info);
   // segment lowering global graph into blocks
-  std::vector<SegmentedBlock> segmented_blocks = segment_graph(g, partition_info);
+  std::vector<SegmentedBlock> segmented_blocks = segment_graph(block, partition_info);
 
   // resolve nonTensor inputs/outputs
-  resolveNonTensorInputs(segmented_blocks, g);
+  resolveNonTensorInputs(segmented_blocks);
 
   // register input/output torch::jit::Value for segmented graphs
-  registerSegmentsOutputs(segmented_blocks, g);
+  registerSegmentsOutputs(segmented_blocks, block);
 
   // run shape analysis on each segmented block
-  runShapeAnalysis(segmented_blocks, input_ranges, g);
+  runShapeAnalysis(segmented_blocks, input_ivalues_map);
 
   return segmented_blocks;
 }

@@ -787,7 +787,7 @@ div.rendered_html tbody tr:hover {
         </div>
        </div>
        <p>
-        <img alt="9598825a8b6447abbcb414c4bc72e721" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
+        <img alt="46ab753b219e41c9b2dbd028bf38e957" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
        </p>
        <h1 id="notebooks-lenet-getting-started--page-root">
         TRTorch Getting Started - LeNet
@@ -1293,14 +1293,13 @@ Average batch time: 0.59 ms
 
 # We use a batch-size of 1024, and half precision
 compile_settings = {
-    "input_shapes": [
-        {
-            "min" : [1024, 1, 32, 32],
-            "opt" : [1024, 1, 33, 33],
-            "max" : [1024, 1, 34, 34],
-        }
-    ],
-    "op_precision": torch.half # Run with FP16
+    "inputs": [trtorch.Input(
+            min_shape=[1024, 1, 32, 32],
+            opt_shape=[1024, 1, 33, 33],
+            max_shape=[1024, 1, 34, 34],
+            dtype=torch.half
+        )],
+    "enabled_precisions": {torch.float, torch.half} # Run with FP16
 }
 
 trt_ts_module = trtorch.compile(traced_model, compile_settings)
@@ -1378,14 +1377,13 @@ Average batch time: 0.40 ms
 
 # We use a batch-size of 1024, and half precision
 compile_settings = {
-    "input_shapes": [
-        {
-            "min" : [1024, 1, 32, 32],
-            "opt" : [1024, 1, 33, 33],
-            "max" : [1024, 1, 34, 34],
-        }
-    ],
-    "op_precision": torch.half # Run with FP16
+    "inputs": [trtorch.Input(
+            min_shape=[1024, 1, 32, 32],
+            opt_shape=[1024, 1, 33, 33],
+            max_shape=[1024, 1, 34, 34],
+            dtype=torch.half
+        )],
+    "enabled_precisions": {torch.float, torch.half} # Run with FP16
 }
 
 trt_script_module = trtorch.compile(script_model, compile_settings)

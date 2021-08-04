@@ -30,8 +30,8 @@ def main():
     scripted_model = torch.jit.script(model)
 
     compile_settings = {
-    "input_shapes": [[1, 3, 5, 5]],
-    "op_precision": torch.float32
+        "inputs": [trtorch.Input([1, 3, 5, 5])],
+        "enabled_precisions": {torch.float32}
     }
 
     trt_ts_module = trtorch.compile(scripted_model, compile_settings)

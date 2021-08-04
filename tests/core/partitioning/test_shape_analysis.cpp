@@ -50,17 +50,23 @@ TEST(Partitioning, InferSequentialModelSegmentedBlockShapeCorrectly) {
 
   trtorch::core::partitioning::PartitionInfo partition_info;
   partition_info.enabled = true;
-  std::vector<trtorch::core::ir::InputRange> input_ranges;
-  input_ranges.push_back(trtorch::core::ir::InputRange({3, 3, 16, 16}));
-  input_ranges.push_back(trtorch::core::ir::InputRange({32, 3, 3, 3}));
-  input_ranges.push_back(trtorch::core::ir::InputRange({32}));
-  input_ranges.push_back(trtorch::core::ir::InputRange({16, 32, 3, 3}));
-  input_ranges.push_back(trtorch::core::ir::InputRange({16}));
-  input_ranges.push_back(trtorch::core::ir::InputRange({8, 16, 3, 3}));
-  input_ranges.push_back(trtorch::core::ir::InputRange({8}));
+  std::vector<trtorch::core::ir::Input> inputs;
+  inputs.push_back(trtorch::core::ir::Input({3, 3, 16, 16}));
+  inputs.push_back(trtorch::core::ir::Input({32, 3, 3, 3}));
+  inputs.push_back(trtorch::core::ir::Input({32}));
+  inputs.push_back(trtorch::core::ir::Input({16, 32, 3, 3}));
+  inputs.push_back(trtorch::core::ir::Input({16}));
+  inputs.push_back(trtorch::core::ir::Input({8, 16, 3, 3}));
+  inputs.push_back(trtorch::core::ir::Input({8}));
 
+  std::unordered_map<torch::jit::Value*, trtorch::core::ir::Input> inputs_map;
+  for (size_t i = 0; i < g->inputs().size(); ++i) {
+    inputs_map.insert({g->inputs()[i], inputs[i]});
+  }
+  auto input_ivalues_map = trtorch::core::partitioning::generateRandomInputs(inputs_map);
   std::vector<trtorch::core::partitioning::SegmentedBlock> segmented_blocks =
-      trtorch::core::partitioning::Partition(g, input_ranges, partition_info);
+      trtorch::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info);
+
   ASSERT_TRUE(checkSegmentedBlockInputShape(
       segmented_blocks,
       {{{3, 3, 16, 16}, {32, 3, 3, 3}, {32}, {16, 32, 3, 3}, {16}},
@@ -94,15 +100,21 @@ TEST(Partitioning, InferBranchModelSegmentedBlockShapeCorrectly) {
 
   trtorch::core::partitioning::PartitionInfo partition_info;
   partition_info.enabled = true;
-  std::vector<trtorch::core::ir::InputRange> input_ranges;
-  input_ranges.push_back(trtorch::core::ir::InputRange({3, 3, 16, 16}));
-  input_ranges.push_back(trtorch::core::ir::InputRange({32, 3, 3, 3}));
-  input_ranges.push_back(trtorch::core::ir::InputRange({32}));
-  input_ranges.push_back(trtorch::core::ir::InputRange({16, 32, 3, 3}));
-  input_ranges.push_back(trtorch::core::ir::InputRange({16}));
+  std::vector<trtorch::core::ir::Input> inputs;
+  inputs.push_back(trtorch::core::ir::Input({3, 3, 16, 16}));
+  inputs.push_back(trtorch::core::ir::Input({32, 3, 3, 3}));
+  inputs.push_back(trtorch::core::ir::Input({32}));
+  inputs.push_back(trtorch::core::ir::Input({16, 32, 3, 3}));
+  inputs.push_back(trtorch::core::ir::Input({16}));
 
+  std::unordered_map<torch::jit::Value*, trtorch::core::ir::Input> inputs_map;
+  for (size_t i = 0; i < g->inputs().size(); ++i) {
+    inputs_map.insert({g->inputs()[i], inputs[i]});
+  }
+  auto input_ivalues_map = trtorch::core::partitioning::generateRandomInputs(inputs_map);
   std::vector<trtorch::core::partitioning::SegmentedBlock> segmented_blocks =
-      trtorch::core::partitioning::Partition(g, input_ranges, partition_info);
+      trtorch::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info);
+
   ASSERT_TRUE(checkSegmentedBlockInputShape(
       segmented_blocks,
       {{{3, 3, 16, 16}, {32, 3, 3, 3}, {32}, {16, 32, 3, 3}, {16}},
