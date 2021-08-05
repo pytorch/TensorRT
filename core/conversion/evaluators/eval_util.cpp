@@ -129,7 +129,7 @@ void storeLastDimension(
   auto n = sizes[dim];
   auto seq_size = obj.size();
   checkSequenceSize(n, dim, seq_size);
-  for (const auto i : c10::irange(n)) {
+  for (int64_t i = 0; i < n; i++) {
     *(DTYPE*)data = obj[i].to<DTYPE>();
     data += strides[dim] * elementSize;
   }
@@ -189,17 +189,17 @@ void recursiveStore(
     } else if (obj.isBoolList()) {
       storeLastDimension<bool>(data, sizes, strides, dim, tenElementSize, seq);
     } else if (obj.isDoubleList()) {
-      if (tenElementSize == static_cast<int>(elementSize(at::ScalarType::Double))) {
+      if (tenElementSize == static_cast<int>(c10::elementSize(at::ScalarType::Double))) {
         storeLastDimension<double>(data, sizes, strides, dim, tenElementSize, seq);
-      } else if (tenElementSize == static_cast<int>(elementSize(at::ScalarType::Float))) {
+      } else if (tenElementSize == static_cast<int>(c10::elementSize(at::ScalarType::Float))) {
         storeLastDimensionFloat(data, sizes, strides, dim, tenElementSize, seq);
-      } else if (tenElementSize == static_cast<int>(elementSize(at::ScalarType::Half))) {
+      } else if (tenElementSize == static_cast<int>(c10::elementSize(at::ScalarType::Half))) {
         storeLastDimensionHalf(data, sizes, strides, dim, tenElementSize, seq);
       } else {
-        TORCH_INTERNAL_ASSERT(false);
+        TRTORCH_THROW_ERROR("Found unsupported data type in arguments for aten::tensor");
       }
     } else {
-      TORCH_INTERNAL_ASSERT(false);
+      TRTORCH_ASSERT("Found unsupported data type in arguments for aten::tensor");
     }
   }
 }
@@ -231,9 +231,11 @@ at::Tensor createTensorFromList(
     const torch::jit::IValue& dtype,
     const torch::jit::IValue& device) {
   auto elem_type = data.type();
+  /// Recurse down nested lists to find base type
   while (auto list_type = elem_type->cast<c10::ListType>()) {
     elem_type = list_type->getElementType();
   }
+  /// Gets shape of tensor to be created
   auto sizes = compute_sizes(data);
   checkListInputType(elem_type, sizes.size() == 1 && sizes[0] == 0);
   at::ScalarType initial_scalar_type = c10::scalarTypeFromJitType(elem_type);
