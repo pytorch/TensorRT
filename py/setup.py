@@ -44,10 +44,12 @@ def which(program):
     return None
 
 
-BAZEL_EXE = which("bazel")
+BAZEL_EXE = which("bazelisk")
 
 if BAZEL_EXE is None:
-    sys.exit("Could not find bazel in PATH")
+    BAZEL_EXE = which("bazel")
+    if BAZEL_EXE is None:
+        sys.exit("Could not find bazel in PATH")
 
 
 def build_libtrtorch_pre_cxx11_abi(develop=True, use_dist_dir=True, cxx11_abi=False):
@@ -207,7 +209,7 @@ setup(name='trtorch',
       long_description=long_description,
       ext_modules=ext_modules,
       install_requires=[
-          'torch>=1.8.0+cu111,<1.9.0',
+          'torch>=1.9.0+cu111,<1.10.0',
       ],
       setup_requires=[],
       cmdclass={

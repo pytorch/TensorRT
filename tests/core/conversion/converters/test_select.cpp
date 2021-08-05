@@ -198,7 +198,7 @@ TEST(Converters, ATenEmbeddingConvertsCorrectly) {
 TEST(Converters, ATenSliceConvertsCorrectly) {
   const auto graph = R"IR(
         graph(%x.1 : Tensor):
-              %2 : int = prim::Constant[value=9223372036854775807]()
+              %2 : None = prim::Constant()
               %3 : int = prim::Constant[value=2]()
               %4 : int = prim::Constant[value=4]()
               %5 : int = prim::Constant[value=1]()
@@ -206,7 +206,7 @@ TEST(Converters, ATenSliceConvertsCorrectly) {
               %7 : Tensor = aten::select(%x.1, %6, %6)
               %8 : Tensor = aten::select(%7, %6, %5)
               %9 : Tensor = aten::slice(%8, %6, %5, %4, %3)
-              %10 : Tensor = aten::slice(%9, %5, %6, %2, %5)
+              %10 : Tensor = aten::slice(%9, %5, %2, %2, %5)
               return (%10))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
