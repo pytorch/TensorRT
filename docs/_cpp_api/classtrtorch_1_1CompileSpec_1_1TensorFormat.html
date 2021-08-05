@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -56,6 +57,11 @@
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
+  </script>
+  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+  <script type="text/x-mathjax-config">
+   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -392,744 +398,750 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <span id="exhale-class-classtrtorch-1-1compilespec-1-1tensorformat">
-       </span>
-       <h1 id="cpp-api-classtrtorch-1-1compilespec-1-1tensorformat--page-root">
-        Class CompileSpec::TensorFormat
-        <a class="headerlink" href="#cpp-api-classtrtorch-1-1compilespec-1-1tensorformat--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <ul class="simple">
-        <li>
-         <p>
-          Defined in
-          <a class="reference internal" href="file_cpp_api_include_trtorch_trtorch.h.html#file-cpp-api-include-trtorch-trtorch-h">
-           <span class="std std-ref">
-            File trtorch.h
-           </span>
-          </a>
-         </p>
-        </li>
-       </ul>
-       <h2 id="nested-relationships">
-        Nested Relationships
-        <a class="headerlink" href="#nested-relationships" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <p>
-        This class is a nested type of
-        <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#exhale-struct-structtrtorch-1-1compilespec">
-         <span class="std std-ref">
-          Struct CompileSpec
-         </span>
-        </a>
-        .
-       </p>
-       <h2 id="class-documentation">
-        Class Documentation
-        <a class="headerlink" href="#class-documentation" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <dl class="cpp class">
-        <dt id="_CPPv4N7trtorch11CompileSpec12TensorFormatE">
-         <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat">
-         </span>
-         <em class="property">
-          class
-         </em>
-         <code class="sig-prename descclassname">
-          trtorch::
-          <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpecE" title="trtorch::CompileSpec">
-           CompileSpec
-          </a>
-          <code class="sig-prename descclassname">
-           ::
-          </code>
-         </code>
-         <code class="sig-name descname">
-          TensorFormat
-         </code>
-         <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec12TensorFormatE" title="Permalink to this definition">
+       <section id="class-compilespec-tensorformat">
+        <span id="exhale-class-classtrtorch-1-1compilespec-1-1tensorformat">
+        </span>
+        <h1 id="cpp-api-classtrtorch-1-1compilespec-1-1tensorformat--page-root">
+         Class CompileSpec::TensorFormat
+         <a class="headerlink" href="#cpp-api-classtrtorch-1-1compilespec-1-1tensorformat--page-root" title="Permalink to this headline">
           ¶
          </a>
-         <br/>
-        </dt>
-        <dd>
-         <div class="breathe-sectiondef docutils container">
-          <p class="breathe-sectiondef-title rubric">
-           Public Types
+        </h1>
+        <ul class="simple">
+         <li>
+          <p>
+           Defined in
+           <a class="reference internal" href="file_cpp_api_include_trtorch_trtorch.h.html#file-cpp-api-include-trtorch-trtorch-h">
+            <span class="std std-ref">
+             File trtorch.h
+            </span>
+           </a>
           </p>
-          <dl class="cpp enum">
-           <dt id="_CPPv4N7trtorch11CompileSpec12TensorFormat5ValueE">
-            <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1a40bc29d3d3370cd10b199bd1a002746e">
-            </span>
-            <em class="property">
-             enum
-            </em>
-            <code class="sig-name descname">
-             Value
-            </code>
-            <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec12TensorFormat5ValueE" title="Permalink to this definition">
-             ¶
+         </li>
+        </ul>
+        <section id="nested-relationships">
+         <h2 id="nested-relationships">
+          Nested Relationships
+          <a class="headerlink" href="#nested-relationships" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <p>
+          This class is a nested type of
+          <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#exhale-struct-structtrtorch-1-1compilespec">
+           <span class="std std-ref">
+            Struct CompileSpec
+           </span>
+          </a>
+          .
+         </p>
+        </section>
+        <section id="class-documentation">
+         <h2 id="class-documentation">
+          Class Documentation
+          <a class="headerlink" href="#class-documentation" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <dl class="cpp class">
+          <dt id="_CPPv4N7trtorch11CompileSpec12TensorFormatE">
+           <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat">
+           </span>
+           <em class="property">
+            class
+           </em>
+           <code class="sig-prename descclassname">
+            trtorch::
+            <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpecE" title="trtorch::CompileSpec">
+             CompileSpec
             </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Underlying enum class to support the
-             <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#classtrtorch_1_1CompileSpec_1_1TensorFormat">
-              <span class="std std-ref">
-               TensorFormat
-              </span>
-             </a>
-             Class
+            <code class="sig-prename descclassname">
+             ::
+            </code>
+           </code>
+           <code class="sig-name descname">
+            TensorFormat
+           </code>
+           <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec12TensorFormatE" title="Permalink to this definition">
+            ¶
+           </a>
+           <br/>
+          </dt>
+          <dd>
+           <div class="breathe-sectiondef docutils container">
+            <p class="breathe-sectiondef-title rubric">
+             Public Types
             </p>
-            <p>
-             In the case that you need to use the
-             <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#classtrtorch_1_1CompileSpec_1_1TensorFormat">
-              <span class="std std-ref">
-               TensorFormat
-              </span>
-             </a>
-             class itself, interface using this enum vs. normal instatination
-            </p>
-            <p>
-             ex. trtorch::TensorFormat type =
-             <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#classtrtorch_1_1CompileSpec_1_1TensorFormat_1a40bc29d3d3370cd10b199bd1a002746eadfd796c5cf8abd2c5c3d540351fe6daa">
-              <span class="std std-ref">
-               TensorFormat::kContiguous
-              </span>
-             </a>
-             ;
-            </p>
-            <p>
-             <em>
-              Values:
-             </em>
-            </p>
-            <dl class="cpp enumerator">
-             <dt id="_CPPv4N7trtorch11CompileSpec12TensorFormat5Value11kContiguousE">
-              <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1a40bc29d3d3370cd10b199bd1a002746eadfd796c5cf8abd2c5c3d540351fe6daa">
+            <dl class="cpp enum">
+             <dt id="_CPPv4N7trtorch11CompileSpec12TensorFormat5ValueE">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1a40bc29d3d3370cd10b199bd1a002746e">
               </span>
               <em class="property">
-               enumerator
+               enum
               </em>
               <code class="sig-name descname">
-               kContiguous
-              </code>
-              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec12TensorFormat5Value11kContiguousE" title="Permalink to this definition">
-               ¶
-              </a>
-              <br/>
-             </dt>
-             <dd>
-              <p>
-               Contiguous / NCHW / Linear.
-              </p>
-             </dd>
-            </dl>
-            <dl class="cpp enumerator">
-             <dt id="_CPPv4N7trtorch11CompileSpec12TensorFormat5Value13kChannelsLastE">
-              <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1a40bc29d3d3370cd10b199bd1a002746ea95eb1e564cf5d275fc496e8b1d598e6a">
-              </span>
-              <em class="property">
-               enumerator
-              </em>
-              <code class="sig-name descname">
-               kChannelsLast
-              </code>
-              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec12TensorFormat5Value13kChannelsLastE" title="Permalink to this definition">
-               ¶
-              </a>
-              <br/>
-             </dt>
-             <dd>
-              <p>
-               Channel Last / NHWC.
-              </p>
-             </dd>
-            </dl>
-            <dl class="cpp enumerator">
-             <dt id="_CPPv4N7trtorch11CompileSpec12TensorFormat5Value8kUnknownE">
-              <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1a40bc29d3d3370cd10b199bd1a002746ea7bc1db7ea523d383ce35e45fc3d1b724">
-              </span>
-              <em class="property">
-               enumerator
-              </em>
-              <code class="sig-name descname">
-               kUnknown
-              </code>
-              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec12TensorFormat5Value8kUnknownE" title="Permalink to this definition">
-               ¶
-              </a>
-              <br/>
-             </dt>
-             <dd>
-              <p>
-               Sentinel value.
-              </p>
-             </dd>
-            </dl>
-           </dd>
-          </dl>
-         </div>
-         <div class="breathe-sectiondef docutils container">
-          <p class="breathe-sectiondef-title rubric">
-           Public Functions
-          </p>
-          <dl class="cpp function">
-           <dt id="_CPPv4N7trtorch11CompileSpec12TensorFormat12TensorFormatEv">
-            <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1aaa99ac2140b735a0287e10541df331a2">
-            </span>
-            <code class="sig-name descname">
-             TensorFormat
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            <span class="sig-paren">
-             )
-            </span>
-            = default
-            <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec12TensorFormat12TensorFormatEv" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Construct a new
-             <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#classtrtorch_1_1CompileSpec_1_1TensorFormat">
-              <span class="std std-ref">
-               TensorFormat
-              </span>
-             </a>
-             object.
-            </p>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4N7trtorch11CompileSpec12TensorFormat12TensorFormatE5Value">
-            <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1a67ec3b69995748b4695c2a598d7ba6db">
-            </span>
-            <em class="property">
-             constexpr
-            </em>
-            <code class="sig-name descname">
-             TensorFormat
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            <a class="reference internal" href="#_CPPv4N7trtorch11CompileSpec12TensorFormat5ValueE" title="trtorch::CompileSpec::TensorFormat::Value">
-             Value
-            </a>
-            <em>
-             t
-            </em>
-            <span class="sig-paren">
-             )
-            </span>
-            <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec12TensorFormat12TensorFormatE5Value" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#classtrtorch_1_1CompileSpec_1_1TensorFormat">
-              <span class="std std-ref">
-               TensorFormat
-              </span>
-             </a>
-             constructor from enum.
-            </p>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4N7trtorch11CompileSpec12TensorFormat12TensorFormatEN2at12MemoryFormatE">
-            <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1abb68e76c781406b11876a88dcf64b637">
-            </span>
-            <code class="sig-name descname">
-             TensorFormat
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            at::MemoryFormat
-            <em>
-             t
-            </em>
-            <span class="sig-paren">
-             )
-            </span>
-            <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec12TensorFormat12TensorFormatEN2at12MemoryFormatE" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Construct a new
-             <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#classtrtorch_1_1CompileSpec_1_1TensorFormat">
-              <span class="std std-ref">
-               TensorFormat
-              </span>
-             </a>
-             object from torch type enums.
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Parameters
-              </strong>
-             </dt>
-             <dd>
-              <ul class="breatheparameterlist simple">
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   t
-                  </span>
-                 </code>
-                 :
-                </p>
-               </li>
-              </ul>
-             </dd>
-            </dl>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4NK7trtorch11CompileSpec12TensorFormatcv5ValueEv">
-            <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1a3fe8578b4fdc93a4aef236344b6546ae">
-            </span>
-            <code class="sig-name descname">
-             operator Value
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            <span class="sig-paren">
-             )
-            </span>
-            <em class="property">
-             const
-            </em>
-            <a class="headerlink" href="#_CPPv4NK7trtorch11CompileSpec12TensorFormatcv5ValueEv" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Get the enum value of the
-             <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#classtrtorch_1_1CompileSpec_1_1TensorFormat">
-              <span class="std std-ref">
-               TensorFormat
-              </span>
-             </a>
-             object.
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Return
-              </strong>
-             </dt>
-             <dd>
-              <p>
                Value
-              </p>
-             </dd>
-            </dl>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4N7trtorch11CompileSpec12TensorFormatcvbEv">
-            <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1ad0e2a9e3da4d7c07258d84cd0b4b5064">
-            </span>
-            <code class="sig-name descname">
-             operator bool
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            <span class="sig-paren">
-             )
-            </span>
-            = delete
-            <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec12TensorFormatcvbEv" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4NK7trtorch11CompileSpec12TensorFormateqE12TensorFormat">
-            <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1af574ba887a2d2da0b5d04477ef715b80">
-            </span>
-            <em class="property">
-             constexpr
-            </em>
-            bool
-            <code class="sig-name descname">
-             operator==
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            <a class="reference internal" href="#_CPPv4N7trtorch11CompileSpec12TensorFormatE" title="trtorch::CompileSpec::TensorFormat">
-             TensorFormat
-            </a>
-            <em>
-             other
-            </em>
-            <span class="sig-paren">
-             )
-            </span>
-            <em class="property">
-             const
-            </em>
-            <a class="headerlink" href="#_CPPv4NK7trtorch11CompileSpec12TensorFormateqE12TensorFormat" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Comparision operator for
-             <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#classtrtorch_1_1CompileSpec_1_1TensorFormat">
-              <span class="std std-ref">
-               TensorFormat
-              </span>
-             </a>
-             .
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Return
-              </strong>
+              </code>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec12TensorFormat5ValueE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
              </dt>
              <dd>
               <p>
-               true
+               Underlying enum class to support the
+               <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#classtrtorch_1_1CompileSpec_1_1TensorFormat">
+                <span class="std std-ref">
+                 TensorFormat
+                </span>
+               </a>
+               Class
               </p>
-             </dd>
-             <dt>
-              <strong>
-               Return
-              </strong>
-             </dt>
-             <dd>
               <p>
-               false
+               In the case that you need to use the
+               <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#classtrtorch_1_1CompileSpec_1_1TensorFormat">
+                <span class="std std-ref">
+                 TensorFormat
+                </span>
+               </a>
+               class itself, interface using this enum vs. normal instatination
               </p>
-             </dd>
-             <dt>
-              <strong>
-               Parameters
-              </strong>
-             </dt>
-             <dd>
-              <ul class="breatheparameterlist simple">
-               <li>
+              <p>
+               ex. trtorch::TensorFormat type =
+               <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#classtrtorch_1_1CompileSpec_1_1TensorFormat_1a40bc29d3d3370cd10b199bd1a002746eadfd796c5cf8abd2c5c3d540351fe6daa">
+                <span class="std std-ref">
+                 TensorFormat::kContiguous
+                </span>
+               </a>
+               ;
+              </p>
+              <p>
+               <em>
+                Values:
+               </em>
+              </p>
+              <dl class="cpp enumerator">
+               <dt id="_CPPv4N7trtorch11CompileSpec12TensorFormat5Value11kContiguousE">
+                <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1a40bc29d3d3370cd10b199bd1a002746eadfd796c5cf8abd2c5c3d540351fe6daa">
+                </span>
+                <em class="property">
+                 enumerator
+                </em>
+                <code class="sig-name descname">
+                 kContiguous
+                </code>
+                <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec12TensorFormat5Value11kContiguousE" title="Permalink to this definition">
+                 ¶
+                </a>
+                <br/>
+               </dt>
+               <dd>
                 <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   other
-                  </span>
-                 </code>
-                 :
+                 Contiguous / NCHW / Linear.
                 </p>
-               </li>
-              </ul>
-             </dd>
-            </dl>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4NK7trtorch11CompileSpec12TensorFormateqEN12TensorFormat5ValueE">
-            <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1a506b32e7938a11eb39e589931292d3e8">
-            </span>
-            <em class="property">
-             constexpr
-            </em>
-            bool
-            <code class="sig-name descname">
-             operator==
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            <a class="reference internal" href="#_CPPv4N7trtorch11CompileSpec12TensorFormatE" title="trtorch::CompileSpec::TensorFormat">
-             TensorFormat
-            </a>
-            ::
-            <a class="reference internal" href="#_CPPv4N7trtorch11CompileSpec12TensorFormat5ValueE" title="trtorch::CompileSpec::TensorFormat::Value">
-             Value
-            </a>
-            <em>
-             other
-            </em>
-            <span class="sig-paren">
-             )
-            </span>
-            <em class="property">
-             const
-            </em>
-            <a class="headerlink" href="#_CPPv4NK7trtorch11CompileSpec12TensorFormateqEN12TensorFormat5ValueE" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Comparision operator for
-             <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#classtrtorch_1_1CompileSpec_1_1TensorFormat">
-              <span class="std std-ref">
-               TensorFormat
-              </span>
-             </a>
-             .
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Return
-              </strong>
-             </dt>
-             <dd>
-              <p>
-               true
-              </p>
-             </dd>
-             <dt>
-              <strong>
-               Return
-              </strong>
-             </dt>
-             <dd>
-              <p>
-               false
-              </p>
-             </dd>
-             <dt>
-              <strong>
-               Parameters
-              </strong>
-             </dt>
-             <dd>
-              <ul class="breatheparameterlist simple">
-               <li>
+               </dd>
+              </dl>
+              <dl class="cpp enumerator">
+               <dt id="_CPPv4N7trtorch11CompileSpec12TensorFormat5Value13kChannelsLastE">
+                <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1a40bc29d3d3370cd10b199bd1a002746ea95eb1e564cf5d275fc496e8b1d598e6a">
+                </span>
+                <em class="property">
+                 enumerator
+                </em>
+                <code class="sig-name descname">
+                 kChannelsLast
+                </code>
+                <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec12TensorFormat5Value13kChannelsLastE" title="Permalink to this definition">
+                 ¶
+                </a>
+                <br/>
+               </dt>
+               <dd>
                 <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   other
-                  </span>
-                 </code>
-                 :
+                 Channel Last / NHWC.
                 </p>
-               </li>
-              </ul>
-             </dd>
-            </dl>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4NK7trtorch11CompileSpec12TensorFormatneE12TensorFormat">
-            <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1a0e29c3bde6d62005ea7e1948e378bd32">
-            </span>
-            <em class="property">
-             constexpr
-            </em>
-            bool
-            <code class="sig-name descname">
-             operator!=
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            <a class="reference internal" href="#_CPPv4N7trtorch11CompileSpec12TensorFormatE" title="trtorch::CompileSpec::TensorFormat">
-             TensorFormat
-            </a>
-            <em>
-             other
-            </em>
-            <span class="sig-paren">
-             )
-            </span>
-            <em class="property">
-             const
-            </em>
-            <a class="headerlink" href="#_CPPv4NK7trtorch11CompileSpec12TensorFormatneE12TensorFormat" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Comparision operator for
-             <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#classtrtorch_1_1CompileSpec_1_1TensorFormat">
-              <span class="std std-ref">
-               TensorFormat
-              </span>
-             </a>
-             .
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Return
-              </strong>
-             </dt>
-             <dd>
-              <p>
-               true
-              </p>
-             </dd>
-             <dt>
-              <strong>
-               Return
-              </strong>
-             </dt>
-             <dd>
-              <p>
-               false
-              </p>
-             </dd>
-             <dt>
-              <strong>
-               Parameters
-              </strong>
-             </dt>
-             <dd>
-              <ul class="breatheparameterlist simple">
-               <li>
+               </dd>
+              </dl>
+              <dl class="cpp enumerator">
+               <dt id="_CPPv4N7trtorch11CompileSpec12TensorFormat5Value8kUnknownE">
+                <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1a40bc29d3d3370cd10b199bd1a002746ea7bc1db7ea523d383ce35e45fc3d1b724">
+                </span>
+                <em class="property">
+                 enumerator
+                </em>
+                <code class="sig-name descname">
+                 kUnknown
+                </code>
+                <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec12TensorFormat5Value8kUnknownE" title="Permalink to this definition">
+                 ¶
+                </a>
+                <br/>
+               </dt>
+               <dd>
                 <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   other
-                  </span>
-                 </code>
-                 :
+                 Sentinel value.
                 </p>
-               </li>
-              </ul>
+               </dd>
+              </dl>
              </dd>
             </dl>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4NK7trtorch11CompileSpec12TensorFormatneEN12TensorFormat5ValueE">
-            <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1a89bb4c31ad83b2fec5d2839028cd2a83">
-            </span>
-            <em class="property">
-             constexpr
-            </em>
-            bool
-            <code class="sig-name descname">
-             operator!=
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            <a class="reference internal" href="#_CPPv4N7trtorch11CompileSpec12TensorFormatE" title="trtorch::CompileSpec::TensorFormat">
-             TensorFormat
-            </a>
-            ::
-            <a class="reference internal" href="#_CPPv4N7trtorch11CompileSpec12TensorFormat5ValueE" title="trtorch::CompileSpec::TensorFormat::Value">
-             Value
-            </a>
-            <em>
-             other
-            </em>
-            <span class="sig-paren">
-             )
-            </span>
-            <em class="property">
-             const
-            </em>
-            <a class="headerlink" href="#_CPPv4NK7trtorch11CompileSpec12TensorFormatneEN12TensorFormat5ValueE" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Comparision operator for
-             <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#classtrtorch_1_1CompileSpec_1_1TensorFormat">
-              <span class="std std-ref">
-               TensorFormat
+           </div>
+           <div class="breathe-sectiondef docutils container">
+            <p class="breathe-sectiondef-title rubric">
+             Public Functions
+            </p>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec12TensorFormat12TensorFormatEv">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1aaa99ac2140b735a0287e10541df331a2">
               </span>
-             </a>
-             .
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Return
-              </strong>
+              <code class="sig-name descname">
+               TensorFormat
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <span class="sig-paren">
+               )
+              </span>
+              = default
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec12TensorFormat12TensorFormatEv" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
              </dt>
              <dd>
               <p>
-               true
+               Construct a new
+               <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#classtrtorch_1_1CompileSpec_1_1TensorFormat">
+                <span class="std std-ref">
+                 TensorFormat
+                </span>
+               </a>
+               object.
               </p>
-             </dd>
-             <dt>
-              <strong>
-               Return
-              </strong>
-             </dt>
-             <dd>
-              <p>
-               false
-              </p>
-             </dd>
-             <dt>
-              <strong>
-               Parameters
-              </strong>
-             </dt>
-             <dd>
-              <ul class="breatheparameterlist simple">
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   other
-                  </span>
-                 </code>
-                 :
-                </p>
-               </li>
-              </ul>
              </dd>
             </dl>
-           </dd>
-          </dl>
-         </div>
-        </dd>
-       </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec12TensorFormat12TensorFormatE5Value">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1a67ec3b69995748b4695c2a598d7ba6db">
+              </span>
+              <em class="property">
+               constexpr
+              </em>
+              <code class="sig-name descname">
+               TensorFormat
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <a class="reference internal" href="#_CPPv4N7trtorch11CompileSpec12TensorFormat5ValueE" title="trtorch::CompileSpec::TensorFormat::Value">
+               Value
+              </a>
+              <em>
+               t
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec12TensorFormat12TensorFormatE5Value" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#classtrtorch_1_1CompileSpec_1_1TensorFormat">
+                <span class="std std-ref">
+                 TensorFormat
+                </span>
+               </a>
+               constructor from enum.
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec12TensorFormat12TensorFormatEN2at12MemoryFormatE">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1abb68e76c781406b11876a88dcf64b637">
+              </span>
+              <code class="sig-name descname">
+               TensorFormat
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              at::MemoryFormat
+              <em>
+               t
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec12TensorFormat12TensorFormatEN2at12MemoryFormatE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Construct a new
+               <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#classtrtorch_1_1CompileSpec_1_1TensorFormat">
+                <span class="std std-ref">
+                 TensorFormat
+                </span>
+               </a>
+               object from torch type enums.
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     t
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4NK7trtorch11CompileSpec12TensorFormatcv5ValueEv">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1a3fe8578b4fdc93a4aef236344b6546ae">
+              </span>
+              <code class="sig-name descname">
+               operator Value
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <span class="sig-paren">
+               )
+              </span>
+              <em class="property">
+               const
+              </em>
+              <a class="headerlink" href="#_CPPv4NK7trtorch11CompileSpec12TensorFormatcv5ValueEv" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Get the enum value of the
+               <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#classtrtorch_1_1CompileSpec_1_1TensorFormat">
+                <span class="std std-ref">
+                 TensorFormat
+                </span>
+               </a>
+               object.
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 Value
+                </p>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec12TensorFormatcvbEv">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1ad0e2a9e3da4d7c07258d84cd0b4b5064">
+              </span>
+              <code class="sig-name descname">
+               operator bool
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <span class="sig-paren">
+               )
+              </span>
+              = delete
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec12TensorFormatcvbEv" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4NK7trtorch11CompileSpec12TensorFormateqE12TensorFormat">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1af574ba887a2d2da0b5d04477ef715b80">
+              </span>
+              <em class="property">
+               constexpr
+              </em>
+              bool
+              <code class="sig-name descname">
+               operator==
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <a class="reference internal" href="#_CPPv4N7trtorch11CompileSpec12TensorFormatE" title="trtorch::CompileSpec::TensorFormat">
+               TensorFormat
+              </a>
+              <em>
+               other
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <em class="property">
+               const
+              </em>
+              <a class="headerlink" href="#_CPPv4NK7trtorch11CompileSpec12TensorFormateqE12TensorFormat" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Comparision operator for
+               <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#classtrtorch_1_1CompileSpec_1_1TensorFormat">
+                <span class="std std-ref">
+                 TensorFormat
+                </span>
+               </a>
+               .
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 true
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 false
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     other
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4NK7trtorch11CompileSpec12TensorFormateqEN12TensorFormat5ValueE">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1a506b32e7938a11eb39e589931292d3e8">
+              </span>
+              <em class="property">
+               constexpr
+              </em>
+              bool
+              <code class="sig-name descname">
+               operator==
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <a class="reference internal" href="#_CPPv4N7trtorch11CompileSpec12TensorFormatE" title="trtorch::CompileSpec::TensorFormat">
+               TensorFormat
+              </a>
+              ::
+              <a class="reference internal" href="#_CPPv4N7trtorch11CompileSpec12TensorFormat5ValueE" title="trtorch::CompileSpec::TensorFormat::Value">
+               Value
+              </a>
+              <em>
+               other
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <em class="property">
+               const
+              </em>
+              <a class="headerlink" href="#_CPPv4NK7trtorch11CompileSpec12TensorFormateqEN12TensorFormat5ValueE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Comparision operator for
+               <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#classtrtorch_1_1CompileSpec_1_1TensorFormat">
+                <span class="std std-ref">
+                 TensorFormat
+                </span>
+               </a>
+               .
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 true
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 false
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     other
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4NK7trtorch11CompileSpec12TensorFormatneE12TensorFormat">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1a0e29c3bde6d62005ea7e1948e378bd32">
+              </span>
+              <em class="property">
+               constexpr
+              </em>
+              bool
+              <code class="sig-name descname">
+               operator!=
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <a class="reference internal" href="#_CPPv4N7trtorch11CompileSpec12TensorFormatE" title="trtorch::CompileSpec::TensorFormat">
+               TensorFormat
+              </a>
+              <em>
+               other
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <em class="property">
+               const
+              </em>
+              <a class="headerlink" href="#_CPPv4NK7trtorch11CompileSpec12TensorFormatneE12TensorFormat" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Comparision operator for
+               <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#classtrtorch_1_1CompileSpec_1_1TensorFormat">
+                <span class="std std-ref">
+                 TensorFormat
+                </span>
+               </a>
+               .
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 true
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 false
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     other
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4NK7trtorch11CompileSpec12TensorFormatneEN12TensorFormat5ValueE">
+              <span class="target" id="classtrtorch_1_1CompileSpec_1_1TensorFormat_1a89bb4c31ad83b2fec5d2839028cd2a83">
+              </span>
+              <em class="property">
+               constexpr
+              </em>
+              bool
+              <code class="sig-name descname">
+               operator!=
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <a class="reference internal" href="#_CPPv4N7trtorch11CompileSpec12TensorFormatE" title="trtorch::CompileSpec::TensorFormat">
+               TensorFormat
+              </a>
+              ::
+              <a class="reference internal" href="#_CPPv4N7trtorch11CompileSpec12TensorFormat5ValueE" title="trtorch::CompileSpec::TensorFormat::Value">
+               Value
+              </a>
+              <em>
+               other
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <em class="property">
+               const
+              </em>
+              <a class="headerlink" href="#_CPPv4NK7trtorch11CompileSpec12TensorFormatneEN12TensorFormat5ValueE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Comparision operator for
+               <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#classtrtorch_1_1CompileSpec_1_1TensorFormat">
+                <span class="std std-ref">
+                 TensorFormat
+                </span>
+               </a>
+               .
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 true
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 false
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     other
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+           </div>
+          </dd>
+         </dl>
+        </section>
+       </section>
       </article>
      </div>
     </div>

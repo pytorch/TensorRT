@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -56,6 +57,11 @@
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
+  </script>
+  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+  <script type="text/x-mathjax-config">
+   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -411,269 +417,283 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <span id="file-cpp-api-include-trtorch-logging-h">
-       </span>
-       <h1 id="cpp-api-file-cpp-api-include-trtorch-logging-h--page-root">
-        File logging.h
-        <a class="headerlink" href="#cpp-api-file-cpp-api-include-trtorch-logging-h--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <p>
-        ↰
-        <a class="reference internal" href="dir_cpp_api_include_trtorch.html#dir-cpp-api-include-trtorch">
-         <span class="std std-ref">
-          Parent directory
-         </span>
-        </a>
-        (
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          cpp/api/include/trtorch
-         </span>
-        </code>
-        )
-       </p>
-       <div class="contents local topic" id="contents">
-        <p class="topic-title">
-         Contents
+       <section id="file-logging-h">
+        <span id="file-cpp-api-include-trtorch-logging-h">
+        </span>
+        <h1 id="cpp-api-file-cpp-api-include-trtorch-logging-h--page-root">
+         File logging.h
+         <a class="headerlink" href="#cpp-api-file-cpp-api-include-trtorch-logging-h--page-root" title="Permalink to this headline">
+          ¶
+         </a>
+        </h1>
+        <p>
+         ↰
+         <a class="reference internal" href="dir_cpp_api_include_trtorch.html#dir-cpp-api-include-trtorch">
+          <span class="std std-ref">
+           Parent directory
+          </span>
+         </a>
+         (
+         <code class="docutils literal notranslate">
+          <span class="pre">
+           cpp/api/include/trtorch
+          </span>
+         </code>
+         )
         </p>
-        <ul class="simple">
-         <li>
-          <p>
-           <a class="reference internal" href="#definition-cpp-api-include-trtorch-logging-h" id="id1">
-            Definition (
+        <div class="contents local topic" id="contents">
+         <p class="topic-title">
+          Contents
+         </p>
+         <ul class="simple">
+          <li>
+           <p>
+            <a class="reference internal" href="#definition-cpp-api-include-trtorch-logging-h" id="id1">
+             Definition (
+             <code class="docutils literal notranslate">
+              <span class="pre">
+               cpp/api/include/trtorch/logging.h
+              </span>
+             </code>
+             )
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference internal" href="#includes" id="id2">
+             Includes
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference internal" href="#included-by" id="id3">
+             Included By
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference internal" href="#namespaces" id="id4">
+             Namespaces
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference internal" href="#enums" id="id5">
+             Enums
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference internal" href="#functions" id="id6">
+             Functions
+            </a>
+           </p>
+          </li>
+         </ul>
+        </div>
+        <section id="definition-cpp-api-include-trtorch-logging-h">
+         <h2 id="definition-cpp-api-include-trtorch-logging-h">
+          Definition (
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            cpp/api/include/trtorch/logging.h
+           </span>
+          </code>
+          )
+          <a class="headerlink" href="#definition-cpp-api-include-trtorch-logging-h" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <div class="toctree-wrapper compound">
+          <ul>
+           <li class="toctree-l1">
+            <a class="reference internal" href="program_listing_file_cpp_api_include_trtorch_logging.h.html">
+             Program Listing for File logging.h
+            </a>
+           </li>
+          </ul>
+         </div>
+        </section>
+        <section id="includes">
+         <h2 id="includes">
+          Includes
+          <a class="headerlink" href="#includes" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <ul class="simple">
+          <li>
+           <p>
             <code class="docutils literal notranslate">
              <span class="pre">
-              cpp/api/include/trtorch/logging.h
+              string
              </span>
             </code>
+           </p>
+          </li>
+          <li>
+           <p>
+            <code class="docutils literal notranslate">
+             <span class="pre">
+              trtorch/macros.h
+             </span>
+            </code>
+            (
+            <a class="reference internal" href="file_cpp_api_include_trtorch_macros.h.html#file-cpp-api-include-trtorch-macros-h">
+             <span class="std std-ref">
+              File macros.h
+             </span>
+            </a>
             )
-           </a>
-          </p>
-         </li>
-         <li>
-          <p>
-           <a class="reference internal" href="#includes" id="id2">
-            Includes
-           </a>
-          </p>
-         </li>
-         <li>
-          <p>
-           <a class="reference internal" href="#included-by" id="id3">
-            Included By
-           </a>
-          </p>
-         </li>
-         <li>
-          <p>
-           <a class="reference internal" href="#namespaces" id="id4">
-            Namespaces
-           </a>
-          </p>
-         </li>
-         <li>
-          <p>
-           <a class="reference internal" href="#enums" id="id5">
-            Enums
-           </a>
-          </p>
-         </li>
-         <li>
-          <p>
-           <a class="reference internal" href="#functions" id="id6">
-            Functions
-           </a>
-          </p>
-         </li>
-        </ul>
-       </div>
-       <h2 id="definition-cpp-api-include-trtorch-logging-h">
-        Definition (
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          cpp/api/include/trtorch/logging.h
-         </span>
-        </code>
-        )
-        <a class="headerlink" href="#definition-cpp-api-include-trtorch-logging-h" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <div class="toctree-wrapper compound">
-        <ul>
-         <li class="toctree-l1">
-          <a class="reference internal" href="program_listing_file_cpp_api_include_trtorch_logging.h.html">
-           Program Listing for File logging.h
+           </p>
+          </li>
+         </ul>
+        </section>
+        <section id="included-by">
+         <h2 id="included-by">
+          Included By
+          <a class="headerlink" href="#included-by" title="Permalink to this headline">
+           ¶
           </a>
-         </li>
-        </ul>
-       </div>
-       <h2 id="includes">
-        Includes
-        <a class="headerlink" href="#includes" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <ul class="simple">
-        <li>
-         <p>
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            string
-           </span>
-          </code>
-         </p>
-        </li>
-        <li>
-         <p>
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            trtorch/macros.h
-           </span>
-          </code>
-          (
-          <a class="reference internal" href="file_cpp_api_include_trtorch_macros.h.html#file-cpp-api-include-trtorch-macros-h">
-           <span class="std std-ref">
-            File macros.h
-           </span>
+         </h2>
+         <ul class="simple">
+          <li>
+           <p>
+            <a class="reference internal" href="file_cpp_api_include_trtorch_ptq.h.html#file-cpp-api-include-trtorch-ptq-h">
+             <span class="std std-ref">
+              File ptq.h
+             </span>
+            </a>
+           </p>
+          </li>
+         </ul>
+        </section>
+        <section id="namespaces">
+         <h2 id="namespaces">
+          Namespaces
+          <a class="headerlink" href="#namespaces" title="Permalink to this headline">
+           ¶
           </a>
-          )
-         </p>
-        </li>
-       </ul>
-       <h2 id="included-by">
-        Included By
-        <a class="headerlink" href="#included-by" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <ul class="simple">
-        <li>
-         <p>
-          <a class="reference internal" href="file_cpp_api_include_trtorch_ptq.h.html#file-cpp-api-include-trtorch-ptq-h">
-           <span class="std std-ref">
-            File ptq.h
-           </span>
+         </h2>
+         <ul class="simple">
+          <li>
+           <p>
+            <a class="reference internal" href="namespace_trtorch.html#namespace-trtorch">
+             <span class="std std-ref">
+              Namespace trtorch
+             </span>
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference internal" href="namespace_trtorch__logging.html#namespace-trtorch-logging">
+             <span class="std std-ref">
+              Namespace trtorch::logging
+             </span>
+            </a>
+           </p>
+          </li>
+         </ul>
+        </section>
+        <section id="enums">
+         <h2 id="enums">
+          Enums
+          <a class="headerlink" href="#enums" title="Permalink to this headline">
+           ¶
           </a>
-         </p>
-        </li>
-       </ul>
-       <h2 id="namespaces">
-        Namespaces
-        <a class="headerlink" href="#namespaces" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <ul class="simple">
-        <li>
-         <p>
-          <a class="reference internal" href="namespace_trtorch.html#namespace-trtorch">
-           <span class="std std-ref">
-            Namespace trtorch
-           </span>
+         </h2>
+         <ul class="simple">
+          <li>
+           <p>
+            <a class="reference internal" href="enum_logging_8h_1a5f612ff2f783ff4fbe89d168f0d817d4.html#exhale-enum-logging-8h-1a5f612ff2f783ff4fbe89d168f0d817d4">
+             <span class="std std-ref">
+              Enum Level
+             </span>
+            </a>
+           </p>
+          </li>
+         </ul>
+        </section>
+        <section id="functions">
+         <h2 id="functions">
+          Functions
+          <a class="headerlink" href="#functions" title="Permalink to this headline">
+           ¶
           </a>
-         </p>
-        </li>
-        <li>
-         <p>
-          <a class="reference internal" href="namespace_trtorch__logging.html#namespace-trtorch-logging">
-           <span class="std std-ref">
-            Namespace trtorch::logging
-           </span>
-          </a>
-         </p>
-        </li>
-       </ul>
-       <h2 id="enums">
-        Enums
-        <a class="headerlink" href="#enums" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <ul class="simple">
-        <li>
-         <p>
-          <a class="reference internal" href="enum_logging_8h_1a5f612ff2f783ff4fbe89d168f0d817d4.html#exhale-enum-logging-8h-1a5f612ff2f783ff4fbe89d168f0d817d4">
-           <span class="std std-ref">
-            Enum Level
-           </span>
-          </a>
-         </p>
-        </li>
-       </ul>
-       <h2 id="functions">
-        Functions
-        <a class="headerlink" href="#functions" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <ul class="simple">
-        <li>
-         <p>
-          <a class="reference internal" href="function_logging_8h_1a9b420280bfacc016d7e36a5704021949.html#exhale-function-logging-8h-1a9b420280bfacc016d7e36a5704021949">
-           <span class="std std-ref">
-            Function trtorch::logging::get_is_colored_output_on
-           </span>
-          </a>
-         </p>
-        </li>
-        <li>
-         <p>
-          <a class="reference internal" href="function_logging_8h_1aef44b69c62af7cf2edc8875a9506641a.html#exhale-function-logging-8h-1aef44b69c62af7cf2edc8875a9506641a">
-           <span class="std std-ref">
-            Function trtorch::logging::get_logging_prefix
-           </span>
-          </a>
-         </p>
-        </li>
-        <li>
-         <p>
-          <a class="reference internal" href="function_logging_8h_1a118d65b179defff7fff279eb9cd126cb.html#exhale-function-logging-8h-1a118d65b179defff7fff279eb9cd126cb">
-           <span class="std std-ref">
-            Function trtorch::logging::get_reportable_log_level
-           </span>
-          </a>
-         </p>
-        </li>
-        <li>
-         <p>
-          <a class="reference internal" href="function_logging_8h_1abc57d473f3af292551dee8b9c78373ad.html#exhale-function-logging-8h-1abc57d473f3af292551dee8b9c78373ad">
-           <span class="std std-ref">
-            Function trtorch::logging::log
-           </span>
-          </a>
-         </p>
-        </li>
-        <li>
-         <p>
-          <a class="reference internal" href="function_logging_8h_1aa533955a2b908db9e5df5acdfa24715f.html#exhale-function-logging-8h-1aa533955a2b908db9e5df5acdfa24715f">
-           <span class="std std-ref">
-            Function trtorch::logging::set_is_colored_output_on
-           </span>
-          </a>
-         </p>
-        </li>
-        <li>
-         <p>
-          <a class="reference internal" href="function_logging_8h_1a396a688110397538f8b3fb7dfdaf38bb.html#exhale-function-logging-8h-1a396a688110397538f8b3fb7dfdaf38bb">
-           <span class="std std-ref">
-            Function trtorch::logging::set_logging_prefix
-           </span>
-          </a>
-         </p>
-        </li>
-        <li>
-         <p>
-          <a class="reference internal" href="function_logging_8h_1adf5435f0dbb09c0d931a1b851847236b.html#exhale-function-logging-8h-1adf5435f0dbb09c0d931a1b851847236b">
-           <span class="std std-ref">
-            Function trtorch::logging::set_reportable_log_level
-           </span>
-          </a>
-         </p>
-        </li>
-       </ul>
+         </h2>
+         <ul class="simple">
+          <li>
+           <p>
+            <a class="reference internal" href="function_logging_8h_1a9b420280bfacc016d7e36a5704021949.html#exhale-function-logging-8h-1a9b420280bfacc016d7e36a5704021949">
+             <span class="std std-ref">
+              Function trtorch::logging::get_is_colored_output_on
+             </span>
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference internal" href="function_logging_8h_1aef44b69c62af7cf2edc8875a9506641a.html#exhale-function-logging-8h-1aef44b69c62af7cf2edc8875a9506641a">
+             <span class="std std-ref">
+              Function trtorch::logging::get_logging_prefix
+             </span>
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference internal" href="function_logging_8h_1a118d65b179defff7fff279eb9cd126cb.html#exhale-function-logging-8h-1a118d65b179defff7fff279eb9cd126cb">
+             <span class="std std-ref">
+              Function trtorch::logging::get_reportable_log_level
+             </span>
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference internal" href="function_logging_8h_1abc57d473f3af292551dee8b9c78373ad.html#exhale-function-logging-8h-1abc57d473f3af292551dee8b9c78373ad">
+             <span class="std std-ref">
+              Function trtorch::logging::log
+             </span>
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference internal" href="function_logging_8h_1aa533955a2b908db9e5df5acdfa24715f.html#exhale-function-logging-8h-1aa533955a2b908db9e5df5acdfa24715f">
+             <span class="std std-ref">
+              Function trtorch::logging::set_is_colored_output_on
+             </span>
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference internal" href="function_logging_8h_1a396a688110397538f8b3fb7dfdaf38bb.html#exhale-function-logging-8h-1a396a688110397538f8b3fb7dfdaf38bb">
+             <span class="std std-ref">
+              Function trtorch::logging::set_logging_prefix
+             </span>
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference internal" href="function_logging_8h_1adf5435f0dbb09c0d931a1b851847236b.html#exhale-function-logging-8h-1adf5435f0dbb09c0d931a1b851847236b">
+             <span class="std std-ref">
+              Function trtorch::logging::set_reportable_log_level
+             </span>
+            </a>
+           </p>
+          </li>
+         </ul>
+        </section>
+       </section>
       </article>
      </div>
     </div>
