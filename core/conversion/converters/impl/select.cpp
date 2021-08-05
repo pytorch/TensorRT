@@ -73,9 +73,15 @@ auto select_registrations TRTORCH_UNUSED =
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                     auto in = args[0].ITensorOrFreeze(ctx);
                     auto maxDim = static_cast<int64_t>(in->getDimensions().nbDims);
-                    auto axis = args[1].unwrapToInt();
-                    axis = axis < 0 ? axis + maxDim : axis;
+                    auto dim = args[1].unwrapToInt();
+                    // Handle negative axis by refering to nbDims of input Tensor
+                    dim = dim < 0 ? dim + maxDim : dim;
                     auto ind = (int32_t)args[2].unwrapToInt();
+                    // Along the specified dimension, handle negative index by subtracting along length of dimension.
+                    ind = ind < 0 ? ind + in->getDimensions().d[dim] : ind;
+                    LOG_DEBUG("Gather input dimensions: " << in->getDimensions());
+                    LOG_DEBUG("Dimension to select: " << dim);
+                    LOG_DEBUG("Index: " << ind);
 
                     // index to access needs to be an at::Tensor
                     at::Tensor indices = torch::tensor({ind}).to(torch::kI32);
@@ -83,7 +89,7 @@ auto select_registrations TRTORCH_UNUSED =
 
                     // IGatherLayer takes in input tensor, the indices, and the axis
                     // of input tensor to take indices from
-                    auto gather_layer = ctx->net->addGather(*in, *const_out, axis);
+                    auto gather_layer = ctx->net->addGather(*in, *const_out, dim);
                     TRTORCH_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
                     auto out = gather_layer->getOutput(0);
 
@@ -93,7 +99,7 @@ auto select_registrations TRTORCH_UNUSED =
                       // IShuffleLayer removes redundant dimensions
                       auto shuffle_layer = ctx->net->addShuffle(*out);
                       TRTORCH_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
-                      shuffle_layer->setReshapeDimensions(util::squeezeDims(out->getDimensions(), axis));
+                      shuffle_layer->setReshapeDimensions(util::squeezeDims(out->getDimensions(), dim));
                       shuffle_layer->setName(util::node_info(n).c_str());
                       out = shuffle_layer->getOutput(0);
                     }

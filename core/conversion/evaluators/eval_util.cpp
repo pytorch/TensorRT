@@ -199,7 +199,7 @@ void recursiveStore(
         TRTORCH_THROW_ERROR("Found unsupported data type in arguments for aten::tensor");
       }
     } else {
-      TRTORCH_ASSERT("Found unsupported data type in arguments for aten::tensor");
+      TRTORCH_THROW_ERROR("Found unsupported data type in arguments for aten::tensor");
     }
   }
 }

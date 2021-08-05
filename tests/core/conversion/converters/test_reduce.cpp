@@ -473,3 +473,29 @@ TEST(Converters, UnpackStdUnbiasedKeepDimsLowersCorrectly) {
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
+
+TEST(Converters, UnpackVarUnbiasedNegAxisLowersCorrectly) {
+  const auto graph = R"IR(
+      graph(%x.1 : Tensor):
+        %37 : bool = prim::Constant[value=1]()
+        %53 : int[] = prim::Constant[value=[-1]]()
+        %69 : Tensor = aten::var(%x.1, %53, %37, %37)
+        return (%69))IR";
+
+  auto in = at::randint(-5, 5, {2, 20, 768}, at::kCUDA).to(at::kFloat);
+
+  auto jit_in = at::clone(in);
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
+
+  in = at::clone(in);
+  trtorch::core::lowering::passes::UnpackVar(g);
+  torch::jit::EliminateCommonSubexpression(g);
+  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {jit_in});
+
+  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+}

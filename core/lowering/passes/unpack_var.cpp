@@ -17,6 +17,7 @@ void UnpackVar(std::shared_ptr<torch::jit::Graph>& graph) {
       %none: None = prim::Constant()
       %false: bool = prim::Constant[value=0]()
       %0: int = prim::Constant[value=0]()
+      %dtype: int = prim::Constant[value=6]()
       %1: int = prim::Constant[value=1]()
       %sqrd: Tensor = aten::mul(%input, %input)
       %sqrdmean: Tensor = aten::mean(%sqrd, %dims, %keepdim, %none)
@@ -26,7 +27,7 @@ void UnpackVar(std::shared_ptr<torch::jit::Graph>& graph) {
       %varout : Tensor = prim::If(%unbiased)
         block0():
           %shape: int[] = aten::size(%input)
-          %shapet: Tensor = aten::tensor(%shape, %0, %none, %false)
+          %shapet: Tensor = aten::tensor(%shape, %dtype, %none, %false)
           %dim: int = prim::ListUnpack(%dims)
           %reduceddims: Tensor = aten::select(%shapet, %0, %dim)
           %numel: Tensor = aten::prod(%reduceddims, %dim, %keepdim, %none)
