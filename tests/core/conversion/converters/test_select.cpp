@@ -460,9 +460,5 @@ TEST(Converters, ATenMaskedFillZerosConvertsCorrectly) {
   trtorch::core::lowering::passes::RemoveNOPs(g);
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
-  std::cout << jit_results[0] << trt_results[0].reshape_as(jit_results[0]) << std::endl;
-
-  std::cout << trt_results[1].reshape_as(jit_results[0]) << std::endl;
-
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
 }

@@ -25,7 +25,6 @@
 #include "trtorch/ptq.h"
 #include "trtorch/trtorch.h"
 
-
 at::ScalarType to_torch_dtype(trtorch::CompileSpec::DataType dtype) {
   switch (dtype) {
     case trtorch::CompileSpec::DataType::kHalf:
@@ -266,8 +265,13 @@ int main(int argc, char** argv) {
       "Maximum acceptable numerical deviation from standard torchscript output (default 2e-5)",
       {'t', "threshold"});
 
-  args::Flag no_threshold_check(parser, "no-threshold-check", "Skip checking threshold compliance", {"no-threshold-check", "no-threshold-check"});
-  args::Flag truncate_long_and_double(parser, "truncate-long-double", "Truncate weights that are provided in 64bit to 32bit (Long, Double to Int, Float)", {"truncate", "truncate-long-double", "truncate-64bit"});
+  args::Flag no_threshold_check(
+      parser, "no-threshold-check", "Skip checking threshold compliance", {"no-threshold-check", "no-threshold-check"});
+  args::Flag truncate_long_and_double(
+      parser,
+      "truncate-long-double",
+      "Truncate weights that are provided in 64bit to 32bit (Long, Double to Int, Float)",
+      {"truncate", "truncate-long-double", "truncate-64bit"});
 
   args::Flag save_engine(
       parser,
@@ -542,9 +546,10 @@ int main(int argc, char** argv) {
   } else {
     auto trt_mod = trtorch::CompileGraph(mod, compile_settings);
 
-    if (!no_threshold_check && (compile_settings.enabled_precisions.size() == 1 &&
-        compile_settings.enabled_precisions.find(trtorch::CompileSpec::DataType::kFloat) !=
-            compile_settings.enabled_precisions.end())) {
+    if (!no_threshold_check &&
+        (compile_settings.enabled_precisions.size() == 1 &&
+         compile_settings.enabled_precisions.find(trtorch::CompileSpec::DataType::kFloat) !=
+             compile_settings.enabled_precisions.end())) {
       double threshold_val = 2e-5;
       if (threshold) {
         threshold_val = args::get(threshold);
@@ -596,12 +601,11 @@ int main(int argc, char** argv) {
     } else {
       if (no_threshold_check) {
         trtorch::logging::log(
-          trtorch::logging::Level::kWARNING,
-          "Threshold check skipped, numerical precision is not checked");
+            trtorch::logging::Level::kWARNING, "Threshold check skipped, numerical precision is not checked");
       } else {
         trtorch::logging::log(
-          trtorch::logging::Level::kWARNING,
-          "Due to change in operating data type, numerical precision is not checked");
+            trtorch::logging::Level::kWARNING,
+            "Due to change in operating data type, numerical precision is not checked");
       }
     }
 

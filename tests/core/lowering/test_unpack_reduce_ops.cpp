@@ -168,7 +168,6 @@ TEST(LoweringPasses, UnpackStdUnbiasedLowersCorrectly) {
   torch::jit::EliminateCommonSubexpression(g);
   auto jit_post_results = trtorch::tests::util::EvaluateGraphJIT(g, {in});
 
-  std::cout << jit_pre_results[0].toTensor() << jit_post_results[0].toTensor() << std::endl;
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
 }
 

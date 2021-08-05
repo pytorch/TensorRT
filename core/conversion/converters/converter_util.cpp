@@ -155,8 +155,7 @@ nvinfer1::ITensor* tensor_to_const(ConversionCtx* ctx, at::Tensor t) {
   }
 
   auto weights = Weights();
-  if ((t.scalar_type() == at::kLong || t.scalar_type() == at::kDouble) &&
-      !ctx->settings.truncate_long_and_double) {
+  if ((t.scalar_type() == at::kLong || t.scalar_type() == at::kDouble) && !ctx->settings.truncate_long_and_double) {
     TRTORCH_THROW_ERROR(
         "Unable to freeze tensor of type Int64/Float64 into constant layer, try to compile model with truncate_long_and_double enabled");
   } else if (t.scalar_type() == at::kLong && ctx->settings.truncate_long_and_double) {

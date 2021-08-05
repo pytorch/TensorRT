@@ -75,7 +75,9 @@ Weights::Weights(ConversionCtx* ctx, at::Tensor t) {
   t_cpu = t_cpu.contiguous();
   auto dtype_optional = util::optScalarTypeToTRTDataType(t_cpu.scalar_type());
   if (!dtype_optional) {
-    TRTORCH_THROW_ERROR("The tensor requested to be converted to nvinfer1::Weights is of an unsupported type: " << dtype_optional.value());
+    TRTORCH_THROW_ERROR(
+        "The tensor requested to be converted to nvinfer1::Weights is of an unsupported type: "
+        << dtype_optional.value());
   }
 
   // Store the data in the conversion context so it remains until building is
