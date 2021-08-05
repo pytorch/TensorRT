@@ -110,7 +110,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     TRTORCH_CHECK(
         inputs[pyt_idx].is_cuda(),
         "Expected input tensors to have device cuda, found device " << inputs[pyt_idx].device());
-    auto expected_type = util::toATenDType(compiled_engine->exec_ctx->getEngine().getBindingDataType(i));
+    auto expected_type = util::TRTDataTypeToScalarType(compiled_engine->exec_ctx->getEngine().getBindingDataType(i));
     TRTORCH_CHECK(
         inputs[pyt_idx].dtype() == expected_type,
         "Expected input tensors to have type " << expected_type << ", found type " << inputs[pyt_idx].dtype());
@@ -131,7 +131,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     auto out_shape = compiled_engine->exec_ctx->getBindingDimensions(o);
     LOG_DEBUG("Output shape: " << out_shape);
     auto dims = core::util::toVec(out_shape);
-    auto type = util::toATenDType(compiled_engine->exec_ctx->getEngine().getBindingDataType(o));
+    auto type = util::TRTDataTypeToScalarType(compiled_engine->exec_ctx->getEngine().getBindingDataType(o));
     outputs[pyt_idx] = std::move(at::empty(dims, {at::kCUDA}).to(type).contiguous());
     gpu_handles.push_back(outputs[pyt_idx].data_ptr());
   }

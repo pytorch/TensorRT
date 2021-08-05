@@ -18,10 +18,7 @@ auto constant_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
               // Tensors vs. just Tensors
 
               auto t = args[0].unwrapToTensor();
-              auto t_weights = Weights(ctx, t);
-              auto const_layer = ctx->net->addConstant(t_weights.shape, t_weights.data);
-              const_layer->setName(util::node_info(n).c_str());
-              auto const_out = ctx->AssociateValueAndTensor(n->outputs()[0], const_layer->getOutput(0));
+              auto const_out = ctx->AssociateValueAndTensor(n->outputs()[0], tensor_to_const(ctx, t));
 
               LOG_DEBUG("Output tensor shape: " << const_out->getDimensions());
 

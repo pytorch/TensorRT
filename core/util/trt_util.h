@@ -120,9 +120,11 @@ nvinfer1::DimsHW toDimsHW(c10::IntArrayRef l);
 std::vector<int64_t> toVec(nvinfer1::Dims d);
 std::string toStr(nvinfer1::Dims d);
 
-at::ScalarType toATenDType(nvinfer1::DataType t);
-nvinfer1::DataType toTRTDataType(at::ScalarType t);
-c10::optional<nvinfer1::DataType> toTRTDataType(caffe2::TypeMeta dtype);
+at::ScalarType TRTDataTypeToScalarType(nvinfer1::DataType t);
+c10::optional<at::ScalarType> optTRTDataTypeToScalarType(nvinfer1::DataType t);
+nvinfer1::DataType ScalarTypeToTRTDataType(at::ScalarType t);
+c10::optional<nvinfer1::DataType> optScalarTypeToTRTDataType(at::ScalarType t);
+c10::optional<nvinfer1::DataType> optTypeMetaToTRTDataType(caffe2::TypeMeta dtype);
 torch::jit::Value* getOrAddInputForValue(
     torch::jit::Value* old_value,
     std::shared_ptr<torch::jit::Graph>& graph,

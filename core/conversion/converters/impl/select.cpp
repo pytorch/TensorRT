@@ -257,7 +257,7 @@ auto select_registrations TRTORCH_UNUSED =
         .pattern({"aten::masked_fill.Scalar(Tensor self, Tensor mask, Scalar value) -> (Tensor)",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                     auto self = args[0].ITensorOrFreeze(ctx);
-                    auto mask = castITensor(ctx, args[1].ITensorOrFreeze(ctx), nvinfer1::DataType::kBOOL);
+                    auto mask = args[1].ITensorOrFreeze(ctx);
                     mask = addPadding(ctx, n, mask, self->getDimensions().nbDims, false, true);
                     auto val = args[2].unwrapToScalar().to<float>();
                     auto val_t = tensor_to_const(ctx, torch::full(util::toVec(self->getDimensions()), val));
