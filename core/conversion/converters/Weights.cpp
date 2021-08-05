@@ -73,9 +73,11 @@ Weights::Weights(ConversionCtx* ctx, at::Tensor t) {
   }
   auto t_cpu = t.to(at::kCPU);
   t_cpu = t_cpu.contiguous();
-  auto dtype_optional = util::toTRTDataType(t_cpu.dtype());
+  auto dtype_optional = util::optScalarTypeToTRTDataType(t_cpu.scalar_type());
   if (!dtype_optional) {
-    TRTORCH_THROW_ERROR("The tensor requested to be converted to nvinfer1::Weights is of an unsupported type");
+    TRTORCH_THROW_ERROR(
+        "The tensor requested to be converted to nvinfer1::Weights is of an unsupported type: "
+        << dtype_optional.value());
   }
 
   // Store the data in the conversion context so it remains until building is
@@ -114,6 +116,7 @@ Weights::Weights(ConversionCtx* ctx, at::Tensor t) {
 // clang-format off
 std::ostream& operator<<(std::ostream& os, const Weights& w) {
   os << "Weights: " << w.shape
+     << "\n    Data Type: " << w.data.type
      << "\n    Number of input maps: " << w.num_input_maps
      << "\n    Number of output maps: " << w.num_output_maps
      << "\n    Element shape: [";

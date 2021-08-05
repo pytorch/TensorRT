@@ -19,6 +19,8 @@ void RemoveNOPs(std::shared_ptr<torch::jit::Graph> graph);
 void UnpackAddMM(std::shared_ptr<torch::jit::Graph>& graph);
 void UnpackBatchNorm(std::shared_ptr<torch::jit::Graph>& graph);
 void UnpackLogSoftmax(std::shared_ptr<torch::jit::Graph>& graph);
+void UnpackStd(std::shared_ptr<torch::jit::Graph>& graph);
+void UnpackVar(std::shared_ptr<torch::jit::Graph>& graph);
 void AliasOperators(std::shared_ptr<torch::jit::Graph>& graph);
 void SiluToSigmoidMultipication(std::shared_ptr<torch::jit::Graph>& graph);
 void UnpackHardSwish(std::shared_ptr<torch::jit::Graph>& graph);

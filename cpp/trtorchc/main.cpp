@@ -25,6 +25,33 @@
 #include "trtorch/ptq.h"
 #include "trtorch/trtorch.h"
 
+at::ScalarType to_torch_dtype(trtorch::CompileSpec::DataType dtype) {
+  switch (dtype) {
+    case trtorch::CompileSpec::DataType::kHalf:
+      return at::kHalf;
+    case trtorch::CompileSpec::DataType::kChar:
+      return at::kChar;
+    case trtorch::CompileSpec::DataType::kInt:
+      return at::kInt;
+    case trtorch::CompileSpec::DataType::kBool:
+      return at::kBool;
+    case trtorch::CompileSpec::DataType::kFloat:
+    default:
+      return at::kFloat;
+  }
+}
+
+const std::unordered_map<nvinfer1::DataType, at::ScalarType>& get_trt_at_type_map() {
+  static const std::unordered_map<nvinfer1::DataType, at::ScalarType> trt_at_type_map = {
+      {nvinfer1::DataType::kFLOAT, at::kFloat},
+      {nvinfer1::DataType::kHALF, at::kHalf},
+      {nvinfer1::DataType::kINT32, at::kInt},
+      {nvinfer1::DataType::kINT8, at::kChar},
+      {nvinfer1::DataType::kBOOL, at::kBool},
+  };
+  return trt_at_type_map;
+}
+
 bool checkRtol(const at::Tensor& diff, const std::vector<at::Tensor> inputs, float threshold) {
   double maxValue = 0.0;
   for (auto& tensor : inputs) {
@@ -259,6 +286,14 @@ int main(int argc, char** argv) {
       "threshold",
       "Maximum acceptable numerical deviation from standard torchscript output (default 2e-5)",
       {'t', "threshold"});
+
+  args::Flag no_threshold_check(
+      parser, "no-threshold-check", "Skip checking threshold compliance", {"no-threshold-check", "no-threshold-check"});
+  args::Flag truncate_long_and_double(
+      parser,
+      "truncate-long-double",
+      "Truncate weights that are provided in 64bit to 32bit (Long, Double to Int, Float)",
+      {"truncate", "truncate-long-double", "truncate-64bit"});
 
   args::Flag save_engine(
       parser,
@@ -504,6 +539,10 @@ int main(int argc, char** argv) {
     compile_settings.max_batch_size = args::get(max_batch_size);
   }
 
+  if (truncate_long_and_double) {
+    compile_settings.truncate_long_and_double = true;
+  }
+
   auto real_input_path = resolve_path(args::get(input_path));
   auto real_output_path = resolve_path(args::get(output_path));
 
@@ -537,9 +576,10 @@ int main(int argc, char** argv) {
   } else {
     auto trt_mod = trtorch::CompileGraph(mod, compile_settings);
 
-    if (compile_settings.enabled_precisions.size() == 1 &&
-        compile_settings.enabled_precisions.find(trtorch::CompileSpec::DataType::kFloat) !=
-            compile_settings.enabled_precisions.end()) {
+    if (!no_threshold_check &&
+        (compile_settings.enabled_precisions.size() == 1 &&
+         compile_settings.enabled_precisions.find(trtorch::CompileSpec::DataType::kFloat) !=
+             compile_settings.enabled_precisions.end())) {
       double threshold_val = 2e-5;
       if (threshold) {
         threshold_val = args::get(threshold);
@@ -550,10 +590,12 @@ int main(int argc, char** argv) {
 
       for (auto i : ranges) {
         auto in = at::randn(i.opt_shape, {at::kCUDA});
+        in = in.to(to_torch_dtype(i.dtype));
         jit_inputs_ivalues.push_back(in.clone());
         trt_inputs_ivalues.push_back(in.clone());
       }
 
+      mod.to({at::kCUDA});
       torch::jit::IValue jit_results_ivalues = mod.forward(jit_inputs_ivalues);
       std::vector<at::Tensor> jit_results;
       if (jit_results_ivalues.isTensor()) {
@@ -587,9 +629,14 @@ int main(int argc, char** argv) {
         }
       }
     } else {
-      trtorch::logging::log(
-          trtorch::logging::Level::kWARNING,
-          "Due to change in operating data type, numerical precision is not checked");
+      if (no_threshold_check) {
+        trtorch::logging::log(
+            trtorch::logging::Level::kWARNING, "Threshold check skipped, numerical precision is not checked");
+      } else {
+        trtorch::logging::log(
+            trtorch::logging::Level::kWARNING,
+            "Due to change in operating data type, numerical precision is not checked");
+      }
     }
 
     trt_mod.save(real_output_path);
