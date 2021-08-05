@@ -79,7 +79,7 @@ c10::impl::GenericList TensorRTBackend::execute(c10::IValue handle, c10::impl::G
 namespace {
 static auto reg = torch::jit::backend<TensorRTBackend>("tensorrt");
 static auto preproc_reg = torch::jit::backend_preprocess_register("tensorrt", &preprocess);
-}
+} // namespace
 
 } // namespace backend
 } // namespace trtorch
