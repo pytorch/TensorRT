@@ -65,8 +65,8 @@ torch::jit::Module LowerModule(const torch::jit::script::Module& mod) {
 std::pair<std::shared_ptr<torch::jit::Graph>, std::vector<torch::jit::IValue>> Lower(
     const torch::jit::script::Module& mod,
     std::string method_name,
-    bool unfreeze_module = false) {
-  auto lowered_mod = unfreeze_module ? mod : LowerModule(mod);
+    LowerInfo lower_info) {
+  auto lowered_mod = lower_info.unfreeze_module ? mod : LowerModule(mod);
   auto g = lowered_mod.get_method(method_name).graph();
   LOG_GRAPH(*g);
 
@@ -75,7 +75,7 @@ std::pair<std::shared_ptr<torch::jit::Graph>, std::vector<torch::jit::IValue>> L
   // unfreeze_module is used to not perform constant folding on weights in the network.
   // In quantization aware trained (QAT) models, weights are passed through quantize and
   // dequantize nodes which should not be folded. So unfreeze_module is set to True for QAT models.
-  if (!unfreeze_module) {
+  if (!lower_info.unfreeze_module) {
     LOG_GRAPH("TRTorch Graph Lowering");
     lowering::LowerGraph(g, false);
   }
@@ -83,7 +83,7 @@ std::pair<std::shared_ptr<torch::jit::Graph>, std::vector<torch::jit::IValue>> L
   LOG_GRAPH("LibTorch Lowering");
   auto graph_and_ivalues = torch::jit::LowerGraph(*g, lowered_mod._ivalue());
 
-  if (unfreeze_module) {
+  if (lower_info.unfreeze_module) {
     LOG_GRAPH("TRTorch Graph Lowering");
     lowering::LowerGraph(graph_and_ivalues.first, true);
   }
