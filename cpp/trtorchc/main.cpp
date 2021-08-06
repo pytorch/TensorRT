@@ -237,6 +237,12 @@ int main(int argc, char** argv) {
       "(Only used when targeting DLA (device-type)) Lets engine run layers on GPU if they are not supported on DLA",
       {"allow-gpu-fallback"});
 
+  args::Flag allow_torch_fallback(
+      parser,
+      "allow-torch-fallback",
+      "Enable layers to run in torch if they are not supported in TensorRT",
+      {"allow-torch-fallback"});
+
   args::Flag disable_tf32(
       parser, "disable-tf32", "Prevent Float32 layers from using the TF32 data format", {"disable-tf32"});
 
@@ -244,7 +250,7 @@ int main(int argc, char** argv) {
       parser,
       "precision",
       "(Repeatable) Enabling an operating precision for kernels to use when building the engine (Int8 requires a calibration-cache argument) [ float | float32 | f32 | fp32 | half | float16 | f16 | fp16 | int8 | i8 | char ] (default: float)",
-      {'p', "enabled-precison"});
+      {'p', "enabled-precision"});
   args::ValueFlag<std::string> device_type(
       parser,
       "type",
@@ -266,6 +272,12 @@ int main(int argc, char** argv) {
       "file_path",
       "Path to calibration cache file to use for post training quantization",
       {"calibration-cache-file"});
+
+  args::ValueFlagList<std::string> forced_fallback_ops(
+      parser,
+      "forced_fallback_ops",
+      "(Repeatable) List of operators in the graph that should be forced to fallback to Pytorch for execution.",
+      {"ffo", "forced-fallback-ops"});
 
   args::Flag embed_engine(
       parser,
@@ -442,6 +454,10 @@ int main(int argc, char** argv) {
     compile_settings.device.allow_gpu_fallback = true;
   }
 
+  if (allow_torch_fallback) {
+    compile_settings.torch_fallback = trtorch::CompileSpec::TorchFallback(true);
+  }
+
   if (disable_tf32) {
     compile_settings.disable_tf32 = true;
   }
@@ -452,6 +468,18 @@ int main(int argc, char** argv) {
   }
 
   auto calibrator = trtorch::ptq::make_int8_cache_calibrator(calibration_cache_file_path);
+
+  if (forced_fallback_ops) {
+    if (!allow_torch_fallback) {
+      trtorch::logging::log(
+          trtorch::logging::Level::kERROR,
+          "Forced fallback ops provided but allow_torch_fallback is False. Please use --allow-torch-fallback to enable automatic fallback of operators.");
+    }
+
+    for (const auto fallback_op : args::get(forced_fallback_ops)) {
+      compile_settings.torch_fallback.forced_fallback_ops.push_back(fallback_op);
+    }
+  }
 
   if (enabled_precision) {
     for (const auto precision : args::get(enabled_precision)) {
@@ -563,9 +591,11 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  if (!trtorch::CheckMethodOperatorSupport(mod, "forward")) {
-    trtorch::logging::log(trtorch::logging::Level::kERROR, "Module is not currently supported by TRTorch");
-    return 1;
+  if (!allow_torch_fallback) {
+    if (!trtorch::CheckMethodOperatorSupport(mod, "forward")) {
+      trtorch::logging::log(trtorch::logging::Level::kERROR, "Module is not currently supported by TRTorch");
+      return 1;
+    }
   }
 
   if (save_engine) {
