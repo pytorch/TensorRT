@@ -233,8 +233,21 @@ const char* NormalizePluginCreator::getPluginVersion() const noexcept {
 nvinfer1::IPluginV2* NormalizePluginCreator::createPlugin(
     const char* name,
     const nvinfer1::PluginFieldCollection* fc) noexcept {
-rmalizePluginCreator::createPlugin(const char* name, const nvinfer1::PluginFieldCollection* fc) noexcept {
-lugin = new NormalizePlugin(order, axes, keep_dims);
+  int32_t order = 0;
+  std::vector<int32_t> axes;
+  int32_t keep_dims = 0;
+  for (int i = 0; i < fc->nbFields; i++) {
+    std::string field_name(fc->fields[i].name);
+    if (field_name.compare("order") == 0) {
+      order = *static_cast<const int32_t*>(fc->fields[i].data);
+    } else if (field_name.compare("axes") == 0) {
+      auto axes_values = static_cast<const int32_t*>(fc->fields[i].data);
+      axes.assign(axes_values, axes_values + fc->fields[i].length);
+    } else if (field_name.compare("keep_dims") == 0) {
+      keep_dims = *static_cast<const int32_t*>(fc->fields[i].data);
+    }
+  }
+  NormalizePlugin* plugin = new NormalizePlugin(order, axes, keep_dims);
   return plugin;
 }
 

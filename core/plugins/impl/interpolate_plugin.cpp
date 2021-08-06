@@ -209,9 +209,6 @@ bool InterpolatePlugin::supportsFormatCombination(
   if (nbInputs != 1) {
     LOG_ERROR("Expected a single tensor as input to interpolate plugin");
   }
-  if (nbInputs != 1) {
-    LOG_ERROR("Expected a single tensor as input to interpolate plugin");
-  }
   if (mode_ == "adaptive_max_pool2d") {
     if (nbOutputs != 2) {
       LOG_ERROR("Expected 2 tensors as output to interpolate plugin");
