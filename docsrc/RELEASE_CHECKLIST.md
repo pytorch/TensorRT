@@ -38,15 +38,22 @@ will result in a minor version bump and sigificant bug fixes will result in a pa
 5. Run performance tests:
     - Models: 
         - Torchbench BERT
+            - `[2, 128], [2, 128]` 
         - EfficientNet B0
+            - `[3, 224, 224]`
+            - `[3, 1920, 1080]` (P2)  
         - ViT
+            - `[3, 224, 224]` 
+            - `[3, 1920, 1080]` (P2)   
         - ResNet50 (v1.5 ?)
+            - `[3, 224, 224]`
+            - `[3, 1920, 1080]` (P2)    
     - Batch Sizes: 1, 4, 8, 16, 32
     - Frameworks: PyTorch, TRTorch, ONNX + TRT
         - If any models do not convert to ONNX / TRT, that is fine. Mark them as failling / no result
     - Devices: 
         - A100 (P0)
-        - T4 is a nice to have (P2)
+        - T4 is a nice to have (P2) (Add batch sizes 64, 128, 256, 512, 1024 if so)
         - Jetson also nice to have (P4) 
 
 6. Once PR is merged tag commit and start creating release on GitHub
