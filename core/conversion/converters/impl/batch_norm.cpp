@@ -18,7 +18,7 @@ auto batch_norm_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().
       auto input = args[0].ITensor(); // assumes non-static input Tensor
       auto orig_shape = input->getDimensions();
       auto shape = util::toVec(orig_shape);
-      auto tensor_type = util::toATenDType(input->getType());
+      auto tensor_type = util::TRTDataTypeToScalarType(input->getType());
       auto options = torch::TensorOptions().dtype(tensor_type);
 
       torch::Tensor gamma, beta, mean, var;

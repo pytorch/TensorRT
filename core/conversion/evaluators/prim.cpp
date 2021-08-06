@@ -107,13 +107,7 @@ auto prim_registrations =
                       auto input = args.at(n->input(0));
                       if (input.isITensor()) {
                         auto trt_dtype = input.ITensor()->getType();
-                        auto trt_aten_type_map = util::get_trt_aten_type_map();
-                        if (trt_aten_type_map.find(trt_dtype) != trt_aten_type_map.end()) {
-                          return static_cast<int>(trt_aten_type_map.at(trt_dtype));
-                        } else {
-                          TRTORCH_THROW_ERROR("Unsupported input type in prim::dtype operator");
-                          return {};
-                        }
+                        return static_cast<int>(util::TRTDataTypeToScalarType(trt_dtype));
                       } else if (input.isIValue()) {
                         if (input.IValue()->isTensor()) {
                           auto pyt_input = input.IValue()->toTensor();

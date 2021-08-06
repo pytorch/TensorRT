@@ -19,7 +19,7 @@ cc_library(
     deps = [
         "@tensorrt//:nvinfer",
         "//core/util:prelude",
-        "//core/conversion/converters:weights",
+        "//core/conversion/converters:converter_util",
         "//core/conversion/tensorcontainer:tensorcontainer",
     ] + select({
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],

@@ -260,25 +260,43 @@ const std::unordered_map<nvinfer1::DataType, at::ScalarType>& get_trt_aten_type_
   return get_trt_at_type_map();
 }
 
-at::ScalarType toATenDType(nvinfer1::DataType t) {
+at::ScalarType TRTDataTypeToScalarType(nvinfer1::DataType t) {
+  auto type = optTRTDataTypeToScalarType(t);
+  TRTORCH_CHECK(type, "Unsupported TensorRT data type " << t);
+  return type.value();
+}
+
+c10::optional<at::ScalarType> optTRTDataTypeToScalarType(nvinfer1::DataType t) {
   auto trt_aten_type_map = get_trt_aten_type_map();
-  TRTORCH_CHECK(trt_aten_type_map.find(t) != trt_aten_type_map.end(), "Unsupported TensorRT datatype");
-  return trt_aten_type_map.at(t);
+  if (trt_aten_type_map.find(t) != trt_aten_type_map.end()) {
+    return trt_aten_type_map.at(t);
+  } else {
+    return {};
+  }
 }
 
 const std::unordered_map<at::ScalarType, nvinfer1::DataType>& get_aten_trt_type_map() {
   return get_at_trt_type_map();
 }
 
-nvinfer1::DataType toTRTDataType(at::ScalarType t) {
-  auto aten_trt_type_map = get_aten_trt_type_map();
-  TRTORCH_CHECK(aten_trt_type_map.find(t) != aten_trt_type_map.end(), "Unsupported Aten datatype");
-  return aten_trt_type_map.at(t);
+nvinfer1::DataType ScalarTypeToTRTDataType(at::ScalarType t) {
+  auto type = optScalarTypeToTRTDataType(t);
+  TRTORCH_CHECK(type, "Unsupported ATen data type " << t);
+  return type.value();
 }
 
-c10::optional<nvinfer1::DataType> toTRTDataType(caffe2::TypeMeta dtype) {
+c10::optional<nvinfer1::DataType> optScalarTypeToTRTDataType(at::ScalarType t) {
+  auto aten_trt_type_map = get_aten_trt_type_map();
+  if (aten_trt_type_map.find(t) != aten_trt_type_map.end()) {
+    return aten_trt_type_map.at(t);
+  } else {
+    return {};
+  }
+}
+
+c10::optional<nvinfer1::DataType> optTypeMetaToTRTDataType(caffe2::TypeMeta dtype) {
   if (auto t = c10::optTypeMetaToScalarType(dtype)) {
-    return toTRTDataType(t.value());
+    return optScalarTypeToTRTDataType(t.value());
   } else {
     return {};
   }

@@ -5,7 +5,6 @@
 
 #include "core/conversion/conversionctx/ConversionCtx.h"
 #include "core/conversion/converters/Weights.h"
-#include "core/conversion/var/Var.h"
 #include "core/util/prelude.h"
 
 namespace trtorch {
@@ -48,6 +47,12 @@ nvinfer1::ILayer* add_elementwise(
     nvinfer1::ITensor* self,
     nvinfer1::ITensor* other,
     const std::string& name);
+
+// If an ITensor is of a type not dtype, add an Identity layer to cast it to dtype
+nvinfer1::ITensor* castITensor(ConversionCtx* ctx, nvinfer1::ITensor* tensor, nvinfer1::DataType dtype);
+
+// Freeze an at::Tensor in a IConstant layer
+nvinfer1::ITensor* tensor_to_const(ConversionCtx* ctx, at::Tensor t);
 
 } // namespace converters
 } // namespace conversion

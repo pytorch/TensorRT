@@ -8,6 +8,7 @@
 
 #include "core/conversion/conversionctx/ConversionCtx.h"
 #include "core/conversion/converters/Weights.h"
+#include "core/conversion/converters/converter_util.h"
 #include "core/conversion/var/Var.h"
 #include "core/util/prelude.h"
 

@@ -1,5 +1,4 @@
 #include "core/conversion/converters/converter_util.h"
-#include "core/conversion/converters/converters.h"
 #include "core/util/prelude.h"
 #include "torch/torch.h"
 
@@ -58,20 +57,6 @@ nvinfer1::ITensor* addUnpadding(
   } else {
     return tensor;
   }
-}
-
-bool register_cast_layer(
-    ConversionCtx* ctx,
-    const torch::jit::Node* n,
-    nvinfer1::ITensor* input,
-    nvinfer1::DataType output_dtype) {
-  auto cast_layer = ctx->net->addIdentity(*input);
-  cast_layer->setOutputType(0, output_dtype);
-  cast_layer->setName(util::node_info(n).c_str());
-  input = ctx->AssociateValueAndTensor(n->outputs()[0], cast_layer->getOutput(0));
-  LOG_DEBUG("Cast layer output tensor shape: " << input->getDimensions());
-
-  return true;
 }
 
 nvinfer1::ILayer* add_elementwise(
@@ -134,6 +119,71 @@ nvinfer1::ILayer* add_elementwise(
   auto ele = ctx->net->addElementWise(*self, *other, op);
   ele->setName(name.c_str());
   return ele;
+}
+
+nvinfer1::ITensor* castITensor(ConversionCtx* ctx, nvinfer1::ITensor* tensor, nvinfer1::DataType dtype) {
+  if (tensor->getType() != dtype) {
+    std::ostringstream tensor_id;
+    tensor_id << reinterpret_cast<int*>(tensor);
+
+    auto id_layer = ctx->net->addIdentity(*tensor);
+    TRTORCH_CHECK(id_layer, "Unable to create identity layer for ITensor: " << tensor_id.str());
+    auto casted_tensor = id_layer->getOutput(0);
+    casted_tensor->setType(dtype);
+
+    LOG_DEBUG(ctx->logger, "Casting ITensor " << tensor_id.str() << " from " << tensor->getType() << " to " << dtype);
+
+    std::stringstream ss;
+    ss << "[Cast ITensor " << tensor_id.str() << " from " << tensor->getType() << " to " << dtype << "]";
+    id_layer->setName(ss.str().c_str());
+    return casted_tensor;
+  } else {
+    return tensor;
+  }
+}
+
+nvinfer1::ITensor* tensor_to_const(ConversionCtx* ctx, at::Tensor t) {
+  bool post_freeze_cast = false;
+  nvinfer1::DataType post_freeze_cast_type = nvinfer1::DataType::kFLOAT;
+  // Other "unsupported weights types" can be added to this check here
+  if (t.scalar_type() == at::kBool) {
+    post_freeze_cast = true;
+    auto type = util::ScalarTypeToTRTDataType(t.scalar_type());
+    post_freeze_cast_type = type;
+    LOG_DEBUG("To cast layer back to " << post_freeze_cast_type << " from int after freezing");
+    t = t.to(at::kFloat);
+  }
+
+  auto weights = Weights();
+  if ((t.scalar_type() == at::kLong || t.scalar_type() == at::kDouble) && !ctx->settings.truncate_long_and_double) {
+    TRTORCH_THROW_ERROR(
+        "Unable to freeze tensor of type Int64/Float64 into constant layer, try to compile model with truncate_long_and_double enabled");
+  } else if (t.scalar_type() == at::kLong && ctx->settings.truncate_long_and_double) {
+    weights = converters::Weights(ctx, t.toType(at::kInt));
+    LOG_WARNING("Truncating weight (constant in the graph) from Int64 to Int32");
+  } else if (t.scalar_type() == at::kDouble && ctx->settings.truncate_long_and_double) {
+    weights = converters::Weights(ctx, t.toType(at::kFloat));
+    LOG_WARNING("Truncating weight (constant in the graph) from Float64 to Float32");
+  } else {
+    weights = Weights(ctx, t);
+  }
+
+  auto const_layer = ctx->net->addConstant(weights.shape, weights.data);
+  TRTORCH_CHECK(const_layer, "Unable to freeze tensor");
+
+  auto out = const_layer->getOutput(0);
+
+  std::ostringstream tensor_id;
+  tensor_id << reinterpret_cast<int*>(out);
+
+  LOG_DEBUG(ctx->logger, "Freezing tensor " << tensor_id.str() << " as an IConstantLayer");
+  const_layer->setName(("[Freeze Tensor " + tensor_id.str() + " ]").c_str());
+
+  if (post_freeze_cast) {
+    out = castITensor(ctx, out, post_freeze_cast_type);
+  }
+
+  return out;
 }
 
 } // namespace converters
