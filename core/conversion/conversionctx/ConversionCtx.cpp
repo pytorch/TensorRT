@@ -70,7 +70,8 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
         TRTORCH_CHECK(builder->platformHasFastInt8(), "Requested inference in INT8 but platform does not support INT8");
         cfg->setFlag(nvinfer1::BuilderFlag::kINT8);
         if (settings.calibrator == nullptr) {
-          LOG_INFO("INT8 kernels are enabled but not calibrator was provided, assuming source model was trained quantization aware");
+          LOG_INFO(
+              "INT8 kernels are enabled but not calibrator was provided, assuming source model was trained quantization aware");
         }
         break;
       case nvinfer1::DataType::kFLOAT:
