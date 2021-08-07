@@ -11,7 +11,7 @@ namespace core {
 namespace runtime {
 
 using EngineID = int64_t;
-const std::string ABI_VERSION = "2";
+const std::string ABI_VERSION = "3";
 
 struct CudaDevice {
   int64_t id; // CUDA device id

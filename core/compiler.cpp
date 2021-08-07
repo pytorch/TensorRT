@@ -36,7 +36,7 @@ void AddEngineToGraph(
     std::string engine_id = "",
     bool fallback = false) {
   auto engine_ptr =
-      c10::make_intrusive<runtime::TRTEngine>(mod._ivalue()->name() + engine_id, serialized_engine, device_info);
+      c10::make_intrusive<runtime::TRTEngine>(mod._ivalue()->name() + "_engine_" + engine_id, serialized_engine, device_info);
   // Get required metadata about the engine out
   auto num_io = engine_ptr->num_io;
   auto name = engine_ptr->name;
