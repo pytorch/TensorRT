@@ -18,20 +18,12 @@ std::string slugify(std::string s) {
   return s;
 }
 
-TRTEngine::TRTEngine(std::string serialized_engine, CudaDevice cuda_device)
-    : logger(
-          std::string("[] - "),
-          util::logging::get_logger().get_reportable_severity(),
-          util::logging::get_logger().get_is_colored_output_on()) {
+TRTEngine::TRTEngine(std::string serialized_engine, CudaDevice cuda_device) {
   std::string _name = "deserialized_trt";
   new (this) TRTEngine(_name, serialized_engine, cuda_device);
 }
 
-TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
-    : logger(
-          std::string("[] = "),
-          util::logging::get_logger().get_reportable_severity(),
-          util::logging::get_logger().get_is_colored_output_on()) {
+TRTEngine::TRTEngine(std::vector<std::string> serialized_info) {
   TRTORCH_CHECK(
       serialized_info.size() == ENGINE_IDX + 1, "Program to be deserialized targets an incompatible TRTorch ABI");
   TRTORCH_CHECK(
@@ -45,26 +37,19 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info)
   new (this) TRTEngine(_name, engine_info, cuda_device);
 }
 
-TRTEngine::TRTEngine(std::string mod_name, std::string serialized_engine, CudaDevice cuda_device)
-    : logger(
-          std::string("[") + mod_name + std::string("_engine] - "),
-          util::logging::get_logger().get_reportable_severity(),
-          util::logging::get_logger().get_is_colored_output_on()) {
+TRTEngine::TRTEngine(std::string mod_name, std::string serialized_engine, CudaDevice cuda_device) {
   device_info = cuda_device;
   set_cuda_device(device_info);
 
-  rt = nvinfer1::createInferRuntime(logger);
+  rt = std::shared_ptr<nvinfer1::IRuntime>(nvinfer1::createInferRuntime(util::logging::get_logger()));
 
   name = slugify(mod_name) + "_engine";
 
-  cuda_engine = rt->deserializeCudaEngine(serialized_engine.c_str(), serialized_engine.size());
+  cuda_engine = std::shared_ptr<nvinfer1::ICudaEngine>(
+      rt->deserializeCudaEngine(serialized_engine.c_str(), serialized_engine.size()));
   TRTORCH_CHECK((cuda_engine != nullptr), "Unable to deserialize the TensorRT engine");
 
-  // Easy way to get a unique name for each engine, maybe there is a more
-  // descriptive way (using something associated with the graph maybe)
-  id = reinterpret_cast<EngineID>(cuda_engine);
-
-  exec_ctx = cuda_engine->createExecutionContext();
+  exec_ctx = std::shared_ptr<nvinfer1::IExecutionContext>(cuda_engine->createExecutionContext());
 
   uint64_t inputs = 0;
   uint64_t outputs = 0;
@@ -86,19 +71,12 @@ TRTEngine::TRTEngine(std::string mod_name, std::string serialized_engine, CudaDe
 }
 
 TRTEngine& TRTEngine::operator=(const TRTEngine& other) {
-  id = other.id;
   rt = other.rt;
   cuda_engine = other.cuda_engine;
   device_info = other.device_info;
   exec_ctx = other.exec_ctx;
   num_io = other.num_io;
   return (*this);
-}
-
-TRTEngine::~TRTEngine() {
-  exec_ctx->destroy();
-  cuda_engine->destroy();
-  rt->destroy();
 }
 
 // TODO: Implement a call method

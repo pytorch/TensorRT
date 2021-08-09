@@ -39,7 +39,14 @@ to standard TorchScript. Load with ``torch.jit.load()`` and run like you would r
           --allow-gpu-fallback              (Only used when targeting DLA
                                             (device-type)) Lets engine run layers on
                                             GPU if they are not supported on DLA
-          --disable-tf32                    Prevent Float32 layers from using the
+
+         --allow-torch-fallback            Enable layers to run in torch
+                                          if they are not supported in TensorRT
+         --ffo,
+         --forced-fallback-ops             List of operators in the graph that
+                                          should be forced to fallback to Pytorch for execution
+                                          
+         --disable-tf32                    Prevent Float32 layers from using the
                                             TF32 data format
           -p[precision...],
           --enabled-precison=[precision...] (Repeatable) Enabling an operating
@@ -48,6 +55,7 @@ to standard TorchScript. Load with ``torch.jit.load()`` and run like you would r
                                             calibration-cache argument) [ float |
                                             float32 | f32 | half | float16 | f16 |
                                             int8 | i8 ] (default: float)
+                                            
           -d[type], --device-type=[type]    The type of device the engine should be
                                             built for [ gpu | dla ] (default: gpu)
           --gpu-id=[gpu_id]                 GPU id if running on multi-GPU platform

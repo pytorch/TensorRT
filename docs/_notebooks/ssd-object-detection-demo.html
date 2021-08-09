@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -56,6 +57,11 @@
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
+  </script>
+  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+  <script type="text/x-mathjax-config">
+   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -550,21 +556,35 @@
         /* CSS for nbsphinx extension */
 
 /* remove conflicting styling from Sphinx themes */
-div.nbinput.container,
-div.nbinput.container div.prompt,
-div.nbinput.container div.input_area,
-div.nbinput.container div[class*=highlight],
-div.nbinput.container div[class*=highlight] pre,
-div.nboutput.container,
-div.nboutput.container div.prompt,
-div.nboutput.container div.output_area,
-div.nboutput.container div[class*=highlight],
-div.nboutput.container div[class*=highlight] pre {
-    background: none;
+div.nbinput.container div.prompt *,
+div.nboutput.container div.prompt *,
+div.nbinput.container div.input_area pre,
+div.nboutput.container div.output_area pre,
+div.nbinput.container div.input_area .highlight,
+div.nboutput.container div.output_area .highlight {
     border: none;
-    padding: 0 0;
+    padding: 0;
     margin: 0;
     box-shadow: none;
+}
+
+div.nbinput.container > div[class*=highlight],
+div.nboutput.container > div[class*=highlight] {
+    margin: 0;
+}
+
+div.nbinput.container div.prompt *,
+div.nboutput.container div.prompt * {
+    background: none;
+}
+
+div.nboutput.container div.output_area .highlight,
+div.nboutput.container div.output_area pre {
+    background: unset;
+}
+
+div.nboutput.container div.output_area div.highlight {
+    color: unset;  /* override Pygments text color */
 }
 
 /* avoid gaps between output lines */
@@ -665,7 +685,7 @@ div.nboutput.container div.output_area {
 div.nbinput.container div.input_area {
     border: 1px solid #e0e0e0;
     border-radius: 2px;
-    background: #f5f5f5;
+    /*background: #f5f5f5;*/
 }
 
 /* override MathJax center alignment in output cells */
@@ -731,6 +751,7 @@ div.nboutput.container div.output_area.rendered_html,
 div.nboutput.container div.output_area > div.output_javascript,
 div.nboutput.container div.output_area:not(.rendered_html) > img{
     padding: 5px;
+    margin: 0;
 }
 
 /* fix copybtn overflow problem in chromium (needed for 'sphinx_copybutton') */
@@ -807,263 +828,272 @@ div.rendered_html tbody tr:hover {
         </div>
        </div>
        <p>
-        <img alt="aa0b7d08657e4632954449c9ba0b4b6a" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
+        <img alt="b8adece3796b4208925bba6234298b91" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
        </p>
-       <h1 id="notebooks-ssd-object-detection-demo--page-root">
-        Object Detection with TRTorch (SSD)
-        <a class="headerlink" href="#notebooks-ssd-object-detection-demo--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <hr class="docutils"/>
-       <h2 id="Overview">
-        Overview
-        <a class="headerlink" href="#Overview" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <p>
-        In PyTorch 1.0, TorchScript was introduced as a method to separate your PyTorch model from Python, make it portable and optimizable.
-       </p>
-       <p>
-        TRTorch is a compiler that uses TensorRT (NVIDIA’s Deep Learning Optimization SDK and Runtime) to optimize TorchScript code. It compiles standard TorchScript modules into ones that internally run with TensorRT optimizations.
-       </p>
-       <p>
-        TensorRT can take models from any major framework and specifically tune them to perform better on specific target hardware in the NVIDIA family, and TRTorch enables us to continue to remain in the PyTorch ecosystem whilst doing so. This allows us to leverage the great features in PyTorch, including module composability, its flexible tensor implementation, data loaders and more. TRTorch is available to use with both PyTorch and LibTorch.
-       </p>
-       <p>
-        To get more background information on this, we suggest the
-        <strong>
-         lenet-getting-started
-        </strong>
-        notebook as a primer for getting started with TRTorch.
-       </p>
-       <h3 id="Learning-objectives">
-        Learning objectives
-        <a class="headerlink" href="#Learning-objectives" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        This notebook demonstrates the steps for compiling a TorchScript module with TRTorch on a pretrained SSD network, and running it to test the speedup obtained.
-       </p>
-       <h2 id="Contents">
-        Contents
-        <a class="headerlink" href="#Contents" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <ol class="arabic simple">
-        <li>
-         <p>
-          <a class="reference external" href="#1">
-           Requirements
+       <section id="Object-Detection-with-TRTorch-(SSD)">
+        <h1 id="notebooks-ssd-object-detection-demo--page-root">
+         Object Detection with TRTorch (SSD)
+         <a class="headerlink" href="#notebooks-ssd-object-detection-demo--page-root" title="Permalink to this headline">
+          ¶
+         </a>
+        </h1>
+        <hr class="docutils"/>
+        <section id="Overview">
+         <h2 id="Overview">
+          Overview
+          <a class="headerlink" href="#Overview" title="Permalink to this headline">
+           ¶
           </a>
-         </p>
-        </li>
-        <li>
+         </h2>
          <p>
-          <a class="reference external" href="#2">
-           SSD Overview
-          </a>
+          In PyTorch 1.0, TorchScript was introduced as a method to separate your PyTorch model from Python, make it portable and optimizable.
          </p>
-        </li>
-        <li>
          <p>
-          <a class="reference external" href="#3">
-           Creating TorchScript modules
-          </a>
+          TRTorch is a compiler that uses TensorRT (NVIDIA’s Deep Learning Optimization SDK and Runtime) to optimize TorchScript code. It compiles standard TorchScript modules into ones that internally run with TensorRT optimizations.
          </p>
-        </li>
-        <li>
          <p>
-          <a class="reference external" href="#4">
-           Compiling with TRTorch
-          </a>
+          TensorRT can take models from any major framework and specifically tune them to perform better on specific target hardware in the NVIDIA family, and TRTorch enables us to continue to remain in the PyTorch ecosystem whilst doing so. This allows us to leverage the great features in PyTorch, including module composability, its flexible tensor implementation, data loaders and more. TRTorch is available to use with both PyTorch and LibTorch.
          </p>
-        </li>
-        <li>
          <p>
-          <a class="reference external" href="#5">
-           Running Inference
-          </a>
+          To get more background information on this, we suggest the
+          <strong>
+           lenet-getting-started
+          </strong>
+          notebook as a primer for getting started with TRTorch.
          </p>
-        </li>
-        <li>
+         <section id="Learning-objectives">
+          <h3 id="Learning-objectives">
+           Learning objectives
+           <a class="headerlink" href="#Learning-objectives" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           This notebook demonstrates the steps for compiling a TorchScript module with TRTorch on a pretrained SSD network, and running it to test the speedup obtained.
+          </p>
+         </section>
+        </section>
+        <section id="Contents">
+         <h2 id="Contents">
+          Contents
+          <a class="headerlink" href="#Contents" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <ol class="arabic simple">
+          <li>
+           <p>
+            <a class="reference external" href="#1">
+             Requirements
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference external" href="#2">
+             SSD Overview
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference external" href="#3">
+             Creating TorchScript modules
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference external" href="#4">
+             Compiling with TRTorch
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference external" href="#5">
+             Running Inference
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference external" href="#6">
+             Measuring Speedup
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference external" href="#7">
+             Conclusion
+            </a>
+           </p>
+          </li>
+         </ol>
+         <hr class="docutils"/>
          <p>
-          <a class="reference external" href="#6">
-           Measuring Speedup
-          </a>
+          ## 1. Requirements
          </p>
-        </li>
-        <li>
          <p>
-          <a class="reference external" href="#7">
-           Conclusion
-          </a>
+          Follow the steps in
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            notebooks/README
+           </span>
+          </code>
+          to prepare a Docker container, within which you can run this demo notebook.
          </p>
-        </li>
-       </ol>
-       <hr class="docutils"/>
-       <p>
-        ## 1. Requirements
-       </p>
-       <p>
-        Follow the steps in
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          notebooks/README
-         </span>
-        </code>
-        to prepare a Docker container, within which you can run this demo notebook.
-       </p>
-       <p>
-        In addition to that, run the following cell to obtain additional libraries specific to this demo.
-       </p>
-       <div class="nbinput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[2]:
+         <p>
+          In addition to that, run the following cell to obtain additional libraries specific to this demo.
+         </p>
+         <div class="nbinput nblast docutils container">
+          <div class="prompt highlight-none notranslate">
+           <div class="highlight">
+            <pre><span></span>[2]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+           </div>
+          </div>
+          <div class="input_area highlight-ipython3 notranslate">
+           <div class="highlight">
+            <pre>
 <span></span>%%capture
 %%bash
 # Known working versions
 pip install numpy==1.19 scipy==1.5.2 Pillow==6.2.0 scikit-image==0.17.2 matplotlib==3.3.0
 </pre>
+           </div>
+          </div>
          </div>
-        </div>
-       </div>
-       <hr class="docutils"/>
-       <p>
-        ## 2. SSD
-       </p>
-       <h3 id="Single-Shot-MultiBox-Detector-model-for-object-detection">
-        Single Shot MultiBox Detector model for object detection
-        <a class="headerlink" href="#Single-Shot-MultiBox-Detector-model-for-object-detection" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <table>
-        <colgroup>
-         <col style="width: 50%"/>
-         <col style="width: 50%"/>
-        </colgroup>
-        <thead>
-         <tr class="row-odd">
-          <th class="head">
-           <p>
-            _
-           </p>
-          </th>
-          <th class="head">
-           <p>
-            _
-           </p>
-          </th>
-         </tr>
-        </thead>
-        <tbody>
-         <tr class="row-even">
-          <td>
-           <p>
-            <img alt="alt" src="https://pytorch.org/assets/images/ssd.png"/>
-           </p>
-          </td>
-          <td>
-           <p>
-            <img alt="alt" src="https://pytorch.org/assets/images/ssd.png"/>
-           </p>
-          </td>
-         </tr>
-        </tbody>
-       </table>
-       <p>
-        PyTorch has a model repository called the PyTorch Hub, which is a source for high quality implementations of common models. We can get our SSD model pretrained on
-        <a class="reference external" href="https://cocodataset.org/#home">
-         COCO
-        </a>
-        from there.
-       </p>
-       <h3 id="Model-Description">
-        Model Description
-        <a class="headerlink" href="#Model-Description" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        This SSD300 model is based on the
-        <a class="reference external" href="https://arxiv.org/abs/1512.02325">
-         SSD: Single Shot MultiBox Detector
-        </a>
-        paper, which describes SSD as “a method for detecting objects in images using a single deep neural network”. The input size is fixed to 300x300.
-       </p>
-       <p>
-        The main difference between this model and the one described in the paper is in the backbone. Specifically, the VGG model is obsolete and is replaced by the ResNet-50 model.
-       </p>
-       <p>
-        From the
-        <a class="reference external" href="https://arxiv.org/abs/1611.10012">
-         Speed/accuracy trade-offs for modern convolutional object detectors
-        </a>
-        paper, the following enhancements were made to the backbone: * The conv5_x, avgpool, fc and softmax layers were removed from the original classification model. * All strides in conv4_x are set to 1x1.
-       </p>
-       <p>
-        The backbone is followed by 5 additional convolutional layers. In addition to the convolutional layers, we attached 6 detection heads: * The first detection head is attached to the last conv4_x layer. * The other five detection heads are attached to the corresponding 5 additional layers.
-       </p>
-       <p>
-        Detector heads are similar to the ones referenced in the paper, however, they are enhanced by additional BatchNorm layers after each convolution.
-       </p>
-       <p>
-        More information about this SSD model is available at Nvidia’s “DeepLearningExamples” Github
-        <a class="reference external" href="https://github.com/NVIDIA/DeepLearningExamples/tree/master/PyTorch/Detection/SSD">
-         here
-        </a>
-        .
-       </p>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[3]:
+         <hr class="docutils"/>
+         <p>
+          ## 2. SSD
+         </p>
+         <section id="Single-Shot-MultiBox-Detector-model-for-object-detection">
+          <h3 id="Single-Shot-MultiBox-Detector-model-for-object-detection">
+           Single Shot MultiBox Detector model for object detection
+           <a class="headerlink" href="#Single-Shot-MultiBox-Detector-model-for-object-detection" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <table>
+           <colgroup>
+            <col style="width: 50%"/>
+            <col style="width: 50%"/>
+           </colgroup>
+           <thead>
+            <tr class="row-odd">
+             <th class="head">
+              <p>
+               _
+              </p>
+             </th>
+             <th class="head">
+              <p>
+               _
+              </p>
+             </th>
+            </tr>
+           </thead>
+           <tbody>
+            <tr class="row-even">
+             <td>
+              <p>
+               <img alt="alt" src="https://pytorch.org/assets/images/ssd.png"/>
+              </p>
+             </td>
+             <td>
+              <p>
+               <img alt="alt" src="https://pytorch.org/assets/images/ssd.png"/>
+              </p>
+             </td>
+            </tr>
+           </tbody>
+          </table>
+          <p>
+           PyTorch has a model repository called the PyTorch Hub, which is a source for high quality implementations of common models. We can get our SSD model pretrained on
+           <a class="reference external" href="https://cocodataset.org/#home">
+            COCO
+           </a>
+           from there.
+          </p>
+         </section>
+         <section id="Model-Description">
+          <h3 id="Model-Description">
+           Model Description
+           <a class="headerlink" href="#Model-Description" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           This SSD300 model is based on the
+           <a class="reference external" href="https://arxiv.org/abs/1512.02325">
+            SSD: Single Shot MultiBox Detector
+           </a>
+           paper, which describes SSD as “a method for detecting objects in images using a single deep neural network”. The input size is fixed to 300x300.
+          </p>
+          <p>
+           The main difference between this model and the one described in the paper is in the backbone. Specifically, the VGG model is obsolete and is replaced by the ResNet-50 model.
+          </p>
+          <p>
+           From the
+           <a class="reference external" href="https://arxiv.org/abs/1611.10012">
+            Speed/accuracy trade-offs for modern convolutional object detectors
+           </a>
+           paper, the following enhancements were made to the backbone: * The conv5_x, avgpool, fc and softmax layers were removed from the original classification model. * All strides in conv4_x are set to 1x1.
+          </p>
+          <p>
+           The backbone is followed by 5 additional convolutional layers. In addition to the convolutional layers, we attached 6 detection heads: * The first detection head is attached to the last conv4_x layer. * The other five detection heads are attached to the corresponding 5 additional layers.
+          </p>
+          <p>
+           Detector heads are similar to the ones referenced in the paper, however, they are enhanced by additional BatchNorm layers after each convolution.
+          </p>
+          <p>
+           More information about this SSD model is available at Nvidia’s “DeepLearningExamples” Github
+           <a class="reference external" href="https://github.com/NVIDIA/DeepLearningExamples/tree/master/PyTorch/Detection/SSD">
+            here
+           </a>
+           .
+          </p>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[3]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span>import torch
 
 # List of available models in PyTorch Hub from Nvidia/DeepLearningExamples
 torch.hub.list('NVIDIA/DeepLearningExamples:torchhub')
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area stderr docutils container">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area stderr docutils container">
+            <div class="highlight">
+             <pre>
 Using cache found in /root/.cache/torch/hub/NVIDIA_DeepLearningExamples_torchhub
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[3]:
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[3]:
 </pre>
-         </div>
-        </div>
-        <div class="output_area docutils container">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
 ['checkpoint_from_distributed',
  'nvidia_ncf',
  'nvidia_ssd',
@@ -1072,65 +1102,67 @@ Using cache found in /root/.cache/torch/hub/NVIDIA_DeepLearningExamples_torchhub
  'nvidia_waveglow',
  'unwrap_distributed']
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[4]:
+            </div>
+           </div>
+          </div>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[4]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span># load SSD model pretrained on COCO from Torch Hub
 precision = 'fp32'
 ssd300 = torch.hub.load('NVIDIA/DeepLearningExamples:torchhub', 'nvidia_ssd', model_math=precision);
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area stderr docutils container">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area stderr docutils container">
+            <div class="highlight">
+             <pre>
 Using cache found in /root/.cache/torch/hub/NVIDIA_DeepLearningExamples_torchhub
 </pre>
-         </div>
-        </div>
-       </div>
-       <p>
-        Setting
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          precision="fp16"
-         </span>
-        </code>
-        will load a checkpoint trained with mixed precision into architecture enabling execution on Tensor Cores. Handling mixed precision data requires the Apex library.
-       </p>
-       <h3 id="Sample-Inference">
-        Sample Inference
-        <a class="headerlink" href="#Sample-Inference" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        We can now run inference on the model. This is demonstrated below using sample images from the COCO 2017 Validation set.
-       </p>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[5]:
+            </div>
+           </div>
+          </div>
+          <p>
+           Setting
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             precision="fp16"
+            </span>
+           </code>
+           will load a checkpoint trained with mixed precision into architecture enabling execution on Tensor Cores. Handling mixed precision data requires the Apex library.
+          </p>
+         </section>
+         <section id="Sample-Inference">
+          <h3 id="Sample-Inference">
+           Sample Inference
+           <a class="headerlink" href="#Sample-Inference" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           We can now run inference on the model. This is demonstrated below using sample images from the COCO 2017 Validation set.
+          </p>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[5]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span># Sample images from the COCO validation set
 uris = [
     'http://images.cocodataset.org/val2017/000000397133.jpg',
@@ -1149,42 +1181,42 @@ tensor = utils.prepare_tensor(inputs, False)
 # translate class IDs into object names.
 classes_to_labels = utils.get_coco_object_dictionary()
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area stderr docutils container">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area stderr docutils container">
+            <div class="highlight">
+             <pre>
 Using cache found in /root/.cache/torch/hub/NVIDIA_DeepLearningExamples_torchhub
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area docutils container">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
 Downloading COCO annotations.
 Downloading finished.
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nbinput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[6]:
+            </div>
+           </div>
+          </div>
+          <div class="nbinput nblast docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[6]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span># Next, we run object detection
 model = ssd300.eval().to("cuda")
 detections_batch = model(tensor)
@@ -1195,25 +1227,27 @@ detections_batch = model(tensor)
 results_per_input = utils.decode_results(detections_batch)
 best_results_per_input = [utils.pick_best(results, 0.40) for results in results_per_input]
 </pre>
-         </div>
-        </div>
-       </div>
-       <h3 id="Visualize-results">
-        Visualize results
-        <a class="headerlink" href="#Visualize-results" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <div class="nbinput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[7]:
+            </div>
+           </div>
+          </div>
+         </section>
+         <section id="Visualize-results">
+          <h3 id="Visualize-results">
+           Visualize results
+           <a class="headerlink" href="#Visualize-results" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <div class="nbinput nblast docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[7]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span>from matplotlib import pyplot as plt
 import matplotlib.patches as patches
 
@@ -1235,62 +1269,64 @@ def plot_results(best_results):
     plt.show()
 
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[8]:
+            </div>
+           </div>
+          </div>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[8]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span># Visualize results without TRTorch/TensorRT
 plot_results(best_results_per_input)
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area docutils container">
-         <img alt="../_images/_notebooks_ssd-object-detection-demo_17_0.png" src="../_images/_notebooks_ssd-object-detection-demo_17_0.png"/>
-        </div>
-       </div>
-       <div class="nboutput docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area docutils container">
-         <img alt="../_images/_notebooks_ssd-object-detection-demo_17_1.png" src="../_images/_notebooks_ssd-object-detection-demo_17_1.png"/>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area docutils container">
-         <img alt="../_images/_notebooks_ssd-object-detection-demo_17_2.png" src="../_images/_notebooks_ssd-object-detection-demo_17_2.png"/>
-        </div>
-       </div>
-       <h3 id="Benchmark-utility">
-        Benchmark utility
-        <a class="headerlink" href="#Benchmark-utility" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <div class="nbinput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[9]:
+            </div>
+           </div>
+          </div>
+          <div class="nboutput docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <img alt="../_images/_notebooks_ssd-object-detection-demo_17_0.png" src="../_images/_notebooks_ssd-object-detection-demo_17_0.png"/>
+           </div>
+          </div>
+          <div class="nboutput docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <img alt="../_images/_notebooks_ssd-object-detection-demo_17_1.png" src="../_images/_notebooks_ssd-object-detection-demo_17_1.png"/>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <img alt="../_images/_notebooks_ssd-object-detection-demo_17_2.png" src="../_images/_notebooks_ssd-object-detection-demo_17_2.png"/>
+           </div>
+          </div>
+         </section>
+         <section id="Benchmark-utility">
+          <h3 id="Benchmark-utility">
+           Benchmark utility
+           <a class="headerlink" href="#Benchmark-utility" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <div class="nbinput nblast docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[9]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span>import time
 import numpy as np
 
@@ -1327,39 +1363,39 @@ def benchmark(model, input_shape=(1024, 1, 32, 32), dtype='fp32', nwarmup=50, nr
     print('Average batch time: %.2f ms'%(np.mean(timings)*1000))
 
 </pre>
-         </div>
-        </div>
-       </div>
-       <p>
-        We check how well the model performs
-        <strong>
-         before
-        </strong>
-        we use TRTorch/TensorRT
-       </p>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[10]:
+            </div>
+           </div>
+          </div>
+          <p>
+           We check how well the model performs
+           <strong>
+            before
+           </strong>
+           we use TRTorch/TensorRT
+          </p>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[10]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span># Model benchmark without TRTorch/TensorRT
 model = ssd300.eval().to("cuda")
 benchmark(model, input_shape=(128, 3, 300, 300), nruns=1000)
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area docutils container">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
 Warm up ...
 Start timing ...
 Iteration 100/1000, avg batch time 362.25 ms
@@ -1377,89 +1413,89 @@ Output location prediction size: torch.Size([128, 4, 8732])
 Output label prediction size: torch.Size([128, 81, 8732])
 Average batch time: 362.99 ms
 </pre>
-         </div>
-        </div>
-       </div>
-       <hr class="docutils"/>
-       <p>
-        ## 3. Creating TorchScript modules
-       </p>
-       <p>
-        To compile with TRTorch, the model must first be in
-        <strong>
-         TorchScript
-        </strong>
-        . TorchScript is a programming language included in PyTorch which removes the Python dependency normal PyTorch models have. This conversion is done via a JIT compiler which given a PyTorch Module will generate an equivalent TorchScript Module. There are two paths that can be used to generate TorchScript:
-        <strong>
-         Tracing
-        </strong>
-        and
-        <strong>
-         Scripting
-        </strong>
-        . - Tracing follows execution of PyTorch generating ops in TorchScript corresponding to what it
+            </div>
+           </div>
+          </div>
+          <hr class="docutils"/>
+          <p>
+           ## 3. Creating TorchScript modules
+          </p>
+          <p>
+           To compile with TRTorch, the model must first be in
+           <strong>
+            TorchScript
+           </strong>
+           . TorchScript is a programming language included in PyTorch which removes the Python dependency normal PyTorch models have. This conversion is done via a JIT compiler which given a PyTorch Module will generate an equivalent TorchScript Module. There are two paths that can be used to generate TorchScript:
+           <strong>
+            Tracing
+           </strong>
+           and
+           <strong>
+            Scripting
+           </strong>
+           . - Tracing follows execution of PyTorch generating ops in TorchScript corresponding to what it
 sees. - Scripting does an analysis of the Python code and generates TorchScript, this allows the resulting graph to include control flow which tracing cannot do.
-       </p>
-       <p>
-        Tracing however due to its simplicity is more likely to compile successfully with TRTorch (though both systems are supported).
-       </p>
-       <div class="nbinput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[11]:
+          </p>
+          <p>
+           Tracing however due to its simplicity is more likely to compile successfully with TRTorch (though both systems are supported).
+          </p>
+          <div class="nbinput nblast docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[11]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span>model = ssd300.eval().to("cuda")
 traced_model = torch.jit.trace(model, [torch.randn((1,3,300,300)).to("cuda")])
 </pre>
-         </div>
-        </div>
-       </div>
-       <p>
-        If required, we can also save this model and use it independently of Python.
-       </p>
-       <div class="nbinput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[12]:
+            </div>
+           </div>
+          </div>
+          <p>
+           If required, we can also save this model and use it independently of Python.
+          </p>
+          <div class="nbinput nblast docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[12]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span># This is just an example, and not required for the purposes of this demo
 torch.jit.save(traced_model, "ssd_300_traced.jit.pt")
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[13]:
+            </div>
+           </div>
+          </div>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[13]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span># Obtain the average time taken by a batch of input with Torchscript compiled modules
 benchmark(traced_model, input_shape=(128, 3, 300, 300), nruns=1000)
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area docutils container">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
 Warm up ...
 Start timing ...
 Iteration 100/1000, avg batch time 363.09 ms
@@ -1477,23 +1513,23 @@ Output location prediction size: torch.Size([128, 4, 8732])
 Output label prediction size: torch.Size([128, 81, 8732])
 Average batch time: 363.08 ms
 </pre>
-         </div>
-        </div>
-       </div>
-       <hr class="docutils"/>
-       <p>
-        ## 4. Compiling with TRTorch TorchScript modules behave just like normal PyTorch modules and are intercompatible. From TorchScript we can now compile a TensorRT based module. This module will still be implemented in TorchScript but all the computation will be done in TensorRT.
-       </p>
-       <div class="nbinput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[14]:
+            </div>
+           </div>
+          </div>
+          <hr class="docutils"/>
+          <p>
+           ## 4. Compiling with TRTorch TorchScript modules behave just like normal PyTorch modules and are intercompatible. From TorchScript we can now compile a TensorRT based module. This module will still be implemented in TorchScript but all the computation will be done in TensorRT.
+          </p>
+          <div class="nbinput nblast docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[14]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span>import trtorch
 
 # The compiled module will have precision as specified by "op_precision".
@@ -1504,26 +1540,26 @@ trt_model = trtorch.compile(traced_model, {
     "workspace_size": 1 &lt;&lt; 20
 })
 </pre>
-         </div>
-        </div>
-       </div>
-       <hr class="docutils"/>
-       <p>
-        ## 5. Running Inference
-       </p>
-       <p>
-        Next, we run object detection
-       </p>
-       <div class="nbinput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[15]:
+            </div>
+           </div>
+          </div>
+          <hr class="docutils"/>
+          <p>
+           ## 5. Running Inference
+          </p>
+          <p>
+           Next, we run object detection
+          </p>
+          <div class="nbinput nblast docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[15]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span># using a TRTorch module is exactly the same as how we usually do inference in PyTorch i.e. model(inputs)
 detections_batch = trt_model(tensor.to(torch.half)) # convert the input to half precision
 
@@ -1533,72 +1569,75 @@ detections_batch = trt_model(tensor.to(torch.half)) # convert the input to half 
 results_per_input = utils.decode_results(detections_batch)
 best_results_per_input_trt = [utils.pick_best(results, 0.40) for results in results_per_input]
 </pre>
-         </div>
-        </div>
-       </div>
-       <p>
-        Now, let’s visualize our predictions!
-       </p>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[16]:
+            </div>
+           </div>
+          </div>
+          <p>
+           Now, let’s visualize our predictions!
+          </p>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[16]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span># Visualize results with TRTorch/TensorRT
 plot_results(best_results_per_input_trt)
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area docutils container">
-         <img alt="../_images/_notebooks_ssd-object-detection-demo_34_0.png" src="../_images/_notebooks_ssd-object-detection-demo_34_0.png"/>
-        </div>
-       </div>
-       <div class="nboutput docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area docutils container">
-         <img alt="../_images/_notebooks_ssd-object-detection-demo_34_1.png" src="../_images/_notebooks_ssd-object-detection-demo_34_1.png"/>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area docutils container">
-         <img alt="../_images/_notebooks_ssd-object-detection-demo_34_2.png" src="../_images/_notebooks_ssd-object-detection-demo_34_2.png"/>
-        </div>
-       </div>
-       <p>
-        We get similar results as before!
-       </p>
-       <hr class="docutils"/>
-       <h2 id="6.-Measuring-Speedup">
-        6. Measuring Speedup
-        <a class="headerlink" href="#6.-Measuring-Speedup" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <p>
-        We can run the benchmark function again to see the speedup gained! Compare this result with the same batch-size of input in the case without TRTorch/TensorRT above.
-       </p>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[17]:
+            </div>
+           </div>
+          </div>
+          <div class="nboutput docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <img alt="../_images/_notebooks_ssd-object-detection-demo_34_0.png" src="../_images/_notebooks_ssd-object-detection-demo_34_0.png"/>
+           </div>
+          </div>
+          <div class="nboutput docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <img alt="../_images/_notebooks_ssd-object-detection-demo_34_1.png" src="../_images/_notebooks_ssd-object-detection-demo_34_1.png"/>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <img alt="../_images/_notebooks_ssd-object-detection-demo_34_2.png" src="../_images/_notebooks_ssd-object-detection-demo_34_2.png"/>
+           </div>
+          </div>
+          <p>
+           We get similar results as before!
+          </p>
+         </section>
+        </section>
+        <hr class="docutils"/>
+        <section id="6.-Measuring-Speedup">
+         <h2 id="6.-Measuring-Speedup">
+          6. Measuring Speedup
+          <a class="headerlink" href="#6.-Measuring-Speedup" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <p>
+          We can run the benchmark function again to see the speedup gained! Compare this result with the same batch-size of input in the case without TRTorch/TensorRT above.
+         </p>
+         <div class="nbinput docutils container">
+          <div class="prompt highlight-none notranslate">
+           <div class="highlight">
+            <pre><span></span>[17]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+           </div>
+          </div>
+          <div class="input_area highlight-ipython3 notranslate">
+           <div class="highlight">
+            <pre>
 <span></span>batch_size = 128
 
 # Recompiling with batch_size we use for evaluating performance
@@ -1610,15 +1649,15 @@ trt_model = trtorch.compile(traced_model, {
 
 benchmark(trt_model, input_shape=(batch_size, 3, 300, 300), nruns=1000, dtype="fp16")
 </pre>
+           </div>
+          </div>
          </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area docutils container">
-         <div class="highlight">
-          <pre>
+         <div class="nboutput nblast docutils container">
+          <div class="prompt empty docutils container">
+          </div>
+          <div class="output_area docutils container">
+           <div class="highlight">
+            <pre>
 Warm up ...
 Start timing ...
 Iteration 100/1000, avg batch time 72.94 ms
@@ -1636,73 +1675,81 @@ Output location prediction size: torch.Size([128, 4, 8732])
 Output label prediction size: torch.Size([128, 81, 8732])
 Average batch time: 73.21 ms
 </pre>
+           </div>
+          </div>
          </div>
-        </div>
-       </div>
-       <hr class="docutils"/>
-       <h2 id="7.-Conclusion">
-        7. Conclusion
-        <a class="headerlink" href="#7.-Conclusion" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <p>
-        In this notebook, we have walked through the complete process of compiling a TorchScript SSD300 model with TRTorch, and tested the performance impact of the optimization. We find that using the TRTorch compiled model, we gain significant speedup in inference without any noticeable drop in performance!
-       </p>
-       <h3 id="Details">
-        Details
-        <a class="headerlink" href="#Details" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        For detailed information on model input and output, training recipies, inference and performance visit:
-        <a class="reference external" href="https://github.com/NVIDIA/DeepLearningExamples/tree/master/PyTorch/Detection/SSD">
-         github
-        </a>
-        and/or
-        <a class="reference external" href="https://ngc.nvidia.com/catalog/model-scripts/nvidia:ssd_for_pytorch">
-         NGC
-        </a>
-       </p>
-       <h3 id="References">
-        References
-        <a class="headerlink" href="#References" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <ul class="simple">
-        <li>
-         <p>
-          <a class="reference external" href="https://arxiv.org/abs/1512.02325">
-           SSD: Single Shot MultiBox Detector
+        </section>
+        <hr class="docutils"/>
+        <section id="7.-Conclusion">
+         <h2 id="7.-Conclusion">
+          7. Conclusion
+          <a class="headerlink" href="#7.-Conclusion" title="Permalink to this headline">
+           ¶
           </a>
-          paper
-         </p>
-        </li>
-        <li>
+         </h2>
          <p>
-          <a class="reference external" href="https://arxiv.org/abs/1611.10012">
-           Speed/accuracy trade-offs for modern convolutional object detectors
-          </a>
-          paper
+          In this notebook, we have walked through the complete process of compiling a TorchScript SSD300 model with TRTorch, and tested the performance impact of the optimization. We find that using the TRTorch compiled model, we gain significant speedup in inference without any noticeable drop in performance!
          </p>
-        </li>
-        <li>
-         <p>
-          <a class="reference external" href="https://ngc.nvidia.com/catalog/model-scripts/nvidia:ssd_for_pytorch">
-           SSD on NGC
-          </a>
-         </p>
-        </li>
-        <li>
-         <p>
-          <a class="reference external" href="https://github.com/NVIDIA/DeepLearningExamples/tree/master/PyTorch/Detection/SSD">
-           SSD on github
-          </a>
-         </p>
-        </li>
-       </ul>
+         <section id="Details">
+          <h3 id="Details">
+           Details
+           <a class="headerlink" href="#Details" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           For detailed information on model input and output, training recipies, inference and performance visit:
+           <a class="reference external" href="https://github.com/NVIDIA/DeepLearningExamples/tree/master/PyTorch/Detection/SSD">
+            github
+           </a>
+           and/or
+           <a class="reference external" href="https://ngc.nvidia.com/catalog/model-scripts/nvidia:ssd_for_pytorch">
+            NGC
+           </a>
+          </p>
+         </section>
+         <section id="References">
+          <h3 id="References">
+           References
+           <a class="headerlink" href="#References" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <ul class="simple">
+           <li>
+            <p>
+             <a class="reference external" href="https://arxiv.org/abs/1512.02325">
+              SSD: Single Shot MultiBox Detector
+             </a>
+             paper
+            </p>
+           </li>
+           <li>
+            <p>
+             <a class="reference external" href="https://arxiv.org/abs/1611.10012">
+              Speed/accuracy trade-offs for modern convolutional object detectors
+             </a>
+             paper
+            </p>
+           </li>
+           <li>
+            <p>
+             <a class="reference external" href="https://ngc.nvidia.com/catalog/model-scripts/nvidia:ssd_for_pytorch">
+              SSD on NGC
+             </a>
+            </p>
+           </li>
+           <li>
+            <p>
+             <a class="reference external" href="https://github.com/NVIDIA/DeepLearningExamples/tree/master/PyTorch/Detection/SSD">
+              SSD on github
+             </a>
+            </p>
+           </li>
+          </ul>
+         </section>
+        </section>
+       </section>
       </article>
      </div>
     </div>

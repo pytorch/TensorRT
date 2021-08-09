@@ -22,7 +22,7 @@ class TRTorchLogger : public nvinfer1::ILogger {
  public:
   TRTorchLogger(std::string prefix = "[TRTorch] - ", Severity severity = Severity::kWARNING, bool color = true);
   TRTorchLogger(std::string prefix = "[TRTorch] - ", LogLevel lvl = LogLevel::kWARNING, bool color = true);
-  void log(Severity severity, const char* msg) override;
+  void log(Severity severity, const char* msg) noexcept override;
   void log(LogLevel lvl, std::string msg);
   void set_logging_prefix(std::string prefix);
   void set_reportable_severity(Severity severity);

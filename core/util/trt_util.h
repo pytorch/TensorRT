@@ -87,12 +87,12 @@ inline std::ostream& operator<<(std::ostream& stream, const nvinfer1::DeviceType
 
 inline std::ostream& operator<<(std::ostream& stream, const nvinfer1::EngineCapability& cap) {
   switch (cap) {
-    case nvinfer1::EngineCapability::kDEFAULT:
-      return stream << "Default";
-    case nvinfer1::EngineCapability::kSAFE_GPU:
-      return stream << "Safe GPU";
-    case nvinfer1::EngineCapability::kSAFE_DLA:
-      return stream << "Safe DLA";
+    case nvinfer1::EngineCapability::kSTANDARD:
+      return stream << "standard";
+    case nvinfer1::EngineCapability::kSAFETY:
+      return stream << "safety";
+    case nvinfer1::EngineCapability::kDLA_STANDALONE:
+      return stream << "DLA standalone";
     default:
       return stream << "Unknown Engine Capability Setting";
   }

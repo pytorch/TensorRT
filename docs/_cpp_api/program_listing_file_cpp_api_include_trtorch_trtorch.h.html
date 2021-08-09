@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -56,6 +57,11 @@
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
+  </script>
+  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+  <script type="text/x-mathjax-config">
+   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -363,32 +369,33 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <span id="program-listing-file-cpp-api-include-trtorch-trtorch-h">
-       </span>
-       <h1 id="cpp-api-program-listing-file-cpp-api-include-trtorch-trtorch-h--page-root">
-        Program Listing for File trtorch.h
-        <a class="headerlink" href="#cpp-api-program-listing-file-cpp-api-include-trtorch-trtorch-h--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <p>
-        ↰
-        <a class="reference internal" href="file_cpp_api_include_trtorch_trtorch.h.html#file-cpp-api-include-trtorch-trtorch-h">
-         <span class="std std-ref">
-          Return to documentation for file
-         </span>
-        </a>
-        (
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          cpp/api/include/trtorch/trtorch.h
-         </span>
-        </code>
-        )
-       </p>
-       <div class="highlight-cpp notranslate">
-        <div class="highlight">
-         <pre><span></span><span class="cm">/*</span>
+       <section id="program-listing-for-file-trtorch-h">
+        <span id="program-listing-file-cpp-api-include-trtorch-trtorch-h">
+        </span>
+        <h1 id="cpp-api-program-listing-file-cpp-api-include-trtorch-trtorch-h--page-root">
+         Program Listing for File trtorch.h
+         <a class="headerlink" href="#cpp-api-program-listing-file-cpp-api-include-trtorch-trtorch-h--page-root" title="Permalink to this headline">
+          ¶
+         </a>
+        </h1>
+        <p>
+         ↰
+         <a class="reference internal" href="file_cpp_api_include_trtorch_trtorch.h.html#file-cpp-api-include-trtorch-trtorch-h">
+          <span class="std std-ref">
+           Return to documentation for file
+          </span>
+         </a>
+         (
+         <code class="docutils literal notranslate">
+          <span class="pre">
+           cpp/api/include/trtorch/trtorch.h
+          </span>
+         </code>
+         )
+        </p>
+        <div class="highlight-cpp notranslate">
+         <div class="highlight">
+          <pre><span></span><span class="cm">/*</span>
 <span class="cm"> * Copyright (c) NVIDIA Corporation.</span>
 <span class="cm"> * All rights reserved.</span>
 <span class="cm"> *</span>
@@ -407,27 +414,27 @@
 
 <span class="c1">// Just include the .h?</span>
 <span class="cp">#ifndef DOXYGEN_SHOULD_SKIP_THIS</span>
-<span class="k">namespace</span> <span class="n">torch</span> <span class="p">{</span>
-<span class="k">namespace</span> <span class="n">jit</span> <span class="p">{</span>
+<span class="k">namespace</span> <span class="nn">torch</span> <span class="p">{</span>
+<span class="k">namespace</span> <span class="nn">jit</span> <span class="p">{</span>
 <span class="k">struct</span> <span class="nc">Graph</span><span class="p">;</span>
 <span class="k">struct</span> <span class="nc">Module</span><span class="p">;</span>
 <span class="p">}</span> <span class="c1">// namespace jit</span>
 <span class="p">}</span> <span class="c1">// namespace torch</span>
 
-<span class="k">namespace</span> <span class="n">c10</span> <span class="p">{</span>
+<span class="k">namespace</span> <span class="nn">c10</span> <span class="p">{</span>
 <span class="k">enum</span> <span class="k">class</span> <span class="nc">DeviceType</span> <span class="o">:</span> <span class="kt">int8_t</span><span class="p">;</span>
 <span class="k">enum</span> <span class="k">class</span> <span class="nc">ScalarType</span> <span class="o">:</span> <span class="kt">int8_t</span><span class="p">;</span>
 <span class="k">template</span> <span class="o">&lt;</span><span class="k">class</span><span class="o">&gt;</span>
 <span class="k">class</span> <span class="nc">ArrayRef</span><span class="p">;</span>
 <span class="p">}</span> <span class="c1">// namespace c10</span>
 
-<span class="k">namespace</span> <span class="n">nvinfer1</span> <span class="p">{</span>
+<span class="k">namespace</span> <span class="nn">nvinfer1</span> <span class="p">{</span>
 <span class="k">class</span> <span class="nc">IInt8Calibrator</span><span class="p">;</span>
 <span class="p">}</span>
 <span class="cp">#endif </span><span class="c1">// DOXYGEN_SHOULD_SKIP_THIS</span>
 
 <span class="cp">#include</span> <span class="cpf">"trtorch/macros.h"</span><span class="cp"></span>
-<span class="k">namespace</span> <span class="n">trtorch</span> <span class="p">{</span>
+<span class="k">namespace</span> <span class="nn">trtorch</span> <span class="p">{</span>
 <span class="k">struct</span> <span class="nc">TRTORCH_API</span> <span class="n">CompileSpec</span> <span class="p">{</span>
   <span class="k">class</span> <span class="nc">TRTORCH_API</span> <span class="n">DataType</span> <span class="p">{</span>
    <span class="k">public</span><span class="o">:</span>
@@ -441,9 +448,9 @@
     <span class="p">};</span>
 
     <span class="n">DataType</span><span class="p">()</span> <span class="o">=</span> <span class="k">default</span><span class="p">;</span>
-    <span class="k">constexpr</span> <span class="nf">DataType</span><span class="p">(</span><span class="n">Value</span> <span class="n">t</span><span class="p">)</span> <span class="o">:</span> <span class="n">value</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="p">{}</span>
+    <span class="k">constexpr</span> <span class="n">DataType</span><span class="p">(</span><span class="n">Value</span> <span class="n">t</span><span class="p">)</span> <span class="o">:</span> <span class="n">value</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="p">{}</span>
     <span class="n">DataType</span><span class="p">(</span><span class="n">c10</span><span class="o">::</span><span class="n">ScalarType</span> <span class="n">t</span><span class="p">);</span>
-    <span class="k">operator</span> <span class="nf">Value</span><span class="p">()</span> <span class="k">const</span> <span class="p">{</span>
+    <span class="k">operator</span> <span class="n">Value</span><span class="p">()</span> <span class="k">const</span> <span class="p">{</span>
       <span class="k">return</span> <span class="n">value</span><span class="p">;</span>
     <span class="p">}</span>
     <span class="k">explicit</span> <span class="k">operator</span> <span class="kt">bool</span><span class="p">()</span> <span class="o">=</span> <span class="k">delete</span><span class="p">;</span>
@@ -477,9 +484,9 @@
       <span class="p">};</span>
 
       <span class="n">DeviceType</span><span class="p">()</span> <span class="o">=</span> <span class="k">default</span><span class="p">;</span>
-      <span class="k">constexpr</span> <span class="nf">DeviceType</span><span class="p">(</span><span class="n">Value</span> <span class="n">t</span><span class="p">)</span> <span class="o">:</span> <span class="n">value</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="p">{}</span>
+      <span class="k">constexpr</span> <span class="n">DeviceType</span><span class="p">(</span><span class="n">Value</span> <span class="n">t</span><span class="p">)</span> <span class="o">:</span> <span class="n">value</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="p">{}</span>
       <span class="n">DeviceType</span><span class="p">(</span><span class="n">c10</span><span class="o">::</span><span class="n">DeviceType</span> <span class="n">t</span><span class="p">);</span>
-      <span class="k">operator</span> <span class="nf">Value</span><span class="p">()</span> <span class="k">const</span> <span class="p">{</span>
+      <span class="k">operator</span> <span class="n">Value</span><span class="p">()</span> <span class="k">const</span> <span class="p">{</span>
         <span class="k">return</span> <span class="n">value</span><span class="p">;</span>
       <span class="p">}</span>
       <span class="k">explicit</span> <span class="k">operator</span> <span class="kt">bool</span><span class="p">()</span> <span class="o">=</span> <span class="k">delete</span><span class="p">;</span>
@@ -526,9 +533,9 @@
     <span class="p">};</span>
 
     <span class="n">TensorFormat</span><span class="p">()</span> <span class="o">=</span> <span class="k">default</span><span class="p">;</span>
-    <span class="k">constexpr</span> <span class="nf">TensorFormat</span><span class="p">(</span><span class="n">Value</span> <span class="n">t</span><span class="p">)</span> <span class="o">:</span> <span class="n">value</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="p">{}</span>
+    <span class="k">constexpr</span> <span class="n">TensorFormat</span><span class="p">(</span><span class="n">Value</span> <span class="n">t</span><span class="p">)</span> <span class="o">:</span> <span class="n">value</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="p">{}</span>
     <span class="n">TensorFormat</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">MemoryFormat</span> <span class="n">t</span><span class="p">);</span>
-    <span class="k">operator</span> <span class="nf">Value</span><span class="p">()</span> <span class="k">const</span> <span class="p">{</span>
+    <span class="k">operator</span> <span class="n">Value</span><span class="p">()</span> <span class="k">const</span> <span class="p">{</span>
       <span class="k">return</span> <span class="n">value</span><span class="p">;</span>
     <span class="p">}</span>
     <span class="k">explicit</span> <span class="k">operator</span> <span class="kt">bool</span><span class="p">()</span> <span class="o">=</span> <span class="k">delete</span><span class="p">;</span>
@@ -703,8 +710,9 @@
 
 <span class="p">}</span> <span class="c1">// namespace trtorch</span>
 </pre>
+         </div>
         </div>
-       </div>
+       </section>
       </article>
      </div>
     </div>

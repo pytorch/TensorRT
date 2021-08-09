@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -56,6 +57,11 @@
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
+  </script>
+  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+  <script type="text/x-mathjax-config">
+   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -500,88 +506,92 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <span id="id1">
-       </span>
-       <h1 id="contributors-writing-converters--page-root">
-        Writing Converters
-        <a class="headerlink" href="#contributors-writing-converters--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <h2 id="background">
-        Background
-        <a class="headerlink" href="#background" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <p>
-        In the JIT IR, operations are represented as nodes in a graph. A node has inputs and outputs, represented by
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          torch::jit::Values
-         </span>
-        </code>
-        which are typed abstract representation of data flowing into and out of a node. TensorRT represents its graph though the
+       <section id="writing-converters">
+        <span id="id1">
+        </span>
+        <h1 id="contributors-writing-converters--page-root">
+         Writing Converters
+         <a class="headerlink" href="#contributors-writing-converters--page-root" title="Permalink to this headline">
+          ¶
+         </a>
+        </h1>
+        <section id="background">
+         <h2 id="background">
+          Background
+          <a class="headerlink" href="#background" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <p>
+          In the JIT IR, operations are represented as nodes in a graph. A node has inputs and outputs, represented by
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            torch::jit::Values
+           </span>
+          </code>
+          which are typed abstract representation of data flowing into and out of a node. TensorRT represents its graph though the
 use of
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          nvinfer1::ILayers
-         </span>
-        </code>
-        and
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          nvinfer1::ITensors
-         </span>
-        </code>
-        which are its analogues to nodes and values. The goal of
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            nvinfer1::ILayers
+           </span>
+          </code>
+          and
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            nvinfer1::ITensors
+           </span>
+          </code>
+          which are its analogues to nodes and values. The goal of
 converters create new ILayers and subgraphs that do operation specified by the node and associate produced ITensors
 and Values together.
-       </p>
-       <h2 id="converters">
-        Converters
-        <a class="headerlink" href="#converters" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <p>
-        Converters should be functions which will use a list of inputs (either
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          nvinfer1::ITensors
-         </span>
-        </code>
-        or
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          torch::jit::IValues
-         </span>
-        </code>
-        ) to
+         </p>
+        </section>
+        <section id="converters">
+         <h2 id="converters">
+          Converters
+          <a class="headerlink" href="#converters" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <p>
+          Converters should be functions which will use a list of inputs (either
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            nvinfer1::ITensors
+           </span>
+          </code>
+          or
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            torch::jit::IValues
+           </span>
+          </code>
+          ) to
 construct an equivalent layer to the LibTorch op.
-       </p>
-       <p>
-        Converters can be registered using the
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          RegisterNodeConversionPatterns
-         </span>
-        </code>
-        helper class where you instantiate a
+         </p>
+         <p>
+          Converters can be registered using the
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            RegisterNodeConversionPatterns
+           </span>
+          </code>
+          helper class where you instantiate a
 RegisterNodeConversionPatterns object and call the pattern function on it (like below) which takes a string
 which describes the function schema of the op that will cause the converter to be run and a lambda or function
 which will do the actual conversion:
-       </p>
-       <blockquote>
-        <div>
-         <p>
-          Note the pattern function can be chained
          </p>
-        </div>
-       </blockquote>
-       <div class="highlight-c++ notranslate">
-        <div class="highlight">
-         <pre><span></span><span class="k">auto</span> <span class="n">acthardtanh</span> <span class="n">TRTORCH_UNUSED</span> <span class="o">=</span> <span class="n">RegisterNodeConversionPatterns</span><span class="p">()</span>
+         <blockquote>
+          <div>
+           <p>
+            Note the pattern function can be chained
+           </p>
+          </div>
+         </blockquote>
+         <div class="highlight-c++ notranslate">
+          <div class="highlight">
+           <pre><span></span><span class="k">auto</span> <span class="n">acthardtanh</span> <span class="n">TRTORCH_UNUSED</span> <span class="o">=</span> <span class="n">RegisterNodeConversionPatterns</span><span class="p">()</span>
     <span class="p">.</span><span class="n">pattern</span><span class="p">({</span>
         <span class="s">"aten::hardtanh(Tensor self, Scalar min_val=-1, Scalar max_val=1) -&gt; (Tensor)"</span><span class="p">,</span>
         <span class="p">[](</span><span class="n">ConversionCtx</span><span class="o">*</span> <span class="n">ctx</span><span class="p">,</span> <span class="k">const</span> <span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Node</span><span class="o">*</span> <span class="n">n</span><span class="p">,</span> <span class="n">args</span><span class="o">&amp;</span> <span class="n">args</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kt">bool</span> <span class="p">{</span>
@@ -603,156 +613,166 @@ which will do the actual conversion:
         <span class="p">}</span>
     <span class="p">});</span>
 </pre>
-        </div>
-       </div>
-       <h2 id="converter-contract">
-        Converter Contract
-        <a class="headerlink" href="#converter-contract" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <h3 id="what-is-guaranteed-to-converters">
-        What is guaranteed to converters
-        <a class="headerlink" href="#what-is-guaranteed-to-converters" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <ol class="arabic simple">
-        <li>
+          </div>
+         </div>
+        </section>
+        <section id="converter-contract">
+         <h2 id="converter-contract">
+          Converter Contract
+          <a class="headerlink" href="#converter-contract" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <section id="what-is-guaranteed-to-converters">
+          <h3 id="what-is-guaranteed-to-converters">
+           What is guaranteed to converters
+           <a class="headerlink" href="#what-is-guaranteed-to-converters" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <ol class="arabic simple">
+           <li>
+            <p>
+             In the args there will be an entry for each node input value, either a ITensor or IValue
+            </p>
+           </li>
+           <li>
+            <p>
+             Inputs will be provided in order according to the function schema
+            </p>
+           </li>
+          </ol>
+         </section>
+         <section id="responsibilities-of-a-converter">
+          <h3 id="responsibilities-of-a-converter">
+           Responsibilities of a converter
+           <a class="headerlink" href="#responsibilities-of-a-converter" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <ol class="arabic simple">
+           <li>
+            <p>
+             Args must be guaranteed to be a type to unwrap the Arg union without checking, typically input tensor arguments can be expected to be ITensors
+            </p>
+           </li>
+           <li>
+            <p>
+             Any weights or static values must guaranteed to be valid until the end of conversion time
+            </p>
+            <ol class="loweralpha simple">
+             <li>
+              <p>
+               A helpful tool is the Weights helper class described below
+              </p>
+             </li>
+            </ol>
+           </li>
+           <li>
+            <p>
+             Converters are expected to produce an IValue or ITensor for each output of a node. The compiler will check this and produce warnings if there are Values that don’t have associated ITensors or IValues.
+            </p>
+           </li>
+           <li>
+            <p>
+             Outputs must be annotated
+            </p>
+            <ol class="loweralpha simple">
+             <li>
+              <p>
+               There must be an association between a JIT nodes output values and the new TRT layers output tensors in the
+               <code class="docutils literal notranslate">
+                <span class="pre">
+                 value_tensor_map
+                </span>
+               </code>
+               in the conversion context
+              </p>
+             </li>
+            </ol>
+           </li>
+           <li>
+            <p>
+             Name your layers
+            </p>
+            <ol class="loweralpha simple">
+             <li>
+              <p>
+               Its much easier to debug when we can track which layers and nodes correspond with each other. The system we are currently using is to use the “node info” of the node as the name of the layer
+              </p>
+             </li>
+            </ol>
+           </li>
+           <li>
+            <p>
+             Name your tensors
+            </p>
+            <ol class="loweralpha simple">
+             <li>
+              <p>
+               Use the output value debug name as the name for the new ITensor (again for debugging)
+              </p>
+             </li>
+            </ol>
+           </li>
+          </ol>
+         </section>
+        </section>
+        <section id="conversion-context">
+         <h2 id="conversion-context">
+          Conversion Context
+          <a class="headerlink" href="#conversion-context" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
          <p>
-          In the args there will be an entry for each node input value, either a ITensor or IValue
-         </p>
-        </li>
-        <li>
-         <p>
-          Inputs will be provided in order according to the function schema
-         </p>
-        </li>
-       </ol>
-       <h3 id="responsibilities-of-a-converter">
-        Responsibilities of a converter
-        <a class="headerlink" href="#responsibilities-of-a-converter" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <ol class="arabic simple">
-        <li>
-         <p>
-          Args must be guaranteed to be a type to unwrap the Arg union without checking, typically input tensor arguments can be expected to be ITensors
-         </p>
-        </li>
-        <li>
-         <p>
-          Any weights or static values must guaranteed to be valid until the end of conversion time
-         </p>
-         <ol class="loweralpha simple">
-          <li>
-           <p>
-            A helpful tool is the Weights helper class described below
-           </p>
-          </li>
-         </ol>
-        </li>
-        <li>
-         <p>
-          Converters are expected to produce an IValue or ITensor for each output of a node. The compiler will check this and produce warnings if there are Values that don’t have associated ITensors or IValues.
-         </p>
-        </li>
-        <li>
-         <p>
-          Outputs must be annotated
-         </p>
-         <ol class="loweralpha simple">
-          <li>
-           <p>
-            There must be an association between a JIT nodes output values and the new TRT layers output tensors in the
-            <code class="docutils literal notranslate">
-             <span class="pre">
-              value_tensor_map
-             </span>
-            </code>
-            in the conversion context
-           </p>
-          </li>
-         </ol>
-        </li>
-        <li>
-         <p>
-          Name your layers
-         </p>
-         <ol class="loweralpha simple">
-          <li>
-           <p>
-            Its much easier to debug when we can track which layers and nodes correspond with each other. The system we are currently using is to use the “node info” of the node as the name of the layer
-           </p>
-          </li>
-         </ol>
-        </li>
-        <li>
-         <p>
-          Name your tensors
-         </p>
-         <ol class="loweralpha simple">
-          <li>
-           <p>
-            Use the output value debug name as the name for the new ITensor (again for debugging)
-           </p>
-          </li>
-         </ol>
-        </li>
-       </ol>
-       <h2 id="conversion-context">
-        Conversion Context
-        <a class="headerlink" href="#conversion-context" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <p>
-        The conversion context maintains the state of conversion, it manages the Network Definition, two maps
+          The conversion context maintains the state of conversion, it manages the Network Definition, two maps
 one that stores associations between Values and IValues (the evaluated_value_map) and one that stores
 associations between Values and ITensors, and any sort of memory that needs to live until the end of
 conversion. The main apis that you will interface with in converters is directly accessing the network
 definition to add layers
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          ctx-&gt;net
-         </span>
-        </code>
-        and data association functions
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          ctx-&gt;AssociateValueAndTensor()
-         </span>
-        </code>
-        and
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          ctx-&gt;AssociateValueAndIValue()
-         </span>
-        </code>
-        , which you will use to add layers to the TRT layers and log
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            ctx-&gt;net
+           </span>
+          </code>
+          and data association functions
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            ctx-&gt;AssociateValueAndTensor()
+           </span>
+          </code>
+          and
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            ctx-&gt;AssociateValueAndIValue()
+           </span>
+          </code>
+          , which you will use to add layers to the TRT layers and log
 pairs of node outputs and static values or TensorRT layer outputs.
-       </p>
-       <h2 id="args">
-        Args
-        <a class="headerlink" href="#args" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <p>
-        Arguments provided to the converter are inspectable unions of
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          nvinfer1::ITensors
-         </span>
-        </code>
-        and
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          torch::jit::IValues
-         </span>
-        </code>
-        (i.e.
+         </p>
+        </section>
+        <section id="args">
+         <h2 id="args">
+          Args
+          <a class="headerlink" href="#args" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <p>
+          Arguments provided to the converter are inspectable unions of
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            nvinfer1::ITensors
+           </span>
+          </code>
+          and
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            torch::jit::IValues
+           </span>
+          </code>
+          (i.e.
 abstract dataflow in the TensorRT graph and static values). You are guaranteed that you will have some
 argument for each input value for the node. They are provided in the order of the function schema.
 It can be expected that inputs (meaning the parameters that would be passed into the forward
@@ -761,64 +781,70 @@ before unwrapping if you are unsure. Args also have deep unwrap methods that let
 underlying data in an IValue if you know it’s safe. You can also pass in a fallback value if there is a
 chance the IValue is None. IValues have been extended to be able to hold a wrapper around ITensors only in the case of TensorLists.
 You can get an ITensor from an IValue by a pattern similar to this:
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          ivalue.toCustomClass&lt;TensorContainer&gt;()-&gt;tensor()
-         </span>
-        </code>
-        .
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            ivalue.toCustomClass&lt;TensorContainer&gt;()-&gt;tensor()
+           </span>
+          </code>
+          .
 You can tell if an IValue contains a Tensor or an ITensor by using
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          ivalue.isTensor()
-         </span>
-        </code>
-        or
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          ivalue.isCustomClass()
-         </span>
-        </code>
-        .
-       </p>
-       <h2 id="weights">
-        Weights
-        <a class="headerlink" href="#weights" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <p>
-        Weights are used during build time, so any weights need to be guaranteed to live until the end of the conversion phase.
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            ivalue.isTensor()
+           </span>
+          </code>
+          or
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            ivalue.isCustomClass()
+           </span>
+          </code>
+          .
+         </p>
+        </section>
+        <section id="weights">
+         <h2 id="weights">
+          Weights
+          <a class="headerlink" href="#weights" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <p>
+          Weights are used during build time, so any weights need to be guaranteed to live until the end of the conversion phase.
 TensorRT also uses its own weights structure to hold the weights. There is a wrapper around this class available
 to converts which abstracts a lot of this.
-       </p>
-       <p>
-        The weights wrapper class can accept either
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          at::Tensors
-         </span>
-        </code>
-        or singular values (right now). You also need to pass the
+         </p>
+         <p>
+          The weights wrapper class can accept either
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            at::Tensors
+           </span>
+          </code>
+          or singular values (right now). You also need to pass the
 conversion context when constructing these weights because internally the weights class will allocate memory managed
 by the conversion context to store a copy of the tensor data. This data gets freed when the conversion context
 destructor gets destroyed so converters don’t really need to think about it.
-       </p>
-       <p>
-        There is metadata generated from the shape of the input data which becomes useful in interfacing with TensorRT, such
+         </p>
+         <p>
+          There is metadata generated from the shape of the input data which becomes useful in interfacing with TensorRT, such
 as number of input maps, number of output maps and kernel shape.
-       </p>
-       <h2 id="other-advice">
-        Other advice
-        <a class="headerlink" href="#other-advice" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <p>
-        You have the benefit of the full aten library when dealing with weights and other static values. This means that you
+         </p>
+        </section>
+        <section id="other-advice">
+         <h2 id="other-advice">
+          Other advice
+          <a class="headerlink" href="#other-advice" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <p>
+          You have the benefit of the full aten library when dealing with weights and other static values. This means that you
 can do quite a bit of work during conversion time to produce efficient conversion. A good example is batch_norm
 converter where the converter does fusion of operations with PyTorch before creating the TensorRT layer.
-       </p>
+         </p>
+        </section>
+       </section>
       </article>
      </div>
     </div>

@@ -25,13 +25,14 @@ struct Device {
 
 struct BuilderSettings {
   std::set<nvinfer1::DataType> enabled_precisions = {nvinfer1::DataType::kFLOAT};
+  bool sparse_weights = false;
   bool disable_tf32 = false;
   bool refit = false;
   bool debug = false;
   bool strict_types = false;
   bool truncate_long_and_double = false;
   Device device;
-  nvinfer1::EngineCapability capability = nvinfer1::EngineCapability::kDEFAULT;
+  nvinfer1::EngineCapability capability = nvinfer1::EngineCapability::kSTANDARD;
   nvinfer1::IInt8Calibrator* calibrator = nullptr;
   uint64_t num_min_timing_iters = 2;
   uint64_t num_avg_timing_iters = 1;
