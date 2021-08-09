@@ -12,7 +12,7 @@ struct LowerInfo {
 };
 
 void LowerBlock(torch::jit::Block* b);
-void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, bool disable_cse=false);
+void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, bool disable_cse = false);
 torch::jit::Module LowerModule(const torch::jit::script::Module& mod);
 std::pair<std::shared_ptr<torch::jit::Graph>, std::vector<torch::jit::IValue>> Lower(
     const torch::jit::script::Module& mod,

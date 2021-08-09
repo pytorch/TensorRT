@@ -544,7 +544,8 @@ int main(int argc, char** argv) {
       compile_settings.capability = trtorch::CompileSpec::EngineCapability::kDLA_STANDALONE;
     } else {
       trtorch::logging::log(
-          trtorch::logging::Level::kERROR, "Invalid engine capability, options are [ standard | safety | dla_standalone ]");
+          trtorch::logging::Level::kERROR,
+          "Invalid engine capability, options are [ standard | safety | dla_standalone ]");
       std::cerr << std::endl << parser;
       return 1;
     }
@@ -609,7 +610,6 @@ int main(int argc, char** argv) {
         (compile_settings.enabled_precisions.size() == 1 &&
          compile_settings.enabled_precisions.find(trtorch::CompileSpec::DataType::kFloat) !=
              compile_settings.enabled_precisions.end())) {
-
       double threshold_val = 2e-5;
       if (threshold) {
         threshold_val = args::get(threshold);
