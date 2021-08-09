@@ -80,7 +80,7 @@ These are the following dependencies used to verify the testcases. TRTorch can w
 - Bazel 4.0.0
 - Libtorch 1.9.0 (built with CUDA 11.1)
 - CUDA 11.1 (10.2 on Jetson)
-- cuDNN 8.1
+- cuDNN 8.2
 - TensorRT 8.0.1.6
 
 ## Prebuilt Binaries and Wheel files
