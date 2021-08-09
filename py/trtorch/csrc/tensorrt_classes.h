@@ -155,8 +155,6 @@ struct CompileSpec : torch::CustomClassHolder {
 
   std::vector<Input> inputs;
   nvinfer1::IInt8Calibrator* ptq_calibrator = nullptr;
-
-  bool sparse_weights = false;
   std::set<DataType> enabled_precisions = {DataType::kFloat};
   bool sparse_weights = false;
   bool disable_tf32 = false;

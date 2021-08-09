@@ -24,7 +24,6 @@ struct Device {
 };
 
 struct BuilderSettings {
-  bool sparse_weights = false;
   std::set<nvinfer1::DataType> enabled_precisions = {nvinfer1::DataType::kFLOAT};
   bool sparse_weights = false;
   bool disable_tf32 = false;

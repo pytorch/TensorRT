@@ -264,7 +264,7 @@ int main(int argc, char** argv) {
   args::ValueFlag<std::string> engine_capability(
       parser,
       "capability",
-      "The type of device the engine should be built for [ default | safe_gpu | safe_dla ]",
+      "The type of device the engine should be built for [ standard | safety | dla_standalone ]",
       {"engine-capability"});
 
   args::ValueFlag<std::string> calibration_cache_file(
@@ -544,7 +544,7 @@ int main(int argc, char** argv) {
       compile_settings.capability = trtorch::CompileSpec::EngineCapability::kDLA_STANDALONE;
     } else {
       trtorch::logging::log(
-          trtorch::logging::Level::kERROR, "Invalid engine capability, options are [ default | safe_gpu | safe_dla ]");
+          trtorch::logging::Level::kERROR, "Invalid engine capability, options are [ standard | safety | dla_standalone ]");
       std::cerr << std::endl << parser;
       return 1;
     }

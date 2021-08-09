@@ -46,8 +46,6 @@ def compile(module: torch.jit.ScriptModule, compile_spec: Any) -> torch.jit.Scri
                     "disable_tf32": False, # Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
                     "sparse_weights": Enable sparsity for convolution and fully connected layers.
                     "enabled_precisions": {torch.float, torch.half}, # Enabling FP16 kernels
-                    "disable_tf32": False, # Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
-                    "sparse_weights": Enable sparsity for convolution and fully connected layers.
                     "refit": false, # enable refit
                     "debug": false, # enable debuggable engine
                     "strict_types": false, # kernels should strictly run in operating precision
