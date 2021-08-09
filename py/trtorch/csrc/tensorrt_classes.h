@@ -158,6 +158,7 @@ struct CompileSpec : torch::CustomClassHolder {
 
   bool sparse_weights = false;
   std::set<DataType> enabled_precisions = {DataType::kFloat};
+  bool sparse_weights = false;
   bool disable_tf32 = false;
   bool refit = false;
   bool debug = false;

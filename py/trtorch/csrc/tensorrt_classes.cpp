@@ -181,6 +181,7 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
   for (auto p : enabled_precisions) {
     info.convert_info.engine_settings.enabled_precisions.insert(toTRTDataType(p));
   }
+
   if (ptq_calibrator) {
     info.convert_info.engine_settings.calibrator = ptq_calibrator;
   } else {

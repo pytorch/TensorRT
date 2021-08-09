@@ -286,8 +286,8 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]) -> torch.classes.tensorrt.
                             "dla_core": 0, # (DLA only) Target dla core id to run engine
                             "allow_gpu_fallback": false, # (DLA only) Allow layers unsupported on DLA to run on GPU
                         },
+                        "enabled_precisions": {torch.half}, # Operating precision set to FP16
                         "sparse_weights": Enable sparsity for convolution and fully connected layers.
-
                         "disable_tf32": False, # Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
                         "refit": False, # enable refit
                         "debug": False, # enable debuggable engine

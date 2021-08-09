@@ -1,5 +1,6 @@
 #pragma once
 #include <map>
+#include <memory>
 #include <utility>
 #include "ATen/core/function_schema.h"
 #include "NvInfer.h"
@@ -37,19 +38,17 @@ CudaDevice deserialize_device(std::string device_info);
 
 struct TRTEngine : torch::CustomClassHolder {
   // Each engine needs it's own runtime object
-  nvinfer1::IRuntime* rt;
-  nvinfer1::ICudaEngine* cuda_engine;
-  nvinfer1::IExecutionContext* exec_ctx;
+  std::shared_ptr<nvinfer1::IRuntime> rt;
+  std::shared_ptr<nvinfer1::ICudaEngine> cuda_engine;
+  std::shared_ptr<nvinfer1::IExecutionContext> exec_ctx;
   std::pair<uint64_t, uint64_t> num_io;
-  EngineID id;
   std::string name;
   CudaDevice device_info;
-  util::logging::TRTorchLogger logger;
 
   std::unordered_map<uint64_t, uint64_t> in_binding_map;
   std::unordered_map<uint64_t, uint64_t> out_binding_map;
 
-  ~TRTEngine();
+  ~TRTEngine() = default;
   TRTEngine(std::string serialized_engine, CudaDevice cuda_device);
   TRTEngine(std::vector<std::string> serialized_info);
   TRTEngine(std::string mod_name, std::string serialized_engine, CudaDevice cuda_device);
