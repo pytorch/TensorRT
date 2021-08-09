@@ -22,7 +22,7 @@ struct NOPRemoval {
   void run() {
     removeNode(graph_->block(), "aten::detach");
     torch::jit::EliminateDeadCode(graph_);
-    LOG_DEBUG("RemoveNOPs - Note: Removing detach operators as they have no meaning in TRT");
+    LOG_DEBUG("RemoveNOPs - Note: Removing operators that have no meaning in TRT");
     LOG_GRAPH("Post aten::detach removal: " << *graph_);
   }
 

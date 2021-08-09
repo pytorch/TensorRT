@@ -134,7 +134,6 @@ torch::jit::Node* cloneNode(
     std::shared_ptr<torch::jit::Graph>& graph,
     std::unordered_map<torch::jit::Value*, torch::jit::Value*>& old_to_new);
 const std::unordered_map<at::ScalarType, nvinfer1::DataType>& get_aten_trt_type_map();
-const std::unordered_map<nvinfer1::DataType, at::ScalarType>& get_trt_aten_type_map();
 
 } // namespace util
 } // namespace core
