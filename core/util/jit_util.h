@@ -13,9 +13,6 @@ inline std::string node_info(const torch::jit::Node* n) {
   std::stringstream ss;
   ss << *n;
   std::string node_info = ss.str();
-  // Nodes in torchscript graph have file name and line numbers commented for every node. Remove that when returning a
-  // node name for easier readability.
-  node_info = node_info.substr(0, node_info.find("#", 0));
   node_info.erase(std::remove(node_info.begin(), node_info.end(), '\n'), node_info.end());
   return node_info;
 }
