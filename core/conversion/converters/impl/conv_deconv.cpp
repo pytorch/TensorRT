@@ -45,7 +45,7 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
   if (args[2].IValue()->isTensor()) {
     bias = Weights(ctx, args[2].unwrapToTensor());
   } else {
-    bias = Weights(); // nvinfer1::Weights{nvinfer1::DataType::kFLOAT, nullptr, 0};
+    bias = Weights();
   }
 
   // Handle case when weights of conv/deconv is an ITensor. This case happens for QAT networks where
