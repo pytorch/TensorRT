@@ -47,7 +47,7 @@ compile_settings = {
         # For static size shape=[1, 3, 224, 224]
         dtype=torch.half, # Datatype of input tensor. Allowed options torch.(float|half|int8|int32|bool)
     )],
-    "enabled_precision": {torch.half}, # Run with FP16
+    "enabled_precisions": {torch.half}, # Run with FP16
 }
 
 trt_ts_module = trtorch.compile(torch_script_module, compile_settings)
