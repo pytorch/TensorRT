@@ -177,9 +177,9 @@ nvinfer1::ITensor* tensor_to_const(ConversionCtx* ctx, at::Tensor t, const std::
   tensor_id << reinterpret_cast<int*>(out);
 
   LOG_DEBUG(ctx->logger, "Freezing tensor " << tensor_id.str() << " as an IConstantLayer");
-  if (!name.empty()){
+  if (!name.empty()) {
     const_layer->setName(name.c_str());
-  }else{
+  } else {
     const_layer->setName(("[Freeze Tensor " + tensor_id.str() + " ]").c_str());
   }
 

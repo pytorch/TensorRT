@@ -19,8 +19,7 @@ auto cast_registrations TRTORCH_UNUSED =
                auto self = args[0].ITensorOrFreeze(ctx);
                auto output_dtype = args[1].unwrapToScalar().to<int64_t>();
                auto trt_dtype = util::ScalarTypeToTRTDataType(static_cast<at::ScalarType>(output_dtype));
-               auto casted_itensor =
-                   castITensor(ctx, self, trt_dtype);
+               auto casted_itensor = castITensor(ctx, self, trt_dtype);
                auto output = ctx->AssociateValueAndTensor(n->outputs()[0], casted_itensor);
                LOG_DEBUG("[aten::to.dtype] Output tensor shape: " << output->getDimensions());
 
@@ -49,8 +48,7 @@ auto cast_registrations TRTORCH_UNUSED =
 
                auto output_dtype = args[2].unwrapToScalar().to<int64_t>();
                auto trt_dtype = util::ScalarTypeToTRTDataType(static_cast<at::ScalarType>(output_dtype));
-               auto casted_itensor =
-                   castITensor(ctx, self, trt_dtype);
+               auto casted_itensor = castITensor(ctx, self, trt_dtype);
                auto output = ctx->AssociateValueAndTensor(n->outputs()[0], casted_itensor);
                LOG_DEBUG("[aten::to.prim_Device] Output tensor shape: " << output->getDimensions());
 
