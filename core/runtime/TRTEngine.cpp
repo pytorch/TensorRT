@@ -45,7 +45,8 @@ TRTEngine::TRTEngine(std::string mod_name, std::string serialized_engine, CudaDe
 
   name = slugify(mod_name) + "_engine";
 
-  cuda_engine = std::shared_ptr<nvinfer1::ICudaEngine>(rt->deserializeCudaEngine(serialized_engine.c_str(), serialized_engine.size()));
+  cuda_engine = std::shared_ptr<nvinfer1::ICudaEngine>(
+      rt->deserializeCudaEngine(serialized_engine.c_str(), serialized_engine.size()));
   TRTORCH_CHECK((cuda_engine != nullptr), "Unable to deserialize the TensorRT engine");
 
   exec_ctx = std::shared_ptr<nvinfer1::IExecutionContext>(cuda_engine->createExecutionContext());
