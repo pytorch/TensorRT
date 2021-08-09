@@ -77,7 +77,7 @@ class Int8Calibrator : Algorithm {
    *
    * @return int
    */
-  int getBatchSize() const override {
+  int getBatchSize() const noexcept override {
     // HACK: TRTorch only uses explict batch sizing, INT8 Calibrator does not
     // work when reporting the batch size here and having explicity batching.
     // So we just report batch size 1 (warnings will still be printed out).
@@ -96,7 +96,7 @@ class Int8Calibrator : Algorithm {
    * @return true - There is a new batch for the calibrator to consume
    * @return false - There is not a new batch for the calibrator to consume
    */
-  bool getBatch(void* bindings[], const char* names[], int nbBindings) override {
+  bool getBatch(void* bindings[], const char* names[], int nbBindings) noexcept override {
     if (it_ != batched_data_.end()) {
       auto status = get_batch_impl(bindings, names, nbBindings, *it_);
       it_ = ++it_;
@@ -116,7 +116,7 @@ class Int8Calibrator : Algorithm {
    * @param length
    * @return const void* - Pointer to cache data
    */
-  const void* readCalibrationCache(size_t& length) override {
+  const void* readCalibrationCache(size_t& length) noexcept override {
     if (use_cache_) {
       std::stringstream ss;
       ss << "Reading Calibration Cache from " << cache_file_path_;
@@ -143,7 +143,7 @@ class Int8Calibrator : Algorithm {
    * @param cache: const void* - cache data
    * @param length: size_t - length of cache
    */
-  void writeCalibrationCache(const void* cache, size_t length) override {
+  void writeCalibrationCache(const void* cache, size_t length) noexcept override {
     std::ofstream cache_file(cache_file_path_, std::ios::binary);
     cache_file.write(reinterpret_cast<const char*>(cache), length);
     std::stringstream ss;
@@ -203,7 +203,7 @@ class Int8CacheCalibrator : Algorithm {
    *
    * @return int
    */
-  int getBatchSize() const override {
+  int getBatchSize() const noexcept override {
     // HACK: TRTorch only uses explict batch sizing, INT8 Calibrator does not
     // work when reporting the batch size here and having explicity batching.
     // So we just report batch size 1 (warnings will still be printed out).
@@ -222,7 +222,7 @@ class Int8CacheCalibrator : Algorithm {
    * @param nbBindings: int - Number of bindings
    * @return false
    */
-  bool getBatch(void* bindings[], const char* names[], int nbBindings) override {
+  bool getBatch(void* bindings[], const char* names[], int nbBindings) noexcept override {
     return false;
   }
 
@@ -234,7 +234,7 @@ class Int8CacheCalibrator : Algorithm {
    * @param length
    * @return const void* - Pointer to cache data
    */
-  const void* readCalibrationCache(size_t& length) override {
+  const void* readCalibrationCache(size_t& length) noexcept override {
     std::stringstream ss;
     ss << "Reading Calibration Cache from " << cache_file_path_;
     logging::log(logging::Level::kINFO, ss.str());
@@ -258,7 +258,7 @@ class Int8CacheCalibrator : Algorithm {
    * @param cache: const void* - cache data
    * @param length: size_t - length of cache
    */
-  void writeCalibrationCache(const void* cache, size_t length) override {
+  void writeCalibrationCache(const void* cache, size_t length) noexcept override {
     std::ofstream cache_file(cache_file_path_, std::ios::binary);
     cache_file.write(reinterpret_cast<const char*>(cache), length);
     std::stringstream ss;

@@ -139,6 +139,7 @@ struct CompileSpec : torch::CustomClassHolder {
   }
 
   ADD_FIELD_GET_SET(disable_tf32, bool);
+  ADD_FIELD_GET_SET(sparse_weights, bool);
   ADD_FIELD_GET_SET(refit, bool);
   ADD_FIELD_GET_SET(debug, bool);
   ADD_FIELD_GET_SET(strict_types, bool);
@@ -155,6 +156,7 @@ struct CompileSpec : torch::CustomClassHolder {
   std::vector<Input> inputs;
   nvinfer1::IInt8Calibrator* ptq_calibrator = nullptr;
   std::set<DataType> enabled_precisions = {DataType::kFloat};
+  bool sparse_weights = false;
   bool disable_tf32 = false;
   bool refit = false;
   bool debug = false;
