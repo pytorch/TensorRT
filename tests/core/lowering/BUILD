@@ -39,6 +39,10 @@ lowering_test(
     name = "test_unpack_hardswish",
 )
 
+lowering_test(
+    name = "test_unpack_reduce_ops",
+)
+
 test_suite(
     name = "lowering_tests",
     tests = [
@@ -48,6 +52,7 @@ test_suite(
         ":test_remove_detach_pass",
         ":test_remove_dropout_pass",
         ":test_remove_to",
-        ":test_unpack_hardswish"
+        ":test_unpack_hardswish",
+        ":test_unpack_reduce_ops"
     ],
 )

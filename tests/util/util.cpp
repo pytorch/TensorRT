@@ -23,6 +23,9 @@ bool almostEqual(const at::Tensor& a, const at::Tensor& b, float threshold) {
 }
 
 bool exactlyEqual(const at::Tensor& a, const at::Tensor& b) {
+  LOG_GRAPH(a << std::endl << b << std::endl);
+  std::cout << "Max Difference: " << (a - b).abs().max().item<float>() << std::endl;
+
   return (a - b).abs().max().item<float>() == 0.f;
 }
 

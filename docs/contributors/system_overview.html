@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -56,6 +57,11 @@
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
+  </script>
+  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+  <script type="text/x-mathjax-config">
+   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -450,141 +456,151 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <span id="id1">
-       </span>
-       <h1 id="contributors-system-overview--page-root">
-        System Overview
-        <a class="headerlink" href="#contributors-system-overview--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <p>
-        TRTorch is primarily a C++ Library with a Python API planned. We use Bazel as our build system and target Linux x86_64 and
+       <section id="system-overview">
+        <span id="id1">
+        </span>
+        <h1 id="contributors-system-overview--page-root">
+         System Overview
+         <a class="headerlink" href="#contributors-system-overview--page-root" title="Permalink to this headline">
+          ¶
+         </a>
+        </h1>
+        <p>
+         TRTorch is primarily a C++ Library with a Python API planned. We use Bazel as our build system and target Linux x86_64 and
 Linux aarch64 (only natively) right now. The compiler we use is GCC 7.5.0 and the library is untested with compilers before that
 version so there may be compilation errors if you try to use an older compiler.
-       </p>
-       <p>
-        The repository is structured into:
-       </p>
-       <ul class="simple">
-        <li>
-         <p>
-          core: Main compiler source code
-         </p>
-        </li>
-        <li>
-         <p>
-          cpp: C++ API
-         </p>
-        </li>
-        <li>
-         <p>
-          tests: tests of the C++ API, the core and converters
-         </p>
-        </li>
-        <li>
-         <p>
-          py: Python API
-         </p>
-        </li>
-        <li>
-         <p>
-          notebooks: Example applications built with TRTorch
-         </p>
-        </li>
-        <li>
-         <p>
-          docs: Documentation
-         </p>
-        </li>
-        <li>
-         <p>
-          docsrc: Documentation Source
-         </p>
-        </li>
-        <li>
-         <p>
-          third_party: BUILD files for dependency libraries
-         </p>
-        </li>
-        <li>
-         <p>
-          toolchains: Toolchains for different platforms
-         </p>
-        </li>
-       </ul>
-       <p>
-        The C++ API is unstable and subject to change until the library matures, though most work is done under the hood in the core.
-       </p>
-       <p>
-        The core has a couple major parts: The top level compiler interface which coordinates ingesting a module, lowering,
+        </p>
+        <p>
+         The repository is structured into:
+        </p>
+        <ul class="simple">
+         <li>
+          <p>
+           core: Main compiler source code
+          </p>
+         </li>
+         <li>
+          <p>
+           cpp: C++ API
+          </p>
+         </li>
+         <li>
+          <p>
+           tests: tests of the C++ API, the core and converters
+          </p>
+         </li>
+         <li>
+          <p>
+           py: Python API
+          </p>
+         </li>
+         <li>
+          <p>
+           notebooks: Example applications built with TRTorch
+          </p>
+         </li>
+         <li>
+          <p>
+           docs: Documentation
+          </p>
+         </li>
+         <li>
+          <p>
+           docsrc: Documentation Source
+          </p>
+         </li>
+         <li>
+          <p>
+           third_party: BUILD files for dependency libraries
+          </p>
+         </li>
+         <li>
+          <p>
+           toolchains: Toolchains for different platforms
+          </p>
+         </li>
+        </ul>
+        <p>
+         The C++ API is unstable and subject to change until the library matures, though most work is done under the hood in the core.
+        </p>
+        <p>
+         The core has a couple major parts: The top level compiler interface which coordinates ingesting a module, lowering,
 converting and generating a new module and returning it back to the user. The there are the three main phases of the
 compiler, the lowering phase, the conversion phase, and the execution phase.
-       </p>
-       <h2 id="compiler-phases">
-        Compiler Phases
-        <a class="headerlink" href="#compiler-phases" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <div class="toctree-wrapper compound">
-       </div>
-       <h3 id="lowering">
-        Lowering
-        <a class="headerlink" href="#lowering" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        <a class="reference internal" href="lowering.html#lowering">
-         <span class="std std-ref">
-          Lowering Phase
-         </span>
-        </a>
-       </p>
-       <p>
-        The lowering is made up of a set of passes (some from PyTorch and some specific to TRTorch)
+        </p>
+        <section id="compiler-phases">
+         <h2 id="compiler-phases">
+          Compiler Phases
+          <a class="headerlink" href="#compiler-phases" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <div class="toctree-wrapper compound">
+         </div>
+         <section id="lowering">
+          <h3 id="lowering">
+           Lowering
+           <a class="headerlink" href="#lowering" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           <a class="reference internal" href="lowering.html#lowering">
+            <span class="std std-ref">
+             Lowering Phase
+            </span>
+           </a>
+          </p>
+          <p>
+           The lowering is made up of a set of passes (some from PyTorch and some specific to TRTorch)
 run over the graph IR to map the large PyTorch opset to a reduced opset that is easier to convert to
 TensorRT.
-       </p>
-       <h3 id="conversion">
-        Conversion
-        <a class="headerlink" href="#conversion" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        <a class="reference internal" href="conversion.html#conversion">
-         <span class="std std-ref">
-          Conversion Phase
-         </span>
-        </a>
-       </p>
-       <p>
-        In the conversion phase we traverse the lowered graph and construct an equivalent TensorRT graph.
+          </p>
+         </section>
+         <section id="conversion">
+          <h3 id="conversion">
+           Conversion
+           <a class="headerlink" href="#conversion" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           <a class="reference internal" href="conversion.html#conversion">
+            <span class="std std-ref">
+             Conversion Phase
+            </span>
+           </a>
+          </p>
+          <p>
+           In the conversion phase we traverse the lowered graph and construct an equivalent TensorRT graph.
 The conversion phase is made up of three main components, a context to manage compile time data,
 a evaluator library which will execute operations that can be resolved at compile time and a converter
 library which maps an op from JIT to TensorRT.
-       </p>
-       <h3 id="compilation-and-runtime">
-        Compilation and Runtime
-        <a class="headerlink" href="#compilation-and-runtime" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        <a class="reference internal" href="runtime.html#execution">
-         <span class="std std-ref">
-          Runtime Phase
-         </span>
-        </a>
-       </p>
-       <p>
-        The final compilation phase constructs a TorchScript program to run the converted TensorRT engine. It
+          </p>
+         </section>
+         <section id="compilation-and-runtime">
+          <h3 id="compilation-and-runtime">
+           Compilation and Runtime
+           <a class="headerlink" href="#compilation-and-runtime" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           <a class="reference internal" href="runtime.html#execution">
+            <span class="std std-ref">
+             Runtime Phase
+            </span>
+           </a>
+          </p>
+          <p>
+           The final compilation phase constructs a TorchScript program to run the converted TensorRT engine. It
 takes a serialized engine and instantiates it within a engine manager, then the compiler will
 build out a JIT graph that references this engine and wraps it in a module to return to the user.
 When the user executes the module, the JIT program run in the JIT runtime extended by TRTorch with the data providied from the user.
-       </p>
+          </p>
+         </section>
+        </section>
+       </section>
       </article>
      </div>
     </div>

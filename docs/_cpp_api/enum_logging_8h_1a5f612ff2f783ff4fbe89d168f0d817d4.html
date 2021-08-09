@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -56,6 +57,11 @@
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
+  </script>
+  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+  <script type="text/x-mathjax-config">
+   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -387,190 +393,194 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <span id="exhale-enum-logging-8h-1a5f612ff2f783ff4fbe89d168f0d817d4">
-       </span>
-       <h1 id="cpp-api-enum-logging-8h-1a5f612ff2f783ff4fbe89d168f0d817d4--page-root">
-        Enum Level
-        <a class="headerlink" href="#cpp-api-enum-logging-8h-1a5f612ff2f783ff4fbe89d168f0d817d4--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <ul class="simple">
-        <li>
-         <p>
-          Defined in
-          <a class="reference internal" href="file_cpp_api_include_trtorch_logging.h.html#file-cpp-api-include-trtorch-logging-h">
-           <span class="std std-ref">
-            File logging.h
-           </span>
-          </a>
-         </p>
-        </li>
-       </ul>
-       <h2 id="enum-documentation">
-        Enum Documentation
-        <a class="headerlink" href="#enum-documentation" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <dl class="cpp enum">
-        <dt id="_CPPv4N7trtorch7logging5LevelE">
-         <span class="target" id="logging_8h_1a5f612ff2f783ff4fbe89d168f0d817d4">
-         </span>
-         <em class="property">
-          enum
-         </em>
-         <code class="sig-prename descclassname">
-          trtorch::logging
-          <code class="sig-prename descclassname">
-           ::
-          </code>
-         </code>
-         <code class="sig-name descname">
-          Level
-         </code>
-         <a class="headerlink" href="#_CPPv4N7trtorch7logging5LevelE" title="Permalink to this definition">
+       <section id="enum-level">
+        <span id="exhale-enum-logging-8h-1a5f612ff2f783ff4fbe89d168f0d817d4">
+        </span>
+        <h1 id="cpp-api-enum-logging-8h-1a5f612ff2f783ff4fbe89d168f0d817d4--page-root">
+         Enum Level
+         <a class="headerlink" href="#cpp-api-enum-logging-8h-1a5f612ff2f783ff4fbe89d168f0d817d4--page-root" title="Permalink to this headline">
           ¶
          </a>
-         <br/>
-        </dt>
-        <dd>
-         <p>
-          Emum for setting message severity
-         </p>
-         <p>
-          <em>
-           Values:
-          </em>
-         </p>
-         <dl class="cpp enumerator">
-          <dt id="_CPPv4N7trtorch7logging5Level15kINTERNAL_ERRORE">
-           <span class="target" id="logging_8h_1a5f612ff2f783ff4fbe89d168f0d817d4a8cc7d8c61cafb6c4b4263d16bff044a0">
+        </h1>
+        <ul class="simple">
+         <li>
+          <p>
+           Defined in
+           <a class="reference internal" href="file_cpp_api_include_trtorch_logging.h.html#file-cpp-api-include-trtorch-logging-h">
+            <span class="std std-ref">
+             File logging.h
+            </span>
+           </a>
+          </p>
+         </li>
+        </ul>
+        <section id="enum-documentation">
+         <h2 id="enum-documentation">
+          Enum Documentation
+          <a class="headerlink" href="#enum-documentation" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <dl class="cpp enum">
+          <dt id="_CPPv4N7trtorch7logging5LevelE">
+           <span class="target" id="logging_8h_1a5f612ff2f783ff4fbe89d168f0d817d4">
            </span>
            <em class="property">
-            enumerator
+            enum
            </em>
-           <code class="sig-name descname">
-            kINTERNAL_ERROR
+           <code class="sig-prename descclassname">
+            trtorch::logging
+            <code class="sig-prename descclassname">
+             ::
+            </code>
            </code>
-           <a class="headerlink" href="#_CPPv4N7trtorch7logging5Level15kINTERNAL_ERRORE" title="Permalink to this definition">
+           <code class="sig-name descname">
+            Level
+           </code>
+           <a class="headerlink" href="#_CPPv4N7trtorch7logging5LevelE" title="Permalink to this definition">
             ¶
            </a>
            <br/>
           </dt>
           <dd>
            <p>
-            Only print messages for internal errors.
+            Emum for setting message severity
            </p>
-          </dd>
-         </dl>
-         <dl class="cpp enumerator">
-          <dt id="_CPPv4N7trtorch7logging5Level6kERRORE">
-           <span class="target" id="logging_8h_1a5f612ff2f783ff4fbe89d168f0d817d4a7cdf4dd581ec9019053d2365682f82f7">
-           </span>
-           <em class="property">
-            enumerator
-           </em>
-           <code class="sig-name descname">
-            kERROR
-           </code>
-           <a class="headerlink" href="#_CPPv4N7trtorch7logging5Level6kERRORE" title="Permalink to this definition">
-            ¶
-           </a>
-           <br/>
-          </dt>
-          <dd>
            <p>
-            Print all internal errors and errors (default)
+            <em>
+             Values:
+            </em>
            </p>
+           <dl class="cpp enumerator">
+            <dt id="_CPPv4N7trtorch7logging5Level15kINTERNAL_ERRORE">
+             <span class="target" id="logging_8h_1a5f612ff2f783ff4fbe89d168f0d817d4a8cc7d8c61cafb6c4b4263d16bff044a0">
+             </span>
+             <em class="property">
+              enumerator
+             </em>
+             <code class="sig-name descname">
+              kINTERNAL_ERROR
+             </code>
+             <a class="headerlink" href="#_CPPv4N7trtorch7logging5Level15kINTERNAL_ERRORE" title="Permalink to this definition">
+              ¶
+             </a>
+             <br/>
+            </dt>
+            <dd>
+             <p>
+              Only print messages for internal errors.
+             </p>
+            </dd>
+           </dl>
+           <dl class="cpp enumerator">
+            <dt id="_CPPv4N7trtorch7logging5Level6kERRORE">
+             <span class="target" id="logging_8h_1a5f612ff2f783ff4fbe89d168f0d817d4a7cdf4dd581ec9019053d2365682f82f7">
+             </span>
+             <em class="property">
+              enumerator
+             </em>
+             <code class="sig-name descname">
+              kERROR
+             </code>
+             <a class="headerlink" href="#_CPPv4N7trtorch7logging5Level6kERRORE" title="Permalink to this definition">
+              ¶
+             </a>
+             <br/>
+            </dt>
+            <dd>
+             <p>
+              Print all internal errors and errors (default)
+             </p>
+            </dd>
+           </dl>
+           <dl class="cpp enumerator">
+            <dt id="_CPPv4N7trtorch7logging5Level8kWARNINGE">
+             <span class="target" id="logging_8h_1a5f612ff2f783ff4fbe89d168f0d817d4a7567e59bb596eff81330f28c90bdeb52">
+             </span>
+             <em class="property">
+              enumerator
+             </em>
+             <code class="sig-name descname">
+              kWARNING
+             </code>
+             <a class="headerlink" href="#_CPPv4N7trtorch7logging5Level8kWARNINGE" title="Permalink to this definition">
+              ¶
+             </a>
+             <br/>
+            </dt>
+            <dd>
+             <p>
+              Print warnings and errors.
+             </p>
+            </dd>
+           </dl>
+           <dl class="cpp enumerator">
+            <dt id="_CPPv4N7trtorch7logging5Level5kINFOE">
+             <span class="target" id="logging_8h_1a5f612ff2f783ff4fbe89d168f0d817d4a25a52afb94ce632c5e2bbbaec41889d2">
+             </span>
+             <em class="property">
+              enumerator
+             </em>
+             <code class="sig-name descname">
+              kINFO
+             </code>
+             <a class="headerlink" href="#_CPPv4N7trtorch7logging5Level5kINFOE" title="Permalink to this definition">
+              ¶
+             </a>
+             <br/>
+            </dt>
+            <dd>
+             <p>
+              Print all info, warnings and errors.
+             </p>
+            </dd>
+           </dl>
+           <dl class="cpp enumerator">
+            <dt id="_CPPv4N7trtorch7logging5Level6kDEBUGE">
+             <span class="target" id="logging_8h_1a5f612ff2f783ff4fbe89d168f0d817d4afb91de0556d91d49dec5a92db74c4893">
+             </span>
+             <em class="property">
+              enumerator
+             </em>
+             <code class="sig-name descname">
+              kDEBUG
+             </code>
+             <a class="headerlink" href="#_CPPv4N7trtorch7logging5Level6kDEBUGE" title="Permalink to this definition">
+              ¶
+             </a>
+             <br/>
+            </dt>
+            <dd>
+             <p>
+              Print all debug info, info, warnings and errors.
+             </p>
+            </dd>
+           </dl>
+           <dl class="cpp enumerator">
+            <dt id="_CPPv4N7trtorch7logging5Level6kGRAPHE">
+             <span class="target" id="logging_8h_1a5f612ff2f783ff4fbe89d168f0d817d4a6fab1d030520e12d29aa8bc73fe084be">
+             </span>
+             <em class="property">
+              enumerator
+             </em>
+             <code class="sig-name descname">
+              kGRAPH
+             </code>
+             <a class="headerlink" href="#_CPPv4N7trtorch7logging5Level6kGRAPHE" title="Permalink to this definition">
+              ¶
+             </a>
+             <br/>
+            </dt>
+            <dd>
+             <p>
+              Print everything including the intermediate graphs of the lowering phase.
+             </p>
+            </dd>
+           </dl>
           </dd>
          </dl>
-         <dl class="cpp enumerator">
-          <dt id="_CPPv4N7trtorch7logging5Level8kWARNINGE">
-           <span class="target" id="logging_8h_1a5f612ff2f783ff4fbe89d168f0d817d4a7567e59bb596eff81330f28c90bdeb52">
-           </span>
-           <em class="property">
-            enumerator
-           </em>
-           <code class="sig-name descname">
-            kWARNING
-           </code>
-           <a class="headerlink" href="#_CPPv4N7trtorch7logging5Level8kWARNINGE" title="Permalink to this definition">
-            ¶
-           </a>
-           <br/>
-          </dt>
-          <dd>
-           <p>
-            Print warnings and errors.
-           </p>
-          </dd>
-         </dl>
-         <dl class="cpp enumerator">
-          <dt id="_CPPv4N7trtorch7logging5Level5kINFOE">
-           <span class="target" id="logging_8h_1a5f612ff2f783ff4fbe89d168f0d817d4a25a52afb94ce632c5e2bbbaec41889d2">
-           </span>
-           <em class="property">
-            enumerator
-           </em>
-           <code class="sig-name descname">
-            kINFO
-           </code>
-           <a class="headerlink" href="#_CPPv4N7trtorch7logging5Level5kINFOE" title="Permalink to this definition">
-            ¶
-           </a>
-           <br/>
-          </dt>
-          <dd>
-           <p>
-            Print all info, warnings and errors.
-           </p>
-          </dd>
-         </dl>
-         <dl class="cpp enumerator">
-          <dt id="_CPPv4N7trtorch7logging5Level6kDEBUGE">
-           <span class="target" id="logging_8h_1a5f612ff2f783ff4fbe89d168f0d817d4afb91de0556d91d49dec5a92db74c4893">
-           </span>
-           <em class="property">
-            enumerator
-           </em>
-           <code class="sig-name descname">
-            kDEBUG
-           </code>
-           <a class="headerlink" href="#_CPPv4N7trtorch7logging5Level6kDEBUGE" title="Permalink to this definition">
-            ¶
-           </a>
-           <br/>
-          </dt>
-          <dd>
-           <p>
-            Print all debug info, info, warnings and errors.
-           </p>
-          </dd>
-         </dl>
-         <dl class="cpp enumerator">
-          <dt id="_CPPv4N7trtorch7logging5Level6kGRAPHE">
-           <span class="target" id="logging_8h_1a5f612ff2f783ff4fbe89d168f0d817d4a6fab1d030520e12d29aa8bc73fe084be">
-           </span>
-           <em class="property">
-            enumerator
-           </em>
-           <code class="sig-name descname">
-            kGRAPH
-           </code>
-           <a class="headerlink" href="#_CPPv4N7trtorch7logging5Level6kGRAPHE" title="Permalink to this definition">
-            ¶
-           </a>
-           <br/>
-          </dt>
-          <dd>
-           <p>
-            Print everything including the intermediate graphs of the lowering phase.
-           </p>
-          </dd>
-         </dl>
-        </dd>
-       </dl>
+        </section>
+       </section>
       </article>
      </div>
     </div>

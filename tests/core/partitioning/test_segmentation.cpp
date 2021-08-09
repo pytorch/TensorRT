@@ -67,7 +67,7 @@ TEST(Partitioning, SegmentSequentialModelCorrectly) {
   trtorch::core::partitioning::PartitionInfo partition_info;
   partition_info.enabled = true;
   std::vector<trtorch::core::partitioning::SegmentedBlock> segmented_blocks =
-      trtorch::core::partitioning::segment_graph(g, partition_info);
+      trtorch::core::partitioning::segment_graph(g->block(), partition_info);
   ASSERT_TRUE(checkSegmentedBlockNumber(segmented_blocks, trtorch::core::partitioning::SegmentedBlock::kTensorRT, 2));
   ASSERT_TRUE(checkSegmentedBlockNumber(segmented_blocks, trtorch::core::partitioning::SegmentedBlock::kTorch, 1));
   ASSERT_TRUE(checkSegmentedBlockNodesMapping(segmented_blocks, g, {{0, 1, 2}, {3}, {4}}));
@@ -100,7 +100,7 @@ TEST(Partitioning, SegmentSequentialModelWithMinBlockSizeCorrectly) {
   partition_info.enabled = true;
   partition_info.min_block_size = 3;
   std::vector<trtorch::core::partitioning::SegmentedBlock> segmented_blocks =
-      trtorch::core::partitioning::segment_graph(g, partition_info);
+      trtorch::core::partitioning::segment_graph(g->block(), partition_info);
   ASSERT_TRUE(checkSegmentedBlockNumber(segmented_blocks, trtorch::core::partitioning::SegmentedBlock::kTensorRT, 1));
   ASSERT_TRUE(checkSegmentedBlockNumber(segmented_blocks, trtorch::core::partitioning::SegmentedBlock::kTorch, 1));
   ASSERT_TRUE(checkSegmentedBlockNodesMapping(segmented_blocks, g, {{0, 1, 2}, {3, 4}}));
@@ -133,7 +133,7 @@ TEST(Partitioning, SegmentSequentialModelWithForcedOPCorrectly) {
   partition_info.enabled = true;
   partition_info.forced_fallback_operators.push_back("aten::relu");
   std::vector<trtorch::core::partitioning::SegmentedBlock> segmented_blocks =
-      trtorch::core::partitioning::segment_graph(g, partition_info);
+      trtorch::core::partitioning::segment_graph(g->block(), partition_info);
   ASSERT_TRUE(checkSegmentedBlockNumber(segmented_blocks, trtorch::core::partitioning::SegmentedBlock::kTensorRT, 3));
   ASSERT_TRUE(checkSegmentedBlockNumber(segmented_blocks, trtorch::core::partitioning::SegmentedBlock::kTorch, 2));
   ASSERT_TRUE(checkSegmentedBlockNodesMapping(segmented_blocks, g, {{0}, {1}, {2}, {3}, {4}}));
@@ -166,7 +166,7 @@ TEST(Partitioning, SegmentBranchModelCorrectly) {
   trtorch::core::partitioning::PartitionInfo partition_info;
   partition_info.enabled = true;
   std::vector<trtorch::core::partitioning::SegmentedBlock> segmented_blocks =
-      trtorch::core::partitioning::segment_graph(g, partition_info);
+      trtorch::core::partitioning::segment_graph(g->block(), partition_info);
   ASSERT_TRUE(checkSegmentedBlockNumber(segmented_blocks, trtorch::core::partitioning::SegmentedBlock::kTensorRT, 2));
   ASSERT_TRUE(checkSegmentedBlockNumber(segmented_blocks, trtorch::core::partitioning::SegmentedBlock::kTorch, 1));
   ASSERT_TRUE(checkSegmentedBlockNodesMapping(segmented_blocks, g, {{0, 1}, {2}, {3, 4, 5, 6}}));
@@ -200,7 +200,7 @@ TEST(Partitioning, SegmentBranchModelWithMinBlockSizeCorrectly) {
   partition_info.enabled = true;
   partition_info.min_block_size = 3;
   std::vector<trtorch::core::partitioning::SegmentedBlock> segmented_blocks =
-      trtorch::core::partitioning::segment_graph(g, partition_info);
+      trtorch::core::partitioning::segment_graph(g->block(), partition_info);
   ASSERT_TRUE(checkSegmentedBlockNumber(segmented_blocks, trtorch::core::partitioning::SegmentedBlock::kTensorRT, 1));
   ASSERT_TRUE(checkSegmentedBlockNumber(segmented_blocks, trtorch::core::partitioning::SegmentedBlock::kTorch, 1));
   ASSERT_TRUE(checkSegmentedBlockNodesMapping(segmented_blocks, g, {{0, 1, 2}, {3, 4, 5, 6}}));
@@ -234,7 +234,7 @@ TEST(Partitioning, SegmentBranchModelWithForcedFallbackOPCorrectly) {
   partition_info.enabled = true;
   partition_info.forced_fallback_operators.push_back("aten::relu");
   std::vector<trtorch::core::partitioning::SegmentedBlock> segmented_blocks =
-      trtorch::core::partitioning::segment_graph(g, partition_info);
+      trtorch::core::partitioning::segment_graph(g->block(), partition_info);
   ASSERT_TRUE(checkSegmentedBlockNumber(segmented_blocks, trtorch::core::partitioning::SegmentedBlock::kTensorRT, 3));
   ASSERT_TRUE(checkSegmentedBlockNumber(segmented_blocks, trtorch::core::partitioning::SegmentedBlock::kTorch, 2));
   ASSERT_TRUE(checkSegmentedBlockNodesMapping(segmented_blocks, g, {{0, 1}, {2}, {3}, {4}, {5, 6}}));

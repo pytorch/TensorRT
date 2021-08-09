@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -56,6 +57,11 @@
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
+  </script>
+  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+  <script type="text/x-mathjax-config">
+   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -530,21 +536,35 @@
         /* CSS for nbsphinx extension */
 
 /* remove conflicting styling from Sphinx themes */
-div.nbinput.container,
-div.nbinput.container div.prompt,
-div.nbinput.container div.input_area,
-div.nbinput.container div[class*=highlight],
-div.nbinput.container div[class*=highlight] pre,
-div.nboutput.container,
-div.nboutput.container div.prompt,
-div.nboutput.container div.output_area,
-div.nboutput.container div[class*=highlight],
-div.nboutput.container div[class*=highlight] pre {
-    background: none;
+div.nbinput.container div.prompt *,
+div.nboutput.container div.prompt *,
+div.nbinput.container div.input_area pre,
+div.nboutput.container div.output_area pre,
+div.nbinput.container div.input_area .highlight,
+div.nboutput.container div.output_area .highlight {
     border: none;
-    padding: 0 0;
+    padding: 0;
     margin: 0;
     box-shadow: none;
+}
+
+div.nbinput.container > div[class*=highlight],
+div.nboutput.container > div[class*=highlight] {
+    margin: 0;
+}
+
+div.nbinput.container div.prompt *,
+div.nboutput.container div.prompt * {
+    background: none;
+}
+
+div.nboutput.container div.output_area .highlight,
+div.nboutput.container div.output_area pre {
+    background: unset;
+}
+
+div.nboutput.container div.output_area div.highlight {
+    color: unset;  /* override Pygments text color */
 }
 
 /* avoid gaps between output lines */
@@ -645,7 +665,7 @@ div.nboutput.container div.output_area {
 div.nbinput.container div.input_area {
     border: 1px solid #e0e0e0;
     border-radius: 2px;
-    background: #f5f5f5;
+    /*background: #f5f5f5;*/
 }
 
 /* override MathJax center alignment in output cells */
@@ -711,6 +731,7 @@ div.nboutput.container div.output_area.rendered_html,
 div.nboutput.container div.output_area > div.output_javascript,
 div.nboutput.container div.output_area:not(.rendered_html) > img{
     padding: 5px;
+    margin: 0;
 }
 
 /* fix copybtn overflow problem in chromium (needed for 'sphinx_copybutton') */
@@ -787,99 +808,105 @@ div.rendered_html tbody tr:hover {
         </div>
        </div>
        <p>
-        <img alt="35e48d6ab3bf43af85a1d2e052cd23e9" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
+        <img alt="5a196ac0b5e945e69ff2d98c8de96e9c" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
        </p>
-       <h1 id="notebooks-lenet-getting-started--page-root">
-        TRTorch Getting Started - LeNet
-        <a class="headerlink" href="#notebooks-lenet-getting-started--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <h2 id="Overview">
-        Overview
-        <a class="headerlink" href="#Overview" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <p>
-        In the practice of developing machine learning models, there are few tools as approachable as PyTorch for developing and experimenting in designing machine learning models. The power of PyTorch comes from its deep integration into Python, its flexibility and its approach to automatic differentiation and execution (eager execution). However, when moving from research into production, the requirements change and we may no longer want that deep Python integration and we want optimization to get the
+       <section id="TRTorch-Getting-Started---LeNet">
+        <h1 id="notebooks-lenet-getting-started--page-root">
+         TRTorch Getting Started - LeNet
+         <a class="headerlink" href="#notebooks-lenet-getting-started--page-root" title="Permalink to this headline">
+          ¶
+         </a>
+        </h1>
+        <section id="Overview">
+         <h2 id="Overview">
+          Overview
+          <a class="headerlink" href="#Overview" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <p>
+          In the practice of developing machine learning models, there are few tools as approachable as PyTorch for developing and experimenting in designing machine learning models. The power of PyTorch comes from its deep integration into Python, its flexibility and its approach to automatic differentiation and execution (eager execution). However, when moving from research into production, the requirements change and we may no longer want that deep Python integration and we want optimization to get the
 best performance we can on our deployment platform. In PyTorch 1.0, TorchScript was introduced as a method to separate your PyTorch model from Python, make it portable and optimizable. TorchScript uses PyTorch’s JIT compiler to transform your normal PyTorch code which gets interpreted by the Python interpreter to an intermediate representation (IR) which can have optimizations run on it and at runtime can get interpreted by the PyTorch JIT interpreter. For PyTorch this has opened up a whole new
 world of possibilities, including deployment in other languages like C++. It also introduces a structured graph based format that we can use to do down to the kernel level optimization of models for inference.
-       </p>
-       <p>
-        When deploying on NVIDIA GPUs TensorRT, NVIDIA’s Deep Learning Optimization SDK and Runtime is able to take models from any major framework and specifically tune them to perform better on specific target hardware in the NVIDIA family be it an A100, TITAN V, Jetson Xavier or NVIDIA’s Deep Learning Accelerator. TensorRT performs a couple sets of optimizations to achieve this. TensorRT fuses layers and tensors in the model graph, it then uses a large kernel library to select implementations that
+         </p>
+         <p>
+          When deploying on NVIDIA GPUs TensorRT, NVIDIA’s Deep Learning Optimization SDK and Runtime is able to take models from any major framework and specifically tune them to perform better on specific target hardware in the NVIDIA family be it an A100, TITAN V, Jetson Xavier or NVIDIA’s Deep Learning Accelerator. TensorRT performs a couple sets of optimizations to achieve this. TensorRT fuses layers and tensors in the model graph, it then uses a large kernel library to select implementations that
 perform best on the target GPU. TensorRT also has strong support for reduced operating precision execution which allows users to leverage the Tensor Cores on Volta and newer GPUs as well as reducing memory and computation footprints on device.
-       </p>
-       <p>
-        TRTorch is a compiler that uses TensorRT to optimize TorchScript code, compiling standard TorchScript modules into ones that internally run with TensorRT optimizations. This enables you to continue to remain in the PyTorch ecosystem, using all the great features PyTorch has such as module composability, its flexible tensor implementation, data loaders and more. TRTorch is available to use with both PyTorch and LibTorch.
-       </p>
-       <h3 id="Learning-objectives">
-        Learning objectives
-        <a class="headerlink" href="#Learning-objectives" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        This notebook demonstrates the steps for compiling a TorchScript module with TRTorch on a simple LeNet network.
-       </p>
-       <h2 id="Content">
-        Content
-        <a class="headerlink" href="#Content" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <ol class="arabic simple">
-        <li>
-         <p>
-          <a class="reference external" href="#1">
-           Requirements
-          </a>
          </p>
-        </li>
-        <li>
          <p>
-          <a class="reference external" href="#2">
-           Creating TorchScript modules
-          </a>
+          TRTorch is a compiler that uses TensorRT to optimize TorchScript code, compiling standard TorchScript modules into ones that internally run with TensorRT optimizations. This enables you to continue to remain in the PyTorch ecosystem, using all the great features PyTorch has such as module composability, its flexible tensor implementation, data loaders and more. TRTorch is available to use with both PyTorch and LibTorch.
          </p>
-        </li>
-        <li>
+         <section id="Learning-objectives">
+          <h3 id="Learning-objectives">
+           Learning objectives
+           <a class="headerlink" href="#Learning-objectives" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           This notebook demonstrates the steps for compiling a TorchScript module with TRTorch on a simple LeNet network.
+          </p>
+         </section>
+        </section>
+        <section id="Content">
+         <h2 id="Content">
+          Content
+          <a class="headerlink" href="#Content" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <ol class="arabic simple">
+          <li>
+           <p>
+            <a class="reference external" href="#1">
+             Requirements
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference external" href="#2">
+             Creating TorchScript modules
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference external" href="#3">
+             Compiling with TRTorch
+            </a>
+           </p>
+          </li>
+         </ol>
          <p>
-          <a class="reference external" href="#3">
-           Compiling with TRTorch
-          </a>
+          ## 1. Requirements
          </p>
-        </li>
-       </ol>
-       <p>
-        ## 1. Requirements
-       </p>
-       <p>
-        Follow the steps in
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          notebooks/README
-         </span>
-        </code>
-        to prepare a Docker container, within which you can run this notebook.
-       </p>
-       <p>
-        ## 2. Creating TorchScript modules
-       </p>
-       <p>
-        Here we create two submodules for a feature extractor and a classifier and stitch them together in a single LeNet module. In this case this is overkill but modules give us granular control over our program including where we decide to optimize and where we don’t. It is also the unit that the TorchScript compiler operates on. So you can decide to only convert/optimize the feature extractor and leave the classifier in standard PyTorch or you can convert the whole thing. When compiling your module
+         <p>
+          Follow the steps in
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            notebooks/README
+           </span>
+          </code>
+          to prepare a Docker container, within which you can run this notebook.
+         </p>
+         <p>
+          ## 2. Creating TorchScript modules
+         </p>
+         <p>
+          Here we create two submodules for a feature extractor and a classifier and stitch them together in a single LeNet module. In this case this is overkill but modules give us granular control over our program including where we decide to optimize and where we don’t. It is also the unit that the TorchScript compiler operates on. So you can decide to only convert/optimize the feature extractor and leave the classifier in standard PyTorch or you can convert the whole thing. When compiling your module
 to TorchScript, there are two paths: Tracing and Scripting.
-       </p>
-       <div class="nbinput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[2]:
+         </p>
+         <div class="nbinput nblast docutils container">
+          <div class="prompt highlight-none notranslate">
+           <div class="highlight">
+            <pre><span></span>[2]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+           </div>
+          </div>
+          <div class="input_area highlight-ipython3 notranslate">
+           <div class="highlight">
+            <pre>
 <span></span>import torch
 from torch import nn
 import torch.nn.functional as F
@@ -921,22 +948,22 @@ class LeNet(nn.Module):
         return x
 
 </pre>
+           </div>
+          </div>
          </div>
-        </div>
-       </div>
-       <p>
-        Let us define a helper function to benchmark a model.
-       </p>
-       <div class="nbinput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[3]:
+         <p>
+          Let us define a helper function to benchmark a model.
+         </p>
+         <div class="nbinput nblast docutils container">
+          <div class="prompt highlight-none notranslate">
+           <div class="highlight">
+            <pre><span></span>[3]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+           </div>
+          </div>
+          <div class="input_area highlight-ipython3 notranslate">
+           <div class="highlight">
+            <pre>
 <span></span>import time
 import numpy as np
 
@@ -971,42 +998,43 @@ def benchmark(model, input_shape=(1024, 1, 32, 32), dtype='fp32', nwarmup=50, nr
 
     print('Average batch time: %.2f ms'%(np.mean(timings)*1000))
 </pre>
+           </div>
+          </div>
          </div>
-        </div>
-       </div>
-       <h3 id="PyTorch-model">
-        PyTorch model
-        <a class="headerlink" href="#PyTorch-model" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[4]:
+         <section id="PyTorch-model">
+          <h3 id="PyTorch-model">
+           PyTorch model
+           <a class="headerlink" href="#PyTorch-model" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[4]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span>model = LeNet()
 model.to("cuda").eval()
 
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[4]:
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[4]:
 </pre>
-         </div>
-        </div>
-        <div class="output_area docutils container">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
 LeNet(
   (feat): LeNetFeatExtractor(
     (conv1): Conv2d(1, 6, kernel_size=(3, 3), stride=(1, 1))
@@ -1019,30 +1047,30 @@ LeNet(
   )
 )
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[5]:
+            </div>
+           </div>
+          </div>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[5]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span>benchmark(model)
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area docutils container">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
 Warm up ...
 Start timing ...
 Iteration 1000/10000, ave batch time 0.58 ms
@@ -1059,47 +1087,49 @@ Input shape: torch.Size([1024, 1, 32, 32])
 Output features size: torch.Size([1024, 10])
 Average batch time: 0.58 ms
 </pre>
-         </div>
-        </div>
-       </div>
-       <p>
-        When compiling your module to TorchScript, there are two paths: Tracing and Scripting.
-       </p>
-       <h3 id="Tracing">
-        Tracing
-        <a class="headerlink" href="#Tracing" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        Tracing follows the path of execution when the module is called and records what happens. This recording is what the TorchScript IR will describe. To trace an instance of our LeNet module, we can call torch.jit.trace with an example input.
-       </p>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[6]:
+            </div>
+           </div>
+          </div>
+          <p>
+           When compiling your module to TorchScript, there are two paths: Tracing and Scripting.
+          </p>
+         </section>
+         <section id="Tracing">
+          <h3 id="Tracing">
+           Tracing
+           <a class="headerlink" href="#Tracing" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           Tracing follows the path of execution when the module is called and records what happens. This recording is what the TorchScript IR will describe. To trace an instance of our LeNet module, we can call torch.jit.trace with an example input.
+          </p>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[6]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span>traced_model = torch.jit.trace(model, torch.empty([1,1,32,32]).to("cuda"))
 traced_model
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[6]:
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[6]:
 </pre>
-         </div>
-        </div>
-        <div class="output_area docutils container">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
 LeNet(
   original_name=LeNet
   (feat): LeNetFeatExtractor(
@@ -1115,30 +1145,30 @@ LeNet(
   )
 )
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[7]:
+            </div>
+           </div>
+          </div>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[7]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span>benchmark(traced_model)
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area docutils container">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
 Warm up ...
 Start timing ...
 Iteration 1000/10000, ave batch time 0.58 ms
@@ -1155,60 +1185,62 @@ Input shape: torch.Size([1024, 1, 32, 32])
 Output features size: torch.Size([1024, 10])
 Average batch time: 0.59 ms
 </pre>
-         </div>
-        </div>
-       </div>
-       <h3 id="Scripting">
-        Scripting
-        <a class="headerlink" href="#Scripting" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        Scripting actually inspects your code with a compiler and generates an equivalent TorchScript program. The difference is that since tracing simply follows the execution of your module, it cannot pick up control flow for instance, it will only follow the code path that a particular input triggers. By working from the Python code, the compiler can include these components. We can run the script compiler on our LeNet module by calling torch.jit.script.
-       </p>
-       <div class="nbinput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[8]:
+            </div>
+           </div>
+          </div>
+         </section>
+         <section id="Scripting">
+          <h3 id="Scripting">
+           Scripting
+           <a class="headerlink" href="#Scripting" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           Scripting actually inspects your code with a compiler and generates an equivalent TorchScript program. The difference is that since tracing simply follows the execution of your module, it cannot pick up control flow for instance, it will only follow the code path that a particular input triggers. By working from the Python code, the compiler can include these components. We can run the script compiler on our LeNet module by calling torch.jit.script.
+          </p>
+          <div class="nbinput nblast docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[8]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span>model = LeNet().to("cuda").eval()
 script_model = torch.jit.script(model)
 
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[9]:
+            </div>
+           </div>
+          </div>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[9]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span>script_model
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[9]:
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[9]:
 </pre>
-         </div>
-        </div>
-        <div class="output_area docutils container">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
 RecursiveScriptModule(
   original_name=LeNet
   (feat): RecursiveScriptModule(
@@ -1224,30 +1256,30 @@ RecursiveScriptModule(
   )
 )
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[10]:
+            </div>
+           </div>
+          </div>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[10]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span>benchmark(script_model)
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area docutils container">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
 Warm up ...
 Start timing ...
 Iteration 1000/10000, ave batch time 0.59 ms
@@ -1264,31 +1296,33 @@ Input shape: torch.Size([1024, 1, 32, 32])
 Output features size: torch.Size([1024, 10])
 Average batch time: 0.59 ms
 </pre>
-         </div>
-        </div>
-       </div>
-       <p>
-        ## 3. Compiling with TRTorch
-       </p>
-       <h3 id="TorchScript-traced-model">
-        TorchScript traced model
-        <a class="headerlink" href="#TorchScript-traced-model" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        First, we compile the TorchScript traced model with TRTorch. Notice the performance impact.
-       </p>
-       <div class="nbinput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[11]:
+            </div>
+           </div>
+          </div>
+          <p>
+           ## 3. Compiling with TRTorch
+          </p>
+         </section>
+         <section id="TorchScript-traced-model">
+          <h3 id="TorchScript-traced-model">
+           TorchScript traced model
+           <a class="headerlink" href="#TorchScript-traced-model" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           First, we compile the TorchScript traced model with TRTorch. Notice the performance impact.
+          </p>
+          <div class="nbinput nblast docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[11]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span>import trtorch
 
 # We use a batch-size of 1024, and half precision
@@ -1311,30 +1345,30 @@ input_data = input_data.half()
 result = trt_ts_module(input_data)
 torch.jit.save(trt_ts_module, "trt_ts_module.ts")
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[12]:
+            </div>
+           </div>
+          </div>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[12]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span>benchmark(trt_ts_module, input_shape=(1024, 1, 32, 32), dtype="fp16")
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area docutils container">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
 Warm up ...
 Start timing ...
 Iteration 1000/10000, ave batch time 0.41 ms
@@ -1351,28 +1385,30 @@ Input shape: torch.Size([1024, 1, 32, 32])
 Output features size: torch.Size([1024, 10])
 Average batch time: 0.40 ms
 </pre>
-         </div>
-        </div>
-       </div>
-       <h3 id="TorchScript-script-model">
-        TorchScript script model
-        <a class="headerlink" href="#TorchScript-script-model" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        Next, we compile the TorchScript script model with TRTorch. Notice the performance impact.
-       </p>
-       <div class="nbinput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[14]:
+            </div>
+           </div>
+          </div>
+         </section>
+         <section id="TorchScript-script-model">
+          <h3 id="TorchScript-script-model">
+           TorchScript script model
+           <a class="headerlink" href="#TorchScript-script-model" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           Next, we compile the TorchScript script model with TRTorch. Notice the performance impact.
+          </p>
+          <div class="nbinput nblast docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[14]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span>import trtorch
 
 # We use a batch-size of 1024, and half precision
@@ -1395,30 +1431,30 @@ input_data = input_data.half()
 result = trt_script_module(input_data)
 torch.jit.save(trt_script_module, "trt_script_module.ts")
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[15]:
+            </div>
+           </div>
+          </div>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[15]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span>benchmark(trt_script_module, input_shape=(1024, 1, 32, 32), dtype="fp16")
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area docutils container">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
 Warm up ...
 Start timing ...
 Iteration 1000/10000, ave batch time 0.40 ms
@@ -1435,31 +1471,38 @@ Input shape: torch.Size([1024, 1, 32, 32])
 Output features size: torch.Size([1024, 10])
 Average batch time: 0.40 ms
 </pre>
-         </div>
-        </div>
-       </div>
-       <h2 id="Conclusion">
-        Conclusion
-        <a class="headerlink" href="#Conclusion" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <p>
-        In this notebook, we have walked through the complete process of compiling TorchScript models with TRTorch and test the performance impact of the optimization.
-       </p>
-       <h3 id="What’s-next">
-        What’s next
-        <a class="headerlink" href="#What’s-next" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        Now it’s time to try TRTorch on your own model. Fill out issues at
-        <a class="reference external" href="https://github.com/NVIDIA/TRTorch">
-         https://github.com/NVIDIA/TRTorch
-        </a>
-        . Your involvement will help future development of TRTorch.
-       </p>
+            </div>
+           </div>
+          </div>
+         </section>
+        </section>
+        <section id="Conclusion">
+         <h2 id="Conclusion">
+          Conclusion
+          <a class="headerlink" href="#Conclusion" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <p>
+          In this notebook, we have walked through the complete process of compiling TorchScript models with TRTorch and test the performance impact of the optimization.
+         </p>
+         <section id="What’s-next">
+          <h3 id="What’s-next">
+           What’s next
+           <a class="headerlink" href="#What’s-next" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           Now it’s time to try TRTorch on your own model. Fill out issues at
+           <a class="reference external" href="https://github.com/NVIDIA/TRTorch">
+            https://github.com/NVIDIA/TRTorch
+           </a>
+           . Your involvement will help future development of TRTorch.
+          </p>
+         </section>
+        </section>
+       </section>
       </article>
      </div>
     </div>

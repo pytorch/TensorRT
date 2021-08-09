@@ -1,4 +1,4 @@
-# trtorhc
+# trtorchc
 
 trtorchc is a compiler CLI application using the TRTorch compiler. It serves as an easy way to compile a
 TorchScript Module with TRTorch from the command-line to quickly check support or as part of
@@ -36,15 +36,22 @@ trtorchc [input_file_path] [output_file_path]
       --allow-gpu-fallback              (Only used when targeting DLA
                                         (device-type)) Lets engine run layers on
                                         GPU if they are not supported on DLA
+
+      --allow-torch-fallback            Enable layers to run in torch
+                                        if they are not supported in TensorRT
+
       --disable-tf32                    Prevent Float32 layers from using the
                                         TF32 data format
       -p[precision...],
       --enabled-precison=[precision...] (Repeatable) Enabling an operating
                                         precision for kernels to use when
-                                        building the engine (Int8 requires a
-                                        calibration-cache argument) [ float |
+                                        building the engine [ float |
                                         float32 | f32 | half | float16 | f16 |
                                         int8 | i8 ] (default: float)
+
+      --ffo,
+      --forced-fallback-ops             List of operators in the graph that
+                                        should be forced to fallback to Pytorch for execution
       -d[type], --device-type=[type]    The type of device the engine should be
                                         built for [ gpu | dla ] (default: gpu)
       --gpu-id=[gpu_id]                 GPU id if running on multi-GPU platform
@@ -57,6 +64,10 @@ trtorchc [input_file_path] [output_file_path]
       --calibration-cache-file=[file_path]
                                         Path to calibration cache file to use
                                         for post training quantization
+      --embed-engine                    Whether to treat input file as a
+                                        serialized TensorRT engine and embed it
+                                        into a TorchScript module (device spec
+                                        must be provided)
       --num-min-timing-iter=[num_iters] Number of minimization timing iterations
                                         used to select kernels
       --num-avg-timing-iters=[num_iters]
@@ -92,6 +103,7 @@ trtorchc [input_file_path] [output_file_path]
 ```
 
 e.g.
+
 ```
 trtorchc tests/modules/ssd_traced.jit.pt ssd_trt.ts "[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@fp16%contiguous" -p f16
 ```

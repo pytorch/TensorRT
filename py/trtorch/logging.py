@@ -13,6 +13,7 @@ class Level(Enum):
     Warning = LogLevel.WARNING
     Info = LogLevel.INFO
     Debug = LogLevel.DEBUG
+    Graph = LogLevel.GRAPH
 
     @staticmethod
     def _to_internal_level(external) -> LogLevel:
@@ -26,6 +27,8 @@ class Level(Enum):
             return LogLevel.INFO
         if external == Level.Debug:
             return LogLevel.DEBUG
+        if external == Level.Graph:
+            return LogLevel.GRAPH
 
 
 def get_logging_prefix() -> str:

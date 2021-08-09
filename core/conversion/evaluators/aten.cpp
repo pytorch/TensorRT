@@ -8,6 +8,7 @@
 #include "torch/torch.h"
 
 #include "core/conversion/evaluators/eval_macros.h"
+#include "core/conversion/evaluators/eval_util.h"
 #include "core/conversion/evaluators/evaluators.h"
 
 namespace trtorch {
@@ -194,40 +195,56 @@ auto aten_registrations TRTORCH_UNUSED =
                       return static_cast<int64_t>(list.size());
                     },
                     EvalOptions().validSchemas({"aten::len.t(t[] a) -> (int)"})})
-        .evaluator({c10::Symbol::fromQualString("aten::size"),
-                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-                      LOG_WARNING("There may be undefined behavior using dynamic shape and aten::size");
-                      auto tensor_var = args.at(n->input(0));
-                      if (n->inputs().size() == 1) {
-                        if (tensor_var.isITensor()) {
-                          auto tensor = tensor_var.ITensor();
-                          return util::toVec(tensor->getDimensions());
-                        } else {
-                          auto tensor = tensor_var.unwrapToTensor();
-                          return tensor.sizes();
-                        }
-                      } else {
-                        auto dim = args.at(n->input(1)).unwrapToInt();
-                        if (tensor_var.isITensor()) {
-                          auto tensor = tensor_var.ITensor();
-                          auto dims = util::toVec(tensor->getDimensions());
-                          auto nbDims = tensor->getDimensions().nbDims;
-                          if (dim < 0) {
-                            dim += nbDims;
-                          }
-                          return dims[dim];
-                        } else {
-                          auto tensor = tensor_var.unwrapToTensor();
-                          auto nbDims = tensor.sizes().size();
-                          if (dim < 0) {
-                            dim += nbDims;
-                          }
-                          return tensor.sizes()[dim];
-                        }
-                      }
-                    },
-                    EvalOptions().validSchemas(
-                        {"aten::size(Tensor self) -> (int[])", "aten::size.int(Tensor self, int dim) -> (int)"})})
+        .evaluator(
+            {c10::Symbol::fromQualString("aten::size"),
+             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+               LOG_WARNING("There may be undefined behavior using dynamic shape and aten::size");
+               auto tensor_var = args.at(n->input(0));
+               if (n->inputs().size() == 1) {
+                 if (tensor_var.isITensor()) {
+                   auto tensor = tensor_var.ITensor();
+                   return util::toVec(tensor->getDimensions());
+                 } else if (tensor_var.IValue()->isTensor()) {
+                   auto tensor = tensor_var.unwrapToTensor();
+                   return tensor.sizes();
+                 } else if (tensor_var.IValue()->isCustomClass()) {
+                   auto tensor = tensor_var.IValue()->toCustomClass<TensorContainer>()->tensor();
+                   return util::toVec(tensor->getDimensions());
+                 } else {
+                   TRTORCH_THROW_ERROR("IValue is not some class of Tensor. Found: " << tensor_var.IValue()->type());
+                 }
+               } else {
+                 auto dim = args.at(n->input(1)).unwrapToInt();
+                 if (tensor_var.isITensor()) {
+                   auto tensor = tensor_var.ITensor();
+                   auto dims = util::toVec(tensor->getDimensions());
+                   auto nbDims = tensor->getDimensions().nbDims;
+                   if (dim < 0) {
+                     dim += nbDims;
+                   }
+                   return dims[dim];
+                 } else if (tensor_var.IValue()->isTensor()) {
+                   auto tensor = tensor_var.unwrapToTensor();
+                   auto nbDims = tensor.sizes().size();
+                   if (dim < 0) {
+                     dim += nbDims;
+                   }
+                   return tensor.sizes()[dim];
+                 } else if (tensor_var.IValue()->isCustomClass()) {
+                   auto tensor = tensor_var.IValue()->toCustomClass<TensorContainer>()->tensor();
+                   auto dims = util::toVec(tensor->getDimensions());
+                   auto nbDims = tensor->getDimensions().nbDims;
+                   if (dim < 0) {
+                     dim += nbDims;
+                   }
+                   return dims[dim];
+                 } else {
+                   TRTORCH_THROW_ERROR("IValue is not some class of Tensor. Found: " << tensor_var.IValue()->type());
+                 }
+               }
+             },
+             EvalOptions().validSchemas(
+                 {"aten::size(Tensor self) -> (int[])", "aten::size.int(Tensor self, int dim) -> (int)"})})
         .evaluator({c10::Symbol::fromQualString("aten::__getitem__"),
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                       auto list = args.at(n->input(0)).IValue()->to<c10::List<c10::IValue>>();
@@ -399,6 +416,30 @@ auto aten_registrations TRTORCH_UNUSED =
                         "aten::Float.int(int a) -> float",
                         "aten::Float.bool(bool a) -> float",
                     })})
+        .evaluator({c10::Symbol::fromQualString("aten::Int"),
+                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+                      if (args.at(n->input(0)).IValue()->isInt()) {
+                        auto a = args.at(n->input(0)).unwrapToInt();
+                        return (int)a;
+                      } else if (args.at(n->input(0)).IValue()->isDouble()) {
+                        auto a = args.at(n->input(0)).unwrapToDouble();
+                        return (int)a;
+                      } else if (args.at(n->input(0)).IValue()->isBool()) {
+                        auto a = args.at(n->input(0)).unwrapToBool();
+                        return (int)a;
+                      } else {
+                        TRTORCH_THROW_ERROR(
+                            "Unimplemented data type for aten::Int evaluator: "
+                            << args.at(n->input(0)).IValue()->type()->str());
+                        return {};
+                      }
+                    },
+                    EvalOptions().validSchemas({
+                        "aten::Int.Scalar(Scalar a) -> int",
+                        "aten::Int.int(int a) -> int",
+                        "aten::Int.bool(bool a) -> int",
+                        "aten::Int.float(float a) -> int",
+                    })})
         .evaluator({c10::Symbol::fromQualString("aten::__not__"),
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                       auto el = args.at(n->input(0)).unwrapToBool();
@@ -518,6 +559,25 @@ auto aten_registrations TRTORCH_UNUSED =
                         "aten::floor.int(int a) -> (int)",
                         "aten::floor.float(float a) -> (int)",
                     })})
+        .evaluator({c10::Symbol::fromQualString("aten::sqrt"),
+                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+                      if (args.at(n->input(0)).IValue()->isInt()) {
+                        auto a = args.at(n->input(0)).unwrapToInt();
+                        return std::sqrt(static_cast<double>(a));
+                      } else if (args.at(n->input(0)).IValue()->isDouble()) {
+                        auto a = args.at(n->input(0)).unwrapToDouble();
+                        return std::sqrt(a);
+                      } else {
+                        TRTORCH_THROW_ERROR(
+                            "Unimplemented data type for aten::sqrt evaluator: "
+                            << args.at(n->input(0)).IValue()->type()->str());
+                        return {};
+                      }
+                    },
+                    EvalOptions().validSchemas({
+                        "aten::sqrt.int(int a) -> (float)",
+                        "aten::sqrt.float(float a) -> (float)",
+                    })})
         .evaluator({c10::Symbol::fromQualString("aten::warn"),
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                       auto warning = args.at(n->input(0)).IValue();
@@ -525,6 +585,17 @@ auto aten_registrations TRTORCH_UNUSED =
                       return {};
                     },
                     EvalOptions()})
+        .evaluator(
+            {c10::Symbol::fromQualString("aten::tensor"),
+             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+               auto data = args.at(n->input(0)).IValue();
+               auto dtype = args.at(n->input(1)).IValue();
+               auto device = args.at(n->input(2)).IValue();
+               auto tensor = createTensorFromList(*data, *dtype, *device);
+               return tensor;
+             },
+             EvalOptions().validSchemas(
+                 {"aten::tensor(t[] data, *, int? dtype=None, Device? device=None, bool requires_grad=False) -> (Tensor)"})})
         .evaluator({c10::Symbol::fromQualString("aten::arange"),
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                       int input_size = n->inputs().size();
@@ -578,6 +649,41 @@ auto aten_registrations TRTORCH_UNUSED =
                             Layout? layout=None, Device? device=None, bool? pin_memory=None) -> (Tensor))SIG",
                         R"SIG(aten::arange.start_step(Scalar start, Scalar end, Scalar step, *, ScalarType? dtype=None,
                         Layout? layout=None, Device? device=None, bool? pin_memory=None) -> (Tensor))SIG",
+                    })})
+        .evaluator({c10::Symbol::fromQualString("aten::clone"),
+                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+                      if (args.at(n->input(0)).isITensor()) {
+                        auto source_tensor = args.at(n->input(0)).ITensor();
+                        auto tensor_holder = TensorContainer();
+                        tensor_holder.hold_tensor(source_tensor);
+                        auto clone_tensor = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
+                        return std::move(clone_tensor);
+                      } else {
+                        auto source_tensor = args.at(n->input(0)).unwrapToTensor();
+                        auto clone_tensor = source_tensor.clone();
+                        return clone_tensor;
+                      }
+                    },
+                    EvalOptions().validSchemas({
+                        R"SIG(aten::clone(Tensor self, *, int? memory_format=None) -> (Tensor))SIG",
+                    })})
+        .evaluator({c10::Symbol::fromQualString("aten::copy_"),
+                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+                      if (args.at(n->input(1)).isITensor()) {
+                        auto source_tensor = args.at(n->input(1)).ITensor();
+                        auto tensor_holder = TensorContainer();
+                        tensor_holder.hold_tensor(source_tensor);
+                        auto clone_tensor = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
+                        return std::move(clone_tensor);
+                      } else {
+                        auto source_tensor = args.at(n->input(1)).unwrapToTensor();
+                        auto self_tensor = args.at(n->input(0)).unwrapToTensor();
+                        self_tensor.copy_(source_tensor);
+                        return self_tensor;
+                      }
+                    },
+                    EvalOptions().validSchemas({
+                        R"SIG(aten::copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> (Tensor(a!)))SIG",
                     })});
 } // namespace
 } // namespace evaluators

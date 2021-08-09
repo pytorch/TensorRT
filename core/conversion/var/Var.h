@@ -4,7 +4,6 @@
 #include <string>
 
 #include "core/conversion/conversionctx/ConversionCtx.h"
-#include "core/conversion/converters/Weights.h"
 #include "core/conversion/tensorcontainer/TensorContainer.h"
 #include "core/util/prelude.h"
 #include "torch/csrc/jit/ir/ir.h"

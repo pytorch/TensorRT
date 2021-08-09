@@ -25,6 +25,27 @@ nvinfer1::ITensor* clamp_util(
   return clamp_layer_out;
 }
 
+nvinfer1::ITensor* scalar_to_tensor(ConversionCtx* ctx, at::Scalar s) {
+  nvinfer1::ITensor* out;
+  if (s.isIntegral(false)) {
+    auto s_int = s.to<int64_t>();
+    auto s_t = torch::tensor({s_int}).to(at::kInt);
+    out = tensor_to_const(ctx, s_t);
+  } else if (s.isBoolean()) {
+    auto s_bool = s.to<bool>();
+    auto s_t = torch::tensor({s_bool}).to(at::kBool);
+    out = tensor_to_const(ctx, s_t);
+  } else if (s.isFloatingPoint()) {
+    auto other_float = s.to<float>();
+    auto s_t = torch::tensor({other_float});
+    out = tensor_to_const(ctx, s_t);
+  } else {
+    out = nullptr;
+    TRTORCH_THROW_ERROR("Unsupported data type for scalar. Found: (" << s.type() << ")");
+  }
+  return out;
+}
+
 auto element_wise_registrations TRTORCH_UNUSED =
     RegisterNodeConversionPatterns()
         .pattern({"aten::add.Tensor(Tensor self, Tensor other, Scalar alpha=1) -> "
@@ -183,6 +204,24 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     sub->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], sub->getOutput(0));
                     LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+                    return true;
+                  }})
+        .pattern({"aten::sub.Scalar(Tensor self, Scalar other, Scalar alpha=1) -> (Tensor)",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    // Should implement self - alpha * other
+                    auto self = args[0].ITensorOrFreeze(ctx);
+                    auto other = args[1].unwrapToScalar().to<float>();
+                    auto alpha = args[2].unwrapToScalar().to<float>();
+                    auto scaled_val = other * alpha;
+
+                    auto scaled_other_tensor = tensor_to_const(ctx, torch::tensor({scaled_val}));
+                    auto sub = add_elementwise(
+                        ctx, nvinfer1::ElementWiseOperation::kSUB, self, scaled_other_tensor, util::node_info(n));
+                    TRTORCH_CHECK(sub, "Unable to create sub layer from node: " << *n);
+                    sub->setName(util::node_info(n).c_str());
+                    LOG_DEBUG("Output tensor shape: " << sub->getOutput(0)->getDimensions());
+                    ctx->AssociateValueAndTensor(n->outputs()[0], sub->getOutput(0));
+
                     return true;
                   }})
         .pattern({"aten::sub_.Tensor(Tensor(a!) self, Tensor other, *, Scalar "
@@ -539,8 +578,10 @@ auto element_wise_registrations TRTORCH_UNUSED =
         .pattern({"aten::gt.Scalar(Tensor self, Scalar other) -> (Tensor)",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                     auto self = args[0].ITensorOrFreeze(ctx);
-                    auto otherScalar = args[1].unwrapToScalar().to<float>();
-                    auto other = tensor_to_const(ctx, torch::tensor({otherScalar}));
+                    auto other = scalar_to_tensor(ctx, args[1].unwrapToScalar());
+                    if (self->getType() != other->getType()) {
+                      other = castITensor(ctx, other, self->getType());
+                    }
                     auto gt =
                         add_elementwise(ctx, nvinfer1::ElementWiseOperation::kGREATER, self, other, util::node_info(n));
                     TRTORCH_CHECK(gt, "Unable to create greater layer from node: " << *n);
@@ -566,8 +607,10 @@ auto element_wise_registrations TRTORCH_UNUSED =
         .pattern({"aten::lt.Scalar(Tensor self, Scalar other) -> (Tensor)",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                     auto self = args[0].ITensorOrFreeze(ctx);
-                    auto otherScalar = args[1].unwrapToScalar().to<float>();
-                    auto other = tensor_to_const(ctx, torch::tensor({otherScalar}));
+                    auto other = scalar_to_tensor(ctx, args[1].unwrapToScalar());
+                    if (self->getType() != other->getType()) {
+                      other = castITensor(ctx, other, self->getType());
+                    }
                     auto lt =
                         add_elementwise(ctx, nvinfer1::ElementWiseOperation::kLESS, self, other, util::node_info(n));
                     TRTORCH_CHECK(lt, "Unable to create less layer from node: " << *n);
@@ -595,6 +638,18 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     auto self = args[0].ITensorOrFreeze(ctx);
                     auto otherScalar = args[1].unwrapToScalar().to<float>();
                     auto other = tensor_to_const(ctx, torch::tensor({otherScalar}));
+                    if (self->getType() == nvinfer1::DataType::kBOOL) {
+                      if (otherScalar == 0 || otherScalar == 1) {
+                        LOG_DEBUG("Since input tensor is type bool, casting input tensor and scalar to int32");
+                        other = castITensor(ctx, other, nvinfer1::DataType::kINT32);
+                        self = castITensor(ctx, self, nvinfer1::DataType::kINT32);
+                      } else {
+                        LOG_WARNING("Input Tensor has type bool, but scalar is not 0 or 1. Found: " << otherScalar);
+                      }
+                    }
+                    if (self->getType() != other->getType()) {
+                      other = castITensor(ctx, other, self->getType());
+                    }
                     auto eq =
                         add_elementwise(ctx, nvinfer1::ElementWiseOperation::kEQUAL, self, other, util::node_info(n));
                     TRTORCH_CHECK(eq, "Unable to create equal layer from node: " << *n);
@@ -630,8 +685,10 @@ auto element_wise_registrations TRTORCH_UNUSED =
         .pattern({"aten::ge.Scalar(Tensor self, Scalar other) -> (Tensor)",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                     auto self = args[0].ITensorOrFreeze(ctx);
-                    auto otherScalar = args[1].unwrapToScalar().to<float>();
-                    auto other = tensor_to_const(ctx, torch::tensor({otherScalar}));
+                    auto other = scalar_to_tensor(ctx, args[1].unwrapToScalar());
+                    if (self->getType() != other->getType()) {
+                      other = castITensor(ctx, other, self->getType());
+                    }
 
                     auto greater = add_elementwise(
                         ctx, nvinfer1::ElementWiseOperation::kGREATER, self, other, util::node_info(n) + "_greater");
@@ -677,8 +734,10 @@ auto element_wise_registrations TRTORCH_UNUSED =
         .pattern({"aten::le.Scalar(Tensor self, Scalar other) -> (Tensor)",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                     auto self = args[0].ITensorOrFreeze(ctx);
-                    auto otherScalar = args[1].unwrapToScalar().to<float>();
-                    auto other = tensor_to_const(ctx, torch::tensor({otherScalar}));
+                    auto other = scalar_to_tensor(ctx, args[1].unwrapToScalar());
+                    if (self->getType() != other->getType()) {
+                      other = castITensor(ctx, other, self->getType());
+                    }
 
                     auto less = add_elementwise(
                         ctx, nvinfer1::ElementWiseOperation::kLESS, self, other, util::node_info(n) + "_less");
