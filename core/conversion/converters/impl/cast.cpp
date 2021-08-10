@@ -40,7 +40,7 @@ auto cast_registrations TRTORCH_UNUSED =
             {"aten::to.prim_Device(Tensor(a) self, Device? device, int? dtype=None, bool non_blocking=False, bool copy=False) -> (Tensor(b|a))",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                auto self = args[0].ITensorOrFreeze(ctx);
-               if (!args[2].isNone()) {
+               if (args[2].isIValue() && !args[2].IValue()->isScalar()) {
                  auto output = ctx->AssociateValueAndTensor(n->outputs()[0], self);
                  LOG_DEBUG("[aten::to.prim_Device] Output tensor shape: " << output->getDimensions());
                  return true;

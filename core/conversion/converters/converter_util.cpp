@@ -175,13 +175,15 @@ nvinfer1::ITensor* tensor_to_const(ConversionCtx* ctx, at::Tensor t, const std::
 
   std::ostringstream tensor_id;
   tensor_id << reinterpret_cast<int*>(out);
+  std::string tensor_name;
 
-  LOG_DEBUG(ctx->logger, "Freezing tensor " << tensor_id.str() << " as an IConstantLayer");
   if (!name.empty()) {
-    const_layer->setName(name.c_str());
+    tensor_name = name;
   } else {
-    const_layer->setName(("[Freeze Tensor " + tensor_id.str() + " ]").c_str());
+    tensor_name = tensor_id.str();
   }
+  LOG_DEBUG(ctx->logger, "Freezing tensor " << tensor_name << " as an IConstantLayer");
+  const_layer->setName(("[Freeze Tensor " + tensor_name + " ]").c_str());
 
   if (post_freeze_cast) {
     out = castITensor(ctx, out, post_freeze_cast_type);

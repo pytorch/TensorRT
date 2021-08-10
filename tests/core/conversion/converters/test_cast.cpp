@@ -33,7 +33,7 @@ TEST(Converters, ATenBoolToFP32DTypeConvertsCorrectly) {
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
-
+  ASSERT_TRUE(jit_results[0].scalar_type() == trt.scalar_type());
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
@@ -64,7 +64,7 @@ TEST(Converters, ATenBoolToINT32DTypeConvertsCorrectly) {
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
-
+  ASSERT_TRUE(jit_results[0].scalar_type() == trt.scalar_type());
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
@@ -78,7 +78,6 @@ TEST(Converters, ATenBoolToINT32DeviceDTypeConvertsCorrectly) {
             %7 : Tensor = aten::ge(%x.1, %4)
             %44 : Device = prim::Constant[value="cuda"]()
             %out.1 : Tensor = aten::to(%7, %44, %3, %5, %5)
-
             return (%out.1))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
@@ -97,6 +96,7 @@ TEST(Converters, ATenBoolToINT32DeviceDTypeConvertsCorrectly) {
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
+  ASSERT_TRUE(jit_results[0].scalar_type() == trt.scalar_type());
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
@@ -131,7 +131,7 @@ TEST(Converters, ATenBoolToINT32TensorConvertsCorrectly) {
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in, trt_in2});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
-
+  ASSERT_TRUE(jit_results[0].scalar_type() == trt.scalar_type());
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
@@ -149,7 +149,7 @@ TEST(Converters, ATenTypeAsConvertsCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, &*g);
 
-  auto in1 = at::randint(1, 3, {3, 4, 3}, {at::kCUDA});
+  auto in1 = at::randint(1, 3, {3, 4, 3}, {at::kCUDA}).to(at::kFloat);
   auto in2 = at::randint(1, 3, {3, 4, 3}, {at::kCUDA});
   // Lower aten::type_as to aten::to.other
   trtorch::core::lowering::passes::ReduceToOperation(g);
@@ -160,5 +160,7 @@ TEST(Converters, ATenTypeAsConvertsCorrectly) {
   params = trtorch::core::conversion::get_named_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in1, in2});
 
+  ASSERT_TRUE(jit_results[0].scalar_type() == trt_results[0].scalar_type());
+  ASSERT_TRUE(trt_results[0].scalar_type() == trt_results[1].scalar_type());
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
 }
