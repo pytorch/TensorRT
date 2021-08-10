@@ -24,7 +24,7 @@ void LowerBlock(torch::jit::Block* b) {
   DropUnusedNodes(b);
 }
 
-void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, bool disable_cse) {
+void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, LowerInfo lower_info) {
   passes::UnpackHardSwish(g);
   torch::jit::EliminateRedundantGuards(g);
   torch::jit::RemoveListMutation(g);
@@ -42,7 +42,7 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, bool disable_cse) {
   passes::Conv3DToConvolution(g);
   passes::FuseAddMMBranches(g);
   passes::RemoveBNDimCheck(g);
-  if (!disable_cse) {
+  if (!lower_info.disable_cse) {
     torch::jit::EliminateCommonSubexpression(g);
   }
   // torch::jit::UnrollLoops(g);
@@ -72,25 +72,19 @@ std::pair<std::shared_ptr<torch::jit::Graph>, std::vector<torch::jit::IValue>> L
   auto g = lowered_mod.get_method(method_name).graph();
   LOG_GRAPH(*g);
 
-  // Go through TRTorch Lowering to reformat graph to be conversion friendly
-  // and also segment for accelerators and executors (TRT-DLA, TRT-GPU, PYT)
-  // unfreeze_module is used to not perform constant folding on weights in the network.
-  // In quantization aware trained (QAT) models, weights are passed through quantize and
-  // dequantize nodes which should not be folded. So unfreeze_module is set to True for QAT models.
-  if (!lower_info.unfreeze_module) {
-    LOG_GRAPH("TRTorch Graph Lowering");
-    lowering::LowerGraph(g, false);
-  }
-
   LOG_GRAPH("LibTorch Lowering");
   auto graph_and_ivalues = torch::jit::LowerGraph(*g, lowered_mod._ivalue());
 
-  if (lower_info.unfreeze_module) {
-    LOG_GRAPH("TRTorch Graph Lowering");
-    lowering::LowerGraph(graph_and_ivalues.first, true);
-  }
+  // Go through TRTorch Lowering to reformat graph to be conversion friendly
+  // and also segment for accelerators and executors (TRT-DLA, TRT-GPU  , PYT)
+  // unfreeze_module is used to not perform constant folding on weights in the network.
+  // In quantization aware trained (QAT) models, weights are passed through quantize and
+  // dequantize nodes which should not be folded. So unfreeze_module is set to True for QAT models.
+  LOG_GRAPH("TRTorch Graph Lowering");
+  lowering::LowerGraph(graph_and_ivalues.first, lower_info);
+
   // Is this necessary?
-  lowering::LowerBlock(g->block());
+  // lowering::LowerBlock(g->block());
 
   return graph_and_ivalues;
 }

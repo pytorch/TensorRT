@@ -409,6 +409,7 @@ core::CompileSpec to_internal_compile_spec(CompileSpec external) {
       internal.convert_info.engine_settings.calibrator = external.ptq_calibrator;
     } else {
       internal.lower_info.unfreeze_module = true;
+      internal.lower_info.disable_cse = true;
       internal.convert_info.engine_settings.calibrator = nullptr;
     }
   } else {
