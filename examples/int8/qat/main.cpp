@@ -4,8 +4,8 @@
 
 #include "NvInfer.h"
 
-#include "cpp/int8/benchmark/benchmark.h"
-#include "cpp/int8/datasets/cifar10.h"
+#include "examples/int8/benchmark/benchmark.h"
+#include "examples/int8/datasets/cifar10.h"
 
 #include <sys/stat.h>
 #include <iostream>

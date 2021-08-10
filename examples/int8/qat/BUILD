@@ -13,8 +13,8 @@ cc_binary(
     ],
     deps = [
         "//cpp/api:trtorch",
-        "//cpp/int8/benchmark",
-        "//cpp/int8/datasets:cifar10",
+        "//examples/int8/benchmark",
+        "//examples/int8/datasets:cifar10",
         "@libtorch",
         "@libtorch//:caffe2",
         "@tensorrt//:nvinfer",
