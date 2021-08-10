@@ -63,8 +63,8 @@ to standard TorchScript. Load with ``torch.jit.load()`` and run like you would r
           --dla-core=[dla_core]             DLACore id if running on available DLA
                                             (defaults to 0)
           --engine-capability=[capability]  The type of device the engine should be
-                                            built for [ default | safe_gpu |
-                                            safe_dla ]
+                                            built for [ standard | safety |
+                                            dla_standalone ]
           --calibration-cache-file=[file_path]
                                             Path to calibration cache file to use
                                             for post training quantization
