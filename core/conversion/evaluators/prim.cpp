@@ -111,7 +111,7 @@ auto prim_registrations =
                       } else if (input.isIValue()) {
                         if (input.IValue()->isTensor()) {
                           auto pyt_input = input.IValue()->toTensor();
-                          return static_cast<int>(c10::typeMetaToScalarType(pyt_input.dtype()));
+                          return static_cast<int>(pyt_input.scalar_type());
                         } else {
                           TRTORCH_THROW_ERROR("Unsupported input type in prim::dtype operator");
                           return {};
