@@ -6,7 +6,7 @@ On a high level, TRTorch plugin library interface does the following :
 
 - Uses TensorRT plugin registry as the main data structure to access all plugins.
 
-- Automatically registers TensorRT plugins with empty namepsace.  
+- Automatically registers TensorRT plugins with empty namepsace.
 
 - Automatically registers TRTorch plugins with `"trtorch"` namespace.
 
@@ -37,4 +37,4 @@ If you'd like to compile your plugin with TRTorch,
 
 Once you've completed the above steps, upon successful compilation of TRTorch library, your plugin should be available in  `libtrtorch_plugins.so`.
 
-A sample runtime application on how to run a network with plugins can be found <a href="https://github.com/NVIDIA/TRTorch/tree/master/examples/sample_rt_app" >here</a>
+A sample runtime application on how to run a network with plugins can be found <a href="https://github.com/NVIDIA/TRTorch/tree/master/examples/trtorchrt_example" >here</a>
