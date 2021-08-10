@@ -11,7 +11,7 @@ namespace trtorch {
 namespace core {
 namespace runtime {
 
-typedef enum { ABI_TARGET_IDX = 0, DEVICE_IDX, ENGINE_IDX } SerializedInfoIndex;
+typedef enum { ABI_TARGET_IDX = 0, NAME_IDX, DEVICE_IDX, ENGINE_IDX } SerializedInfoIndex;
 
 std::string slugify(std::string s) {
   std::replace(s.begin(), s.end(), '.', '_');
@@ -29,8 +29,8 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info) {
   TRTORCH_CHECK(
       serialized_info[ABI_TARGET_IDX] == ABI_VERSION,
       "Program to be deserialized targets a different TRTorch ABI Version ("
-          << serialized_info[ABI_TARGET_IDX] << ") than the TRTorch Runtime ABI (" << ABI_VERSION << ")");
-  std::string _name = "deserialized_trt";
+          << serialized_info[ABI_TARGET_IDX] << ") than the TRTorch Runtime ABI Version (" << ABI_VERSION << ")");
+  std::string _name = serialized_info[NAME_IDX];
   std::string engine_info = serialized_info[ENGINE_IDX];
 
   CudaDevice cuda_device = deserialize_device(serialized_info[DEVICE_IDX]);
@@ -43,7 +43,7 @@ TRTEngine::TRTEngine(std::string mod_name, std::string serialized_engine, CudaDe
 
   rt = std::shared_ptr<nvinfer1::IRuntime>(nvinfer1::createInferRuntime(util::logging::get_logger()));
 
-  name = slugify(mod_name) + "_engine";
+  name = slugify(mod_name);
 
   cuda_engine = std::shared_ptr<nvinfer1::ICudaEngine>(
       rt->deserializeCudaEngine(serialized_engine.c_str(), serialized_engine.size()));
@@ -55,8 +55,8 @@ TRTEngine::TRTEngine(std::string mod_name, std::string serialized_engine, CudaDe
   uint64_t outputs = 0;
 
   for (int64_t x = 0; x < cuda_engine->getNbBindings(); x++) {
-    std::string name = cuda_engine->getBindingName(x);
-    std::string idx_s = name.substr(name.find("_") + 1);
+    std::string bind_name = cuda_engine->getBindingName(x);
+    std::string idx_s = bind_name.substr(bind_name.find("_") + 1);
     uint64_t idx = static_cast<uint64_t>(std::stoi(idx_s));
 
     if (cuda_engine->bindingIsInput(x)) {
@@ -102,9 +102,12 @@ static auto TRTORCH_UNUSED TRTEngineTSRegistrtion =
               auto trt_engine = std::string((const char*)serialized_trt_engine->data(), serialized_trt_engine->size());
 
               std::vector<std::string> serialize_info;
-              serialize_info.push_back(ABI_VERSION);
-              serialize_info.push_back(serialize_device(self->device_info));
-              serialize_info.push_back(trt_engine);
+              serialize_info.resize(ENGINE_IDX + 1);
+
+              serialize_info[ABI_TARGET_IDX] = ABI_VERSION;
+              serialize_info[NAME_IDX] = self->name;
+              serialize_info[DEVICE_IDX] = serialize_device(self->device_info);
+              serialize_info[ENGINE_IDX] = trt_engine;
               return serialize_info;
             },
             [](std::vector<std::string> seralized_info) -> c10::intrusive_ptr<TRTEngine> {
