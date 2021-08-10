@@ -34,7 +34,6 @@ torch::jit::Module compile_int8_qat_model(const std::string& data_dir, torch::ji
   /// Configure settings for compilation
   auto compile_spec = trtorch::CompileSpec(inputs);
   /// Set operating precision to INT8
-  // compile_spec.enabled_precisions.insert(torch::kF16);
   compile_spec.enabled_precisions.insert(torch::kI8);
   /// Set max batch size for the engine
   compile_spec.max_batch_size = 32;
