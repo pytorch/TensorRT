@@ -41,3 +41,6 @@ py/.eggs
 notebooks/.ipynb_checkpoints/
 *.cache
 tests/py/data
+examples/**/deps/**/*
+!examples/**/deps/.gitkeep
+examples/trtorchrt_example/trtorchrt_example
