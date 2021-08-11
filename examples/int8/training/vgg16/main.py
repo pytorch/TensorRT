@@ -124,7 +124,7 @@ def main():
 
         print("Test Loss: {:.5f} Test Acc: {:.2f}%".format(test_loss, 100 * test_acc))
 
-        if epoch % 10 == 9:
+        if epoch % 10 == 9 or epoch==args.epochs-1:
             save_checkpoint(
                 {
                     'epoch': epoch + 1,
