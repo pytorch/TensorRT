@@ -54,9 +54,9 @@ class TestAccuracy(ModelTestCase):
         log(Level.Info, "[Pyt FP32] Test Acc: {:.2f}%".format(100 * fp32_test_acc))
 
         compile_spec = {
-        "inputs": [trtorch.Input([16, 3, 32, 32])],
-        "op_precision": torch.int8,
-        # "enabled_precision": {torch.float32, torch.int8},
+            "inputs": [trtorch.Input([16, 3, 32, 32])],
+            "op_precision": torch.int8,
+            # "enabled_precision": {torch.float32, torch.int8},
         }
 
         trt_mod = trtorch.compile(self.model, compile_spec)
