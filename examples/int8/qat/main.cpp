@@ -2,8 +2,6 @@
 #include "torch/torch.h"
 #include "trtorch/trtorch.h"
 
-#include "NvInfer.h"
-
 #include "examples/int8/benchmark/benchmark.h"
 #include "examples/int8/datasets/cifar10.h"
 
@@ -127,3 +125,4 @@ int main(int argc, const char* argv[]) {
   auto trt_runtimes = benchmark_module(trt_mod, dims[0]);
   print_avg_std_dev("TRT quantized model", trt_runtimes, dims[0][0]);
 }
+

@@ -3,8 +3,6 @@
 #include "trtorch/ptq.h"
 #include "trtorch/trtorch.h"
 
-#include "NvInfer.h"
-
 #include "examples/int8/benchmark/benchmark.h"
 #include "examples/int8/datasets/cifar10.h"
 
