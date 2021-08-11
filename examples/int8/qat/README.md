@@ -20,13 +20,13 @@ This is a short example application that shows how to use TRTorch to perform inf
 ## Compilation using bazel
 
 ``` shell
-bazel run //examples/int8/ptq --compilation_mode=opt <path-to-module> <path-to-cifar10>
+bazel run //examples/int8/qat --compilation_mode=opt <path-to-module> <path-to-cifar10>
 ```
 
 If you want insight into what is going under the hood or need debug symbols
 
 ``` shell
-bazel run //examples/int8/ptq --compilation_mode=dbg <path-to-module> <path-to-cifar10>
+bazel run //examples/int8/qat --compilation_mode=dbg <path-to-module> <path-to-cifar10>
 ```
 
 This will build a binary named `qat` in `bazel-out/k8-<opt|dbg>/bin/cpp/int8/qat/` directory. Optionally you can add this to `$PATH` environment variable to run `qat` from anywhere on your system.
