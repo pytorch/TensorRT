@@ -468,20 +468,6 @@ auto aten_registrations TRTORCH_UNUSED =
                     EvalOptions().validSchemas({
                         "aten::numel(Tensor self) -> int",
                     })})
-        .evaluator({c10::Symbol::fromQualString("aten::t"),
-                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-                      auto tensor_var = args.at(n->input(0));
-                      if (tensor_var.IValue()->isTensor()) {
-                        auto tensor = tensor_var.unwrapToTensor();
-                        return tensor.t();
-                      } else {
-                        TRTORCH_THROW_ERROR("Unimplemented data type for aten::t evaluator: ITensor");
-                        return {};
-                      }
-                    },
-                    EvalOptions().validSchemas({
-                        "aten::t(Tensor self) -> Tensor",
-                    })})
         .evaluator({c10::Symbol::fromQualString("aten::dim"),
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                       auto tensor_var = args.at(n->input(0));

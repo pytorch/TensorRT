@@ -142,7 +142,7 @@ nvinfer1::ITensor* castITensor(ConversionCtx* ctx, nvinfer1::ITensor* tensor, nv
   }
 }
 
-nvinfer1::ITensor* tensor_to_const(ConversionCtx* ctx, at::Tensor t) {
+nvinfer1::ITensor* tensor_to_const(ConversionCtx* ctx, at::Tensor t, const std::string& name) {
   bool post_freeze_cast = false;
   nvinfer1::DataType post_freeze_cast_type = nvinfer1::DataType::kFLOAT;
   // Other "unsupported weights types" can be added to this check here
@@ -175,9 +175,15 @@ nvinfer1::ITensor* tensor_to_const(ConversionCtx* ctx, at::Tensor t) {
 
   std::ostringstream tensor_id;
   tensor_id << reinterpret_cast<int*>(out);
+  std::string tensor_name;
 
-  LOG_DEBUG(ctx->logger, "Freezing tensor " << tensor_id.str() << " as an IConstantLayer");
-  const_layer->setName(("[Freeze Tensor " + tensor_id.str() + " ]").c_str());
+  if (!name.empty()) {
+    tensor_name = name;
+  } else {
+    tensor_name = tensor_id.str();
+  }
+  LOG_DEBUG(ctx->logger, "Freezing tensor " << tensor_name << " as an IConstantLayer");
+  const_layer->setName(("[Freeze Tensor " + tensor_name + " ]").c_str());
 
   if (post_freeze_cast) {
     out = castITensor(ctx, out, post_freeze_cast_type);
