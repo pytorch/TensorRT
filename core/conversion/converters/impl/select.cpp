@@ -224,6 +224,14 @@ auto select_registrations TRTORCH_UNUSED =
                auto end = (endIdx < 0) ? (maxDim + endIdx) : endIdx;
                auto step = args[4].unwrapToInt();
 
+               if (startIdxIVal->isNone() && endIdxIVal->isNone()) { // for dynamic shape
+                 auto layer = ctx->net->addIdentity(*in);
+                 layer->setOutputType(0, in->getType());
+                 auto out = ctx->AssociateValueAndTensor(n->outputs()[0], layer->getOutput(0));
+                 LOG_DEBUG("Slice layer output shape: " << out->getDimensions());
+                 return true;
+               }
+
                LOG_DEBUG("Start idx: " << start);
                LOG_DEBUG("End idx: " << end);
 
