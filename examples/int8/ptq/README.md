@@ -120,61 +120,55 @@ This is a short example application that shows how to use TRTorch to perform pos
 ## Prerequisites
 
 1. Download CIFAR10 Dataset Binary version ([https://www.cs.toronto.edu/~kriz/cifar-10-binary.tar.gz](https://www.cs.toronto.edu/~kriz/cifar-10-binary.tar.gz))
-2. Train a network on CIFAR10 (see `training/` for a VGG16 recipe)
+2. Train a network on CIFAR10 (see `examples/int8/training/vgg16/README.md` for a VGG16 recipe)
 3. Export model to torchscript
 
 ## Compilation using bazel
 
 ``` shell
-bazel run //cpp/ptq --compilation_mode=opt <path-to-module> <path-to-cifar10>
+bazel run //examples/int8/ptq --compilation_mode=opt <path-to-module> <path-to-cifar10>
 ```
 
 If you want insight into what is going under the hood or need debug symbols
 
 ``` shell
-bazel run //cpp/ptq --compilation_mode=dbg <path-to-module> <path-to-cifar10>
+bazel run //examples/int8/ptq --compilation_mode=dbg <path-to-module> <path-to-cifar10>
 ```
 
-This will build a binary named `ptq` in `bazel-out/k8-<opt|dbg>/bin/cpp/int8/qat/` directory. Optionally you can add this to `$PATH` environment variable to run `ptq` from anywhere on your system.
+This will build a binary named `ptq` in `bazel-out/k8-<opt|dbg>/bin/cpp/int8/ptq/` directory. Optionally you can add this to `$PATH` environment variable to run `ptq` from anywhere on your system.
 
 ## Compilation using Makefile
 
-1) Download releases of <a href="https://pytorch.org">LibTorch</a>, <a href="https://github.com/NVIDIA/TRTorch/releases">TRTorch </a>and <a href="https://developer.nvidia.com/nvidia-tensorrt-download">TensorRT</a> and unpack them in the deps directory. Ensure CUDA is installed at `/usr/local/cuda` , if not you need to modify the CUDA include and lib paths in the Makefile.
+1) Download releases of <a href="https://pytorch.org">LibTorch</a>, <a href="https://github.com/NVIDIA/TRTorch/releases">TRTorch </a>and <a href="https://developer.nvidia.com/nvidia-tensorrt-download">TensorRT</a> and unpack them in the deps directory.
 
 ```sh
 cd examples/trtorchrt_example/deps
 # Download latest TRTorch release tar file (libtrtorch.tar.gz) from https://github.com/NVIDIA/TRTorch/releases
 tar -xvzf libtrtorch.tar.gz
 # unzip libtorch downloaded from pytorch.org
-unzip libtorch-cxx11-abi-shared-with-deps-1.9.0+cu111.zip
-# Extract TensorRT downloaded from developer.nvidia.com
-tar -xvzf TensorRT-8.0.1.6.Linux.x86_64-gnu.cuda-11.3.cudnn8.2.tar.gz
+unzip libtorch.zip
 ```
 
-> If cuDNN is not installed on your system / in your LD_LIBRARY_PATH then do the following as well
+> If cuDNN and TensorRT are not installed on your system / in your LD_LIBRARY_PATH then do the following as well
 
 ```sh
 cd deps
 mkdir cudnn && tar -xvzf <cuDNN TARBALL> --directory cudnn --strip-components=1
+mkdir tensorrt && tar -xvzf <TensorRT TARBALL> --directory tensorrt --strip-components=1
 cd ..
-```
-
-Set your LD_LIBRARY_PATH accordingly
-
-```sh
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/deps/trtorch/lib:$(pwd)/deps/libtorch/lib:$(pwd)/deps/TensorRT-8.0.1.6/lib:$(pwd)/deps/cudnn/lib64:/usr/local/cuda/lib64/
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/deps/trtorch/lib:$(pwd)/deps/libtorch/lib:$(pwd)/deps/tensorrt/lib:$(pwd)/deps/cudnn/lib64:/usr/local/cuda/lib
 ```
 
 2) Build and run `ptq`
 
 We import header files `cifar10.h` and `benchmark.h` from `ROOT_DIR`. `ROOT_DIR` should point to the path where TRTorch is located `<path_to_TRTORCH>`.
 
-By default it is set to `../../../`. If your TRTorch directory structure is different, please set `ROOT_DIR` accordingly.  
+By default it is set to `../../../`. If your TRTorch directory structure is different, please set `ROOT_DIR` accordingly.
 
 ```sh
 cd examples/int8/ptq
 # This will generate a ptq binary
-make
+make ROOT_DIR=<PATH> CUDA_VERSION=11.1
 ./ptq <path-to-module> <path-to-cifar10>
 ```
 
