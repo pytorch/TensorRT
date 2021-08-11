@@ -21,20 +21,21 @@ std::string unmangle_cls_name(const std::string& name) {
   if (mangle_pos != std::string::npos) {
     unmangled.erase(mangle_pos, 21);
   }
+
   return unmangled;
 }
 
-void NotateModuleForFallback(const torch::jit::Module& mod, std::string mod_name, const std::string& method_name, std::unordered_set<std::string> forced_fallback_modules) {
+void NotateModuleForFallback(const torch::jit::Module& mod, std::string mod_name, std::string method_name, std::unordered_set<std::string> forced_fallback_modules) {
   auto cls_name = unmangle_cls_name(mod.type()->name()->qualifiedName());
-  auto g = mod.get_method(method_name).graph();
 
+  auto g = mod.get_method(method_name).graph();
   auto nodes = g->block()->nodes();
   bool changed_mod = false;
   for (const auto n : nodes) {
     if (n->kind() == torch::jit::prim::GetAttr) {
       auto out_type = unmangle_cls_name(c10::toString(n->output(0)->type()));
       if (forced_fallback_modules.find(out_type) != forced_fallback_modules.end()) {
-        LOG_DEBUG("Marking module for fallback: " << n->s(c10::attr::name) << " (" << out_type << ") [owner: " << mod_name << " (" << cls_name << ")]");
+        LOG_DEBUG("Notating module for fallback: " << n->s(c10::attr::name) << " (" << out_type << ") [owner: " << mod_name << " (" << cls_name << ")]");
         auto uses = n->output(0)->uses();
         for (const auto u : uses) {
           auto user = u.user;
@@ -52,7 +53,7 @@ void NotateModuleForFallback(const torch::jit::Module& mod, std::string mod_name
   }
 
   if (changed_mod) {
-    LOG_DEBUG(*g);
+    LOG_DEBUG("Notated graph: " << *g);
   }
 
   for (const auto sub_mod : mod.named_children()) {
@@ -68,24 +69,24 @@ void MarkNodesForFallback(std::shared_ptr<torch::jit::Graph>& g) {
     auto n = *it;
     if (!mark.top() && n->kind() == torch::jit::prim::Enter && n->hasAttributeS("compilation_edge")) {
       if (n->s(c10::Symbol::attr("compilation_edge")) == "start") {
-          LOG_DEBUG("Starting to mark new segmented targeted for torch");
-          mark.push(true);
-          it.destroyCurrent();
+        LOG_DEBUG("Starting to mark new segmented block targeted for torch");
+        mark.push(true);
+        it.destroyCurrent();
       }
     } else if (mark.top() && n->kind() == torch::jit::prim::Enter && n->hasAttributeS("compilation_edge")) {
-      if(n->s(c10::Symbol::attr("compilation_edge")) == "start") {
+      if (n->s(c10::Symbol::attr("compilation_edge")) == "start") {
         LOG_DEBUG("Found the start of another segmented block targeted for torch while actively marking a block");
         mark.push(true);
         it.destroyCurrent();
       }
     } else if (mark.top() && n->kind() == torch::jit::prim::Exit && n->hasAttributeS("compilation_edge")) {
-      if(n->s(c10::Symbol::attr("compilation_edge")) == "end") {
+      if (n->s(c10::Symbol::attr("compilation_edge")) == "end") {
         LOG_DEBUG("Found the end of segmented block targeted for torch while actively marking a block");
         mark.pop();
         it.destroyCurrent();
       }
     } else if (!mark.top() && n->kind() == torch::jit::prim::Exit && n->hasAttributeS("compilation_edge")) {
-      if(n->s(c10::Symbol::attr("compilation_edge")) == "end") {
+      if (n->s(c10::Symbol::attr("compilation_edge")) == "end") {
         LOG_WARNING("Found the end of segmented block targeted for torch while not actively marking a block");
       }
     } else if (mark.top()) {
@@ -94,10 +95,10 @@ void MarkNodesForFallback(std::shared_ptr<torch::jit::Graph>& g) {
     }
   }
 
-  LOG_GRAPH("Post marking ops for pytorch execution: " << *g);
+  LOG_DEBUG("After marking operations for torch fallback: " << *g);
 }
 
-} // Namespace passes
+} // namespace passes
 } // namespace lowering
 } // namespace core
 } // namespace trtorch
