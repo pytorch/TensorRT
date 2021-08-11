@@ -41,7 +41,6 @@ def test(model, dataloader, crit):
 
 PARSER = argparse.ArgumentParser(description="Export trained VGG")
 PARSER.add_argument('ckpt', type=str, help="Path to saved checkpoint")
-PARSER.add_argument('--enable_qat', action="store_true", help="Enable quantization aware training. This is recommended to perform on a pre-trained model.")
 
 args = PARSER.parse_args()
 
@@ -50,7 +49,13 @@ model = vgg16(num_classes=10, init_weights=False)
 model = model.cuda()
 
 ckpt = torch.load(args.ckpt)
-weights = ckpt["model_state_dict"]
+weights = {}
+for key, val in ckpt["model_state_dict"].items():
+    # Remove 'module.' from the key names
+    if key.startswith('module'):
+        weights[key[7:]] = val
+    else:
+        weights[key] = val
 
 model.load_state_dict(weights)
 model.eval()

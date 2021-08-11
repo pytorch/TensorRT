@@ -190,9 +190,12 @@ def main():
         assert (os.path.isfile(ckpt_file))
         ckpt = torch.load(ckpt_file)
         modified_state_dict={}
-
         for key, val in ckpt["model_state_dict"].items():
-            modified_state_dict[key] = val
+            # Remove 'module.' from the key names
+            if key.startswith('module'):
+                modified_state_dict[key[7:]] = val
+            else:
+                modified_state_dict[key] = val
 
         model.load_state_dict(modified_state_dict)
         opt.load_state_dict(ckpt["opt_state_dict"])
