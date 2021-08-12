@@ -140,4 +140,5 @@ int main(int argc, const char* argv[]) {
 
   auto trt_runtimes = benchmark_module(trt_mod, dims[0]);
   print_avg_std_dev("TRT quantized model", trt_runtimes, dims[0][0]);
+  trt_mod.save("/tmp/ptq_vgg16.trt.ts");
 }

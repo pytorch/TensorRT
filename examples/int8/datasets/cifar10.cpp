@@ -50,7 +50,7 @@ std::pair<torch::Tensor, torch::Tensor> read_batch(const std::string& path) {
     labels.push_back(label);
     auto image_tensor =
         torch::from_blob(image.data(), {kImageChannels, kImageDim, kImageDim}, torch::TensorOptions().dtype(torch::kU8))
-            .to(torch::kF32);
+            .to(torch::kF32).div(255);
     images.push_back(image_tensor);
   }
 
