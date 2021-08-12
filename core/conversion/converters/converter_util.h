@@ -45,7 +45,7 @@ nvinfer1::ILayer* add_elementwise(
 nvinfer1::ITensor* castITensor(ConversionCtx* ctx, nvinfer1::ITensor* tensor, nvinfer1::DataType dtype);
 
 // Freeze an at::Tensor in a IConstant layer
-nvinfer1::ITensor* tensor_to_const(ConversionCtx* ctx, at::Tensor t);
+nvinfer1::ITensor* tensor_to_const(ConversionCtx* ctx, at::Tensor t, const std::string& name = std::string());
 
 } // namespace converters
 } // namespace conversion

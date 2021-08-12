@@ -16,6 +16,7 @@ cc_library(
         "fuse_addmm_branches.cpp",
         "linear_to_addmm.cpp",
         "op_aliasing.cpp",
+        "reduce_to.cpp",
         "remove_bn_dim_check.cpp",
         "remove_contiguous.cpp",
         "remove_dropout.cpp",
