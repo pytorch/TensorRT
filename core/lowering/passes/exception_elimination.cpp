@@ -41,6 +41,10 @@ struct ExceptionOrPassPatternElimination {
     auto arm1_start = arm1->nodes().begin();
     auto arm2_start = arm2->nodes().begin();
 
+    if ((*arm1_start)->kind() != prim::RaiseException && (*arm2_start)->kind() != prim::RaiseException) {
+      return false;
+    }
+
     /// Check if this Node hosts a pattern like so:
     ///  = prim::If(%5958)
     ///   block0():
