@@ -3,8 +3,22 @@
 #include "ATen/Tensor.h"
 #include "ATen/core/List.h"
 #include "NvInfer.h"
+#include "torch/csrc/jit/api/module.h"
+#include "torch/csrc/jit/ir/ir.h"
 
 namespace nvinfer1 {
+
+inline std::ostream& operator<<(std::ostream& os, const nvinfer1::TensorFormat& format) {
+  switch (format) {
+    case nvinfer1::TensorFormat::kLINEAR:
+      return os << "NCHW\\Contiguous\\Linear";
+    case nvinfer1::TensorFormat::kHWC:
+      return os << "NHWC\\Channel Last";
+    default:
+      return os << "Unknown Tensor Format";
+  }
+}
+
 inline std::ostream& operator<<(std::ostream& stream, const nvinfer1::DataType& dtype) {
   switch (dtype) {
     case nvinfer1::DataType::kFLOAT:
@@ -15,6 +29,8 @@ inline std::ostream& operator<<(std::ostream& stream, const nvinfer1::DataType& 
       return stream << "Int8";
     case nvinfer1::DataType::kINT32:
       return stream << "Int32";
+    case nvinfer1::DataType::kBOOL:
+      return stream << "Bool";
     default:
       return stream << "Unknown Data Type";
   }
@@ -71,12 +87,12 @@ inline std::ostream& operator<<(std::ostream& stream, const nvinfer1::DeviceType
 
 inline std::ostream& operator<<(std::ostream& stream, const nvinfer1::EngineCapability& cap) {
   switch (cap) {
-    case nvinfer1::EngineCapability::kDEFAULT:
-      return stream << "Default";
-    case nvinfer1::EngineCapability::kSAFE_GPU:
-      return stream << "Safe GPU";
-    case nvinfer1::EngineCapability::kSAFE_DLA:
-      return stream << "Safe DLA";
+    case nvinfer1::EngineCapability::kSTANDARD:
+      return stream << "standard";
+    case nvinfer1::EngineCapability::kSAFETY:
+      return stream << "safety";
+    case nvinfer1::EngineCapability::kDLA_STANDALONE:
+      return stream << "DLA standalone";
     default:
       return stream << "Unknown Engine Capability Setting";
   }
@@ -92,8 +108,11 @@ int64_t volume(const nvinfer1::Dims& d);
 bool broadcastable(nvinfer1::Dims a, nvinfer1::Dims b, bool multidirectional = true);
 nvinfer1::Dims toDimsPad(c10::IntArrayRef l, uint64_t pad_to);
 nvinfer1::Dims toDimsPad(c10::List<int64_t> l, uint64_t pad_to);
+nvinfer1::Dims toDimsTailPad(c10::IntArrayRef l, uint64_t pad_to);
+nvinfer1::Dims toDimsTailPad(c10::List<int64_t> l, uint64_t pad_to);
 nvinfer1::Dims unpadDims(const nvinfer1::Dims& d);
-nvinfer1::Dims unsqueezeDims(const nvinfer1::Dims& d, int pos);
+nvinfer1::Dims unsqueezeDims(const nvinfer1::Dims& d, int pos, int val = 1, bool use_zeros = true);
+nvinfer1::Dims squeezeDims(const nvinfer1::Dims& d, int pos, bool use_zeros = true);
 nvinfer1::Dims toDims(c10::IntArrayRef l);
 nvinfer1::Dims toDims(c10::List<int64_t> l);
 nvinfer1::DimsHW toDimsHW(c10::List<int64_t> l);
@@ -101,10 +120,19 @@ nvinfer1::DimsHW toDimsHW(c10::IntArrayRef l);
 std::vector<int64_t> toVec(nvinfer1::Dims d);
 std::string toStr(nvinfer1::Dims d);
 
-at::ScalarType toATenDType(nvinfer1::DataType t);
-nvinfer1::DataType toTRTDataType(at::ScalarType t);
-c10::optional<nvinfer1::DataType> toTRTDataType(caffe2::TypeMeta dtype);
-
+at::ScalarType TRTDataTypeToScalarType(nvinfer1::DataType t);
+c10::optional<at::ScalarType> optTRTDataTypeToScalarType(nvinfer1::DataType t);
+nvinfer1::DataType ScalarTypeToTRTDataType(at::ScalarType t);
+c10::optional<nvinfer1::DataType> optScalarTypeToTRTDataType(at::ScalarType t);
+c10::optional<nvinfer1::DataType> optTypeMetaToTRTDataType(caffe2::TypeMeta dtype);
+torch::jit::Value* getOrAddInputForValue(
+    torch::jit::Value* old_value,
+    std::shared_ptr<torch::jit::Graph>& graph,
+    std::unordered_map<torch::jit::Value*, torch::jit::Value*>& old_to_new);
+torch::jit::Node* cloneNode(
+    torch::jit::Node* node,
+    std::shared_ptr<torch::jit::Graph>& graph,
+    std::unordered_map<torch::jit::Value*, torch::jit::Value*>& old_to_new);
 const std::unordered_map<at::ScalarType, nvinfer1::DataType>& get_aten_trt_type_map();
 
 } // namespace util

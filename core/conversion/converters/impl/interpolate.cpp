@@ -2,7 +2,6 @@
 #include "NvInferRuntimeCommon.h"
 #include "core/conversion/converters/converters.h"
 #include "core/util/prelude.h"
-#include "plugins/interpolate_plugin.h"
 #include "torch/torch.h"
 
 namespace trtorch {
@@ -28,11 +27,36 @@ void create_plugin(
     bool align_corners,
     bool use_scales = false) {
   LOG_WARNING("Interpolation layer will be run through ATen, not TensorRT. Performance may be lower than expected");
+  nvinfer1::PluginFieldCollection fc;
+  std::vector<nvinfer1::PluginField> f;
 
-  auto creator = new plugins::InterpolatePluginCreator();
-  auto plugin = creator->createPlugin(name, in_shape, out_shape, out_size, scales, mode, align_corners, use_scales);
+  std::vector<int32_t> in_shape_casted(in_shape.begin(), in_shape.end());
+  f.emplace_back(
+      nvinfer1::PluginField("in_shape", in_shape_casted.data(), nvinfer1::PluginFieldType::kINT32, in_shape.size()));
 
-  auto resize_layer = ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(&in), 1, *plugin);
+  std::vector<int32_t> out_shape_casted(out_shape.begin(), out_shape.end());
+  f.emplace_back(
+      nvinfer1::PluginField("out_shape", out_shape_casted.data(), nvinfer1::PluginFieldType::kINT32, out_shape.size()));
+
+  std::vector<int32_t> out_size_casted(out_size.begin(), out_size.end());
+  f.emplace_back(
+      nvinfer1::PluginField("out_size", out_size_casted.data(), nvinfer1::PluginFieldType::kINT32, out_size.size()));
+
+  f.emplace_back(nvinfer1::PluginField("scales", scales.data(), nvinfer1::PluginFieldType::kFLOAT64, scales.size()));
+  f.emplace_back(nvinfer1::PluginField("mode", &mode, nvinfer1::PluginFieldType::kCHAR, 1));
+
+  int32_t align_corners_casted = static_cast<int32_t>(align_corners);
+  f.emplace_back(nvinfer1::PluginField("align_corners", &align_corners_casted, nvinfer1::PluginFieldType::kINT32, 1));
+
+  int32_t use_scales_casted = static_cast<int32_t>(use_scales);
+  f.emplace_back(nvinfer1::PluginField("use_scales", &use_scales_casted, nvinfer1::PluginFieldType::kINT32, 1));
+
+  fc.nbFields = f.size();
+  fc.fields = f.data();
+  auto creator = getPluginRegistry()->getPluginCreator("Interpolate", "1", "trtorch");
+  auto interpolate_plugin = creator->createPlugin(name, &fc);
+
+  auto resize_layer = ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(&in), 1, *interpolate_plugin);
   TRTORCH_CHECK(resize_layer, "Unable to create interpolation plugin from node" << *n);
 
   resize_layer->setName(util::node_info(n).c_str());
@@ -85,17 +109,9 @@ void resize_layer_size(
   resize_layer->setResizeMode(mode);
   resize_layer->setName(util::node_info(n).c_str());
 
-  // if interpolation mode is linear, align corners must have been set to true.
-  // else, don't use align corners.
-  if (mode == nvinfer1::ResizeMode::kLINEAR) {
-#if NV_TENSORRT_MAJOR < 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR < 1) // IF TRT VERSION <= 7.0
-    TRTORCH_CHECK(align_corners, "resize layer (linear) only supports align_corners=True in TensorRT <= 7.0");
-    resize_layer->setAlignCorners(true);
-#else
-    resize_layer->setAlignCorners(align_corners);
-#endif
+  if (align_corners) {
+    resize_layer->setCoordinateTransformation(nvinfer1::ResizeCoordinateTransformation::kALIGN_CORNERS);
   }
-
   auto layer_output = ctx->AssociateValueAndTensor(n->outputs()[0], resize_layer->getOutput(0));
 
   LOG_DEBUG("Output tensor shape: " << layer_output->getDimensions());

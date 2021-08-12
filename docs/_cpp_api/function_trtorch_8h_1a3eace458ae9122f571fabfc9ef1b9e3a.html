@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -56,6 +57,11 @@
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
+  </script>
+  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+  <script type="text/x-mathjax-config">
+   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -153,6 +159,12 @@
       <div class="dropdown-content md-hero">
        <a href="https://nvidia.github.io/TRTorch/" title="master">
         master
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.3.0/" title="v0.3.0">
+        v0.3.0
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.2.0/" title="v0.2.0">
+        v0.2.0
        </a>
        <a href="https://nvidia.github.io/TRTorch/v0.1.0/" title="v0.1.0">
         v0.1.0
@@ -328,6 +340,18 @@
             Useful Links for TRTorch Development
            </a>
           </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Indices
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../indices/supported_ops.html">
+            Operators Supported
+           </a>
+          </li>
          </ul>
         </nav>
        </div>
@@ -369,136 +393,140 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <span id="exhale-function-trtorch-8h-1a3eace458ae9122f571fabfc9ef1b9e3a">
-       </span>
-       <h1 id="cpp-api-function-trtorch-8h-1a3eace458ae9122f571fabfc9ef1b9e3a--page-root">
-        Function trtorch::CompileGraph
-        <a class="headerlink" href="#cpp-api-function-trtorch-8h-1a3eace458ae9122f571fabfc9ef1b9e3a--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <ul class="simple">
-        <li>
-         <p>
-          Defined in
-          <a class="reference internal" href="file_cpp_api_include_trtorch_trtorch.h.html#file-cpp-api-include-trtorch-trtorch-h">
-           <span class="std std-ref">
-            File trtorch.h
-           </span>
-          </a>
-         </p>
-        </li>
-       </ul>
-       <h2 id="function-documentation">
-        Function Documentation
-        <a class="headerlink" href="#function-documentation" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <dl class="cpp function">
-        <dt id="_CPPv4N7trtorch12CompileGraphERKN5torch3jit6ModuleE11CompileSpec">
-         <span class="target" id="trtorch_8h_1a3eace458ae9122f571fabfc9ef1b9e3a">
-         </span>
-         TRTORCH_API torch::jit::Module
-         <code class="sig-prename descclassname">
-          trtorch
-          <code class="sig-prename descclassname">
-           ::
-          </code>
-         </code>
-         <code class="sig-name descname">
-          CompileGraph
-         </code>
-         <span class="sig-paren">
-          (
-         </span>
-         <em class="property">
-          const
-         </em>
-         torch::jit::Module &amp;
-         <em>
-          module
-         </em>
-         ,
-         <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpecE" title="trtorch::CompileSpec">
-          CompileSpec
-         </a>
-         <em>
-          info
-         </em>
-         <span class="sig-paren">
-          )
-         </span>
-         <a class="headerlink" href="#_CPPv4N7trtorch12CompileGraphERKN5torch3jit6ModuleE11CompileSpec" title="Permalink to this definition">
+       <section id="function-trtorch-compilegraph">
+        <span id="exhale-function-trtorch-8h-1a3eace458ae9122f571fabfc9ef1b9e3a">
+        </span>
+        <h1 id="cpp-api-function-trtorch-8h-1a3eace458ae9122f571fabfc9ef1b9e3a--page-root">
+         Function trtorch::CompileGraph
+         <a class="headerlink" href="#cpp-api-function-trtorch-8h-1a3eace458ae9122f571fabfc9ef1b9e3a--page-root" title="Permalink to this headline">
           ¶
          </a>
-         <br/>
-        </dt>
-        <dd>
-         <p>
-          Compile a TorchScript module for NVIDIA GPUs using TensorRT.
-         </p>
-         <p>
-         </p>
-         <p>
-          Takes a existing TorchScript module and a set of settings to configure the compiler and will convert methods to JIT Graphs which call equivalent TensorRT engines
-         </p>
-         <dl class="simple">
-          <dt>
-           <strong>
-            Parameters
-           </strong>
-          </dt>
-          <dd>
-           <ul class="breatheparameterlist simple">
-            <li>
-             <p>
-              <code class="docutils literal notranslate">
-               <span class="pre">
-                module
-               </span>
-              </code>
-              : torch::jit::Module - Existing TorchScript module
-             </p>
-            </li>
-            <li>
-             <p>
-              <code class="docutils literal notranslate">
-               <span class="pre">
-                info
-               </span>
-              </code>
-              :
-              <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#structtrtorch_1_1CompileSpec">
-               <span class="std std-ref">
-                trtorch::CompileSpec
-               </span>
-              </a>
-              - Compilation settings
-             </p>
-            </li>
-           </ul>
-          </dd>
-         </dl>
-         <p>
-          Converts specifically the forward method of a TorchScript Module
-         </p>
-         <p>
-         </p>
-         <dl class="simple">
-          <dt>
-           <strong>
-            Return
-           </strong>
+        </h1>
+        <ul class="simple">
+         <li>
+          <p>
+           Defined in
+           <a class="reference internal" href="file_cpp_api_include_trtorch_trtorch.h.html#file-cpp-api-include-trtorch-trtorch-h">
+            <span class="std std-ref">
+             File trtorch.h
+            </span>
+           </a>
+          </p>
+         </li>
+        </ul>
+        <section id="function-documentation">
+         <h2 id="function-documentation">
+          Function Documentation
+          <a class="headerlink" href="#function-documentation" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <dl class="cpp function">
+          <dt id="_CPPv4N7trtorch12CompileGraphERKN5torch3jit6ModuleE11CompileSpec">
+           <span class="target" id="trtorch_8h_1a3eace458ae9122f571fabfc9ef1b9e3a">
+           </span>
+           TRTORCH_API torch::jit::Module
+           <code class="sig-prename descclassname">
+            trtorch
+            <code class="sig-prename descclassname">
+             ::
+            </code>
+           </code>
+           <code class="sig-name descname">
+            CompileGraph
+           </code>
+           <span class="sig-paren">
+            (
+           </span>
+           <em class="property">
+            const
+           </em>
+           torch::jit::Module &amp;
+           <em>
+            module
+           </em>
+           ,
+           <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpecE" title="trtorch::CompileSpec">
+            CompileSpec
+           </a>
+           <em>
+            info
+           </em>
+           <span class="sig-paren">
+            )
+           </span>
+           <a class="headerlink" href="#_CPPv4N7trtorch12CompileGraphERKN5torch3jit6ModuleE11CompileSpec" title="Permalink to this definition">
+            ¶
+           </a>
+           <br/>
           </dt>
           <dd>
            <p>
-            : A new module trageting a TensorRT engine
+            Compile a TorchScript module for NVIDIA GPUs using TensorRT.
            </p>
+           <p>
+           </p>
+           <p>
+            Takes a existing TorchScript module and a set of settings to configure the compiler and will convert methods to JIT Graphs which call equivalent TensorRT engines
+           </p>
+           <dl class="simple">
+            <dt>
+             <strong>
+              Parameters
+             </strong>
+            </dt>
+            <dd>
+             <ul class="breatheparameterlist simple">
+              <li>
+               <p>
+                <code class="docutils literal notranslate">
+                 <span class="pre">
+                  module
+                 </span>
+                </code>
+                : torch::jit::Module - Existing TorchScript module
+               </p>
+              </li>
+              <li>
+               <p>
+                <code class="docutils literal notranslate">
+                 <span class="pre">
+                  info
+                 </span>
+                </code>
+                :
+                <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#structtrtorch_1_1CompileSpec">
+                 <span class="std std-ref">
+                  trtorch::CompileSpec
+                 </span>
+                </a>
+                - Compilation settings
+               </p>
+              </li>
+             </ul>
+            </dd>
+           </dl>
+           <p>
+            Converts specifically the forward method of a TorchScript Module
+           </p>
+           <p>
+           </p>
+           <dl class="simple">
+            <dt>
+             <strong>
+              Return
+             </strong>
+            </dt>
+            <dd>
+             <p>
+              : A new module trageting a TensorRT engine
+             </p>
+            </dd>
+           </dl>
           </dd>
          </dl>
-        </dd>
-       </dl>
+        </section>
+       </section>
       </article>
      </div>
     </div>

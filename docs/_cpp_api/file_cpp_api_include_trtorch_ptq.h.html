@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -56,6 +57,11 @@
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
+  </script>
+  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+  <script type="text/x-mathjax-config">
+   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -151,6 +157,12 @@
       <div class="dropdown-content md-hero">
        <a href="https://nvidia.github.io/TRTorch/" title="master">
         master
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.3.0/" title="v0.3.0">
+        v0.3.0
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.2.0/" title="v0.2.0">
+        v0.2.0
        </a>
        <a href="https://nvidia.github.io/TRTorch/v0.1.0/" title="v0.1.0">
         v0.1.0
@@ -321,6 +333,18 @@
             Useful Links for TRTorch Development
            </a>
           </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Indices
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../indices/supported_ops.html">
+            Operators Supported
+           </a>
+          </li>
          </ul>
         </nav>
        </div>
@@ -388,281 +412,293 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <span id="file-cpp-api-include-trtorch-ptq-h">
-       </span>
-       <h1 id="cpp-api-file-cpp-api-include-trtorch-ptq-h--page-root">
-        File ptq.h
-        <a class="headerlink" href="#cpp-api-file-cpp-api-include-trtorch-ptq-h--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <p>
-        ↰
-        <a class="reference internal" href="dir_cpp_api_include_trtorch.html#dir-cpp-api-include-trtorch">
-         <span class="std std-ref">
-          Parent directory
-         </span>
-        </a>
-        (
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          cpp/api/include/trtorch
-         </span>
-        </code>
-        )
-       </p>
-       <div class="contents local topic" id="contents">
-        <p class="topic-title">
-         Contents
+       <section id="file-ptq-h">
+        <span id="file-cpp-api-include-trtorch-ptq-h">
+        </span>
+        <h1 id="cpp-api-file-cpp-api-include-trtorch-ptq-h--page-root">
+         File ptq.h
+         <a class="headerlink" href="#cpp-api-file-cpp-api-include-trtorch-ptq-h--page-root" title="Permalink to this headline">
+          ¶
+         </a>
+        </h1>
+        <p>
+         ↰
+         <a class="reference internal" href="dir_cpp_api_include_trtorch.html#dir-cpp-api-include-trtorch">
+          <span class="std std-ref">
+           Parent directory
+          </span>
+         </a>
+         (
+         <code class="docutils literal notranslate">
+          <span class="pre">
+           cpp/api/include/trtorch
+          </span>
+         </code>
+         )
         </p>
-        <ul class="simple">
-         <li>
-          <p>
-           <a class="reference internal" href="#definition-cpp-api-include-trtorch-ptq-h" id="id1">
-            Definition (
+        <div class="contents local topic" id="contents">
+         <p class="topic-title">
+          Contents
+         </p>
+         <ul class="simple">
+          <li>
+           <p>
+            <a class="reference internal" href="#definition-cpp-api-include-trtorch-ptq-h" id="id1">
+             Definition (
+             <code class="docutils literal notranslate">
+              <span class="pre">
+               cpp/api/include/trtorch/ptq.h
+              </span>
+             </code>
+             )
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference internal" href="#includes" id="id2">
+             Includes
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference internal" href="#namespaces" id="id3">
+             Namespaces
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference internal" href="#classes" id="id4">
+             Classes
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference internal" href="#functions" id="id5">
+             Functions
+            </a>
+           </p>
+          </li>
+         </ul>
+        </div>
+        <section id="definition-cpp-api-include-trtorch-ptq-h">
+         <h2 id="definition-cpp-api-include-trtorch-ptq-h">
+          Definition (
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            cpp/api/include/trtorch/ptq.h
+           </span>
+          </code>
+          )
+          <a class="headerlink" href="#definition-cpp-api-include-trtorch-ptq-h" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <div class="toctree-wrapper compound">
+          <ul>
+           <li class="toctree-l1">
+            <a class="reference internal" href="program_listing_file_cpp_api_include_trtorch_ptq.h.html">
+             Program Listing for File ptq.h
+            </a>
+           </li>
+          </ul>
+         </div>
+        </section>
+        <section id="includes">
+         <h2 id="includes">
+          Includes
+          <a class="headerlink" href="#includes" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <ul class="simple">
+          <li>
+           <p>
             <code class="docutils literal notranslate">
              <span class="pre">
-              cpp/api/include/trtorch/ptq.h
+              NvInfer.h
              </span>
             </code>
+           </p>
+          </li>
+          <li>
+           <p>
+            <code class="docutils literal notranslate">
+             <span class="pre">
+              fstream
+             </span>
+            </code>
+           </p>
+          </li>
+          <li>
+           <p>
+            <code class="docutils literal notranslate">
+             <span class="pre">
+              iostream
+             </span>
+            </code>
+           </p>
+          </li>
+          <li>
+           <p>
+            <code class="docutils literal notranslate">
+             <span class="pre">
+              iterator
+             </span>
+            </code>
+           </p>
+          </li>
+          <li>
+           <p>
+            <code class="docutils literal notranslate">
+             <span class="pre">
+              memory
+             </span>
+            </code>
+           </p>
+          </li>
+          <li>
+           <p>
+            <code class="docutils literal notranslate">
+             <span class="pre">
+              sstream
+             </span>
+            </code>
+           </p>
+          </li>
+          <li>
+           <p>
+            <code class="docutils literal notranslate">
+             <span class="pre">
+              string
+             </span>
+            </code>
+           </p>
+          </li>
+          <li>
+           <p>
+            <code class="docutils literal notranslate">
+             <span class="pre">
+              torch/torch.h
+             </span>
+            </code>
+           </p>
+          </li>
+          <li>
+           <p>
+            <code class="docutils literal notranslate">
+             <span class="pre">
+              trtorch/logging.h
+             </span>
+            </code>
+            (
+            <a class="reference internal" href="file_cpp_api_include_trtorch_logging.h.html#file-cpp-api-include-trtorch-logging-h">
+             <span class="std std-ref">
+              File logging.h
+             </span>
+            </a>
             )
-           </a>
-          </p>
-         </li>
-         <li>
-          <p>
-           <a class="reference internal" href="#includes" id="id2">
-            Includes
-           </a>
-          </p>
-         </li>
-         <li>
-          <p>
-           <a class="reference internal" href="#namespaces" id="id3">
-            Namespaces
-           </a>
-          </p>
-         </li>
-         <li>
-          <p>
-           <a class="reference internal" href="#classes" id="id4">
-            Classes
-           </a>
-          </p>
-         </li>
-         <li>
-          <p>
-           <a class="reference internal" href="#functions" id="id5">
-            Functions
-           </a>
-          </p>
-         </li>
-        </ul>
-       </div>
-       <h2 id="definition-cpp-api-include-trtorch-ptq-h">
-        Definition (
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          cpp/api/include/trtorch/ptq.h
-         </span>
-        </code>
-        )
-        <a class="headerlink" href="#definition-cpp-api-include-trtorch-ptq-h" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <div class="toctree-wrapper compound">
-        <ul>
-         <li class="toctree-l1">
-          <a class="reference internal" href="program_listing_file_cpp_api_include_trtorch_ptq.h.html">
-           Program Listing for File ptq.h
+           </p>
+          </li>
+          <li>
+           <p>
+            <code class="docutils literal notranslate">
+             <span class="pre">
+              vector
+             </span>
+            </code>
+           </p>
+          </li>
+         </ul>
+        </section>
+        <section id="namespaces">
+         <h2 id="namespaces">
+          Namespaces
+          <a class="headerlink" href="#namespaces" title="Permalink to this headline">
+           ¶
           </a>
-         </li>
-        </ul>
-       </div>
-       <h2 id="includes">
-        Includes
-        <a class="headerlink" href="#includes" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <ul class="simple">
-        <li>
-         <p>
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            NvInfer.h
-           </span>
-          </code>
-         </p>
-        </li>
-        <li>
-         <p>
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            fstream
-           </span>
-          </code>
-         </p>
-        </li>
-        <li>
-         <p>
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            iostream
-           </span>
-          </code>
-         </p>
-        </li>
-        <li>
-         <p>
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            iterator
-           </span>
-          </code>
-         </p>
-        </li>
-        <li>
-         <p>
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            memory
-           </span>
-          </code>
-         </p>
-        </li>
-        <li>
-         <p>
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            sstream
-           </span>
-          </code>
-         </p>
-        </li>
-        <li>
-         <p>
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            string
-           </span>
-          </code>
-         </p>
-        </li>
-        <li>
-         <p>
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            torch/torch.h
-           </span>
-          </code>
-         </p>
-        </li>
-        <li>
-         <p>
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            trtorch/logging.h
-           </span>
-          </code>
-          (
-          <a class="reference internal" href="file_cpp_api_include_trtorch_logging.h.html#file-cpp-api-include-trtorch-logging-h">
-           <span class="std std-ref">
-            File logging.h
-           </span>
+         </h2>
+         <ul class="simple">
+          <li>
+           <p>
+            <a class="reference internal" href="namespace_trtorch.html#namespace-trtorch">
+             <span class="std std-ref">
+              Namespace trtorch
+             </span>
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference internal" href="namespace_trtorch__ptq.html#namespace-trtorch-ptq">
+             <span class="std std-ref">
+              Namespace trtorch::ptq
+             </span>
+            </a>
+           </p>
+          </li>
+         </ul>
+        </section>
+        <section id="classes">
+         <h2 id="classes">
+          Classes
+          <a class="headerlink" href="#classes" title="Permalink to this headline">
+           ¶
           </a>
-          )
-         </p>
-        </li>
-        <li>
-         <p>
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            vector
-           </span>
-          </code>
-         </p>
-        </li>
-       </ul>
-       <h2 id="namespaces">
-        Namespaces
-        <a class="headerlink" href="#namespaces" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <ul class="simple">
-        <li>
-         <p>
-          <a class="reference internal" href="namespace_trtorch.html#namespace-trtorch">
-           <span class="std std-ref">
-            Namespace trtorch
-           </span>
+         </h2>
+         <ul class="simple">
+          <li>
+           <p>
+            <a class="reference internal" href="classtrtorch_1_1ptq_1_1Int8CacheCalibrator.html#exhale-class-classtrtorch-1-1ptq-1-1int8cachecalibrator">
+             <span class="std std-ref">
+              Template Class Int8CacheCalibrator
+             </span>
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference internal" href="classtrtorch_1_1ptq_1_1Int8Calibrator.html#exhale-class-classtrtorch-1-1ptq-1-1int8calibrator">
+             <span class="std std-ref">
+              Template Class Int8Calibrator
+             </span>
+            </a>
+           </p>
+          </li>
+         </ul>
+        </section>
+        <section id="functions">
+         <h2 id="functions">
+          Functions
+          <a class="headerlink" href="#functions" title="Permalink to this headline">
+           ¶
           </a>
-         </p>
-        </li>
-        <li>
-         <p>
-          <a class="reference internal" href="namespace_trtorch__ptq.html#namespace-trtorch-ptq">
-           <span class="std std-ref">
-            Namespace trtorch::ptq
-           </span>
-          </a>
-         </p>
-        </li>
-       </ul>
-       <h2 id="classes">
-        Classes
-        <a class="headerlink" href="#classes" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <ul class="simple">
-        <li>
-         <p>
-          <a class="reference internal" href="classtrtorch_1_1ptq_1_1Int8CacheCalibrator.html#exhale-class-classtrtorch-1-1ptq-1-1int8cachecalibrator">
-           <span class="std std-ref">
-            Template Class Int8CacheCalibrator
-           </span>
-          </a>
-         </p>
-        </li>
-        <li>
-         <p>
-          <a class="reference internal" href="classtrtorch_1_1ptq_1_1Int8Calibrator.html#exhale-class-classtrtorch-1-1ptq-1-1int8calibrator">
-           <span class="std std-ref">
-            Template Class Int8Calibrator
-           </span>
-          </a>
-         </p>
-        </li>
-       </ul>
-       <h2 id="functions">
-        Functions
-        <a class="headerlink" href="#functions" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <ul class="simple">
-        <li>
-         <p>
-          <a class="reference internal" href="function_ptq_8h_1a5f33b142bc2f3f2aaf462270b3ad7e31.html#exhale-function-ptq-8h-1a5f33b142bc2f3f2aaf462270b3ad7e31">
-           <span class="std std-ref">
-            Template Function trtorch::ptq::make_int8_cache_calibrator
-           </span>
-          </a>
-         </p>
-        </li>
-        <li>
-         <p>
-          <a class="reference internal" href="function_ptq_8h_1a4422781719d7befedb364cacd91c6247.html#exhale-function-ptq-8h-1a4422781719d7befedb364cacd91c6247">
-           <span class="std std-ref">
-            Template Function trtorch::ptq::make_int8_calibrator
-           </span>
-          </a>
-         </p>
-        </li>
-       </ul>
+         </h2>
+         <ul class="simple">
+          <li>
+           <p>
+            <a class="reference internal" href="function_ptq_8h_1a5f33b142bc2f3f2aaf462270b3ad7e31.html#exhale-function-ptq-8h-1a5f33b142bc2f3f2aaf462270b3ad7e31">
+             <span class="std std-ref">
+              Template Function trtorch::ptq::make_int8_cache_calibrator
+             </span>
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference internal" href="function_ptq_8h_1a4422781719d7befedb364cacd91c6247.html#exhale-function-ptq-8h-1a4422781719d7befedb364cacd91c6247">
+             <span class="std std-ref">
+              Template Function trtorch::ptq::make_int8_calibrator
+             </span>
+            </a>
+           </p>
+          </li>
+         </ul>
+        </section>
+       </section>
       </article>
      </div>
     </div>

@@ -10,8 +10,11 @@ import torch
 from trtorch._version import __version__
 from trtorch._compiler import *
 from trtorch._compile_spec import TensorRTCompileSpec
+from trtorch import ptq
 from trtorch._types import *
 from trtorch import logging
+from trtorch.Input import Input
+from trtorch.Device import Device
 
 
 def _register_with_torch():

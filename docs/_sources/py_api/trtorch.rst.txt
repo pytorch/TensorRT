@@ -11,11 +11,15 @@ trtorch
 Functions
 ------------
 
+.. autofunction:: set_device
+
 .. autofunction:: compile
 
 .. autofunction:: convert_method_to_trt_engine
 
 .. autofunction:: check_method_op_support
+
+.. autofunction:: embed_engine_in_new_module
 
 .. autofunction:: get_build_info
 

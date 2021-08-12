@@ -24,4 +24,12 @@ if output.returncode != 0:
     comment = '''There are some changes that do not conform to Python style guidelines:\n ```diff\n{}```'''.format(output.stdout.decode("utf-8"))
     approval = 'REQUEST_CHANGES'
 
-pr.create_review(commit, comment, approval)
+try:
+    pr.create_review(commit, comment, approval)
+except:
+    print("Unable to submit in depth review, please review logs for linting issues")
+
+if output.returncode != 0:
+    exit(1)
+else:
+    exit(0)

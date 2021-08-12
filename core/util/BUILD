@@ -4,7 +4,7 @@ config_setting(
     name = "use_pre_cxx11_abi",
     values = {
         "define": "abi=pre_cxx11_abi",
-    }
+    },
 )
 
 cc_library(
@@ -13,13 +13,13 @@ cc_library(
         "prelude.h",
     ],
     deps = [
-        "//core/util/logging",
         ":build_info",
+        ":exception",
         ":jit_util",
-        ":trt_util",
         ":macros",
-        ":exception"
-    ]
+        ":trt_util",
+        "//core/util/logging",
+    ],
 )
 
 cc_library(
@@ -28,8 +28,8 @@ cc_library(
         "jit_util.h",
     ],
     deps = select({
-        ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default":  ["@libtorch//:libtorch"],
+        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
+        "//conditions:default": ["@libtorch//:libtorch"],
     }),
 )
 
@@ -39,18 +39,18 @@ cc_library(
         "macros.h",
     ],
     deps = [
-        ":exception"
-    ]
+        ":exception",
+    ],
 )
 
 cc_library(
     name = "exception",
+    srcs = [
+        "Exception.cpp",
+    ],
     hdrs = [
         "Exception.h",
     ],
-    srcs = [
-        "Exception.cpp"
-    ]
 )
 
 cc_library(
@@ -59,43 +59,42 @@ cc_library(
         "build_info.h",
     ],
     deps = [
-        "@tensorrt//:nvinfer"
+        "@tensorrt//:nvinfer",
     ] + select({
-        ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default":  ["@libtorch//:libtorch"],
-    })
+        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
+        "//conditions:default": ["@libtorch//:libtorch"],
+    }),
 )
 
 cc_library(
     name = "trt_util",
+    srcs = [
+        "trt_util.cpp",
+    ],
     hdrs = [
         "trt_util.h",
-    ],
-    srcs = [
-        "trt_util.cpp"
     ],
     deps = [
         "@tensorrt//:nvinfer",
         "//core/util/logging",
-        ":macros"
+        ":macros",
     ] + select({
-        ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default":  ["@libtorch//:libtorch"],
-    })
+        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
+        "//conditions:default": ["@libtorch//:libtorch"],
+    }),
 )
-
 
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 
 pkg_tar(
     name = "include",
-    package_dir = "core/util/",
     srcs = [
-        "//core/util:build_info.h",
-        "//core/util:macros.h",
         "//core/util:Exception.h",
-        "//core/util:prelude.h",
+        "//core/util:build_info.h",
         "//core/util:jit_util.h",
-        "//core/util:trt_util.h"
+        "//core/util:macros.h",
+        "//core/util:prelude.h",
+        "//core/util:trt_util.h",
     ],
+    package_dir = "core/util/",
 )

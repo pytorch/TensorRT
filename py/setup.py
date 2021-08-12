@@ -16,7 +16,7 @@ import subprocess
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
-__version__ = '0.2.0a0'
+__version__ = '0.4.0a0'
 
 CXX11_ABI = False
 
@@ -44,7 +44,12 @@ def which(program):
     return None
 
 
-BAZEL_EXE = which("bazel")
+BAZEL_EXE = which("bazelisk")
+
+if BAZEL_EXE is None:
+    BAZEL_EXE = which("bazel")
+    if BAZEL_EXE is None:
+        sys.exit("Could not find bazel in PATH")
 
 
 def build_libtrtorch_pre_cxx11_abi(develop=True, use_dist_dir=True, cxx11_abi=False):
@@ -204,7 +209,7 @@ setup(name='trtorch',
       long_description=long_description,
       ext_modules=ext_modules,
       install_requires=[
-          'torch==1.7.1',
+          'torch>=1.9.0+cu111,<1.10.0',
       ],
       setup_requires=[],
       cmdclass={

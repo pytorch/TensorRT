@@ -38,6 +38,7 @@ typedef std::function<c10::optional<torch::jit::IValue>(const torch::jit::Node*,
 struct EvalOptions {
   std::set<c10::TypePtr> blacklisted_output_types;
   std::vector<c10::OperatorName> valid_schemas;
+  std::vector<std::string> supported_variants;
   EvalOptions() = default;
   EvalOptions& blacklistOutputTypes(std::set<c10::TypePtr> types) {
     use_options = true;
@@ -45,6 +46,7 @@ struct EvalOptions {
     return *this;
   }
   EvalOptions& validSchemas(std::set<std::string> schemas) {
+    std::copy(schemas.begin(), schemas.end(), std::back_inserter(supported_variants));
     use_options = true;
     for (auto s : schemas) {
       valid_schemas.push_back(torch::jit::parseSchema(s).operator_name());
@@ -72,6 +74,7 @@ struct EvalRegistration {
 
 c10::optional<torch::jit::IValue> EvalNode(const torch::jit::Node* n, kwargs& args);
 bool shouldEvalAtConversionTime(const torch::jit::Node* n);
+std::vector<std::string> getEvaluatorList();
 void register_node_evaluator(torch::jit::NodeKind node_kind, NodeEvaluator evaluator);
 void register_node_evaluator(EvalRegistration r);
 

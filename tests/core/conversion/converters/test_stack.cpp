@@ -14,7 +14,7 @@ TEST(Converters, ATenStackPureTensorConvertsCorrectly) {
         return (%4))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in1 = at::randint(1, 10, {4, 4, 4}, {at::kCUDA});
   auto in2 = at::randint(1, 10, {4, 4, 4}, {at::kCUDA});
@@ -31,14 +31,14 @@ TEST(Converters, ATenStackPureTensorConvertsCorrectly) {
 TEST(Converters, ATenStackDiffTensorConvertsCorrectly) {
   const auto graph = R"IR(
       graph(%0 : Tensor,
-            %1 : Float(4:16, 4:4, 4:1)):
+            %1 : Float(4, 4, 4, strides=[16, 4, 1])):
         %2 : Tensor[] = prim::ListConstruct(%0, %1)
         %3 : int = prim::Constant[value=1]()
         %4 : Tensor = aten::stack(%2, %3)
         return (%4))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
-  torch::jit::parseIR(graph, &*g);
+  torch::jit::parseIR(graph, g.get());
 
   auto in1 = at::randint(1, 10, {4, 4, 4}, {at::kCUDA});
   auto in2 = at::randint(1, 10, {4, 4, 4}, {at::kCUDA});

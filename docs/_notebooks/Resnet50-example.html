@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -56,6 +57,11 @@
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
+  </script>
+  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+  <script type="text/x-mathjax-config">
+   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -151,6 +157,12 @@
       <div class="dropdown-content md-hero">
        <a href="https://nvidia.github.io/TRTorch/" title="master">
         master
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.3.0/" title="v0.3.0">
+        v0.3.0
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.2.0/" title="v0.2.0">
+        v0.2.0
        </a>
        <a href="https://nvidia.github.io/TRTorch/v0.1.0/" title="v0.1.0">
         v0.1.0
@@ -321,6 +333,18 @@
             Useful Links for TRTorch Development
            </a>
           </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Indices
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../indices/supported_ops.html">
+            Operators Supported
+           </a>
+          </li>
          </ul>
         </nav>
        </div>
@@ -390,7 +414,7 @@
                  </a>
                 </li>
                 <li class="md-nav__item">
-                 <a class="md-nav__link" href="#What's-next">
+                 <a class="md-nav__link" href="#What’s-next">
                   What’s next
                  </a>
                 </li>
@@ -418,21 +442,35 @@
         /* CSS for nbsphinx extension */
 
 /* remove conflicting styling from Sphinx themes */
-div.nbinput.container,
-div.nbinput.container div.prompt,
-div.nbinput.container div.input_area,
-div.nbinput.container div[class*=highlight],
-div.nbinput.container div[class*=highlight] pre,
-div.nboutput.container,
-div.nboutput.container div.prompt,
-div.nboutput.container div.output_area,
-div.nboutput.container div[class*=highlight],
-div.nboutput.container div[class*=highlight] pre {
-    background: none;
+div.nbinput.container div.prompt *,
+div.nboutput.container div.prompt *,
+div.nbinput.container div.input_area pre,
+div.nboutput.container div.output_area pre,
+div.nbinput.container div.input_area .highlight,
+div.nboutput.container div.output_area .highlight {
     border: none;
-    padding: 0 0;
+    padding: 0;
     margin: 0;
     box-shadow: none;
+}
+
+div.nbinput.container > div[class*=highlight],
+div.nboutput.container > div[class*=highlight] {
+    margin: 0;
+}
+
+div.nbinput.container div.prompt *,
+div.nboutput.container div.prompt * {
+    background: none;
+}
+
+div.nboutput.container div.output_area .highlight,
+div.nboutput.container div.output_area pre {
+    background: unset;
+}
+
+div.nboutput.container div.output_area div.highlight {
+    color: unset;  /* override Pygments text color */
 }
 
 /* avoid gaps between output lines */
@@ -533,7 +571,7 @@ div.nboutput.container div.output_area {
 div.nbinput.container div.input_area {
     border: 1px solid #e0e0e0;
     border-radius: 2px;
-    background: #f5f5f5;
+    /*background: #f5f5f5;*/
 }
 
 /* override MathJax center alignment in output cells */
@@ -599,6 +637,7 @@ div.nboutput.container div.output_area.rendered_html,
 div.nboutput.container div.output_area > div.output_javascript,
 div.nboutput.container div.output_area:not(.rendered_html) > img{
     padding: 5px;
+    margin: 0;
 }
 
 /* fix copybtn overflow problem in chromium (needed for 'sphinx_copybutton') */
@@ -675,105 +714,111 @@ div.rendered_html tbody tr:hover {
         </div>
        </div>
        <p>
-        <img alt="411f58ab87f344dbb5a49e2bb82515e7" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
+        <img alt="abfc4a69939442a9ab451706eeef5198" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
        </p>
-       <h1 id="notebooks-resnet50-example--page-root">
-        TRTorch Getting Started - ResNet 50
-        <a class="headerlink" href="#notebooks-resnet50-example--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <h2 id="Overview">
-        Overview
-        <a class="headerlink" href="#Overview" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <p>
-        In the practice of developing machine learning models, there are few tools as approachable as PyTorch for developing and experimenting in designing machine learning models. The power of PyTorch comes from its deep integration into Python, its flexibility and its approach to automatic differentiation and execution (eager execution). However, when moving from research into production, the requirements change and we may no longer want that deep Python integration and we want optimization to get the
+       <section id="TRTorch-Getting-Started---ResNet-50">
+        <h1 id="notebooks-resnet50-example--page-root">
+         TRTorch Getting Started - ResNet 50
+         <a class="headerlink" href="#notebooks-resnet50-example--page-root" title="Permalink to this headline">
+          ¶
+         </a>
+        </h1>
+        <section id="Overview">
+         <h2 id="Overview">
+          Overview
+          <a class="headerlink" href="#Overview" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <p>
+          In the practice of developing machine learning models, there are few tools as approachable as PyTorch for developing and experimenting in designing machine learning models. The power of PyTorch comes from its deep integration into Python, its flexibility and its approach to automatic differentiation and execution (eager execution). However, when moving from research into production, the requirements change and we may no longer want that deep Python integration and we want optimization to get the
 best performance we can on our deployment platform. In PyTorch 1.0, TorchScript was introduced as a method to separate your PyTorch model from Python, make it portable and optimizable. TorchScript uses PyTorch’s JIT compiler to transform your normal PyTorch code which gets interpreted by the Python interpreter to an intermediate representation (IR) which can have optimizations run on it and at runtime can get interpreted by the PyTorch JIT interpreter. For PyTorch this has opened up a whole new
 world of possibilities, including deployment in other languages like C++. It also introduces a structured graph based format that we can use to do down to the kernel level optimization of models for inference.
-       </p>
-       <p>
-        When deploying on NVIDIA GPUs TensorRT, NVIDIA’s Deep Learning Optimization SDK and Runtime is able to take models from any major framework and specifically tune them to perform better on specific target hardware in the NVIDIA family be it an A100, TITAN V, Jetson Xavier or NVIDIA’s Deep Learning Accelerator. TensorRT performs a couple sets of optimizations to achieve this. TensorRT fuses layers and tensors in the model graph, it then uses a large kernel library to select implementations that
+         </p>
+         <p>
+          When deploying on NVIDIA GPUs TensorRT, NVIDIA’s Deep Learning Optimization SDK and Runtime is able to take models from any major framework and specifically tune them to perform better on specific target hardware in the NVIDIA family be it an A100, TITAN V, Jetson Xavier or NVIDIA’s Deep Learning Accelerator. TensorRT performs a couple sets of optimizations to achieve this. TensorRT fuses layers and tensors in the model graph, it then uses a large kernel library to select implementations that
 perform best on the target GPU. TensorRT also has strong support for reduced operating precision execution which allows users to leverage the Tensor Cores on Volta and newer GPUs as well as reducing memory and computation footprints on device.
-       </p>
-       <p>
-        TRTorch is a compiler that uses TensorRT to optimize TorchScript code, compiling standard TorchScript modules into ones that internally run with TensorRT optimizations. This enables you to continue to remain in the PyTorch ecosystem, using all the great features PyTorch has such as module composability, its flexible tensor implementation, data loaders and more. TRTorch is available to use with both PyTorch and LibTorch.
-       </p>
-       <h3 id="Learning-objectives">
-        Learning objectives
-        <a class="headerlink" href="#Learning-objectives" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        This notebook demonstrates the steps for compiling a TorchScript module with TRTorch on a pretrained ResNet-50 network, and running it to test the speedup obtained.
-       </p>
-       <h2 id="Content">
-        Content
-        <a class="headerlink" href="#Content" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <ol class="arabic simple">
-        <li>
-         <p>
-          <a class="reference external" href="#1">
-           Requirements
-          </a>
          </p>
-        </li>
-        <li>
          <p>
-          <a class="reference external" href="#2">
-           ResNet-50 Overview
-          </a>
+          TRTorch is a compiler that uses TensorRT to optimize TorchScript code, compiling standard TorchScript modules into ones that internally run with TensorRT optimizations. This enables you to continue to remain in the PyTorch ecosystem, using all the great features PyTorch has such as module composability, its flexible tensor implementation, data loaders and more. TRTorch is available to use with both PyTorch and LibTorch.
          </p>
-        </li>
-        <li>
-         <p>
-          <a class="reference external" href="#3">
-           Creating TorchScript modules
+         <section id="Learning-objectives">
+          <h3 id="Learning-objectives">
+           Learning objectives
+           <a class="headerlink" href="#Learning-objectives" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           This notebook demonstrates the steps for compiling a TorchScript module with TRTorch on a pretrained ResNet-50 network, and running it to test the speedup obtained.
+          </p>
+         </section>
+        </section>
+        <section id="Content">
+         <h2 id="Content">
+          Content
+          <a class="headerlink" href="#Content" title="Permalink to this headline">
+           ¶
           </a>
-         </p>
-        </li>
-        <li>
-         <p>
-          <a class="reference external" href="#4">
-           Compiling with TRTorch
-          </a>
-         </p>
-        </li>
-        <li>
-         <p>
-          <a class="reference external" href="#5">
-           Conclusion
-          </a>
-         </p>
-        </li>
-       </ol>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[2]:
+         </h2>
+         <ol class="arabic simple">
+          <li>
+           <p>
+            <a class="reference external" href="#1">
+             Requirements
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference external" href="#2">
+             ResNet-50 Overview
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference external" href="#3">
+             Creating TorchScript modules
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference external" href="#4">
+             Compiling with TRTorch
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference external" href="#5">
+             Conclusion
+            </a>
+           </p>
+          </li>
+         </ol>
+         <div class="nbinput docutils container">
+          <div class="prompt highlight-none notranslate">
+           <div class="highlight">
+            <pre><span></span>[2]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+           </div>
+          </div>
+          <div class="input_area highlight-ipython3 notranslate">
+           <div class="highlight">
+            <pre>
 <span></span>!nvidia-smi
 </pre>
+           </div>
+          </div>
          </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area docutils container">
-         <div class="highlight">
-          <pre>
+         <div class="nboutput nblast docutils container">
+          <div class="prompt empty docutils container">
+          </div>
+          <div class="output_area docutils container">
+           <div class="highlight">
+            <pre>
 Tue Aug 25 06:25:19 2020
 +-----------------------------------------------------------------------------+
 | NVIDIA-SMI 450.24       Driver Version: 450.24       CUDA Version: 11.0     |
@@ -822,89 +867,82 @@ Tue Aug 25 06:25:19 2020
 |=============================================================================|
 +-----------------------------------------------------------------------------+
 </pre>
+           </div>
+          </div>
          </div>
-        </div>
-       </div>
-       <blockquote>
-        <div>
          <p>
           ## 1. Requirements
          </p>
-        </div>
-       </blockquote>
-       <p>
-        Follow the steps in
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          notebooks/README
-         </span>
-        </code>
-        to prepare a Docker container, within which you can run this notebook.
-       </p>
-       <blockquote>
-        <div>
+         <p>
+          Follow the steps in
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            notebooks/README
+           </span>
+          </code>
+          to prepare a Docker container, within which you can run this notebook.
+         </p>
          <p>
           ## 2. ResNet-50 Overview
          </p>
-        </div>
-       </blockquote>
-       <p>
-        PyTorch has a model repository called the PyTorch Hub, which is a source for high quality implementations of common models. We can get our ResNet-50 model from there pretrained on ImageNet.
-       </p>
-       <h3 id="Model-Description">
-        Model Description
-        <a class="headerlink" href="#Model-Description" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        This ResNet-50 model is based on the
-        <a class="reference external" href="https://arxiv.org/pdf/1512.03385.pdf">
-         Deep Residual Learning for Image Recognition
-        </a>
-        paper, which describes ResNet as “a method for detecting objects in images using a single deep neural network”. The input size is fixed to 32x32.
-       </p>
-       <p>
-        <img alt="alt" class="no-scaled-link" src="https://pytorch.org/assets/images/resnet.png" style="width: 50%;"/>
-       </p>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[3]:
+         <p>
+          PyTorch has a model repository called the PyTorch Hub, which is a source for high quality implementations of common models. We can get our ResNet-50 model from there pretrained on ImageNet.
+         </p>
+         <section id="Model-Description">
+          <h3 id="Model-Description">
+           Model Description
+           <a class="headerlink" href="#Model-Description" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           This ResNet-50 model is based on the
+           <a class="reference external" href="https://arxiv.org/pdf/1512.03385.pdf">
+            Deep Residual Learning for Image Recognition
+           </a>
+           paper, which describes ResNet as “a method for detecting objects in images using a single deep neural network”. The input size is fixed to 32x32.
+          </p>
+          <p>
+           <img alt="alt" class="no-scaled-link" src="https://pytorch.org/assets/images/resnet.png" style="width: 50%;"/>
+          </p>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[3]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span>import torch
 resnet50_model = torch.hub.load('pytorch/vision:v0.6.0', 'resnet50', pretrained=True)
 resnet50_model.eval()
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area stderr docutils container">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area stderr docutils container">
+            <div class="highlight">
+             <pre>
 Using cache found in /root/.cache/torch/hub/pytorch_vision_v0.6.0
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[3]:
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[3]:
 </pre>
-         </div>
-        </div>
-        <div class="output_area docutils container">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
 ResNet(
   (conv1): Conv2d(3, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
   (bn1): BatchNorm2d(64, eps=1e-05, momentum=0.1, affine=True, track_running_stats=True)
@@ -1082,106 +1120,106 @@ ResNet(
   (fc): Linear(in_features=2048, out_features=1000, bias=True)
 )
 </pre>
-         </div>
-        </div>
-       </div>
-       <p>
-        All pre-trained models expect input images normalized in the same way, i.e. mini-batches of 3-channel RGB images of shape
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          (3
-         </span>
-         <span class="pre">
-          x
-         </span>
-         <span class="pre">
-          H
-         </span>
-         <span class="pre">
-          x
-         </span>
-         <span class="pre">
-          W)
-         </span>
-        </code>
-        , where
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          H
-         </span>
-        </code>
-        and
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          W
-         </span>
-        </code>
-        are expected to be at least
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          224
-         </span>
-        </code>
-        . The images have to be loaded in to a range of
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          [0,
-         </span>
-         <span class="pre">
-          1]
-         </span>
-        </code>
-        and then normalized using
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          mean
-         </span>
-         <span class="pre">
-          =
-         </span>
-         <span class="pre">
-          [0.485,
-         </span>
-         <span class="pre">
-          0.456,
-         </span>
-         <span class="pre">
-          0.406]
-         </span>
-        </code>
-        and
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          std
-         </span>
-         <span class="pre">
-          =
-         </span>
-         <span class="pre">
-          [0.229,
-         </span>
-         <span class="pre">
-          0.224,
-         </span>
-         <span class="pre">
-          0.225]
-         </span>
-        </code>
-        .
-       </p>
-       <p>
-        Here’s a sample execution.
-       </p>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[4]:
+            </div>
+           </div>
+          </div>
+          <p>
+           All pre-trained models expect input images normalized in the same way, i.e. mini-batches of 3-channel RGB images of shape
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             (3
+            </span>
+            <span class="pre">
+             x
+            </span>
+            <span class="pre">
+             H
+            </span>
+            <span class="pre">
+             x
+            </span>
+            <span class="pre">
+             W)
+            </span>
+           </code>
+           , where
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             H
+            </span>
+           </code>
+           and
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             W
+            </span>
+           </code>
+           are expected to be at least
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             224
+            </span>
+           </code>
+           . The images have to be loaded in to a range of
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             [0,
+            </span>
+            <span class="pre">
+             1]
+            </span>
+           </code>
+           and then normalized using
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             mean
+            </span>
+            <span class="pre">
+             =
+            </span>
+            <span class="pre">
+             [0.485,
+            </span>
+            <span class="pre">
+             0.456,
+            </span>
+            <span class="pre">
+             0.406]
+            </span>
+           </code>
+           and
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             std
+            </span>
+            <span class="pre">
+             =
+            </span>
+            <span class="pre">
+             [0.229,
+            </span>
+            <span class="pre">
+             0.224,
+            </span>
+            <span class="pre">
+             0.225]
+            </span>
+           </code>
+           .
+          </p>
+          <p>
+           Here’s a sample execution.
+          </p>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[4]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span>!mkdir ./data
 !wget  -O ./data/img0.JPG "https://d17fnq9dkz9hgj.cloudfront.net/breed-uploads/2018/08/siberian-husky-detail.jpg?bust=1535566590&amp;width=630"
 !wget  -O ./data/img1.JPG "https://www.hakaimagazine.com/wp-content/uploads/header-gulf-birds.jpg"
@@ -1190,15 +1228,15 @@ ResNet(
 
 !wget  -O ./data/imagenet_class_index.json "https://s3.amazonaws.com/deep-learning-models/image-models/imagenet_class_index.json"
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area docutils container">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
 mkdir: cannot create directory ‘./data’: File exists
 --2020-08-25 06:25:22--  https://d17fnq9dkz9hgj.cloudfront.net/breed-uploads/2018/08/siberian-husky-detail.jpg?bust=1535566590&amp;width=630
 Resolving d17fnq9dkz9hgj.cloudfront.net (d17fnq9dkz9hgj.cloudfront.net)... 13.227.77.77, 13.227.77.154, 13.227.77.109, ...
@@ -1256,30 +1294,30 @@ Saving to: ‘./data/imagenet_class_index.json’
 2020-08-25 06:25:32 (482 KB/s) - ‘./data/imagenet_class_index.json’ saved [35363/35363]
 
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[5]:
+            </div>
+           </div>
+          </div>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[5]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span>!pip install pillow matplotlib
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area docutils container">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
 Requirement already satisfied: pillow in /usr/local/lib/python3.6/dist-packages (4.3.0)
 Requirement already satisfied: matplotlib in /usr/local/lib/python3.6/dist-packages (3.3.1)
 Requirement already satisfied: olefile in /usr/local/lib/python3.6/dist-packages (from pillow) (0.46)
@@ -1293,19 +1331,19 @@ Requirement already satisfied: six&gt;=1.5 in /usr/local/lib/python3.6/dist-pack
 <span class="ansi-yellow-fg">WARNING: You are using pip version 20.0.2; however, version 20.2.2 is available.
 You should consider upgrading via the '/usr/bin/python -m pip install --upgrade pip' command.</span>
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[6]:
+            </div>
+           </div>
+          </div>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[6]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span>from PIL import Image
 from torchvision import transforms
 import matplotlib.pyplot as plt
@@ -1326,26 +1364,26 @@ for i in range(4):
     plt.imshow(img)
     plt.axis('off')
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area docutils container">
-         <img alt="../_images/_notebooks_Resnet50-example_11_0.png" src="../_images/_notebooks_Resnet50-example_11_0.png"/>
-        </div>
-       </div>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[7]:
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <img alt="../_images/_notebooks_Resnet50-example_11_0.png" src="../_images/_notebooks_Resnet50-example_11_0.png"/>
+           </div>
+          </div>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[7]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span>import json
 
 with open("./data/imagenet_class_index.json") as json_file:
@@ -1353,30 +1391,30 @@ with open("./data/imagenet_class_index.json") as json_file:
 
 print("Number of classes in ImageNet: {}".format(len(d)))
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area docutils container">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
 Number of classes in ImageNet: 1000
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nbinput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[8]:
+            </div>
+           </div>
+          </div>
+          <div class="nbinput nblast docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[8]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span>import numpy as np
 
 def rn50_preprocess():
@@ -1408,19 +1446,19 @@ def predict(img_path, model):
     ind = torch.argmax(sm_output)
     return d[str(ind.item())], sm_output[ind] #([predicted class, description], probability)
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[9]:
+            </div>
+           </div>
+          </div>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[9]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span>for i in range(4):
     img_path = './data/img%d.JPG'%i
     img = Image.open(img_path)
@@ -1433,49 +1471,51 @@ def predict(img_path, model):
     plt.axis('off');
     plt.title(pred[1])
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area docutils container">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
 ./data/img0.JPG - Predicted: ['n02110185', 'Siberian_husky'], Probablility: 0.49295926094055176
 ./data/img1.JPG - Predicted: ['n01820546', 'lorikeet'], Probablility: 0.6450406312942505
 ./data/img2.JPG - Predicted: ['n02481823', 'chimpanzee'], Probablility: 0.9903154969215393
 ./data/img3.JPG - Predicted: ['n01749939', 'green_mamba'], Probablility: 0.35704153776168823
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area docutils container">
-         <img alt="../_images/_notebooks_Resnet50-example_14_1.png" src="../_images/_notebooks_Resnet50-example_14_1.png"/>
-        </div>
-       </div>
-       <h3 id="Benchmark-utility">
-        Benchmark utility
-        <a class="headerlink" href="#Benchmark-utility" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        Let us define a helper function to benchmark a model.
-       </p>
-       <div class="nbinput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[10]:
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <img alt="../_images/_notebooks_Resnet50-example_14_1.png" src="../_images/_notebooks_Resnet50-example_14_1.png"/>
+           </div>
+          </div>
+         </section>
+         <section id="Benchmark-utility">
+          <h3 id="Benchmark-utility">
+           Benchmark utility
+           <a class="headerlink" href="#Benchmark-utility" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           Let us define a helper function to benchmark a model.
+          </p>
+          <div class="nbinput nblast docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[10]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span>import time
 import numpy as np
 
@@ -1509,32 +1549,32 @@ def benchmark(model, input_shape=(1024, 1, 224, 224), dtype='fp32', nwarmup=50, 
     print("Output features size:", features.size())
     print('Average batch time: %.2f ms'%(np.mean(timings)*1000))
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[11]:
+            </div>
+           </div>
+          </div>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[11]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span># Model benchmark without TRTorch/TensorRT
 model = resnet50_model.eval().to("cuda")
 benchmark(model, input_shape=(128, 3, 224, 224), nruns=1000)
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area docutils container">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
 Warm up ...
 Start timing ...
 Iteration 100/1000, ave batch time 162.87 ms
@@ -1551,115 +1591,114 @@ Input shape: torch.Size([128, 3, 224, 224])
 Output features size: torch.Size([128, 1000])
 Average batch time: 162.94 ms
 </pre>
-         </div>
-        </div>
-       </div>
-       <blockquote>
-        <div>
+            </div>
+           </div>
+          </div>
+          <p>
+           ## 3. Creating TorchScript modules
+          </p>
+          <p>
+           To compile with TRTorch, the model must first be in
+           <strong>
+            TorchScript
+           </strong>
+           . TorchScript is a programming language included in PyTorch which removes the Python dependency normal PyTorch models have. This conversion is done via a JIT compiler which given a PyTorch Module will generate an equivalent TorchScript Module. There are two paths that can be used to generate TorchScript:
+           <strong>
+            Tracing
+           </strong>
+           and
+           <strong>
+            Scripting
+           </strong>
+           .
+          </p>
+          <ul class="simple">
+           <li>
+            <p>
+             Tracing follows execution of PyTorch generating ops in TorchScript corresponding to what it sees.
+            </p>
+           </li>
+           <li>
+            <p>
+             Scripting does an analysis of the Python code and generates TorchScript, this allows the resulting graph to include control flow which tracing cannot do.
+            </p>
+           </li>
+          </ul>
+          <p>
+           Tracing is more likely to compile successfully with TRTorch due to simplicity (though both systems are supported). We start with an example of the traced model in TorchScript.
+          </p>
+         </section>
+        </section>
+        <section id="Tracing">
+         <h2 id="Tracing">
+          Tracing
+          <a class="headerlink" href="#Tracing" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
          <p>
-          ## 3. Creating TorchScript modules
+          Tracing follows the path of execution when the module is called and records what happens. This recording is what the TorchScript IR will describe.
          </p>
-        </div>
-       </blockquote>
-       <p>
-        To compile with TRTorch, the model must first be in
-        <strong>
-         TorchScript
-        </strong>
-        . TorchScript is a programming language included in PyTorch which removes the Python dependency normal PyTorch models have. This conversion is done via a JIT compiler which given a PyTorch Module will generate an equivalent TorchScript Module. There are two paths that can be used to generate TorchScript:
-        <strong>
-         Tracing
-        </strong>
-        and
-        <strong>
-         Scripting
-        </strong>
-        .
-       </p>
-       <ul class="simple">
-        <li>
          <p>
-          Tracing follows execution of PyTorch generating ops in TorchScript corresponding to what it sees.
+          To trace an instance of the model, we can call torch.jit.trace with an example input.
          </p>
-        </li>
-        <li>
-         <p>
-          Scripting does an analysis of the Python code and generates TorchScript, this allows the resulting graph to include control flow which tracing cannot do.
-         </p>
-        </li>
-       </ul>
-       <p>
-        Tracing is more likely to compile successfully with TRTorch due to simplicity (though both systems are supported). We start with an example of the traced model in TorchScript.
-       </p>
-       <h2 id="Tracing">
-        Tracing
-        <a class="headerlink" href="#Tracing" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <p>
-        Tracing follows the path of execution when the module is called and records what happens. This recording is what the TorchScript IR will describe.
-       </p>
-       <p>
-        To trace an instance of the model, we can call torch.jit.trace with an example input.
-       </p>
-       <div class="nbinput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[12]:
+         <div class="nbinput nblast docutils container">
+          <div class="prompt highlight-none notranslate">
+           <div class="highlight">
+            <pre><span></span>[12]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+           </div>
+          </div>
+          <div class="input_area highlight-ipython3 notranslate">
+           <div class="highlight">
+            <pre>
 <span></span>model = resnet50_model.eval().to("cuda")
 traced_model = torch.jit.trace(model, [torch.randn((128, 3, 224, 224)).to("cuda")])
 </pre>
+           </div>
+          </div>
          </div>
-        </div>
-       </div>
-       <p>
-        We can save this model and use it independently of Python.
-       </p>
-       <div class="nbinput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[13]:
+         <p>
+          We can save this model and use it independently of Python.
+         </p>
+         <div class="nbinput nblast docutils container">
+          <div class="prompt highlight-none notranslate">
+           <div class="highlight">
+            <pre><span></span>[13]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+           </div>
+          </div>
+          <div class="input_area highlight-ipython3 notranslate">
+           <div class="highlight">
+            <pre>
 <span></span># This is just an example, and not required for the purposes of this demo
 torch.jit.save(traced_model, "resnet_50_traced.jit.pt")
 </pre>
+           </div>
+          </div>
          </div>
-        </div>
-       </div>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[14]:
+         <div class="nbinput docutils container">
+          <div class="prompt highlight-none notranslate">
+           <div class="highlight">
+            <pre><span></span>[14]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+           </div>
+          </div>
+          <div class="input_area highlight-ipython3 notranslate">
+           <div class="highlight">
+            <pre>
 <span></span># Obtain the average time taken by a batch of input
 benchmark(traced_model, input_shape=(128, 3, 224, 224), nruns=1000)
 </pre>
+           </div>
+          </div>
          </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area docutils container">
-         <div class="highlight">
-          <pre>
+         <div class="nboutput nblast docutils container">
+          <div class="prompt empty docutils container">
+          </div>
+          <div class="output_area docutils container">
+           <div class="highlight">
+            <pre>
 Warm up ...
 Start timing ...
 Iteration 100/1000, ave batch time 162.96 ms
@@ -1676,78 +1715,75 @@ Input shape: torch.Size([128, 3, 224, 224])
 Output features size: torch.Size([128, 1000])
 Average batch time: 162.96 ms
 </pre>
+           </div>
+          </div>
          </div>
-        </div>
-       </div>
-       <blockquote>
-        <div>
          <p>
           ## 4. Compiling with TRTorch
          </p>
-        </div>
-       </blockquote>
-       <p>
-        TorchScript modules behave just like normal PyTorch modules and are intercompatible. From TorchScript we can now compile a TensorRT based module. This module will still be implemented in TorchScript but all the computation will be done in TensorRT.
-       </p>
-       <p>
-        As mentioned earlier, we start with an example of TRTorch compilation with the traced model.
-       </p>
-       <p>
-        Note that we show benchmarking results of two precisions: FP32 (single precision) and FP16 (half precision).
-       </p>
-       <h3 id="FP32-(single-precision)">
-        FP32 (single precision)
-        <a class="headerlink" href="#FP32-(single-precision)" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <div class="nbinput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[18]:
+         <p>
+          TorchScript modules behave just like normal PyTorch modules and are intercompatible. From TorchScript we can now compile a TensorRT based module. This module will still be implemented in TorchScript but all the computation will be done in TensorRT.
+         </p>
+         <p>
+          As mentioned earlier, we start with an example of TRTorch compilation with the traced model.
+         </p>
+         <p>
+          Note that we show benchmarking results of two precisions: FP32 (single precision) and FP16 (half precision).
+         </p>
+         <section id="FP32-(single-precision)">
+          <h3 id="FP32-(single-precision)">
+           FP32 (single precision)
+           <a class="headerlink" href="#FP32-(single-precision)" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <div class="nbinput nblast docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[18]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span>import trtorch
 
 # The compiled module will have precision as specified by "op_precision".
 # Here, it will have FP16 precision.
 trt_model_fp32 = trtorch.compile(traced_model, {
-    "input_shapes": [(128, 3, 224, 224)],
-    "op_precision": torch.float32, # Run with FP32
+    "inputs": [trtorch.Input((128, 3, 224, 224))],
+    "enabled_precisions": {torch.float32}, # Run with FP32
     "workspace_size": 1 &lt;&lt; 20
 })
 
 
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[19]:
+            </div>
+           </div>
+          </div>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[19]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span># Obtain the average time taken by a batch of input
 benchmark(trt_model_fp32, input_shape=(128, 3, 224, 224), nruns=1000)
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area docutils container">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
 Warm up ...
 Start timing ...
 Iteration 100/1000, ave batch time 117.05 ms
@@ -1764,61 +1800,63 @@ Input shape: torch.Size([128, 3, 224, 224])
 Output features size: torch.Size([128, 1000])
 Average batch time: 117.41 ms
 </pre>
-         </div>
-        </div>
-       </div>
-       <h3 id="FP16-(half-precision)">
-        FP16 (half precision)
-        <a class="headerlink" href="#FP16-(half-precision)" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <div class="nbinput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[20]:
+            </div>
+           </div>
+          </div>
+         </section>
+         <section id="FP16-(half-precision)">
+          <h3 id="FP16-(half-precision)">
+           FP16 (half precision)
+           <a class="headerlink" href="#FP16-(half-precision)" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <div class="nbinput nblast docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[20]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span>import trtorch
 
 # The compiled module will have precision as specified by "op_precision".
 # Here, it will have FP16 precision.
 trt_model = trtorch.compile(traced_model, {
-    "input_shapes": [(128, 3, 224, 224)],
-    "op_precision": torch.half, # Run with FP16
+    "inputs": [trtorch.Input((128, 3, 224, 224))],
+    "enabled_precisions": {torch.float, torch.half}, # Run with FP16
     "workspace_size": 1 &lt;&lt; 20
 })
 
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[21]:
+            </div>
+           </div>
+          </div>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[21]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span># Obtain the average time taken by a batch of input
 benchmark(trt_model, input_shape=(128, 3, 224, 224), dtype='fp16', nruns=1000)
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area docutils container">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
 Warm up ...
 Start timing ...
 Iteration 100/1000, ave batch time 62.79 ms
@@ -1835,55 +1873,56 @@ Input shape: torch.Size([128, 3, 224, 224])
 Output features size: torch.Size([128, 1000])
 Average batch time: 54.04 ms
 </pre>
-         </div>
-        </div>
-       </div>
-       <blockquote>
-        <div>
-         <p>
-          ## 5. Conclusion
-         </p>
-        </div>
-       </blockquote>
-       <p>
-        In this notebook, we have walked through the complete process of compiling TorchScript models with TRTorch for ResNet-50 model and test the performance impact of the optimization. With TRTorch, we observe a speedup of
-        <strong>
-         1.4X
-        </strong>
-        with FP32, and
-        <strong>
-         3.0X
-        </strong>
-        with FP16.
-       </p>
-       <h3 id="What's-next">
-        What’s next
-        <a class="headerlink" href="#What's-next" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        Now it’s time to try TRTorch on your own model. Fill out issues at
-        <a class="reference external" href="https://github.com/NVIDIA/TRTorch">
-         https://github.com/NVIDIA/TRTorch
-        </a>
-        . Your involvement will help future development of TRTorch.
-       </p>
-       <div class="nbinput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[ ]:
+            </div>
+           </div>
+          </div>
+          <p>
+           ## 5. Conclusion
+          </p>
+          <p>
+           In this notebook, we have walked through the complete process of compiling TorchScript models with TRTorch for ResNet-50 model and test the performance impact of the optimization. With TRTorch, we observe a speedup of
+           <strong>
+            1.4X
+           </strong>
+           with FP32, and
+           <strong>
+            3.0X
+           </strong>
+           with FP16.
+          </p>
+         </section>
+         <section id="What’s-next">
+          <h3 id="What’s-next">
+           What’s next
+           <a class="headerlink" href="#What’s-next" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           Now it’s time to try TRTorch on your own model. Fill out issues at
+           <a class="reference external" href="https://github.com/NVIDIA/TRTorch">
+            https://github.com/NVIDIA/TRTorch
+           </a>
+           . Your involvement will help future development of TRTorch.
+          </p>
+          <div class="nbinput nblast docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[ ]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
 <span></span>
 </pre>
-         </div>
-        </div>
-       </div>
+            </div>
+           </div>
+          </div>
+         </section>
+        </section>
+       </section>
       </article>
      </div>
     </div>

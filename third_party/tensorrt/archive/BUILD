@@ -1,13 +1,31 @@
 package(default_visibility = ["//visibility:public"])
 
+config_setting(
+    name = "aarch64_linux",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
+)
+
+config_setting(
+    name = "windows",
+    constraint_values = [
+        "@platforms//os:windows",
+    ],
+)
+
 cc_library(
     name = "nvinfer_headers",
-    hdrs = glob([
-        "include/NvInfer*.h",
-    ], exclude=[
-        "include/NvInferPlugin.h",
-        "include/NvInferPluginUtils.h"
-    ]),
+    hdrs = glob(
+        [
+            "include/NvInfer*.h",
+        ],
+        exclude = [
+            "include/NvInferPlugin.h",
+            "include/NvInferPluginUtils.h",
+        ],
+    ),
     includes = ["include/"],
     visibility = ["//visibility:private"],
 )
@@ -20,14 +38,17 @@ cc_import(
 
 cc_library(
     name = "nvinfer",
+    visibility = ["//visibility:public"],
     deps = [
         "nvinfer_headers",
         "nvinfer_lib",
         "@cuda//:cudart",
-        "@cuda//:cublas",
-        "@cudnn//:cudnn"
-    ],
-    visibility = ["//visibility:public"],
+        "@cudnn",
+    ] + select({
+        ":aarch64_linux": ["@cublas//:cublas"],
+        ":windows": ["@cuda//:cublas"],
+        "//conditions:default": ["@cuda//:cublas"],
+    }),
 )
 
 ####################################################################################
@@ -38,15 +59,14 @@ cc_import(
     visibility = ["//visibility:private"],
 )
 
-
 cc_library(
     name = "nvparsers_headers",
     hdrs = [
         "include/NvCaffeParser.h",
+        "include/NvOnnxConfig.h",
         "include/NvOnnxParser.h",
         "include/NvOnnxParserRuntime.h",
-        "include/NvOnnxConfig.h",
-        "include/NvUffParser.h"
+        "include/NvUffParser.h",
     ],
     includes = ["include/"],
     visibility = ["//visibility:private"],
@@ -54,12 +74,12 @@ cc_library(
 
 cc_library(
     name = "nvparsers",
+    visibility = ["//visibility:public"],
     deps = [
+        "nvinfer",
         "nvparsers_headers",
         "nvparsers_lib",
-        "nvinfer"
     ],
-    visibility = ["//visibility:public"],
 )
 
 ####################################################################################
@@ -73,9 +93,9 @@ cc_import(
 cc_library(
     name = "nvonnxparser_headers",
     hdrs = [
+        "include/NvOnnxConfig.h",
         "include/NvOnnxParser.h",
         "include/NvOnnxParserRuntime.h",
-        "include/NvOnnxConfig.h"
     ],
     includes = ["include/"],
     visibility = ["//visibility:private"],
@@ -83,12 +103,12 @@ cc_library(
 
 cc_library(
     name = "nvonnxparser",
+    visibility = ["//visibility:public"],
     deps = [
+        "nvinfer",
         "nvonnxparser_headers",
         "nvonnxparser_lib",
-        "nvinfer"
     ],
-    visibility = ["//visibility:public"],
 )
 
 ####################################################################################
@@ -108,12 +128,12 @@ cc_library(
 
 cc_library(
     name = "nvonnxparser_runtime",
+    visibility = ["//visibility:public"],
     deps = [
+        "nvinfer",
         "nvparsers_headers",
         "nvparsers_lib",
-        "nvinfer"
     ],
-    visibility = ["//visibility:public"],
 )
 
 ####################################################################################
@@ -133,12 +153,12 @@ cc_library(
 
 cc_library(
     name = "nvcaffeparser",
+    visibility = ["//visibility:public"],
     deps = [
         "nvcaffeparser_headers",
         "nvcaffeparser_lib",
-        "nvinfer"
+        "nvinfer",
     ],
-    visibility = ["//visibility:public"],
 )
 
 ####################################################################################
@@ -158,10 +178,16 @@ cc_library(
 
 cc_library(
     name = "nvinferplugin",
+    visibility = ["//visibility:public"],
     deps = [
+        "nvinfer",
         "nvinferplugin_headers",
         "nvinferplugin_lib",
-        "nvinfer"
-    ],
-    visibility = ["//visibility:public"],
+        "@cuda//:cudart",
+        "@cudnn",
+    ] + select({
+        ":aarch64_linux": ["@cublas//:cublas"],
+        ":windows": ["@cuda//:cublas"],
+        "//conditions:default": ["@cuda//:cublas"],
+    }),
 )

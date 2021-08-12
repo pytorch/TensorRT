@@ -34,7 +34,7 @@ struct AddMMBranchFusion {
     ///   -> (%ret.1)
     /// block1():
     ///   %output.1 : Tensor = aten::matmul(%x9.1, %3677)
-    ///   %output0.1 : Tensor = aten::add_(%output.1, %self.fc.bias, %3)
+    ///   %output0.1 : Tensor = aten::add(%output.1, %self.fc.bias, %3)
     ///   -> (%output0.1)
 
     if (n->blocks().size() != 2) {
@@ -49,7 +49,7 @@ struct AddMMBranchFusion {
     if ((*arm1_start)->kind().toQualString() == std::string("aten::addmm") &&
         (*(++arm1_start))->kind() == prim::Return &&
         (*arm2_start)->kind().toQualString() == std::string("aten::matmul") &&
-        (*(++arm2_start))->kind().toQualString() != std::string("aten::add_") &&
+        (*(++arm2_start))->kind().toQualString() != std::string("aten::add") &&
         (*(++arm2_start))->kind() == prim::Return) {
       // Make sure that block0 is solely just the aten::addmm op and block1 is matmul + add
       return true;

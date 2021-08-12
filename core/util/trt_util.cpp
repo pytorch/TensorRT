@@ -160,28 +160,38 @@ nvinfer1::Dims unpadDims(const nvinfer1::Dims& d) {
   return dims;
 }
 
-nvinfer1::Dims unsqueezeDims(const nvinfer1::Dims& d, int pos) {
+nvinfer1::Dims unsqueezeDims(const nvinfer1::Dims& d, int pos, int val, bool use_zeros) {
   // acceptable range for pos is [0, d.nbDims]
   TRTORCH_ASSERT(pos >= 0 && pos <= d.nbDims, "ERROR: Index to unsqueeze is out of bounds.");
 
   nvinfer1::Dims dims;
-
-  int i = 0;
-  int j = 0;
-
-  while (i <= d.nbDims) {
-    if (j != pos) {
-      dims.d[j] = d.d[i];
-      i++;
+  for (int i = 0, j = 0; j <= d.nbDims; j++) {
+    // add new dimension at pos
+    if (j == pos) {
+      dims.d[j] = val;
     } else {
-      // add new dimension at pos
-      dims.d[j] = 1;
+      dims.d[j] = (use_zeros && d.d[i] == -1) ? 0 : d.d[i];
+      ++i;
     }
-
-    j++;
   }
 
   dims.nbDims = d.nbDims + 1;
+
+  return dims;
+}
+
+nvinfer1::Dims squeezeDims(const nvinfer1::Dims& d, int pos, bool use_zeros) {
+  // acceptable range for pos is [0, d.nbDims]
+  TRTORCH_ASSERT(pos >= 0 && pos <= d.nbDims, "ERROR: Index to squeeze is out of bounds.");
+
+  nvinfer1::Dims dims;
+  int j = 0;
+  for (int i = 0; i < d.nbDims; i++) {
+    if (i != pos) {
+      dims.d[j++] = (use_zeros && d.d[i] == -1) ? 0 : d.d[i];
+    }
+  }
+  dims.nbDims = j;
 
   return dims;
 }
@@ -250,28 +260,84 @@ const std::unordered_map<nvinfer1::DataType, at::ScalarType>& get_trt_aten_type_
   return get_trt_at_type_map();
 }
 
-at::ScalarType toATenDType(nvinfer1::DataType t) {
+at::ScalarType TRTDataTypeToScalarType(nvinfer1::DataType t) {
+  auto type = optTRTDataTypeToScalarType(t);
+  TRTORCH_CHECK(type, "Unsupported TensorRT data type " << t);
+  return type.value();
+}
+
+c10::optional<at::ScalarType> optTRTDataTypeToScalarType(nvinfer1::DataType t) {
   auto trt_aten_type_map = get_trt_aten_type_map();
-  TRTORCH_CHECK(trt_aten_type_map.find(t) != trt_aten_type_map.end(), "Unsupported TensorRT datatype");
-  return trt_aten_type_map.at(t);
+  if (trt_aten_type_map.find(t) != trt_aten_type_map.end()) {
+    return trt_aten_type_map.at(t);
+  } else {
+    return {};
+  }
 }
 
 const std::unordered_map<at::ScalarType, nvinfer1::DataType>& get_aten_trt_type_map() {
   return get_at_trt_type_map();
 }
 
-nvinfer1::DataType toTRTDataType(at::ScalarType t) {
-  auto aten_trt_type_map = get_aten_trt_type_map();
-  TRTORCH_CHECK(aten_trt_type_map.find(t) != aten_trt_type_map.end(), "Unsupported Aten datatype");
-  return aten_trt_type_map.at(t);
+nvinfer1::DataType ScalarTypeToTRTDataType(at::ScalarType t) {
+  auto type = optScalarTypeToTRTDataType(t);
+  TRTORCH_CHECK(type, "Unsupported ATen data type " << t);
+  return type.value();
 }
 
-c10::optional<nvinfer1::DataType> toTRTDataType(caffe2::TypeMeta dtype) {
-  if (auto t = c10::tryTypeMetaToScalarType(dtype)) {
-    return toTRTDataType(t.value());
+c10::optional<nvinfer1::DataType> optScalarTypeToTRTDataType(at::ScalarType t) {
+  auto aten_trt_type_map = get_aten_trt_type_map();
+  if (aten_trt_type_map.find(t) != aten_trt_type_map.end()) {
+    return aten_trt_type_map.at(t);
   } else {
     return {};
   }
+}
+
+c10::optional<nvinfer1::DataType> optTypeMetaToTRTDataType(caffe2::TypeMeta dtype) {
+  if (auto t = c10::optTypeMetaToScalarType(dtype)) {
+    return optScalarTypeToTRTDataType(t.value());
+  } else {
+    return {};
+  }
+}
+
+torch::jit::Value* getOrAddInputForValue(
+    torch::jit::Value* old_value,
+    std::shared_ptr<torch::jit::Graph>& graph,
+    std::unordered_map<torch::jit::Value*, torch::jit::Value*>& old_to_new) {
+  if (old_to_new.count(old_value) == 0) {
+    auto node = old_value->node();
+
+    if (node->kind() == torch::jit::prim::Constant) {
+      auto new_const = graph->createClone(node, {nullptr});
+      graph->block()->prependNode(new_const);
+      return new_const->output();
+    }
+    auto new_value = graph->block()->addInput();
+    old_to_new[old_value] = new_value;
+    new_value->copyMetadata(old_value);
+    return new_value;
+  } else {
+    return old_to_new[old_value];
+  }
+}
+
+torch::jit::Node* cloneNode(
+    torch::jit::Node* node,
+    std::shared_ptr<torch::jit::Graph>& graph,
+    std::unordered_map<torch::jit::Value*, torch::jit::Value*>& old_to_new) {
+  auto* block = graph->block();
+  auto env = [&](torch::jit::Value* v) { return getOrAddInputForValue(v, graph, old_to_new); };
+
+  // create node for current graph by using the metadata in node and input Values in env
+  auto new_node = block->appendNode(graph->createClone(node, env));
+  for (size_t i = 0; i < node->outputs().size(); ++i) {
+    auto oo = node->outputs()[i];
+    auto no = new_node->outputs()[i];
+    old_to_new[oo] = no;
+  }
+  return new_node;
 }
 
 } // namespace util

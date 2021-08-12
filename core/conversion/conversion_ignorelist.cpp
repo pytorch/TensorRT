@@ -16,7 +16,6 @@ const std::unordered_set<std::string>& get_non_convertable_nodes() {
     "aten::backward",
     "aten::save",
     "aten::contiguous",
-    "aten::to",
     "prim::RaiseException",
     "prim::Print",
     "prim::device",
@@ -24,7 +23,11 @@ const std::unordered_set<std::string>& get_non_convertable_nodes() {
     "prim::CallMethod",
     "prim::Drop",
     "aten::dropout",
-    "aten::dropout_"};
+    "aten::dropout_",
+    "aten::feature_dropout",
+    "aten::feature_dropout_",
+    "aten::feature_alpha_dropout",
+    "aten::feature_alpha_dropout_"};
   return nonconvertable_nodes;
 }
 // clang-format on

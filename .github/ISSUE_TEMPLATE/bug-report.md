@@ -29,7 +29,8 @@ Steps to reproduce the behavior:
 
 > Build information about the TRTorch compiler can be found by turning on debug messages
 
- - PyTorch Version (e.g., 1.0):
+ - TRTorch Version (e.g. 0.2.0): 
+ - PyTorch Version (e.g. 1.0):
  - CPU Architecture:
  - OS (e.g., Linux):
  - How you installed PyTorch (`conda`, `pip`, `libtorch`, source):

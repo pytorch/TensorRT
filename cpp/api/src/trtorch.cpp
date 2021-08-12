@@ -9,6 +9,7 @@ namespace trtorch {
 
 // Defined in compile_spec.cpp
 core::CompileSpec to_internal_compile_spec(CompileSpec external);
+core::runtime::CudaDevice to_internal_cuda_device(CompileSpec::Device device);
 
 bool CheckMethodOperatorSupport(const torch::jit::script::Module& module, std::string method_name) {
   return core::CheckMethodOperatorSupport(module, method_name);
@@ -29,6 +30,10 @@ torch::jit::script::Module CompileGraph(const torch::jit::script::Module& module
   // Want to export a much simpler (non TRT header dependent) API so doing the
   // type conversion here
   return core::CompileGraph(module, to_internal_compile_spec(info));
+}
+
+torch::jit::Module EmbedEngineInNewModule(const std::string& engine, CompileSpec::Device device) {
+  return core::EmbedEngineInNewModule(engine, to_internal_cuda_device(device));
 }
 
 std::string get_build_info() {

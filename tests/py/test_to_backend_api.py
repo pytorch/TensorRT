@@ -14,8 +14,8 @@ class TestToBackendLowering(ModelTestCase):
         self.spec = {
             "forward":
                 trtorch.TensorRTCompileSpec({
-                    "input_shapes": [[1, 3, 300, 300]],
-                    "op_precision": torch.float,
+                    "inputs": [trtorch.Input([1, 3, 300, 300])],
+                    "enabled_precision": {torch.float},
                     "refit": False,
                     "debug": False,
                     "strict_types": False,
@@ -29,6 +29,7 @@ class TestToBackendLowering(ModelTestCase):
                     "num_min_timing_iters": 2,
                     "num_avg_timing_iters": 1,
                     "max_batch_size": 0,
+                    "disable_tf32": False,
                 })
         }
 

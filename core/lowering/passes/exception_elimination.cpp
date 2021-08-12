@@ -27,13 +27,6 @@ struct ExceptionOrPassPatternElimination {
 
  private:
   bool isExceptionOrPassNode(Node* n) {
-    /// Check if this Node hosts a pattern like so:
-    ///  = prim::If(%5958)
-    ///   block0():
-    ///     = prim::RaiseException(%45)
-    ///    -> ()
-    ///   block1():
-    ///    -> ()
     if (n->blocks().size() != 2) {
       return false;
     }
@@ -46,15 +39,44 @@ struct ExceptionOrPassPatternElimination {
     }
 
     auto arm1_start = arm1->nodes().begin();
+    auto arm2_start = arm2->nodes().begin();
 
-    if ((*arm1_start)->kind() != prim::RaiseException && (*(++arm1_start))->kind() != prim::Return) {
-      // Make sure that block0 is solely just the exception and the return
-      return false;
+    /// Check if this Node hosts a pattern like so:
+    ///  = prim::If(%5958)
+    ///   block0():
+    ///     = prim::RaiseException(%45)
+    ///    -> ()
+    ///   block1():
+    ///    -> ()
+    if ((*arm1_start)->kind() == prim::RaiseException) {
+      if ((*(++arm1_start))->kind() != prim::Return) {
+        // Make sure that block0 is solely just the exception and the return
+        return false;
+      }
+
+      if ((*(arm2_start))->kind() != prim::Return) {
+        // Make sure that block1 is solely the return
+        return false;
+      }
     }
 
-    if ((*(arm2->nodes().begin()))->kind() != prim::Return) {
-      // Make sure that block1 is solely the return
-      return false;
+    /// Check if this Node hosts a pattern like so:
+    ///  = prim::If(%5958)
+    ///   block0():
+    ///    -> ()
+    ///   block1():
+    ///     = prim::RaiseException(%45)
+    ///    -> ()
+    if ((*arm2_start)->kind() == prim::RaiseException) {
+      if ((*(++arm2_start))->kind() != prim::Return) {
+        // Make sure that block1 is solely just the exception and the return
+        return false;
+      }
+
+      if ((*(arm1_start))->kind() != prim::Return) {
+        // Make sure that block0 is solely the return
+        return false;
+      }
     }
 
     return true;

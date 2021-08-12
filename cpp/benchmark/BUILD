@@ -4,11 +4,11 @@ cc_binary(
     name = "benchmark",
     srcs = [
         "main.cpp",
-        "timer.h"
+        "timer.h",
     ],
     deps = [
-        "@libtorch//:libtorch",
+        "//cpp/api:trtorch",
+        "@libtorch",
         "@libtorch//:caffe2",
-        "//cpp/api:trtorch"
     ],
 )

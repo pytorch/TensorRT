@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -56,6 +57,11 @@
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
+  </script>
+  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+  <script type="text/x-mathjax-config">
+   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -153,6 +159,12 @@
       <div class="dropdown-content md-hero">
        <a href="https://nvidia.github.io/TRTorch/" title="master">
         master
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.3.0/" title="v0.3.0">
+        v0.3.0
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.2.0/" title="v0.2.0">
+        v0.2.0
        </a>
        <a href="https://nvidia.github.io/TRTorch/v0.1.0/" title="v0.1.0">
         v0.1.0
@@ -274,6 +286,11 @@
                   Runtime Library
                  </a>
                 </li>
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#plugin-library">
+                  Plugin Library
+                 </a>
+                </li>
                </ul>
               </nav>
              </li>
@@ -358,6 +375,18 @@
             Useful Links for TRTorch Development
            </a>
           </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Indices
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../indices/supported_ops.html">
+            Operators Supported
+           </a>
+          </li>
          </ul>
         </nav>
        </div>
@@ -387,6 +416,11 @@
                Runtime Library
               </a>
              </li>
+             <li class="md-nav__item">
+              <a class="md-nav__link" href="#plugin-library">
+               Plugin Library
+              </a>
+             </li>
             </ul>
            </nav>
           </li>
@@ -404,104 +438,179 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <span id="runtime">
-       </span>
-       <h1 id="tutorials-runtime--page-root">
-        Deploying TRTorch Programs
-        <a class="headerlink" href="#tutorials-runtime--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <p>
-        After compiling and saving TRTorch programs there is no longer a strict dependency on the full
+       <section id="deploying-trtorch-programs">
+        <span id="runtime">
+        </span>
+        <h1 id="tutorials-runtime--page-root">
+         Deploying TRTorch Programs
+         <a class="headerlink" href="#tutorials-runtime--page-root" title="Permalink to this headline">
+          ¶
+         </a>
+        </h1>
+        <p>
+         After compiling and saving TRTorch programs there is no longer a strict dependency on the full
 TRTorch library. All that is required to run a compiled program is the runtime. There are therfore a couple
 options to deploy your programs other than shipping the full trtorch compiler with your applications.
-       </p>
-       <h2 id="trtorch-package-libtrtorch-so">
-        TRTorch package / libtrtorch.so
-        <a class="headerlink" href="#trtorch-package-libtrtorch-so" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <p>
-        Once a program is compiled, you run it using the standard PyTorch APIs. All that is required is that the package
+        </p>
+        <section id="trtorch-package-libtrtorch-so">
+         <h2 id="trtorch-package-libtrtorch-so">
+          TRTorch package / libtrtorch.so
+          <a class="headerlink" href="#trtorch-package-libtrtorch-so" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <p>
+          Once a program is compiled, you run it using the standard PyTorch APIs. All that is required is that the package
 must be imported in python or linked in C++.
-       </p>
-       <h2 id="runtime-library">
-        Runtime Library
-        <a class="headerlink" href="#runtime-library" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <p>
-        Distributed with the C++ distribution is
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          libtrtorchrt.so
-         </span>
-        </code>
-        . This library only contains the components
+         </p>
+        </section>
+        <section id="runtime-library">
+         <h2 id="runtime-library">
+          Runtime Library
+          <a class="headerlink" href="#runtime-library" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <p>
+          Distributed with the C++ distribution is
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            libtrtorchrt.so
+           </span>
+          </code>
+          . This library only contains the components
 necessary to run TRTorch programs. Instead of linking
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          libtrtorch.so
-         </span>
-        </code>
-        or importing
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          trtorch
-         </span>
-        </code>
-        you can
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            libtrtorch.so
+           </span>
+          </code>
+          or importing
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            trtorch
+           </span>
+          </code>
+          you can
 link
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          libtrtorchrt.so
-         </span>
-        </code>
-        in your deployment programs or use
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          DL_OPEN
-         </span>
-        </code>
-        or
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          LD_PRELOAD
-         </span>
-        </code>
-        . For python
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            libtrtorchrt.so
+           </span>
+          </code>
+          in your deployment programs or use
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            DL_OPEN
+           </span>
+          </code>
+          or
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            LD_PRELOAD
+           </span>
+          </code>
+          . For python
 you can load the runtime with
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          torch.ops.load_library("libtrtorchrt.so")
-         </span>
-        </code>
-        . You can then continue to use
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            torch.ops.load_library("libtrtorchrt.so")
+           </span>
+          </code>
+          . You can then continue to use
 programs just as you would otherwise via PyTorch API.
-       </p>
-       <div class="admonition note">
-        <p class="admonition-title">
-         Note
-        </p>
-        <p>
-         If you are using the standard distribution of PyTorch in Python on x86, likely you will need the pre-cxx11-abi variant of
-         <code class="docutils literal notranslate">
-          <span class="pre">
-           libtrtorchrt.so
-          </span>
-         </code>
-         , check
-         <a class="reference internal" href="installation.html#installation">
-          <span class="std std-ref">
-           Installation
-          </span>
-         </a>
-         documentation for more details.
-        </p>
-       </div>
+         </p>
+         <div class="admonition note">
+          <p class="admonition-title">
+           Note
+          </p>
+          <p>
+           If you are using the standard distribution of PyTorch in Python on x86, likely you will need the pre-cxx11-abi variant of
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             libtrtorchrt.so
+            </span>
+           </code>
+           , check
+           <a class="reference internal" href="installation.html#installation">
+            <span class="std std-ref">
+             Installation
+            </span>
+           </a>
+           documentation for more details.
+          </p>
+         </div>
+         <div class="admonition note">
+          <p class="admonition-title">
+           Note
+          </p>
+          <p>
+           If you are linking
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             libtrtorchrt.so
+            </span>
+           </code>
+           , likely using the following flags will help
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             -Wl,--no-as-needed
+            </span>
+            <span class="pre">
+             -ltrtorchrt
+            </span>
+            <span class="pre">
+             -Wl,--as-needed
+            </span>
+           </code>
+           as theres no direct symbol dependency to anything in the TRTorch runtime for most TRTorch runtime applications
+          </p>
+         </div>
+         <p>
+          An example of how to use
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            libtrtorchrt.so
+           </span>
+          </code>
+          can be found here:
+          <a class="reference external" href="https://github.com/NVIDIA/TRTorch/tree/master/examples/trtorchrt_example">
+           https://github.com/NVIDIA/TRTorch/tree/master/examples/trtorchrt_example
+          </a>
+         </p>
+        </section>
+        <section id="plugin-library">
+         <h2 id="plugin-library">
+          Plugin Library
+          <a class="headerlink" href="#plugin-library" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <p>
+          In the case you use TRTorch as a converter to a TensorRT engine and your engine uses plugins provided by TRTorch, TRTorch
+ships the library
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            libtrtorch_plugins.so
+           </span>
+          </code>
+          which contains the implementation of the TensorRT plugins used by TRTorch during
+compilation. This library can be
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            DL_OPEN
+           </span>
+          </code>
+          or
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            LD_PRELOAD
+           </span>
+          </code>
+          similar to other TensorRT plugin libraries.
+         </p>
+        </section>
+       </section>
       </article>
      </div>
     </div>

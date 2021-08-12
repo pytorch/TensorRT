@@ -18,9 +18,13 @@ More Information / System Architecture:
 #include "trtorch/trtorch.h"
 
 ...
-auto compile_settings = trtorch::CompileSpec(dims);
+// Set input datatypes. Allowerd options torch::{kFloat, kHalf, kChar, kInt32, kBool}
+// Size of input_dtypes should match number of inputs to the network.
+// If input_dtypes is not set, default precision follows traditional PyT / TRT rules
+auto input = trtorch::CompileSpec::Input(dims, torch::kHalf)
+auto compile_settings = trtorch::CompileSpec({input});
 // FP16 execution
-compile_settings.op_precision = torch::kFloat;
+compile_settings.enabled_precisions = {torch::kHalf};
 // Compile module
 auto trt_mod = trtorch::CompileGraph(ts_mod, compile_settings);
 // Run like normal
@@ -36,14 +40,14 @@ import trtorch
 
 ...
 compile_settings = {
-    "input_shapes": [
-        {
-            "min": [1, 3, 224, 224],
-            "opt": [1, 3, 512, 512],
-            "max": [1, 3, 1024, 1024]
-        }, # For static size [1, 3, 224, 224]
-    ],
-    "op_precision": torch.half # Run with FP16
+    "inputs": [trtorch.Input(
+        min_shape=[1, 3, 224, 224],
+        opt_shape=[1, 3, 512, 512],
+        max_shape=[1, 3, 1024, 1024]
+        # For static size shape=[1, 3, 224, 224]
+        dtype=torch.half, # Datatype of input tensor. Allowed options torch.(float|half|int8|int32|bool)
+    )],
+    "enabled_precisions": {torch.half}, # Run with FP16
 }
 
 trt_ts_module = trtorch.compile(torch_script_module, compile_settings)
@@ -54,17 +58,17 @@ torch.jit.save(trt_ts_module, "trt_torchscript_module.ts")
 ```
 
 > Notes on running in lower precisions:
-> - Set precision with compile_spec.op_precision
+> - Enabled lower precisions with compile_spec.enabled_precisions
 > - The module should be left in FP32 before compilation (FP16 can support half tensor models)
-> - In FP16 only input tensors should be converted to FP16, other precisions use FP32
+> - In FP16 only input tensors by default should be FP16, other precisions use FP32. This can be overrided by setting Input::dtype
 
 ## Platform Support
 
 | Platform | Support |
 | -------- | ------- |
 | Linux AMD64 / GPU   | **Supported** |
-| Linux aarch64 / GPU | **Native Compilation Supported on JetPack-4.4** |
-| Linux aarch64 / DLA | **Native Compilation Supported on JetPack-4.4** |
+| Linux aarch64 / GPU | **Native Compilation Supported on JetPack-4.4+** |
+| Linux aarch64 / DLA | **Native Compilation Supported on JetPack-4.4+** |
 | Windows / GPU       | **Unofficial Support** |
 | Linux ppc64le / GPU | - |
 
@@ -73,11 +77,11 @@ torch.jit.save(trt_ts_module, "trt_torchscript_module.ts")
 ### Dependencies
 These are the following dependencies used to verify the testcases. TRTorch can work with other versions, but the tests are not guaranteed to pass.
 
-- Bazel 3.7.0
-- Libtorch 1.7.1 (built with CUDA 11.0)
-- CUDA 11.0
-- cuDNN 8
-- TensorRT 7.2.1.6
+- Bazel 4.0.0
+- Libtorch 1.9.0 (built with CUDA 11.1)
+- CUDA 11.1 (10.2 on Jetson)
+- cuDNN 8.2
+- TensorRT 8.0.1.6
 
 ## Prebuilt Binaries and Wheel files
 

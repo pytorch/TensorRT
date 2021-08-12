@@ -24,7 +24,8 @@ void LowerBlock(torch::jit::Block* b) {
   DropUnusedNodes(b);
 }
 
-void LowerGraph(std::shared_ptr<torch::jit::Graph>& g) {
+void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, LowerInfo lower_info) {
+  passes::UnpackHardSwish(g);
   torch::jit::EliminateRedundantGuards(g);
   torch::jit::RemoveListMutation(g);
   torch::jit::RemoveTensorMutation(g);
@@ -34,45 +35,57 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g) {
   passes::EliminateExceptionOrPassPattern(g);
   torch::jit::FuseLinear(g);
   torch::jit::LowerAllTuples(g);
+  passes::ReduceToOperation(g);
   passes::RemoveContiguous(g);
   passes::RemoveDropout(g);
-  passes::FuseFlattenLinear(g);
+  passes::LinearToAddMM(g);
   passes::Conv2DToConvolution(g);
   passes::Conv3DToConvolution(g);
   passes::FuseAddMMBranches(g);
   passes::RemoveBNDimCheck(g);
-  torch::jit::EliminateCommonSubexpression(g);
+  if (!lower_info.disable_cse) {
+    torch::jit::EliminateCommonSubexpression(g);
+  }
   // torch::jit::UnrollLoops(g);
-  torch::jit::EliminateCommonSubexpression(g);
   passes::UnpackAddMM(g);
   // passes::UnpackBatchNorm(g);
   passes::UnpackLogSoftmax(g);
-  passes::RemoveTo(g);
+  passes::UnpackStd(g);
+  passes::UnpackVar(g);
+  passes::RemoveNOPs(g);
+  passes::AliasOperators(g);
+  passes::SiluToSigmoidMultipication(g);
   torch::jit::EliminateDeadCode(g);
   LOG_GRAPH(*g);
 }
 
 torch::jit::Module LowerModule(const torch::jit::script::Module& mod) {
+  LOG_DEBUG("Input module is being frozen by torch::jit::freeze_module");
   auto mod_ = torch::jit::freeze_module(mod);
   return mod_;
 }
 
 std::pair<std::shared_ptr<torch::jit::Graph>, std::vector<torch::jit::IValue>> Lower(
     const torch::jit::script::Module& mod,
-    std::string method_name) {
-  auto lowered_mod = LowerModule(mod);
+    std::string method_name,
+    LowerInfo lower_info) {
+  auto lowered_mod = lower_info.unfreeze_module ? mod : LowerModule(mod);
   auto g = lowered_mod.get_method(method_name).graph();
   LOG_GRAPH(*g);
 
-  // Go through TRTorch Lowering to reformat graph to be conversion friendly
-  // and also segment for accelerators and executors (TRT-DLA, TRT-GPU, PYT)
-  LOG_GRAPH("TRTorch Graph Lowering");
-  lowering::LowerGraph(g);
-  //=[torch::jit::FoldConvBatchNorm2d(lowered_mod);
   LOG_GRAPH("LibTorch Lowering");
   auto graph_and_ivalues = torch::jit::LowerGraph(*g, lowered_mod._ivalue());
+
+  // Go through TRTorch Lowering to reformat graph to be conversion friendly
+  // and also segment for accelerators and executors (TRT-DLA, TRT-GPU  , PYT)
+  // unfreeze_module is used to not perform constant folding on weights in the network.
+  // In quantization aware trained (QAT) models, weights are passed through quantize and
+  // dequantize nodes which should not be folded. So unfreeze_module is set to True for QAT models.
+  LOG_GRAPH("TRTorch Graph Lowering");
+  lowering::LowerGraph(graph_and_ivalues.first, lower_info);
+
   // Is this necessary?
-  lowering::LowerBlock(g->block());
+  // lowering::LowerBlock(g->block());
 
   return graph_and_ivalues;
 }

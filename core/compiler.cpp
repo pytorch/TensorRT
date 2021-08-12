@@ -11,47 +11,37 @@
 
 #include "torch/csrc/jit/frontend/function_schema_parser.h"
 #include "torch/csrc/jit/ir/ir.h"
+#include "torch/csrc/jit/ir/ir_views.h"
 #include "torch/csrc/jit/passes/graph_fuser.h"
+#include "torch/csrc/jit/passes/loop_unrolling.h"
 #include "torch/csrc/jit/passes/lower_graph.h"
 #include "torch/csrc/jit/passes/pass_manager.h"
 #include "torch/custom_class.h"
 
 #include "core/compiler.h"
-#include "core/util/prelude.h"
 
 #include "core/conversion/conversion.h"
 #include "core/lowering/lowering.h"
+#include "core/partitioning/partitioning.h"
 #include "core/runtime/runtime.h"
 
 namespace trtorch {
 namespace core {
 
-c10::FunctionSchema GenerateGraphSchema(
-    torch::jit::script::Module mod,
-    std::string method_name,
-    std::shared_ptr<torch::jit::Graph>& g) {
-  std::vector<c10::Argument> args;
-  for (auto in : g->inputs()) {
-    args.push_back(c10::Argument(in->debugName(), in->type()));
-  }
-
-  std::vector<c10::Argument> returns;
-  for (auto out : g->outputs()) {
-    returns.push_back(c10::Argument(out->debugName(), out->type()));
-  }
-
-  return c10::FunctionSchema(method_name, method_name, args, returns);
-}
-
 void AddEngineToGraph(
     torch::jit::script::Module mod,
     std::shared_ptr<torch::jit::Graph>& g,
-    std::string& serialized_engine) {
-  auto engine_ptr = c10::make_intrusive<runtime::TRTEngine>(mod._ivalue()->name(), serialized_engine);
+    const std::string& serialized_engine,
+    runtime::CudaDevice& device_info,
+    std::string engine_id = "",
+    bool fallback = false) {
+  auto engine_ptr = c10::make_intrusive<runtime::TRTEngine>(
+      mod._ivalue()->name() + "_engine_" + engine_id, serialized_engine, device_info);
   // Get required metadata about the engine out
   auto num_io = engine_ptr->num_io;
   auto name = engine_ptr->name;
 
+  //..
   // Add the engine as an attribute of the module, this will let the engine be
   // serialized and deserialized
   mod.register_attribute(
@@ -108,8 +98,8 @@ void AddEngineToGraph(
   g->block()->appendNode(unpack_node);
 
   // If there are multiple output tensors from TensorRT we wrap them in a tuple
-  // to return
-  if (unpack_node->outputs().size() > 1) {
+  // to return, convert to tuple only when we only have 1 segmented graph
+  if (!fallback && unpack_node->outputs().size() > 1) {
     // Creates prim::TupleConstruct(<output tensors>) using outputs of the
     // unpack node
     auto return_tuple_node = g->createTuple(unpack_node->outputs());
@@ -117,8 +107,10 @@ void AddEngineToGraph(
     // Set the output as the produced tuple
     g->registerOutput(return_tuple_node->outputs()[0]);
   } else {
-    // Set the output as the sole output tensor
-    g->registerOutput(unpack_node->outputs()[0]);
+    // if fallback is enabled, multiple outputs will be registered
+    for (size_t i = 0; i < unpack_node->outputs().size(); ++i) {
+      g->registerOutput(unpack_node->outputs()[i]);
+    }
   }
 
   LOG_DEBUG(*g << "(AddEngineToGraph)\n");
@@ -127,8 +119,8 @@ void AddEngineToGraph(
 }
 
 bool CheckMethodOperatorSupport(const torch::jit::script::Module& mod, std::string method_name) {
-  // Go through Lowering to simplify graph and extract weight parameters
-  auto graph_and_parameters = lowering::Lower(mod, method_name);
+  // Go through Lowering to simplify graph
+  auto graph_and_parameters = lowering::Lower(mod, method_name, lowering::LowerInfo());
 
   auto g = graph_and_parameters.first;
   LOG_DEBUG(*g << "(CheckMethodOperatorSupport)\n");
@@ -138,10 +130,11 @@ bool CheckMethodOperatorSupport(const torch::jit::script::Module& mod, std::stri
 
 std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::string method_name, CompileSpec cfg) {
   // Go through Lowering to simplify graph and extract weight parameters
-  auto graph_and_parameters = lowering::Lower(mod, method_name);
+  auto graph_and_parameters = lowering::Lower(mod, method_name, cfg.lower_info);
 
   auto convert_cfg = std::move(cfg.convert_info);
   auto g = graph_and_parameters.first;
+
   auto params = graph_and_parameters.second;
   auto named_params = conversion::get_named_params(g->inputs(), params);
 
@@ -151,24 +144,242 @@ std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::
   return std::move(engine);
 }
 
-torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod, CompileSpec cfg) {
+void AddSegmentedBlockToGraph(
+    std::shared_ptr<torch::jit::Graph>& g,
+    partitioning::SegmentedBlock& seg,
+    std::unordered_map<torch::jit::Value*, torch::jit::Value*>& old_to_new_g) {
+  // old_to_new_g contains: original global graph value => new global graph value,
+  // mini_to_new_g: mini graph value -> new graph value
+  std::unordered_map<torch::jit::Value*, torch::jit::Value*> mini_to_new_g;
+  size_t input_idx = 0;
+  if (seg.target() == partitioning::SegmentedBlock::kTensorRT && g->inputs().size() > 0) {
+    if (g->inputs()[0]->type()->str().find("__torch__") == std::string::npos) {
+      auto self = g->insertInput(0, "self_1");
+      self->setType(seg.inputs()[0]->type());
+    }
+    mini_to_new_g[seg.inputs()[input_idx++]] = g->inputs()[0];
+  }
+
+  for (auto& raw_input : seg.raw_inputs()) {
+    if (old_to_new_g.count(raw_input)) {
+      mini_to_new_g[seg.inputs()[input_idx++]] = old_to_new_g[raw_input];
+    }
+  }
+
+  for (const auto n : seg.nodes()) {
+    util::cloneNode(n, g, mini_to_new_g);
+  }
+
+  // original graph value => new global graph value
+  for (size_t i = 0; i < seg.raw_outputs().size(); ++i) {
+    old_to_new_g[seg.raw_outputs()[i]] = mini_to_new_g[seg.outputs()[i]];
+  }
+  size_t offset = seg.target() == partitioning::SegmentedBlock::kTensorRT ? 1 : 0;
+  for (size_t i = 0; i < seg.raw_inputs().size(); ++i) {
+    if (!old_to_new_g.count(seg.raw_inputs()[i])) {
+      old_to_new_g[seg.raw_inputs()[i]] = mini_to_new_g[seg.inputs()[i + offset]];
+    }
+  }
+
+  return;
+}
+
+typedef std::pair<std::shared_ptr<torch::jit::Graph>, std::unordered_map<torch::jit::Value*, torch::jit::Value*>>
+    GraphAndMapping;
+
+void AddIfBlockToGraph(
+    std::shared_ptr<torch::jit::Graph>& new_g,
+    torch::jit::Node* if_node,
+    const std::vector<GraphAndMapping>& graph_and_mappings,
+    std::unordered_map<torch::jit::Value*, torch::jit::Value*>& old_to_new_g) {
+  torch::jit::IfView if_view(if_node);
+
+  // create a new if node in new_g and add corresponding inputs
+  auto new_if = new_g->insertNode(new_g->create(torch::jit::prim::If, {}, 0));
+  new_if->addInput(util::getOrAddInputForValue(if_view.cond(), new_g, old_to_new_g));
+
+  // iterate over all blocks and add them to new created prim::If
+  for (auto graph_and_mapping : graph_and_mappings) {
+    auto new_if_block = new_if->addBlock();
+    auto cur_block_graph = graph_and_mapping.first;
+    auto cur_block_mapping = graph_and_mapping.second;
+    std::unordered_map<torch::jit::Value*, torch::jit::Value*> block_graph_to_new_g;
+    for (auto& i : cur_block_mapping) {
+      // for every pair in then_mapping, old_value => mini graph value, if old_value also appears in old_to_new_g, then
+      // it's mini graph's input
+      if (old_to_new_g.count(i.first)) {
+        block_graph_to_new_g[i.second] = old_to_new_g[i.first];
+      }
+    }
+
+    auto env = [&](torch::jit::Value* v) { return util::getOrAddInputForValue(v, new_g, block_graph_to_new_g); };
+    new_if_block->cloneFrom(cur_block_graph->block(), env);
+    if (cur_block_graph->inputs()[0]->type()->str().find("__torch__") != std::string::npos) {
+      if (new_g->inputs()[0]->type()->str().find("__torch__") == std::string::npos) {
+        auto self = new_g->insertInput(0, "self_1");
+        self->setType(cur_block_graph->inputs()[0]->type());
+      }
+      block_graph_to_new_g[cur_block_graph->inputs()[0]] = new_g->inputs()[0];
+    }
+    for (int i = cur_block_graph->inputs().size() - 1; i >= 0; --i) {
+      new_if_block->inputs()[i]->replaceAllUsesWith(block_graph_to_new_g[cur_block_graph->inputs()[i]]);
+      new_if_block->eraseInput(i);
+    }
+  }
+  for (auto ov : if_view.outputs()) {
+    auto no = new_if->addOutput();
+    old_to_new_g[ov] = no;
+    no->copyMetadata(ov);
+  }
+  return;
+}
+
+GraphAndMapping ConstructFallbackGraph(
+    torch::jit::script::Module& new_mod,
+    torch::jit::Block* block,
+    std::unordered_map<torch::jit::Value*, torch::jit::IValue> input_ivalues_map,
+    CompileSpec cfg,
+    conversion::GraphParams named_params) {
+  auto convert_cfg = cfg.convert_info;
+  auto partition_info = cfg.partition_info;
+
+  auto new_g = std::make_shared<torch::jit::Graph>();
+
+  auto segmented_blocks = partitioning::Partition(block, input_ivalues_map, partition_info);
+
+  // the mapping from lowering graph => fallback global graph
+  std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_g;
+  for (auto input : block->inputs()) {
+    util::getOrAddInputForValue(input, new_g, old_to_new_g);
+  }
+
+  for (auto& seg_block : segmented_blocks) {
+    LOG_INFO(*seg_block.g() << "(GraphInSegmentedBlock)\n");
+    std::ostringstream trt_engine_id;
+    trt_engine_id << reinterpret_cast<const int*>(&seg_block);
+
+    if (seg_block.target() == partitioning::SegmentedBlock::kTensorRT) {
+      std::vector<ir::Input> inputs;
+      for (auto& shape : seg_block.in_shape()) {
+        inputs.push_back(ir::Input(shape));
+      }
+      // update the input ranges for each segments
+      convert_cfg.inputs = inputs;
+      auto engine = conversion::ConvertBlockToEngine(seg_block.block(), convert_cfg, named_params);
+      auto temp_g = std::make_shared<torch::jit::Graph>();
+      auto device_spec = convert_cfg.engine_settings.device;
+      auto cuda_device = runtime::CudaDevice(device_spec.gpu_id, device_spec.device_type);
+      AddEngineToGraph(new_mod, temp_g, engine, cuda_device, trt_engine_id.str(), true);
+
+      seg_block.update_graph(temp_g);
+      AddSegmentedBlockToGraph(new_g, seg_block, old_to_new_g);
+    } else {
+      if (seg_block.raw_nodes()[0]->kind() == torch::jit::prim::If) {
+        auto if_node = seg_block.raw_nodes()[0];
+
+        // convert the 2 blocks in prim::if and get the converted graph with mappings
+        std::vector<GraphAndMapping> graph_and_mappings;
+        for (auto cur_block : if_node->blocks()) {
+          graph_and_mappings.push_back(
+              ConstructFallbackGraph(new_mod, cur_block, input_ivalues_map, cfg, named_params));
+        }
+        AddIfBlockToGraph(new_g, if_node, graph_and_mappings, old_to_new_g);
+
+      } else {
+        AddSegmentedBlockToGraph(new_g, seg_block, old_to_new_g);
+      }
+    }
+  }
+
+  for (auto& output : block->outputs()) {
+    if (old_to_new_g.count(output)) {
+      new_g->registerOutput(old_to_new_g[output]);
+    }
+  }
+  return {new_g, old_to_new_g};
+}
+
+torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Module& mod, CompileSpec cfg) {
   // TODO: Should be doing a functional transform but need PR #31978
   // [jit] More robust mangling
   // torch::jit::script::Module new_mod = mod.clone();
   torch::jit::script::Module new_mod(mod._ivalue()->name() + "_trt");
   std::vector<std::shared_ptr<torch::jit::Graph>> graphs;
   for (const torch::jit::script::Method& method : mod.get_methods()) {
-    // Don't convert hidden methods
-    if (method.name().rfind("_", 0)) {
-      auto engine = ConvertGraphToTRTEngine(mod, method.name(), cfg);
+    // Compile only forward methods. forward method contains the entire graph.
+    if (method.name().compare("forward") == 0) {
       auto new_g = std::make_shared<torch::jit::Graph>();
-      AddEngineToGraph(new_mod, new_g, engine);
+      auto graph_and_parameters = lowering::Lower(mod, method.name(), cfg.lower_info);
+
+      auto g = graph_and_parameters.first;
+      auto params = graph_and_parameters.second;
+      auto named_params = conversion::get_named_params(g->inputs(), params);
+      LOG_INFO("(LoweredGraph)\n" << *g);
+
+      std::unordered_map<torch::jit::Value*, ir::Input> inputs;
+      for (size_t i = 0; i < g->inputs().size(); ++i) {
+        inputs.insert({g->inputs()[i], cfg.convert_info.inputs[i]});
+      }
+      auto input_ivalues_map = partitioning::generateRandomInputs(inputs);
+      auto graph_and_mapping = ConstructFallbackGraph(new_mod, g->block(), input_ivalues_map, cfg, named_params);
+      new_g = graph_and_mapping.first;
+      LOG_INFO("(FallbackGraph)\n" << *new_g);
+
+      // if there is no tensorrt engine self in fallback graph, there is no conversion, we just return the initial
+      // module
+      if (new_g->inputs()[0]->type()->str().find("__torch__") == std::string::npos) {
+        LOG_WARNING("Didn't generate any TensorRT engines, the compiler did nothing\n");
+        return mod;
+      }
+
       auto new_method = new_mod._ivalue()->compilation_unit()->create_function(method.name(), new_g);
-      auto schema = GenerateGraphSchema(new_mod, new_method->name(), new_g);
+      auto schema = util::GenerateGraphSchema(new_method->name(), new_g);
       new_mod.type()->addMethod(new_method);
       new_method->setSchema(schema);
     }
   }
+
+  return new_mod;
+}
+
+torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod, CompileSpec cfg) {
+  // TODO: not sure how to deal with duplicated code here, so just cut out a branch temporally
+  if (cfg.partition_info.enabled) {
+    return CompileGraphWithFallback(mod, cfg);
+  }
+  // TODO: Should be doing a functional transform but need PR #31978
+  // [jit] More robust mangling
+  // torch::jit::script::Module new_mod = mod.clone();
+  torch::jit::script::Module new_mod(mod._ivalue()->name() + "_trt");
+  std::vector<std::shared_ptr<torch::jit::Graph>> graphs;
+  for (const torch::jit::script::Method& method : mod.get_methods()) {
+    // Compile only forward methods. forward method contains the entire graph.
+    if (method.name().compare("forward") == 0) {
+      auto engine = ConvertGraphToTRTEngine(mod, method.name(), cfg);
+      auto new_g = std::make_shared<torch::jit::Graph>();
+      auto device_spec = cfg.convert_info.engine_settings.device;
+      auto cuda_device = runtime::CudaDevice(device_spec.gpu_id, device_spec.device_type);
+      AddEngineToGraph(new_mod, new_g, engine, cuda_device);
+      auto new_method = new_mod._ivalue()->compilation_unit()->create_function(method.name(), new_g);
+      auto schema = util::GenerateGraphSchema(new_method->name(), new_g);
+      new_mod.type()->addMethod(new_method);
+      new_method->setSchema(schema);
+    }
+  }
+
+  return new_mod;
+}
+
+torch::jit::script::Module EmbedEngineInNewModule(const std::string& engine, runtime::CudaDevice cuda_device) {
+  std::ostringstream engine_id;
+  engine_id << reinterpret_cast<const int*>(&engine);
+  torch::jit::script::Module new_mod("tensorrt_engine_mod_" + engine_id.str());
+  auto new_g = std::make_shared<torch::jit::Graph>();
+  AddEngineToGraph(new_mod, new_g, engine, cuda_device);
+  auto new_method = new_mod._ivalue()->compilation_unit()->create_function("forward", new_g);
+  auto schema = util::GenerateGraphSchema(new_method->name(), new_g);
+  new_mod.type()->addMethod(new_method);
+  new_method->setSchema(schema);
 
   return new_mod;
 }

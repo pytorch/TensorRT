@@ -25,6 +25,33 @@
 #include "trtorch/ptq.h"
 #include "trtorch/trtorch.h"
 
+at::ScalarType to_torch_dtype(trtorch::CompileSpec::DataType dtype) {
+  switch (dtype) {
+    case trtorch::CompileSpec::DataType::kHalf:
+      return at::kHalf;
+    case trtorch::CompileSpec::DataType::kChar:
+      return at::kChar;
+    case trtorch::CompileSpec::DataType::kInt:
+      return at::kInt;
+    case trtorch::CompileSpec::DataType::kBool:
+      return at::kBool;
+    case trtorch::CompileSpec::DataType::kFloat:
+    default:
+      return at::kFloat;
+  }
+}
+
+const std::unordered_map<nvinfer1::DataType, at::ScalarType>& get_trt_at_type_map() {
+  static const std::unordered_map<nvinfer1::DataType, at::ScalarType> trt_at_type_map = {
+      {nvinfer1::DataType::kFLOAT, at::kFloat},
+      {nvinfer1::DataType::kHALF, at::kHalf},
+      {nvinfer1::DataType::kINT32, at::kInt},
+      {nvinfer1::DataType::kINT8, at::kChar},
+      {nvinfer1::DataType::kBOOL, at::kBool},
+  };
+  return trt_at_type_map;
+}
+
 bool checkRtol(const at::Tensor& diff, const std::vector<at::Tensor> inputs, float threshold) {
   double maxValue = 0.0;
   for (auto& tensor : inputs) {
@@ -40,6 +67,44 @@ bool checkRtol(const at::Tensor& diff, const std::vector<at::Tensor> inputs, flo
 
 bool almostEqual(const at::Tensor& a, const at::Tensor& b, float threshold) {
   return checkRtol(a - b, {a, b}, threshold);
+}
+
+trtorch::CompileSpec::TensorFormat parseTensorFormat(std::string str) {
+  std::transform(str.begin(), str.end(), str.begin(), [](unsigned char c) { return std::tolower(c); });
+
+  if (str == "linear" || str == "nchw" || str == "chw" || str == "contiguous") {
+    return trtorch::CompileSpec::TensorFormat::kContiguous;
+  } else if (str == "nhwc" || str == "hwc" || str == "channels_last") {
+    return trtorch::CompileSpec::TensorFormat::kChannelsLast;
+  } else {
+    trtorch::logging::log(
+        trtorch::logging::Level::kERROR,
+        "Invalid tensor format, options are [ linear | nchw | chw | contiguous | nhwc | hwc | channels_last ], found: " +
+            str);
+    return trtorch::CompileSpec::TensorFormat::kUnknown;
+  }
+}
+
+trtorch::CompileSpec::DataType parseDataType(std::string dtype_str) {
+  std::transform(
+      dtype_str.begin(), dtype_str.end(), dtype_str.begin(), [](unsigned char c) { return std::tolower(c); });
+  if (dtype_str == "float" || dtype_str == "float32" || dtype_str == "f32" || dtype_str == "fp32") {
+    return trtorch::CompileSpec::DataType::kFloat;
+  } else if (dtype_str == "half" || dtype_str == "float16" || dtype_str == "f16" || dtype_str == "fp16") {
+    return trtorch::CompileSpec::DataType::kHalf;
+  } else if (dtype_str == "char" || dtype_str == "int8" || dtype_str == "i8") {
+    return trtorch::CompileSpec::DataType::kChar;
+  } else if (dtype_str == "int" || dtype_str == "int32" || dtype_str == "i32") {
+    return trtorch::CompileSpec::DataType::kInt;
+  } else if (dtype_str == "bool" || dtype_str == "b") {
+    return trtorch::CompileSpec::DataType::kBool;
+  } else {
+    trtorch::logging::log(
+        trtorch::logging::Level::kERROR,
+        "Invalid precision, options are [ float | float32 | fp32 | f32 | half | float16 | fp16 | f16 | char | int8 | i8 | int | int32 | i32 | bool | b], found: " +
+            dtype_str);
+    return trtorch::CompileSpec::DataType::kUnknown;
+  }
 }
 
 std::vector<int64_t> parseSingleDim(std::string shape_str) {
@@ -71,7 +136,7 @@ std::vector<int64_t> parseSingleDim(std::string shape_str) {
   return {};
 }
 
-trtorch::CompileSpec::InputRange parseDynamicDim(std::string shape_str) {
+std::vector<std::vector<int64_t>> parseDynamicDim(std::string shape_str) {
   shape_str = shape_str.substr(1, shape_str.size() - 2);
   std::vector<std::vector<int64_t>> shape;
   std::stringstream ss;
@@ -96,7 +161,19 @@ trtorch::CompileSpec::InputRange parseDynamicDim(std::string shape_str) {
     exit(1);
   }
 
-  return trtorch::CompileSpec::InputRange(shape[0], shape[1], shape[2]);
+  return shape;
+}
+
+std::string read_buf(std::string const& path) {
+  std::string buf;
+  std::ifstream stream(path.c_str(), std::ios::binary);
+
+  if (stream) {
+    stream >> std::noskipws;
+    std::copy(std::istream_iterator<char>(stream), std::istream_iterator<char>(), std::back_inserter(buf));
+  }
+
+  return buf;
 }
 
 std::string get_cwd() {
@@ -153,34 +230,41 @@ int main(int argc, char** argv) {
   args::Flag build_debuggable_engine(
       parser, "build-debuggable-engine", "Creates a debuggable engine", {"build-debuggable-engine"});
   args::Flag use_strict_types(
-      parser,
-      "use-strict-types",
-      "Restrict operating type to only use set default operation precision (op_precision)",
-      {"use-strict-types"});
+      parser, "use-strict-types", "Restrict operating type to only use set operation precision", {"use-strict-types"});
   args::Flag allow_gpu_fallback(
       parser,
       "allow-gpu-fallback",
       "(Only used when targeting DLA (device-type)) Lets engine run layers on GPU if they are not supported on DLA",
       {"allow-gpu-fallback"});
 
-  args::ValueFlag<std::string> op_precision(
+  args::Flag allow_torch_fallback(
+      parser,
+      "allow-torch-fallback",
+      "Enable layers to run in torch if they are not supported in TensorRT",
+      {"allow-torch-fallback"});
+
+  args::Flag disable_tf32(
+      parser, "disable-tf32", "Prevent Float32 layers from using the TF32 data format", {"disable-tf32"});
+
+  args::ValueFlagList<std::string> enabled_precision(
       parser,
       "precision",
-      "Default operating precision for the engine (Int8 requires a calibration-cache argument) [ float | float32 | f32 | half | float16 | f16 | int8 | i8 ] (default: float)",
-      {'p', "default-op-precision"});
+      "(Repeatable) Enabling an operating precision for kernels to use when building the engine (Int8 requires a calibration-cache argument) [ float | float32 | f32 | fp32 | half | float16 | f16 | fp16 | int8 | i8 | char ] (default: float)",
+      {'p', "enabled-precision"});
   args::ValueFlag<std::string> device_type(
       parser,
       "type",
       "The type of device the engine should be built for [ gpu | dla ] (default: gpu)",
       {'d', "device-type"});
-  args::ValueFlag<int> gpu_id(parser, "gpu_id", "GPU id if running on multi-GPU platform (defaults to 0)", {"gpu-id"});
-  args::ValueFlag<int> dla_core(
+  args::ValueFlag<uint64_t> gpu_id(
+      parser, "gpu_id", "GPU id if running on multi-GPU platform (defaults to 0)", {"gpu-id"});
+  args::ValueFlag<uint64_t> dla_core(
       parser, "dla_core", "DLACore id if running on available DLA (defaults to 0)", {"dla-core"});
 
   args::ValueFlag<std::string> engine_capability(
       parser,
       "capability",
-      "The type of device the engine should be built for [ default | safe_gpu | safe_dla ]",
+      "The type of device the engine should be built for [ standard | safety | dla_standalone ]",
       {"engine-capability"});
 
   args::ValueFlag<std::string> calibration_cache_file(
@@ -188,19 +272,40 @@ int main(int argc, char** argv) {
       "file_path",
       "Path to calibration cache file to use for post training quantization",
       {"calibration-cache-file"});
-  args::ValueFlag<int> num_min_timing_iters(
+
+  args::ValueFlagList<std::string> forced_fallback_ops(
+      parser,
+      "forced_fallback_ops",
+      "(Repeatable) List of operators in the graph that should be forced to fallback to Pytorch for execution.",
+      {"ffo", "forced-fallback-ops"});
+
+  args::Flag embed_engine(
+      parser,
+      "embed-engine",
+      "Whether to treat input file as a serialized TensorRT engine and embed it into a TorchScript module (device spec must be provided)",
+      {"embed-engine"});
+
+  args::ValueFlag<uint64_t> num_min_timing_iters(
       parser, "num_iters", "Number of minimization timing iterations used to select kernels", {"num-min-timing-iter"});
-  args::ValueFlag<int> num_avg_timing_iters(
+  args::ValueFlag<uint64_t> num_avg_timing_iters(
       parser, "num_iters", "Number of averaging timing iterations used to select kernels", {"num-avg-timing-iters"});
-  args::ValueFlag<int> workspace_size(
+  args::ValueFlag<uint64_t> workspace_size(
       parser, "workspace_size", "Maximum size of workspace given to TensorRT", {"workspace-size"});
-  args::ValueFlag<int> max_batch_size(
+  args::ValueFlag<uint64_t> max_batch_size(
       parser, "max_batch_size", "Maximum batch size (must be >= 1 to be set, 0 means not set)", {"max-batch-size"});
   args::ValueFlag<double> threshold(
       parser,
       "threshold",
       "Maximum acceptable numerical deviation from standard torchscript output (default 2e-5)",
       {'t', "threshold"});
+
+  args::Flag no_threshold_check(
+      parser, "no-threshold-check", "Skip checking threshold compliance", {"no-threshold-check", "no-threshold-check"});
+  args::Flag truncate_long_and_double(
+      parser,
+      "truncate-long-double",
+      "Truncate weights that are provided in 64bit to 32bit (Long, Double to Int, Float)",
+      {"truncate", "truncate-long-double", "truncate-64bit"});
 
   args::Flag save_engine(
       parser,
@@ -212,8 +317,8 @@ int main(int argc, char** argv) {
       parser, "output_file_path", "Path for compiled TorchScript (or TensorRT engine) file");
   args::PositionalList<std::string> input_shapes(
       parser,
-      "input_shapes",
-      "Sizes for inputs to engine, can either be a single size or a range defined by Min, Optimal, Max sizes, e.g. \"(N,..,C,H,W)\" \"[(MIN_N,..,MIN_C,MIN_H,MIN_W);(OPT_N,..,OPT_C,OPT_H,OPT_W);(MAX_N,..,MAX_C,MAX_H,MAX_W)]\"");
+      "input_specs",
+      "Specs for inputs to engine, can either be a single size or a range defined by Min, Optimal, Max sizes, e.g. \"(N,..,C,H,W)\" \"[(MIN_N,..,MIN_C,MIN_H,MIN_W);(OPT_N,..,OPT_C,OPT_H,OPT_W);(MAX_N,..,MAX_C,MAX_H,MAX_W)]\". Data Type and format can be specified by adding an \"@\" followed by dtype and \"%\" followed by format to the end of the shape spec. e.g. \"(3, 3, 32, 32)@f16\%NHWC\"");
 
   try {
     parser.ParseCLI(argc, argv);
@@ -221,8 +326,8 @@ int main(int argc, char** argv) {
     std::cout << parser;
     return 0;
   } catch (args::ParseError e) {
-    std::cerr << e.what() << std::endl;
-    std::cerr << parser;
+    trtorch::logging::log(trtorch::logging::Level::kERROR, e.what());
+    std::cerr << std::endl << parser;
     return 1;
   }
 
@@ -234,19 +339,105 @@ int main(int argc, char** argv) {
     trtorch::logging::set_reportable_log_level(trtorch::logging::Level::kERROR);
   }
 
-  std::vector<trtorch::CompileSpec::InputRange> ranges;
-  for (const auto shapes : args::get(input_shapes)) {
-    if (shapes.rfind("(", 0) == 0) {
-      ranges.push_back(trtorch::CompileSpec::InputRange(parseSingleDim(shapes)));
-    } else if (shapes.rfind("[", 0) == 0) {
-      ranges.push_back(parseDynamicDim(shapes));
+  std::vector<trtorch::CompileSpec::Input> ranges;
+  const std::string spec_err_str =
+      "Dimensions should be specified in one of these types \"(N,..,C,H,W)\" \"[(MIN_N,..,MIN_C,MIN_H,MIN_W);(OPT_N,..,OPT_C,OPT_H,OPT_W);(MAX_N,..,MAX_C,MAX_H,MAX_W)]\"\n e.g \"(3,3,300,300)\" \"[(3,3,100,100);(3,3,200,200);(3,3,300,300)]\"\nTo specify input type append an @ followed by the precision\n e.g. \"(3,3,300,300)@f32\"\nTo specify input format append an \% followed by the format [contiguous | channel_last]\n e.g. \"(3,3,300,300)@f32\%channel_last\"";
+  for (const auto spec : args::get(input_shapes)) {
+    std::string shapes;
+    std::string dtype;
+    std::string format;
+    // THERE IS A SPEC FOR DTYPE
+    if (spec.find('@') != std::string::npos) {
+      // THERE IS ALSO A SPEC FOR FORMAT
+      if (spec.find('%') != std::string::npos) {
+        auto dtype_delim = spec.find('@');
+        auto format_delim = spec.find('%');
+        std::string shapes = spec.substr(0, dtype_delim);
+        std::string dtype = spec.substr(dtype_delim + 1, format_delim - (dtype_delim + 1));
+        std::string format = spec.substr(format_delim + 1, spec.size());
+
+        auto parsed_dtype = parseDataType(dtype);
+        if (parsed_dtype == trtorch::CompileSpec::DataType::kUnknown) {
+          trtorch::logging::log(trtorch::logging::Level::kERROR, "Invalid datatype for input specification " + spec);
+          std::cerr << std::endl << parser;
+          exit(1);
+        }
+        auto parsed_format = parseTensorFormat(format);
+        if (parsed_format == trtorch::CompileSpec::TensorFormat::kUnknown) {
+          trtorch::logging::log(trtorch::logging::Level::kERROR, "Invalid format for input specification " + spec);
+          std::cerr << std::endl << parser;
+          exit(1);
+        }
+        if (shapes.rfind("(", 0) == 0) {
+          ranges.push_back(trtorch::CompileSpec::Input(parseSingleDim(shapes), parsed_dtype, parsed_format));
+        } else if (shapes.rfind("[", 0) == 0) {
+          auto dyn_shapes = parseDynamicDim(shapes);
+          ranges.push_back(
+              trtorch::CompileSpec::Input(dyn_shapes[0], dyn_shapes[1], dyn_shapes[2], parsed_dtype, parsed_format));
+        } else {
+          trtorch::logging::log(trtorch::logging::Level::kERROR, spec_err_str);
+          std::cerr << std::endl << parser;
+          exit(1);
+        }
+        // THERE IS NO SPEC FOR FORMAT
+      } else {
+        std::string shapes = spec.substr(0, spec.find('@'));
+        std::string dtype = spec.substr(spec.find('@') + 1, spec.size());
+
+        auto parsed_dtype = parseDataType(dtype);
+        if (parsed_dtype == trtorch::CompileSpec::DataType::kUnknown) {
+          trtorch::logging::log(trtorch::logging::Level::kERROR, "Invalid datatype for input specification " + spec);
+          std::cerr << std::endl << parser;
+          exit(1);
+        }
+        if (shapes.rfind("(", 0) == 0) {
+          ranges.push_back(trtorch::CompileSpec::Input(parseSingleDim(shapes), parsed_dtype));
+        } else if (shapes.rfind("[", 0) == 0) {
+          auto dyn_shapes = parseDynamicDim(shapes);
+          ranges.push_back(trtorch::CompileSpec::Input(dyn_shapes[0], dyn_shapes[1], dyn_shapes[2], parsed_dtype));
+        } else {
+          trtorch::logging::log(trtorch::logging::Level::kERROR, spec_err_str);
+          std::cerr << std::endl << parser;
+          exit(1);
+        }
+      }
+      // THERE IS A SPEC FOR FORMAT BUT NOT DTYPE
+    } else if (spec.find('%') != std::string::npos) {
+      std::string shapes = spec.substr(0, spec.find('%'));
+      std::string format = spec.substr(spec.find('%') + 1, spec.size());
+
+      auto parsed_format = parseTensorFormat(format);
+      if (parsed_format == trtorch::CompileSpec::TensorFormat::kUnknown) {
+        trtorch::logging::log(trtorch::logging::Level::kERROR, "Invalid format for input specification " + spec);
+        std::cerr << std::endl << parser;
+        exit(1);
+      }
+      if (shapes.rfind("(", 0) == 0) {
+        ranges.push_back(trtorch::CompileSpec::Input(parseSingleDim(shapes), parsed_format));
+      } else if (shapes.rfind("[", 0) == 0) {
+        auto dyn_shapes = parseDynamicDim(shapes);
+        ranges.push_back(trtorch::CompileSpec::Input(dyn_shapes[0], dyn_shapes[1], dyn_shapes[2], parsed_format));
+      } else {
+        trtorch::logging::log(trtorch::logging::Level::kERROR, spec_err_str);
+        std::cerr << std::endl << parser;
+        exit(1);
+      }
+      // JUST SHAPE USE DEFAULT DTYPE
     } else {
-      trtorch::logging::log(
-          trtorch::logging::Level::kERROR,
-          "Dimensions should be specified in one of these types \"(N,..,C,H,W)\" \"[(MIN_N,..,MIN_C,MIN_H,MIN_W);(OPT_N,..,OPT_C,OPT_H,OPT_W);(MAX_N,..,MAX_C,MAX_H,MAX_W)]\"\n e.g \"(3,3,300,300)\" \"[(3,3,100,100);(3,3,200,200);(3,3,300,300)]\"");
-      std::cerr << parser;
-      exit(1);
+      if (spec.rfind("(", 0) == 0) {
+        ranges.push_back(trtorch::CompileSpec::Input(parseSingleDim(spec)));
+      } else if (spec.rfind("[", 0) == 0) {
+        auto dyn_shapes = parseDynamicDim(spec);
+        ranges.push_back(trtorch::CompileSpec::Input(dyn_shapes[0], dyn_shapes[1], dyn_shapes[2]));
+      } else {
+        trtorch::logging::log(trtorch::logging::Level::kERROR, spec_err_str);
+        std::cerr << std::endl << parser;
+        exit(1);
+      }
     }
+    std::stringstream ss;
+    ss << "Parsed Input: " << ranges.back();
+    trtorch::logging::log(trtorch::logging::Level::kDEBUG, ss.str());
   }
 
   auto compile_settings = trtorch::CompileSpec(ranges);
@@ -263,6 +454,14 @@ int main(int argc, char** argv) {
     compile_settings.device.allow_gpu_fallback = true;
   }
 
+  if (allow_torch_fallback) {
+    compile_settings.torch_fallback = trtorch::CompileSpec::TorchFallback(true);
+  }
+
+  if (disable_tf32) {
+    compile_settings.disable_tf32 = true;
+  }
+
   std::string calibration_cache_file_path = "";
   if (calibration_cache_file) {
     calibration_cache_file_path = resolve_path(args::get(calibration_cache_file));
@@ -270,54 +469,66 @@ int main(int argc, char** argv) {
 
   auto calibrator = trtorch::ptq::make_int8_cache_calibrator(calibration_cache_file_path);
 
-  if (op_precision) {
-    auto precision = args::get(op_precision);
-    std::transform(
-        precision.begin(), precision.end(), precision.begin(), [](unsigned char c) { return std::tolower(c); });
-    if (precision == "float" || precision == "float32" || precision == "f32") {
-      compile_settings.op_precision = torch::kF32;
-    } else if (precision == "half" || precision == "float16" || precision == "f16") {
-      compile_settings.op_precision = torch::kF16;
-    } else if (precision == "int8" || precision == "i8") {
-      compile_settings.op_precision = torch::kI8;
-      if (calibration_cache_file) {
-        compile_settings.ptq_calibrator = calibrator;
+  if (forced_fallback_ops) {
+    if (!allow_torch_fallback) {
+      trtorch::logging::log(
+          trtorch::logging::Level::kERROR,
+          "Forced fallback ops provided but allow_torch_fallback is False. Please use --allow-torch-fallback to enable automatic fallback of operators.");
+    }
+
+    for (const auto fallback_op : args::get(forced_fallback_ops)) {
+      compile_settings.torch_fallback.forced_fallback_ops.push_back(fallback_op);
+    }
+  }
+
+  if (enabled_precision) {
+    for (const auto precision : args::get(enabled_precision)) {
+      auto dtype = parseDataType(precision);
+      if (dtype == trtorch::CompileSpec::DataType::kFloat) {
+        compile_settings.enabled_precisions.insert(torch::kF32);
+      } else if (dtype == trtorch::CompileSpec::DataType::kHalf) {
+        compile_settings.enabled_precisions.insert(torch::kF16);
+      } else if (dtype == trtorch::CompileSpec::DataType::kChar) {
+        compile_settings.enabled_precisions.insert(torch::kI8);
+        if (calibration_cache_file) {
+          compile_settings.ptq_calibrator = calibrator;
+        } else {
+          trtorch::logging::log(
+              trtorch::logging::Level::kINFO,
+              "Int8 precision has been enabled but no calibrator provided. This assumes the network has Q/DQ nodes obtained from Quantization aware training. For more details, refer to https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#work-with-qat-networks");
+        }
       } else {
-        trtorch::logging::log(
-            trtorch::logging::Level::kERROR,
-            "If targeting INT8 default operating precision with trtorchc, a calibration cache file must be provided");
-        std::cerr << parser;
+        std::stringstream ss;
+        ss << "Invalid precision given for enabled kernel precision, options are [ float | float32 | f32 | fp32 | half | float16 | f16 | fp16 | char | int8 | i8 ], found: ";
+        ss << dtype;
+        trtorch::logging::log(trtorch::logging::Level::kERROR, ss.str());
+        std::cerr << std::endl << parser;
         return 1;
+      }
+    }
+  }
+
+  if (device_type) {
+    auto device = args::get(device_type);
+    std::transform(device.begin(), device.end(), device.begin(), [](unsigned char c) { return std::tolower(c); });
+
+    if (gpu_id) {
+      compile_settings.device.gpu_id = args::get(gpu_id);
+      trtorch::set_device(compile_settings.device.gpu_id);
+    }
+
+    if (device == "gpu") {
+      compile_settings.device.device_type = trtorch::CompileSpec::Device::DeviceType::kGPU;
+    } else if (device == "dla") {
+      compile_settings.device.device_type = trtorch::CompileSpec::Device::DeviceType::kDLA;
+      if (dla_core) {
+        compile_settings.device.dla_core = args::get(dla_core);
       }
     } else {
       trtorch::logging::log(
-          trtorch::logging::Level::kERROR,
-          "Invalid default operating precision, options are [ float | float32 | f32 | half | float16 | f16 | int8 | i8 ]");
-      std::cerr << parser;
+          trtorch::logging::Level::kERROR, "Invalid device type, options are [ gpu | dla ] found: " + device);
+      std::cerr << std::endl << parser;
       return 1;
-    }
-
-    if (device_type) {
-      auto device = args::get(device_type);
-      std::transform(device.begin(), device.end(), device.begin(), [](unsigned char c) { return std::tolower(c); });
-
-      if (gpu_id) {
-        compile_settings.device.gpu_id = args::get(gpu_id);
-        trtorch::set_device(compile_settings.device.gpu_id);
-      }
-
-      if (device == "gpu") {
-        compile_settings.device.device_type = trtorch::CompileSpec::Device::DeviceType::kGPU;
-      } else if (device == "dla") {
-        compile_settings.device.device_type = trtorch::CompileSpec::Device::DeviceType::kDLA;
-        if (dla_core) {
-          compile_settings.device.dla_core = args::get(dla_core);
-        }
-      } else {
-        trtorch::logging::log(trtorch::logging::Level::kERROR, "Invalid device type, options are [ gpu | dla ]");
-        std::cerr << parser;
-        return 1;
-      }
     }
   }
 
@@ -325,16 +536,17 @@ int main(int argc, char** argv) {
     auto capability = args::get(engine_capability);
     std::transform(
         capability.begin(), capability.end(), capability.begin(), [](unsigned char c) { return std::tolower(c); });
-    if (capability == "default") {
-      compile_settings.capability = trtorch::CompileSpec::EngineCapability::kDEFAULT;
-    } else if (capability == "safe_gpu") {
-      compile_settings.capability = trtorch::CompileSpec::EngineCapability::kSAFE_GPU;
-    } else if (capability == "safe_dla") {
-      compile_settings.capability = trtorch::CompileSpec::EngineCapability::kSAFE_DLA;
+    if (capability == "standard") {
+      compile_settings.capability = trtorch::CompileSpec::EngineCapability::kSTANDARD;
+    } else if (capability == "safety") {
+      compile_settings.capability = trtorch::CompileSpec::EngineCapability::kSAFETY;
+    } else if (capability == "dla_standalone") {
+      compile_settings.capability = trtorch::CompileSpec::EngineCapability::kDLA_STANDALONE;
     } else {
       trtorch::logging::log(
-          trtorch::logging::Level::kERROR, "Invalid engine capability, options are [ default | safe_gpu | safe_dla ]");
-      std::cerr << parser;
+          trtorch::logging::Level::kERROR,
+          "Invalid engine capability, options are [ standard | safety | dla_standalone ]");
+      std::cerr << std::endl << parser;
       return 1;
     }
   }
@@ -355,8 +567,20 @@ int main(int argc, char** argv) {
     compile_settings.max_batch_size = args::get(max_batch_size);
   }
 
+  if (truncate_long_and_double) {
+    compile_settings.truncate_long_and_double = true;
+  }
+
   auto real_input_path = resolve_path(args::get(input_path));
   auto real_output_path = resolve_path(args::get(output_path));
+
+  // Instead of compiling, just embed engine in a PyTorch module
+  if (embed_engine) {
+    std::string serialized_engine = read_buf(real_input_path);
+    auto trt_mod = trtorch::EmbedEngineInNewModule(serialized_engine, compile_settings.device);
+    trt_mod.save(real_output_path);
+    return 0;
+  }
 
   torch::jit::Module mod;
   try {
@@ -364,13 +588,14 @@ int main(int argc, char** argv) {
     mod = torch::jit::load(real_input_path);
   } catch (const c10::Error& e) {
     trtorch::logging::log(trtorch::logging::Level::kERROR, "Error loading the model (path may be incorrect)");
-    std::cerr << parser;
     return 1;
   }
 
-  if (!trtorch::CheckMethodOperatorSupport(mod, "forward")) {
-    trtorch::logging::log(trtorch::logging::Level::kERROR, "Module is not currently supported by TRTorch");
-    return 1;
+  if (!allow_torch_fallback) {
+    if (!trtorch::CheckMethodOperatorSupport(mod, "forward")) {
+      trtorch::logging::log(trtorch::logging::Level::kERROR, "Module is not currently supported by TRTorch");
+      return 1;
+    }
   }
 
   if (save_engine) {
@@ -381,7 +606,10 @@ int main(int argc, char** argv) {
   } else {
     auto trt_mod = trtorch::CompileGraph(mod, compile_settings);
 
-    if (compile_settings.op_precision == trtorch::CompileSpec::DataType::kFloat) {
+    if (!no_threshold_check &&
+        (compile_settings.enabled_precisions.size() == 1 &&
+         compile_settings.enabled_precisions.find(trtorch::CompileSpec::DataType::kFloat) !=
+             compile_settings.enabled_precisions.end())) {
       double threshold_val = 2e-5;
       if (threshold) {
         threshold_val = args::get(threshold);
@@ -391,11 +619,13 @@ int main(int argc, char** argv) {
       std::vector<torch::jit::IValue> trt_inputs_ivalues;
 
       for (auto i : ranges) {
-        auto in = at::randn(i.opt, {at::kCUDA});
+        auto in = at::randn(i.opt_shape, {at::kCUDA});
+        in = in.to(to_torch_dtype(i.dtype));
         jit_inputs_ivalues.push_back(in.clone());
         trt_inputs_ivalues.push_back(in.clone());
       }
 
+      mod.to({at::kCUDA});
       torch::jit::IValue jit_results_ivalues = mod.forward(jit_inputs_ivalues);
       std::vector<at::Tensor> jit_results;
       if (jit_results_ivalues.isTensor()) {
@@ -429,9 +659,14 @@ int main(int argc, char** argv) {
         }
       }
     } else {
-      trtorch::logging::log(
-          trtorch::logging::Level::kWARNING,
-          "Due to change in operating data type, numerical precision is not checked");
+      if (no_threshold_check) {
+        trtorch::logging::log(
+            trtorch::logging::Level::kWARNING, "Threshold check skipped, numerical precision is not checked");
+      } else {
+        trtorch::logging::log(
+            trtorch::logging::Level::kWARNING,
+            "Due to change in operating data type, numerical precision is not checked");
+      }
     }
 
     trt_mod.save(real_output_path);

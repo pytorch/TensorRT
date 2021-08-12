@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -57,10 +58,15 @@
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
   </script>
+  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+  <script type="text/x-mathjax-config">
+   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
+  </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
   <link href="function_logging_8h_1a9b420280bfacc016d7e36a5704021949.html" rel="next" title="Function trtorch::logging::get_is_colored_output_on"/>
-  <link href="function_trtorch_8h_1a726f6e7091b6b7be45b5a4275b2ffb10.html" rel="prev" title="Function trtorch::dump_build_info"/>
+  <link href="function_trtorch_8h_1ad39358d5c1f523ab2a528d054860e9d7.html" rel="prev" title="Function trtorch::EmbedEngineInNewModule"/>
  </head>
  <body data-md-color-accent="light-green" data-md-color-primary="light-green" dir="ltr">
   <svg class="md-svg">
@@ -153,6 +159,12 @@
       <div class="dropdown-content md-hero">
        <a href="https://nvidia.github.io/TRTorch/" title="master">
         master
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.3.0/" title="v0.3.0">
+        v0.3.0
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.2.0/" title="v0.2.0">
+        v0.2.0
        </a>
        <a href="https://nvidia.github.io/TRTorch/v0.1.0/" title="v0.1.0">
         v0.1.0
@@ -328,6 +340,18 @@
             Useful Links for TRTorch Development
            </a>
           </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Indices
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../indices/supported_ops.html">
+            Operators Supported
+           </a>
+          </li>
          </ul>
         </nav>
        </div>
@@ -369,77 +393,81 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <span id="exhale-function-trtorch-8h-1a2cf17d43ba9117b3b4d652744b4f0447">
-       </span>
-       <h1 id="cpp-api-function-trtorch-8h-1a2cf17d43ba9117b3b4d652744b4f0447--page-root">
-        Function trtorch::get_build_info
-        <a class="headerlink" href="#cpp-api-function-trtorch-8h-1a2cf17d43ba9117b3b4d652744b4f0447--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <ul class="simple">
-        <li>
-         <p>
-          Defined in
-          <a class="reference internal" href="file_cpp_api_include_trtorch_trtorch.h.html#file-cpp-api-include-trtorch-trtorch-h">
-           <span class="std std-ref">
-            File trtorch.h
-           </span>
-          </a>
-         </p>
-        </li>
-       </ul>
-       <h2 id="function-documentation">
-        Function Documentation
-        <a class="headerlink" href="#function-documentation" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <dl class="cpp function">
-        <dt id="_CPPv4N7trtorch14get_build_infoEv">
-         <span class="target" id="trtorch_8h_1a2cf17d43ba9117b3b4d652744b4f0447">
-         </span>
-         TRTORCH_API std::string
-         <code class="sig-prename descclassname">
-          trtorch
-          <code class="sig-prename descclassname">
-           ::
-          </code>
-         </code>
-         <code class="sig-name descname">
-          get_build_info
-         </code>
-         <span class="sig-paren">
-          (
-         </span>
-         <span class="sig-paren">
-          )
-         </span>
-         <a class="headerlink" href="#_CPPv4N7trtorch14get_build_infoEv" title="Permalink to this definition">
+       <section id="function-trtorch-get-build-info">
+        <span id="exhale-function-trtorch-8h-1a2cf17d43ba9117b3b4d652744b4f0447">
+        </span>
+        <h1 id="cpp-api-function-trtorch-8h-1a2cf17d43ba9117b3b4d652744b4f0447--page-root">
+         Function trtorch::get_build_info
+         <a class="headerlink" href="#cpp-api-function-trtorch-8h-1a2cf17d43ba9117b3b4d652744b4f0447--page-root" title="Permalink to this headline">
           ¶
          </a>
-         <br/>
-        </dt>
-        <dd>
-         <p>
-          Get the build information for the library including the dependency versions.
-         </p>
-         <p>
-         </p>
-         <dl class="simple">
-          <dt>
-           <strong>
-            Return
-           </strong>
+        </h1>
+        <ul class="simple">
+         <li>
+          <p>
+           Defined in
+           <a class="reference internal" href="file_cpp_api_include_trtorch_trtorch.h.html#file-cpp-api-include-trtorch-trtorch-h">
+            <span class="std std-ref">
+             File trtorch.h
+            </span>
+           </a>
+          </p>
+         </li>
+        </ul>
+        <section id="function-documentation">
+         <h2 id="function-documentation">
+          Function Documentation
+          <a class="headerlink" href="#function-documentation" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <dl class="cpp function">
+          <dt id="_CPPv4N7trtorch14get_build_infoEv">
+           <span class="target" id="trtorch_8h_1a2cf17d43ba9117b3b4d652744b4f0447">
+           </span>
+           TRTORCH_API std::string
+           <code class="sig-prename descclassname">
+            trtorch
+            <code class="sig-prename descclassname">
+             ::
+            </code>
+           </code>
+           <code class="sig-name descname">
+            get_build_info
+           </code>
+           <span class="sig-paren">
+            (
+           </span>
+           <span class="sig-paren">
+            )
+           </span>
+           <a class="headerlink" href="#_CPPv4N7trtorch14get_build_infoEv" title="Permalink to this definition">
+            ¶
+           </a>
+           <br/>
           </dt>
           <dd>
            <p>
-            std::string
+            Get the build information for the library including the dependency versions.
            </p>
+           <p>
+           </p>
+           <dl class="simple">
+            <dt>
+             <strong>
+              Return
+             </strong>
+            </dt>
+            <dd>
+             <p>
+              std::string
+             </p>
+            </dd>
+           </dl>
           </dd>
          </dl>
-        </dd>
-       </dl>
+        </section>
+       </section>
       </article>
      </div>
     </div>
@@ -448,7 +476,7 @@
   <footer class="md-footer">
    <div class="md-footer-nav">
     <nav class="md-footer-nav__inner md-grid">
-     <a class="md-flex md-footer-nav__link md-footer-nav__link--prev" href="function_trtorch_8h_1a726f6e7091b6b7be45b5a4275b2ffb10.html" rel="prev" title="Function trtorch::dump_build_info">
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--prev" href="function_trtorch_8h_1ad39358d5c1f523ab2a528d054860e9d7.html" rel="prev" title="Function trtorch::EmbedEngineInNewModule">
       <div class="md-flex__cell md-flex__cell--shrink">
        <i class="md-icon md-icon--arrow-back md-footer-nav__button">
        </i>
@@ -458,7 +486,7 @@
         <span class="md-footer-nav__direction">
          Previous
         </span>
-        Function trtorch::dump_build_info
+        Function trtorch::EmbedEngineInNewModule
        </span>
       </div>
      </a>

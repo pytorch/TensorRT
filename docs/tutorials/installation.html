@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -56,6 +57,11 @@
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
+  </script>
+  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+  <script type="text/x-mathjax-config">
+   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -153,6 +159,12 @@
       <div class="dropdown-content md-hero">
        <a href="https://nvidia.github.io/TRTorch/" title="master">
         master
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.3.0/" title="v0.3.0">
+        v0.3.0
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.2.0/" title="v0.2.0">
+        v0.2.0
        </a>
        <a href="https://nvidia.github.io/TRTorch/v0.1.0/" title="v0.1.0">
         v0.1.0
@@ -485,6 +497,18 @@
             Useful Links for TRTorch Development
            </a>
           </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Indices
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../indices/supported_ops.html">
+            Operators Supported
+           </a>
+          </li>
          </ul>
         </nav>
        </div>
@@ -658,145 +682,151 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <span id="id1">
-       </span>
-       <h1 id="tutorials-installation--page-root">
-        Installation
-        <a class="headerlink" href="#tutorials-installation--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <h2 id="precompiled-binaries">
-        Precompiled Binaries
-        <a class="headerlink" href="#precompiled-binaries" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <h3 id="dependencies">
-        Dependencies
-        <a class="headerlink" href="#dependencies" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        You need to have either PyTorch or LibTorch installed based on if you are using Python or C++
+       <section id="installation">
+        <span id="id1">
+        </span>
+        <h1 id="tutorials-installation--page-root">
+         Installation
+         <a class="headerlink" href="#tutorials-installation--page-root" title="Permalink to this headline">
+          ¶
+         </a>
+        </h1>
+        <section id="precompiled-binaries">
+         <h2 id="precompiled-binaries">
+          Precompiled Binaries
+          <a class="headerlink" href="#precompiled-binaries" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <section id="dependencies">
+          <h3 id="dependencies">
+           Dependencies
+           <a class="headerlink" href="#dependencies" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           You need to have either PyTorch or LibTorch installed based on if you are using Python or C++
 and you must have CUDA, cuDNN and TensorRT installed.
-       </p>
-       <blockquote>
-        <div>
-         <ul class="simple">
-          <li>
-           <p>
-            <a class="reference external" href="https://www.pytorch.org">
-             https://www.pytorch.org
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference external" href="https://developer.nvidia.com/cuda">
-             https://developer.nvidia.com/cuda
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference external" href="https://developer.nvidia.com/cudnn">
-             https://developer.nvidia.com/cudnn
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference external" href="https://developer.nvidia.com/tensorrt">
-             https://developer.nvidia.com/tensorrt
-            </a>
-           </p>
-          </li>
-         </ul>
-        </div>
-       </blockquote>
-       <h3 id="python-package">
-        Python Package
-        <a class="headerlink" href="#python-package" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        You can install the python package using
-       </p>
-       <div class="highlight-sh notranslate">
-        <div class="highlight">
-         <pre><span></span><span class="c1"># Python 3.6</span>
-pip3 install  https://github.com/NVIDIA/TRTorch/releases/download/v0.1.0/trtorch-0.1.0-cp36-cp36m-linux_x86_64.whl
-<span class="c1"># Python 3.7</span>
-pip3 install  https://github.com/NVIDIA/TRTorch/releases/download/v0.1.0/trtorch-0.1.0-cp37-cp37m-linux_x86_64.whl
-<span class="c1"># Python 3.8</span>
-pip3 install  https://github.com/NVIDIA/TRTorch/releases/download/v0.1.0/trtorch-0.1.0-cp38-cp38-linux_x86_64.whl
+          </p>
+          <blockquote>
+           <div>
+            <ul class="simple">
+             <li>
+              <p>
+               <a class="reference external" href="https://www.pytorch.org">
+                https://www.pytorch.org
+               </a>
+              </p>
+             </li>
+             <li>
+              <p>
+               <a class="reference external" href="https://developer.nvidia.com/cuda">
+                https://developer.nvidia.com/cuda
+               </a>
+              </p>
+             </li>
+             <li>
+              <p>
+               <a class="reference external" href="https://developer.nvidia.com/cudnn">
+                https://developer.nvidia.com/cudnn
+               </a>
+              </p>
+             </li>
+             <li>
+              <p>
+               <a class="reference external" href="https://developer.nvidia.com/tensorrt">
+                https://developer.nvidia.com/tensorrt
+               </a>
+              </p>
+             </li>
+            </ul>
+           </div>
+          </blockquote>
+         </section>
+         <section id="python-package">
+          <h3 id="python-package">
+           Python Package
+           <a class="headerlink" href="#python-package" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           You can install the python package using
+          </p>
+          <div class="highlight-sh notranslate">
+           <div class="highlight">
+            <pre><span></span>pip3 install trtorch -f https://github.com/NVIDIA/TRTorch/releases
 </pre>
-        </div>
-       </div>
-       <span id="bin-dist">
-       </span>
-       <h3 id="c-binary-distribution">
-        C++ Binary Distribution
-        <a class="headerlink" href="#c-binary-distribution" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        Precompiled tarballs for releases are provided here:
-        <a class="reference external" href="https://github.com/NVIDIA/TRTorch/releases">
-         https://github.com/NVIDIA/TRTorch/releases
-        </a>
-       </p>
-       <span id="compile-from-source">
-       </span>
-       <h2 id="compiling-from-source">
-        Compiling From Source
-        <a class="headerlink" href="#compiling-from-source" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <span id="installing-deps">
-       </span>
-       <h3 id="dependencies-for-compilation">
-        Dependencies for Compilation
-        <a class="headerlink" href="#dependencies-for-compilation" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        TRTorch is built with Bazel, so begin by installing it.
-       </p>
-       <blockquote>
-        <div>
-         <ul class="simple">
-          <li>
-           <p>
-            The easiest way is to install bazelisk using the method of you choosing
-            <a class="reference external" href="https://github.com/bazelbuild/bazelisk">
-             https://github.com/bazelbuild/bazelisk
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            Otherwise you can use the following instructions to install binaries
-            <a class="reference external" href="https://docs.bazel.build/versions/master/install.html">
-             https://docs.bazel.build/versions/master/install.html
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            Finally if you need to compile from source (e.g. aarch64 until bazel distributes binaries for the architecture) you can use these instructions
-           </p>
-          </li>
-         </ul>
-         <div class="highlight-shell notranslate">
-          <div class="highlight">
-           <pre><span></span><span class="nb">export</span> <span class="nv">BAZEL_VERSION</span><span class="o">=</span><span class="k">$(</span>cat &lt;PATH_TO_TRTORCH_ROOT&gt;/.bazelversion<span class="k">)</span>
+           </div>
+          </div>
+         </section>
+         <section id="c-binary-distribution">
+          <span id="bin-dist">
+          </span>
+          <h3 id="c-binary-distribution">
+           C++ Binary Distribution
+           <a class="headerlink" href="#c-binary-distribution" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           Precompiled tarballs for releases are provided here:
+           <a class="reference external" href="https://github.com/NVIDIA/TRTorch/releases">
+            https://github.com/NVIDIA/TRTorch/releases
+           </a>
+          </p>
+         </section>
+        </section>
+        <section id="compiling-from-source">
+         <span id="compile-from-source">
+         </span>
+         <h2 id="compiling-from-source">
+          Compiling From Source
+          <a class="headerlink" href="#compiling-from-source" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <section id="dependencies-for-compilation">
+          <span id="installing-deps">
+          </span>
+          <h3 id="dependencies-for-compilation">
+           Dependencies for Compilation
+           <a class="headerlink" href="#dependencies-for-compilation" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           TRTorch is built with Bazel, so begin by installing it.
+          </p>
+          <blockquote>
+           <div>
+            <ul class="simple">
+             <li>
+              <p>
+               The easiest way is to install bazelisk using the method of you choosing
+               <a class="reference external" href="https://github.com/bazelbuild/bazelisk">
+                https://github.com/bazelbuild/bazelisk
+               </a>
+              </p>
+             </li>
+             <li>
+              <p>
+               Otherwise you can use the following instructions to install binaries
+               <a class="reference external" href="https://docs.bazel.build/versions/master/install.html">
+                https://docs.bazel.build/versions/master/install.html
+               </a>
+              </p>
+             </li>
+             <li>
+              <p>
+               Finally if you need to compile from source (e.g. aarch64 until bazel distributes binaries for the architecture) you can use these instructions
+              </p>
+             </li>
+            </ul>
+            <div class="highlight-shell notranslate">
+             <div class="highlight">
+              <pre><span></span><span class="nb">export</span> <span class="nv">BAZEL_VERSION</span><span class="o">=</span><span class="k">$(</span>cat &lt;PATH_TO_TRTORCH_ROOT&gt;/.bazelversion<span class="k">)</span>
 mkdir bazel
 <span class="nb">cd</span> bazel
 curl -fSsL -O https://github.com/bazelbuild/bazel/releases/download/<span class="nv">$BAZEL_VERSION</span>/bazel-<span class="nv">$BAZEL_VERSION</span>-dist.zip
@@ -804,207 +834,217 @@ unzip bazel-<span class="nv">$BAZEL_VERSION</span>-dist.zip
 bash ./compile.sh
 cp output/bazel /usr/local/bin/
 </pre>
-          </div>
-         </div>
-        </div>
-       </blockquote>
-       <p>
-        You will also need to have CUDA installed on the system (or if running in a container, the system must have
+             </div>
+            </div>
+           </div>
+          </blockquote>
+          <p>
+           You will also need to have CUDA installed on the system (or if running in a container, the system must have
 the CUDA driver installed and the container must have CUDA)
-       </p>
-       <p>
-        The correct LibTorch version will be pulled down for you by bazel.
-       </p>
-       <blockquote>
-        <div>
-         <p>
-          NOTE: For best compatability with official PyTorch, use TensorRT 7.0 and cuDNN 7.6 however TRTorch itself supports
-TensorRT 7.1 and cuDNN 8.0 for usecases such as using NVIDIA compiled distributions of PyTorch that use cuDNN 8
-e.g. aarch64 or custom compiled version of PyTorch that use cuDNN 8.
-         </p>
-        </div>
-       </blockquote>
-       <p>
-        You then have two compilation options:
-       </p>
-       <span id="build-from-archive">
-       </span>
-       <h3 id="building-using-cudnn-tensorrt-tarball-distributions">
-        <strong>
-         Building using cuDNN &amp; TensorRT tarball distributions
-        </strong>
-        <a class="headerlink" href="#building-using-cudnn-tensorrt-tarball-distributions" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <blockquote>
-        <div>
-         <p>
-          This is recommended so as to build TRTorch hermetically and insures any compilation errors are not caused by version issues
-         </p>
-         <p>
-          Make sure when running TRTorch that these versions of the libraries are prioritized in your
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            $LD_LIBRARY_PATH
-           </span>
-          </code>
-         </p>
-        </div>
-       </blockquote>
-       <dl class="simple">
-        <dt>
-         You need to download the tarball distributions of TensorRT and cuDNN from the NVIDIA website.
-        </dt>
-        <dd>
-         <ul class="simple">
-          <li>
-           <p>
-            <a class="reference external" href="https://developer.nvidia.com/cudnn">
-             https://developer.nvidia.com/cudnn
+          </p>
+          <p>
+           The correct LibTorch version will be pulled down for you by bazel.
+          </p>
+          <blockquote>
+           <div>
+            <p>
+             NOTE: For best compatability with official PyTorch, use torch==1.9.0+cuda111, TensorRT 7.2 and cuDNN 8.1 for CUDA 11.1 however TRTorch itself supports
+TensorRT and cuDNN for CUDA versions other than 11.1 for usecases such as using NVIDIA compiled distributions of PyTorch that use other versions of CUDA
+e.g. aarch64 or custom compiled version of PyTorch.
+            </p>
+           </div>
+          </blockquote>
+          <p>
+           You then have two compilation options:
+          </p>
+         </section>
+         <section id="building-using-cudnn-tensorrt-tarball-distributions">
+          <span id="build-from-archive">
+          </span>
+          <h3 id="building-using-cudnn-tensorrt-tarball-distributions">
+           <strong>
+            Building using cuDNN &amp; TensorRT tarball distributions
+           </strong>
+           <a class="headerlink" href="#building-using-cudnn-tensorrt-tarball-distributions" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <blockquote>
+           <div>
+            <p>
+             This is recommended so as to build TRTorch hermetically and insures any compilation errors are not caused by version issues
+            </p>
+            <p>
+             Make sure when running TRTorch that these versions of the libraries are prioritized in your
+             <code class="docutils literal notranslate">
+              <span class="pre">
+               $LD_LIBRARY_PATH
+              </span>
+             </code>
+            </p>
+           </div>
+          </blockquote>
+          <dl class="simple">
+           <dt>
+            You need to download the tarball distributions of TensorRT and cuDNN from the NVIDIA website.
+           </dt>
+           <dd>
+            <ul class="simple">
+             <li>
+              <p>
+               <a class="reference external" href="https://developer.nvidia.com/cudnn">
+                https://developer.nvidia.com/cudnn
+               </a>
+              </p>
+             </li>
+             <li>
+              <p>
+               <a class="reference external" href="https://developer.nvidia.com/tensorrt">
+                https://developer.nvidia.com/tensorrt
+               </a>
+              </p>
+             </li>
+            </ul>
+           </dd>
+          </dl>
+          <p>
+           Place these files in a directory (the directories
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             thrid_party/distdir/[x86_64-linux-gnu
+            </span>
+            <span class="pre">
+             |
+            </span>
+            <span class="pre">
+             aarch64-linux-gnu]
+            </span>
+           </code>
+           exist for this purpose)
+          </p>
+          <p>
+           Then compile referencing the directory with the tarballs
+          </p>
+          <blockquote>
+           <div>
+            <p>
+             If you get errors regarding the packages, check their sha256 hashes and make sure they match the ones listed in
+             <code class="docutils literal notranslate">
+              <span class="pre">
+               WORKSPACE
+              </span>
+             </code>
+            </p>
+           </div>
+          </blockquote>
+          <section id="release-build">
+           <h4 id="release-build">
+            Release Build
+            <a class="headerlink" href="#release-build" title="Permalink to this headline">
+             ¶
             </a>
-           </p>
-          </li>
-          <li>
+           </h4>
+           <div class="highlight-shell notranslate">
+            <div class="highlight">
+             <pre><span></span>bazel build //:libtrtorch -c opt --distdir thrid_party/distdir/<span class="o">[</span>x86_64-linux-gnu <span class="p">|</span> aarch64-linux-gnu<span class="o">]</span>
+</pre>
+            </div>
+           </div>
            <p>
-            <a class="reference external" href="https://developer.nvidia.com/tensorrt">
-             https://developer.nvidia.com/tensorrt
-            </a>
+            A tarball with the include files and library can then be found in
+            <code class="docutils literal notranslate">
+             <span class="pre">
+              bazel-bin
+             </span>
+            </code>
            </p>
-          </li>
-         </ul>
-        </dd>
-       </dl>
-       <p>
-        Place these files in a directory (the directories
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          thrid_party/distdir/[x86_64-linux-gnu
-         </span>
-         <span class="pre">
-          |
-         </span>
-         <span class="pre">
-          aarch64-linux-gnu]
-         </span>
-        </code>
-        exist for this purpose)
-       </p>
-       <p>
-        Then compile referencing the directory with the tarballs
-       </p>
-       <blockquote>
-        <div>
-         <p>
-          If you get errors regarding the packages, check their sha256 hashes and make sure they match the ones listed in
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            WORKSPACE
+          </section>
+          <section id="debug-build">
+           <span id="build-from-archive-debug">
            </span>
-          </code>
-         </p>
-        </div>
-       </blockquote>
-       <h4 id="release-build">
-        Release Build
-        <a class="headerlink" href="#release-build" title="Permalink to this headline">
-         ¶
-        </a>
-       </h4>
-       <div class="highlight-shell notranslate">
-        <div class="highlight">
-         <pre><span></span>bazel build //:libtrtorch -c opt --distdir thrid_party/distdir/<span class="o">[</span>x86_64-linux-gnu <span class="p">|</span> aarch64-linux-gnu<span class="o">]</span>
+           <h4 id="debug-build">
+            Debug Build
+            <a class="headerlink" href="#debug-build" title="Permalink to this headline">
+             ¶
+            </a>
+           </h4>
+           <p>
+            To build with debug symbols use the following command
+           </p>
+           <div class="highlight-shell notranslate">
+            <div class="highlight">
+             <pre><span></span>bazel build //:libtrtorch -c dbg --distdir thrid_party/distdir/<span class="o">[</span>x86_64-linux-gnu <span class="p">|</span> aarch64-linux-gnu<span class="o">]</span>
 </pre>
-        </div>
-       </div>
-       <p>
-        A tarball with the include files and library can then be found in
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          bazel-bin
-         </span>
-        </code>
-       </p>
-       <span id="build-from-archive-debug">
-       </span>
-       <h4 id="debug-build">
-        Debug Build
-        <a class="headerlink" href="#debug-build" title="Permalink to this headline">
-         ¶
-        </a>
-       </h4>
-       <p>
-        To build with debug symbols use the following command
-       </p>
-       <div class="highlight-shell notranslate">
-        <div class="highlight">
-         <pre><span></span>bazel build //:libtrtorch -c dbg --distdir thrid_party/distdir/<span class="o">[</span>x86_64-linux-gnu <span class="p">|</span> aarch64-linux-gnu<span class="o">]</span>
+            </div>
+           </div>
+           <p>
+            A tarball with the include files and library can then be found in
+            <code class="docutils literal notranslate">
+             <span class="pre">
+              bazel-bin
+             </span>
+            </code>
+           </p>
+          </section>
+          <section id="pre-cxx11-abi-build">
+           <h4 id="pre-cxx11-abi-build">
+            Pre CXX11 ABI Build
+            <a class="headerlink" href="#pre-cxx11-abi-build" title="Permalink to this headline">
+             ¶
+            </a>
+           </h4>
+           <p>
+            To build using the pre-CXX11 ABI use the
+            <code class="docutils literal notranslate">
+             <span class="pre">
+              pre_cxx11_abi
+             </span>
+            </code>
+            config
+           </p>
+           <div class="highlight-shell notranslate">
+            <div class="highlight">
+             <pre><span></span>bazel build //:libtrtorch --config pre_cxx11_abi -c <span class="o">[</span>dbg/opt<span class="o">]</span> --distdir thrid_party/distdir/<span class="o">[</span>x86_64-linux-gnu <span class="p">|</span> aarch64-linux-gnu<span class="o">]</span>
 </pre>
-        </div>
-       </div>
-       <p>
-        A tarball with the include files and library can then be found in
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          bazel-bin
-         </span>
-        </code>
-       </p>
-       <h4 id="pre-cxx11-abi-build">
-        Pre CXX11 ABI Build
-        <a class="headerlink" href="#pre-cxx11-abi-build" title="Permalink to this headline">
-         ¶
-        </a>
-       </h4>
-       <p>
-        To build using the pre-CXX11 ABI use the
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          pre_cxx11_abi
-         </span>
-        </code>
-        config
-       </p>
-       <div class="highlight-shell notranslate">
-        <div class="highlight">
-         <pre><span></span>bazel build //:libtrtorch --config pre_cxx11_abi -c <span class="o">[</span>dbg/opt<span class="o">]</span> --distdir thrid_party/distdir/<span class="o">[</span>x86_64-linux-gnu <span class="p">|</span> aarch64-linux-gnu<span class="o">]</span>
-</pre>
-        </div>
-       </div>
-       <p>
-        A tarball with the include files and library can then be found in
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          bazel-bin
-         </span>
-        </code>
-       </p>
-       <span id="build-from-local">
-       </span>
-       <h3 id="building-using-locally-installed-cudnn-tensorrt">
-        <strong>
-         Building using locally installed cuDNN &amp; TensorRT
-        </strong>
-        <a class="headerlink" href="#building-using-locally-installed-cudnn-tensorrt" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <blockquote>
-        <div>
-         <p>
-          If you encounter bugs and you compiled using this method please disclose it in the issue (an ldd dump would be nice too)
-         </p>
-        </div>
-       </blockquote>
-       <p>
-        Install TensorRT, CUDA and cuDNN on the system before starting to compile.
-       </p>
-       <p>
-        In WORKSPACE comment out:
-       </p>
-       <div class="highlight-python notranslate">
-        <div class="highlight">
-         <pre><span></span><span class="c1"># Downloaded distributions to use with --distdir</span>
+            </div>
+           </div>
+           <p>
+            A tarball with the include files and library can then be found in
+            <code class="docutils literal notranslate">
+             <span class="pre">
+              bazel-bin
+             </span>
+            </code>
+           </p>
+          </section>
+         </section>
+         <section id="building-using-locally-installed-cudnn-tensorrt">
+          <span id="build-from-local">
+          </span>
+          <h3 id="building-using-locally-installed-cudnn-tensorrt">
+           <strong>
+            Building using locally installed cuDNN &amp; TensorRT
+           </strong>
+           <a class="headerlink" href="#building-using-locally-installed-cudnn-tensorrt" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <blockquote>
+           <div>
+            <p>
+             If you encounter bugs and you compiled using this method please disclose that you used local sources in the issue (an ldd dump would be nice too)
+            </p>
+           </div>
+          </blockquote>
+          <p>
+           Install TensorRT, CUDA and cuDNN on the system before starting to compile.
+          </p>
+          <p>
+           In WORKSPACE comment out:
+          </p>
+          <div class="highlight-python notranslate">
+           <div class="highlight">
+            <pre><span></span><span class="c1"># Downloaded distributions to use with --distdir</span>
 <span class="n">http_archive</span><span class="p">(</span>
     <span class="n">name</span> <span class="o">=</span> <span class="s2">"cudnn"</span><span class="p">,</span>
     <span class="n">urls</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"&lt;URL&gt;"</span><span class="p">,],</span>
@@ -1023,14 +1063,14 @@ e.g. aarch64 or custom compiled version of PyTorch that use cuDNN 8.
     <span class="n">strip_prefix</span> <span class="o">=</span> <span class="s2">"TensorRT-&lt;VERSION&gt;"</span>
 <span class="p">)</span>
 </pre>
-        </div>
-       </div>
-       <p>
-        and uncomment
-       </p>
-       <div class="highlight-python notranslate">
-        <div class="highlight">
-         <pre><span></span><span class="c1"># Locally installed dependencies</span>
+           </div>
+          </div>
+          <p>
+           and uncomment
+          </p>
+          <div class="highlight-python notranslate">
+           <div class="highlight">
+            <pre><span></span><span class="c1"># Locally installed dependencies</span>
 <span class="n">new_local_repository</span><span class="p">(</span>
     <span class="n">name</span> <span class="o">=</span> <span class="s2">"cudnn"</span><span class="p">,</span>
     <span class="n">path</span> <span class="o">=</span> <span class="s2">"/usr/"</span><span class="p">,</span>
@@ -1043,194 +1083,209 @@ e.g. aarch64 or custom compiled version of PyTorch that use cuDNN 8.
 <span class="n">build_file</span> <span class="o">=</span> <span class="s2">"@//third_party/tensorrt/local:BUILD"</span>
 <span class="p">)</span>
 </pre>
-        </div>
-       </div>
-       <h4 id="id2">
-        Release Build
-        <a class="headerlink" href="#id2" title="Permalink to this headline">
-         ¶
-        </a>
-       </h4>
-       <p>
-        Compile using:
-       </p>
-       <div class="highlight-shell notranslate">
-        <div class="highlight">
-         <pre><span></span>bazel build //:libtrtorch -c opt
+           </div>
+          </div>
+          <section id="id2">
+           <h4 id="id2">
+            Release Build
+            <a class="headerlink" href="#id2" title="Permalink to this headline">
+             ¶
+            </a>
+           </h4>
+           <p>
+            Compile using:
+           </p>
+           <div class="highlight-shell notranslate">
+            <div class="highlight">
+             <pre><span></span>bazel build //:libtrtorch -c opt
 </pre>
-        </div>
-       </div>
-       <p>
-        A tarball with the include files and library can then be found in
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          bazel-bin
-         </span>
-        </code>
-       </p>
-       <span id="id3">
-       </span>
-       <h4 id="build-from-local-debug">
-        Debug Build
-        <a class="headerlink" href="#build-from-local-debug" title="Permalink to this headline">
-         ¶
-        </a>
-       </h4>
-       <p>
-        To build with debug symbols use the following command
-       </p>
-       <div class="highlight-shell notranslate">
-        <div class="highlight">
-         <pre><span></span>bazel build //:libtrtorch -c dbg
-</pre>
-        </div>
-       </div>
-       <p>
-        A tarball with the include files and library can then be found in
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          bazel-bin
-         </span>
-        </code>
-       </p>
-       <h4 id="id4">
-        Pre CXX11 ABI Build
-        <a class="headerlink" href="#id4" title="Permalink to this headline">
-         ¶
-        </a>
-       </h4>
-       <p>
-        To build using the pre-CXX11 ABI use the
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          pre_cxx11_abi
-         </span>
-        </code>
-        config
-       </p>
-       <div class="highlight-shell notranslate">
-        <div class="highlight">
-         <pre><span></span>bazel build //:libtrtorch --config pre_cxx11_abi -c <span class="o">[</span>dbg/opt<span class="o">]</span>
-</pre>
-        </div>
-       </div>
-       <h3 id="building-the-python-package">
-        <strong>
-         Building the Python package
-        </strong>
-        <a class="headerlink" href="#building-the-python-package" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        Begin by installing
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          ninja
-         </span>
-        </code>
-       </p>
-       <p>
-        You can build the Python package using
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          setup.py
-         </span>
-        </code>
-        (this will also build the correct version of
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          libtrtorch.so
-         </span>
-        </code>
-        )
-       </p>
-       <div class="highlight-shell notranslate">
-        <div class="highlight">
-         <pre><span></span>python3 setup.py <span class="o">[</span>install/bdist_wheel<span class="o">]</span>
-</pre>
-        </div>
-       </div>
-       <h4 id="id5">
-        Debug Build
-        <a class="headerlink" href="#id5" title="Permalink to this headline">
-         ¶
-        </a>
-       </h4>
-       <div class="highlight-shell notranslate">
-        <div class="highlight">
-         <pre><span></span>python3 setup.py develop <span class="o">[</span>--user<span class="o">]</span>
-</pre>
-        </div>
-       </div>
-       <p>
-        This also compiles a debug build of
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          libtrtorch.so
-         </span>
-        </code>
-       </p>
-       <h3 id="building-natively-on-aarch64-jetson">
-        <strong>
-         Building Natively on aarch64 (Jetson)
-        </strong>
-        <a class="headerlink" href="#building-natively-on-aarch64-jetson" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <h4 id="prerequisites">
-        Prerequisites
-        <a class="headerlink" href="#prerequisites" title="Permalink to this headline">
-         ¶
-        </a>
-       </h4>
-       <p>
-        Install or compile a build of PyTorch/LibTorch for aarch64
-       </p>
-       <p>
-        NVIDIA hosts builds the latest release branch for Jetson here:
-       </p>
-       <blockquote>
-        <div>
-         <p>
-          <a class="reference external" href="https://forums.developer.nvidia.com/t/pytorch-for-jetson-nano-version-1-5-0-now-available/72048">
-           https://forums.developer.nvidia.com/t/pytorch-for-jetson-nano-version-1-5-0-now-available/72048
-          </a>
-         </p>
-        </div>
-       </blockquote>
-       <h4 id="enviorment-setup">
-        Enviorment Setup
-        <a class="headerlink" href="#enviorment-setup" title="Permalink to this headline">
-         ¶
-        </a>
-       </h4>
-       <p>
-        To build natively on aarch64-linux-gnu platform, configure the
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          WORKSPACE
-         </span>
-        </code>
-        with local available dependencies.
-       </p>
-       <ol class="arabic simple">
-        <li>
-         <p>
-          Disable the rules with
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            http_archive
+            </div>
+           </div>
+           <p>
+            A tarball with the include files and library can then be found in
+            <code class="docutils literal notranslate">
+             <span class="pre">
+              bazel-bin
+             </span>
+            </code>
+           </p>
+          </section>
+          <section id="build-from-local-debug">
+           <span id="id3">
            </span>
-          </code>
-          for x86_64 by commenting the following rules:
-         </p>
-        </li>
-       </ol>
-       <div class="highlight-shell notranslate">
-        <div class="highlight">
-         <pre><span></span><span class="c1">#http_archive(</span>
+           <h4 id="build-from-local-debug">
+            Debug Build
+            <a class="headerlink" href="#build-from-local-debug" title="Permalink to this headline">
+             ¶
+            </a>
+           </h4>
+           <p>
+            To build with debug symbols use the following command
+           </p>
+           <div class="highlight-shell notranslate">
+            <div class="highlight">
+             <pre><span></span>bazel build //:libtrtorch -c dbg
+</pre>
+            </div>
+           </div>
+           <p>
+            A tarball with the include files and library can then be found in
+            <code class="docutils literal notranslate">
+             <span class="pre">
+              bazel-bin
+             </span>
+            </code>
+           </p>
+          </section>
+          <section id="id4">
+           <h4 id="id4">
+            Pre CXX11 ABI Build
+            <a class="headerlink" href="#id4" title="Permalink to this headline">
+             ¶
+            </a>
+           </h4>
+           <p>
+            To build using the pre-CXX11 ABI use the
+            <code class="docutils literal notranslate">
+             <span class="pre">
+              pre_cxx11_abi
+             </span>
+            </code>
+            config
+           </p>
+           <div class="highlight-shell notranslate">
+            <div class="highlight">
+             <pre><span></span>bazel build //:libtrtorch --config pre_cxx11_abi -c <span class="o">[</span>dbg/opt<span class="o">]</span>
+</pre>
+            </div>
+           </div>
+          </section>
+         </section>
+         <section id="building-the-python-package">
+          <h3 id="building-the-python-package">
+           <strong>
+            Building the Python package
+           </strong>
+           <a class="headerlink" href="#building-the-python-package" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           Begin by installing
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             ninja
+            </span>
+           </code>
+          </p>
+          <p>
+           You can build the Python package using
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             setup.py
+            </span>
+           </code>
+           (this will also build the correct version of
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             libtrtorch.so
+            </span>
+           </code>
+           )
+          </p>
+          <div class="highlight-shell notranslate">
+           <div class="highlight">
+            <pre><span></span>python3 setup.py <span class="o">[</span>install/bdist_wheel<span class="o">]</span>
+</pre>
+           </div>
+          </div>
+          <section id="id5">
+           <h4 id="id5">
+            Debug Build
+            <a class="headerlink" href="#id5" title="Permalink to this headline">
+             ¶
+            </a>
+           </h4>
+           <div class="highlight-shell notranslate">
+            <div class="highlight">
+             <pre><span></span>python3 setup.py develop <span class="o">[</span>--user<span class="o">]</span>
+</pre>
+            </div>
+           </div>
+           <p>
+            This also compiles a debug build of
+            <code class="docutils literal notranslate">
+             <span class="pre">
+              libtrtorch.so
+             </span>
+            </code>
+           </p>
+          </section>
+         </section>
+         <section id="building-natively-on-aarch64-jetson">
+          <h3 id="building-natively-on-aarch64-jetson">
+           <strong>
+            Building Natively on aarch64 (Jetson)
+           </strong>
+           <a class="headerlink" href="#building-natively-on-aarch64-jetson" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <section id="prerequisites">
+           <h4 id="prerequisites">
+            Prerequisites
+            <a class="headerlink" href="#prerequisites" title="Permalink to this headline">
+             ¶
+            </a>
+           </h4>
+           <p>
+            Install or compile a build of PyTorch/LibTorch for aarch64
+           </p>
+           <p>
+            NVIDIA hosts builds the latest release branch for Jetson here:
+           </p>
+           <blockquote>
+            <div>
+             <p>
+              <a class="reference external" href="https://forums.developer.nvidia.com/t/pytorch-for-jetson-nano-version-1-5-0-now-available/72048">
+               https://forums.developer.nvidia.com/t/pytorch-for-jetson-nano-version-1-5-0-now-available/72048
+              </a>
+             </p>
+            </div>
+           </blockquote>
+          </section>
+          <section id="enviorment-setup">
+           <h4 id="enviorment-setup">
+            Enviorment Setup
+            <a class="headerlink" href="#enviorment-setup" title="Permalink to this headline">
+             ¶
+            </a>
+           </h4>
+           <p>
+            To build natively on aarch64-linux-gnu platform, configure the
+            <code class="docutils literal notranslate">
+             <span class="pre">
+              WORKSPACE
+             </span>
+            </code>
+            with local available dependencies.
+           </p>
+           <ol class="arabic simple">
+            <li>
+             <p>
+              Disable the rules with
+              <code class="docutils literal notranslate">
+               <span class="pre">
+                http_archive
+               </span>
+              </code>
+              for x86_64 by commenting the following rules:
+             </p>
+            </li>
+           </ol>
+           <div class="highlight-shell notranslate">
+            <div class="highlight">
+             <pre><span></span><span class="c1">#http_archive(</span>
 <span class="c1">#    name = "libtorch",</span>
 <span class="c1">#    build_file = "@//third_party/libtorch:BUILD",</span>
 <span class="c1">#    strip_prefix = "libtorch",</span>
@@ -1266,18 +1321,18 @@ e.g. aarch64 or custom compiled version of PyTorch that use cuDNN 8.
 <span class="c1">#    strip_prefix = "TensorRT-7.1.3.4"</span>
 <span class="c1">#)</span>
 </pre>
-        </div>
-       </div>
-       <ol class="arabic simple" start="2">
-        <li>
-         <p>
-          Disable Python API testing dependencies:
-         </p>
-        </li>
-       </ol>
-       <div class="highlight-shell notranslate">
-        <div class="highlight">
-         <pre><span></span><span class="c1">#pip3_import(</span>
+            </div>
+           </div>
+           <ol class="arabic simple" start="2">
+            <li>
+             <p>
+              Disable Python API testing dependencies:
+             </p>
+            </li>
+           </ol>
+           <div class="highlight-shell notranslate">
+            <div class="highlight">
+             <pre><span></span><span class="c1">#pip3_import(</span>
 <span class="c1">#    name = "trtorch_py_deps",</span>
 <span class="c1">#    requirements = "//py:requirements.txt"</span>
 <span class="c1">#)</span>
@@ -1293,79 +1348,79 @@ e.g. aarch64 or custom compiled version of PyTorch that use cuDNN 8.
 <span class="c1">#load("@py_test_deps//:requirements.bzl", "pip_install")</span>
 <span class="c1">#pip_install()</span>
 </pre>
-        </div>
-       </div>
-       <ol class="arabic" start="3">
-        <li>
-         <p>
-          Configure the correct paths to directory roots containing local dependencies in the
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            new_local_repository
-           </span>
-          </code>
-          rules:
-         </p>
-         <blockquote>
-          <div>
-           <p>
-            NOTE: If you installed PyTorch using a pip package, the correct path is the path to the root of the python torch package.
+            </div>
+           </div>
+           <ol class="arabic" start="3">
+            <li>
+             <p>
+              Configure the correct paths to directory roots containing local dependencies in the
+              <code class="docutils literal notranslate">
+               <span class="pre">
+                new_local_repository
+               </span>
+              </code>
+              rules:
+             </p>
+             <blockquote>
+              <div>
+               <p>
+                NOTE: If you installed PyTorch using a pip package, the correct path is the path to the root of the python torch package.
 In the case that you installed with
-            <code class="docutils literal notranslate">
-             <span class="pre">
-              sudo
-             </span>
-             <span class="pre">
-              pip
-             </span>
-             <span class="pre">
-              install
-             </span>
-            </code>
-            this will be
-            <code class="docutils literal notranslate">
-             <span class="pre">
-              /usr/local/lib/python3.6/dist-packages/torch
-             </span>
-            </code>
-            .
+                <code class="docutils literal notranslate">
+                 <span class="pre">
+                  sudo
+                 </span>
+                 <span class="pre">
+                  pip
+                 </span>
+                 <span class="pre">
+                  install
+                 </span>
+                </code>
+                this will be
+                <code class="docutils literal notranslate">
+                 <span class="pre">
+                  /usr/local/lib/python3.6/dist-packages/torch
+                 </span>
+                </code>
+                .
 In the case you installed with
-            <code class="docutils literal notranslate">
-             <span class="pre">
-              pip
-             </span>
-             <span class="pre">
-              install
-             </span>
-             <span class="pre">
-              --user
-             </span>
-            </code>
-            this will be
-            <code class="docutils literal notranslate">
-             <span class="pre">
-              $HOME/.local/lib/python3.6/site-packages/torch
-             </span>
-            </code>
-            .
-           </p>
-          </div>
-         </blockquote>
-        </li>
-       </ol>
-       <p>
-        In the case you are using NVIDIA compiled pip packages, set the path for both libtorch sources to the same path. This is because unlike
+                <code class="docutils literal notranslate">
+                 <span class="pre">
+                  pip
+                 </span>
+                 <span class="pre">
+                  install
+                 </span>
+                 <span class="pre">
+                  --user
+                 </span>
+                </code>
+                this will be
+                <code class="docutils literal notranslate">
+                 <span class="pre">
+                  $HOME/.local/lib/python3.6/site-packages/torch
+                 </span>
+                </code>
+                .
+               </p>
+              </div>
+             </blockquote>
+            </li>
+           </ol>
+           <p>
+            In the case you are using NVIDIA compiled pip packages, set the path for both libtorch sources to the same path. This is because unlike
 PyTorch on x86_64, NVIDIA aarch64 PyTorch uses the CXX11-ABI. If you compiled for source using the pre_cxx11_abi and only would like to
 use that library, set the paths to the same path but when you compile make sure to add the flag
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          --config=pre_cxx11_abi
-         </span>
-        </code>
-       </p>
-       <div class="highlight-shell notranslate">
-        <div class="highlight">
-         <pre><span></span>new_local_repository<span class="o">(</span>
+            <code class="docutils literal notranslate">
+             <span class="pre">
+              --config=pre_cxx11_abi
+             </span>
+            </code>
+           </p>
+           <div class="highlight-shell notranslate">
+            <div class="highlight">
+             <pre><span></span>new_local_repository<span class="o">(</span>
     <span class="nv">name</span> <span class="o">=</span> <span class="s2">"libtorch"</span>,
     <span class="nv">path</span> <span class="o">=</span> <span class="s2">"/usr/local/lib/python3.6/dist-packages/torch"</span>,
     <span class="nv">build_file</span> <span class="o">=</span> <span class="s2">"third_party/libtorch/BUILD"</span>
@@ -1389,53 +1444,61 @@ new_local_repository<span class="o">(</span>
     <span class="nv">build_file</span> <span class="o">=</span> <span class="s2">"@//third_party/tensorrt/local:BUILD"</span>
 <span class="o">)</span>
 </pre>
-        </div>
-       </div>
-       <h4 id="compile-c-library-and-compiler-cli">
-        Compile C++ Library and Compiler CLI
-        <a class="headerlink" href="#compile-c-library-and-compiler-cli" title="Permalink to this headline">
-         ¶
-        </a>
-       </h4>
-       <p>
-        Compile TRTorch library using bazel command:
-       </p>
-       <div class="highlight-shell notranslate">
-        <div class="highlight">
-         <pre><span></span>bazel build //:libtrtorch
+            </div>
+           </div>
+          </section>
+          <section id="compile-c-library-and-compiler-cli">
+           <h4 id="compile-c-library-and-compiler-cli">
+            Compile C++ Library and Compiler CLI
+            <a class="headerlink" href="#compile-c-library-and-compiler-cli" title="Permalink to this headline">
+             ¶
+            </a>
+           </h4>
+           <p>
+            Compile TRTorch library using bazel command:
+           </p>
+           <div class="highlight-shell notranslate">
+            <div class="highlight">
+             <pre><span></span>bazel build //:libtrtorch
 </pre>
-        </div>
-       </div>
-       <h4 id="compile-python-api">
-        Compile Python API
-        <a class="headerlink" href="#compile-python-api" title="Permalink to this headline">
-         ¶
-        </a>
-       </h4>
-       <p>
-        Compile the Python API using the following command from the
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          //py
-         </span>
-        </code>
-        directory:
-       </p>
-       <div class="highlight-shell notranslate">
-        <div class="highlight">
-         <pre><span></span>python3 setup.py install --use-cxx11-abi
+            </div>
+           </div>
+          </section>
+          <section id="compile-python-api">
+           <h4 id="compile-python-api">
+            Compile Python API
+            <a class="headerlink" href="#compile-python-api" title="Permalink to this headline">
+             ¶
+            </a>
+           </h4>
+           <p>
+            Compile the Python API using the following command from the
+            <code class="docutils literal notranslate">
+             <span class="pre">
+              //py
+             </span>
+            </code>
+            directory:
+           </p>
+           <div class="highlight-shell notranslate">
+            <div class="highlight">
+             <pre><span></span>python3 setup.py install --use-cxx11-abi
 </pre>
-        </div>
-       </div>
-       <p>
-        If you have a build of PyTorch that uses Pre-CXX11 ABI drop the
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          --use-cxx11-abi
-         </span>
-        </code>
-        flag
-       </p>
+            </div>
+           </div>
+           <p>
+            If you have a build of PyTorch that uses Pre-CXX11 ABI drop the
+            <code class="docutils literal notranslate">
+             <span class="pre">
+              --use-cxx11-abi
+             </span>
+            </code>
+            flag
+           </p>
+          </section>
+         </section>
+        </section>
+       </section>
       </article>
      </div>
     </div>

@@ -73,16 +73,38 @@ Weights::Weights(ConversionCtx* ctx, at::Tensor t) {
   }
   auto t_cpu = t.to(at::kCPU);
   t_cpu = t_cpu.contiguous();
-  auto dtype_optional = util::toTRTDataType(t_cpu.dtype());
+  auto dtype_optional = util::optScalarTypeToTRTDataType(t_cpu.scalar_type());
   if (!dtype_optional) {
-    TRTORCH_THROW_ERROR("The tensor requested to be converted to nvinfer1::Weights is of an unsupported type");
+    TRTORCH_THROW_ERROR(
+        "The tensor requested to be converted to nvinfer1::Weights is of an unsupported type: "
+        << dtype_optional.value());
   }
 
   // Store the data in the conversion context so it remains until building is
   // complete
-  void* buf = malloc(t_cpu.numel() * sizeof(float));
+
+  void* buf = nullptr;
+
+  if (dtype_optional.value() == nvinfer1::DataType::kFLOAT) {
+    buf = malloc(t_cpu.numel() * sizeof(float));
+    memcpy(buf, t_cpu.data_ptr(), t_cpu.numel() * sizeof(float));
+  } else if (dtype_optional.value() == nvinfer1::DataType::kHALF) {
+    buf = malloc(t_cpu.numel() * (sizeof(float) / 2));
+    memcpy(buf, t_cpu.data_ptr(), t_cpu.numel() * (sizeof(float) / 2));
+  } else if (dtype_optional.value() == nvinfer1::DataType::kINT8) {
+    buf = malloc(t_cpu.numel() * sizeof(char));
+    memcpy(buf, t_cpu.data_ptr(), t_cpu.numel() * sizeof(char));
+  } else if (dtype_optional.value() == nvinfer1::DataType::kINT32) {
+    buf = malloc(t_cpu.numel() * sizeof(int));
+    memcpy(buf, t_cpu.data_ptr(), t_cpu.numel() * sizeof(int));
+  } else if (dtype_optional.value() == nvinfer1::DataType::kBOOL) {
+    buf = malloc(t_cpu.numel() * sizeof(bool));
+    memcpy(buf, t_cpu.data_ptr(), t_cpu.numel() * sizeof(bool));
+  } else {
+    TRTORCH_THROW_ERROR("Found unsupported data type for tensor to weight conversion");
+  }
+
   ctx->builder_resources.push_back(buf);
-  memcpy(buf, t_cpu.data_ptr(), t_cpu.numel() * sizeof(float));
 
   this->data.type = dtype_optional.value();
   this->data.count = t_cpu.numel();
@@ -94,6 +116,7 @@ Weights::Weights(ConversionCtx* ctx, at::Tensor t) {
 // clang-format off
 std::ostream& operator<<(std::ostream& os, const Weights& w) {
   os << "Weights: " << w.shape
+     << "\n    Data Type: " << w.data.type
      << "\n    Number of input maps: " << w.num_input_maps
      << "\n    Number of output maps: " << w.num_output_maps
      << "\n    Element shape: [";

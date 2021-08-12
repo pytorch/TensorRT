@@ -84,7 +84,7 @@ void TRTorchLogger::log(LogLevel lvl, std::string msg) {
   std::cerr << prefix_ << msg << std::endl;
 }
 
-void TRTorchLogger::log(Severity severity, const char* msg) {
+void TRTorchLogger::log(Severity severity, const char* msg) noexcept {
   LogLevel lvl = (LogLevel)severity;
   log(lvl, std::string(msg));
 }

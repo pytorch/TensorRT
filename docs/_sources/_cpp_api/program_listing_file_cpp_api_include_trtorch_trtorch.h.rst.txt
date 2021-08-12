@@ -21,7 +21,9 @@ Program Listing for File trtorch.h
    #pragma once
    
    #include <cuda_runtime.h>
+   #include <iostream>
    #include <memory>
+   #include <set>
    #include <string>
    #include <vector>
    
@@ -35,7 +37,7 @@ Program Listing for File trtorch.h
    } // namespace torch
    
    namespace c10 {
-   enum class DeviceType : int16_t;
+   enum class DeviceType : int8_t;
    enum class ScalarType : int8_t;
    template <class>
    class ArrayRef;
@@ -49,22 +51,15 @@ Program Listing for File trtorch.h
    #include "trtorch/macros.h"
    namespace trtorch {
    struct TRTORCH_API CompileSpec {
-     struct TRTORCH_API InputRange {
-       std::vector<int64_t> min;
-       std::vector<int64_t> opt;
-       std::vector<int64_t> max;
-       InputRange(std::vector<int64_t> opt);
-       InputRange(c10::ArrayRef<int64_t> opt);
-       InputRange(std::vector<int64_t> min, std::vector<int64_t> opt, std::vector<int64_t> max);
-       InputRange(c10::ArrayRef<int64_t> min, c10::ArrayRef<int64_t> opt, c10::ArrayRef<int64_t> max);
-     };
-   
      class TRTORCH_API DataType {
       public:
        enum Value : int8_t {
          kFloat,
          kHalf,
          kChar,
+         kInt,
+         kBool,
+         kUnknown
        };
    
        DataType() = default;
@@ -88,30 +83,9 @@ Program Listing for File trtorch.h
        }
    
       private:
+       friend std::ostream& operator<<(std::ostream& os, const DataType& dtype);
        Value value;
      };
-   
-     enum class EngineCapability : int8_t {
-       kDEFAULT,
-       kSAFE_GPU,
-       kSAFE_DLA,
-     };
-   
-     CompileSpec(std::vector<InputRange> input_ranges) : input_ranges(std::move(input_ranges)) {}
-     CompileSpec(std::vector<std::vector<int64_t>> fixed_sizes);
-     CompileSpec(std::vector<c10::ArrayRef<int64_t>> fixed_sizes);
-   
-     // Defaults should reflect TensorRT defaults for BuilderConfig
-   
-     std::vector<InputRange> input_ranges;
-   
-     DataType op_precision = DataType::kFloat;
-   
-     bool refit = false;
-   
-     bool debug = false;
-   
-     bool strict_types = false;
    
      /*
       * Setting data structure for Target device
@@ -159,12 +133,170 @@ Program Listing for File trtorch.h
        Device() : device_type(DeviceType::kGPU), gpu_id(0), dla_core(0), allow_gpu_fallback(false) {}
      };
    
-     /*
-      * Target Device
-      */
+     enum class EngineCapability : int8_t {
+       kSTANDARD,
+       kSAFETY,
+       kDLA_STANDALONE,
+     };
+   
+     class TRTORCH_API TensorFormat {
+      public:
+       enum Value : int8_t {
+         kContiguous,
+         kChannelsLast,
+         kUnknown,
+       };
+   
+       TensorFormat() = default;
+       constexpr TensorFormat(Value t) : value(t) {}
+       TensorFormat(at::MemoryFormat t);
+       operator Value() const {
+         return value;
+       }
+       explicit operator bool() = delete;
+       constexpr bool operator==(TensorFormat other) const {
+         return value == other.value;
+       }
+       constexpr bool operator==(TensorFormat::Value other) const {
+         return value == other;
+       }
+       constexpr bool operator!=(TensorFormat other) const {
+         return value != other.value;
+       }
+       constexpr bool operator!=(TensorFormat::Value other) const {
+         return value != other;
+       }
+   
+      private:
+       friend std::ostream& operator<<(std::ostream& os, const TensorFormat& format);
+       Value value;
+     };
+   
+     struct TRTORCH_API Input {
+       std::vector<int64_t> min_shape;
+       std::vector<int64_t> opt_shape;
+       std::vector<int64_t> max_shape;
+       std::vector<int64_t> shape;
+       DataType dtype;
+       TensorFormat format;
+   
+       Input(std::vector<int64_t> shape, TensorFormat format = TensorFormat::kContiguous);
+   
+       Input(std::vector<int64_t> shape, DataType dtype, TensorFormat format = TensorFormat::kContiguous);
+   
+       Input(c10::ArrayRef<int64_t> shape, TensorFormat format = TensorFormat::kContiguous);
+   
+       Input(c10::ArrayRef<int64_t> shape, DataType dtype, TensorFormat format = TensorFormat::kContiguous);
+   
+       Input(
+           std::vector<int64_t> min_shape,
+           std::vector<int64_t> opt_shape,
+           std::vector<int64_t> max_shape,
+           TensorFormat format = TensorFormat::kContiguous);
+   
+       Input(
+           std::vector<int64_t> min_shape,
+           std::vector<int64_t> opt_shape,
+           std::vector<int64_t> max_shape,
+           DataType dtype,
+           TensorFormat format = TensorFormat::kContiguous);
+   
+       Input(
+           c10::ArrayRef<int64_t> min_shape,
+           c10::ArrayRef<int64_t> opt_shape,
+           c10::ArrayRef<int64_t> max_shape,
+           TensorFormat format = TensorFormat::kContiguous);
+   
+       Input(
+           c10::ArrayRef<int64_t> min_shape,
+           c10::ArrayRef<int64_t> opt_shape,
+           c10::ArrayRef<int64_t> max_shape,
+           DataType dtype,
+           TensorFormat format = TensorFormat::kContiguous);
+   
+       bool get_explicit_set_dtype() {
+         return explicit_set_dtype;
+       }
+   
+      private:
+       friend std::ostream& operator<<(std::ostream& os, const Input& input);
+       bool input_is_dynamic;
+       bool explicit_set_dtype;
+     };
+   
+     struct TRTORCH_API InputRange {
+       std::vector<int64_t> min;
+       std::vector<int64_t> opt;
+       std::vector<int64_t> max;
+       [[deprecated("trtorch::CompileSpec::InputRange is being deprecated in favor of trtorch::CompileSpec::Input. trtorch::CompileSpec::InputRange will be removed in TRTorch v0.5.0")]] InputRange(
+           std::vector<int64_t> opt);
+       [[deprecated("trtorch::CompileSpec::InputRange is being deprecated in favor of trtorch::CompileSpec::Input. trtorch::CompileSpec::InputRange will be removed in TRTorch v0.5.0")]] InputRange(
+           c10::ArrayRef<int64_t> opt);
+       [[deprecated("trtorch::CompileSpec::InputRange is being deprecated in favor of trtorch::CompileSpec::Input. trtorch::CompileSpec::InputRange will be removed in TRTorch v0.5.0")]] InputRange(
+           std::vector<int64_t> min,
+           std::vector<int64_t> opt,
+           std::vector<int64_t> max);
+       [[deprecated("trtorch::CompileSpec::InputRange is being deprecated in favor of trtorch::CompileSpec::Input. trtorch::CompileSpec::InputRange will be removed in TRTorch v0.5.0")]] InputRange(
+           c10::ArrayRef<int64_t> min,
+           c10::ArrayRef<int64_t> opt,
+           c10::ArrayRef<int64_t> max);
+     };
+   
+     struct TRTORCH_API TorchFallback {
+       bool enabled = false;
+   
+       uint64_t min_block_size = 1;
+   
+       std::vector<std::string> forced_fallback_ops;
+   
+       TorchFallback() = default;
+   
+       TorchFallback(bool enabled) : enabled(enabled) {}
+   
+       TorchFallback(bool enabled, uint64_t min_size) : enabled(enabled), min_block_size(min_size) {}
+     };
+   
+     [[deprecated("trtorch::CompileSpec::CompileSpec(std::vector<InputRange> input_ranges) is being deprecated in favor of trtorch::CompileSpec::CompileSpec(std::vector<Input> inputs). Please use CompileSpec(std::vector<Input> inputs). trtorch::CompileSpec::CompileSpec(std::vector<InputRange> input_ranges) will be removed in TRTorch v0.5.0")]] CompileSpec(
+         std::vector<InputRange> input_ranges)
+         : input_ranges(std::move(input_ranges)) {}
+     CompileSpec(std::vector<std::vector<int64_t>> fixed_sizes);
+   
+     CompileSpec(std::vector<c10::ArrayRef<int64_t>> fixed_sizes);
+   
+     CompileSpec(std::vector<Input> inputs) : inputs(std::move(inputs)) {}
+   
+     // Defaults should reflect TensorRT defaults for BuilderConfig
+   
+     std::vector<Input> inputs;
+   
+     [[deprecated(
+         "trtorch::CompileSpec::input_ranges is being deprecated in favor of trtorch::CompileSpec::inputs. trtorch::CompileSpec::input_ranges will be removed in TRTorch v0.5.0")]] std::
+         vector<InputRange>
+             input_ranges;
+   
+     [[deprecated(
+         "trtorch::CompileSpec::op_precision is being deprecated in favor of trtorch::CompileSpec::enabled_precisions, a set of all enabled precisions to use during compilation, trtorch::CompileSpec::op_precision will be removed in TRTorch v0.5.0")]] DataType
+         op_precision = DataType::kFloat;
+   
+     std::set<DataType> enabled_precisions = {DataType::kFloat};
+   
+     bool disable_tf32 = false;
+   
+     bool sparse_weights = false;
+   
+     bool refit = false;
+   
+     bool debug = false;
+   
+     bool truncate_long_and_double = false;
+   
+     bool strict_types = false;
+   
      Device device;
    
-     EngineCapability capability = EngineCapability::kDEFAULT;
+     TorchFallback torch_fallback;
+   
+     EngineCapability capability = EngineCapability::kSTANDARD;
    
      uint64_t num_min_timing_iters = 2;
      uint64_t num_avg_timing_iters = 1;
@@ -188,6 +320,9 @@ Program Listing for File trtorch.h
        const torch::jit::Module& module,
        std::string method_name,
        CompileSpec info);
+   
+   TRTORCH_API torch::jit::Module EmbedEngineInNewModule(const std::string& engine, CompileSpec::Device device);
+   
    TRTORCH_API void set_device(const int gpu_id);
    
    } // namespace trtorch

@@ -5,6 +5,7 @@ bazel-genfiles
 bazel-out
 bazel-testlogs
 bazel-TRTorch
+bazel-trtorch-testing
 third_party/pytorch
 *.jit
 *.jit.pt
@@ -38,3 +39,12 @@ py/trtorch/_version.py
 py/wheelhouse
 py/.eggs
 notebooks/.ipynb_checkpoints/
+*.cache
+tests/py/data
+examples/**/deps/**/*
+!examples/**/deps/.gitkeep
+examples/trtorchrt_example/trtorchrt_example
+examples/int8/ptq/ptq
+examples/int8/qat/qat
+examples/int8/training/vgg16/data/*
+examples/int8/datasets/data/*

@@ -21,9 +21,9 @@ data = torch.randn((1, 3, 224, 224)).to("cuda")
 traced_model = torch.jit.trace(model, [data])
 
 # Compile module
-compiled_trt_model = trtorch.compile(model, {
-    "input_shapes": [data.shape],
-    "op_precision": torch.half, # Run in FP16
+compiled_trt_model = trtorch.compile(traced_model, {
+    "inputs": [trtorch.Input(data.shape)],
+    "enabled_precisions": {torch.float, torch.half}, # Run with FP16
 })
 
 results = compiled_trt_model(data.half())

@@ -8,6 +8,7 @@
 
 #include "core/conversion/conversionctx/ConversionCtx.h"
 #include "core/conversion/converters/Weights.h"
+#include "core/conversion/converters/converter_util.h"
 #include "core/conversion/var/Var.h"
 #include "core/util/prelude.h"
 
@@ -39,6 +40,7 @@ class RegisterNodeConversionPatterns {
 
 bool node_is_convertable(const torch::jit::Node* n);
 OpConverter get_node_converter_for(const torch::jit::FunctionSchema* signature);
+std::vector<std::string> get_converter_list();
 
 } // namespace converters
 } // namespace conversion

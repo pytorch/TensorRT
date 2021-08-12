@@ -34,8 +34,8 @@ at the documentation for the TRTorch ``TensorRTCompileSpec`` API.
     spec = {
         "forward":
             trtorch.TensorRTCompileSpec({
-                "input_shapes": [[1, 3, 300, 300]],
-                "op_precision": torch.half,
+                "inputs": [trtorch.Input([1, 3, 300, 300])],
+                "enabled_precisions": {torch.float, torch.half},
                 "refit": False,
                 "debug": False,
                 "strict_types": False,

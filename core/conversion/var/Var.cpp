@@ -1,5 +1,6 @@
 #include <sstream>
 
+#include "core/conversion/converters/converter_util.h"
 #include "core/conversion/var/Var.h"
 #include "core/util/prelude.h"
 
@@ -89,31 +90,28 @@ nvinfer1::ITensor* Var::ITensorOrFreeze(ConversionCtx* ctx) {
   if (isIValue()) {
     LOG_DEBUG(ctx->logger, "Found IValue containing object of type " << *(ptr_.ivalue->type()));
   }
+
   TRTORCH_CHECK(
-      isITensor() || (isIValue() && ptr_.ivalue->isTensor()),
+      isITensor() || (isIValue() && (ptr_.ivalue->isTensor() || ptr_.ivalue->isCustomClass())),
       "Requested either IValue containing a Tensor, or ITensor, however Var type is " << type_name());
 
   nvinfer1::ITensor* out;
 
   if (isIValue()) {
-    auto weights = converters::Weights(ctx, ptr_.ivalue->toTensor());
-
-    auto const_layer = ctx->net->addConstant(weights.shape, weights.data);
-    TRTORCH_CHECK(const_layer, "Unable to freeze tensor into constant layer");
-
-    out = const_layer->getOutput(0);
-
-    std::ostringstream tensor_id;
-    tensor_id << reinterpret_cast<int*>(out);
-
-    LOG_DEBUG(ctx->logger, "Freezing tensor " << tensor_id.str() << " as an IConstantLayer");
-    const_layer->setName(("[Freeze Tensor " + tensor_id.str() + " ]").c_str());
+    if (ptr_.ivalue->isTensor()) {
+      auto tensor = ptr_.ivalue->toTensor();
+      out = converters::tensor_to_const(ctx, tensor);
+    } else {
+      // Split converter generates c10::IValue which hold TensorContainer.
+      auto output_container = ptr_.ivalue->toCustomClass<TensorContainer>();
+      out = output_container.get()->tensor();
+    }
   } else {
     out = ptr_.tensor;
   }
 
-  LOG_DEBUG("Frozen tensor shape: " << out->getDimensions());
-
+  LOG_DEBUG("ITensor shape: " << out->getDimensions());
+  LOG_DEBUG("ITensor type: " << out->getType());
   return out;
 }
 
