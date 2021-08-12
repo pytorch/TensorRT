@@ -585,6 +585,22 @@ auto aten_registrations TRTORCH_UNUSED =
                       return {};
                     },
                     EvalOptions()})
+        .evaluator({c10::Symbol::fromQualString("aten::is_floating_point"),
+                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+                      auto tensor_var = args.at(n->input(0));
+                      if (tensor_var.isITensor()) {
+                        auto tensor = tensor_var.ITensor();
+                        auto t = tensor->getType();
+                        return (t == nvinfer1::DataType::kFLOAT || t == nvinfer1::DataType::kHALF);
+                      } else {
+                        auto tensor = tensor_var.unwrapToTensor();
+                        auto t = tensor.scalar_type();
+                        return at::isFloatingType(t);
+                      }
+                    },
+                    EvalOptions().validSchemas({
+                        "aten::is_floating_point(Tensor self) -> (bool)",
+                    })})
         .evaluator(
             {c10::Symbol::fromQualString("aten::tensor"),
              [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
