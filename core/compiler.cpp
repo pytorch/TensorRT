@@ -120,8 +120,7 @@ void AddEngineToGraph(
 
 bool CheckMethodOperatorSupport(const torch::jit::script::Module& mod, std::string method_name) {
   // Go through Lowering to simplify graph
-  CompileSpec cfg({});
-  auto graph_and_parameters = lowering::Lower(mod, method_name, cfg.lower_info);
+  auto graph_and_parameters = lowering::Lower(mod, method_name, lowering::LowerInfo());
 
   auto g = graph_and_parameters.first;
   LOG_DEBUG(*g << "(CheckMethodOperatorSupport)\n");
