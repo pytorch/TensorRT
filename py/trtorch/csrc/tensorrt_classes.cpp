@@ -182,7 +182,15 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
     info.convert_info.engine_settings.enabled_precisions.insert(toTRTDataType(p));
   }
 
-  info.convert_info.engine_settings.calibrator = ptq_calibrator;
+  if (ptq_calibrator) {
+    info.convert_info.engine_settings.calibrator = ptq_calibrator;
+  } else {
+    if (info.convert_info.engine_settings.enabled_precisions.find(nvinfer1::DataType::kINT8) !=
+        info.convert_info.engine_settings.enabled_precisions.end()) {
+      info.lower_info.unfreeze_module = true;
+      info.lower_info.disable_cse = true;
+    }
+  }
   info.convert_info.engine_settings.sparse_weights = sparse_weights;
   info.convert_info.engine_settings.disable_tf32 = disable_tf32;
   info.convert_info.engine_settings.refit = refit;

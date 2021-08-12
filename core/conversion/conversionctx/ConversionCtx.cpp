@@ -69,9 +69,11 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
       case nvinfer1::DataType::kINT8:
         TRTORCH_CHECK(builder->platformHasFastInt8(), "Requested inference in INT8 but platform does not support INT8");
         cfg->setFlag(nvinfer1::BuilderFlag::kINT8);
-        if (settings.calibrator == nullptr) {
+        if (!settings.calibrator) {
           LOG_INFO(
-              "INT8 kernels are enabled but not calibrator was provided, assuming source model was trained quantization aware");
+              "Int8 precision has been enabled but no calibrator provided. This assumes the network has Q/DQ nodes obtained from Quantization aware training. For more details, refer to https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#work-with-qat-networks");
+        } else {
+          cfg->setInt8Calibrator(settings.calibrator);
         }
         break;
       case nvinfer1::DataType::kFLOAT:

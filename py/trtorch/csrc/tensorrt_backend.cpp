@@ -27,12 +27,12 @@ c10::impl::GenericDict TensorRTBackend::compile(c10::IValue mod_val, c10::impl::
   mod = core::lowering::LowerModule(mod);
 
   auto spec = c10::impl::toTypedDict<std::string, at::IValue>(method_compile_spec);
-
+  core::lowering::LowerInfo lower_info;
   for (auto it = spec.begin(), end = spec.end(); it != end; ++it) {
     const auto& method_name = it->key();
     auto method = mod.get_method(method_name);
     auto graph = method.graph();
-    core::lowering::LowerGraph(graph);
+    core::lowering::LowerGraph(graph, lower_info);
   }
 
   auto handles = c10::impl::GenericDict(
