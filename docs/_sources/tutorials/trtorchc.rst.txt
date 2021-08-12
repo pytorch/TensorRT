@@ -105,7 +105,6 @@ to standard TorchScript. Load with ``torch.jit.load()`` and run like you would r
           "--" can be used to terminate flag options and force all following
           arguments to be treated as positional options
 
-
 e.g.
 
 .. code-block:: shell
