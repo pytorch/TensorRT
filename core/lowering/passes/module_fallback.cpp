@@ -61,7 +61,7 @@ void NotateModuleForFallback(const torch::jit::Module& mod, std::string mod_name
   }
 }
 
-void MarkNodesForFallback(std::shared_ptr<torch::jit::Graph>& g) {
+void MarkNodesForFallback(std::shared_ptr<torch::jit::Graph>& g, bool delete_delims) {
   auto b = g->block();
 
   std::stack<bool> mark = std::stack<bool>({false});
@@ -71,19 +71,25 @@ void MarkNodesForFallback(std::shared_ptr<torch::jit::Graph>& g) {
       if (n->s(c10::Symbol::attr("compilation_edge")) == "start") {
         LOG_DEBUG("Starting to mark new segmented block targeted for torch");
         mark.push(true);
-        it.destroyCurrent();
+        if (delete_delims) {
+          it.destroyCurrent();
+        }
       }
     } else if (mark.top() && n->kind() == torch::jit::prim::Enter && n->hasAttributeS("compilation_edge")) {
       if (n->s(c10::Symbol::attr("compilation_edge")) == "start") {
         LOG_DEBUG("Found the start of another segmented block targeted for torch while actively marking a block");
         mark.push(true);
-        it.destroyCurrent();
+        if (delete_delims) {
+          it.destroyCurrent();
+        }
       }
     } else if (mark.top() && n->kind() == torch::jit::prim::Exit && n->hasAttributeS("compilation_edge")) {
       if (n->s(c10::Symbol::attr("compilation_edge")) == "end") {
         LOG_DEBUG("Found the end of segmented block targeted for torch while actively marking a block");
         mark.pop();
-        it.destroyCurrent();
+        if (delete_delims) {
+          it.destroyCurrent();
+        }
       }
     } else if (!mark.top() && n->kind() == torch::jit::prim::Exit && n->hasAttributeS("compilation_edge")) {
       if (n->s(c10::Symbol::attr("compilation_edge")) == "end") {
