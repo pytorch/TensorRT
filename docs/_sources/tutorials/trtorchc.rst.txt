@@ -45,7 +45,7 @@ to standard TorchScript. Load with ``torch.jit.load()`` and run like you would r
          --ffo,
          --forced-fallback-ops             List of operators in the graph that
                                           should be forced to fallback to Pytorch for execution
-                                          
+
          --disable-tf32                    Prevent Float32 layers from using the
                                             TF32 data format
           -p[precision...],
@@ -55,7 +55,7 @@ to standard TorchScript. Load with ``torch.jit.load()`` and run like you would r
                                             calibration-cache argument) [ float |
                                             float32 | f32 | half | float16 | f16 |
                                             int8 | i8 ] (default: float)
-                                            
+
           -d[type], --device-type=[type]    The type of device the engine should be
                                             built for [ gpu | dla ] (default: gpu)
           --gpu-id=[gpu_id]                 GPU id if running on multi-GPU platform
@@ -63,8 +63,8 @@ to standard TorchScript. Load with ``torch.jit.load()`` and run like you would r
           --dla-core=[dla_core]             DLACore id if running on available DLA
                                             (defaults to 0)
           --engine-capability=[capability]  The type of device the engine should be
-                                            built for [ default | safe_gpu |
-                                            safe_dla ]
+                                            built for [ standard | safety |
+                                            dla_standalone ]
           --calibration-cache-file=[file_path]
                                             Path to calibration cache file to use
                                             for post training quantization
@@ -104,7 +104,6 @@ to standard TorchScript. Load with ``torch.jit.load()`` and run like you would r
                                             32)@f16%NHWC"
           "--" can be used to terminate flag options and force all following
           arguments to be treated as positional options
-
 
 e.g.
 

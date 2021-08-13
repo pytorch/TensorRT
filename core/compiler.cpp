@@ -35,8 +35,8 @@ void AddEngineToGraph(
     runtime::CudaDevice& device_info,
     std::string engine_id = "",
     bool fallback = false) {
-  auto engine_ptr =
-      c10::make_intrusive<runtime::TRTEngine>(mod._ivalue()->name() + engine_id, serialized_engine, device_info);
+  auto engine_ptr = c10::make_intrusive<runtime::TRTEngine>(
+      mod._ivalue()->name() + "_engine_" + engine_id, serialized_engine, device_info);
   // Get required metadata about the engine out
   auto num_io = engine_ptr->num_io;
   auto name = engine_ptr->name;
@@ -119,8 +119,8 @@ void AddEngineToGraph(
 }
 
 bool CheckMethodOperatorSupport(const torch::jit::script::Module& mod, std::string method_name) {
-  // Go through Lowering to simplify graph and extract weight parameters
-  auto graph_and_parameters = lowering::Lower(mod, method_name);
+  // Go through Lowering to simplify graph
+  auto graph_and_parameters = lowering::Lower(mod, method_name, lowering::LowerInfo());
 
   auto g = graph_and_parameters.first;
   LOG_DEBUG(*g << "(CheckMethodOperatorSupport)\n");
@@ -130,7 +130,7 @@ bool CheckMethodOperatorSupport(const torch::jit::script::Module& mod, std::stri
 
 std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::string method_name, CompileSpec cfg) {
   // Go through Lowering to simplify graph and extract weight parameters
-  auto graph_and_parameters = lowering::Lower(mod, method_name);
+  auto graph_and_parameters = lowering::Lower(mod, method_name, cfg.lower_info);
 
   auto convert_cfg = std::move(cfg.convert_info);
   auto g = graph_and_parameters.first;
@@ -309,7 +309,7 @@ torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Mo
     // Compile only forward methods. forward method contains the entire graph.
     if (method.name().compare("forward") == 0) {
       auto new_g = std::make_shared<torch::jit::Graph>();
-      auto graph_and_parameters = lowering::Lower(mod, method.name());
+      auto graph_and_parameters = lowering::Lower(mod, method.name(), cfg.lower_info);
 
       auto g = graph_and_parameters.first;
       auto params = graph_and_parameters.second;

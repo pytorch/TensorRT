@@ -20,6 +20,10 @@ converter_test(
 )
 
 converter_test(
+    name = "test_cast",
+)
+
+converter_test(
     name = "test_clone",
 )
 
@@ -69,6 +73,10 @@ converter_test(
 
 converter_test(
     name = "test_pooling",
+)
+
+converter_test(
+    name = "test_quantization",
 )
 
 converter_test(
@@ -125,6 +133,7 @@ test_suite(
         ":test_activation",
         ":test_batch_norm",
         ":test_instance_norm",
+        ":test_cast",
         ":test_clone",
         ":test_concat",
         ":test_constant_pad",

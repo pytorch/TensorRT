@@ -599,6 +599,8 @@ to the graph as well as expect types and formats for those inputs. All other key
         <span class="s2">"dla_core"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="c1"># (DLA only) Target dla core id to run engine</span>
         <span class="s2">"allow_gpu_fallback"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># (DLA only) Allow layers unsupported on DLA to run on GPU</span>
     <span class="p">},</span>
+    <span class="s2">"disable_tf32"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="c1"># Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas</span>
+    <span class="s2">"sparse_weights"</span><span class="p">:</span> <span class="n">Enable</span> <span class="n">sparsity</span> <span class="k">for</span> <span class="n">convolution</span> <span class="ow">and</span> <span class="n">fully</span> <span class="n">connected</span> <span class="n">layers</span><span class="o">.</span>
     <span class="s2">"enabled_precisions"</span><span class="p">:</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">},</span> <span class="c1"># Enabling FP16 kernels</span>
     <span class="s2">"refit"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># enable refit</span>
     <span class="s2">"debug"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># enable debuggable engine</span>
@@ -786,6 +788,7 @@ to the graph as well as expect types and formats for those inputs. All other key
     <span class="s2">"enabled_precisions"</span><span class="p">:</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">},</span> <span class="c1"># Enabling FP16 kernels</span>
     <span class="c1"># List of datatypes that should be configured for each input. Supported options torch.{float|half|int8|int32|bool}.</span>
     <span class="s2">"disable_tf32"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="c1"># Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas</span>
+    <span class="s2">"sparse_weights"</span><span class="p">:</span> <span class="n">Enable</span> <span class="n">sparsity</span> <span class="k">for</span> <span class="n">convolution</span> <span class="ow">and</span> <span class="n">fully</span> <span class="n">connected</span> <span class="n">layers</span><span class="o">.</span>
     <span class="s2">"refit"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># enable refit</span>
     <span class="s2">"debug"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># enable debuggable engine</span>
     <span class="s2">"strict_types"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># kernels should strictly run in operating precision</span>
@@ -1129,7 +1132,7 @@ Registers the forward method to execute the TensorRT engine with the function si
            <span class="sig-paren">
             )
            </span>
-           → &lt;torch._C.ScriptClass object at 0x7fecea4c6f70&gt;
+           → &lt;torch._C.ScriptClass object at 0x7faf83b971b0&gt;
            <a class="headerlink" href="#trtorch.TensorRTCompileSpec" title="Permalink to this definition">
             ¶
            </a>
@@ -1190,8 +1193,8 @@ as if you were using the TensorRT integration.
             <span class="s2">"dla_core"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="c1"># (DLA only) Target dla core id to run engine</span>
             <span class="s2">"allow_gpu_fallback"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># (DLA only) Allow layers unsupported on DLA to run on GPU</span>
         <span class="p">},</span>
-        <span class="s2">"op_precision"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">,</span> <span class="c1"># Operating precision set to FP16</span>
-        <span class="c1"># List of datatypes that should be configured for each input. Supported options torch.{float|half|int8|int32|bool}.</span>
+        <span class="s2">"enabled_precisions"</span><span class="p">:</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">},</span> <span class="c1"># Operating precision set to FP16</span>
+        <span class="s2">"sparse_weights"</span><span class="p">:</span> <span class="n">Enable</span> <span class="n">sparsity</span> <span class="k">for</span> <span class="n">convolution</span> <span class="ow">and</span> <span class="n">fully</span> <span class="n">connected</span> <span class="n">layers</span><span class="o">.</span>
         <span class="s2">"disable_tf32"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="c1"># Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas</span>
         <span class="s2">"refit"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="c1"># enable refit</span>
         <span class="s2">"debug"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="c1"># enable debuggable engine</span>

@@ -28,7 +28,8 @@ std::vector<at::Tensor> RunGraph(
 std::vector<at::Tensor> RunGraphEngine(
     std::shared_ptr<torch::jit::Graph>& g,
     core::conversion::GraphParams& named_params,
-    std::vector<at::Tensor> inputs);
+    std::vector<at::Tensor> inputs,
+    nvinfer1::DataType dtype = nvinfer1::DataType::kFLOAT);
 
 // Runs an arbitrary JIT graph with dynamic input sizes by converting it to
 // TensorRT and running inference and returns results

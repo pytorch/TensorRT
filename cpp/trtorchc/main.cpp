@@ -494,9 +494,8 @@ int main(int argc, char** argv) {
           compile_settings.ptq_calibrator = calibrator;
         } else {
           trtorch::logging::log(
-              trtorch::logging::Level::kERROR,
-              "If targeting INT8 default operating precision with trtorchc, a calibration cache file must be provided");
-          return 1;
+              trtorch::logging::Level::kINFO,
+              "Int8 precision has been enabled but no calibrator provided. This assumes the network has Q/DQ nodes obtained from Quantization aware training. For more details, refer to https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#work-with-qat-networks");
         }
       } else {
         std::stringstream ss;
@@ -545,7 +544,8 @@ int main(int argc, char** argv) {
       compile_settings.capability = trtorch::CompileSpec::EngineCapability::kDLA_STANDALONE;
     } else {
       trtorch::logging::log(
-          trtorch::logging::Level::kERROR, "Invalid engine capability, options are [ default | safe_gpu | safe_dla ]");
+          trtorch::logging::Level::kERROR,
+          "Invalid engine capability, options are [ standard | safety | dla_standalone ]");
       std::cerr << std::endl << parser;
       return 1;
     }
