@@ -41,7 +41,6 @@ void NotateModuleForFallback(const torch::jit::Module& mod, std::string mod_name
           auto user = u.user;
           auto delim_start_n = g->create(torch::jit::prim::Enter, 0);
           delim_start_n->s_(c10::Symbol::attr("compilation_edge"), "start");
-          auto num_end_outs = user->outputs().size();
           auto delim_end_n = g->create(torch::jit::prim::Exit, 0);
           delim_end_n->s_(c10::Symbol::attr("compilation_edge"), "end");
           delim_start_n->insertBefore(user);

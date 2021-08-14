@@ -1,5 +1,4 @@
 #include "torch/csrc/jit/runtime/custom_operator.h"
-#include "torch/library.h"
 
 namespace torch {
 namespace jit {
