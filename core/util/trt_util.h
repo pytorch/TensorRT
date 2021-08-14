@@ -8,6 +8,18 @@
 
 namespace nvinfer1 {
 
+#if NV_TENSORRT_MAJOR < 8
+template <class T>
+std::shared_ptr<T> make_trt(T* p) {
+  return std::shared_ptr<T>(p, [](T* p){p->destroy();});
+}
+#else
+template <class T>
+std::shared_ptr<T> make_trt(T* p) {
+  return std::shared_ptr<T>(p);
+}
+#endif
+
 inline std::ostream& operator<<(std::ostream& os, const nvinfer1::TensorFormat& format) {
   switch (format) {
     case nvinfer1::TensorFormat::kLINEAR:
@@ -87,11 +99,11 @@ inline std::ostream& operator<<(std::ostream& stream, const nvinfer1::DeviceType
 
 inline std::ostream& operator<<(std::ostream& stream, const nvinfer1::EngineCapability& cap) {
   switch (cap) {
-    case nvinfer1::EngineCapability::kSTANDARD:
+    case nvinfer1::EngineCapability::kDEFAULT:
       return stream << "standard";
-    case nvinfer1::EngineCapability::kSAFETY:
+    case nvinfer1::EngineCapability::kSAFE_GPU:
       return stream << "safety";
-    case nvinfer1::EngineCapability::kDLA_STANDALONE:
+    case nvinfer1::EngineCapability::kSAFE_DLA:
       return stream << "DLA standalone";
     default:
       return stream << "Unknown Engine Capability Setting";

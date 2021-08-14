@@ -74,6 +74,7 @@ class DeviceList {
   std::string dump_list();
 };
 
+  
 DeviceList get_available_device_list();
 const std::unordered_map<std::string, std::string>& get_dla_supported_SMs();
 
