@@ -119,7 +119,7 @@ void AddEngineToGraph(
 }
 
 bool CheckMethodOperatorSupport(const torch::jit::script::Module& mod, std::string method_name) {
-  // Go through Lowering to simplify graph and extract weight parameters
+  // Go through Lowering to simplify graph
   auto graph_and_parameters = lowering::Lower(mod, method_name, lowering::LowerInfo());
 
   auto g = graph_and_parameters.first;
