@@ -201,7 +201,7 @@ std::vector<int64_t> toVec(nvinfer1::Dims d) {
   for (int i = 0; i < d.nbDims; i++) {
     dims.push_back(d.d[i]);
   }
-  return std::move(dims);
+  return dims;
 }
 
 std::string toStr(nvinfer1::Dims d) {

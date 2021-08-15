@@ -146,12 +146,12 @@ std::string to_str(EngineCapability value) {
 nvinfer1::EngineCapability toTRTEngineCapability(EngineCapability value) {
   switch (value) {
     case EngineCapability::kSAFE_DLA:
-      return nvinfer1::EngineCapability::kSAFE_DLA;
+      return TRT_ENGINE_CAPABILITY_DLA_STANDALONE;
     case EngineCapability::kSAFE_GPU:
-      return nvinfer1::EngineCapability::kSAFE_GPU;
+      return TRT_ENGINE_CAPABILITY_SAFETY;
     case EngineCapability::kDEFAULT:
     default:
-      return nvinfer1::EngineCapability::kDEFAULT;
+      return TRT_ENGINE_CAPABILITY_STANDARD;
   }
 }
 

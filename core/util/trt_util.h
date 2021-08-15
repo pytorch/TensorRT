@@ -9,15 +9,27 @@
 namespace nvinfer1 {
 
 #if NV_TENSORRT_MAJOR < 8
+  
+#define TRT_ENGINE_CAPABILITY_STANDARD nvinfer1::EngineCapability::kDEFAULT
+#define TRT_ENGINE_CAPABILITY_SAFETY nvinfer1::EngineCapability::kSAFE_GPU
+#define TRT_ENGINE_CAPABILITY_DLA_STANDALONE nvinfer1::EngineCapability::kSAFE_DLA
+  
 template <class T>
 std::shared_ptr<T> make_trt(T* p) {
   return std::shared_ptr<T>(p, [](T* p){p->destroy();});
 }
+ 
 #else
+ 
+#define TRT_ENGINE_CAPABILITY_STANDARD nvinfer1::EngineCapability::kSTANDARD
+#define TRT_ENGINE_CAPABILITY_SAFETY nvinfer1::EngineCapability::kSAFETY
+#define TRT_ENGINE_CAPABILITY_DLA_STANDALONE nvinfer1::EngineCapability::kDLA_STANDALONE
+ 
 template <class T>
 std::shared_ptr<T> make_trt(T* p) {
   return std::shared_ptr<T>(p);
 }
+ 
 #endif
 
 inline std::ostream& operator<<(std::ostream& os, const nvinfer1::TensorFormat& format) {
@@ -99,11 +111,11 @@ inline std::ostream& operator<<(std::ostream& stream, const nvinfer1::DeviceType
 
 inline std::ostream& operator<<(std::ostream& stream, const nvinfer1::EngineCapability& cap) {
   switch (cap) {
-    case nvinfer1::EngineCapability::kDEFAULT:
+    case TRT_ENGINE_CAPABILITY_STANDARD:
       return stream << "standard";
-    case nvinfer1::EngineCapability::kSAFE_GPU:
+    case TRT_ENGINE_CAPABILITY_SAFETY:
       return stream << "safety";
-    case nvinfer1::EngineCapability::kSAFE_DLA:
+    case TRT_ENGINE_CAPABILITY_DLA_STANDALONE:
       return stream << "DLA standalone";
     default:
       return stream << "Unknown Engine Capability Setting";
