@@ -3,6 +3,7 @@
 #include "gtest/gtest.h"
 #include "tests/util/util.h"
 #include "torch/csrc/jit/ir/irparser.h"
+#include "torch/torch.h"
 
 TEST(Evaluators, DivIntEvaluatesCorrectly) {
   const auto graph = R"IR(
