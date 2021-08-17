@@ -25,17 +25,21 @@ void LowerBlock(torch::jit::Block* b) {
 }
 
 void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, LowerInfo lower_info) {
-  passes::MarkNodesForFallback(g, false);
-  passes::UnpackHardSwish(g);
   torch::jit::EliminateRedundantGuards(g);
   torch::jit::RemoveListMutation(g);
   torch::jit::RemoveTensorMutation(g);
   torch::jit::CreateFunctionalGraphs(g);
   torch::jit::InlineFunctionalGraphs(g);
   torch::jit::PeepholeOptimize(g, false);
-  passes::EliminateExceptionOrPassPattern(g);
   torch::jit::FuseLinear(g);
   torch::jit::LowerAllTuples(g);
+  if (!lower_info.disable_cse) {
+    torch::jit::EliminateCommonSubexpression(g);
+  }
+  torch::jit::EliminateDeadCode(g);
+  passes::MarkNodesForFallback(g, true);
+  passes::UnpackHardSwish(g);
+  passes::EliminateExceptionOrPassPattern(g);
   passes::ReduceToOperation(g);
   passes::RemoveContiguous(g);
   passes::RemoveDropout(g);
@@ -44,9 +48,6 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, LowerInfo lower_info) {
   passes::Conv3DToConvolution(g);
   passes::FuseAddMMBranches(g);
   passes::RemoveBNDimCheck(g);
-  if (!lower_info.disable_cse) {
-    torch::jit::EliminateCommonSubexpression(g);
-  }
   // torch::jit::UnrollLoops(g);
   passes::UnpackAddMM(g);
   // passes::UnpackBatchNorm(g);
@@ -56,8 +57,6 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, LowerInfo lower_info) {
   passes::RemoveNOPs(g);
   passes::AliasOperators(g);
   passes::SiluToSigmoidMultipication(g);
-  torch::jit::EliminateDeadCode(g);
-  passes::MarkNodesForFallback(g, true);
   LOG_GRAPH(*g);
 }
 

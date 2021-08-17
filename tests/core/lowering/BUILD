@@ -11,6 +11,22 @@ lowering_test(
     name = "test_linear_to_addmm",
 )
 
+cc_test(
+  name = "test_module_level_fallback",
+  srcs = ["test_module_level_fallback.cpp"],
+  deps = [
+      "//tests/util",
+      "//core",
+      "@googletest//:gtest_main",
+  ] + select({
+      ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
+      "//conditions:default":  ["@libtorch//:libtorch"],
+  }),
+  data = [
+      "//tests/modules:jit_models"
+  ]
+)
+
 lowering_test(
     name = "test_remove_contiguous_pass",
 )
@@ -47,6 +63,7 @@ test_suite(
     name = "lowering_tests",
     tests = [
         ":test_linear_to_addmm",
+        ":test_module_level_fallback",
         ":test_operator_aliasing_pass",
         ":test_remove_contiguous_pass",
         ":test_remove_detach_pass",
