@@ -115,8 +115,6 @@ auto batch_norm_registrations TRTORCH_UNUSED =
 
               auto scales = args[1].unwrapToTensor(at::ones(shape[1], options)).cpu().contiguous();
               auto bias = args[2].unwrapToTensor(at::zeros(shape[1], options)).cpu().contiguous();
-              LOG_DEBUG("Scales : " <<    );
-              LOG_DEBUG("bias : " << bias);
               
               // track_running_stats=True
               if (!args[3].IValue()->isNone() || !args[4].IValue()->isNone()) {
