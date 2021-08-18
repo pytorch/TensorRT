@@ -53,7 +53,8 @@ will result in a minor version bump and sigificant bug fixes will result in a pa
         - If any models do not convert to ONNX / TRT, that is fine. Mark them as failling / no result
     - Devices: 
         - A100 (P0)
-        - T4 is a nice to have (P2) (Add batch sizes 64, 128, 256, 512, 1024 if so)
+        - T4 is a should have (P1) (Add batch sizes 64, 128, 256, 512, 1024 if so)
+        - A30 + A30 MIG is a nice to have (P2) (same batches as T4)
         - Jetson also nice to have (P4) 
 
 6. Once PR is merged tag commit and start creating release on GitHub
