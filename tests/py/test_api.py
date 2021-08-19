@@ -147,6 +147,32 @@ class TestFallbackToTorch(ModelTestCase):
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
         self.assertTrue(same < 2e-3)
 
+class TestModuleFallbackToTorch(ModelTestCase):
+
+    def setUp(self):
+        self.input = torch.randn((1, 3, 224, 224)).to("cuda")
+        self.scripted_model = torch.jit.script(self.model)
+
+    def test_compile_script(self):
+        compile_spec = {
+            "inputs": [trtorch.Input(self.input.shape)],
+            "device": {
+                "device_type": trtorch.DeviceType.GPU,
+                "gpu_id": 0,
+                "dla_core": 0,
+                "allow_gpu_fallback": False,
+                "disable_tf32": False
+            },
+            "torch_fallback": {
+                "enabled": True,
+                "forced_fallback_modules": ["torchvision.models.resnet.BasicBlock"],
+                "min_block_size": 1
+            }
+        }
+
+        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
+        same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
+        self.assertTrue(same < 2e-3)
 
 class TestPTtoTRTtoPT(ModelTestCase):
 
@@ -211,6 +237,7 @@ def test_suite():
     suite.addTest(TestCompileHalfDefault.parametrize(TestCompileHalfDefault, model=models.resnet18(pretrained=True)))
     suite.addTest(TestPTtoTRTtoPT.parametrize(TestPTtoTRTtoPT, model=models.mobilenet_v2(pretrained=True)))
     suite.addTest(TestFallbackToTorch.parametrize(TestFallbackToTorch, model=models.resnet18(pretrained=True)))
+    suite.addTest(TestModuleFallbackToTorch.parametrize(TestModuleFallbackToTorch, model=models.resnet18(pretrained=True)))
     suite.addTest(unittest.makeSuite(TestCheckMethodOpSupport))
 
     return suite
