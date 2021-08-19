@@ -55,7 +55,8 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
   }
 
   builder = make_trt(nvinfer1::createInferBuilder(logger));
-  net = make_trt(builder->createNetworkV2(1U << static_cast<uint32_t>(nvinfer1::NetworkDefinitionCreationFlag::kEXPLICIT_BATCH)));
+  net = make_trt(
+      builder->createNetworkV2(1U << static_cast<uint32_t>(nvinfer1::NetworkDefinitionCreationFlag::kEXPLICIT_BATCH)));
 
   LOG_DEBUG(build_settings);
   cfg = make_trt(builder->createBuilderConfig());
@@ -165,7 +166,7 @@ std::string ConversionCtx::SerializeEngine() {
   }
   auto serialized_network = engine->serialize();
   engine->destroy();
-#endif  
+#endif
   auto engine_str = std::string((const char*)serialized_network->data(), serialized_network->size());
   return engine_str;
 }

@@ -8,7 +8,7 @@ namespace conversion {
 namespace converters {
 namespace impl {
 namespace {
-  
+
 #if NV_TENSORRT_MAJOR > 7
 // clang-format off
 auto quantization_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()

@@ -65,26 +65,30 @@ c10::impl::GenericList TensorRTBackend::execute(c10::IValue handle, c10::impl::G
 }
 
 namespace {
-  c10::IValue preprocess(const torch::jit::Module& mod,
-			 const c10::Dict<c10::IValue,
-			 // this API changed between 1.9 and 1.10
+c10::IValue preprocess(
+    const torch::jit::Module& mod,
+    const c10::Dict<
+        c10::IValue,
+// this API changed between 1.9 and 1.10
 #if TORCH_VERSION_MAJOR < 2 && TORCH_VERSION_MINOR < 10
-			 c10::IValue>& method_compile_spec
-# else  
-			 c10::IValue>& method_compile_spec, const torch::jit::BackendDebugHandleGenerator& generate_debug_handles
+        c10::IValue>& method_compile_spec
+#else
+        c10::IValue>& method_compile_spec,
+    const torch::jit::BackendDebugHandleGenerator& generate_debug_handles
 #endif
-			 ) {
-    for (auto it = method_compile_spec.begin(), end = method_compile_spec.end(); it != end; ++it) {
-      TRTORCH_CHECK(
-		    core::CheckMethodOperatorSupport(mod, it->key().toStringRef()),
-		    "Method " << it->key().toStringRef() << "cannot be compiled by TRTorch");
-    }
-    return mod._ivalue();
-  };
-  
-  static const std::string trt("tensorrt");
-  static auto reg = torch::jit::backend<TensorRTBackend>(trt);
-  static auto preproc_reg = torch::jit::backend_preprocess_register(trt, torch::jit::detail::BackendPreprocessFunction(preprocess));
+) {
+  for (auto it = method_compile_spec.begin(), end = method_compile_spec.end(); it != end; ++it) {
+    TRTORCH_CHECK(
+        core::CheckMethodOperatorSupport(mod, it->key().toStringRef()),
+        "Method " << it->key().toStringRef() << "cannot be compiled by TRTorch");
+  }
+  return mod._ivalue();
+};
+
+static const std::string trt("tensorrt");
+static auto reg = torch::jit::backend<TensorRTBackend>(trt);
+static auto preproc_reg =
+    torch::jit::backend_preprocess_register(trt, torch::jit::detail::BackendPreprocessFunction(preprocess));
 } // namespace
 
 } // namespace backend

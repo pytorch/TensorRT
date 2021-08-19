@@ -114,7 +114,7 @@ void resize_layer_size(
   if (align_corners) {
     resize_layer->setCoordinateTransformation(nvinfer1::ResizeCoordinateTransformation::kALIGN_CORNERS);
   }
-#endif  
+#endif
   auto layer_output = ctx->AssociateValueAndTensor(n->outputs()[0], resize_layer->getOutput(0));
 
   LOG_DEBUG("Output tensor shape: " << layer_output->getDimensions());
