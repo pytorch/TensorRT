@@ -101,7 +101,6 @@ auto batch_norm_registrations TRTORCH_UNUSED =
               // track_running_stats=True
               LOG_DEBUG("Args[3] running_mean : " << args[3].isIValue() << " / " << args[3].IValue()->isNone());
               LOG_DEBUG("Args[4] running_var : " << args[4].isIValue() << " / " << args[4].IValue()->isNone());
-              
               LOG_DEBUG("use_input_stats, momemtum, cudnn_enabled disregarded");
               LOG_DEBUG("ctx->input_is_dynamic : " << ctx->input_is_dynamic);
               
@@ -112,15 +111,15 @@ auto batch_norm_registrations TRTORCH_UNUSED =
               }
 
               auto eps = static_cast<float>(args[7].unwrapToDouble(1e-5f));
-
+              
               auto scales = args[1].unwrapToTensor(at::ones(shape[1], options)).cpu().contiguous();
               auto bias = args[2].unwrapToTensor(at::zeros(shape[1], options)).cpu().contiguous();
               
               // track_running_stats=True
               if (!args[3].IValue()->isNone() || !args[4].IValue()->isNone()) {
-                auto running_mean = args[3].unwrapToTensor().cpu().contiguous();
-                auto running_var = args[4].unwrapToTensor().cpu().contiguous();
-                _batch_norm(ctx, n, input, orig_shape, scales, bias, running_mean, running_var, eps);
+                auto running_mean = args[3].unwrapToTensor();
+                auto running_var = args[4].unwrapToTensor();
+                _batch_norm(ctx, n, input, orig_shape, scales.to(running_mean.options()), bias.to(running_mean.options()), running_mean, running_var, eps);
                 return true;
               }
 
