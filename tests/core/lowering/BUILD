@@ -12,8 +12,8 @@ lowering_test(
 )
 
 cc_test(
-  name = "test_module_level_fallback",
-  srcs = ["test_module_level_fallback.cpp"],
+  name = "test_module_fallback_passes",
+  srcs = ["test_module_fallback_passes.cpp"],
   deps = [
       "//tests/util",
       "//core",
@@ -63,7 +63,7 @@ test_suite(
     name = "lowering_tests",
     tests = [
         ":test_linear_to_addmm",
-        ":test_module_level_fallback",
+        ":test_module_fallback_passes",
         ":test_operator_aliasing_pass",
         ":test_remove_contiguous_pass",
         ":test_remove_detach_pass",
