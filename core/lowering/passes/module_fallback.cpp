@@ -25,7 +25,11 @@ std::string unmangle_cls_name(const std::string& name) {
   return unmangled;
 }
 
-void NotateModuleForFallback(const torch::jit::Module& mod, std::string mod_name, std::string method_name, std::unordered_set<std::string> forced_fallback_modules) {
+void NotateModuleForFallback(
+    const torch::jit::Module& mod,
+    std::string mod_name,
+    std::string method_name,
+    std::unordered_set<std::string> forced_fallback_modules) {
   auto cls_name = unmangle_cls_name(mod.type()->name()->qualifiedName());
 
   auto g = mod.get_method(method_name).graph();
@@ -35,7 +39,9 @@ void NotateModuleForFallback(const torch::jit::Module& mod, std::string mod_name
     if (n->kind() == torch::jit::prim::GetAttr) {
       auto out_type = unmangle_cls_name(c10::toString(n->output(0)->type()));
       if (forced_fallback_modules.find(out_type) != forced_fallback_modules.end()) {
-        LOG_DEBUG("Notating module for fallback: " << n->s(c10::attr::name) << " (" << out_type << ") [owner: " << mod_name << " (" << cls_name << ")]");
+        LOG_DEBUG(
+            "Notating module for fallback: " << n->s(c10::attr::name) << " (" << out_type << ") [owner: " << mod_name
+                                             << " (" << cls_name << ")]");
         auto uses = n->output(0)->uses();
         for (const auto u : uses) {
           auto user = u.user;

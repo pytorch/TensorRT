@@ -2,11 +2,11 @@
 #include <unordered_set>
 #include "core/compiler.h"
 #include "core/lowering/lowering.h"
+#include "core/lowering/passes/passes.h"
 #include "gtest/gtest.h"
 #include "tests/util/util.h"
-#include "torch/script.h"
-#include "core/lowering/passes/passes.h"
 #include "torch/csrc/jit/passes/freeze_module.h"
+#include "torch/script.h"
 
 TEST(Lowering, NotateModuleForFallbackWorksCorrectly) {
   torch::jit::script::Module mod;
@@ -124,4 +124,3 @@ TEST(Lowering, LowerAndPartitionSimpleModuleFallbackCorrectly) {
   auto trt_results = trt_mod.forward(trt_inputs_ivalues).toTensor();
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results, trt_results, 2e-6));
 }
-

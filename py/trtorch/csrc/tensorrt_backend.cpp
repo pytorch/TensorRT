@@ -35,7 +35,7 @@ c10::impl::GenericDict TensorRTBackend::compile(c10::IValue mod_val, c10::impl::
     auto raw_spec = it->value().toCustomClass<trtorch::pyapi::CompileSpec>();
     LOG_DEBUG(raw_spec->stringify());
     auto cfg = raw_spec->toInternalCompileSpec();
-    auto graph_and_ivals = Lower(mod_, method_name, cfg.lower_info);
+    auto graph_and_ivals = core::lowering::Lower(mod_, method_name, cfg.lower_info);
 
     auto g = graph_and_ivals.first;
     auto params = graph_and_ivals.second;

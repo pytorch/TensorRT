@@ -147,6 +147,7 @@ class TestFallbackToTorch(ModelTestCase):
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
         self.assertTrue(same < 2e-3)
 
+
 class TestModuleFallbackToTorch(ModelTestCase):
 
     def setUp(self):
@@ -173,6 +174,7 @@ class TestModuleFallbackToTorch(ModelTestCase):
         trt_mod = trtorch.compile(self.scripted_model, compile_spec)
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
         self.assertTrue(same < 2e-3)
+
 
 class TestPTtoTRTtoPT(ModelTestCase):
 
@@ -237,7 +239,8 @@ def test_suite():
     suite.addTest(TestCompileHalfDefault.parametrize(TestCompileHalfDefault, model=models.resnet18(pretrained=True)))
     suite.addTest(TestPTtoTRTtoPT.parametrize(TestPTtoTRTtoPT, model=models.mobilenet_v2(pretrained=True)))
     suite.addTest(TestFallbackToTorch.parametrize(TestFallbackToTorch, model=models.resnet18(pretrained=True)))
-    suite.addTest(TestModuleFallbackToTorch.parametrize(TestModuleFallbackToTorch, model=models.resnet18(pretrained=True)))
+    suite.addTest(
+        TestModuleFallbackToTorch.parametrize(TestModuleFallbackToTorch, model=models.resnet18(pretrained=True)))
     suite.addTest(unittest.makeSuite(TestCheckMethodOpSupport))
 
     return suite

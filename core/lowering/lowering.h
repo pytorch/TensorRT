@@ -21,10 +21,14 @@ struct LowerInfo {
 
 void LowerBlock(torch::jit::Block* b);
 void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, LowerInfo lower_info);
-torch::jit::Module LowerModule(const torch::jit::Module& mod, std::string method_name, std::unordered_set<std::string> forced_fallback_modules);
+torch::jit::Module LowerModule(
+    const torch::jit::Module& mod,
+    std::string method_name,
+    std::unordered_set<std::string> forced_fallback_modules);
 std::pair<std::shared_ptr<torch::jit::Graph>, std::vector<torch::jit::IValue>> Lower(
     const torch::jit::Module& mod,
-    std::string method_name, const LowerInfo& lower_info);
+    std::string method_name,
+    const LowerInfo& lower_info);
 
 } // namespace lowering
 } // namespace core
