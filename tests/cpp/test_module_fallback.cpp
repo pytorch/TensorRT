@@ -22,7 +22,8 @@ TEST(CppAPITests, LowerResNetModuleFallbackCorrectly) {
     trt_inputs_ivalues.push_back(in.clone());
   }
 
-  std::vector<trtorch::CompileSpec::Input> input_ranges{trtorch::CompileSpec::Input(std::vector<int64_t>({1, 3, 224, 224}))};
+  std::vector<trtorch::CompileSpec::Input> input_ranges{
+      trtorch::CompileSpec::Input(std::vector<int64_t>({1, 3, 224, 224}))};
   trtorch::CompileSpec cfg(input_ranges);
   cfg.torch_fallback.enabled = true;
   cfg.torch_fallback.forced_fallback_modules.push_back("torchvision.models.resnet.BasicBlock");
@@ -51,7 +52,8 @@ TEST(CppAPITests, LowerAndPartitionMobileNetModuleFallbackCorrectly) {
     trt_inputs_ivalues.push_back(in.clone());
   }
 
-  std::vector<trtorch::CompileSpec::Input> input_ranges{trtorch::CompileSpec::Input(std::vector<int64_t>({1, 3, 224, 224}))};
+  std::vector<trtorch::CompileSpec::Input> input_ranges{
+      trtorch::CompileSpec::Input(std::vector<int64_t>({1, 3, 224, 224}))};
   trtorch::CompileSpec cfg(input_ranges);
   cfg.torch_fallback.enabled = true;
   cfg.torch_fallback.min_block_size = 5;

@@ -7,7 +7,11 @@ namespace core {
 namespace lowering {
 namespace passes {
 
-void NotateModuleForFallback(const torch::jit::Module& mod, std::string mod_name, std::string method_name, std::unordered_set<std::string> forced_fallback_modules);
+void NotateModuleForFallback(
+    const torch::jit::Module& mod,
+    std::string mod_name,
+    std::string method_name,
+    std::unordered_set<std::string> forced_fallback_modules);
 void Conv2DToConvolution(std::shared_ptr<torch::jit::Graph>& graph);
 void Conv3DToConvolution(std::shared_ptr<torch::jit::Graph>& graph);
 void FuseAddMMBranches(std::shared_ptr<torch::jit::Graph> graph);

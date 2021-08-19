@@ -9,13 +9,13 @@ namespace core {
 namespace lowering {
 
 std::ostream& operator<<(std::ostream& os, const LowerInfo& l) {
-    os << "Settings requested for Lowering:" << std::endl;
-    os << "    Forced Fallback Modules: [" << std::endl;
-    for (auto i : l.forced_fallback_modules) {
-        os << "      " << i << std::endl;
-    }
-    os << "    ]";
-    return os;
+  os << "Settings requested for Lowering:" << std::endl;
+  os << "    Forced Fallback Modules: [" << std::endl;
+  for (auto i : l.forced_fallback_modules) {
+    os << "      " << i << std::endl;
+  }
+  os << "    ]";
+  return os;
 }
 
 } // namespace lowering
