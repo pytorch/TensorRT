@@ -36,6 +36,7 @@ void _batch_norm(
   // Un-pad bn output if needed
   auto out_tensor = addUnpadding(ctx, n, bn->getOutput(0), orig_shape.nbDims);
   ctx->AssociateValueAndTensor(n->outputs()[0], out_tensor);
+  LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
 }
 
 auto batch_norm_registrations TRTORCH_UNUSED =
@@ -103,7 +104,7 @@ auto batch_norm_registrations TRTORCH_UNUSED =
               LOG_DEBUG("Args[4] running_var : " << args[4].isIValue() << " / " << args[4].IValue()->isNone());
               LOG_DEBUG("use_input_stats, momemtum, cudnn_enabled disregarded");
               LOG_DEBUG("ctx->input_is_dynamic : " << ctx->input_is_dynamic);
-              
+
               // Expand spatial dims from 1D to 2D if needed
               bool expandDims = (orig_shape.nbDims < 4);
               if (expandDims) {
@@ -111,15 +112,24 @@ auto batch_norm_registrations TRTORCH_UNUSED =
               }
 
               auto eps = static_cast<float>(args[7].unwrapToDouble(1e-5f));
-              
+
               auto scales = args[1].unwrapToTensor(at::ones(shape[1], options)).cpu().contiguous();
               auto bias = args[2].unwrapToTensor(at::zeros(shape[1], options)).cpu().contiguous();
-              
+
               // track_running_stats=True
               if (!args[3].IValue()->isNone() || !args[4].IValue()->isNone()) {
                 auto running_mean = args[3].unwrapToTensor();
                 auto running_var = args[4].unwrapToTensor();
-                _batch_norm(ctx, n, input, orig_shape, scales.to(running_mean.options()), bias.to(running_mean.options()), running_mean, running_var, eps);
+                _batch_norm(
+                    ctx,
+                    n,
+                    input,
+                    orig_shape,
+                    scales.to(running_mean.options()),
+                    bias.to(running_mean.options()),
+                    running_mean,
+                    running_var,
+                    eps);
                 return true;
               }
 
@@ -132,7 +142,7 @@ auto batch_norm_registrations TRTORCH_UNUSED =
               Type	      Parameter	  Description
               float	      epsilon	    A small number to prevent being divided by zero during normalization.
               Weights *	  scale	      A pointer to weights which contains information about scale factors for
-                                      normalization. The definition of Weights can be found in the NvInfer.h header. 
+                                      normalization. The definition of Weights can be found in the NvInfer.h header.
               Weights *	  bias        A pointer to weights which contains information about the bias values for
                                       normalization. The definition of Weights can be found in the NvInfer.h header.
               int	        relu	      A value used to enable leaky relu activation
@@ -162,6 +172,7 @@ auto batch_norm_registrations TRTORCH_UNUSED =
 
               new_layer->setName(util::node_info(n).c_str());
               auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
+              LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
               return true;
             }});
 } // namespace

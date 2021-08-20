@@ -10,7 +10,7 @@
 //     const c10::optional<Tensor>& bias_opt /* optional */,
 //     const c10::optional<Tensor>& running_mean_opt /* optional */,
 //     const c10::optional<Tensor>& running_var_opt /* optional */,
-//     bool use_input_stats, double momentum, double eps, bool cudnn_enabled) 
+//     bool use_input_stats, double momentum, double eps, bool cudnn_enabled)
 constexpr auto graph = R"IR(
       graph(%input.1 : Tensor,
             %weight.1 : Tensor?,
@@ -28,7 +28,6 @@ constexpr auto graph = R"IR(
         return (%4)
 )IR";
 
-
 TEST(Converters, ATenInstanceNormConvertsCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
@@ -36,15 +35,16 @@ TEST(Converters, ATenInstanceNormConvertsCorrectly) {
   auto in = at::randint(1, 10, {1, 5, 5, 5}, {at::kCUDA});
   torch::jit::IValue weight, bias, mean, var; // NoneType
   // https://github.com/pytorch/pytorch/blob/79693bb86a3f601a5c0d3da52d99acec95bb48c1/torch/nn/modules/instancenorm.py#L59
-  const bool use_input_stats = true; 
-  
+  const bool use_input_stats = true;
+
   auto trt_in = at::clone(in);
   torch::jit::IValue trt_weight, trt_bias, trt_mean, trt_var;
 
   auto params = trtorch::core::conversion::get_named_params(g->inputs(), {weight, bias, mean, var, use_input_stats});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
 
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_weight, trt_bias, trt_mean, trt_var, use_input_stats});
+  params = trtorch::core::conversion::get_named_params(
+      g->inputs(), {trt_weight, trt_bias, trt_mean, trt_var, use_input_stats});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
@@ -58,8 +58,8 @@ TEST(Converters, ATenInstanceNormAffineConvertsCorrectly) {
 
   auto weight = at::randn({in.size(1)}).to(at::kCUDA);
   auto bias = at::randn({in.size(1)}).to(at::kCUDA);
-    
-  torch::jit::IValue mean, var; // NoneType  
+
+  torch::jit::IValue mean, var; // NoneType
   const bool use_input_stats = true;
 
   auto trt_in = at::clone(in);
@@ -70,7 +70,8 @@ TEST(Converters, ATenInstanceNormAffineConvertsCorrectly) {
   auto params = trtorch::core::conversion::get_named_params(g->inputs(), {weight, bias, mean, var, use_input_stats});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
 
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_weight, trt_bias, trt_mean, trt_var, use_input_stats});
+  params = trtorch::core::conversion::get_named_params(
+      g->inputs(), {trt_weight, trt_bias, trt_mean, trt_var, use_input_stats});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
@@ -81,12 +82,12 @@ TEST(Converters, ATenInstanceNormRunningStatsConvertsCorrectly) {
   torch::jit::parseIR(graph, g.get());
 
   auto in = at::randn({1, 5, 5, 5}, {at::kCUDA});
-  
+
   torch::jit::IValue weight, bias;
   auto mean = at::zeros({in.size(1)}, {at::kCUDA});
   auto var = at::ones({in.size(1)}, {at::kCUDA});
   const bool use_input_stats = false;
-  
+
   auto trt_in = at::clone(in);
   torch::jit::IValue trt_weight, trt_bias;
   auto trt_mean = at::clone(mean);
@@ -95,7 +96,8 @@ TEST(Converters, ATenInstanceNormRunningStatsConvertsCorrectly) {
   auto params = trtorch::core::conversion::get_named_params(g->inputs(), {weight, bias, mean, var, use_input_stats});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
 
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_weight, trt_bias, trt_mean, trt_var, use_input_stats});
+  params = trtorch::core::conversion::get_named_params(
+      g->inputs(), {trt_weight, trt_bias, trt_mean, trt_var, use_input_stats});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
 }
