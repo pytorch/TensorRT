@@ -9,6 +9,7 @@ namespace converters {
 namespace impl {
 namespace {
 
+#if NV_TENSORRT_MAJOR > 7
 // clang-format off
 auto quantization_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
   .pattern({"aten::fake_quantize_per_tensor_affine(Tensor self, float scale, int zero_point, int quant_min, int quant_max) -> (Tensor)",
@@ -53,6 +54,7 @@ auto quantization_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns(
               return true;
             }});
 // clang-format on
+#endif
 } // namespace
 } // namespace impl
 } // namespace converters
