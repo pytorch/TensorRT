@@ -53,8 +53,11 @@ will result in a minor version bump and sigificant bug fixes will result in a pa
         - If any models do not convert to ONNX / TRT, that is fine. Mark them as failling / no result
     - Devices: 
         - A100 (P0)
-        - T4 is a nice to have (P2) (Add batch sizes 64, 128, 256, 512, 1024 if so)
+        - A30 / A30 MIG (P1) (same batches as T4
+        - T4 (P1) (Add batch sizes 64, 128, 256, 512, 1024 if so)
         - Jetson also nice to have (P4) 
+    - Please submit one PBR for A100, and one PBR for T4 + A30
+
 
 6. Once PR is merged tag commit and start creating release on GitHub
     - Paste in Milestone information and Changelog information into release notes
