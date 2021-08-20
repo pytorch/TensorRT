@@ -24,6 +24,7 @@ struct CudaDevice {
   CudaDevice();
   CudaDevice(int64_t gpu_id, nvinfer1::DeviceType device_type);
   CudaDevice(std::string serialized_device_info);
+  CudaDevice& operator=(const CudaDevice& other);
   std::string serialize();
   std::string getSMCapability() const;
   friend std::ostream& operator<<(std::ostream& os, const CudaDevice& device);
@@ -32,6 +33,9 @@ struct CudaDevice {
 void set_cuda_device(CudaDevice& cuda_device);
 // Gets the current active GPU (DLA will not show up through this)
 CudaDevice get_current_device();
+
+c10::optional<CudaDevice> get_most_compatible_device(const CudaDevice& target_device);
+std::vector<CudaDevice> find_compatible_devices(const CudaDevice& target_device);
 
 std::string serialize_device(CudaDevice& cuda_device);
 CudaDevice deserialize_device(std::string device_info);

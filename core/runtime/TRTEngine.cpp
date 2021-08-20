@@ -38,7 +38,9 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info) {
 }
 
 TRTEngine::TRTEngine(std::string mod_name, std::string serialized_engine, CudaDevice cuda_device) {
-  device_info = cuda_device;
+  auto most_compatible_device = get_most_compatible_device(cuda_device);
+  TRTORCH_CHECK(most_compatible_device, "No compatible device was found for instantiating TensorRT engine");
+  device_info = most_compatible_device.value();
   set_cuda_device(device_info);
 
   rt = std::shared_ptr<nvinfer1::IRuntime>(nvinfer1::createInferRuntime(util::logging::get_logger()));
