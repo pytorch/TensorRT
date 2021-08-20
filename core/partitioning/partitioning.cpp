@@ -274,7 +274,9 @@ std::vector<SegmentedBlock> segment_graph(torch::jit::Block* block, const Partit
     }
 
     std::string node_string(n->kind().toQualString());
-    if (conversion::OpSupported(n) && !forced_fallback_operators.count(node_string)) {
+    auto has_compile_attribute = n->hasAttribute(c10::Symbol::attr("to_compile"));
+    if (conversion::OpSupported(n) && !forced_fallback_operators.count(node_string) &&
+        (!has_compile_attribute || n->i(c10::Symbol::attr("to_compile")) == (int64_t) true)) {
       tensorrt_nodes.push_back(n);
       if (tensorrt_nodes.size() >= min_block_size && !pytorch_nodes.empty()) {
         segmented_blocks.emplace_back(SegmentedBlock::kTorch, pytorch_nodes);

@@ -577,6 +577,9 @@ struct TRTORCH_API CompileSpec {
     /// A list of names of operations that will explicitly run in PyTorch
     std::vector<std::string> forced_fallback_ops;
 
+    /// A list of names of modules that will explicitly run in PyTorch
+    std::vector<std::string> forced_fallback_modules;
+
     /**
      * @brief Construct a default Torch Fallback object, fallback will be off
      */

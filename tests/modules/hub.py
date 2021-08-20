@@ -98,6 +98,35 @@ trace_model = torch.jit.trace(model, x)
 torch.jit.save(trace_model, "pooling_traced.jit.pt")
 
 
+# Sample Nested Module (for module-level fallback testing)
+class ModuleFallbackSub(nn.Module):
+
+    def __init__(self):
+        super(ModuleFallbackSub, self).__init__()
+        self.conv = nn.Conv2d(1, 3, 3)
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        return self.relu(self.conv(x))
+
+
+class ModuleFallbackMain(nn.Module):
+
+    def __init__(self):
+        super(ModuleFallbackMain, self).__init__()
+        self.layer1 = ModuleFallbackSub()
+        self.conv = nn.Conv2d(3, 6, 3)
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        return self.relu(self.conv(self.layer1(x)))
+
+
+module_fallback_model = ModuleFallbackMain().eval().cuda()
+module_fallback_script_model = torch.jit.script(module_fallback_model)
+torch.jit.save(module_fallback_script_model, "module_fallback_scripted.jit.pt")
+
+
 # Sample Conditional Model (for testing partitioning and fallback in conditionals)
 class FallbackIf(torch.nn.Module):
 
