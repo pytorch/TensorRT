@@ -249,6 +249,8 @@ Program Listing for File trtorch.h
    
        std::vector<std::string> forced_fallback_ops;
    
+       std::vector<std::string> forced_fallback_modules;
+   
        TorchFallback() = default;
    
        TorchFallback(bool enabled) : enabled(enabled) {}

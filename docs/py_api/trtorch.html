@@ -615,6 +615,9 @@ to the graph as well as expect types and formats for those inputs. All other key
         <span class="s2">"force_fallback_ops"</span><span class="p">:</span> <span class="p">[</span>
             <span class="s2">"aten::max_pool2d"</span> <span class="c1"># List of specific ops to require running in PyTorch</span>
         <span class="p">],</span>
+        <span class="s2">"force_fallback_modules"</span><span class="p">:</span> <span class="p">[</span>
+            <span class="s2">"mypymod.mytorchmod"</span> <span class="c1"># List of specific torch modules to require running in PyTorch</span>
+        <span class="p">],</span>
         <span class="s2">"min_block_size"</span><span class="p">:</span> <span class="mi">3</span> <span class="c1"># Minimum number of ops an engine must incapsulate to be run in TensorRT</span>
     <span class="p">}</span>
 <span class="p">}</span>
@@ -1132,7 +1135,7 @@ Registers the forward method to execute the TensorRT engine with the function si
            <span class="sig-paren">
             )
            </span>
-           → &lt;torch._C.ScriptClass object at 0x7fa6b642ee30&gt;
+           → &lt;torch._C.ScriptClass object at 0x7f5da1429d70&gt;
            <a class="headerlink" href="#trtorch.TensorRTCompileSpec" title="Permalink to this definition">
             ¶
            </a>

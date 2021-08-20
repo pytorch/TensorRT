@@ -237,7 +237,7 @@ Install or compile a build of PyTorch/LibTorch for aarch64
 
 NVIDIA hosts builds the latest release branch for Jetson here:
 
-    https://forums.developer.nvidia.com/t/pytorch-for-jetson-nano-version-1-5-0-now-available/72048
+    https://forums.developer.nvidia.com/t/pytorch-for-jetson-version-1-9-0-now-available/72048
 
 
 Enviorment Setup
@@ -285,29 +285,10 @@ To build natively on aarch64-linux-gnu platform, configure the ``WORKSPACE`` wit
     #    strip_prefix = "TensorRT-7.1.3.4"
     #)
 
-
-2. Disable Python API testing dependencies:
-
-.. code-block:: shell
-
-    #pip3_import(
-    #    name = "trtorch_py_deps",
-    #    requirements = "//py:requirements.txt"
-    #)
-
-    #load("@trtorch_py_deps//:requirements.bzl", "pip_install")
-    #pip_install()
-
-    #pip3_import(
-    #   name = "py_test_deps",
-    #   requirements = "//tests/py:requirements.txt"
-    #)
-
-    #load("@py_test_deps//:requirements.bzl", "pip_install")
-    #pip_install()
+    NOTE: You may also need to configure the CUDA version to 10.2 by setting the path for the cuda new_local_repository
 
 
-3. Configure the correct paths to directory roots containing local dependencies in the ``new_local_repository`` rules:
+2. Configure the correct paths to directory roots containing local dependencies in the ``new_local_repository`` rules:
 
     NOTE: If you installed PyTorch using a pip package, the correct path is the path to the root of the python torch package.
     In the case that you installed with ``sudo pip install`` this will be ``/usr/local/lib/python3.6/dist-packages/torch``.
@@ -346,14 +327,23 @@ use that library, set the paths to the same path but when you compile make sure 
 Compile C++ Library and Compiler CLI
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+    NOTE: Due to shifting dependency locations between Jetpack 4.5 and 4.6 there is a now a flag to inform bazel of the Jetpack version 
+
+    .. code-block:: shell
+
+        --platforms //toolchains:jetpack_4.x
+
+
 Compile TRTorch library using bazel command:
 
 .. code-block:: shell
 
-   bazel build //:libtrtorch
+   bazel build //:libtrtorch --platforms //toolchains:jetpack_4.6
 
 Compile Python API
 ^^^^^^^^^^^^^^^^^^^^
+
+    NOTE: Due to shifting dependencies locations between Jetpack 4.5 and Jetpack 4.6 there is now a flag for ``setup.py`` which sets the jetpack version (default: 4.6)
 
 Compile the Python API using the following command from the ``//py`` directory:
 
@@ -362,3 +352,5 @@ Compile the Python API using the following command from the ``//py`` directory:
     python3 setup.py install --use-cxx11-abi
 
 If you have a build of PyTorch that uses Pre-CXX11 ABI drop the ``--use-cxx11-abi`` flag
+
+If you are building for Jetpack 4.5 add the ``--jetpack-version 4.5`` flag
