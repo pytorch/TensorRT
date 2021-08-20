@@ -94,10 +94,10 @@ cc_test(
     name = "test_multi_gpu_serdes",
     srcs = ["test_multi_gpu_serdes.cpp"],
     data = [
-        ":jit_models",
+        "//tests/modules:jit_models",
     ],
     deps = [
-        ":module_test",
+        ":cpp_api_test",
     ],
 )
 
