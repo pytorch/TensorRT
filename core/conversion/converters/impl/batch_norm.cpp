@@ -14,7 +14,7 @@ void _batch_norm(
     ConversionCtx* ctx,
     const torch::jit::Node* n,
     nvinfer1::ITensor* input,
-    const nvinfer1::Dims32& orig_shape,
+    const nvinfer1::Dims& orig_shape,
     const torch::Tensor& gamma,
     const torch::Tensor& beta,
     const torch::Tensor& mean,
