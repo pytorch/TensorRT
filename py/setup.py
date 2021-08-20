@@ -13,6 +13,8 @@ from torch.utils import cpp_extension
 from shutil import copyfile, rmtree
 
 import subprocess
+import platform
+import warnings
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -20,9 +22,25 @@ __version__ = '0.4.0a0'
 
 CXX11_ABI = False
 
+JETPACK_VERSION = None
+
 if "--use-cxx11-abi" in sys.argv:
     sys.argv.remove("--use-cxx11-abi")
     CXX11_ABI = True
+
+if platform.uname().processor == "aarch64":
+    if "--jetpack-version" in sys.argv:
+        version_idx = sys.argv.index("--jetpack-version") + 1
+        version = sys.argv[version_idx]
+        sys.argv.remove(version)
+        sys.argv.remove("--jetpack-version")
+        if version == "4.5":
+            JETPACK_VERSION = "4.5"
+        elif version == "4.6":
+            JETPACK_VERSION = "4.6"
+    if not JETPACK_VERSION:
+        warnings.warn("Assuming jetpack version to be 4.6, if not use the --jetpack-version option")
+        JETPACK_VERSION = "4.6"
 
 
 def which(program):
@@ -65,6 +83,13 @@ def build_libtrtorch_pre_cxx11_abi(develop=True, use_dist_dir=True, cxx11_abi=Fa
         cmd.append("--config=python")
     else:
         print("using CXX11 ABI build")
+
+    if JETPACK_VERSION == "4.5":
+        cmd.append("--platforms=//toolchains:jetpack_4.5")
+        print("Jetpack version: 4.5")
+    elif JETPACK_VERSION == "4.6":
+        cmd.append("--platforms=//toolchains:jetpack_4.6")
+        print("Jetpack version: 4.6")
 
     print("building libtrtorch")
     status_code = subprocess.run(cmd).returncode

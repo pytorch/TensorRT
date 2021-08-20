@@ -4,6 +4,8 @@ import torch.nn.functional as F
 import torchvision.models as models
 import timm
 
+torch.hub._validate_not_a_forked_repo = lambda a, b, c: True
+
 models = {
     "alexnet": {
         "model": models.alexnet(pretrained=True),

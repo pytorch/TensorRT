@@ -79,6 +79,7 @@ cc_test(
     deps = [
         ":cpp_api_test",
     ],
+    timeout="long"
 )
 
 cc_test(
