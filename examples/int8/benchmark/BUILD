@@ -10,7 +10,7 @@ cc_library(
         "benchmark.h",
     ],
     deps = [
-        "//cpp/api:trtorch",
+        "//cpp:trtorch",
         "@libtorch",
         "@libtorch//:caffe2",
     ],

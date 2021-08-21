@@ -222,11 +222,11 @@ You can register a converter for your op using the `NodeConverterRegistry` insid
 
 | Component     | Description                                                  |
 | ------------- | ------------------------------------------------------------ |
-| [**core**](core)  | Main JIT ingest, lowering, conversion and execution implementations |
-| [**cpp**](cpp)   | C++ specific components including API and example applications |
-| [**cpp/api**](cpp/api)   | C++ API for TRTorch |
+| [**core**](core)  | Main JIT ingest, lowering, conversion and runtime implementations |
+| [**cpp**](cpp)   | C++ API and CLI source |
+| [**examples**](examples)   | Example applications to show different features of TRTorch |
 | [**py**](py)   | Python API for TRTorch |
-| [**tests**](tests) | Unit test for TRTorch |
+| [**tests**](tests) | Unit tests for TRTorch |
 
 ## Contributing
 
