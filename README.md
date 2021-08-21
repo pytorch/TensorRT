@@ -43,7 +43,7 @@ compile_settings = {
     "inputs": [trtorch.Input(
         min_shape=[1, 3, 224, 224],
         opt_shape=[1, 3, 512, 512],
-        max_shape=[1, 3, 1024, 1024]
+        max_shape=[1, 3, 1024, 1024],
         # For static size shape=[1, 3, 224, 224]
         dtype=torch.half, # Datatype of input tensor. Allowed options torch.(float|half|int8|int32|bool)
     )],
