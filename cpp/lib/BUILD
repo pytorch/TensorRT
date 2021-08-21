@@ -27,7 +27,7 @@ cc_binary(
     linkshared = True,
     linkstatic = True,
     deps = [
-        "//cpp/api:trtorch",
+        "//cpp:trtorch",
     ],
 )
 

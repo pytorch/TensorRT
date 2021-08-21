@@ -14,7 +14,7 @@ cc_binary(
     ],
     deps = [
         "//third_party/args",
-        "//cpp/api:trtorch",
+        "//cpp:trtorch",
     ] + select({
         ":use_pre_cxx11_abi": [
             "@libtorch_pre_cxx11_abi//:libtorch",
