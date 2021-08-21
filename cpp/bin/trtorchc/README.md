@@ -36,22 +36,19 @@ trtorchc [input_file_path] [output_file_path]
       --allow-gpu-fallback              (Only used when targeting DLA
                                         (device-type)) Lets engine run layers on
                                         GPU if they are not supported on DLA
-
-      --allow-torch-fallback            Enable layers to run in torch
-                                        if they are not supported in TensorRT
-
+      --allow-torch-fallback            Enable layers to run in torch if they
+                                        are not supported in TensorRT
       --disable-tf32                    Prevent Float32 layers from using the
                                         TF32 data format
       -p[precision...],
-      --enabled-precison=[precision...] (Repeatable) Enabling an operating
+      --enabled-precision=[precision...]
+                                        (Repeatable) Enabling an operating
                                         precision for kernels to use when
-                                        building the engine [ float |
-                                        float32 | f32 | half | float16 | f16 |
-                                        int8 | i8 ] (default: float)
-
-      --ffo,
-      --forced-fallback-ops             List of operators in the graph that
-                                        should be forced to fallback to Pytorch for execution
+                                        building the engine (Int8 requires a
+                                        calibration-cache argument) [ float |
+                                        float32 | f32 | fp32 | half | float16 |
+                                        f16 | fp16 | int8 | i8 | char ]
+                                        (default: float)
       -d[type], --device-type=[type]    The type of device the engine should be
                                         built for [ gpu | dla ] (default: gpu)
       --gpu-id=[gpu_id]                 GPU id if running on multi-GPU platform
@@ -64,6 +61,18 @@ trtorchc [input_file_path] [output_file_path]
       --calibration-cache-file=[file_path]
                                         Path to calibration cache file to use
                                         for post training quantization
+      --ffo=[forced_fallback_ops...],
+      --forced-fallback-op=[forced_fallback_ops...]
+                                        (Repeatable) Operator in the graph that
+                                        should be forced to fallback to Pytorch
+                                        for execution (allow torch fallback must
+                                        be set)
+      --ffm=[forced_fallback_mods...],
+      --forced-fallback-mod=[forced_fallback_mods...]
+                                        (Repeatable) Module that should be
+                                        forced to fallback to Pytorch for
+                                        execution (allow torch fallback must be
+                                        set)
       --embed-engine                    Whether to treat input file as a
                                         serialized TensorRT engine and embed it
                                         into a TorchScript module (device spec
@@ -81,6 +90,11 @@ trtorchc [input_file_path] [output_file_path]
       --threshold=[threshold]           Maximum acceptable numerical deviation
                                         from standard torchscript output
                                         (default 2e-5)
+      --no-threshold-check              Skip checking threshold compliance
+      --truncate-long-double,
+      --truncate, --truncate-64bit      Truncate weights that are provided in
+                                        64bit to 32bit (Long, Double to Int,
+                                        Float)
       --save-engine                     Instead of compiling a full a
                                         TorchScript program, save the created
                                         engine to the path specified as the

@@ -33,7 +33,7 @@ pkg_tar(
 pkg_tar(
     name = "include",
     srcs = [
-        "//cpp/api:api_headers",
+        "//cpp:api_headers",
     ],
     package_dir = "include/trtorch/",
 )
@@ -41,11 +41,11 @@ pkg_tar(
 pkg_tar(
     name = "lib",
     srcs = select({
-        ":windows": ["//cpp/api/lib:trtorch.dll"],
+        ":windows": ["//cpp/lib:trtorch.dll"],
         "//conditions:default": [
-            "//cpp/api/lib:libtrtorch.so",
-            "//cpp/api/lib:libtrtorchrt.so",
-            "//cpp/api/lib:libtrtorch_plugins.so",
+            "//cpp/lib:libtrtorch.so",
+            "//cpp/lib:libtrtorchrt.so",
+            "//cpp/lib:libtrtorch_plugins.so",
         ],
     }),
     mode = "0755",
@@ -55,7 +55,7 @@ pkg_tar(
 pkg_tar(
     name = "bin",
     srcs = [
-        "//cpp/trtorchc",
+        "//cpp/bin/trtorchc",
     ],
     mode = "0755",
     package_dir = "bin/",

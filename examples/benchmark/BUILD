@@ -7,7 +7,7 @@ cc_binary(
         "timer.h",
     ],
     deps = [
-        "//cpp/api:trtorch",
+        "//cpp:trtorch",
         "@libtorch",
         "@libtorch//:caffe2",
     ],

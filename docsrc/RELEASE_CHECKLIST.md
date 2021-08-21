@@ -25,7 +25,7 @@ will result in a minor version bump and sigificant bug fixes will result in a pa
     - There should be a PR which will be the PR that bumps the actual version of the library, this PR should contain the following
         - Bump version in `py/setup.py`
         - Make sure dependency versions are updated in `py/requirements.txt`, `tests/py/requirements.txt` and `py/setup.py`
-        - Bump version in `cpp/api/include/macros.h`
+        - Bump version in `cpp/include/macros.h`
         - Add new link to doc versions in `docsrc/conf.py`
         - Generate frozen docs for new version
             - Set `docsrc/conf.py` version to new version (temporarily, return back to master after)
@@ -36,26 +36,26 @@ will result in a minor version bump and sigificant bug fixes will result in a pa
             - `conventional-changelog -p angular -s -i CHANGELOG.md -t <last version tag> -a`
 
 5. Run performance tests:
-    - Models: 
+    - Models:
         - Torchbench BERT
-            - `[2, 128], [2, 128]` 
+            - `[2, 128], [2, 128]`
         - EfficientNet B0
             - `[3, 224, 224]`
-            - `[3, 1920, 1080]` (P2)  
+            - `[3, 1920, 1080]` (P2)
         - ViT
-            - `[3, 224, 224]` 
-            - `[3, 1920, 1080]` (P2)   
+            - `[3, 224, 224]`
+            - `[3, 1920, 1080]` (P2)
         - ResNet50 (v1.5 ?)
             - `[3, 224, 224]`
-            - `[3, 1920, 1080]` (P2)    
+            - `[3, 1920, 1080]` (P2)
     - Batch Sizes: 1, 4, 8, 16, 32
     - Frameworks: PyTorch, TRTorch, ONNX + TRT
         - If any models do not convert to ONNX / TRT, that is fine. Mark them as failling / no result
-    - Devices: 
+    - Devices:
         - A100 (P0)
         - A30 / A30 MIG (P1) (same batches as T4
         - T4 (P1) (Add batch sizes 64, 128, 256, 512, 1024 if so)
-        - Jetson also nice to have (P4) 
+        - Jetson also nice to have (P4)
     - Please submit one PBR for A100, and one PBR for T4 + A30
 
 

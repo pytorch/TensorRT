@@ -22,7 +22,7 @@ cc_library(
     deps = [
         "//core/conversion",
         "//core/util:prelude",
-        "//cpp/api:trtorch",
+        "//cpp:trtorch",
         "@tensorrt//:nvinfer",
     ] + select({
         ":use_pre_cxx11_abi": [

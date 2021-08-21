@@ -276,8 +276,14 @@ int main(int argc, char** argv) {
   args::ValueFlagList<std::string> forced_fallback_ops(
       parser,
       "forced_fallback_ops",
-      "(Repeatable) List of operators in the graph that should be forced to fallback to Pytorch for execution.",
-      {"ffo", "forced-fallback-ops"});
+      "(Repeatable) Operator in the graph that should be forced to fallback to Pytorch for execution (allow torch fallback must be set)",
+      {"ffo", "forced-fallback-op"});
+
+  args::ValueFlagList<std::string> forced_fallback_mods(
+      parser,
+      "forced_fallback_mods",
+      "(Repeatable) Module that should be forced to fallback to Pytorch for execution (allow torch fallback must be set)",
+      {"ffm", "forced-fallback-mod"});
 
   args::Flag embed_engine(
       parser,
@@ -454,10 +460,6 @@ int main(int argc, char** argv) {
     compile_settings.device.allow_gpu_fallback = true;
   }
 
-  if (allow_torch_fallback) {
-    compile_settings.torch_fallback = trtorch::CompileSpec::TorchFallback(true);
-  }
-
   if (disable_tf32) {
     compile_settings.disable_tf32 = true;
   }
@@ -469,15 +471,24 @@ int main(int argc, char** argv) {
 
   auto calibrator = trtorch::ptq::make_int8_cache_calibrator(calibration_cache_file_path);
 
-  if (forced_fallback_ops) {
+  if (allow_torch_fallback) {
+    compile_settings.torch_fallback = trtorch::CompileSpec::TorchFallback(true);
+  }
+
+  if (forced_fallback_ops || forced_fallback_mods) {
     if (!allow_torch_fallback) {
       trtorch::logging::log(
           trtorch::logging::Level::kERROR,
-          "Forced fallback ops provided but allow_torch_fallback is False. Please use --allow-torch-fallback to enable automatic fallback of operators.");
+          "Forced fallback ops provided but allow-torch-fallback is not set. Please use --allow-torch-fallback to enable automatic fallback of operators.");
+      exit(1);
     }
 
     for (const auto fallback_op : args::get(forced_fallback_ops)) {
       compile_settings.torch_fallback.forced_fallback_ops.push_back(fallback_op);
+    }
+
+    for (const auto fallback_mod : args::get(forced_fallback_mods)) {
+      compile_settings.torch_fallback.forced_fallback_modules.push_back(fallback_mod);
     }
   }
 
