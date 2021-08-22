@@ -241,6 +241,30 @@ TEST(Converters, ATenTransposeConvertsCorrectly) {
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
+TEST(Converters, ATenTConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%x.1 : Tensor):
+      %out : Tensor = aten::t(%x.1)
+      return (%out))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, &*g);
+
+  auto in = at::randint(0, 5, {3, 4}, {at::kCUDA});
+  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+
+  std::cout << "Running JIT" << std::endl;
+  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
+
+  std::cout << "Running TRT" << std::endl;
+  in = at::clone(in);
+  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
+  auto trt = trt_results[0].reshape_as(jit_results[0]);
+
+  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+}
+
 TEST(Converters, ATenTransposeNegativeConvertsCorrectly) {
   const auto graph = R"IR(
     graph(%x.1 : Tensor):
@@ -312,7 +336,6 @@ TEST(Converters, ATenPixelShuffle3DConvertsCorrectly) {
   in = at::clone(in);
   params = trtorch::core::conversion::get_named_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
-  // auto trt = trt_results[0].reshape_as(jit_results[0]);
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }

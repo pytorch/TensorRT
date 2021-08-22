@@ -143,6 +143,22 @@ auto aten_registrations TRTORCH_UNUSED =
                       auto out_tensor = torch::ones(args.at(n->input(0)).unwrapToIntList().vec(), options);
                       return out_tensor;
                     }})
+        .evaluator({c10::Symbol::fromQualString("aten::full"),
+                    // aten::full(int[] size, Scalar fill_value, *, int? dtype=None, int? layout=None,
+                    // Device? device=None, bool? pin_memory=None) -> (Tensor)
+                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+                      auto options = torch::TensorOptions().layout(torch::kStrided).device(torch::kCUDA);
+
+                      // Input 2 here is the dtype
+                      if (!args.at(n->input(2)).isNone() && !args.at(n->input(2)).IValue()->isNone()) {
+                        options = options.dtype(c10::ScalarType(args.at(n->input(2)).unwrapToInt()));
+                      }
+
+                      auto scalar_value = args.at(n->input(1)).unwrapToScalar().to<float>();
+                      auto out_tensor =
+                          torch::full(args.at(n->input(0)).unwrapToIntList().vec(), scalar_value, options);
+                      return out_tensor;
+                    }})
         .evaluator({c10::Symbol::fromQualString("aten::slice"),
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                       c10::List<c10::IValue> list = args.at(n->input(0)).IValue()->to<c10::List<c10::IValue>>();
@@ -569,6 +585,22 @@ auto aten_registrations TRTORCH_UNUSED =
                       return {};
                     },
                     EvalOptions()})
+        .evaluator({c10::Symbol::fromQualString("aten::is_floating_point"),
+                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+                      auto tensor_var = args.at(n->input(0));
+                      if (tensor_var.isITensor()) {
+                        auto tensor = tensor_var.ITensor();
+                        auto t = tensor->getType();
+                        return (t == nvinfer1::DataType::kFLOAT || t == nvinfer1::DataType::kHALF);
+                      } else {
+                        auto tensor = tensor_var.unwrapToTensor();
+                        auto t = tensor.scalar_type();
+                        return at::isFloatingType(t);
+                      }
+                    },
+                    EvalOptions().validSchemas({
+                        "aten::is_floating_point(Tensor self) -> (bool)",
+                    })})
         .evaluator(
             {c10::Symbol::fromQualString("aten::tensor"),
              [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {

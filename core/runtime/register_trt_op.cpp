@@ -11,11 +11,11 @@ namespace core {
 namespace runtime {
 
 // Checks if the context switch requred for device ID
-bool is_switch_required(const CudaDevice& curr_device, const CudaDevice& conf_device) {
+bool is_switch_required(const CudaDevice& curr_device, const CudaDevice& engine_device) {
   // If SM capability is not the same as configured then switch
-  if ((curr_device.major != conf_device.major) || (curr_device.minor != conf_device.minor)) {
+  if ((curr_device.major != engine_device.major) || (curr_device.minor != engine_device.minor)) {
     LOG_WARNING(
-        "Configured SM capability " << conf_device.getSMCapability()
+        "Configured SM capability " << engine_device.getSMCapability()
                                     << " does not match with current device SM capability "
                                     << curr_device.getSMCapability() << " (" << curr_device
                                     << "). Switching device context");
@@ -23,63 +23,38 @@ bool is_switch_required(const CudaDevice& curr_device, const CudaDevice& conf_de
   }
 
   // GPU case
-  if (conf_device.device_type == nvinfer1::DeviceType::kGPU) {
-    if (curr_device.device_name != conf_device.device_name) {
+  if (engine_device.device_type == nvinfer1::DeviceType::kGPU) {
+    if (curr_device.device_name != engine_device.device_name) {
       LOG_WARNING(
-          "Program compiled for " << conf_device.device_name << " but current CUDA device is " << curr_device
+          "Program compiled for " << engine_device.device_name << " but current CUDA device is " << curr_device
                                   << ". Attempting to switch device context for better compatibility");
       return true;
     }
   }
 
-  if (curr_device.id != conf_device.id) {
+  if (curr_device.id != engine_device.id) {
     LOG_WARNING(
-        "Configured Device ID: " << conf_device.id << " is different that current device ID: " << curr_device.id
-                                 << ". Moving input tensors to device: " << conf_device.id);
+        "Configured Device ID: " << engine_device.id << " is different that current device ID: " << curr_device.id
+                                 << ". Moving input tensors to device: " << engine_device.id);
     return true;
   }
 
   return false;
 }
 
-CudaDevice select_cuda_device(const CudaDevice& conf_device) {
-  int64_t device_id = -1;
-  auto dla_supported = get_dla_supported_SMs();
-
-  auto device_list = get_available_device_list().get_devices();
-
-  CudaDevice new_target_device;
-
-  for (auto device : device_list) {
-    auto compute_cap = device.second.getSMCapability();
-    // In case of DLA select the DLA supported device ID
-    if (conf_device.device_type == nvinfer1::DeviceType::kDLA) {
-      if (dla_supported.find(compute_cap) != dla_supported.end() &&
-          dla_supported[compute_cap] == device.second.device_name) {
-        device_id = device.second.id;
-        new_target_device = CudaDevice(device_id, nvinfer1::DeviceType::kDLA);
-        break;
-      }
-    } else if (conf_device.device_type == nvinfer1::DeviceType::kGPU) {
-      auto conf_sm = conf_device.getSMCapability();
-      if (compute_cap == conf_sm && device.second.device_name == conf_device.device_name) {
-        device_id = device.second.id;
-        new_target_device = CudaDevice(device_id, nvinfer1::DeviceType::kGPU);
-        break;
-      }
-    } else {
-      TRTORCH_THROW_ERROR("Unknown target device type detected from the compiled program (runtime.select_cuda_device)");
-      break;
-    }
-  }
+CudaDevice select_cuda_device(const CudaDevice& engine_device) {
+  auto new_target_device_opt = get_most_compatible_device(engine_device);
 
   // REVIEW: THIS DOES NOT LIST DLA PROBABLY, WHICH WE SHOULD
+  // TODO: I think this logic could be way simpler at execution time since if the tensors arent on the right
+  // device, its not going to run. We should just set device to engine device and maybe reset and memcpy tensors
+  // back to orginal device if needed.
   TRTORCH_CHECK(
-      device_id >= 0,
+      new_target_device_opt,
       "No compatible device found on system to run program.\n Program targets "
-          << conf_device << "\n Available targets: \n"
+          << engine_device << "\n Available targets: \n"
           << get_available_device_list().dump_list() << "\n(runtime.select_cuda_device)");
-  return new_target_device;
+  return new_target_device_opt.value();
 }
 
 std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intrusive_ptr<TRTEngine> compiled_engine) {
@@ -96,7 +71,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     std::string target_device = "cuda:" + std::to_string(device.id);
 
     for (auto& in : inputs) {
-      in = in.to(at::kCUDA);
+      in = in.to(torch::Device(target_device));
     }
   }
 

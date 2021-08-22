@@ -43,9 +43,9 @@ def compile(module: torch.jit.ScriptModule, compile_spec: Any) -> torch.jit.Scri
                         "dla_core": 0, # (DLA only) Target dla core id to run engine
                         "allow_gpu_fallback": false, # (DLA only) Allow layers unsupported on DLA to run on GPU
                     },
-                    "enabled_precisions": {torch.float, torch.half}, # Enabling FP16 kernels
                     "disable_tf32": False, # Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
                     "sparse_weights": Enable sparsity for convolution and fully connected layers.
+                    "enabled_precisions": {torch.float, torch.half}, # Enabling FP16 kernels
                     "refit": false, # enable refit
                     "debug": false, # enable debuggable engine
                     "strict_types": false, # kernels should strictly run in operating precision
@@ -58,6 +58,9 @@ def compile(module: torch.jit.ScriptModule, compile_spec: Any) -> torch.jit.Scri
                         "enabled": True, # Turn on or turn off falling back to PyTorch if operations are not supported in TensorRT
                         "force_fallback_ops": [
                             "aten::max_pool2d" # List of specific ops to require running in PyTorch
+                        ],
+                        "force_fallback_modules": [
+                            "mypymod.mytorchmod" # List of specific torch modules to require running in PyTorch
                         ],
                         "min_block_size": 3 # Minimum number of ops an engine must incapsulate to be run in TensorRT
                     }

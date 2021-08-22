@@ -148,6 +148,10 @@ def _parse_torch_fallback(fallback_info: Dict[str, Any]) -> trtorch._C.TorchFall
         assert isinstance(fallback_info["forced_fallback_ops"], list)
         info.forced_fallback_operators = fallback_info["forced_fallback_ops"]
 
+    if "forced_fallback_modules" in fallback_info:
+        assert isinstance(fallback_info["forced_fallback_modules"], list)
+        info.forced_fallback_modules = fallback_info["forced_fallback_modules"]
+
     return info
 
 
@@ -338,6 +342,7 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]) -> torch.classes.tensorrt.
     torch_fallback._set_enabled(parsed_spec.torch_fallback.enabled)
     torch_fallback._set_min_block_size(parsed_spec.torch_fallback.min_block_size)
     torch_fallback._set_forced_fallback_operators(parsed_spec.torch_fallback.forced_fallback_operators)
+    torch_fallback._set_forced_fallback_modules(parsed_spec.torch_fallback.forced_fallback_modules)
 
     backend_spec._set_device(d)
     backend_spec._set_torch_fallback(torch_fallback)

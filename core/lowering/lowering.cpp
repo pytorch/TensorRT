@@ -24,17 +24,22 @@ void LowerBlock(torch::jit::Block* b) {
   DropUnusedNodes(b);
 }
 
-void LowerGraph(std::shared_ptr<torch::jit::Graph>& g) {
-  passes::UnpackHardSwish(g);
+void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, LowerInfo lower_info) {
   torch::jit::EliminateRedundantGuards(g);
   torch::jit::RemoveListMutation(g);
   torch::jit::RemoveTensorMutation(g);
   torch::jit::CreateFunctionalGraphs(g);
   torch::jit::InlineFunctionalGraphs(g);
   torch::jit::PeepholeOptimize(g, false);
-  passes::EliminateExceptionOrPassPattern(g);
   torch::jit::FuseLinear(g);
   torch::jit::LowerAllTuples(g);
+  if (!lower_info.disable_cse) {
+    torch::jit::EliminateCommonSubexpression(g);
+  }
+  torch::jit::EliminateDeadCode(g);
+  passes::MarkNodesForFallback(g, true);
+  passes::UnpackHardSwish(g);
+  passes::EliminateExceptionOrPassPattern(g);
   passes::ReduceToOperation(g);
   passes::RemoveContiguous(g);
   passes::RemoveDropout(g);
@@ -43,9 +48,7 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g) {
   passes::Conv3DToConvolution(g);
   passes::FuseAddMMBranches(g);
   passes::RemoveBNDimCheck(g);
-  torch::jit::EliminateCommonSubexpression(g);
   // torch::jit::UnrollLoops(g);
-  torch::jit::EliminateCommonSubexpression(g);
   passes::UnpackAddMM(g);
   // passes::UnpackBatchNorm(g);
   passes::UnpackLogSoftmax(g);
@@ -54,31 +57,44 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g) {
   passes::RemoveNOPs(g);
   passes::AliasOperators(g);
   passes::SiluToSigmoidMultipication(g);
-  torch::jit::EliminateDeadCode(g);
   LOG_GRAPH(*g);
 }
 
-torch::jit::Module LowerModule(const torch::jit::script::Module& mod) {
+torch::jit::Module LowerModule(
+    const torch::jit::Module& mod,
+    std::string method_name,
+    std::unordered_set<std::string> forced_fallback_modules) {
+  passes::NotateModuleForFallback(mod, "", method_name, forced_fallback_modules);
+  LOG_GRAPH("After MLF notation pass: " << *mod.get_method(method_name).graph());
   auto mod_ = torch::jit::freeze_module(mod);
+  LOG_GRAPH("After freeze: " << *mod_.get_method(method_name).graph());
   return mod_;
 }
 
 std::pair<std::shared_ptr<torch::jit::Graph>, std::vector<torch::jit::IValue>> Lower(
-    const torch::jit::script::Module& mod,
-    std::string method_name) {
-  auto lowered_mod = LowerModule(mod);
+    const torch::jit::Module& mod,
+    std::string method_name,
+    const LowerInfo& lower_info) {
+  LOG_DEBUG(lower_info);
+  LOG_GRAPH("Before lowering: " << *mod.get_method(method_name).graph());
+  std::unordered_set<std::string> forced_fallback_modules(
+      lower_info.forced_fallback_modules.begin(), lower_info.forced_fallback_modules.end());
+  auto lowered_mod = lower_info.unfreeze_module ? mod : LowerModule(mod, method_name, forced_fallback_modules);
   auto g = lowered_mod.get_method(method_name).graph();
-  LOG_GRAPH(*g);
 
-  // Go through TRTorch Lowering to reformat graph to be conversion friendly
-  // and also segment for accelerators and executors (TRT-DLA, TRT-GPU, PYT)
-  LOG_GRAPH("TRTorch Graph Lowering");
-  lowering::LowerGraph(g);
-  //=[torch::jit::FoldConvBatchNorm2d(lowered_mod);
   LOG_GRAPH("LibTorch Lowering");
   auto graph_and_ivalues = torch::jit::LowerGraph(*g, lowered_mod._ivalue());
+
+  // Go through TRTorch Lowering to reformat graph to be conversion friendly
+  // and also segment for accelerators and executors (TRT-DLA, TRT-GPU  , PYT)
+  // unfreeze_module is used to not perform constant folding on weights in the network.
+  // In quantization aware trained (QAT) models, weights are passed through quantize and
+  // dequantize nodes which should not be folded. So unfreeze_module is set to True for QAT models.
+  LOG_GRAPH("TRTorch Graph Lowering");
+  lowering::LowerGraph(graph_and_ivalues.first, lower_info);
+
   // Is this necessary?
-  lowering::LowerBlock(g->block());
+  // lowering::LowerBlock(g->block());
 
   return graph_and_ivalues;
 }

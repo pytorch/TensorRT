@@ -4,6 +4,7 @@
 #include <vector>
 #include "core/conversion/conversion.h"
 #include "core/ir/ir.h"
+#include "core/lowering/lowering.h"
 #include "core/partitioning/partitioning.h"
 #include "core/runtime/runtime.h"
 #include "torch/csrc/jit/api/module.h"
@@ -14,6 +15,7 @@ namespace core {
 struct CompileSpec {
   CompileSpec(std::vector<ir::Input> inputs) : convert_info(std::move(inputs)) {}
   conversion::ConversionInfo convert_info;
+  lowering::LowerInfo lower_info;
   partitioning::PartitionInfo partition_info;
 };
 

@@ -25,6 +25,7 @@ auto mm_registrations TRTORCH_UNUSED =
 
                     auto mm_layer = ctx->net->addMatrixMultiply(
                         *self, nvinfer1::MatrixOperation::kNONE, *other, nvinfer1::MatrixOperation::kNONE);
+
                     TRTORCH_CHECK(mm_layer, "Unable to create matrix multiplication node: " << *n);
                     mm_layer->setName(util::node_info(n).c_str());
                     auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], mm_layer->getOutput(0));

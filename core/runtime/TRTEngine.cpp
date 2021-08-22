@@ -38,18 +38,19 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info) {
 }
 
 TRTEngine::TRTEngine(std::string mod_name, std::string serialized_engine, CudaDevice cuda_device) {
-  device_info = cuda_device;
+  auto most_compatible_device = get_most_compatible_device(cuda_device);
+  TRTORCH_CHECK(most_compatible_device, "No compatible device was found for instantiating TensorRT engine");
+  device_info = most_compatible_device.value();
   set_cuda_device(device_info);
 
-  rt = std::shared_ptr<nvinfer1::IRuntime>(nvinfer1::createInferRuntime(util::logging::get_logger()));
+  rt = make_trt(nvinfer1::createInferRuntime(util::logging::get_logger()));
 
   name = slugify(mod_name);
 
-  cuda_engine = std::shared_ptr<nvinfer1::ICudaEngine>(
-      rt->deserializeCudaEngine(serialized_engine.c_str(), serialized_engine.size()));
-  TRTORCH_CHECK((cuda_engine != nullptr), "Unable to deserialize the TensorRT engine");
+  cuda_engine = make_trt(rt->deserializeCudaEngine(serialized_engine.c_str(), serialized_engine.size()));
+  TRTORCH_CHECK((cuda_engine.get() != nullptr), "Unable to deserialize the TensorRT engine");
 
-  exec_ctx = std::shared_ptr<nvinfer1::IExecutionContext>(cuda_engine->createExecutionContext());
+  exec_ctx = make_trt(cuda_engine->createExecutionContext());
 
   uint64_t inputs = 0;
   uint64_t outputs = 0;

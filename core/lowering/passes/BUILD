@@ -15,6 +15,7 @@ cc_library(
         "exception_elimination.cpp",
         "fuse_addmm_branches.cpp",
         "linear_to_addmm.cpp",
+        "module_fallback.cpp",
         "op_aliasing.cpp",
         "reduce_to.cpp",
         "remove_bn_dim_check.cpp",

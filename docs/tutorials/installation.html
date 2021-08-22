@@ -1247,8 +1247,8 @@ e.g. aarch64 or custom compiled version of PyTorch.
            <blockquote>
             <div>
              <p>
-              <a class="reference external" href="https://forums.developer.nvidia.com/t/pytorch-for-jetson-nano-version-1-5-0-now-available/72048">
-               https://forums.developer.nvidia.com/t/pytorch-for-jetson-nano-version-1-5-0-now-available/72048
+              <a class="reference external" href="https://forums.developer.nvidia.com/t/pytorch-for-jetson-version-1-9-0-now-available/72048">
+               https://forums.developer.nvidia.com/t/pytorch-for-jetson-version-1-9-0-now-available/72048
               </a>
              </p>
             </div>
@@ -1320,37 +1320,12 @@ e.g. aarch64 or custom compiled version of PyTorch.
 <span class="c1">#    sha256 = "9205bed204e2ae7aafd2e01cce0f21309e281e18d5bfd7172ef8541771539d41",</span>
 <span class="c1">#    strip_prefix = "TensorRT-7.1.3.4"</span>
 <span class="c1">#)</span>
+
+NOTE: You may also need to configure the CUDA version to <span class="m">10</span>.2 by setting the path <span class="k">for</span> the cuda new_local_repository
 </pre>
             </div>
            </div>
-           <ol class="arabic simple" start="2">
-            <li>
-             <p>
-              Disable Python API testing dependencies:
-             </p>
-            </li>
-           </ol>
-           <div class="highlight-shell notranslate">
-            <div class="highlight">
-             <pre><span></span><span class="c1">#pip3_import(</span>
-<span class="c1">#    name = "trtorch_py_deps",</span>
-<span class="c1">#    requirements = "//py:requirements.txt"</span>
-<span class="c1">#)</span>
-
-<span class="c1">#load("@trtorch_py_deps//:requirements.bzl", "pip_install")</span>
-<span class="c1">#pip_install()</span>
-
-<span class="c1">#pip3_import(</span>
-<span class="c1">#   name = "py_test_deps",</span>
-<span class="c1">#   requirements = "//tests/py:requirements.txt"</span>
-<span class="c1">#)</span>
-
-<span class="c1">#load("@py_test_deps//:requirements.bzl", "pip_install")</span>
-<span class="c1">#pip_install()</span>
-</pre>
-            </div>
-           </div>
-           <ol class="arabic" start="3">
+           <ol class="arabic" start="2">
             <li>
              <p>
               Configure the correct paths to directory roots containing local dependencies in the
@@ -1454,12 +1429,25 @@ new_local_repository<span class="o">(</span>
              ¶
             </a>
            </h4>
+           <blockquote>
+            <div>
+             <p>
+              NOTE: Due to shifting dependency locations between Jetpack 4.5 and 4.6 there is a now a flag to inform bazel of the Jetpack version
+             </p>
+             <div class="highlight-shell notranslate">
+              <div class="highlight">
+               <pre><span></span>--platforms //toolchains:jetpack_4.x
+</pre>
+              </div>
+             </div>
+            </div>
+           </blockquote>
            <p>
             Compile TRTorch library using bazel command:
            </p>
            <div class="highlight-shell notranslate">
             <div class="highlight">
-             <pre><span></span>bazel build //:libtrtorch
+             <pre><span></span>bazel build //:libtrtorch --platforms //toolchains:jetpack_4.6
 </pre>
             </div>
            </div>
@@ -1471,6 +1459,19 @@ new_local_repository<span class="o">(</span>
              ¶
             </a>
            </h4>
+           <blockquote>
+            <div>
+             <p>
+              NOTE: Due to shifting dependencies locations between Jetpack 4.5 and Jetpack 4.6 there is now a flag for
+              <code class="docutils literal notranslate">
+               <span class="pre">
+                setup.py
+               </span>
+              </code>
+              which sets the jetpack version (default: 4.6)
+             </p>
+            </div>
+           </blockquote>
            <p>
             Compile the Python API using the following command from the
             <code class="docutils literal notranslate">
@@ -1491,6 +1492,18 @@ new_local_repository<span class="o">(</span>
             <code class="docutils literal notranslate">
              <span class="pre">
               --use-cxx11-abi
+             </span>
+            </code>
+            flag
+           </p>
+           <p>
+            If you are building for Jetpack 4.5 add the
+            <code class="docutils literal notranslate">
+             <span class="pre">
+              --jetpack-version
+             </span>
+             <span class="pre">
+              4.5
              </span>
             </code>
             flag
