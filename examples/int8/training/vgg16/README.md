@@ -22,7 +22,7 @@ python3 main.py --lr 0.01 --batch-size 128 --drop-ratio 0.15 --ckpt-dir $(pwd)/v
 
 You can monitor training with tensorboard, logs are stored by default at `/tmp/vgg16_logs`
 
-### Quantization
+### Quantization Aware Fine Tuning (for trying out QAT Workflows)
 
 To perform quantization aware training, it is recommended that you finetune your model obtained from previous step with quantization layers.
 
@@ -51,12 +51,14 @@ After QAT is completed, you should see the checkpoint of QAT model in the `$pwd/
 
 Use the exporter script to create a torchscript module you can compile with TRTorch
 
+### For PTQ
 ```
 python3 export_ckpt.py <path-to-checkpoint>
 ```
 
-It should produce a file called `trained_vgg16.jit.pt`
+The checkpoint file should be from the original training and not quatization aware fine tuning. THe script should produce a file called `trained_vgg16.jit.pt`
 
+### For QAT
 To export a QAT  model, you can run
 
 ```
