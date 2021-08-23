@@ -72,7 +72,7 @@ if BAZEL_EXE is None:
 
 def build_libtrtorch_pre_cxx11_abi(develop=True, use_dist_dir=True, cxx11_abi=False):
     cmd = [BAZEL_EXE, "build"]
-    cmd.append("//cpp/api/lib:libtrtorch.so")
+    cmd.append("//cpp/lib:libtrtorch.so")
     if develop:
         cmd.append("--compilation_mode=dbg")
     else:
@@ -115,7 +115,7 @@ def copy_libtrtorch(multilinux=False):
     if multilinux:
         copyfile(dir_path + "/build/libtrtorch_build/libtrtorch.so", dir_path + '/trtorch/lib/libtrtorch.so')
     else:
-        copyfile(dir_path + "/../bazel-bin/cpp/api/lib/libtrtorch.so", dir_path + '/trtorch/lib/libtrtorch.so')
+        copyfile(dir_path + "/../bazel-bin/cpp/lib/libtrtorch.so", dir_path + '/trtorch/lib/libtrtorch.so')
 
 
 class DevelopCommand(develop):
