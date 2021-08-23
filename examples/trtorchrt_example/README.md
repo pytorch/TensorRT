@@ -4,7 +4,7 @@
 
 This sample is a demonstration on how to use TRTorch runtime library `libtrtorchrt.so` along with plugin library `libtrtorch_plugins.so`
 
-In this demo, we convert two models `ConvGelu` and `Norm` to TensorRT using TRTorch python API and perform inference using `samplertapp`. In these models, `Gelu` and `Norm` layer are expressed as plugins in the network.
+In this demo, we convert two models `ConvGelu` and `Norm` to TensorRT using TRTorch python API and perform inference using `trtorchrt_example`. In these models, `Gelu` and `Norm` layer are expressed as plugins in the network.
 
 ### Generating Torch script modules with TRT Engines
 
