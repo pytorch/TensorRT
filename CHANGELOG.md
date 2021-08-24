@@ -1,7 +1,7 @@
 # Changelog
 
 
-# v0.0.1 (2020-03-31)
+# 0.0.1 (2020-03-31)
 
 
 ### Bug Fixes
@@ -24,7 +24,7 @@
 * **CheckMethodOperatorSupport:** A new API which will check the graph ([28ee445](https://github.com/NVIDIA/TRTorch/commit/28ee445)), closes [#26](https://github.com/NVIDIA/TRTorch/issues/26)
 * **hardtanh:** Adds support for the the hard tanh operator ([391af52](https://github.com/NVIDIA/TRTorch/commit/391af52))
 
-# v0.0.2  (2020-05-17)
+# 0.0.2  (2020-05-17)
 
 
 ### Bug Fixes
@@ -73,7 +73,7 @@
 * **conv2d_to_convolution:** A pass to map aten::conv2d to _convolution ([2c5c0d5](https://github.com/NVIDIA/TRTorch/commit/2c5c0d5))
 
 
-# v0.0.3 (2020-07-18)
+# 0.0.3 (2020-07-18)
 
 
 * feat!: Lock bazel version ([25f4371](https://github.com/NVIDIA/TRTorch/commit/25f4371))
@@ -232,7 +232,7 @@ Signed-off-by: Naren Dasan <naren@narendasan.com>
 Signed-off-by: Naren Dasan <narens@nvidia.com>
 
 
-# v0.1.0 (2020-10-23)
+# 0.1.0 (2020-10-23)
 
 
 ### Bug Fixes
@@ -303,7 +303,7 @@ Signed-off-by: Naren Dasan <narens@nvidia.com>
 
 
 
-#  v0.2.0 (2021-02-25)
+#  0.2.0 (2021-02-25)
 
 
 * refactor!: Update bazel and trt versions ([0618b6b](https://github.com/NVIDIA/TRTorch/commit/0618b6b))
@@ -355,7 +355,7 @@ Signed-off-by: Naren Dasan <naren@narendasan.com>
 Signed-off-by: Naren Dasan <narens@nvidia.com>
 
 
-# v0.3.0 (2021-05-13)
+# 0.3.0 (2021-05-13)
 
 
 ### Bug Fixes
@@ -430,7 +430,7 @@ source with the dependencies in WORKSPACE changed
 Signed-off-by: Naren Dasan <naren@narendasan.com>
 Signed-off-by: Naren Dasan <narens@nvidia.com>
 
-#  v0.4.0 (2021-08-24)
+#  0.4.0 (2021-08-24)
 
 
 * feat(serde)!: Refactor CudaDevice struct, implement ABI versioning, ([9327cce](https://github.com/NVIDIA/TRTorch/commit/9327cce))
@@ -491,26 +491,27 @@ Signed-off-by: Naren Dasan <narens@nvidia.com>
 * **aten::ones:** Adding support for aten::ones ([2b45a3d](https://github.com/NVIDIA/TRTorch/commit/2b45a3d))
 * **aten::slice:** Patching slice for new optional params ([a11287f](https://github.com/NVIDIA/TRTorch/commit/a11287f))
 * **aten::sqrt:** Adding support for sqrt evaluators ([6aaba3b](https://github.com/NVIDIA/TRTorch/commit/6aaba3b))
-* Support fallback options in trtorchc ([ad966b7](https://github.com/NVIDIA/TRTorch/commit/ad966b7))
 * **aten::std|aten::masked_fill:** Implement masked_fill, aten::std ([a086a5b](https://github.com/NVIDIA/TRTorch/commit/a086a5b))
 * **aten::std|aten::masked_fill:** Implement masked_fill, aten::std ([2866627](https://github.com/NVIDIA/TRTorch/commit/2866627))
+* **jetson:** Support for Jetpack 4.6 ([9760fe3](https://github.com/NVIDIA/TRTorch/commit/9760fe3))
+* **to_backend:** Updating backend integration preproc function ([080b594](https://github.com/NVIDIA/TRTorch/commit/080b594))
+* Enable sparsity support in TRTorch ([f9e1f2b](https://github.com/NVIDIA/TRTorch/commit/f9e1f2b))
+* **trtorchc:** Adding flag for sparse weights ([bfdc6f5](https://github.com/NVIDIA/TRTorch/commit/bfdc6f5))
 * Add aten::full converter, quantization ops testcases ([9f2ffd0](https://github.com/NVIDIA/TRTorch/commit/9f2ffd0))
 * Add aten::type_as lowering pass ([b57a6dd](https://github.com/NVIDIA/TRTorch/commit/b57a6dd))
 * Add functionality for QAT workflow ([fc8eafb](https://github.com/NVIDIA/TRTorch/commit/fc8eafb))
 * Add functionality for QAT workflow ([f776e76](https://github.com/NVIDIA/TRTorch/commit/f776e76))
 * Add support for providing input datatypes in TRTorch ([a3f4a3c](https://github.com/NVIDIA/TRTorch/commit/a3f4a3c))
 * Adding automatic casting to compare layers ([90af26e](https://github.com/NVIDIA/TRTorch/commit/90af26e))
-* Enable sparsity support in TRTorch ([f9e1f2b](https://github.com/NVIDIA/TRTorch/commit/f9e1f2b))
 * Enable sparsity support in TRTorch ([decd0ed](https://github.com/NVIDIA/TRTorch/commit/decd0ed))
-* **jetson:** Support for Jetpack 4.6 ([9760fe3](https://github.com/NVIDIA/TRTorch/commit/9760fe3))
 * Enable TRT 8.0 QAT functionality in TRTorch ([c76a28a](https://github.com/NVIDIA/TRTorch/commit/c76a28a))
-* **to_backend:** Updating backend integration preproc function ([080b594](https://github.com/NVIDIA/TRTorch/commit/080b594))
 * Makefile for trtorchrt.so example ([c60c521](https://github.com/NVIDIA/TRTorch/commit/c60c521))
 * show pytorch code of unsupported operators ([2ee2a84](https://github.com/NVIDIA/TRTorch/commit/2ee2a84))
 * support aten::Int ([5bc977d](https://github.com/NVIDIA/TRTorch/commit/5bc977d))
-* Using shared_ptrs to manage TRT resources in runtime ([e336630](https://github.com/NVIDIA/TRTorch/commit/e336630))
 * **trtorchc:** Adding more dtype aliases ([652fb13](https://github.com/NVIDIA/TRTorch/commit/652fb13))
 * **trtorchc:** Adding new support for dtypes and formats in ([c39bf81](https://github.com/NVIDIA/TRTorch/commit/c39bf81))
+* Support fallback options in trtorchc ([ad966b7](https://github.com/NVIDIA/TRTorch/commit/ad966b7))
+* Using shared_ptrs to manage TRT resources in runtime ([e336630](https://github.com/NVIDIA/TRTorch/commit/e336630))
 * **trtorchc:** Embedding engines in modules from the CLI ([2b4b9e3](https://github.com/NVIDIA/TRTorch/commit/2b4b9e3))
 
 

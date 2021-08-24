@@ -43,6 +43,8 @@ to standard TorchScript. Load with ``torch.jit.load()`` and run like you would r
                                           are not supported in TensorRT
         --disable-tf32                    Prevent Float32 layers from using the
                                           TF32 data format
+        --sparse-weights                  Enable sparsity for weights of conv and
+                                          FC layers
         -p[precision...],
         --enabled-precision=[precision...]
                                           (Repeatable) Enabling an operating
