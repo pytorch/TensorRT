@@ -246,6 +246,9 @@ int main(int argc, char** argv) {
   args::Flag disable_tf32(
       parser, "disable-tf32", "Prevent Float32 layers from using the TF32 data format", {"disable-tf32"});
 
+  args::Flag sparse_weights(
+      parser, "sparse-weights", "Enable sparsity for weights of conv and FC layers", {"sparse-weights"});
+
   args::ValueFlagList<std::string> enabled_precision(
       parser,
       "precision",
@@ -462,6 +465,10 @@ int main(int argc, char** argv) {
 
   if (disable_tf32) {
     compile_settings.disable_tf32 = true;
+  }
+
+  if (sparse_weights) {
+    compile_settings.sparse_weights = true;
   }
 
   std::string calibration_cache_file_path = "";

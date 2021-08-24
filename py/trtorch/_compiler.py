@@ -28,11 +28,11 @@ def compile(module: torch.jit.ScriptModule, compile_spec: Any) -> torch.jit.Scri
 
                 compile_spec = {
                     "inputs": [
-                        trtorch.Input((1, 3, 224, 224)), # Static input shape for input #1
+                        trtorch.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
                         trtorch.Input(
-                            min_shape=1, 3, 224, 224),
-                            opt_shape=(1, 3, 512, 512),
-                            max_shape=(1, 3, 1024, 1024),
+                            min_shape=(1, 224, 224, 3),
+                            opt_shape=(1, 512, 512, 3),
+                            max_shape=(1, 1024, 1024, 3),
                             dtype=torch.int32
                             format=torch.channel_last
                         ) # Dynamic input shape for input #2
@@ -100,11 +100,11 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule, method_name: st
 
                 CompileSpec = {
                     "inputs": [
-                        trtorch.Input((1, 3, 224, 224)), # Static input shape for input #1
+                        trtorch.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
                         trtorch.Input(
-                            min_shape=1, 3, 224, 224),
-                            opt_shape=(1, 3, 512, 512),
-                            max_shape=(1, 3, 1024, 1024),
+                            min_shape=(1, 224, 224, 3),
+                            opt_shape=(1, 512, 512, 3),
+                            max_shape=(1, 1024, 1024, 3),
                             dtype=torch.int32
                             format=torch.channel_last
                         ) # Dynamic input shape for input #2
