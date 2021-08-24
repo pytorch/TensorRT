@@ -3,7 +3,7 @@
 Struct CompileSpec::Device
 ==========================
 
-- Defined in :ref:`file_cpp_api_include_trtorch_trtorch.h`
+- Defined in :ref:`file_cpp_include_trtorch_trtorch.h`
 
 
 Nested Relationships

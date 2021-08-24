@@ -3,7 +3,7 @@
 Function trtorch::logging::set_logging_prefix
 =============================================
 
-- Defined in :ref:`file_cpp_api_include_trtorch_logging.h`
+- Defined in :ref:`file_cpp_include_trtorch_logging.h`
 
 
 Function Documentation

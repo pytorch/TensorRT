@@ -131,6 +131,22 @@ Removes tuples where TupleConstruct and TupleUnpack are matched but leaves tuple
 
 Removes _all_ tuples and raises an error if some cannot be removed, this is used by ONNX to ensure there are not tuples before conversion, but will not work on graphs whose inputs contain tuples.
 
+Module Fallback
+*****************
+
+    `trtorch/core/lowering/passes/module_fallback.cpp <https://github.com/nvidia/trtorch/blob/master/core/lowering/passes/module_fallback.cpp>`
+
+Module fallback consists of two lowering passes that must be run as a pair. The first pass is run before freezing to place delimiters in the graph around modules
+that should run in PyTorch. The second pass marks nodes between these delimiters after freezing to signify they should run in PyTorch.
+
+* ``NotateModuleForFallback``
+
+Places delimiting nodes around module calls pre freezing to signify where in the graph nodes should run in PyTorch
+
+* ``MarkNodesForFallback``
+
+Looks for delimiters then marks all nodes between the delimiters to tell partitioning to run them in PyTorch
+
 Peephole Optimze
 ***************************************
 

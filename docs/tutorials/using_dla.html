@@ -160,6 +160,9 @@
        <a href="https://nvidia.github.io/TRTorch/" title="master">
         master
        </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.4.0/" title="v0.4.0">
+        v0.4.0
+       </a>
        <a href="https://nvidia.github.io/TRTorch/v0.3.0/" title="v0.3.0">
         v0.3.0
        </a>
@@ -448,20 +451,15 @@
         <p>
          Using DLA in a python application
         </p>
-        <div class="highlight-shell notranslate">
+        <div class="highlight-python notranslate">
          <div class="highlight">
-          <pre><span></span><span class="nv">compile_spec</span> <span class="o">=</span> <span class="o">{</span>
-        <span class="s2">"inputs"</span>: <span class="o">[</span>trtorch.Input<span class="o">(</span>self.input.shape<span class="o">)]</span>,
-        <span class="s2">"device"</span>: <span class="o">{</span>
-            <span class="s2">"device_type"</span>: trtorch.DeviceType.DLA,
-            <span class="s2">"gpu_id"</span>: <span class="m">0</span>,
-            <span class="s2">"dla_core"</span>: <span class="m">0</span>,
-            <span class="s2">"allow_gpu_fallback"</span>: True
-        <span class="o">}</span>,
-        <span class="s2">"enalbed_precisions"</span>: <span class="o">{</span>torch.half<span class="o">}</span>
-<span class="o">}</span>
+          <pre><span></span><span class="n">compile_spec</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"inputs"</span><span class="p">:</span> <span class="p">[</span><span class="n">trtorch</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">input</span><span class="o">.</span><span class="n">shape</span><span class="p">)],</span>
+    <span class="s2">"device"</span><span class="p">:</span> <span class="n">trtorch</span><span class="o">.</span><span class="n">Device</span><span class="p">(</span><span class="s2">"dla:0"</span><span class="p">,</span> <span class="n">allow_gpu_fallback</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+    <span class="s2">"enalbed_precisions"</span><span class="p">:</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">}</span>
+<span class="p">}</span>
 
-<span class="nv">trt_mod</span> <span class="o">=</span> trtorch.compile<span class="o">(</span>self.scripted_model, compile_spec<span class="o">)</span>
+<span class="n">trt_mod</span> <span class="o">=</span> <span class="n">trtorch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">scripted_model</span><span class="p">,</span> <span class="n">compile_spec</span><span class="p">)</span>
 </pre>
          </div>
         </div>
@@ -508,7 +506,7 @@
     <div class="md-footer-meta__inner md-grid">
      <div class="md-footer-copyright">
       <div class="md-footer-copyright__highlight">
-       © Copyright 2020, NVIDIA Corporation.
+       © Copyright 2021, NVIDIA Corporation.
       </div>
       Created using
       <a href="http://www.sphinx-doc.org/">

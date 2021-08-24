@@ -158,6 +158,9 @@
        <a href="https://nvidia.github.io/TRTorch/" title="master">
         master
        </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.4.0/" title="v0.4.0">
+        v0.4.0
+       </a>
        <a href="https://nvidia.github.io/TRTorch/v0.3.0/" title="v0.3.0">
         v0.3.0
        </a>
@@ -370,6 +373,11 @@
               </a>
              </li>
              <li class="md-nav__item">
+              <a class="md-nav__link" href="#partitioning">
+               Partitioning
+              </a>
+             </li>
+             <li class="md-nav__item">
               <a class="md-nav__link" href="#conversion">
                Conversion
               </a>
@@ -425,6 +433,28 @@ run over the graph IR to map the large PyTorch opset to a reduced opset that is 
 TensorRT.
          </p>
         </section>
+        <section id="partitioning">
+         <h2 id="partitioning">
+          Partitioning
+          <a class="headerlink" href="#partitioning" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <p>
+          :ref:
+          <a href="#id1">
+           <span class="problematic" id="id2">
+            `
+           </span>
+          </a>
+          partitioning
+         </p>
+         <p>
+          The phase is optional and enabled by the user. It instructs the compiler to seperate nodes into ones that should run in PyTorch and ones that should run in TensorRT.
+Criteria for seperation include: Lack of a converter, operator is explicitly set to run in PyTorch by the user or the node has a flag which tells partitioning to
+run in PyTorch by the module fallback passes.
+         </p>
+        </section>
         <section id="conversion">
          <h2 id="conversion">
           Conversion
@@ -454,9 +484,9 @@ library which maps an op from JIT to TensorRT.
           </a>
          </h2>
          <p>
-          <a class="reference internal" href="runtime.html#execution">
+          <a class="reference internal" href="../tutorials/runtime.html#runtime">
            <span class="std std-ref">
-            Runtime Phase
+            Deploying TRTorch Programs
            </span>
           </a>
          </p>
@@ -482,7 +512,7 @@ When the user executes the module, the JIT program run in the JIT runtime extend
     <div class="md-footer-meta__inner md-grid">
      <div class="md-footer-copyright">
       <div class="md-footer-copyright__highlight">
-       © Copyright 2020, NVIDIA Corporation.
+       © Copyright 2021, NVIDIA Corporation.
       </div>
       Created using
       <a href="http://www.sphinx-doc.org/">

@@ -3,7 +3,7 @@
 Function trtorch::dump_build_info
 =================================
 
-- Defined in :ref:`file_cpp_api_include_trtorch_trtorch.h`
+- Defined in :ref:`file_cpp_include_trtorch_trtorch.h`
 
 
 Function Documentation

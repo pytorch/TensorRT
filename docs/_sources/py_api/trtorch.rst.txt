@@ -27,6 +27,17 @@ Functions
 
 .. autofunction:: TensorRTCompileSpec
 
+Classes
+---------
+
+.. autoclass:: Input
+   :members:
+   :special-members: __init__
+
+.. autoclass:: Device
+   :members:
+   :special-members: __init__
+
 Enums
 -------
 
@@ -35,6 +46,8 @@ Enums
 .. autoclass:: DeviceType
 
 .. autoclass:: EngineCapability
+
+.. autoclass:: TensorFormat
 
 Submodules
 ----------

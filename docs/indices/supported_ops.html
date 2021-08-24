@@ -159,6 +159,9 @@
        <a href="https://nvidia.github.io/TRTorch/" title="master">
         master
        </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.4.0/" title="v0.4.0">
+        v0.4.0
+       </a>
        <a href="https://nvidia.github.io/TRTorch/v0.3.0/" title="v0.3.0">
         v0.3.0
        </a>
@@ -481,6 +484,11 @@
           </li>
           <li>
            <p>
+            aten::adaptive_max_pool2d(Tensor self, int[2] output_size) -&gt; (Tensor, Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
             aten::add.Scalar(Tensor self, Scalar other, Scalar alpha=1) -&gt; (Tensor)
            </p>
           </li>
@@ -492,8 +500,8 @@
           <li>
            <p>
             aten::
-            <a href="#id29">
-             <span class="problematic" id="id30">
+            <a href="#id33">
+             <span class="problematic" id="id34">
               add_
              </span>
             </a>
@@ -578,6 +586,11 @@
           </li>
           <li>
            <p>
+            aten::constant_pad_nd(Tensor self, int[] pad, Scalar value=0) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
             aten::cos(Tensor self) -&gt; (Tensor)
            </p>
           </li>
@@ -610,8 +623,8 @@
           <li>
            <p>
             aten::
-            <a href="#id31">
-             <span class="problematic" id="id32">
+            <a href="#id35">
+             <span class="problematic" id="id36">
               div_
              </span>
             </a>
@@ -621,8 +634,8 @@
           <li>
            <p>
             aten::
-            <a href="#id33">
-             <span class="problematic" id="id34">
+            <a href="#id37">
+             <span class="problematic" id="id38">
               div_
              </span>
             </a>
@@ -677,6 +690,16 @@
           </li>
           <li>
            <p>
+            aten::fake_quantize_per_channel_affine(Tensor self, Tensor scale, Tensor zero_point, int axis, int quant_min, int quant_max) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::fake_quantize_per_tensor_affine(Tensor self, float scale, int zero_point, int quant_min, int quant_max) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
             aten::flatten.using_ints(Tensor self, int start_dim=0, int end_dim=-1) -&gt; (Tensor)
            </p>
           </li>
@@ -712,6 +735,11 @@
           </li>
           <li>
            <p>
+            aten::gru_cell(Tensor input, Tensor hx, Tensor w_ih, Tensor w_hh, Tensor? b_ih=None, Tensor? b_hh=None) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
             aten::gt.Scalar(Tensor self, Scalar other) -&gt; (Tensor)
            </p>
           </li>
@@ -728,6 +756,11 @@
           <li>
            <p>
             aten::hardtanh_(Tensor(a!) self, Scalar min_val=-1, Scalar max_val=1) -&gt; (Tensor(a!))
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::instance_norm(Tensor input, Tensor? weight, Tensor? bias, Tensor? running_mean, Tensor? running_var, bool use_input_stats, float momentum, float eps, bool cudnn_enabled) -&gt; (Tensor)
            </p>
           </li>
           <li>
@@ -778,6 +811,11 @@
           <li>
            <p>
             aten::lt.Tensor(Tensor self, Tensor other) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::masked_fill.Scalar(Tensor self, Tensor mask, Scalar value) -&gt; (Tensor)
            </p>
           </li>
           <li>
@@ -855,8 +893,8 @@
           <li>
            <p>
             aten::
-            <a href="#id35">
-             <span class="problematic" id="id36">
+            <a href="#id39">
+             <span class="problematic" id="id40">
               mul_
              </span>
             </a>
@@ -1017,7 +1055,7 @@
           </li>
           <li>
            <p>
-            aten::slice.Tensor(Tensor(a) self, int dim=0, int start=0, int end=9223372036854775807, int step=1) -&gt; (Tensor(a))
+            aten::slice.Tensor(Tensor(a) self, int dim=0, int? start=None, int? end=None, int step=1) -&gt; (Tensor(a))
            </p>
           </li>
           <li>
@@ -1057,14 +1095,19 @@
           </li>
           <li>
            <p>
+            aten::sub.Scalar(Tensor self, Scalar other, Scalar alpha=1) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
             aten::sub.Tensor(Tensor self, Tensor other, Scalar alpha=1) -&gt; (Tensor)
            </p>
           </li>
           <li>
            <p>
             aten::
-            <a href="#id37">
-             <span class="problematic" id="id38">
+            <a href="#id41">
+             <span class="problematic" id="id42">
               sub_
              </span>
             </a>
@@ -1101,6 +1144,11 @@
           </li>
           <li>
            <p>
+            aten::t(Tensor self) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
             aten::tan(Tensor self) -&gt; (Tensor)
            </p>
           </li>
@@ -1112,6 +1160,21 @@
           <li>
            <p>
             aten::tanh_(Tensor(a!) self) -&gt; (Tensor(a!))
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::to.dtype(Tensor self, int dtype, bool non_blocking=False, bool copy=False, int? memory_format=None) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::to.other(Tensor self, Tensor other, bool non_blocking=False, bool copy=False, int? memory_format=None) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::to.prim_Device(Tensor(a) self, Device? device, int? dtype=None, bool non_blocking=False, bool copy=False) -&gt; (Tensor(a|b))
            </p>
           </li>
           <li>
@@ -1236,6 +1299,26 @@
           </li>
           <li>
            <p>
+            aten::Int.Scalar(Scalar a) -&gt; int
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::Int.bool(bool a) -&gt; int
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::Int.float(float a) -&gt; int
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::Int.int(int a) -&gt; int
+           </p>
+          </li>
+          <li>
+           <p>
             aten::__and__(int a, int b) -&gt; (bool)
            </p>
           </li>
@@ -1287,8 +1370,8 @@
           <li>
            <p>
             aten::
-            <a href="#id39">
-             <span class="problematic" id="id40">
+            <a href="#id43">
+             <span class="problematic" id="id44">
               add_
              </span>
             </a>
@@ -1359,6 +1442,22 @@
              </p>
             </dd>
            </dl>
+          </li>
+          <li>
+           <p>
+            aten::clone(Tensor self,
+            <a href="#id29">
+             <span class="problematic" id="id30">
+              *
+             </span>
+            </a>
+            , int? memory_format=None) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -&gt; (Tensor(a!))
+           </p>
           </li>
           <li>
            <p>
@@ -1468,6 +1567,11 @@
           <li>
            <p>
             aten::gt.int_float(int a, float b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::is_floating_point(Tensor self) -&gt; (bool)
            </p>
           </li>
           <li>
@@ -1587,6 +1691,16 @@
           </li>
           <li>
            <p>
+            aten::sqrt.float(float a) -&gt; (float)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::sqrt.int(int a) -&gt; (float)
+           </p>
+          </li>
+          <li>
+           <p>
             aten::sub.float(float a, float b) -&gt; (float)
            </p>
           </li>
@@ -1597,7 +1711,18 @@
           </li>
           <li>
            <p>
-            aten::t(Tensor self) -&gt; Tensor
+            aten::tensor(t[] data,
+            <a href="#id31">
+             <span class="problematic" id="id32">
+              *
+             </span>
+            </a>
+            , int? dtype=None, Device? device=None, bool requires_grad=False) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            prim::dtype(Tensor a) -&gt; (int)
            </p>
           </li>
           <li>
@@ -1696,7 +1821,7 @@
     <div class="md-footer-meta__inner md-grid">
      <div class="md-footer-copyright">
       <div class="md-footer-copyright__highlight">
-       © Copyright 2020, NVIDIA Corporation.
+       © Copyright 2021, NVIDIA Corporation.
       </div>
       Created using
       <a href="http://www.sphinx-doc.org/">

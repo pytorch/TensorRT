@@ -3,7 +3,7 @@
 Define TRTORCH_MINOR_VERSION
 ============================
 
-- Defined in :ref:`file_cpp_api_include_trtorch_macros.h`
+- Defined in :ref:`file_cpp_include_trtorch_macros.h`
 
 
 Define Documentation

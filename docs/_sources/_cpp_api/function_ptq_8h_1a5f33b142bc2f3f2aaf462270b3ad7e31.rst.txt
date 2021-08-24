@@ -3,7 +3,7 @@
 Template Function trtorch::ptq::make_int8_cache_calibrator
 ==========================================================
 
-- Defined in :ref:`file_cpp_api_include_trtorch_ptq.h`
+- Defined in :ref:`file_cpp_include_trtorch_ptq.h`
 
 
 Function Documentation

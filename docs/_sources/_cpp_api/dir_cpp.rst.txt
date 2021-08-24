@@ -10,7 +10,7 @@ Directory cpp
 Subdirectories
 --------------
 
-- :ref:`dir_cpp_api`
+- :ref:`dir_cpp_include`
 
 
 

@@ -16,17 +16,12 @@ Directories
 .. toctree::
    :maxdepth: 5
 
-   dir_cpp_api.rst
+   dir_cpp_include.rst
 
 .. toctree::
    :maxdepth: 5
 
-   dir_cpp_api_include.rst
-
-.. toctree::
-   :maxdepth: 5
-
-   dir_cpp_api_include_trtorch.rst
+   dir_cpp_include_trtorch.rst
 
 Files
 *****
@@ -35,19 +30,19 @@ Files
 .. toctree::
    :maxdepth: 5
 
-   file_cpp_api_include_trtorch_logging.h.rst
+   file_cpp_include_trtorch_logging.h.rst
 
 .. toctree::
    :maxdepth: 5
 
-   file_cpp_api_include_trtorch_macros.h.rst
+   file_cpp_include_trtorch_macros.h.rst
 
 .. toctree::
    :maxdepth: 5
 
-   file_cpp_api_include_trtorch_ptq.h.rst
+   file_cpp_include_trtorch_ptq.h.rst
 
 .. toctree::
    :maxdepth: 5
 
-   file_cpp_api_include_trtorch_trtorch.h.rst
+   file_cpp_include_trtorch_trtorch.h.rst
