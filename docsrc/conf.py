@@ -19,7 +19,7 @@ import sphinx_material
 # -- Project information -----------------------------------------------------
 
 project = 'TRTorch'
-copyright = '2020, NVIDIA Corporation'
+copyright = '2021, NVIDIA Corporation'
 author = 'NVIDIA Corporation'
 
 # The full version, including alpha/beta/rc tags
@@ -78,7 +78,7 @@ exhale_args = {
     # TIP: if using the sphinx-bootstrap-theme, you need
     # "treeViewIsBootstrap": True,
     "exhaleExecutesDoxygen": True,
-    "exhaleDoxygenStdin": "INPUT = ../cpp/api/include"
+    "exhaleDoxygenStdin": "INPUT = ../cpp/include"
 }
 
 html_show_sourcelink = True
@@ -119,6 +119,7 @@ html_theme_options = {
     'master_doc': True,
     "version_info": {
         "master": "https://nvidia.github.io/TRTorch/",
+        "v0.4.0": "https://nvidia.github.io/TRTorch/v0.4.0/",
         "v0.3.0": "https://nvidia.github.io/TRTorch/v0.3.0/",
         "v0.2.0": "https://nvidia.github.io/TRTorch/v0.2.0/",
         "v0.1.0": "https://nvidia.github.io/TRTorch/v0.1.0/",

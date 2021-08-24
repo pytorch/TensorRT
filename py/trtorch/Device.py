@@ -18,10 +18,10 @@ class Device(object):
         allow_gpu_fallback (bool): Whether falling back to GPU if DLA cannot support an op should be allowed
     """
 
-    device_type = None
-    gpu_id = -1
-    dla_core = -1
-    allow_gpu_fallback = False
+    device_type = None  #: (trtorch.DeviceType): Target device type (GPU or DLA). Set implicitly based on if dla_core is specified.
+    gpu_id = -1  #: (int) Device ID for target GPU
+    dla_core = -1  #: (int) Core ID for target DLA core
+    allow_gpu_fallback = False  #: (bool) Whether falling back to GPU if DLA cannot support an op should be allowed
 
     def __init__(self, *args, **kwargs):
         """ __init__ Method for trtorch.Device

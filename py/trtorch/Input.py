@@ -28,11 +28,11 @@ class Input(object):
         STATIC = 0
         DYNAMIC = 1
 
-    shape_mode = None
-    shape = None
-    dtype = _types.dtype.float32
+    shape_mode = None  #: (trtorch.Input._ShapeMode): Is input statically or dynamically shaped
+    shape = None  #: (Tuple or Dict): Either a single Tuple or a dict of tuples defining the input shape. Static shaped inputs will have a single tuple. Dynamic inputs will have a dict of the form ``{ "min_shape": Tuple, "opt_shape": Tuple, "max_shape": Tuple }``
+    dtype = _types.dtype.float32  #: The expected data type of the input tensor (default: trtorch.dtype.float32)
     _explicit_set_dtype = False
-    format = _types.TensorFormat.contiguous
+    format = _types.TensorFormat.contiguous  #: The expected format of the input tensor (default: trtorch.TensorFormat.NCHW)
 
     def __init__(self, *args, **kwargs):
         """ __init__ Method for trtorch.Input
