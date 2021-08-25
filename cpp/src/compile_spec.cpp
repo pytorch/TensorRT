@@ -144,30 +144,6 @@ CompileSpec::Device::DeviceType::DeviceType(c10::DeviceType t) {
   value = DeviceType::kGPU;
 }
 
-CompileSpec::InputRange::InputRange(std::vector<int64_t> opt) {
-  this->opt = opt;
-  this->min = opt;
-  this->max = opt;
-}
-
-CompileSpec::InputRange::InputRange(c10::IntArrayRef opt) {
-  this->opt = core::util::toVec(opt);
-  this->min = core::util::toVec(opt);
-  this->max = core::util::toVec(opt);
-}
-
-CompileSpec::InputRange::InputRange(std::vector<int64_t> min, std::vector<int64_t> opt, std::vector<int64_t> max) {
-  this->opt = opt;
-  this->min = min;
-  this->max = max;
-}
-
-CompileSpec::InputRange::InputRange(c10::IntArrayRef min, c10::IntArrayRef opt, c10::IntArrayRef max) {
-  this->opt = core::util::toVec(opt);
-  this->min = core::util::toVec(min);
-  this->max = core::util::toVec(max);
-}
-
 CompileSpec::CompileSpec(std::vector<c10::ArrayRef<int64_t>> fixed_sizes) {
   for (auto in : fixed_sizes) {
     inputs.push_back(Input(in));
@@ -289,20 +265,8 @@ CompileSpec::Input::Input(
 
 /* ==========================================*/
 
-core::ir::Input to_internal_input(CompileSpec::InputRange& i) {
-  return core::ir::Input(i.min, i.opt, i.max);
-}
-
 core::ir::Input to_internal_input(CompileSpec::Input& i) {
   return core::ir::Input(i.min_shape, i.opt_shape, i.max_shape, toTRTDataType(i.dtype), toTRTTensorFormat(i.format));
-}
-
-std::vector<core::ir::Input> to_vec_internal_inputs(std::vector<CompileSpec::InputRange>& external) {
-  std::vector<core::ir::Input> internal;
-  for (auto range : external) {
-    internal.push_back(to_internal_input(range));
-  }
-  return internal;
 }
 
 std::vector<core::ir::Input> to_vec_internal_inputs(std::vector<CompileSpec::Input>& external) {
@@ -328,24 +292,9 @@ core::runtime::CudaDevice to_internal_cuda_device(CompileSpec::Device device) {
 
 core::CompileSpec to_internal_compile_spec(CompileSpec external) {
   core::CompileSpec internal(to_vec_internal_inputs(external.inputs));
-  if (external.input_ranges.size() > 0 && external.inputs.size() > 0) {
-    TRTORCH_THROW_ERROR(
-        "Saw both input specs listed for inputs and input_ranges in CompileSpec. input_ranges is deprecated and will be removed in v0.5.0. Please port forward to using inputs");
-  } else if (external.input_ranges.size() > 0) {
-    internal = core::CompileSpec(to_vec_internal_inputs(external.input_ranges));
-  } else {
-    TRTORCH_CHECK(external.inputs.size() > 0, "Compilation requires at least one input specification");
-    internal = core::CompileSpec(to_vec_internal_inputs(external.inputs));
-  }
 
-  if (external.enabled_precisions.size() == 1 &&
-      toTRTDataType(*external.enabled_precisions.begin()) == nvinfer1::DataType::kFLOAT &&
-      toTRTDataType(external.op_precision) != nvinfer1::DataType::kFLOAT) {
-    internal.convert_info.engine_settings.enabled_precisions.insert(toTRTDataType(external.op_precision));
-  } else {
-    for (auto p : external.enabled_precisions) {
-      internal.convert_info.engine_settings.enabled_precisions.insert(toTRTDataType(p));
-    }
+  for (auto p : external.enabled_precisions) {
+    internal.convert_info.engine_settings.enabled_precisions.insert(toTRTDataType(p));
   }
 
   /* We want default behavior for types to match PyTorch, so in the case the user did not explicitly set the dtype for

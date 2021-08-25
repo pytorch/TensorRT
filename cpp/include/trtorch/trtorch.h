@@ -507,64 +507,6 @@ struct TRTORCH_API CompileSpec {
   };
 
   /**
-   * @brief A struct to hold an input range (used by TensorRT Optimization
-   * profile)
-   *
-   * This struct can either hold a single vector representing an input shape,
-   * signifying a static input shape or a set of three input shapes representing
-   * the min, optiminal and max input shapes allowed for the engine.
-   */
-  struct TRTORCH_API InputRange {
-    /// Minimum acceptable input size into the engine
-    std::vector<int64_t> min;
-    /// Optimal input size into the engine (gets best performace)
-    std::vector<int64_t> opt;
-    /// Maximum acceptable input size into the engine
-    std::vector<int64_t> max;
-    /**
-     * @brief Construct a new Input Range object for static input size from
-     * vector
-     *
-     * @param opt
-     */
-    [[deprecated("trtorch::CompileSpec::InputRange is being deprecated in favor of trtorch::CompileSpec::Input. trtorch::CompileSpec::InputRange will be removed in TRTorch v0.5.0")]] InputRange(
-        std::vector<int64_t> opt);
-    /**
-     * @brief Construct a new Input Range object static input size from
-     * c10::ArrayRef (the type produced by tensor.sizes())
-     *
-     * @param opt
-     */
-    [[deprecated("trtorch::CompileSpec::InputRange is being deprecated in favor of trtorch::CompileSpec::Input. trtorch::CompileSpec::InputRange will be removed in TRTorch v0.5.0")]] InputRange(
-        c10::ArrayRef<int64_t> opt);
-    /**
-     * @brief Construct a new Input Range object dynamic input size from vectors
-     * for min, opt, and max supported sizes
-     *
-     * @param min
-     * @param opt
-     * @param max
-     */
-    [[deprecated("trtorch::CompileSpec::InputRange is being deprecated in favor of trtorch::CompileSpec::Input. trtorch::CompileSpec::InputRange will be removed in TRTorch v0.5.0")]] InputRange(
-        std::vector<int64_t> min,
-        std::vector<int64_t> opt,
-        std::vector<int64_t> max);
-    /**
-     * @brief Construct a new Input Range object dynamic input size from
-     * c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max
-     * supported sizes
-     *
-     * @param min
-     * @param opt
-     * @param max
-     */
-    [[deprecated("trtorch::CompileSpec::InputRange is being deprecated in favor of trtorch::CompileSpec::Input. trtorch::CompileSpec::InputRange will be removed in TRTorch v0.5.0")]] InputRange(
-        c10::ArrayRef<int64_t> min,
-        c10::ArrayRef<int64_t> opt,
-        c10::ArrayRef<int64_t> max);
-  };
-
-  /**
    * @brief A struct to hold fallback info
    */
   struct TRTORCH_API TorchFallback {
@@ -596,18 +538,6 @@ struct TRTORCH_API CompileSpec {
     TorchFallback(bool enabled, uint64_t min_size) : enabled(enabled), min_block_size(min_size) {}
   };
 
-  /**
-   * @brief Construct a new Extra Info object from input ranges.
-   * Each entry in the vector represents a input and should be provided in call
-   * order.
-   *
-   * Use this constructor if you want to use dynamic shape
-   *
-   * @param input_ranges
-   */
-  [[deprecated("trtorch::CompileSpec::CompileSpec(std::vector<InputRange> input_ranges) is being deprecated in favor of trtorch::CompileSpec::CompileSpec(std::vector<Input> inputs). Please use CompileSpec(std::vector<Input> inputs). trtorch::CompileSpec::CompileSpec(std::vector<InputRange> input_ranges) will be removed in TRTorch v0.5.0")]] CompileSpec(
-      std::vector<InputRange> input_ranges)
-      : input_ranges(std::move(input_ranges)) {}
   /**
    * @brief Construct a new Extra Info object
    * Convienence constructor to set fixed input size from vectors describing
@@ -656,24 +586,6 @@ struct TRTORCH_API CompileSpec {
    * Order in vector should match call order for the function
    */
   std::vector<Input> inputs;
-
-  /**
-   * Sizes for inputs to engine, can either be a single size or a range
-   * defined by Min, Optimal, Max sizes
-   *
-   * Order is should match call order
-   */
-  [[deprecated(
-      "trtorch::CompileSpec::input_ranges is being deprecated in favor of trtorch::CompileSpec::inputs. trtorch::CompileSpec::input_ranges will be removed in TRTorch v0.5.0")]] std::
-      vector<InputRange>
-          input_ranges;
-
-  /**
-   * Default operating precision for the engine
-   */
-  [[deprecated(
-      "trtorch::CompileSpec::op_precision is being deprecated in favor of trtorch::CompileSpec::enabled_precisions, a set of all enabled precisions to use during compilation, trtorch::CompileSpec::op_precision will be removed in TRTorch v0.5.0")]] DataType
-      op_precision = DataType::kFloat;
 
   /**
    * @brief The set of precisions TensorRT is allowed to use for kernels during compilation
