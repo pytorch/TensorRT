@@ -15,14 +15,14 @@ RUN pip install notebook
 
 FROM builder as trtorch
 
-COPY . /opt/trtorch
-RUN rm /opt/trtorch/WORKSPACE
-COPY ./docker/WORKSPACE.cu.docker  /opt/trtorch/WORKSPACE
 
-WORKDIR /opt/trtorch
-RUN bazel build //:libtrtorch --compilation_mode opt
+COPY . /opt/trtorch/src
+WORKDIR /opt/trtorch/src
+RUN cp ./docker/WORKSPACE.cu.docker  WORKSPACE
 
-WORKDIR /opt/trtorch/py
+RUN bazel build //:libtrtorch //cpp/trtorchc:trtorchc //cpp/trtorchexec:trtorchexec --compilation_mode opt
+
+WORKDIR /opt/trtorch/src/py
 
 RUN pip install ipywidgets --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host=files.pythonhosted.org
 RUN jupyter nbextension enable --py widgetsnbextension
@@ -32,11 +32,21 @@ RUN apt-get update && apt-get install -y locales ninja-build && rm -rf /var/lib/
 ENV LANG en_US.UTF-8
 ENV LANGUAGE en_US:en
 ENV LC_ALL en_US.UTF-8
-RUN python3 setup.py install --use-cxx11-abi
+RUN MAX_JOBS=1 python3 setup.py install --use-cxx11-abi
 
 RUN conda init bash
 
-ENV LD_LIBRARY_PATH /opt/conda/lib/python3.8/site-packages/torch/lib:$LD_LIBRARY_PATH
+WORKDIR /opt/trtorch/src
+RUN mkdir -p /opt/trtorch/lib /opt/trtorch/bin
+RUN cp ./bazel-bin/cpp/trtorchc/trtorchc /opt/trtorch/bin
+RUN cp ./bazel-bin/cpp/trtorchexec/trtorchexec /opt/trtorch/bin
+RUN cp ./bazel-bin/cpp/api/lib/libtrtorch.so /opt/trtorch/lib
+RUN cp ./bazel-bin/cpp/api/lib/libtrtorchrt.so /opt/trtorch/lib
+RUN cp ./bazel-bin/cpp/api/lib/libtrtorch_plugins.so /opt/trtorch/lib
+# RUN cp /opt/conda/lib/python3.8/site-packages/torch/lib/libtorch_global_deps.so /opt/trtorch/lib
+
+ENV LD_LIBRARY_PATH /opt/conda/lib/python3.8/site-packages/torch/lib:/opt/trtorch/lib:${LD_LIBRARY_PATH}
+ENV PATH /opt/trtorch/bin:${PATH}
 
 WORKDIR /opt/trtorch/
 CMD /bin/bash
