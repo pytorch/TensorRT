@@ -84,6 +84,10 @@ converter_test(
 )
 
 converter_test(
+    name = "test_reflection_pad2d",
+)
+
+converter_test(
     name = "test_replication_pad",
 )
 

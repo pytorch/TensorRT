@@ -71,6 +71,7 @@ cc_library(
         "impl/pooling.cpp",
         "impl/quantization.cpp",
         "impl/reduce.cpp",
+        "impl/reflection_pad2d.cpp",
         "impl/replication_pad.cpp",
         "impl/select.cpp",
         "impl/shuffle.cpp",
