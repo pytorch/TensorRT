@@ -2,6 +2,7 @@
 
 #include <queue>
 #include "core/conversion/conversion.h"
+#include "core/conversion/evaluators/evaluators.h"
 #include "core/partitioning/shape_analysis.h"
 #include "torch/csrc/jit/passes/constant_pooling.h"
 #include "torch/csrc/jit/passes/dead_code_elimination.h"
@@ -258,6 +259,21 @@ void registerSegmentsOutputs(PartitionedGraph& segmented_blocks, torch::jit::Blo
   return;
 }
 
+bool check_if_loop_evaluatable(const torch::jit::Node* n);
+bool check_if_loop_evaluatable(const torch::jit::Node* n) {
+  bool compile_to_trt = true;
+  for (auto bn : n->blocks()[0]->nodes()) {
+    if (bn->kind() == torch::jit::prim::Loop) {
+      compile_to_trt = compile_to_trt && check_if_loop_evaluatable(bn);
+    } else if (bn->kind() == torch::jit::prim::If) {
+      return false;
+    } else {
+      compile_to_trt = compile_to_trt && core::conversion::evaluators::shouldEvalAtConversionTime(bn);
+    }
+  }
+  return compile_to_trt;
+}
+
 std::vector<SegmentedBlock> segment_graph(torch::jit::Block* block, const PartitionInfo& partition_info) {
   auto min_block_size = partition_info.min_block_size;
   std::unordered_set<std::string> forced_fallback_operators(
@@ -297,6 +313,17 @@ std::vector<SegmentedBlock> segment_graph(torch::jit::Block* block, const Partit
           pytorch_nodes.clear();
         }
         segmented_blocks.emplace_back(SegmentedBlock::kTorch, std::vector<torch::jit::Node*>{n});
+        continue;
+      } else if (n->kind() == torch::jit::prim::Loop) {
+        if (!pytorch_nodes.empty()) {
+          segmented_blocks.emplace_back(SegmentedBlock::kTorch, pytorch_nodes);
+          pytorch_nodes.clear();
+        }
+        if (check_if_loop_evaluatable(n)) {
+          tensorrt_nodes.push_back(n);
+        } else {
+          pytorch_nodes.push_back(n);
+        }
         continue;
       }
       pytorch_nodes.push_back(n);
