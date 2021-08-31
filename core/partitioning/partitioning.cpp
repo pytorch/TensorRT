@@ -259,14 +259,13 @@ void registerSegmentsOutputs(PartitionedGraph& segmented_blocks, torch::jit::Blo
   return;
 }
 
-bool check_if_loop_evaluatable(const torch::jit::Node* n);
-bool check_if_loop_evaluatable(const torch::jit::Node* n) {
+bool checkLoopEvaluatable(torch::jit::Node* n) {
   bool compile_to_trt = true;
   for (auto bn : n->blocks()[0]->nodes()) {
     if (bn->kind() == torch::jit::prim::Loop) {
-      compile_to_trt = compile_to_trt && check_if_loop_evaluatable(bn);
+      compile_to_trt = compile_to_trt && checkLoopEvaluatable(bn);
     } else if (bn->kind() == torch::jit::prim::If) {
-      return false;
+      compile_to_trt = compile_to_trt && containNonTensorOutputs(bn);
     } else {
       compile_to_trt = compile_to_trt && core::conversion::evaluators::shouldEvalAtConversionTime(bn);
     }
@@ -319,10 +318,10 @@ std::vector<SegmentedBlock> segment_graph(torch::jit::Block* block, const Partit
           segmented_blocks.emplace_back(SegmentedBlock::kTorch, pytorch_nodes);
           pytorch_nodes.clear();
         }
-        if (check_if_loop_evaluatable(n)) {
-          tensorrt_nodes.push_back(n);
+        if (checkLoopEvaluatable(n)) {
+          segmented_blocks.emplace_back(SegmentedBlock::kTensorRT, std::vector<torch::jit::Node*>{n});
         } else {
-          pytorch_nodes.push_back(n);
+          segmented_blocks.emplace_back(SegmentedBlock::kTorch, std::vector<torch::jit::Node*>{n});
         }
         continue;
       }
