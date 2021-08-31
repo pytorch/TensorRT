@@ -294,7 +294,9 @@ CompileSpec::Input::Input(at::Tensor tensor) {
   this->shape = tensor.sizes().vec();
   this->dtype = tensor.scalar_type();
   this->explicit_set_dtype = true;
-  TRTORCH_ASSERT(tensor.is_contiguous(at::MemoryFormat::ChannelsLast) || tensor.is_contiguous(at::MemoryFormat::Contiguous), "Tensor does not have a supported contiguous memory format, supported formats are contiguous or channel_last");
+  TRTORCH_ASSERT(
+      tensor.is_contiguous(at::MemoryFormat::ChannelsLast) || tensor.is_contiguous(at::MemoryFormat::Contiguous),
+      "Tensor does not have a supported contiguous memory format, supported formats are contiguous or channel_last");
   at::MemoryFormat frmt;
   if (tensor.is_contiguous(at::MemoryFormat::Contiguous)) {
     frmt = at::MemoryFormat::Contiguous;

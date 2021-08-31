@@ -175,7 +175,8 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
 
     if "inputs" in compile_spec:
         if not all([isinstance(i, torch.Tensor) or isinstance(i, trtorch.Input) for i in compile_spec["inputs"]]):
-            raise KeyError("Input specs should be either trtorch.Input or torch.Tensor, found types: {}".format([typeof(i) for i in compile_spec["inputs"]]))
+            raise KeyError("Input specs should be either trtorch.Input or torch.Tensor, found types: {}".format(
+                [typeof(i) for i in compile_spec["inputs"]]))
 
         inputs = [trtorch.Input._from_tensor(i) if isinstance(i, torch.Tensor) else i for i in compile_spec["inputs"]]
         info.inputs = [i._to_internal() for i in inputs]

@@ -88,15 +88,12 @@ class TestCompile(ModelTestCase):
         self.assertTrue(same < 2e-2)
 
     def test_device(self):
-        compile_spec = {
-            "inputs": [self.input],
-            "device": trtorch.Device("gpu:0"),
-            "enabled_precisions": {torch.float}
-        }
+        compile_spec = {"inputs": [self.input], "device": trtorch.Device("gpu:0"), "enabled_precisions": {torch.float}}
 
         trt_mod = trtorch.compile(self.scripted_model, compile_spec)
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
         self.assertTrue(same < 2e-2)
+
 
 class TestCompileHalf(ModelTestCase):
 
