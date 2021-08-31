@@ -15,11 +15,12 @@ RUN pip install notebook
 
 FROM builder as trtorch
 
+
 COPY . /opt/trtorch/src
 WORKDIR /opt/trtorch/src
 RUN cp ./docker/WORKSPACE.cu.docker  WORKSPACE
 
-RUN bazel build //:libtrtorch //cpp/trtorchc:trtorchc //cpp/trtorchexec:trtorchexec --compilation_mode opt
+RUN bazel build //:libtrtorch //:bin --compilation_mode opt
 
 WORKDIR /opt/trtorch/src/py
 
@@ -37,12 +38,10 @@ RUN conda init bash
 
 WORKDIR /opt/trtorch/src
 RUN mkdir -p /opt/trtorch/lib /opt/trtorch/bin
-RUN cp ./bazel-bin/cpp/trtorchc/trtorchc /opt/trtorch/bin
-RUN cp ./bazel-bin/cpp/trtorchexec/trtorchexec /opt/trtorch/bin
+RUN cp ./bazel-bin/cpp/bin/trtorchc/trtorchc /opt/trtorch/bin
 RUN cp ./bazel-bin/cpp/api/lib/libtrtorch.so /opt/trtorch/lib
 RUN cp ./bazel-bin/cpp/api/lib/libtrtorchrt.so /opt/trtorch/lib
 RUN cp ./bazel-bin/cpp/api/lib/libtrtorch_plugins.so /opt/trtorch/lib
-# RUN cp /opt/conda/lib/python3.8/site-packages/torch/lib/libtorch_global_deps.so /opt/trtorch/lib
 
 ENV LD_LIBRARY_PATH /opt/conda/lib/python3.8/site-packages/torch/lib:/opt/trtorch/lib:${LD_LIBRARY_PATH}
 ENV PATH /opt/trtorch/bin:${PATH}
