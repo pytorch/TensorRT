@@ -319,7 +319,7 @@ std::vector<SegmentedBlock> segment_graph(torch::jit::Block* block, const Partit
           pytorch_nodes.clear();
         }
         if (checkLoopEvaluatable(n)) {
-          segmented_blocks.emplace_back(SegmentedBlock::kTensorRT, std::vector<torch::jit::Node*>{n});
+          tensorrt_nodes.push_back(n);
         } else {
           segmented_blocks.emplace_back(SegmentedBlock::kTorch, std::vector<torch::jit::Node*>{n});
         }
