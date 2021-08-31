@@ -174,7 +174,11 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
         info.inputs = _parse_input_ranges(compile_spec["input_shapes"])
 
     if "inputs" in compile_spec:
-        info.inputs = [i._to_internal() for i in compile_spec["inputs"]]
+        if not all([isinstance(i, torch.Tensor) or isinstance(i, trtorch.Input) for i in compile_spec["inputs"]]):
+            raise KeyError("Input specs should be either trtorch.Input or torch.Tensor, found types: {}".format([typeof(i) for i in compile_spec["inputs"]]))
+
+        inputs = [trtorch.Input._from_tensor(i) if isinstance(i, torch.Tensor) else i for i in compile_spec["inputs"]]
+        info.inputs = [i._to_internal() for i in inputs]
 
     if "op_precision" in compile_spec and "enabled_precisions" in compile_spec:
         raise KeyError(

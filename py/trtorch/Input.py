@@ -196,3 +196,10 @@ class Input(object):
         else:
             raise TypeError(
                 "Tensor format needs to be specified with either torch.memory_format or trtorch.TensorFormat")
+
+    @classmethod
+    def _from_tensor(cls, t: torch.Tensor):
+        if not any([t.is_contiguous(memory_format=torch.contiguous_format), t.is_contiguous(memory_format=torch.channels_last)]):
+            raise ValueError("Tensor does not have a supported contiguous memory format, supported formats are contiguous or channel_last")
+        frmt = torch.contiguous_format if t.is_contiguous(memory_format=torch.contiguous_format) else torch.channels_last
+        return cls(shape=t.shape, dtype=t.dtype, format=frmt)
