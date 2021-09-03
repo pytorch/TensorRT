@@ -61,8 +61,29 @@ void NotateModuleForFallback(
     LOG_GRAPH("Notated graph: " << *g);
   }
 
-  for (const auto sub_mod : mod.named_children()) {
-    NotateModuleForFallback(sub_mod.value, sub_mod.name, method_name, forced_fallback_modules);
+  if (mod.named_children().size() > 0) {
+    for (const auto n : nodes) {
+      std::string sub_method_name = "";
+      if (n->kind() == torch::jit::prim::CallMethod) {
+        sub_method_name = n->s(c10::Symbol::attr("name"));
+        auto sub_mod_val = n->input(0);
+        auto sub_mod_src_n = sub_mod_val->node();
+        if (!sub_mod_src_n->hasAttributeS("name")) {
+          LOG_GRAPH("Node: " << util::node_info(sub_mod_src_n) << " manages a module with no name, skipping");
+          break;
+        }
+        auto sub_mod_name = sub_mod_src_n->s(c10::Symbol::attr("name"));
+        for (const auto sub_mod : mod.named_children()) {
+          // Theres probably a way to directly access the module we care about
+          if (sub_mod.name == sub_mod_name) {
+            LOG_GRAPH(
+                "Looking at <module>.<method>() next: " << sub_mod_name << "." << sub_method_name
+                                                        << "() (lowering.passes.NotateModuleForFallback)");
+            NotateModuleForFallback(sub_mod.value, sub_mod.name, sub_method_name, forced_fallback_modules);
+          }
+        }
+      }
+    }
   }
 }
 
@@ -74,7 +95,7 @@ void MarkNodesForFallback(std::shared_ptr<torch::jit::Graph>& g, bool delete_del
     auto n = *it;
     if (!mark.top() && n->kind() == torch::jit::prim::Enter && n->hasAttributeS("compilation_edge")) {
       if (n->s(c10::Symbol::attr("compilation_edge")) == "start") {
-        LOG_DEBUG("Starting to mark new segmented block targeted for torch");
+        LOG_GRAPH("Starting to mark new segmented block targeted for torch");
         mark.push(true);
         if (delete_delims) {
           it.destroyCurrent();
@@ -82,7 +103,7 @@ void MarkNodesForFallback(std::shared_ptr<torch::jit::Graph>& g, bool delete_del
       }
     } else if (mark.top() && n->kind() == torch::jit::prim::Enter && n->hasAttributeS("compilation_edge")) {
       if (n->s(c10::Symbol::attr("compilation_edge")) == "start") {
-        LOG_DEBUG("Found the start of another segmented block targeted for torch while actively marking a block");
+        LOG_GRAPH("Found the start of another segmented block targeted for torch while actively marking a block");
         mark.push(true);
         if (delete_delims) {
           it.destroyCurrent();
@@ -90,7 +111,7 @@ void MarkNodesForFallback(std::shared_ptr<torch::jit::Graph>& g, bool delete_del
       }
     } else if (mark.top() && n->kind() == torch::jit::prim::Exit && n->hasAttributeS("compilation_edge")) {
       if (n->s(c10::Symbol::attr("compilation_edge")) == "end") {
-        LOG_DEBUG("Found the end of segmented block targeted for torch while actively marking a block");
+        LOG_GRAPH("Found the end of segmented block targeted for torch while actively marking a block");
         mark.pop();
         if (delete_delims) {
           it.destroyCurrent();
