@@ -37,7 +37,9 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, LowerInfo lower_info) {
     torch::jit::EliminateCommonSubexpression(g);
   }
   torch::jit::EliminateDeadCode(g);
-  passes::MarkNodesForFallback(g, true);
+  if (lower_info.forced_fallback_modules.size() > 0) {
+    passes::MarkNodesForFallback(g, true);
+  }
   passes::UnpackHardSwish(g);
   passes::EliminateExceptionOrPassPattern(g);
   passes::ReduceToOperation(g);
@@ -60,12 +62,13 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, LowerInfo lower_info) {
   LOG_GRAPH(*g);
 }
 
-torch::jit::Module LowerModule(
-    const torch::jit::Module& mod,
-    std::string method_name,
-    std::unordered_set<std::string> forced_fallback_modules) {
-  passes::NotateModuleForFallback(mod, "", method_name, forced_fallback_modules);
-  LOG_GRAPH("After MLF notation pass: " << *mod.get_method(method_name).graph());
+torch::jit::Module LowerModule(const torch::jit::Module& mod, std::string method_name, const LowerInfo& lower_info) {
+  std::unordered_set<std::string> forced_fallback_modules(
+      lower_info.forced_fallback_modules.begin(), lower_info.forced_fallback_modules.end());
+  if (forced_fallback_modules.size() > 0) {
+    passes::NotateModuleForFallback(mod, "", method_name, forced_fallback_modules);
+    LOG_GRAPH("After MLF notation pass: " << *mod.get_method(method_name).graph());
+  }
   auto mod_ = torch::jit::freeze_module(mod);
   LOG_GRAPH("After freeze: " << *mod_.get_method(method_name).graph());
   return mod_;
@@ -77,9 +80,7 @@ std::pair<std::shared_ptr<torch::jit::Graph>, std::vector<torch::jit::IValue>> L
     const LowerInfo& lower_info) {
   LOG_DEBUG(lower_info);
   LOG_GRAPH("Before lowering: " << *mod.get_method(method_name).graph());
-  std::unordered_set<std::string> forced_fallback_modules(
-      lower_info.forced_fallback_modules.begin(), lower_info.forced_fallback_modules.end());
-  auto lowered_mod = lower_info.unfreeze_module ? mod : LowerModule(mod, method_name, forced_fallback_modules);
+  auto lowered_mod = lower_info.unfreeze_module ? mod : LowerModule(mod, method_name, lower_info);
   auto g = lowered_mod.get_method(method_name).graph();
 
   LOG_GRAPH("LibTorch Lowering");
