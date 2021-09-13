@@ -214,6 +214,8 @@ Program Listing for File trtorch.h
            DataType dtype,
            TensorFormat format = TensorFormat::kContiguous);
    
+       Input(at::Tensor tensor);
+   
        bool get_explicit_set_dtype() {
          return explicit_set_dtype;
        }

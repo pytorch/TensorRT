@@ -917,7 +917,7 @@
                  Input
                 </span>
                </a>
-               Range object dynamic input size from c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max supported sizes. dtype (Expected data type for the input) defaults to PyTorch / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8)
+               spec object dynamic input size from c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max supported sizes. dtype (Expected data type for the input) defaults to PyTorch / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8)
               </p>
               <p>
               </p>
@@ -1148,7 +1148,7 @@
                  Input
                 </span>
                </a>
-               Range object dynamic input size from c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max supported sizes. dtype (Expected data type for the input) defaults to PyTorch / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8)
+               spec object dynamic input size from c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max supported sizes. dtype (Expected data type for the input) defaults to PyTorch / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8)
               </p>
               <p>
               </p>
@@ -1262,7 +1262,7 @@
                  Input
                 </span>
                </a>
-               Range object dynamic input size from c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max supported sizes.
+               spec object dynamic input size from c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max supported sizes.
               </p>
               <p>
               </p>
@@ -1322,6 +1322,63 @@
                     </span>
                    </code>
                    : Expected tensor format for the input (Defaults to contiguous)
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec5Input5InputEN2at6TensorE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1Input_1ae105d59812bed86ad71e838cc484e593">
+              </span>
+              <code class="sig-name descname">
+               Input
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              at::Tensor
+              <em>
+               tensor
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Construct a new
+               <a class="reference internal" href="#structtrtorch_1_1CompileSpec_1_1Input">
+                <span class="std std-ref">
+                 Input
+                </span>
+               </a>
+               spec object using a torch tensor as an example The tensor’s shape, type and layout inform the spec’s values.
+              </p>
+              <p>
+               Note: You cannot set dynamic shape through this method, you must use an alternative constructor
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     tensor
+                    </span>
+                   </code>
+                   : Reference tensor to set shape, type and layout
                   </p>
                  </li>
                 </ul>
