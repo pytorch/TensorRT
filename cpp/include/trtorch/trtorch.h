@@ -427,7 +427,7 @@ struct TRTORCH_API CompileSpec {
     Input(c10::ArrayRef<int64_t> shape, DataType dtype, TensorFormat format = TensorFormat::kContiguous);
 
     /**
-     * @brief Construct a new Input Range object dynamic input size from
+     * @brief Construct a new Input spec object dynamic input size from
      * c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max
      * supported sizes. dtype (Expected data type for the input) defaults to PyTorch
      * / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8)
@@ -462,7 +462,7 @@ struct TRTORCH_API CompileSpec {
         TensorFormat format = TensorFormat::kContiguous);
 
     /**
-     * @brief Construct a new Input Range object dynamic input size from
+     * @brief Construct a new Input spec object dynamic input size from
      * c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max
      * supported sizes. dtype (Expected data type for the input) defaults to PyTorch
      * / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8)
@@ -479,7 +479,7 @@ struct TRTORCH_API CompileSpec {
         TensorFormat format = TensorFormat::kContiguous);
 
     /**
-     * @brief Construct a new Input Range object dynamic input size from
+     * @brief Construct a new Input spec object dynamic input size from
      * c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max
      * supported sizes
      *
@@ -495,6 +495,16 @@ struct TRTORCH_API CompileSpec {
         c10::ArrayRef<int64_t> max_shape,
         DataType dtype,
         TensorFormat format = TensorFormat::kContiguous);
+
+    /**
+     * @brief Construct a new Input spec object using a torch tensor as an example
+     * The tensor's shape, type and layout inform the spec's values
+     *
+     * Note: You cannot set dynamic shape through this method, you must use an alternative constructor
+     *
+     * @param tensor Reference tensor to set shape, type and layout
+     */
+    Input(at::Tensor tensor);
 
     bool get_explicit_set_dtype() {
       return explicit_set_dtype;
