@@ -15,22 +15,12 @@ RUN pip install notebook
 
 FROM builder as trtorch
 
-<<<<<<< HEAD
 COPY . /opt/trtorch/src
 WORKDIR /opt/trtorch/src
 RUN cp ./docker/WORKSPACE.cu.docker  WORKSPACE
 
 RUN bazel build //:libtrtorch //:bin --compilation_mode opt
 
-=======
-
-COPY . /opt/trtorch/src
-WORKDIR /opt/trtorch/src
-RUN cp ./docker/WORKSPACE.cu.docker  WORKSPACE
-
-RUN bazel build //:libtrtorch //:bin --compilation_mode opt
-
->>>>>>> 76d9d0448adbf4b224b5219a4f5b38602c188cc5
 WORKDIR /opt/trtorch/src/py
 
 RUN pip install ipywidgets --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host=files.pythonhosted.org
@@ -46,20 +36,10 @@ RUN MAX_JOBS=1 python3 setup.py install --use-cxx11-abi
 RUN conda init bash
 
 WORKDIR /opt/trtorch/src
-<<<<<<< HEAD
+
 RUN cd ./bazel-bin && tar xvf libtrtorch.tar.gz -C /usr/local --strip-components 2 --exclude=LICENSE
 
 ENV LD_LIBRARY_PATH /opt/conda/lib/python3.8/site-packages/torch/lib:${LD_LIBRARY_PATH}
-=======
-RUN mkdir -p /opt/trtorch/lib /opt/trtorch/bin
-RUN cp ./bazel-bin/cpp/bin/trtorchc/trtorchc /opt/trtorch/bin
-RUN cp ./bazel-bin/cpp/api/lib/libtrtorch.so /opt/trtorch/lib
-RUN cp ./bazel-bin/cpp/api/lib/libtrtorchrt.so /opt/trtorch/lib
-RUN cp ./bazel-bin/cpp/api/lib/libtrtorch_plugins.so /opt/trtorch/lib
-
-ENV LD_LIBRARY_PATH /opt/conda/lib/python3.8/site-packages/torch/lib:/opt/trtorch/lib:${LD_LIBRARY_PATH}
-ENV PATH /opt/trtorch/bin:${PATH}
->>>>>>> 76d9d0448adbf4b224b5219a4f5b38602c188cc5
 
 WORKDIR /opt/trtorch/
 CMD /bin/bash
