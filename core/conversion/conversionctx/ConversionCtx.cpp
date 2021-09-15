@@ -54,11 +54,12 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
         cudaSetDevice(settings.device.gpu_id) == cudaSuccess, "Unable to set gpu id: " << settings.device.gpu_id);
   }
 
-  builder = nvinfer1::createInferBuilder(logger);
-  net = builder->createNetworkV2(1U << static_cast<uint32_t>(nvinfer1::NetworkDefinitionCreationFlag::kEXPLICIT_BATCH));
+  builder = make_trt(nvinfer1::createInferBuilder(logger));
+  net = make_trt(
+      builder->createNetworkV2(1U << static_cast<uint32_t>(nvinfer1::NetworkDefinitionCreationFlag::kEXPLICIT_BATCH)));
 
   LOG_DEBUG(build_settings);
-  cfg = builder->createBuilderConfig();
+  cfg = make_trt(builder->createBuilderConfig());
 
   for (auto p = settings.enabled_precisions.begin(); p != settings.enabled_precisions.end(); ++p) {
     switch (*p) {
@@ -69,10 +70,12 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
       case nvinfer1::DataType::kINT8:
         TRTORCH_CHECK(builder->platformHasFastInt8(), "Requested inference in INT8 but platform does not support INT8");
         cfg->setFlag(nvinfer1::BuilderFlag::kINT8);
-        TRTORCH_CHECK(
-            settings.calibrator != nullptr,
-            "Requested inference in INT8 but no calibrator provided, set the ptq_calibrator field in the CompileSpec struct with your calibrator");
-        cfg->setInt8Calibrator(settings.calibrator);
+        if (!settings.calibrator) {
+          LOG_INFO(
+              "Int8 precision has been enabled but no calibrator provided. This assumes the network has Q/DQ nodes obtained from Quantization aware training. For more details, refer to https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#work-with-qat-networks");
+        } else {
+          cfg->setInt8Calibrator(settings.calibrator);
+        }
         break;
       case nvinfer1::DataType::kFLOAT:
         break;
@@ -89,11 +92,11 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
   if (settings.disable_tf32) {
     cfg->clearFlag(nvinfer1::BuilderFlag::kTF32);
   }
-
+#if NV_TENSORRT_MAJOR > 7
   if (settings.sparse_weights) {
     cfg->setFlag(nvinfer1::BuilderFlag::kSPARSE_WEIGHTS);
   }
-
+#endif
   if (settings.refit) {
     cfg->setFlag(nvinfer1::BuilderFlag::kREFIT);
   }
@@ -134,9 +137,6 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
 }
 
 ConversionCtx::~ConversionCtx() {
-  delete builder;
-  delete net;
-  delete cfg;
   for (auto ptr : builder_resources) {
     free(ptr);
   }
@@ -154,10 +154,19 @@ torch::jit::IValue* ConversionCtx::AssociateValueAndIValue(const torch::jit::Val
 }
 
 std::string ConversionCtx::SerializeEngine() {
+#if NV_TENSORRT_MAJOR > 7
   auto serialized_network = builder->buildSerializedNetwork(*net, *cfg);
   if (!serialized_network) {
     TRTORCH_THROW_ERROR("Building serialized network failed in TensorRT");
   }
+#else
+  auto engine = builder->buildEngineWithConfig(*net, *cfg);
+  if (!engine) {
+    TRTORCH_THROW_ERROR("Building TensorRT engine failed");
+  }
+  auto serialized_network = engine->serialize();
+  engine->destroy();
+#endif
   auto engine_str = std::string((const char*)serialized_network->data(), serialized_network->size());
   return engine_str;
 }

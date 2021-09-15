@@ -57,6 +57,11 @@
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
   </script>
+  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+  <script type="text/x-mathjax-config">
+   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
+  </script>
   <link href="#" rel="index" title="Index"/>
   <link href="search.html" rel="search" title="Search"/>
  </head>
@@ -151,6 +156,9 @@
       <div class="dropdown-content md-hero">
        <a href="https://nvidia.github.io/TRTorch/" title="master">
         master
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.4.0/" title="v0.4.0">
+        v0.4.0
        </a>
        <a href="https://nvidia.github.io/TRTorch/v0.3.0/" title="v0.3.0">
         v0.3.0
@@ -277,6 +285,11 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="_notebooks/vgg-qat.html">
+            Deploying Quantization Aware Trained models in INT8 using TRTorch
+           </a>
+          </li>
+          <li class="md-nav__item">
            <span class="md-nav__link caption">
             <span class="caption-text">
              Python API Documenation
@@ -362,6 +375,18 @@
         Index
        </h1>
        <div class="genindex-jumpbox">
+        <a href="#_">
+         <strong>
+          _
+         </strong>
+        </a>
+        |
+        <a href="#A">
+         <strong>
+          A
+         </strong>
+        </a>
+        |
         <a href="#C">
          <strong>
           C
@@ -377,6 +402,12 @@
         <a href="#E">
          <strong>
           E
+         </strong>
+        </a>
+        |
+        <a href="#F">
+         <strong>
+          F
          </strong>
         </a>
         |
@@ -428,6 +459,45 @@
          </strong>
         </a>
        </div>
+       <h2 id="_">
+        _
+       </h2>
+       <table class="indextable genindextable" style="width: 100%">
+        <tr>
+         <td style="width: 33%; vertical-align: top;">
+          <ul>
+           <li>
+            <a href="py_api/trtorch.html#trtorch.Device.__init__">
+             __init__() (trtorch.Device method)
+            </a>
+            <ul>
+             <li>
+              <a href="py_api/trtorch.html#trtorch.Input.__init__">
+               (trtorch.Input method)
+              </a>
+             </li>
+            </ul>
+           </li>
+          </ul>
+         </td>
+        </tr>
+       </table>
+       <h2 id="A">
+        A
+       </h2>
+       <table class="indextable genindextable" style="width: 100%">
+        <tr>
+         <td style="width: 33%; vertical-align: top;">
+          <ul>
+           <li>
+            <a href="py_api/trtorch.html#trtorch.Device.allow_gpu_fallback">
+             allow_gpu_fallback (trtorch.Device attribute)
+            </a>
+           </li>
+          </ul>
+         </td>
+        </tr>
+       </table>
        <h2 id="C">
         C
        </h2>
@@ -471,6 +541,16 @@
             </a>
            </li>
            <li>
+            <a href="py_api/trtorch.html#trtorch.Device">
+             Device (class in trtorch)
+            </a>
+           </li>
+           <li>
+            <a href="py_api/trtorch.html#trtorch.Device.device_type">
+             device_type (trtorch.Device attribute)
+            </a>
+           </li>
+           <li>
             <a href="py_api/trtorch.html#trtorch.DeviceType">
              DeviceType (class in trtorch)
             </a>
@@ -480,9 +560,21 @@
          <td style="width: 33%; vertical-align: top;">
           <ul>
            <li>
+            <a href="py_api/trtorch.html#trtorch.Device.dla_core">
+             dla_core (trtorch.Device attribute)
+            </a>
+           </li>
+           <li>
             <a href="py_api/trtorch.html#trtorch.dtype">
              dtype (class in trtorch)
             </a>
+            <ul>
+             <li>
+              <a href="py_api/trtorch.html#trtorch.Input.dtype">
+               (trtorch.Input attribute)
+              </a>
+             </li>
+            </ul>
            </li>
            <li>
             <a href="py_api/trtorch.html#trtorch.dump_build_info">
@@ -523,6 +615,22 @@
          </td>
         </tr>
        </table>
+       <h2 id="F">
+        F
+       </h2>
+       <table class="indextable genindextable" style="width: 100%">
+        <tr>
+         <td style="width: 33%; vertical-align: top;">
+          <ul>
+           <li>
+            <a href="py_api/trtorch.html#trtorch.Input.format">
+             format (trtorch.Input attribute)
+            </a>
+           </li>
+          </ul>
+         </td>
+        </tr>
+       </table>
        <h2 id="G">
         G
        </h2>
@@ -540,18 +648,28 @@
              get_is_colored_output_on() (in module trtorch.logging)
             </a>
            </li>
-          </ul>
-         </td>
-         <td style="width: 33%; vertical-align: top;">
-          <ul>
            <li>
             <a href="py_api/logging.html#trtorch.logging.get_logging_prefix">
              get_logging_prefix() (in module trtorch.logging)
             </a>
            </li>
+          </ul>
+         </td>
+         <td style="width: 33%; vertical-align: top;">
+          <ul>
            <li>
             <a href="py_api/logging.html#trtorch.logging.get_reportable_log_level">
              get_reportable_log_level() (in module trtorch.logging)
+            </a>
+           </li>
+           <li>
+            <a href="py_api/trtorch.html#trtorch.Device.gpu_id">
+             gpu_id (trtorch.Device attribute)
+            </a>
+           </li>
+           <li>
+            <a href="py_api/logging.html#trtorch.logging.Level.Graph">
+             Graph (trtorch.logging.Level attribute)
             </a>
            </li>
           </ul>
@@ -574,6 +692,11 @@
          </td>
          <td style="width: 33%; vertical-align: top;">
           <ul>
+           <li>
+            <a href="py_api/trtorch.html#trtorch.Input">
+             Input (class in trtorch)
+            </a>
+           </li>
            <li>
             <a href="py_api/logging.html#trtorch.logging.Level.InternalError">
              InternalError (trtorch.logging.Level attribute)
@@ -651,18 +774,28 @@
              set_is_colored_output_on() (in module trtorch.logging)
             </a>
            </li>
-          </ul>
-         </td>
-         <td style="width: 33%; vertical-align: top;">
-          <ul>
            <li>
             <a href="py_api/logging.html#trtorch.logging.set_logging_prefix">
              set_logging_prefix() (in module trtorch.logging)
             </a>
            </li>
+          </ul>
+         </td>
+         <td style="width: 33%; vertical-align: top;">
+          <ul>
            <li>
             <a href="py_api/logging.html#trtorch.logging.set_reportable_log_level">
              set_reportable_log_level() (in module trtorch.logging)
+            </a>
+           </li>
+           <li>
+            <a href="py_api/trtorch.html#trtorch.Input.shape">
+             shape (trtorch.Input attribute)
+            </a>
+           </li>
+           <li>
+            <a href="py_api/trtorch.html#trtorch.Input.shape_mode">
+             shape_mode (trtorch.Input attribute)
             </a>
            </li>
            <li>
@@ -681,6 +814,11 @@
         <tr>
          <td style="width: 33%; vertical-align: top;">
           <ul>
+           <li>
+            <a href="py_api/trtorch.html#trtorch.TensorFormat">
+             TensorFormat (class in trtorch)
+            </a>
+           </li>
            <li>
             <a href="py_api/trtorch.html#trtorch.TensorRTCompileSpec">
              TensorRTCompileSpec() (in module trtorch)
@@ -1113,18 +1251,18 @@
             </a>
            </li>
            <li>
-            <a href="_cpp_api/structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpec16EngineCapability8kDEFAULTE">
-             trtorch::CompileSpec::EngineCapability::kDEFAULT (C++ enumerator)
+            <a href="_cpp_api/structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpec16EngineCapability15kDLA_STANDALONEE">
+             trtorch::CompileSpec::EngineCapability::kDLA_STANDALONE (C++ enumerator)
             </a>
            </li>
            <li>
-            <a href="_cpp_api/structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpec16EngineCapability9kSAFE_DLAE">
-             trtorch::CompileSpec::EngineCapability::kSAFE_DLA (C++ enumerator)
+            <a href="_cpp_api/structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpec16EngineCapability7kSAFETYE">
+             trtorch::CompileSpec::EngineCapability::kSAFETY (C++ enumerator)
             </a>
            </li>
            <li>
-            <a href="_cpp_api/structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpec16EngineCapability9kSAFE_GPUE">
-             trtorch::CompileSpec::EngineCapability::kSAFE_GPU (C++ enumerator)
+            <a href="_cpp_api/structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpec16EngineCapability9kSTANDARDE">
+             trtorch::CompileSpec::EngineCapability::kSTANDARD (C++ enumerator)
             </a>
            </li>
            <li>
@@ -1164,68 +1302,76 @@
             </a>
            </li>
            <li>
-            <a href="_cpp_api/structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpec5Input5InputEN3c108ArrayRefI7int64_tEE12TensorFormat">
+            <a href="_cpp_api/structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpec5Input5InputEN2at6TensorE">
              trtorch::CompileSpec::Input::Input (C++ function)
             </a>
             ,
-            <a href="_cpp_api/structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpec5Input5InputEN3c108ArrayRefI7int64_tEE8DataType12TensorFormat">
+            <a href="_cpp_api/structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpec5Input5InputEN3c108ArrayRefI7int64_tEE12TensorFormat">
              [1]
             </a>
             ,
-            <a href="_cpp_api/structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpec5Input5InputEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE12TensorFormat">
+            <a href="_cpp_api/structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpec5Input5InputEN3c108ArrayRefI7int64_tEE8DataType12TensorFormat">
              [2]
             </a>
             ,
-            <a href="_cpp_api/structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpec5Input5InputEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE8DataType12TensorFormat">
+            <a href="_cpp_api/structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpec5Input5InputEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE12TensorFormat">
              [3]
             </a>
             ,
-            <a href="_cpp_api/structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpec5Input5InputENSt6vectorI7int64_tEE12TensorFormat">
+            <a href="_cpp_api/structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpec5Input5InputEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE8DataType12TensorFormat">
              [4]
             </a>
             ,
-            <a href="_cpp_api/structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpec5Input5InputENSt6vectorI7int64_tEE8DataType12TensorFormat">
+            <a href="_cpp_api/structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpec5Input5InputENSt6vectorI7int64_tEE12TensorFormat">
              [5]
             </a>
             ,
-            <a href="_cpp_api/structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpec5Input5InputENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE12TensorFormat">
+            <a href="_cpp_api/structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpec5Input5InputENSt6vectorI7int64_tEE8DataType12TensorFormat">
              [6]
             </a>
             ,
-            <a href="_cpp_api/structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpec5Input5InputENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE8DataType12TensorFormat">
+            <a href="_cpp_api/structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpec5Input5InputENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE12TensorFormat">
              [7]
             </a>
             ,
-            <a href="_cpp_api/structtrtorch_1_1CompileSpec_1_1Input.html#_CPPv4N7trtorch11CompileSpec5Input5InputEN3c108ArrayRefI7int64_tEE12TensorFormat">
+            <a href="_cpp_api/structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpec5Input5InputENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE8DataType12TensorFormat">
              [8]
             </a>
             ,
-            <a href="_cpp_api/structtrtorch_1_1CompileSpec_1_1Input.html#_CPPv4N7trtorch11CompileSpec5Input5InputEN3c108ArrayRefI7int64_tEE8DataType12TensorFormat">
+            <a href="_cpp_api/structtrtorch_1_1CompileSpec_1_1Input.html#_CPPv4N7trtorch11CompileSpec5Input5InputEN2at6TensorE">
              [9]
             </a>
             ,
-            <a href="_cpp_api/structtrtorch_1_1CompileSpec_1_1Input.html#_CPPv4N7trtorch11CompileSpec5Input5InputEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE12TensorFormat">
+            <a href="_cpp_api/structtrtorch_1_1CompileSpec_1_1Input.html#_CPPv4N7trtorch11CompileSpec5Input5InputEN3c108ArrayRefI7int64_tEE12TensorFormat">
              [10]
             </a>
             ,
-            <a href="_cpp_api/structtrtorch_1_1CompileSpec_1_1Input.html#_CPPv4N7trtorch11CompileSpec5Input5InputEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE8DataType12TensorFormat">
+            <a href="_cpp_api/structtrtorch_1_1CompileSpec_1_1Input.html#_CPPv4N7trtorch11CompileSpec5Input5InputEN3c108ArrayRefI7int64_tEE8DataType12TensorFormat">
              [11]
             </a>
             ,
-            <a href="_cpp_api/structtrtorch_1_1CompileSpec_1_1Input.html#_CPPv4N7trtorch11CompileSpec5Input5InputENSt6vectorI7int64_tEE12TensorFormat">
+            <a href="_cpp_api/structtrtorch_1_1CompileSpec_1_1Input.html#_CPPv4N7trtorch11CompileSpec5Input5InputEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE12TensorFormat">
              [12]
             </a>
             ,
-            <a href="_cpp_api/structtrtorch_1_1CompileSpec_1_1Input.html#_CPPv4N7trtorch11CompileSpec5Input5InputENSt6vectorI7int64_tEE8DataType12TensorFormat">
+            <a href="_cpp_api/structtrtorch_1_1CompileSpec_1_1Input.html#_CPPv4N7trtorch11CompileSpec5Input5InputEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE8DataType12TensorFormat">
              [13]
             </a>
             ,
-            <a href="_cpp_api/structtrtorch_1_1CompileSpec_1_1Input.html#_CPPv4N7trtorch11CompileSpec5Input5InputENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE12TensorFormat">
+            <a href="_cpp_api/structtrtorch_1_1CompileSpec_1_1Input.html#_CPPv4N7trtorch11CompileSpec5Input5InputENSt6vectorI7int64_tEE12TensorFormat">
              [14]
             </a>
             ,
-            <a href="_cpp_api/structtrtorch_1_1CompileSpec_1_1Input.html#_CPPv4N7trtorch11CompileSpec5Input5InputENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE8DataType12TensorFormat">
+            <a href="_cpp_api/structtrtorch_1_1CompileSpec_1_1Input.html#_CPPv4N7trtorch11CompileSpec5Input5InputENSt6vectorI7int64_tEE8DataType12TensorFormat">
              [15]
+            </a>
+            ,
+            <a href="_cpp_api/structtrtorch_1_1CompileSpec_1_1Input.html#_CPPv4N7trtorch11CompileSpec5Input5InputENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE12TensorFormat">
+             [16]
+            </a>
+            ,
+            <a href="_cpp_api/structtrtorch_1_1CompileSpec_1_1Input.html#_CPPv4N7trtorch11CompileSpec5Input5InputENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE8DataType12TensorFormat">
+             [17]
             </a>
            </li>
            <li>
@@ -1378,6 +1524,11 @@
             </a>
            </li>
            <li>
+            <a href="_cpp_api/structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpec14sparse_weightsE">
+             trtorch::CompileSpec::sparse_weights (C++ member)
+            </a>
+           </li>
+           <li>
             <a href="_cpp_api/structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpec12strict_typesE">
              trtorch::CompileSpec::strict_types (C++ member)
             </a>
@@ -1524,6 +1675,15 @@
             </a>
             ,
             <a href="_cpp_api/structtrtorch_1_1CompileSpec_1_1TorchFallback.html#_CPPv4N7trtorch11CompileSpec13TorchFallback7enabledE">
+             [1]
+            </a>
+           </li>
+           <li>
+            <a href="_cpp_api/structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpec13TorchFallback23forced_fallback_modulesE">
+             trtorch::CompileSpec::TorchFallback::forced_fallback_modules (C++ member)
+            </a>
+            ,
+            <a href="_cpp_api/structtrtorch_1_1CompileSpec_1_1TorchFallback.html#_CPPv4N7trtorch11CompileSpec13TorchFallback23forced_fallback_modulesE">
              [1]
             </a>
            </li>
@@ -1835,7 +1995,7 @@
     <div class="md-footer-meta__inner md-grid">
      <div class="md-footer-copyright">
       <div class="md-footer-copyright__highlight">
-       © Copyright 2020, NVIDIA Corporation.
+       © Copyright 2021, NVIDIA Corporation.
       </div>
       Created using
       <a href="http://www.sphinx-doc.org/">

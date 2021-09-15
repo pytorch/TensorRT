@@ -87,6 +87,9 @@ void AddLayer(ConversionCtx* ctx, const torch::jit::Node* n) {
       if (eval) {
         if (!eval.value().isTensor()) {
           LOG_DEBUG(ctx->logger, "Found the value to be: " << eval.value());
+          if (eval.value().isTuple() && eval.value().toTuple()->elements().size() == 1) {
+            eval.value() = {eval.value().toTuple()->elements()[0]};
+          }
         } else {
           LOG_DEBUG(ctx->logger, "Found the value to be a tensor (shape " << eval.value().toTensor().sizes() << ')');
         }
@@ -283,6 +286,9 @@ void EvaluateConditionalBlock(ConversionCtx* ctx, const torch::jit::Node* n, boo
       auto eval = EvaluateNode(ctx, bn);
       if (!eval.value().isTensor()) {
         LOG_DEBUG(ctx->logger, "(Conditional Evaluation) Found the value to be: " << eval.value());
+        if (eval.value().isTuple() && eval.value().toTuple()->elements().size() == 1) {
+          eval.value() = {eval.value().toTuple()->elements()[0]};
+        }
       } else {
         LOG_DEBUG(
             ctx->logger,

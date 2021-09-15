@@ -281,7 +281,8 @@ PYBIND11_MODULE(_C, m) {
       .def("__str__", &trtorch::pyapi::TorchFallback::to_str)
       .def_readwrite("enabled", &TorchFallback::enabled)
       .def_readwrite("min_block_size", &TorchFallback::min_block_size)
-      .def_readwrite("forced_fallback_operators", &TorchFallback::forced_fallback_operators);
+      .def_readwrite("forced_fallback_operators", &TorchFallback::forced_fallback_operators)
+      .def_readwrite("forced_fallback_modules", &TorchFallback::forced_fallback_modules);
 
   m.doc() =
       "TRTorch Internal C Bindings: Ahead of Time compilation for PyTorch JIT. A tool to convert PyTorch JIT to TensorRT";
@@ -321,6 +322,7 @@ PYBIND11_MODULE(_C, m) {
       .value("WARNING", core::util::logging::LogLevel::kWARNING)
       .value("INFO", core::util::logging::LogLevel::kINFO)
       .value("DEBUG", core::util::logging::LogLevel::kDEBUG)
+      .value("GRAPH", core::util::logging::LogLevel::kGRAPH)
       .export_values();
 }
 

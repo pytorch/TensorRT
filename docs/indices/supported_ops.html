@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -56,6 +57,11 @@
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
+  </script>
+  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+  <script type="text/x-mathjax-config">
+   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -152,6 +158,9 @@
       <div class="dropdown-content md-hero">
        <a href="https://nvidia.github.io/TRTorch/" title="master">
         master
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.4.0/" title="v0.4.0">
+        v0.4.0
        </a>
        <a href="https://nvidia.github.io/TRTorch/v0.3.0/" title="v0.3.0">
         v0.3.0
@@ -275,6 +284,11 @@
           <li class="md-nav__item">
            <a class="md-nav__link" href="../_notebooks/ssd-object-detection-demo.html">
             Object Detection with TRTorch (SSD)
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/vgg-qat.html">
+            Deploying Quantization Aware Trained models in INT8 using TRTorch
            </a>
           </li>
           <li class="md-nav__item">
@@ -421,1241 +435,1369 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <span id="supported-ops">
-       </span>
-       <h1 id="indices-supported-ops--page-root">
-        Operators Supported
-        <a class="headerlink" href="#indices-supported-ops--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <h2 id="operators-currently-supported-through-converters">
-        Operators Currently Supported Through Converters
-        <a class="headerlink" href="#operators-currently-supported-through-converters" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <ul class="simple">
-        <li>
-         <p>
-          aten::_convolution(Tensor input, Tensor weight, Tensor? bias, int[] stride, int[] padding, int[] dilation, bool transposed, int[] output_padding, int groups, bool benchmark, bool deterministic, bool cudnn_enabled, bool allow_tf32) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::_convolution.deprecated(Tensor input, Tensor weight, Tensor? bias, int[] stride, int[] padding, int[] dilation, bool transposed, int[] output_padding, int groups, bool benchmark, bool deterministic, bool cudnn_enabled) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::abs(Tensor self) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::acos(Tensor self) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::acosh(Tensor self) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::adaptive_avg_pool1d(Tensor self, int[1] output_size) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::adaptive_avg_pool2d(Tensor self, int[2] output_size) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::add.Scalar(Tensor self, Scalar other, Scalar alpha=1) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::add.Tensor(Tensor self, Tensor other, Scalar alpha=1) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::
-          <a href="#id29">
-           <span class="problematic" id="id30">
-            add_
-           </span>
+       <section id="operators-supported">
+        <span id="supported-ops">
+        </span>
+        <h1 id="indices-supported-ops--page-root">
+         Operators Supported
+         <a class="headerlink" href="#indices-supported-ops--page-root" title="Permalink to this headline">
+          ¶
+         </a>
+        </h1>
+        <section id="operators-currently-supported-through-converters">
+         <h2 id="operators-currently-supported-through-converters">
+          Operators Currently Supported Through Converters
+          <a class="headerlink" href="#operators-currently-supported-through-converters" title="Permalink to this headline">
+           ¶
           </a>
-          .Tensor(Tensor(a!) self, Tensor other,
-          <a href="#id1">
-           <span class="problematic" id="id2">
-            *
-           </span>
-          </a>
-          , Scalar alpha=1) -&gt; (Tensor(a!))
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::asin(Tensor self) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::asinh(Tensor self) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::atan(Tensor self) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::atanh(Tensor self) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::avg_pool1d(Tensor self, int[1] kernel_size, int[1] stride=[], int[1] padding=[0], bool ceil_mode=False, bool count_include_pad=True) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::avg_pool2d(Tensor self, int[2] kernel_size, int[2] stride=[], int[2] padding=[0, 0], bool ceil_mode=False, bool count_include_pad=True, int? divisor_override=None) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::avg_pool3d(Tensor self, int[3] kernel_size, int[3] stride=[], int[3] padding=[], bool ceil_mode=False, bool count_include_pad=True, int? divisor_override=None) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::batch_norm(Tensor input, Tensor? gamma, Tensor? beta, Tensor? mean, Tensor? var, bool training, float momentum, float eps, bool cudnn_enabled) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::bmm(Tensor self, Tensor mat2) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::cat(Tensor[] tensors, int dim=0) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::ceil(Tensor self) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::clamp(Tensor self, Scalar? min=None, Scalar? max=None) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::clamp_max(Tensor self, Scalar max) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::clamp_min(Tensor self, Scalar min) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::cos(Tensor self) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::cosh(Tensor self) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::cumsum(Tensor self, int dim,
-          <a href="#id3">
-           <span class="problematic" id="id4">
-            *
-           </span>
-          </a>
-          , int? dtype=None) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::div.Scalar(Tensor self, Scalar other) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::div.Tensor(Tensor self, Tensor other) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::
-          <a href="#id31">
-           <span class="problematic" id="id32">
-            div_
-           </span>
-          </a>
-          .Scalar(Tensor(a!) self, Scalar other) -&gt; (Tensor(a!))
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::
-          <a href="#id33">
-           <span class="problematic" id="id34">
-            div_
-           </span>
-          </a>
-          .Tensor(Tensor(a!) self, Tensor other) -&gt; (Tensor(a!))
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::elu(Tensor self, Scalar alpha=1, Scalar scale=1, Scalar input_scale=1) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::embedding(Tensor weight, Tensor indices, int padding_idx=-1, bool scale_grad_by_freq=False, bool sparse=False) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::eq.Scalar(Tensor self, Scalar other) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::eq.Tensor(Tensor self, Tensor other) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::erf(Tensor self) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::exp(Tensor self) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::expand(Tensor(a) self, int[] size,
-          <a href="#id5">
-           <span class="problematic" id="id6">
-            *
-           </span>
-          </a>
-          , bool implicit=False) -&gt; (Tensor(a))
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::expand_as(Tensor(a) self, Tensor other) -&gt; (Tensor(a))
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::flatten.using_ints(Tensor self, int start_dim=0, int end_dim=-1) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::floor(Tensor self) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::floor_divide(Tensor self, Tensor other) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::floor_divide.Scalar(Tensor self, Scalar other) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::ge.Scalar(Tensor self, Scalar other) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::ge.Tensor(Tensor self, Tensor other) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::gelu(Tensor self) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::gt.Scalar(Tensor self, Scalar other) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::gt.Tensor(Tensor self, Tensor other) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::hardtanh(Tensor self, Scalar min_val=-1, Scalar max_val=1) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::hardtanh_(Tensor(a!) self, Scalar min_val=-1, Scalar max_val=1) -&gt; (Tensor(a!))
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::layer_norm(Tensor input, int[] normalized_shape, Tensor? gamma, Tensor? beta, float eps, bool cudnn_enabled) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::le.Scalar(Tensor self, Scalar other) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::le.Tensor(Tensor self, Tensor other) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::leaky_relu(Tensor self, Scalar negative_slope=0.01) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::leaky_relu_(Tensor(a!) self, Scalar negative_slope=0.01) -&gt; (Tensor(a!))
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::linear(Tensor input, Tensor weight, Tensor? bias=None) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::log(Tensor self) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::lstm_cell(Tensor input, Tensor[] hx, Tensor w_ih, Tensor w_hh, Tensor? b_ih=None, Tensor? b_hh=None) -&gt; (Tensor, Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::lt.Scalar(Tensor self, Scalar other) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::lt.Tensor(Tensor self, Tensor other) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::matmul(Tensor self, Tensor other) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::max(Tensor self) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::max.other(Tensor self, Tensor other) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::max_pool1d(Tensor self, int[1] kernel_size, int[1] stride=[], int[1] padding=[], int[1] dilation=[], bool ceil_mode=False) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::max_pool2d(Tensor self, int[2] kernel_size, int[2] stride=[], int[2] padding=[0, 0], int[2] dilation=[1, 1], bool ceil_mode=False) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::max_pool3d(Tensor self, int[3] kernel_size, int[3] stride=[], int[3] padding=[], int[3] dilation=[], bool ceil_mode=False) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::mean(Tensor self,
-          <a href="#id7">
-           <span class="problematic" id="id8">
-            *
-           </span>
-          </a>
-          , int? dtype=None) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::mean.dim(Tensor self, int[] dim, bool keepdim=False,
-          <a href="#id9">
-           <span class="problematic" id="id10">
-            *
-           </span>
-          </a>
-          , int? dtype=None) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::min(Tensor self) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::min.other(Tensor self, Tensor other) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::mul.Scalar(Tensor self, Scalar other) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::mul.Tensor(Tensor self, Tensor other) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::
-          <a href="#id35">
-           <span class="problematic" id="id36">
-            mul_
-           </span>
-          </a>
-          .Tensor(Tensor(a!) self, Tensor other) -&gt; (Tensor(a!))
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::narrow(Tensor(a) self, int dim, int start, int length) -&gt; (Tensor(a))
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::narrow.Tensor(Tensor(a) self, int dim, Tensor start, int length) -&gt; (Tensor(a))
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::ne.Scalar(Tensor self, Scalar other) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::ne.Tensor(Tensor self, Tensor other) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::neg(Tensor self) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::norm.ScalarOpt_dim(Tensor self, Scalar? p, int[1] dim, bool keepdim=False) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::permute(Tensor(a) self, int[] dims) -&gt; (Tensor(a))
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::pixel_shuffle(Tensor self, int upscale_factor) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::pow.Tensor_Scalar(Tensor self, Scalar exponent) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::pow.Tensor_Tensor(Tensor self, Tensor exponent) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::prelu(Tensor self, Tensor weight) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::prod(Tensor self,
-          <a href="#id11">
-           <span class="problematic" id="id12">
-            *
-           </span>
-          </a>
-          , int? dtype=None) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::prod.dim_int(Tensor self, int dim, bool keepdim=False,
-          <a href="#id13">
-           <span class="problematic" id="id14">
-            *
-           </span>
-          </a>
-          , int? dtype=None) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::reciprocal(Tensor self) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::relu(Tensor input) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::relu_(Tensor(a!) self) -&gt; (Tensor(a!))
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::repeat(Tensor self, int[] repeats) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::replication_pad1d(Tensor self, int[2] padding) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::replication_pad2d(Tensor self, int[4] padding) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::replication_pad3d(Tensor self, int[6] padding) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::reshape(Tensor self, int[] shape) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::rsub.Scalar(Tensor self, Scalar other, Scalar alpha=1) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::rsub.Tensor(Tensor self, Tensor other, Scalar alpha=1) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::select.int(Tensor(a) self, int dim, int index) -&gt; (Tensor(a))
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::sigmoid(Tensor input) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::sigmoid_(Tensor(a!) self) -&gt; (Tensor(a!))
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::sin(Tensor self) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::sinh(Tensor self) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::slice.Tensor(Tensor(a) self, int dim=0, int start=0, int end=9223372036854775807, int step=1) -&gt; (Tensor(a))
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::softmax.int(Tensor self, int dim, int? dtype=None) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::split(Tensor self, int[] split_sizes, int dim=0) -&gt; (Tensor[])
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::split.Tensor(Tensor(a) self, int split_size, int dim=0) -&gt; (Tensor[])
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::split_with_sizes(Tensor(a) self, int[] split_sizes, int dim=0) -&gt; (Tensor[])
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::sqrt(Tensor self) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::squeeze.dim(Tensor(a) self, int dim) -&gt; (Tensor(a))
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::stack(Tensor[] tensors, int dim=0) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::sub.Tensor(Tensor self, Tensor other, Scalar alpha=1) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::
-          <a href="#id37">
-           <span class="problematic" id="id38">
-            sub_
-           </span>
-          </a>
-          .Tensor(Tensor(a!) self, Tensor other,
-          <a href="#id15">
-           <span class="problematic" id="id16">
-            *
-           </span>
-          </a>
-          , Scalar alpha=1) -&gt; (Tensor(a!))
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::sum(Tensor self,
-          <a href="#id17">
-           <span class="problematic" id="id18">
-            *
-           </span>
-          </a>
-          , int? dtype=None) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::sum.dim_IntList(Tensor self, int[1] dim, bool keepdim=False,
-          <a href="#id19">
-           <span class="problematic" id="id20">
-            *
-           </span>
-          </a>
-          , int? dtype=None) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::tan(Tensor self) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::tanh(Tensor input) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::tanh_(Tensor(a!) self) -&gt; (Tensor(a!))
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::topk(Tensor self, int k, int dim=-1, bool largest=True, bool sorted=True) -&gt; (Tensor values, Tensor indices)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::transpose.int(Tensor(a) self, int dim0, int dim1) -&gt; (Tensor(a))
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::unsqueeze(Tensor(a) self, int dim) -&gt; (Tensor(a))
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::upsample_bilinear2d(Tensor self, int[2] output_size, bool align_corners, float? scales_h=None, float? scales_w=None) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::upsample_bilinear2d.vec(Tensor input, int[]? output_size, bool align_corners, float[]? scale_factors) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::upsample_linear1d(Tensor self, int[1] output_size, bool align_corners, float? scales=None) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::upsample_linear1d.vec(Tensor input, int[]? output_size, bool align_corners, float[]? scale_factors) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::upsample_nearest1d(Tensor self, int[1] output_size, float? scales=None) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::upsample_nearest1d.vec(Tensor input, int[]? output_size, float[]? scale_factors) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::upsample_nearest2d(Tensor self, int[2] output_size, float? scales_h=None, float? scales_w=None) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::upsample_nearest2d.vec(Tensor input, int[]? output_size, float[]? scale_factors) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::upsample_nearest3d(Tensor self, int[3] output_size, float? scales_d=None, float? scales_h=None, float? scales_w=None) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::upsample_nearest3d.vec(Tensor input, int[]? output_size, float[]? scale_factors) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::upsample_trilinear3d(Tensor self, int[3] output_size, bool align_corners, float? scales_d=None, float? scales_h=None, float? scales_w=None) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::upsample_trilinear3d.vec(Tensor input, int[]? output_size, bool align_corners, float[]? scale_factors) -&gt; (Tensor)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::view(Tensor(a) self, int[] size) -&gt; (Tensor(a))
-         </p>
-        </li>
-        <li>
-         <p>
-          trt::const(Tensor self) -&gt; (Tensor)
-         </p>
-        </li>
-       </ul>
-       <h2 id="operators-currently-supported-through-evaluators">
-        Operators Currently Supported Through Evaluators
-        <a class="headerlink" href="#operators-currently-supported-through-evaluators" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <ul class="simple">
-        <li>
-         <p>
-          aten::Bool.float(float b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::Bool.int(int a) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::Float.Scalar(Scalar a) -&gt; float
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::Float.bool(bool a) -&gt; float
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::Float.int(int a) -&gt; float
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::__and__(int a, int b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::__getitem__.t(t[](a) list, int idx) -&gt; (t(*))
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::__is__(t1 self, t2 obj) -&gt; bool
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::__isnot__(t1 self, t2 obj) -&gt; bool
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::__not__(bool self) -&gt; bool
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::__or__(int a, int b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::__round_to_zero_floordiv(int a, int b) -&gt; (int)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::__xor__(int a, int b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::add.float(float a, float b) -&gt; (float)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::add.int(int a, int b) -&gt; (int)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::
-          <a href="#id39">
-           <span class="problematic" id="id40">
-            add_
-           </span>
-          </a>
-          .t(t[](a!) self, t[] b) -&gt; (t[])
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::append.t(t[](a!) self, t(c -&gt;
-          <a href="#id21">
-           <span class="problematic" id="id22">
-            *
-           </span>
-          </a>
-          ) el) -&gt; (t[](a!))
-         </p>
-        </li>
-        <li>
-         <dl class="simple">
-          <dt>
-           aten::arange(Scalar end,
-           <a href="#id23">
-            <span class="problematic" id="id24">
-             *
-            </span>
-           </a>
-           , int? dtype=None, int? layout=None,
-          </dt>
-          <dd>
+         </h2>
+         <ul class="simple">
+          <li>
            <p>
-            Device? device=None, bool? pin_memory=None) -&gt; (Tensor)
+            aten::_convolution(Tensor input, Tensor weight, Tensor? bias, int[] stride, int[] padding, int[] dilation, bool transposed, int[] output_padding, int groups, bool benchmark, bool deterministic, bool cudnn_enabled, bool allow_tf32) -&gt; (Tensor)
            </p>
-          </dd>
-         </dl>
-        </li>
-        <li>
-         <dl class="simple">
-          <dt>
-           aten::arange.start(Scalar start, Scalar end,
-           <a href="#id25">
-            <span class="problematic" id="id26">
-             *
-            </span>
-           </a>
-           , ScalarType? dtype=None,
-          </dt>
-          <dd>
+          </li>
+          <li>
            <p>
-            Layout? layout=None, Device? device=None, bool? pin_memory=None) -&gt; (Tensor)
+            aten::_convolution.deprecated(Tensor input, Tensor weight, Tensor? bias, int[] stride, int[] padding, int[] dilation, bool transposed, int[] output_padding, int groups, bool benchmark, bool deterministic, bool cudnn_enabled) -&gt; (Tensor)
            </p>
-          </dd>
-         </dl>
-        </li>
-        <li>
-         <dl class="simple">
-          <dt>
-           aten::arange.start_step(Scalar start, Scalar end, Scalar step,
-           <a href="#id27">
-            <span class="problematic" id="id28">
-             *
-            </span>
-           </a>
-           , ScalarType? dtype=None,
-          </dt>
-          <dd>
+          </li>
+          <li>
            <p>
-            Layout? layout=None, Device? device=None, bool? pin_memory=None) -&gt; (Tensor)
+            aten::abs(Tensor self) -&gt; (Tensor)
            </p>
-          </dd>
-         </dl>
-        </li>
-        <li>
-         <p>
-          aten::dim(Tensor self) -&gt; int
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::div.float(float a, float b) -&gt; (float)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::div.int(int a, int b) -&gt; (float)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::eq.bool(bool a, bool b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::eq.float(float a, float b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::eq.float_int(float a, int b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::eq.int(int a, int b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::eq.int_float(int a, float b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::floor.float(float a) -&gt; (int)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::floor.int(int a) -&gt; (int)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::floordiv.float(float a, float b) -&gt; (int)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::floordiv.int(int a, int b) -&gt; (int)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::ge.bool(bool a, bool b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::ge.float(float a, float b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::ge.float_int(float a, int b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::ge.int(int a, int b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::ge.int_float(int a, float b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::gt.bool(bool a, bool b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::gt.float(float a, float b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::gt.float_int(float a, int b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::gt.int(int a, int b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::gt.int_float(int a, float b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::le.bool(bool a, bool b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::le.float(float a, float b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::le.float_int(float a, int b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::le.int(int a, int b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::le.int_float(int a, float b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::len.t(t[] a) -&gt; (int)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::lt.bool(bool a, bool b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::lt.float(float a, float b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::lt.float_int(float a, int b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::lt.int(int a, int b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::lt.int_float(int a, float b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::mul.float(float a, float b) -&gt; (float)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::mul.int(int a, int b) -&gt; (int)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::ne.bool(bool a, bool b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::ne.float(float a, float b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::ne.float_int(float a, int b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::ne.int(int a, int b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::ne.int_float(int a, float b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::neg.int(int a) -&gt; (int)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::numel(Tensor self) -&gt; int
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::size(Tensor self) -&gt; (int[])
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::size.int(Tensor self, int dim) -&gt; (int)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::slice.t(t[] l, int start, int end=9223372036854775807, int step=1) -&gt; (t[])
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::sub.float(float a, float b) -&gt; (float)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::sub.int(int a, int b) -&gt; (int)
-         </p>
-        </li>
-        <li>
-         <p>
-          aten::t(Tensor self) -&gt; Tensor
-         </p>
-        </li>
-        <li>
-         <p>
-          prim::max.bool(bool a, bool b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          prim::max.float(float a, float b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          prim::max.float_int(float a, int b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          prim::max.int(int a, int b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          prim::max.int_float(int a, float b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          prim::max.self_int(int[] self) -&gt; (int)
-         </p>
-        </li>
-        <li>
-         <p>
-          prim::min.bool(bool a, bool b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          prim::min.float(float a, float b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          prim::min.float_int(float a, int b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          prim::min.int(int a, int b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          prim::min.int_float(int a, float b) -&gt; (bool)
-         </p>
-        </li>
-        <li>
-         <p>
-          prim::min.self_int(int[] self) -&gt; (int)
-         </p>
-        </li>
-        <li>
-         <p>
-          prim::shape(Tensor a) -&gt; (int[])
-         </p>
-        </li>
-       </ul>
+          </li>
+          <li>
+           <p>
+            aten::acos(Tensor self) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::acosh(Tensor self) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::adaptive_avg_pool1d(Tensor self, int[1] output_size) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::adaptive_avg_pool2d(Tensor self, int[2] output_size) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::adaptive_max_pool2d(Tensor self, int[2] output_size) -&gt; (Tensor, Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::add.Scalar(Tensor self, Scalar other, Scalar alpha=1) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::add.Tensor(Tensor self, Tensor other, Scalar alpha=1) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::
+            <a href="#id33">
+             <span class="problematic" id="id34">
+              add_
+             </span>
+            </a>
+            .Tensor(Tensor(a!) self, Tensor other,
+            <a href="#id1">
+             <span class="problematic" id="id2">
+              *
+             </span>
+            </a>
+            , Scalar alpha=1) -&gt; (Tensor(a!))
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::asin(Tensor self) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::asinh(Tensor self) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::atan(Tensor self) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::atanh(Tensor self) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::avg_pool1d(Tensor self, int[1] kernel_size, int[1] stride=[], int[1] padding=[0], bool ceil_mode=False, bool count_include_pad=True) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::avg_pool2d(Tensor self, int[2] kernel_size, int[2] stride=[], int[2] padding=[0, 0], bool ceil_mode=False, bool count_include_pad=True, int? divisor_override=None) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::avg_pool3d(Tensor self, int[3] kernel_size, int[3] stride=[], int[3] padding=[], bool ceil_mode=False, bool count_include_pad=True, int? divisor_override=None) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::batch_norm(Tensor input, Tensor? gamma, Tensor? beta, Tensor? mean, Tensor? var, bool training, float momentum, float eps, bool cudnn_enabled) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::bmm(Tensor self, Tensor mat2) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::cat(Tensor[] tensors, int dim=0) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::ceil(Tensor self) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::clamp(Tensor self, Scalar? min=None, Scalar? max=None) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::clamp_max(Tensor self, Scalar max) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::clamp_min(Tensor self, Scalar min) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::constant_pad_nd(Tensor self, int[] pad, Scalar value=0) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::cos(Tensor self) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::cosh(Tensor self) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::cumsum(Tensor self, int dim,
+            <a href="#id3">
+             <span class="problematic" id="id4">
+              *
+             </span>
+            </a>
+            , int? dtype=None) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::div.Scalar(Tensor self, Scalar other) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::div.Tensor(Tensor self, Tensor other) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::
+            <a href="#id35">
+             <span class="problematic" id="id36">
+              div_
+             </span>
+            </a>
+            .Scalar(Tensor(a!) self, Scalar other) -&gt; (Tensor(a!))
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::
+            <a href="#id37">
+             <span class="problematic" id="id38">
+              div_
+             </span>
+            </a>
+            .Tensor(Tensor(a!) self, Tensor other) -&gt; (Tensor(a!))
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::elu(Tensor self, Scalar alpha=1, Scalar scale=1, Scalar input_scale=1) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::embedding(Tensor weight, Tensor indices, int padding_idx=-1, bool scale_grad_by_freq=False, bool sparse=False) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::eq.Scalar(Tensor self, Scalar other) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::eq.Tensor(Tensor self, Tensor other) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::erf(Tensor self) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::exp(Tensor self) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::expand(Tensor(a) self, int[] size,
+            <a href="#id5">
+             <span class="problematic" id="id6">
+              *
+             </span>
+            </a>
+            , bool implicit=False) -&gt; (Tensor(a))
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::expand_as(Tensor(a) self, Tensor other) -&gt; (Tensor(a))
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::fake_quantize_per_channel_affine(Tensor self, Tensor scale, Tensor zero_point, int axis, int quant_min, int quant_max) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::fake_quantize_per_tensor_affine(Tensor self, float scale, int zero_point, int quant_min, int quant_max) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::flatten.using_ints(Tensor self, int start_dim=0, int end_dim=-1) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::floor(Tensor self) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::floor_divide(Tensor self, Tensor other) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::floor_divide.Scalar(Tensor self, Scalar other) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::ge.Scalar(Tensor self, Scalar other) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::ge.Tensor(Tensor self, Tensor other) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::gelu(Tensor self) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::gru_cell(Tensor input, Tensor hx, Tensor w_ih, Tensor w_hh, Tensor? b_ih=None, Tensor? b_hh=None) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::gt.Scalar(Tensor self, Scalar other) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::gt.Tensor(Tensor self, Tensor other) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::hardtanh(Tensor self, Scalar min_val=-1, Scalar max_val=1) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::hardtanh_(Tensor(a!) self, Scalar min_val=-1, Scalar max_val=1) -&gt; (Tensor(a!))
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::instance_norm(Tensor input, Tensor? weight, Tensor? bias, Tensor? running_mean, Tensor? running_var, bool use_input_stats, float momentum, float eps, bool cudnn_enabled) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::layer_norm(Tensor input, int[] normalized_shape, Tensor? gamma, Tensor? beta, float eps, bool cudnn_enabled) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::le.Scalar(Tensor self, Scalar other) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::le.Tensor(Tensor self, Tensor other) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::leaky_relu(Tensor self, Scalar negative_slope=0.01) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::leaky_relu_(Tensor(a!) self, Scalar negative_slope=0.01) -&gt; (Tensor(a!))
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::linear(Tensor input, Tensor weight, Tensor? bias=None) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::log(Tensor self) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::lstm_cell(Tensor input, Tensor[] hx, Tensor w_ih, Tensor w_hh, Tensor? b_ih=None, Tensor? b_hh=None) -&gt; (Tensor, Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::lt.Scalar(Tensor self, Scalar other) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::lt.Tensor(Tensor self, Tensor other) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::masked_fill.Scalar(Tensor self, Tensor mask, Scalar value) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::matmul(Tensor self, Tensor other) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::max(Tensor self) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::max.other(Tensor self, Tensor other) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::max_pool1d(Tensor self, int[1] kernel_size, int[1] stride=[], int[1] padding=[], int[1] dilation=[], bool ceil_mode=False) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::max_pool2d(Tensor self, int[2] kernel_size, int[2] stride=[], int[2] padding=[0, 0], int[2] dilation=[1, 1], bool ceil_mode=False) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::max_pool3d(Tensor self, int[3] kernel_size, int[3] stride=[], int[3] padding=[], int[3] dilation=[], bool ceil_mode=False) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::mean(Tensor self,
+            <a href="#id7">
+             <span class="problematic" id="id8">
+              *
+             </span>
+            </a>
+            , int? dtype=None) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::mean.dim(Tensor self, int[] dim, bool keepdim=False,
+            <a href="#id9">
+             <span class="problematic" id="id10">
+              *
+             </span>
+            </a>
+            , int? dtype=None) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::min(Tensor self) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::min.other(Tensor self, Tensor other) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::mul.Scalar(Tensor self, Scalar other) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::mul.Tensor(Tensor self, Tensor other) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::
+            <a href="#id39">
+             <span class="problematic" id="id40">
+              mul_
+             </span>
+            </a>
+            .Tensor(Tensor(a!) self, Tensor other) -&gt; (Tensor(a!))
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::narrow(Tensor(a) self, int dim, int start, int length) -&gt; (Tensor(a))
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::narrow.Tensor(Tensor(a) self, int dim, Tensor start, int length) -&gt; (Tensor(a))
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::ne.Scalar(Tensor self, Scalar other) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::ne.Tensor(Tensor self, Tensor other) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::neg(Tensor self) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::norm.ScalarOpt_dim(Tensor self, Scalar? p, int[1] dim, bool keepdim=False) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::permute(Tensor(a) self, int[] dims) -&gt; (Tensor(a))
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::pixel_shuffle(Tensor self, int upscale_factor) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::pow.Tensor_Scalar(Tensor self, Scalar exponent) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::pow.Tensor_Tensor(Tensor self, Tensor exponent) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::prelu(Tensor self, Tensor weight) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::prod(Tensor self,
+            <a href="#id11">
+             <span class="problematic" id="id12">
+              *
+             </span>
+            </a>
+            , int? dtype=None) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::prod.dim_int(Tensor self, int dim, bool keepdim=False,
+            <a href="#id13">
+             <span class="problematic" id="id14">
+              *
+             </span>
+            </a>
+            , int? dtype=None) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::reciprocal(Tensor self) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::relu(Tensor input) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::relu_(Tensor(a!) self) -&gt; (Tensor(a!))
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::repeat(Tensor self, int[] repeats) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::replication_pad1d(Tensor self, int[2] padding) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::replication_pad2d(Tensor self, int[4] padding) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::replication_pad3d(Tensor self, int[6] padding) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::reshape(Tensor self, int[] shape) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::rsub.Scalar(Tensor self, Scalar other, Scalar alpha=1) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::rsub.Tensor(Tensor self, Tensor other, Scalar alpha=1) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::select.int(Tensor(a) self, int dim, int index) -&gt; (Tensor(a))
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::sigmoid(Tensor input) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::sigmoid_(Tensor(a!) self) -&gt; (Tensor(a!))
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::sin(Tensor self) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::sinh(Tensor self) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::slice.Tensor(Tensor(a) self, int dim=0, int? start=None, int? end=None, int step=1) -&gt; (Tensor(a))
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::softmax.int(Tensor self, int dim, int? dtype=None) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::split(Tensor self, int[] split_sizes, int dim=0) -&gt; (Tensor[])
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::split.Tensor(Tensor(a) self, int split_size, int dim=0) -&gt; (Tensor[])
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::split_with_sizes(Tensor(a) self, int[] split_sizes, int dim=0) -&gt; (Tensor[])
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::sqrt(Tensor self) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::squeeze.dim(Tensor(a) self, int dim) -&gt; (Tensor(a))
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::stack(Tensor[] tensors, int dim=0) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::sub.Scalar(Tensor self, Scalar other, Scalar alpha=1) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::sub.Tensor(Tensor self, Tensor other, Scalar alpha=1) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::
+            <a href="#id41">
+             <span class="problematic" id="id42">
+              sub_
+             </span>
+            </a>
+            .Tensor(Tensor(a!) self, Tensor other,
+            <a href="#id15">
+             <span class="problematic" id="id16">
+              *
+             </span>
+            </a>
+            , Scalar alpha=1) -&gt; (Tensor(a!))
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::sum(Tensor self,
+            <a href="#id17">
+             <span class="problematic" id="id18">
+              *
+             </span>
+            </a>
+            , int? dtype=None) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::sum.dim_IntList(Tensor self, int[1] dim, bool keepdim=False,
+            <a href="#id19">
+             <span class="problematic" id="id20">
+              *
+             </span>
+            </a>
+            , int? dtype=None) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::t(Tensor self) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::tan(Tensor self) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::tanh(Tensor input) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::tanh_(Tensor(a!) self) -&gt; (Tensor(a!))
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::to.dtype(Tensor self, int dtype, bool non_blocking=False, bool copy=False, int? memory_format=None) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::to.other(Tensor self, Tensor other, bool non_blocking=False, bool copy=False, int? memory_format=None) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::to.prim_Device(Tensor(a) self, Device? device, int? dtype=None, bool non_blocking=False, bool copy=False) -&gt; (Tensor(a|b))
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::topk(Tensor self, int k, int dim=-1, bool largest=True, bool sorted=True) -&gt; (Tensor values, Tensor indices)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::transpose.int(Tensor(a) self, int dim0, int dim1) -&gt; (Tensor(a))
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::unsqueeze(Tensor(a) self, int dim) -&gt; (Tensor(a))
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::upsample_bilinear2d(Tensor self, int[2] output_size, bool align_corners, float? scales_h=None, float? scales_w=None) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::upsample_bilinear2d.vec(Tensor input, int[]? output_size, bool align_corners, float[]? scale_factors) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::upsample_linear1d(Tensor self, int[1] output_size, bool align_corners, float? scales=None) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::upsample_linear1d.vec(Tensor input, int[]? output_size, bool align_corners, float[]? scale_factors) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::upsample_nearest1d(Tensor self, int[1] output_size, float? scales=None) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::upsample_nearest1d.vec(Tensor input, int[]? output_size, float[]? scale_factors) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::upsample_nearest2d(Tensor self, int[2] output_size, float? scales_h=None, float? scales_w=None) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::upsample_nearest2d.vec(Tensor input, int[]? output_size, float[]? scale_factors) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::upsample_nearest3d(Tensor self, int[3] output_size, float? scales_d=None, float? scales_h=None, float? scales_w=None) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::upsample_nearest3d.vec(Tensor input, int[]? output_size, float[]? scale_factors) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::upsample_trilinear3d(Tensor self, int[3] output_size, bool align_corners, float? scales_d=None, float? scales_h=None, float? scales_w=None) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::upsample_trilinear3d.vec(Tensor input, int[]? output_size, bool align_corners, float[]? scale_factors) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::view(Tensor(a) self, int[] size) -&gt; (Tensor(a))
+           </p>
+          </li>
+          <li>
+           <p>
+            trt::const(Tensor self) -&gt; (Tensor)
+           </p>
+          </li>
+         </ul>
+        </section>
+        <section id="operators-currently-supported-through-evaluators">
+         <h2 id="operators-currently-supported-through-evaluators">
+          Operators Currently Supported Through Evaluators
+          <a class="headerlink" href="#operators-currently-supported-through-evaluators" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <ul class="simple">
+          <li>
+           <p>
+            aten::Bool.float(float b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::Bool.int(int a) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::Float.Scalar(Scalar a) -&gt; float
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::Float.bool(bool a) -&gt; float
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::Float.int(int a) -&gt; float
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::Int.Scalar(Scalar a) -&gt; int
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::Int.bool(bool a) -&gt; int
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::Int.float(float a) -&gt; int
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::Int.int(int a) -&gt; int
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::__and__(int a, int b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::__getitem__.t(t[](a) list, int idx) -&gt; (t(*))
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::__is__(t1 self, t2 obj) -&gt; bool
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::__isnot__(t1 self, t2 obj) -&gt; bool
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::__not__(bool self) -&gt; bool
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::__or__(int a, int b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::__round_to_zero_floordiv(int a, int b) -&gt; (int)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::__xor__(int a, int b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::add.float(float a, float b) -&gt; (float)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::add.int(int a, int b) -&gt; (int)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::
+            <a href="#id43">
+             <span class="problematic" id="id44">
+              add_
+             </span>
+            </a>
+            .t(t[](a!) self, t[] b) -&gt; (t[])
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::append.t(t[](a!) self, t(c -&gt;
+            <a href="#id21">
+             <span class="problematic" id="id22">
+              *
+             </span>
+            </a>
+            ) el) -&gt; (t[](a!))
+           </p>
+          </li>
+          <li>
+           <dl class="simple">
+            <dt>
+             aten::arange(Scalar end,
+             <a href="#id23">
+              <span class="problematic" id="id24">
+               *
+              </span>
+             </a>
+             , int? dtype=None, int? layout=None,
+            </dt>
+            <dd>
+             <p>
+              Device? device=None, bool? pin_memory=None) -&gt; (Tensor)
+             </p>
+            </dd>
+           </dl>
+          </li>
+          <li>
+           <dl class="simple">
+            <dt>
+             aten::arange.start(Scalar start, Scalar end,
+             <a href="#id25">
+              <span class="problematic" id="id26">
+               *
+              </span>
+             </a>
+             , ScalarType? dtype=None,
+            </dt>
+            <dd>
+             <p>
+              Layout? layout=None, Device? device=None, bool? pin_memory=None) -&gt; (Tensor)
+             </p>
+            </dd>
+           </dl>
+          </li>
+          <li>
+           <dl class="simple">
+            <dt>
+             aten::arange.start_step(Scalar start, Scalar end, Scalar step,
+             <a href="#id27">
+              <span class="problematic" id="id28">
+               *
+              </span>
+             </a>
+             , ScalarType? dtype=None,
+            </dt>
+            <dd>
+             <p>
+              Layout? layout=None, Device? device=None, bool? pin_memory=None) -&gt; (Tensor)
+             </p>
+            </dd>
+           </dl>
+          </li>
+          <li>
+           <p>
+            aten::clone(Tensor self,
+            <a href="#id29">
+             <span class="problematic" id="id30">
+              *
+             </span>
+            </a>
+            , int? memory_format=None) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -&gt; (Tensor(a!))
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::dim(Tensor self) -&gt; int
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::div.float(float a, float b) -&gt; (float)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::div.int(int a, int b) -&gt; (float)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::eq.bool(bool a, bool b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::eq.float(float a, float b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::eq.float_int(float a, int b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::eq.int(int a, int b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::eq.int_float(int a, float b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::floor.float(float a) -&gt; (int)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::floor.int(int a) -&gt; (int)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::floordiv.float(float a, float b) -&gt; (int)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::floordiv.int(int a, int b) -&gt; (int)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::ge.bool(bool a, bool b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::ge.float(float a, float b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::ge.float_int(float a, int b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::ge.int(int a, int b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::ge.int_float(int a, float b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::gt.bool(bool a, bool b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::gt.float(float a, float b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::gt.float_int(float a, int b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::gt.int(int a, int b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::gt.int_float(int a, float b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::is_floating_point(Tensor self) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::le.bool(bool a, bool b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::le.float(float a, float b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::le.float_int(float a, int b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::le.int(int a, int b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::le.int_float(int a, float b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::len.t(t[] a) -&gt; (int)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::lt.bool(bool a, bool b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::lt.float(float a, float b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::lt.float_int(float a, int b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::lt.int(int a, int b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::lt.int_float(int a, float b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::mul.float(float a, float b) -&gt; (float)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::mul.int(int a, int b) -&gt; (int)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::ne.bool(bool a, bool b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::ne.float(float a, float b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::ne.float_int(float a, int b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::ne.int(int a, int b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::ne.int_float(int a, float b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::neg.int(int a) -&gt; (int)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::numel(Tensor self) -&gt; int
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::size(Tensor self) -&gt; (int[])
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::size.int(Tensor self, int dim) -&gt; (int)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::slice.t(t[] l, int start, int end=9223372036854775807, int step=1) -&gt; (t[])
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::sqrt.float(float a) -&gt; (float)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::sqrt.int(int a) -&gt; (float)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::sub.float(float a, float b) -&gt; (float)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::sub.int(int a, int b) -&gt; (int)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::tensor(t[] data,
+            <a href="#id31">
+             <span class="problematic" id="id32">
+              *
+             </span>
+            </a>
+            , int? dtype=None, Device? device=None, bool requires_grad=False) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            prim::dtype(Tensor a) -&gt; (int)
+           </p>
+          </li>
+          <li>
+           <p>
+            prim::max.bool(bool a, bool b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            prim::max.float(float a, float b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            prim::max.float_int(float a, int b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            prim::max.int(int a, int b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            prim::max.int_float(int a, float b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            prim::max.self_int(int[] self) -&gt; (int)
+           </p>
+          </li>
+          <li>
+           <p>
+            prim::min.bool(bool a, bool b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            prim::min.float(float a, float b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            prim::min.float_int(float a, int b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            prim::min.int(int a, int b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            prim::min.int_float(int a, float b) -&gt; (bool)
+           </p>
+          </li>
+          <li>
+           <p>
+            prim::min.self_int(int[] self) -&gt; (int)
+           </p>
+          </li>
+          <li>
+           <p>
+            prim::shape(Tensor a) -&gt; (int[])
+           </p>
+          </li>
+         </ul>
+        </section>
+       </section>
       </article>
      </div>
     </div>
@@ -1684,7 +1826,7 @@
     <div class="md-footer-meta__inner md-grid">
      <div class="md-footer-copyright">
       <div class="md-footer-copyright__highlight">
-       © Copyright 2020, NVIDIA Corporation.
+       © Copyright 2021, NVIDIA Corporation.
       </div>
       Created using
       <a href="http://www.sphinx-doc.org/">

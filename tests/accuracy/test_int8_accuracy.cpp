@@ -14,13 +14,16 @@ TEST_P(AccuracyTests, INT8AccuracyIsClose) {
 
   std::string calibration_cache_file = "/tmp/vgg16_TRT_ptq_calibration.cache";
 
-  auto calibrator = trtorch::ptq::make_int8_calibrator(std::move(calibration_dataloader), calibration_cache_file, true);
+  auto calibrator =
+      trtorch::ptq::make_int8_calibrator(std::move(calibration_dataloader), calibration_cache_file, false);
   // auto calibrator = trtorch::ptq::make_int8_cache_calibrator(calibration_cache_file);
 
-  std::vector<std::vector<int64_t>> input_shape = {{32, 3, 32, 32}};
+  std::vector<trtorch::CompileSpec::Input> inputs = {
+      trtorch::CompileSpec::Input(std::vector<int64_t>({32, 3, 32, 32}), trtorch::CompileSpec::DataType::kFloat)};
   // Configure settings for compilation
-  auto compile_spec = trtorch::CompileSpec({input_shape});
+  auto compile_spec = trtorch::CompileSpec(inputs);
   // Set operating precision to INT8
+  compile_spec.enabled_precisions.insert(torch::kF16);
   compile_spec.enabled_precisions.insert(torch::kI8);
   // Use the TensorRT Entropy Calibrator
   compile_spec.ptq_calibrator = calibrator;

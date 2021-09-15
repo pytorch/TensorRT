@@ -18,7 +18,7 @@ test_suite(
     name = "aarch64_tests",
     tests = [
         "//tests/core:core_tests",
-        "//tests/modules:aarch64_module_tests",
+        "//tests/cpp:aarch64_api_tests",
     ],
 )
 

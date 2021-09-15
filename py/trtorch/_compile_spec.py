@@ -148,6 +148,10 @@ def _parse_torch_fallback(fallback_info: Dict[str, Any]) -> trtorch._C.TorchFall
         assert isinstance(fallback_info["forced_fallback_ops"], list)
         info.forced_fallback_operators = fallback_info["forced_fallback_ops"]
 
+    if "forced_fallback_modules" in fallback_info:
+        assert isinstance(fallback_info["forced_fallback_modules"], list)
+        info.forced_fallback_modules = fallback_info["forced_fallback_modules"]
+
     return info
 
 
@@ -170,7 +174,12 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
         info.inputs = _parse_input_ranges(compile_spec["input_shapes"])
 
     if "inputs" in compile_spec:
-        info.inputs = [i._to_internal() for i in compile_spec["inputs"]]
+        if not all([isinstance(i, torch.Tensor) or isinstance(i, trtorch.Input) for i in compile_spec["inputs"]]):
+            raise KeyError("Input specs should be either trtorch.Input or torch.Tensor, found types: {}".format(
+                [typeof(i) for i in compile_spec["inputs"]]))
+
+        inputs = [trtorch.Input._from_tensor(i) if isinstance(i, torch.Tensor) else i for i in compile_spec["inputs"]]
+        info.inputs = [i._to_internal() for i in inputs]
 
     if "op_precision" in compile_spec and "enabled_precisions" in compile_spec:
         raise KeyError(
@@ -286,8 +295,8 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]) -> torch.classes.tensorrt.
                             "dla_core": 0, # (DLA only) Target dla core id to run engine
                             "allow_gpu_fallback": false, # (DLA only) Allow layers unsupported on DLA to run on GPU
                         },
+                        "enabled_precisions": {torch.half}, # Operating precision set to FP16
                         "sparse_weights": Enable sparsity for convolution and fully connected layers.
-
                         "disable_tf32": False, # Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
                         "refit": False, # enable refit
                         "debug": False, # enable debuggable engine
@@ -338,6 +347,7 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]) -> torch.classes.tensorrt.
     torch_fallback._set_enabled(parsed_spec.torch_fallback.enabled)
     torch_fallback._set_min_block_size(parsed_spec.torch_fallback.min_block_size)
     torch_fallback._set_forced_fallback_operators(parsed_spec.torch_fallback.forced_fallback_operators)
+    torch_fallback._set_forced_fallback_modules(parsed_spec.torch_fallback.forced_fallback_modules)
 
     backend_spec._set_device(d)
     backend_spec._set_torch_fallback(torch_fallback)

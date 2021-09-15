@@ -39,17 +39,12 @@ Using DLA in a C++ application
 
 Using DLA in a python application
 
-.. code-block:: shell
+.. code-block:: python
 
     compile_spec = {
-            "inputs": [trtorch.Input(self.input.shape)],
-            "device": {
-                "device_type": trtorch.DeviceType.DLA,
-                "gpu_id": 0,
-                "dla_core": 0,
-                "allow_gpu_fallback": True
-            },
-            "enalbed_precisions": {torch.half}
+        "inputs": [trtorch.Input(self.input.shape)],
+        "device": trtorch.Device("dla:0", allow_gpu_fallback=True),
+        "enalbed_precisions": {torch.half}
     }
 
     trt_mod = trtorch.compile(self.scripted_model, compile_spec)

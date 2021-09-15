@@ -8,6 +8,30 @@
 
 namespace nvinfer1 {
 
+#if NV_TENSORRT_MAJOR < 8
+
+#define TRT_ENGINE_CAPABILITY_STANDARD nvinfer1::EngineCapability::kDEFAULT
+#define TRT_ENGINE_CAPABILITY_SAFETY nvinfer1::EngineCapability::kSAFE_GPU
+#define TRT_ENGINE_CAPABILITY_DLA_STANDALONE nvinfer1::EngineCapability::kSAFE_DLA
+
+template <class T>
+std::shared_ptr<T> make_trt(T* p) {
+  return std::shared_ptr<T>(p, [](T* p) { p->destroy(); });
+}
+
+#else
+
+#define TRT_ENGINE_CAPABILITY_STANDARD nvinfer1::EngineCapability::kSTANDARD
+#define TRT_ENGINE_CAPABILITY_SAFETY nvinfer1::EngineCapability::kSAFETY
+#define TRT_ENGINE_CAPABILITY_DLA_STANDALONE nvinfer1::EngineCapability::kDLA_STANDALONE
+
+template <class T>
+std::shared_ptr<T> make_trt(T* p) {
+  return std::shared_ptr<T>(p);
+}
+
+#endif
+
 inline std::ostream& operator<<(std::ostream& os, const nvinfer1::TensorFormat& format) {
   switch (format) {
     case nvinfer1::TensorFormat::kLINEAR:
@@ -21,8 +45,6 @@ inline std::ostream& operator<<(std::ostream& os, const nvinfer1::TensorFormat& 
 
 inline std::ostream& operator<<(std::ostream& stream, const nvinfer1::DataType& dtype) {
   switch (dtype) {
-    case nvinfer1::DataType::kBOOL:
-      return stream << "Bool";
     case nvinfer1::DataType::kFLOAT:
       return stream << "Float32";
     case nvinfer1::DataType::kHALF:
@@ -31,6 +53,8 @@ inline std::ostream& operator<<(std::ostream& stream, const nvinfer1::DataType& 
       return stream << "Int8";
     case nvinfer1::DataType::kINT32:
       return stream << "Int32";
+    case nvinfer1::DataType::kBOOL:
+      return stream << "Bool";
     default:
       return stream << "Unknown Data Type";
   }
@@ -87,12 +111,12 @@ inline std::ostream& operator<<(std::ostream& stream, const nvinfer1::DeviceType
 
 inline std::ostream& operator<<(std::ostream& stream, const nvinfer1::EngineCapability& cap) {
   switch (cap) {
-    case nvinfer1::EngineCapability::kSTANDARD:
-      return stream << "Default";
-    case nvinfer1::EngineCapability::kSAFETY:
-      return stream << "Safe GPU";
-    case nvinfer1::EngineCapability::kDLA_STANDALONE:
-      return stream << "Safe DLA";
+    case TRT_ENGINE_CAPABILITY_STANDARD:
+      return stream << "standard";
+    case TRT_ENGINE_CAPABILITY_SAFETY:
+      return stream << "safety";
+    case TRT_ENGINE_CAPABILITY_DLA_STANDALONE:
+      return stream << "DLA standalone";
     default:
       return stream << "Unknown Engine Capability Setting";
   }
@@ -120,9 +144,11 @@ nvinfer1::DimsHW toDimsHW(c10::IntArrayRef l);
 std::vector<int64_t> toVec(nvinfer1::Dims d);
 std::string toStr(nvinfer1::Dims d);
 
-at::ScalarType toATenDType(nvinfer1::DataType t);
-nvinfer1::DataType toTRTDataType(at::ScalarType t);
-c10::optional<nvinfer1::DataType> toTRTDataType(caffe2::TypeMeta dtype);
+at::ScalarType TRTDataTypeToScalarType(nvinfer1::DataType t);
+c10::optional<at::ScalarType> optTRTDataTypeToScalarType(nvinfer1::DataType t);
+nvinfer1::DataType ScalarTypeToTRTDataType(at::ScalarType t);
+c10::optional<nvinfer1::DataType> optScalarTypeToTRTDataType(at::ScalarType t);
+c10::optional<nvinfer1::DataType> optTypeMetaToTRTDataType(caffe2::TypeMeta dtype);
 torch::jit::Value* getOrAddInputForValue(
     torch::jit::Value* old_value,
     std::shared_ptr<torch::jit::Graph>& graph,

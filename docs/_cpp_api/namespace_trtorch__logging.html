@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -56,6 +57,11 @@
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
+  </script>
+  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+  <script type="text/x-mathjax-config">
+   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -153,6 +159,9 @@
       <div class="dropdown-content md-hero">
        <a href="https://nvidia.github.io/TRTorch/" title="master">
         master
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.4.0/" title="v0.4.0">
+        v0.4.0
        </a>
        <a href="https://nvidia.github.io/TRTorch/v0.3.0/" title="v0.3.0">
         v0.3.0
@@ -284,6 +293,11 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/vgg-qat.html">
+            Deploying Quantization Aware Trained models in INT8 using TRTorch
+           </a>
+          </li>
+          <li class="md-nav__item">
            <span class="md-nav__link caption">
             <span class="caption-text">
              Python API Documenation
@@ -392,123 +406,129 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <span id="id1">
-       </span>
-       <h1 id="cpp-api-namespace-trtorch-logging--page-root">
-        Namespace trtorch::logging
-        <a class="headerlink" href="#cpp-api-namespace-trtorch-logging--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <div class="contents local topic" id="contents">
-        <p class="topic-title">
-         Contents
-        </p>
-        <ul class="simple">
-         <li>
-          <p>
-           <a class="reference internal" href="#enums" id="id2">
-            Enums
-           </a>
-          </p>
-         </li>
-         <li>
-          <p>
-           <a class="reference internal" href="#functions" id="id3">
-            Functions
-           </a>
-          </p>
-         </li>
-        </ul>
-       </div>
-       <h2 id="enums">
-        Enums
-        <a class="headerlink" href="#enums" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <ul class="simple">
-        <li>
-         <p>
-          <a class="reference internal" href="enum_logging_8h_1a5f612ff2f783ff4fbe89d168f0d817d4.html#exhale-enum-logging-8h-1a5f612ff2f783ff4fbe89d168f0d817d4">
-           <span class="std std-ref">
-            Enum Level
-           </span>
-          </a>
+       <section id="namespace-trtorch-logging">
+        <span id="id1">
+        </span>
+        <h1 id="cpp-api-namespace-trtorch-logging--page-root">
+         Namespace trtorch::logging
+         <a class="headerlink" href="#cpp-api-namespace-trtorch-logging--page-root" title="Permalink to this headline">
+          ¶
+         </a>
+        </h1>
+        <div class="contents local topic" id="contents">
+         <p class="topic-title">
+          Contents
          </p>
-        </li>
-       </ul>
-       <h2 id="functions">
-        Functions
-        <a class="headerlink" href="#functions" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <ul class="simple">
-        <li>
-         <p>
-          <a class="reference internal" href="function_logging_8h_1a9b420280bfacc016d7e36a5704021949.html#exhale-function-logging-8h-1a9b420280bfacc016d7e36a5704021949">
-           <span class="std std-ref">
-            Function trtorch::logging::get_is_colored_output_on
-           </span>
+         <ul class="simple">
+          <li>
+           <p>
+            <a class="reference internal" href="#enums" id="id2">
+             Enums
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference internal" href="#functions" id="id3">
+             Functions
+            </a>
+           </p>
+          </li>
+         </ul>
+        </div>
+        <section id="enums">
+         <h2 id="enums">
+          Enums
+          <a class="headerlink" href="#enums" title="Permalink to this headline">
+           ¶
           </a>
-         </p>
-        </li>
-        <li>
-         <p>
-          <a class="reference internal" href="function_logging_8h_1aef44b69c62af7cf2edc8875a9506641a.html#exhale-function-logging-8h-1aef44b69c62af7cf2edc8875a9506641a">
-           <span class="std std-ref">
-            Function trtorch::logging::get_logging_prefix
-           </span>
+         </h2>
+         <ul class="simple">
+          <li>
+           <p>
+            <a class="reference internal" href="enum_logging_8h_1a5f612ff2f783ff4fbe89d168f0d817d4.html#exhale-enum-logging-8h-1a5f612ff2f783ff4fbe89d168f0d817d4">
+             <span class="std std-ref">
+              Enum Level
+             </span>
+            </a>
+           </p>
+          </li>
+         </ul>
+        </section>
+        <section id="functions">
+         <h2 id="functions">
+          Functions
+          <a class="headerlink" href="#functions" title="Permalink to this headline">
+           ¶
           </a>
-         </p>
-        </li>
-        <li>
-         <p>
-          <a class="reference internal" href="function_logging_8h_1a118d65b179defff7fff279eb9cd126cb.html#exhale-function-logging-8h-1a118d65b179defff7fff279eb9cd126cb">
-           <span class="std std-ref">
-            Function trtorch::logging::get_reportable_log_level
-           </span>
-          </a>
-         </p>
-        </li>
-        <li>
-         <p>
-          <a class="reference internal" href="function_logging_8h_1abc57d473f3af292551dee8b9c78373ad.html#exhale-function-logging-8h-1abc57d473f3af292551dee8b9c78373ad">
-           <span class="std std-ref">
-            Function trtorch::logging::log
-           </span>
-          </a>
-         </p>
-        </li>
-        <li>
-         <p>
-          <a class="reference internal" href="function_logging_8h_1aa533955a2b908db9e5df5acdfa24715f.html#exhale-function-logging-8h-1aa533955a2b908db9e5df5acdfa24715f">
-           <span class="std std-ref">
-            Function trtorch::logging::set_is_colored_output_on
-           </span>
-          </a>
-         </p>
-        </li>
-        <li>
-         <p>
-          <a class="reference internal" href="function_logging_8h_1a396a688110397538f8b3fb7dfdaf38bb.html#exhale-function-logging-8h-1a396a688110397538f8b3fb7dfdaf38bb">
-           <span class="std std-ref">
-            Function trtorch::logging::set_logging_prefix
-           </span>
-          </a>
-         </p>
-        </li>
-        <li>
-         <p>
-          <a class="reference internal" href="function_logging_8h_1adf5435f0dbb09c0d931a1b851847236b.html#exhale-function-logging-8h-1adf5435f0dbb09c0d931a1b851847236b">
-           <span class="std std-ref">
-            Function trtorch::logging::set_reportable_log_level
-           </span>
-          </a>
-         </p>
-        </li>
-       </ul>
+         </h2>
+         <ul class="simple">
+          <li>
+           <p>
+            <a class="reference internal" href="function_logging_8h_1a9b420280bfacc016d7e36a5704021949.html#exhale-function-logging-8h-1a9b420280bfacc016d7e36a5704021949">
+             <span class="std std-ref">
+              Function trtorch::logging::get_is_colored_output_on
+             </span>
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference internal" href="function_logging_8h_1aef44b69c62af7cf2edc8875a9506641a.html#exhale-function-logging-8h-1aef44b69c62af7cf2edc8875a9506641a">
+             <span class="std std-ref">
+              Function trtorch::logging::get_logging_prefix
+             </span>
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference internal" href="function_logging_8h_1a118d65b179defff7fff279eb9cd126cb.html#exhale-function-logging-8h-1a118d65b179defff7fff279eb9cd126cb">
+             <span class="std std-ref">
+              Function trtorch::logging::get_reportable_log_level
+             </span>
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference internal" href="function_logging_8h_1abc57d473f3af292551dee8b9c78373ad.html#exhale-function-logging-8h-1abc57d473f3af292551dee8b9c78373ad">
+             <span class="std std-ref">
+              Function trtorch::logging::log
+             </span>
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference internal" href="function_logging_8h_1aa533955a2b908db9e5df5acdfa24715f.html#exhale-function-logging-8h-1aa533955a2b908db9e5df5acdfa24715f">
+             <span class="std std-ref">
+              Function trtorch::logging::set_is_colored_output_on
+             </span>
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference internal" href="function_logging_8h_1a396a688110397538f8b3fb7dfdaf38bb.html#exhale-function-logging-8h-1a396a688110397538f8b3fb7dfdaf38bb">
+             <span class="std std-ref">
+              Function trtorch::logging::set_logging_prefix
+             </span>
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference internal" href="function_logging_8h_1adf5435f0dbb09c0d931a1b851847236b.html#exhale-function-logging-8h-1adf5435f0dbb09c0d931a1b851847236b">
+             <span class="std std-ref">
+              Function trtorch::logging::set_reportable_log_level
+             </span>
+            </a>
+           </p>
+          </li>
+         </ul>
+        </section>
+       </section>
       </article>
      </div>
     </div>
@@ -551,7 +571,7 @@
     <div class="md-footer-meta__inner md-grid">
      <div class="md-footer-copyright">
       <div class="md-footer-copyright__highlight">
-       © Copyright 2020, NVIDIA Corporation.
+       © Copyright 2021, NVIDIA Corporation.
       </div>
       Created using
       <a href="http://www.sphinx-doc.org/">

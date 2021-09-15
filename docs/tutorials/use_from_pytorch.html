@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -56,6 +57,11 @@
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
+  </script>
+  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+  <script type="text/x-mathjax-config">
+   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -153,6 +159,9 @@
       <div class="dropdown-content md-hero">
        <a href="https://nvidia.github.io/TRTorch/" title="master">
         master
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.4.0/" title="v0.4.0">
+        v0.4.0
        </a>
        <a href="https://nvidia.github.io/TRTorch/v0.3.0/" title="v0.3.0">
         v0.3.0
@@ -292,6 +301,11 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/vgg-qat.html">
+            Deploying Quantization Aware Trained models in INT8 using TRTorch
+           </a>
+          </li>
+          <li class="md-nav__item">
            <span class="md-nav__link caption">
             <span class="caption-text">
              Python API Documenation
@@ -378,100 +392,101 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <span id="use-from-pytorch">
-       </span>
-       <h1 id="tutorials-use-from-pytorch--page-root">
-        Using TRTorch Directly From PyTorch
-        <a class="headerlink" href="#tutorials-use-from-pytorch--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <p>
-        Starting in TRTorch 0.1.0, you will now be able to directly access TensorRT from PyTorch APIs. The process to use this feature
+       <section id="using-trtorch-directly-from-pytorch">
+        <span id="use-from-pytorch">
+        </span>
+        <h1 id="tutorials-use-from-pytorch--page-root">
+         Using TRTorch Directly From PyTorch
+         <a class="headerlink" href="#tutorials-use-from-pytorch--page-root" title="Permalink to this headline">
+          ¶
+         </a>
+        </h1>
+        <p>
+         Starting in TRTorch 0.1.0, you will now be able to directly access TensorRT from PyTorch APIs. The process to use this feature
 is very similar to the compilation workflow described in
-        <a class="reference internal" href="getting_started.html#getting-started">
-         <span class="std std-ref">
-          Getting Started
-         </span>
-        </a>
-       </p>
-       <p>
-        Start by loading
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          trtorch
-         </span>
-        </code>
-        into your application.
-       </p>
-       <div class="highlight-python notranslate">
-        <div class="highlight">
-         <pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+         <a class="reference internal" href="getting_started.html#getting-started">
+          <span class="std std-ref">
+           Getting Started
+          </span>
+         </a>
+        </p>
+        <p>
+         Start by loading
+         <code class="docutils literal notranslate">
+          <span class="pre">
+           trtorch
+          </span>
+         </code>
+         into your application.
+        </p>
+        <div class="highlight-python notranslate">
+         <div class="highlight">
+          <pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">trtorch</span>
 </pre>
+         </div>
         </div>
-       </div>
-       <p>
-        Then given a TorchScript module, you can compile it with TensorRT using the
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          torch._C._jit_to_backend("tensorrt",
-         </span>
-         <span class="pre">
-          ...)
-         </span>
-        </code>
-        API.
-       </p>
-       <div class="highlight-python notranslate">
-        <div class="highlight">
-         <pre><span></span><span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
+        <p>
+         Then given a TorchScript module, you can compile it with TensorRT using the
+         <code class="docutils literal notranslate">
+          <span class="pre">
+           torch._C._jit_to_backend("tensorrt",
+          </span>
+          <span class="pre">
+           ...)
+          </span>
+         </code>
+         API.
+        </p>
+        <div class="highlight-python notranslate">
+         <div class="highlight">
+          <pre><span></span><span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
 
 <span class="n">model</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">mobilenet_v2</span><span class="p">(</span><span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">script_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">script</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
 </pre>
+         </div>
         </div>
-       </div>
-       <p>
-        Unlike the
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          compile
-         </span>
-        </code>
-        API in TRTorch which assumes you are trying to compile the
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          forward
-         </span>
-        </code>
-        function of a module
+        <p>
+         Unlike the
+         <code class="docutils literal notranslate">
+          <span class="pre">
+           compile
+          </span>
+         </code>
+         API in TRTorch which assumes you are trying to compile the
+         <code class="docutils literal notranslate">
+          <span class="pre">
+           forward
+          </span>
+         </code>
+         function of a module
 or the
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          convert_method_to_trt_engine
-         </span>
-        </code>
-        which converts a specified function to a TensorRT engine, the backend API
+         <code class="docutils literal notranslate">
+          <span class="pre">
+           convert_method_to_trt_engine
+          </span>
+         </code>
+         which converts a specified function to a TensorRT engine, the backend API
 will take a dictionary which maps names of functions to compile to Compilation Spec objects which wrap the same
 sort of dictionary you would provide to
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          compile
-         </span>
-        </code>
-        . For more information on the compile spec dictionary take a look
+         <code class="docutils literal notranslate">
+          <span class="pre">
+           compile
+          </span>
+         </code>
+         . For more information on the compile spec dictionary take a look
 at the documentation for the TRTorch
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          TensorRTCompileSpec
-         </span>
-        </code>
-        API.
-       </p>
-       <div class="highlight-python notranslate">
-        <div class="highlight">
-         <pre><span></span><span class="n">spec</span> <span class="o">=</span> <span class="p">{</span>
+         <code class="docutils literal notranslate">
+          <span class="pre">
+           TensorRTCompileSpec
+          </span>
+         </code>
+         API.
+        </p>
+        <div class="highlight-python notranslate">
+         <div class="highlight">
+          <pre><span></span><span class="n">spec</span> <span class="o">=</span> <span class="p">{</span>
     <span class="s2">"forward"</span><span class="p">:</span>
         <span class="n">trtorch</span><span class="o">.</span><span class="n">TensorRTCompileSpec</span><span class="p">({</span>
             <span class="s2">"inputs"</span><span class="p">:</span> <span class="p">[</span><span class="n">trtorch</span><span class="o">.</span><span class="n">Input</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">300</span><span class="p">])],</span>
@@ -492,35 +507,36 @@ at the documentation for the TRTorch
         <span class="p">})</span>
     <span class="p">}</span>
 </pre>
+         </div>
         </div>
-       </div>
-       <p>
-        Now to compile with TRTorch, provide the target module objects and the spec dictionary to
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          torch._C._jit_to_backend("tensorrt",
-         </span>
-         <span class="pre">
-          ...)
-         </span>
-        </code>
-       </p>
-       <div class="highlight-python notranslate">
-        <div class="highlight">
-         <pre><span></span><span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">_C</span><span class="o">.</span><span class="n">_jit_to_backend</span><span class="p">(</span><span class="s2">"tensorrt"</span><span class="p">,</span> <span class="n">script_model</span><span class="p">,</span> <span class="n">spec</span><span class="p">)</span>
+        <p>
+         Now to compile with TRTorch, provide the target module objects and the spec dictionary to
+         <code class="docutils literal notranslate">
+          <span class="pre">
+           torch._C._jit_to_backend("tensorrt",
+          </span>
+          <span class="pre">
+           ...)
+          </span>
+         </code>
+        </p>
+        <div class="highlight-python notranslate">
+         <div class="highlight">
+          <pre><span></span><span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">_C</span><span class="o">.</span><span class="n">_jit_to_backend</span><span class="p">(</span><span class="s2">"tensorrt"</span><span class="p">,</span> <span class="n">script_model</span><span class="p">,</span> <span class="n">spec</span><span class="p">)</span>
 </pre>
+         </div>
         </div>
-       </div>
-       <p>
-        To run explicitly call the function of the method you want to run (vs. how you can just call on the module itself in standard PyTorch)
-       </p>
-       <div class="highlight-python notranslate">
-        <div class="highlight">
-         <pre><span></span><span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">300</span><span class="p">))</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">)</span>
+        <p>
+         To run explicitly call the function of the method you want to run (vs. how you can just call on the module itself in standard PyTorch)
+        </p>
+        <div class="highlight-python notranslate">
+         <div class="highlight">
+          <pre><span></span><span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">300</span><span class="p">))</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">trt_model</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="nb">input</span><span class="p">))</span>
 </pre>
+         </div>
         </div>
-       </div>
+       </section>
       </article>
      </div>
     </div>
@@ -563,7 +579,7 @@ at the documentation for the TRTorch
     <div class="md-footer-meta__inner md-grid">
      <div class="md-footer-copyright">
       <div class="md-footer-copyright__highlight">
-       © Copyright 2020, NVIDIA Corporation.
+       © Copyright 2021, NVIDIA Corporation.
       </div>
       Created using
       <a href="http://www.sphinx-doc.org/">

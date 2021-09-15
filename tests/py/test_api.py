@@ -73,6 +73,27 @@ class TestCompile(ModelTestCase):
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
         self.assertTrue(same < 2e-2)
 
+    def test_from_torch_tensor(self):
+        compile_spec = {
+            "inputs": [self.input],
+            "device": {
+                "device_type": trtorch.DeviceType.GPU,
+                "gpu_id": 0,
+            },
+            "enabled_precisions": {torch.float}
+        }
+
+        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
+        same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
+        self.assertTrue(same < 2e-2)
+
+    def test_device(self):
+        compile_spec = {"inputs": [self.input], "device": trtorch.Device("gpu:0"), "enabled_precisions": {torch.float}}
+
+        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
+        same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
+        self.assertTrue(same < 2e-2)
+
 
 class TestCompileHalf(ModelTestCase):
 
@@ -93,7 +114,8 @@ class TestCompileHalf(ModelTestCase):
 
         trt_mod = trtorch.compile(self.scripted_model, compile_spec)
         same = (trt_mod(self.input.half()) - self.scripted_model(self.input.half())).abs().max()
-        self.assertTrue(same < 2e-2)
+        trtorch.logging.log(trtorch.logging.Level.Debug, "Max diff: " + str(same))
+        self.assertTrue(same < 3e-2)
 
 
 class TestCompileHalfDefault(ModelTestCase):
@@ -115,7 +137,8 @@ class TestCompileHalfDefault(ModelTestCase):
 
         trt_mod = trtorch.compile(self.scripted_model, compile_spec)
         same = (trt_mod(self.input.half()) - self.scripted_model(self.input.half())).abs().max()
-        self.assertTrue(same < 2e-2)
+        trtorch.logging.log(trtorch.logging.Level.Debug, "Max diff: " + str(same))
+        self.assertTrue(same < 3e-2)
 
 
 class TestFallbackToTorch(ModelTestCase):
@@ -137,6 +160,34 @@ class TestFallbackToTorch(ModelTestCase):
             "torch_fallback": {
                 "enabled": True,
                 "forced_fallback_ops": ["aten::max_pool2d"],
+                "min_block_size": 1
+            }
+        }
+
+        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
+        same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
+        self.assertTrue(same < 2e-3)
+
+
+class TestModuleFallbackToTorch(ModelTestCase):
+
+    def setUp(self):
+        self.input = torch.randn((1, 3, 224, 224)).to("cuda")
+        self.scripted_model = torch.jit.script(self.model)
+
+    def test_compile_script(self):
+        compile_spec = {
+            "inputs": [trtorch.Input(self.input.shape)],
+            "device": {
+                "device_type": trtorch.DeviceType.GPU,
+                "gpu_id": 0,
+                "dla_core": 0,
+                "allow_gpu_fallback": False,
+                "disable_tf32": False
+            },
+            "torch_fallback": {
+                "enabled": True,
+                "forced_fallback_modules": ["torchvision.models.resnet.BasicBlock"],
                 "min_block_size": 1
             }
         }
@@ -209,6 +260,8 @@ def test_suite():
     suite.addTest(TestCompileHalfDefault.parametrize(TestCompileHalfDefault, model=models.resnet18(pretrained=True)))
     suite.addTest(TestPTtoTRTtoPT.parametrize(TestPTtoTRTtoPT, model=models.mobilenet_v2(pretrained=True)))
     suite.addTest(TestFallbackToTorch.parametrize(TestFallbackToTorch, model=models.resnet18(pretrained=True)))
+    suite.addTest(
+        TestModuleFallbackToTorch.parametrize(TestModuleFallbackToTorch, model=models.resnet18(pretrained=True)))
     suite.addTest(unittest.makeSuite(TestCheckMethodOpSupport))
 
     return suite

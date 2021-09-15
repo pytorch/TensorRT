@@ -50,6 +50,7 @@ Getting Started
 
    _notebooks/lenet-getting-started
    _notebooks/ssd-object-detection-demo
+   _notebooks/vgg-qat
 
 
 Python API Documenation

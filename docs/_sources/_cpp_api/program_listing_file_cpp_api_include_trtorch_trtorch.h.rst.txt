@@ -134,9 +134,9 @@ Program Listing for File trtorch.h
      };
    
      enum class EngineCapability : int8_t {
-       kDEFAULT,
-       kSAFE_GPU,
-       kSAFE_DLA,
+       kSTANDARD,
+       kSAFETY,
+       kDLA_STANDALONE,
      };
    
      class TRTORCH_API TensorFormat {
@@ -249,6 +249,8 @@ Program Listing for File trtorch.h
    
        std::vector<std::string> forced_fallback_ops;
    
+       std::vector<std::string> forced_fallback_modules;
+   
        TorchFallback() = default;
    
        TorchFallback(bool enabled) : enabled(enabled) {}
@@ -282,6 +284,8 @@ Program Listing for File trtorch.h
    
      bool disable_tf32 = false;
    
+     bool sparse_weights = false;
+   
      bool refit = false;
    
      bool debug = false;
@@ -294,7 +298,7 @@ Program Listing for File trtorch.h
    
      TorchFallback torch_fallback;
    
-     EngineCapability capability = EngineCapability::kDEFAULT;
+     EngineCapability capability = EngineCapability::kSTANDARD;
    
      uint64_t num_min_timing_iters = 2;
      uint64_t num_avg_timing_iters = 1;

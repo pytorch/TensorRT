@@ -127,6 +127,33 @@ static auto shuffle_registrations TRTORCH_UNUSED =
 
                     return true;
                   }})
+        .pattern({"aten::t(Tensor self) -> Tensor",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    auto in = args[0].ITensorOrFreeze(ctx);
+                    auto input_dims = in->getDimensions();
+                    // For input tensors < 2D, return them as is
+                    // For a 2D input tensor, return transpose(input, 0, 1) which is a general 2d matrix transpose.
+                    if (input_dims.nbDims < 2) {
+                      auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], in);
+                      LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+                      return true;
+                    }
+
+                    auto shuffle_layer = ctx->net->addShuffle(*in);
+                    TRTORCH_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
+                    nvinfer1::Permutation firstPerm;
+                    firstPerm.order[0] = 1;
+                    firstPerm.order[1] = 0;
+
+                    shuffle_layer->setFirstTranspose(firstPerm);
+                    shuffle_layer->setZeroIsPlaceholder(false);
+                    shuffle_layer->setName(util::node_info(n).c_str());
+
+                    auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], shuffle_layer->getOutput(0));
+                    LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
+
+                    return true;
+                  }})
         .pattern({"aten::pixel_shuffle(Tensor self, int upscale_factor) -> (Tensor)",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                     auto self = args[0].ITensorOrFreeze(ctx);

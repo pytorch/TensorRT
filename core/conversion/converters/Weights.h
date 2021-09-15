@@ -22,22 +22,6 @@ struct Weights {
   friend std::ostream& operator<<(std::ostream& os, const Weights& w);
 };
 
-inline nvinfer1::ITensor* tensor_to_const(ConversionCtx* ctx, at::Tensor t) {
-  auto t_weights = Weights(ctx, t);
-  auto const_layer = ctx->net->addConstant(t_weights.shape, t_weights.data);
-  TRTORCH_CHECK(const_layer, "Unable to freeze tensor");
-
-  auto out = const_layer->getOutput(0);
-
-  std::ostringstream tensor_id;
-  tensor_id << reinterpret_cast<int*>(out);
-
-  LOG_DEBUG(ctx->logger, "Freezing tensor " << tensor_id.str() << " as an IConstantLayer");
-  const_layer->setName(("[Freeze Tensor " + tensor_id.str() + " ]").c_str());
-
-  return out;
-}
-
 } // namespace converters
 } // namespace conversion
 } // namespace core

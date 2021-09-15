@@ -319,5 +319,8 @@ cc_library(
     ],
     linkopts = [
         "-lpthread",
-    ]
+    ] + select({
+        ":aarch64_linux": ["-Wl,--no-as-needed -ldl -lrt -Wl,--as-needed"],
+        "//conditions:default": []
+    })
 )

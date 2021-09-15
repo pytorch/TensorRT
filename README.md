@@ -43,11 +43,11 @@ compile_settings = {
     "inputs": [trtorch.Input(
         min_shape=[1, 3, 224, 224],
         opt_shape=[1, 3, 512, 512],
-        max_shape=[1, 3, 1024, 1024]
+        max_shape=[1, 3, 1024, 1024],
         # For static size shape=[1, 3, 224, 224]
         dtype=torch.half, # Datatype of input tensor. Allowed options torch.(float|half|int8|int32|bool)
     )],
-    "enabled_precision": {torch.half}, # Run with FP16
+    "enabled_precisions": {torch.half}, # Run with FP16
 }
 
 trt_ts_module = trtorch.compile(torch_script_module, compile_settings)
@@ -78,9 +78,9 @@ torch.jit.save(trt_ts_module, "trt_torchscript_module.ts")
 These are the following dependencies used to verify the testcases. TRTorch can work with other versions, but the tests are not guaranteed to pass.
 
 - Bazel 4.0.0
-- Libtorch 1.8.1 (built with CUDA 11.1)
+- Libtorch 1.9.0 (built with CUDA 11.1)
 - CUDA 11.1 (10.2 on Jetson)
-- cuDNN 8.1
+- cuDNN 8.2
 - TensorRT 8.0.1.6
 
 ## Prebuilt Binaries and Wheel files
@@ -222,11 +222,11 @@ You can register a converter for your op using the `NodeConverterRegistry` insid
 
 | Component     | Description                                                  |
 | ------------- | ------------------------------------------------------------ |
-| [**core**](core)  | Main JIT ingest, lowering, conversion and execution implementations |
-| [**cpp**](cpp)   | C++ specific components including API and example applications |
-| [**cpp/api**](cpp/api)   | C++ API for TRTorch |
+| [**core**](core)  | Main JIT ingest, lowering, conversion and runtime implementations |
+| [**cpp**](cpp)   | C++ API and CLI source |
+| [**examples**](examples)   | Example applications to show different features of TRTorch |
 | [**py**](py)   | Python API for TRTorch |
-| [**tests**](tests) | Unit test for TRTorch |
+| [**tests**](tests) | Unit tests for TRTorch |
 
 ## Contributing
 

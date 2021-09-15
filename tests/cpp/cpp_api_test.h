@@ -18,7 +18,7 @@ class CppAPITests : public testing::TestWithParam<PathAndInSize> {
       mod = torch::jit::load(path);
     } catch (const c10::Error& e) {
       std::cerr << "error loading the model\n";
-      return;
+      ASSERT_TRUE(false);
     }
     input_shapes = std::get<1>(params);
     threshold = std::get<2>(params);

@@ -30,16 +30,6 @@ class InterpolatePlugin : public nvinfer1::IPluginV2DynamicExt {
   bool align_corners_;
   bool use_scales_;
 
- protected:
-  // To prevent compiler warnings
-  //  using nvinfer1::IPluginV2DynamicExt::canBroadcastInputAcrossBatch;
-  // using nvinfer1::IPluginV2DynamicExt::configurePlugin;
-  // using nvinfer1::IPluginV2DynamicExt::enqueue;
-  // using nvinfer1::IPluginV2DynamicExt::getOutputDimensions;
-  // using nvinfer1::IPluginV2DynamicExt::getWorkspaceSize;
-  // using nvinfer1::IPluginV2DynamicExt::isOutputBroadcastAcrossBatch;
-  // using nvinfer1::IPluginV2DynamicExt::supportsFormat;
-
  public:
   InterpolatePlugin(
       std::vector<int64_t> in_shape,

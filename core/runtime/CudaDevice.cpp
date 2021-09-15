@@ -66,6 +66,15 @@ CudaDevice::CudaDevice(std::string device_info) {
   LOG_DEBUG("Deserialized Device Info: " << *this);
 }
 
+CudaDevice& CudaDevice::operator=(const CudaDevice& other) {
+  id = other.id;
+  major = other.major;
+  minor = other.minor;
+  device_type = other.device_type;
+  device_name = other.device_name;
+  return (*this);
+}
+
 std::string CudaDevice::serialize() {
   std::vector<std::string> content;
   content.resize(DEVICE_NAME_IDX + 1);

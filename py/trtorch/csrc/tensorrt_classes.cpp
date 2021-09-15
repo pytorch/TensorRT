@@ -146,12 +146,12 @@ std::string to_str(EngineCapability value) {
 nvinfer1::EngineCapability toTRTEngineCapability(EngineCapability value) {
   switch (value) {
     case EngineCapability::kSAFE_DLA:
-      return nvinfer1::EngineCapability::kSAFE_DLA;
+      return TRT_ENGINE_CAPABILITY_DLA_STANDALONE;
     case EngineCapability::kSAFE_GPU:
-      return nvinfer1::EngineCapability::kSAFE_GPU;
+      return TRT_ENGINE_CAPABILITY_SAFETY;
     case EngineCapability::kDEFAULT:
     default:
-      return nvinfer1::EngineCapability::kDEFAULT;
+      return TRT_ENGINE_CAPABILITY_STANDARD;
   }
 }
 
@@ -163,6 +163,11 @@ std::string TorchFallback::to_str() {
   ss << "        \"min_block_size\": " << min_block_size << std::endl;
   ss << "        \"forced_fallback_operators\": [" << std::endl;
   for (auto i : forced_fallback_operators) {
+    ss << "            " << i << ',' << std::endl;
+  }
+  ss << "        ]" << std::endl;
+  ss << "        \"forced_fallback_modules\": [" << std::endl;
+  for (auto i : forced_fallback_modules) {
     ss << "            " << i << ',' << std::endl;
   }
   ss << "        ]" << std::endl;
@@ -182,7 +187,15 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
     info.convert_info.engine_settings.enabled_precisions.insert(toTRTDataType(p));
   }
 
-  info.convert_info.engine_settings.calibrator = ptq_calibrator;
+  if (ptq_calibrator) {
+    info.convert_info.engine_settings.calibrator = ptq_calibrator;
+  } else {
+    if (info.convert_info.engine_settings.enabled_precisions.find(nvinfer1::DataType::kINT8) !=
+        info.convert_info.engine_settings.enabled_precisions.end()) {
+      info.lower_info.unfreeze_module = true;
+      info.lower_info.disable_cse = true;
+    }
+  }
   info.convert_info.engine_settings.sparse_weights = sparse_weights;
   info.convert_info.engine_settings.disable_tf32 = disable_tf32;
   info.convert_info.engine_settings.refit = refit;
@@ -195,6 +208,7 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
   info.partition_info.enabled = torch_fallback.enabled;
   info.partition_info.min_block_size = torch_fallback.min_block_size;
   info.partition_info.forced_fallback_operators = torch_fallback.forced_fallback_operators;
+  info.lower_info.forced_fallback_modules = torch_fallback.forced_fallback_modules;
   info.convert_info.engine_settings.truncate_long_and_double = truncate_long_and_double;
 
   info.convert_info.engine_settings.capability = toTRTEngineCapability(capability);

@@ -26,13 +26,35 @@ cc_library(
     alwayslink = True,
 )
 
+
+cc_library(
+    name = "converter_util",
+    srcs = [
+        "converter_util.cpp"
+    ],
+    hdrs = [
+        "converter_util.h"
+    ],
+    deps = [
+        ":weights",
+        "@tensorrt//:nvinfer",
+        "//core/util:prelude",
+        "//core/conversion/conversionctx",
+    ] + select({
+        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
+        "//conditions:default": ["@libtorch//:libtorch"],
+    }),
+    alwayslink = True,
+)
+
+
 cc_library(
     name = "converters",
     srcs = [
         "NodeConverterRegistry.cpp",
-        "converter_util.cpp",
         "impl/activation.cpp",
         "impl/batch_norm.cpp",
+        "impl/cast.cpp",
         "impl/concat.cpp",
         "impl/constant.cpp",
         "impl/constant_pad.cpp",
@@ -47,6 +69,7 @@ cc_library(
         "impl/matrix_multiply.cpp",
         "impl/normalize.cpp",
         "impl/pooling.cpp",
+        "impl/quantization.cpp",
         "impl/reduce.cpp",
         "impl/replication_pad.cpp",
         "impl/select.cpp",
@@ -59,7 +82,6 @@ cc_library(
         "impl/unsqueeze.cpp",
     ],
     hdrs = [
-        "converter_util.h",
         "converters.h",
     ],
     deps = [
@@ -69,6 +91,7 @@ cc_library(
         "//core/conversion/tensorcontainer",
         "//core/conversion/conversionctx",
         "//core/plugins:trtorch_plugins",
+        ":converter_util"
     ] + select({
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default": ["@libtorch//:libtorch"],
@@ -83,6 +106,7 @@ pkg_tar(
     srcs = [
         "Weights.h",
         "converters.h",
+        "converter_util.h"
     ],
     package_dir = "core/conversion/converters/",
 )

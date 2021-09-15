@@ -1,2 +1,0 @@
-torch>=1.4.0
-tensorboard>=1.14.0

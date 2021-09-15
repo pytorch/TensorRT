@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -56,6 +57,11 @@
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
+  </script>
+  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+  <script type="text/x-mathjax-config">
+   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -153,6 +159,9 @@
       <div class="dropdown-content md-hero">
        <a href="https://nvidia.github.io/TRTorch/" title="master">
         master
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.4.0/" title="v0.4.0">
+        v0.4.0
        </a>
        <a href="https://nvidia.github.io/TRTorch/v0.3.0/" title="v0.3.0">
         v0.3.0
@@ -292,6 +301,11 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/vgg-qat.html">
+            Deploying Quantization Aware Trained models in INT8 using TRTorch
+           </a>
+          </li>
+          <li class="md-nav__item">
            <span class="md-nav__link caption">
             <span class="caption-text">
              Python API Documenation
@@ -378,46 +392,47 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <span id="using-dla">
-       </span>
-       <h1 id="tutorials-using-dla--page-root">
-        DLA
-        <a class="headerlink" href="#tutorials-using-dla--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <p>
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          DLA
-         </span>
-        </code>
-        NVIDIA Deep Learning Accelerator is a fixed-function accelerator engine targeted for deep learning operations. DLA is designed to do full hardware acceleration of convolutional neural networks. DLA supports various layers such as convolution, deconvolution, fully-connected, activation, pooling, batch normalization, etc.
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          trtorch
-         </span>
-        </code>
-        supports compilation of TorchScript Module and deployment pipeline on the DLA hardware available on NVIDIA embedded platforms.
-       </p>
-       <p>
-        NOTE: DLA supports fp16 and int8 precision only.
-       </p>
-       <p>
-        Using DLA with trtorchc
-       </p>
-       <div class="highlight-shell notranslate">
-        <div class="highlight">
-         <pre><span></span>trtorchc <span class="o">[</span>input_file_path<span class="o">]</span> <span class="o">[</span>output_file_path<span class="o">]</span> <span class="o">[</span>input_shapes...<span class="o">]</span> -p f16 -d dla <span class="o">{</span>OPTIONS<span class="o">}</span>
+       <section id="dla">
+        <span id="using-dla">
+        </span>
+        <h1 id="tutorials-using-dla--page-root">
+         DLA
+         <a class="headerlink" href="#tutorials-using-dla--page-root" title="Permalink to this headline">
+          ¶
+         </a>
+        </h1>
+        <p>
+         <code class="docutils literal notranslate">
+          <span class="pre">
+           DLA
+          </span>
+         </code>
+         NVIDIA Deep Learning Accelerator is a fixed-function accelerator engine targeted for deep learning operations. DLA is designed to do full hardware acceleration of convolutional neural networks. DLA supports various layers such as convolution, deconvolution, fully-connected, activation, pooling, batch normalization, etc.
+         <code class="docutils literal notranslate">
+          <span class="pre">
+           trtorch
+          </span>
+         </code>
+         supports compilation of TorchScript Module and deployment pipeline on the DLA hardware available on NVIDIA embedded platforms.
+        </p>
+        <p>
+         NOTE: DLA supports fp16 and int8 precision only.
+        </p>
+        <p>
+         Using DLA with trtorchc
+        </p>
+        <div class="highlight-shell notranslate">
+         <div class="highlight">
+          <pre><span></span>trtorchc <span class="o">[</span>input_file_path<span class="o">]</span> <span class="o">[</span>output_file_path<span class="o">]</span> <span class="o">[</span>input_shapes...<span class="o">]</span> -p f16 -d dla <span class="o">{</span>OPTIONS<span class="o">}</span>
 </pre>
+         </div>
         </div>
-       </div>
-       <p>
-        Using DLA in a C++ application
-       </p>
-       <div class="highlight-c++ notranslate">
-        <div class="highlight">
-         <pre><span></span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;&gt;</span> <span class="n">input_shape</span> <span class="o">=</span> <span class="p">{{</span><span class="mi">32</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">}};</span>
+        <p>
+         Using DLA in a C++ application
+        </p>
+        <div class="highlight-c++ notranslate">
+         <div class="highlight">
+          <pre><span></span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;&gt;</span> <span class="n">input_shape</span> <span class="o">=</span> <span class="p">{{</span><span class="mi">32</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">}};</span>
 <span class="k">auto</span> <span class="n">compile_spec</span> <span class="o">=</span> <span class="n">trtorch</span><span class="o">::</span><span class="n">CompileSpec</span><span class="p">({</span><span class="n">input_shape</span><span class="p">});</span>
 
 <span class="cp"># Set a precision. DLA supports fp16 or int8 only</span>
@@ -436,28 +451,24 @@
 <span class="cp"># Set the workspace size</span>
 <span class="n">compile_spec</span><span class="p">.</span><span class="n">workspace_size</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">28</span><span class="p">;</span>
 </pre>
+         </div>
         </div>
-       </div>
-       <p>
-        Using DLA in a python application
-       </p>
-       <div class="highlight-shell notranslate">
-        <div class="highlight">
-         <pre><span></span><span class="nv">compile_spec</span> <span class="o">=</span> <span class="o">{</span>
-        <span class="s2">"inputs"</span>: <span class="o">[</span>trtorch.Input<span class="o">(</span>self.input.shape<span class="o">)]</span>,
-        <span class="s2">"device"</span>: <span class="o">{</span>
-            <span class="s2">"device_type"</span>: trtorch.DeviceType.DLA,
-            <span class="s2">"gpu_id"</span>: <span class="m">0</span>,
-            <span class="s2">"dla_core"</span>: <span class="m">0</span>,
-            <span class="s2">"allow_gpu_fallback"</span>: True
-        <span class="o">}</span>,
-        <span class="s2">"enalbed_precisions"</span>: <span class="o">{</span>torch.half<span class="o">}</span>
-<span class="o">}</span>
+        <p>
+         Using DLA in a python application
+        </p>
+        <div class="highlight-python notranslate">
+         <div class="highlight">
+          <pre><span></span><span class="n">compile_spec</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"inputs"</span><span class="p">:</span> <span class="p">[</span><span class="n">trtorch</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">input</span><span class="o">.</span><span class="n">shape</span><span class="p">)],</span>
+    <span class="s2">"device"</span><span class="p">:</span> <span class="n">trtorch</span><span class="o">.</span><span class="n">Device</span><span class="p">(</span><span class="s2">"dla:0"</span><span class="p">,</span> <span class="n">allow_gpu_fallback</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+    <span class="s2">"enalbed_precisions"</span><span class="p">:</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">}</span>
+<span class="p">}</span>
 
-<span class="nv">trt_mod</span> <span class="o">=</span> trtorch.compile<span class="o">(</span>self.scripted_model, compile_spec<span class="o">)</span>
+<span class="n">trt_mod</span> <span class="o">=</span> <span class="n">trtorch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">scripted_model</span><span class="p">,</span> <span class="n">compile_spec</span><span class="p">)</span>
 </pre>
+         </div>
         </div>
-       </div>
+       </section>
       </article>
      </div>
     </div>
@@ -500,7 +511,7 @@
     <div class="md-footer-meta__inner md-grid">
      <div class="md-footer-copyright">
       <div class="md-footer-copyright__highlight">
-       © Copyright 2020, NVIDIA Corporation.
+       © Copyright 2021, NVIDIA Corporation.
       </div>
       Created using
       <a href="http://www.sphinx-doc.org/">

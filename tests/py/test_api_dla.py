@@ -37,7 +37,7 @@ class TestCompile(ModelTestCaseOnDLA):
                 "dla_core": 0,
                 "allow_gpu_fallback": True
             },
-            "enabled_precision": {torch.float, torch.half}
+            "enabled_precisions": {torch.half}
         }
 
         trt_mod = trtorch.compile(self.traced_model, compile_spec)
@@ -53,7 +53,7 @@ class TestCompile(ModelTestCaseOnDLA):
                 "dla_core": 0,
                 "allow_gpu_fallback": True
             },
-            "enabled_precision": {torch.float, torch.half}
+            "enabled_precisions": {torch.half}
         }
 
         trt_mod = trtorch.compile(self.scripted_model, compile_spec)

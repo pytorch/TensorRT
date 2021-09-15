@@ -13,6 +13,7 @@ cc_library(
         "drop_unused_nodes.cpp",
         "lowering.cpp",
         "register_trt_placeholder_ops.cpp",
+        "LowerInfo.cpp"
     ],
     hdrs = [
         "lowering.h",

@@ -3,6 +3,11 @@ filegroup(
     srcs = glob(["**/*.jit.pt"]),
 )
 
+filegroup(
+    name = "data",
+    srcs = glob(["datasets/**/*"])
+)
+
 test_suite(
     name = "aarch64_accuracy_tests",
     tests = [
@@ -28,6 +33,7 @@ cc_test(
     srcs = ["test_int8_accuracy.cpp"],
     data = [
         ":jit_models",
+        ":data"
     ],
     deps = [
         ":accuracy_test",
@@ -40,6 +46,7 @@ cc_test(
     srcs = ["test_fp16_accuracy.cpp"],
     data = [
         ":jit_models",
+        ":data"
     ],
     deps = [
         ":accuracy_test",
@@ -52,6 +59,7 @@ cc_test(
     srcs = ["test_fp32_accuracy.cpp"],
     data = [
         ":jit_models",
+        ":data"
     ],
     deps = [
         ":accuracy_test",
@@ -64,6 +72,7 @@ cc_test(
     srcs = ["test_dla_int8_accuracy.cpp"],
     data = [
         ":jit_models",
+        ":data"
     ],
     deps = [
         ":accuracy_test",
@@ -76,6 +85,7 @@ cc_test(
     srcs = ["test_dla_fp16_accuracy.cpp"],
     data = [
         ":jit_models",
+        ":data"
     ],
     deps = [
         ":accuracy_test",
@@ -99,7 +109,7 @@ cc_library(
     name = "accuracy_test",
     hdrs = ["accuracy_test.h"],
     deps = [
-        "//cpp/api:trtorch",
+        "//cpp:trtorch",
         "//tests/util",
         "@googletest//:gtest_main",
         "@libtorch",

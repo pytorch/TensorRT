@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -56,6 +57,11 @@
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
+  </script>
+  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+  <script type="text/x-mathjax-config">
+   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -153,6 +159,9 @@
       <div class="dropdown-content md-hero">
        <a href="https://nvidia.github.io/TRTorch/" title="master">
         master
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.4.0/" title="v0.4.0">
+        v0.4.0
        </a>
        <a href="https://nvidia.github.io/TRTorch/v0.3.0/" title="v0.3.0">
         v0.3.0
@@ -284,6 +293,11 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/vgg-qat.html">
+            Deploying Quantization Aware Trained models in INT8 using TRTorch
+           </a>
+          </li>
+          <li class="md-nav__item">
            <span class="md-nav__link caption">
             <span class="caption-text">
              Python API Documenation
@@ -387,77 +401,81 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <span id="exhale-function-logging-8h-1a9b420280bfacc016d7e36a5704021949">
-       </span>
-       <h1 id="cpp-api-function-logging-8h-1a9b420280bfacc016d7e36a5704021949--page-root">
-        Function trtorch::logging::get_is_colored_output_on
-        <a class="headerlink" href="#cpp-api-function-logging-8h-1a9b420280bfacc016d7e36a5704021949--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <ul class="simple">
-        <li>
-         <p>
-          Defined in
-          <a class="reference internal" href="file_cpp_api_include_trtorch_logging.h.html#file-cpp-api-include-trtorch-logging-h">
-           <span class="std std-ref">
-            File logging.h
-           </span>
-          </a>
-         </p>
-        </li>
-       </ul>
-       <h2 id="function-documentation">
-        Function Documentation
-        <a class="headerlink" href="#function-documentation" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <dl class="cpp function">
-        <dt id="_CPPv4N7trtorch7logging24get_is_colored_output_onEv">
-         <span class="target" id="logging_8h_1a9b420280bfacc016d7e36a5704021949">
-         </span>
-         TRTORCH_API bool
-         <code class="sig-prename descclassname">
-          trtorch::logging
-          <code class="sig-prename descclassname">
-           ::
-          </code>
-         </code>
-         <code class="sig-name descname">
-          get_is_colored_output_on
-         </code>
-         <span class="sig-paren">
-          (
-         </span>
-         <span class="sig-paren">
-          )
-         </span>
-         <a class="headerlink" href="#_CPPv4N7trtorch7logging24get_is_colored_output_onEv" title="Permalink to this definition">
+       <section id="function-trtorch-logging-get-is-colored-output-on">
+        <span id="exhale-function-logging-8h-1a9b420280bfacc016d7e36a5704021949">
+        </span>
+        <h1 id="cpp-api-function-logging-8h-1a9b420280bfacc016d7e36a5704021949--page-root">
+         Function trtorch::logging::get_is_colored_output_on
+         <a class="headerlink" href="#cpp-api-function-logging-8h-1a9b420280bfacc016d7e36a5704021949--page-root" title="Permalink to this headline">
           ¶
          </a>
-         <br/>
-        </dt>
-        <dd>
-         <p>
-          Is colored output enabled?
-         </p>
-         <p>
-         </p>
-         <dl class="simple">
-          <dt>
-           <strong>
-            Return
-           </strong>
+        </h1>
+        <ul class="simple">
+         <li>
+          <p>
+           Defined in
+           <a class="reference internal" href="file_cpp_include_trtorch_logging.h.html#file-cpp-include-trtorch-logging-h">
+            <span class="std std-ref">
+             File logging.h
+            </span>
+           </a>
+          </p>
+         </li>
+        </ul>
+        <section id="function-documentation">
+         <h2 id="function-documentation">
+          Function Documentation
+          <a class="headerlink" href="#function-documentation" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <dl class="cpp function">
+          <dt id="_CPPv4N7trtorch7logging24get_is_colored_output_onEv">
+           <span class="target" id="logging_8h_1a9b420280bfacc016d7e36a5704021949">
+           </span>
+           TRTORCH_API bool
+           <code class="sig-prename descclassname">
+            trtorch::logging
+            <code class="sig-prename descclassname">
+             ::
+            </code>
+           </code>
+           <code class="sig-name descname">
+            get_is_colored_output_on
+           </code>
+           <span class="sig-paren">
+            (
+           </span>
+           <span class="sig-paren">
+            )
+           </span>
+           <a class="headerlink" href="#_CPPv4N7trtorch7logging24get_is_colored_output_onEv" title="Permalink to this definition">
+            ¶
+           </a>
+           <br/>
           </dt>
           <dd>
            <p>
-            TRTORCH_API get_is_colored_output_on
+            Is colored output enabled?
            </p>
+           <p>
+           </p>
+           <dl class="simple">
+            <dt>
+             <strong>
+              Return
+             </strong>
+            </dt>
+            <dd>
+             <p>
+              TRTORCH_API get_is_colored_output_on
+             </p>
+            </dd>
+           </dl>
           </dd>
          </dl>
-        </dd>
-       </dl>
+        </section>
+       </section>
       </article>
      </div>
     </div>
@@ -500,7 +518,7 @@
     <div class="md-footer-meta__inner md-grid">
      <div class="md-footer-copyright">
       <div class="md-footer-copyright__highlight">
-       © Copyright 2020, NVIDIA Corporation.
+       © Copyright 2021, NVIDIA Corporation.
       </div>
       Created using
       <a href="http://www.sphinx-doc.org/">

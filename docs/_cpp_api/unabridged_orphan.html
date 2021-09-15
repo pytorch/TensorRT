@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -56,6 +57,11 @@
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
+  </script>
+  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+  <script type="text/x-mathjax-config">
+   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -151,6 +157,9 @@
       <div class="dropdown-content md-hero">
        <a href="https://nvidia.github.io/TRTorch/" title="master">
         master
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.4.0/" title="v0.4.0">
+        v0.4.0
        </a>
        <a href="https://nvidia.github.io/TRTorch/v0.3.0/" title="v0.3.0">
         v0.3.0
@@ -277,6 +286,11 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/vgg-qat.html">
+            Deploying Quantization Aware Trained models in INT8 using TRTorch
+           </a>
+          </li>
+          <li class="md-nav__item">
            <span class="md-nav__link caption">
             <span class="caption-text">
              Python API Documenation
@@ -385,279 +399,269 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <h1 id="cpp-api-unabridged-orphan--page-root">
-        Full API
-        <a class="headerlink" href="#cpp-api-unabridged-orphan--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <h2 id="directories">
-        Directories
-        <a class="headerlink" href="#directories" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <div class="toctree-wrapper compound">
-        <ul>
-         <li class="toctree-l1">
-          <a class="reference internal" href="dir_cpp.html">
-           Directory cpp
+       <section id="full-api">
+        <h1 id="cpp-api-unabridged-orphan--page-root">
+         Full API
+         <a class="headerlink" href="#cpp-api-unabridged-orphan--page-root" title="Permalink to this headline">
+          ¶
+         </a>
+        </h1>
+        <section id="directories">
+         <h2 id="directories">
+          Directories
+          <a class="headerlink" href="#directories" title="Permalink to this headline">
+           ¶
           </a>
+         </h2>
+         <div class="toctree-wrapper compound">
           <ul>
-           <li class="toctree-l2">
-            <a class="reference internal" href="dir_cpp.html#subdirectories">
-             Subdirectories
-            </a>
-           </li>
-          </ul>
-         </li>
-        </ul>
-       </div>
-       <div class="toctree-wrapper compound">
-        <ul>
-         <li class="toctree-l1">
-          <a class="reference internal" href="dir_cpp_api.html">
-           Directory api
-          </a>
-          <ul>
-           <li class="toctree-l2">
-            <a class="reference internal" href="dir_cpp_api.html#subdirectories">
-             Subdirectories
-            </a>
-           </li>
-          </ul>
-         </li>
-        </ul>
-       </div>
-       <div class="toctree-wrapper compound">
-        <ul>
-         <li class="toctree-l1">
-          <a class="reference internal" href="dir_cpp_api_include.html">
-           Directory include
-          </a>
-          <ul>
-           <li class="toctree-l2">
-            <a class="reference internal" href="dir_cpp_api_include.html#subdirectories">
-             Subdirectories
-            </a>
-           </li>
-          </ul>
-         </li>
-        </ul>
-       </div>
-       <div class="toctree-wrapper compound">
-        <ul>
-         <li class="toctree-l1">
-          <a class="reference internal" href="dir_cpp_api_include_trtorch.html">
-           Directory trtorch
-          </a>
-          <ul>
-           <li class="toctree-l2">
-            <a class="reference internal" href="dir_cpp_api_include_trtorch.html#files">
-             Files
-            </a>
-           </li>
-          </ul>
-         </li>
-        </ul>
-       </div>
-       <h2 id="files">
-        Files
-        <a class="headerlink" href="#files" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <div class="toctree-wrapper compound">
-        <ul>
-         <li class="toctree-l1">
-          <a class="reference internal" href="file_cpp_api_include_trtorch_logging.h.html">
-           File logging.h
-          </a>
-          <ul>
-           <li class="toctree-l2">
-            <a class="reference internal" href="file_cpp_api_include_trtorch_logging.h.html#definition-cpp-api-include-trtorch-logging-h">
-             Definition (
-             <code class="docutils literal notranslate">
-              <span class="pre">
-               cpp/api/include/trtorch/logging.h
-              </span>
-             </code>
-             )
+           <li class="toctree-l1">
+            <a class="reference internal" href="dir_cpp.html">
+             Directory cpp
             </a>
             <ul>
-             <li class="toctree-l3">
-              <a class="reference internal" href="program_listing_file_cpp_api_include_trtorch_logging.h.html">
-               Program Listing for File logging.h
+             <li class="toctree-l2">
+              <a class="reference internal" href="dir_cpp.html#subdirectories">
+               Subdirectories
               </a>
              </li>
             </ul>
            </li>
-           <li class="toctree-l2">
-            <a class="reference internal" href="file_cpp_api_include_trtorch_logging.h.html#includes">
-             Includes
-            </a>
-           </li>
-           <li class="toctree-l2">
-            <a class="reference internal" href="file_cpp_api_include_trtorch_logging.h.html#included-by">
-             Included By
-            </a>
-           </li>
-           <li class="toctree-l2">
-            <a class="reference internal" href="file_cpp_api_include_trtorch_logging.h.html#namespaces">
-             Namespaces
-            </a>
-           </li>
-           <li class="toctree-l2">
-            <a class="reference internal" href="file_cpp_api_include_trtorch_logging.h.html#enums">
-             Enums
-            </a>
-           </li>
-           <li class="toctree-l2">
-            <a class="reference internal" href="file_cpp_api_include_trtorch_logging.h.html#functions">
-             Functions
-            </a>
-           </li>
           </ul>
-         </li>
-        </ul>
-       </div>
-       <div class="toctree-wrapper compound">
-        <ul>
-         <li class="toctree-l1">
-          <a class="reference internal" href="file_cpp_api_include_trtorch_macros.h.html">
-           File macros.h
-          </a>
+         </div>
+         <div class="toctree-wrapper compound">
           <ul>
-           <li class="toctree-l2">
-            <a class="reference internal" href="file_cpp_api_include_trtorch_macros.h.html#definition-cpp-api-include-trtorch-macros-h">
-             Definition (
-             <code class="docutils literal notranslate">
-              <span class="pre">
-               cpp/api/include/trtorch/macros.h
-              </span>
-             </code>
-             )
+           <li class="toctree-l1">
+            <a class="reference internal" href="dir_cpp_include.html">
+             Directory include
             </a>
             <ul>
-             <li class="toctree-l3">
-              <a class="reference internal" href="program_listing_file_cpp_api_include_trtorch_macros.h.html">
-               Program Listing for File macros.h
+             <li class="toctree-l2">
+              <a class="reference internal" href="dir_cpp_include.html#subdirectories">
+               Subdirectories
               </a>
              </li>
             </ul>
            </li>
-           <li class="toctree-l2">
-            <a class="reference internal" href="file_cpp_api_include_trtorch_macros.h.html#included-by">
-             Included By
-            </a>
-           </li>
-           <li class="toctree-l2">
-            <a class="reference internal" href="file_cpp_api_include_trtorch_macros.h.html#defines">
-             Defines
-            </a>
-           </li>
           </ul>
-         </li>
-        </ul>
-       </div>
-       <div class="toctree-wrapper compound">
-        <ul>
-         <li class="toctree-l1">
-          <a class="reference internal" href="file_cpp_api_include_trtorch_ptq.h.html">
-           File ptq.h
-          </a>
+         </div>
+         <div class="toctree-wrapper compound">
           <ul>
-           <li class="toctree-l2">
-            <a class="reference internal" href="file_cpp_api_include_trtorch_ptq.h.html#definition-cpp-api-include-trtorch-ptq-h">
-             Definition (
-             <code class="docutils literal notranslate">
-              <span class="pre">
-               cpp/api/include/trtorch/ptq.h
-              </span>
-             </code>
-             )
+           <li class="toctree-l1">
+            <a class="reference internal" href="dir_cpp_include_trtorch.html">
+             Directory trtorch
             </a>
             <ul>
-             <li class="toctree-l3">
-              <a class="reference internal" href="program_listing_file_cpp_api_include_trtorch_ptq.h.html">
-               Program Listing for File ptq.h
+             <li class="toctree-l2">
+              <a class="reference internal" href="dir_cpp_include_trtorch.html#files">
+               Files
               </a>
              </li>
             </ul>
            </li>
-           <li class="toctree-l2">
-            <a class="reference internal" href="file_cpp_api_include_trtorch_ptq.h.html#includes">
-             Includes
-            </a>
-           </li>
-           <li class="toctree-l2">
-            <a class="reference internal" href="file_cpp_api_include_trtorch_ptq.h.html#namespaces">
-             Namespaces
-            </a>
-           </li>
-           <li class="toctree-l2">
-            <a class="reference internal" href="file_cpp_api_include_trtorch_ptq.h.html#classes">
-             Classes
-            </a>
-           </li>
-           <li class="toctree-l2">
-            <a class="reference internal" href="file_cpp_api_include_trtorch_ptq.h.html#functions">
-             Functions
-            </a>
-           </li>
           </ul>
-         </li>
-        </ul>
-       </div>
-       <div class="toctree-wrapper compound">
-        <ul>
-         <li class="toctree-l1">
-          <a class="reference internal" href="file_cpp_api_include_trtorch_trtorch.h.html">
-           File trtorch.h
+         </div>
+        </section>
+        <section id="files">
+         <h2 id="files">
+          Files
+          <a class="headerlink" href="#files" title="Permalink to this headline">
+           ¶
           </a>
+         </h2>
+         <div class="toctree-wrapper compound">
           <ul>
-           <li class="toctree-l2">
-            <a class="reference internal" href="file_cpp_api_include_trtorch_trtorch.h.html#definition-cpp-api-include-trtorch-trtorch-h">
-             Definition (
-             <code class="docutils literal notranslate">
-              <span class="pre">
-               cpp/api/include/trtorch/trtorch.h
-              </span>
-             </code>
-             )
+           <li class="toctree-l1">
+            <a class="reference internal" href="file_cpp_include_trtorch_logging.h.html">
+             File logging.h
             </a>
             <ul>
-             <li class="toctree-l3">
-              <a class="reference internal" href="program_listing_file_cpp_api_include_trtorch_trtorch.h.html">
-               Program Listing for File trtorch.h
+             <li class="toctree-l2">
+              <a class="reference internal" href="file_cpp_include_trtorch_logging.h.html#definition-cpp-include-trtorch-logging-h">
+               Definition (
+               <code class="docutils literal notranslate">
+                <span class="pre">
+                 cpp/include/trtorch/logging.h
+                </span>
+               </code>
+               )
+              </a>
+              <ul>
+               <li class="toctree-l3">
+                <a class="reference internal" href="program_listing_file_cpp_include_trtorch_logging.h.html">
+                 Program Listing for File logging.h
+                </a>
+               </li>
+              </ul>
+             </li>
+             <li class="toctree-l2">
+              <a class="reference internal" href="file_cpp_include_trtorch_logging.h.html#includes">
+               Includes
+              </a>
+             </li>
+             <li class="toctree-l2">
+              <a class="reference internal" href="file_cpp_include_trtorch_logging.h.html#included-by">
+               Included By
+              </a>
+             </li>
+             <li class="toctree-l2">
+              <a class="reference internal" href="file_cpp_include_trtorch_logging.h.html#namespaces">
+               Namespaces
+              </a>
+             </li>
+             <li class="toctree-l2">
+              <a class="reference internal" href="file_cpp_include_trtorch_logging.h.html#enums">
+               Enums
+              </a>
+             </li>
+             <li class="toctree-l2">
+              <a class="reference internal" href="file_cpp_include_trtorch_logging.h.html#functions">
+               Functions
               </a>
              </li>
             </ul>
            </li>
-           <li class="toctree-l2">
-            <a class="reference internal" href="file_cpp_api_include_trtorch_trtorch.h.html#includes">
-             Includes
+          </ul>
+         </div>
+         <div class="toctree-wrapper compound">
+          <ul>
+           <li class="toctree-l1">
+            <a class="reference internal" href="file_cpp_include_trtorch_macros.h.html">
+             File macros.h
             </a>
-           </li>
-           <li class="toctree-l2">
-            <a class="reference internal" href="file_cpp_api_include_trtorch_trtorch.h.html#namespaces">
-             Namespaces
-            </a>
-           </li>
-           <li class="toctree-l2">
-            <a class="reference internal" href="file_cpp_api_include_trtorch_trtorch.h.html#classes">
-             Classes
-            </a>
-           </li>
-           <li class="toctree-l2">
-            <a class="reference internal" href="file_cpp_api_include_trtorch_trtorch.h.html#functions">
-             Functions
-            </a>
+            <ul>
+             <li class="toctree-l2">
+              <a class="reference internal" href="file_cpp_include_trtorch_macros.h.html#definition-cpp-include-trtorch-macros-h">
+               Definition (
+               <code class="docutils literal notranslate">
+                <span class="pre">
+                 cpp/include/trtorch/macros.h
+                </span>
+               </code>
+               )
+              </a>
+              <ul>
+               <li class="toctree-l3">
+                <a class="reference internal" href="program_listing_file_cpp_include_trtorch_macros.h.html">
+                 Program Listing for File macros.h
+                </a>
+               </li>
+              </ul>
+             </li>
+             <li class="toctree-l2">
+              <a class="reference internal" href="file_cpp_include_trtorch_macros.h.html#included-by">
+               Included By
+              </a>
+             </li>
+             <li class="toctree-l2">
+              <a class="reference internal" href="file_cpp_include_trtorch_macros.h.html#defines">
+               Defines
+              </a>
+             </li>
+            </ul>
            </li>
           </ul>
-         </li>
-        </ul>
-       </div>
+         </div>
+         <div class="toctree-wrapper compound">
+          <ul>
+           <li class="toctree-l1">
+            <a class="reference internal" href="file_cpp_include_trtorch_ptq.h.html">
+             File ptq.h
+            </a>
+            <ul>
+             <li class="toctree-l2">
+              <a class="reference internal" href="file_cpp_include_trtorch_ptq.h.html#definition-cpp-include-trtorch-ptq-h">
+               Definition (
+               <code class="docutils literal notranslate">
+                <span class="pre">
+                 cpp/include/trtorch/ptq.h
+                </span>
+               </code>
+               )
+              </a>
+              <ul>
+               <li class="toctree-l3">
+                <a class="reference internal" href="program_listing_file_cpp_include_trtorch_ptq.h.html">
+                 Program Listing for File ptq.h
+                </a>
+               </li>
+              </ul>
+             </li>
+             <li class="toctree-l2">
+              <a class="reference internal" href="file_cpp_include_trtorch_ptq.h.html#includes">
+               Includes
+              </a>
+             </li>
+             <li class="toctree-l2">
+              <a class="reference internal" href="file_cpp_include_trtorch_ptq.h.html#namespaces">
+               Namespaces
+              </a>
+             </li>
+             <li class="toctree-l2">
+              <a class="reference internal" href="file_cpp_include_trtorch_ptq.h.html#classes">
+               Classes
+              </a>
+             </li>
+             <li class="toctree-l2">
+              <a class="reference internal" href="file_cpp_include_trtorch_ptq.h.html#functions">
+               Functions
+              </a>
+             </li>
+            </ul>
+           </li>
+          </ul>
+         </div>
+         <div class="toctree-wrapper compound">
+          <ul>
+           <li class="toctree-l1">
+            <a class="reference internal" href="file_cpp_include_trtorch_trtorch.h.html">
+             File trtorch.h
+            </a>
+            <ul>
+             <li class="toctree-l2">
+              <a class="reference internal" href="file_cpp_include_trtorch_trtorch.h.html#definition-cpp-include-trtorch-trtorch-h">
+               Definition (
+               <code class="docutils literal notranslate">
+                <span class="pre">
+                 cpp/include/trtorch/trtorch.h
+                </span>
+               </code>
+               )
+              </a>
+              <ul>
+               <li class="toctree-l3">
+                <a class="reference internal" href="program_listing_file_cpp_include_trtorch_trtorch.h.html">
+                 Program Listing for File trtorch.h
+                </a>
+               </li>
+              </ul>
+             </li>
+             <li class="toctree-l2">
+              <a class="reference internal" href="file_cpp_include_trtorch_trtorch.h.html#includes">
+               Includes
+              </a>
+             </li>
+             <li class="toctree-l2">
+              <a class="reference internal" href="file_cpp_include_trtorch_trtorch.h.html#namespaces">
+               Namespaces
+              </a>
+             </li>
+             <li class="toctree-l2">
+              <a class="reference internal" href="file_cpp_include_trtorch_trtorch.h.html#classes">
+               Classes
+              </a>
+             </li>
+             <li class="toctree-l2">
+              <a class="reference internal" href="file_cpp_include_trtorch_trtorch.h.html#functions">
+               Functions
+              </a>
+             </li>
+            </ul>
+           </li>
+          </ul>
+         </div>
+        </section>
+       </section>
       </article>
      </div>
     </div>
@@ -672,7 +676,7 @@
     <div class="md-footer-meta__inner md-grid">
      <div class="md-footer-copyright">
       <div class="md-footer-copyright__highlight">
-       © Copyright 2020, NVIDIA Corporation.
+       © Copyright 2021, NVIDIA Corporation.
       </div>
       Created using
       <a href="http://www.sphinx-doc.org/">

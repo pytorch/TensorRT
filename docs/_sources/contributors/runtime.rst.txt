@@ -8,7 +8,7 @@ when these engines are called. The main interface accepts a serialized TensorRT 
 will deserialize and wrap this engine in a class which maintains a execution context for each engine
 and some metadata about its inputs and outputs and is compatable with the TorchScript interpreter so that
 it can be moved around and used like other TorchScript IValues. The engine is run by providing it and inputs
-to the ``trt::execute_engine`` operator which will take the engine and its inputs and return the results of engine exeuction.
+to the ``tensorrt::execute_engine`` operator which will take the engine and its inputs and return the results of engine exeuction.
 
 
 Background
@@ -68,3 +68,18 @@ Serialization and deserialization of TensorRT engines embedded in TorchScript gr
 When a TorchScript module is saved, the pickler will run serilization on the cuda engine and store the serialized engine in the zip file created.
 When deserializing, the depickler will call a constructor for the engine holder class with the serialized engine so that it can be set up again for
 execution.
+
+ABI Versioning and Serialization Format
+=========================================
+
+TRTorch programs are standard TorchScript with TensorRT engines as objects embedded in the graph. Therefore there is a serialization format
+for the TensorRT engines. The format for TRTorch serialized programs are versioned with an "ABI" version which tells the runtime about runtime compatibility.
+
+> Current ABI version is 3
+
+The format is a vector of serialized strings. They encode the following information
+
+* ABI Version for the program
+* Name of the TRT engine
+* Device information: Includes the target device the engine was built on, SM capability and other device information. This information is used at deserialization time to select the correct device to run the engine
+* Serialized TensorRT engine

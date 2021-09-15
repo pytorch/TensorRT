@@ -3,6 +3,7 @@
 #include "gtest/gtest.h"
 #include "tests/util/util.h"
 #include "torch/csrc/jit/ir/irparser.h"
+#include "torch/torch.h"
 
 TEST(Evaluators, DivIntEvaluatesCorrectly) {
   const auto graph = R"IR(
@@ -45,6 +46,30 @@ TEST(Evaluators, OnesEvaluatesCorrectly) {
         %3 : int[] = aten::size(%x.1) # <string>:7:9
         %z.1 : Tensor = aten::ones(%3, %2, %2, %2, %2) # experiments/test_zeros.py:8:12
         return (%z.1))IR";
+
+  auto in = at::randint(1, 10, {1, 5, 5, 5}, {at::kCUDA});
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto jit_results = trtorch::tests::util::EvaluateGraphJIT(g, {in});
+  auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {in});
+
+  ASSERT_TRUE(at::equal(jit_results[0].toTensor().to(at::kCUDA), trt_results[0].toTensor()));
+}
+
+TEST(Evaluators, FullEvaluatesCorrectly) {
+  const auto graph = R"IR(
+      graph(%x.1 : Tensor):
+        %size : int[] = aten::size(%x.1) # <string>:7:9
+        %3 : int = prim::Constant[value=5]()
+        %9 : None = prim::Constant()
+        %12 : int[] = prim::ListConstruct(%3)
+        %13 : float = prim::Constant[value=1.3]()
+        %14 : int = prim::Constant[value=4]()
+        %35 : Device = prim::Constant[value="cuda:0"]()
+        %19 : Tensor = aten::full(%size, %13, %14, %9, %35, %9)
+        return (%19))IR";
 
   auto in = at::randint(1, 10, {1, 5, 5, 5}, {at::kCUDA});
 
@@ -355,4 +380,131 @@ TEST(Evaluators, ATenAppendWithITensorAndTensorEvaluatesCorrectly) {
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in0});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+}
+
+TEST(Evaluators, SqrtIntEvaluatesCorrectly) {
+  const auto graph = R"IR(
+      graph():
+        %1 : int = prim::Constant[value=9]()
+        %2 : float = aten::sqrt(%1)
+        return (%2))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto jit_results = trtorch::tests::util::EvaluateGraphJIT(g, {});
+  auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {});
+
+  ASSERT_TRUE(jit_results[0] == trt_results[0]);
+}
+
+TEST(Evaluators, SqrtFloatEvaluatesCorrectly) {
+  const auto graph = R"IR(
+      graph():
+        %1 : float = prim::Constant[value=9.0]()
+        %2 : float = aten::sqrt(%1)
+        return (%2))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto jit_results = trtorch::tests::util::EvaluateGraphJIT(g, {});
+  auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {});
+
+  ASSERT_TRUE(jit_results[0] == trt_results[0]);
+}
+TEST(Evaluators, ATenCloneEvaluatesCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor):
+        %1 : None = prim::Constant()
+        %2 : Tensor = aten::clone(%0, %1)
+        return (%2))IR";
+
+  auto in = at::randint(1, 10, {1, 3, 10, 10}, {at::kCUDA});
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto jit_results = trtorch::tests::util::EvaluateGraphJIT(g, {in});
+  auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {in});
+
+  ASSERT_TRUE(at::equal(jit_results[0].toTensor().to(at::kCUDA), trt_results[0].toTensor()));
+}
+
+TEST(Evaluators, ATenCopyEvaluatesCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor):
+        %1 : int = prim::Constant[value=1]()
+        %2 : int = prim::Constant[value=3]()
+        %3 : int = prim::Constant[value=10]()
+        %4 : int = prim::Constant[value=10]()
+        %5 : int[] = prim::ListConstruct(%1, %2, %3, %4)
+        %6 : None = prim::Constant()
+        %7 : Device = prim::Constant[value="cuda"]()
+        %8 : Tensor = aten::ones(%5, %6, %6, %7, %6)
+        %9 : bool = prim::Constant[value=0]()
+        %10 : Tensor = aten::copy_(%8, %0, %9)
+        return (%10))IR";
+
+  auto in = at::randint(1, 10, {1, 3, 10, 10}, {at::kCUDA});
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto jit_results = trtorch::tests::util::EvaluateGraphJIT(g, {in});
+  auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {in});
+
+  ASSERT_TRUE(at::equal(jit_results[0].toTensor().to(at::kCUDA), trt_results[0].toTensor()));
+}
+
+TEST(Evaluators, IntFloatEvaluatesCorrectly) {
+  const auto graph = R"IR(
+      graph():
+        %1 : float = prim::Constant[value=9.3]()
+        %2 : int = aten::Int(%1)
+        return (%2))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto jit_results = trtorch::tests::util::EvaluateGraphJIT(g, {});
+  auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {});
+
+  ASSERT_TRUE(jit_results[0] == trt_results[0]);
+}
+
+TEST(Evaluators, ATenIsFloatingPointEvaluatesTrueCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor):
+        %1 : bool = aten::is_floating_point(%0)
+        return (%1))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, &*g);
+
+  auto in = at::randint(1, 10, {1, 3, 3, 3}, {at::kCUDA}).to(torch::kF32);
+  auto in_trt = in.clone();
+
+  auto jit_results = trtorch::tests::util::EvaluateGraphJIT(g, {in});
+  auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {in_trt});
+
+  ASSERT_TRUE(jit_results[0] == trt_results[0]);
+}
+
+TEST(Evaluators, ATenIsFloatingPointEvaluatesFalseCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor):
+        %1 : bool = aten::is_floating_point(%0)
+        return (%1))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, &*g);
+
+  auto in = at::randint(1, 10, {1, 3, 3, 3}, {at::kCUDA}).to(torch::kI8);
+  auto in_trt = in.clone();
+
+  auto jit_results = trtorch::tests::util::EvaluateGraphJIT(g, {in});
+  auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {in_trt});
+
+  ASSERT_TRUE(jit_results[0] == trt_results[0]);
 }

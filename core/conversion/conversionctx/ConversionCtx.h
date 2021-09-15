@@ -24,15 +24,15 @@ struct Device {
 };
 
 struct BuilderSettings {
+  std::set<nvinfer1::DataType> enabled_precisions = {};
   bool sparse_weights = false;
-  std::set<nvinfer1::DataType> enabled_precisions = {nvinfer1::DataType::kFLOAT};
   bool disable_tf32 = false;
   bool refit = false;
   bool debug = false;
   bool strict_types = false;
   bool truncate_long_and_double = false;
   Device device;
-  nvinfer1::EngineCapability capability = nvinfer1::EngineCapability::kSTANDARD;
+  nvinfer1::EngineCapability capability = TRT_ENGINE_CAPABILITY_STANDARD;
   nvinfer1::IInt8Calibrator* calibrator = nullptr;
   uint64_t num_min_timing_iters = 2;
   uint64_t num_avg_timing_iters = 1;
@@ -56,9 +56,9 @@ struct ConversionCtx {
   uint64_t num_inputs = 0;
   uint64_t num_outputs = 0;
   bool input_is_dynamic = false;
-  nvinfer1::IBuilder* builder;
-  nvinfer1::INetworkDefinition* net;
-  nvinfer1::IBuilderConfig* cfg;
+  std::shared_ptr<nvinfer1::IBuilder> builder;
+  std::shared_ptr<nvinfer1::INetworkDefinition> net;
+  std::shared_ptr<nvinfer1::IBuilderConfig> cfg;
   std::set<nvinfer1::DataType> enabled_precisions;
   BuilderSettings settings;
   util::logging::TRTorchLogger logger;

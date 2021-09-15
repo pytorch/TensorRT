@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -56,6 +57,11 @@
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
+  </script>
+  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+  <script type="text/x-mathjax-config">
+   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -153,6 +159,9 @@
       <div class="dropdown-content md-hero">
        <a href="https://nvidia.github.io/TRTorch/" title="master">
         master
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.4.0/" title="v0.4.0">
+        v0.4.0
        </a>
        <a href="https://nvidia.github.io/TRTorch/v0.3.0/" title="v0.3.0">
         v0.3.0
@@ -284,6 +293,11 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/vgg-qat.html">
+            Deploying Quantization Aware Trained models in INT8 using TRTorch
+           </a>
+          </li>
+          <li class="md-nav__item">
            <span class="md-nav__link caption">
             <span class="caption-text">
              Python API Documenation
@@ -387,47 +401,51 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <span id="exhale-define-macros-8h-1a20c1fbeb21757871c52299dc52351b5f">
-       </span>
-       <h1 id="cpp-api-define-macros-8h-1a20c1fbeb21757871c52299dc52351b5f--page-root">
-        Define TRTORCH_API
-        <a class="headerlink" href="#cpp-api-define-macros-8h-1a20c1fbeb21757871c52299dc52351b5f--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <ul class="simple">
-        <li>
-         <p>
-          Defined in
-          <a class="reference internal" href="file_cpp_api_include_trtorch_macros.h.html#file-cpp-api-include-trtorch-macros-h">
-           <span class="std std-ref">
-            File macros.h
-           </span>
-          </a>
-         </p>
-        </li>
-       </ul>
-       <h2 id="define-documentation">
-        Define Documentation
-        <a class="headerlink" href="#define-documentation" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <dl class="cpp macro">
-        <dt id="c.TRTORCH_API">
-         <span class="target" id="macros_8h_1a20c1fbeb21757871c52299dc52351b5f">
-         </span>
-         <code class="sig-name descname">
-          TRTORCH_API
-         </code>
-         <a class="headerlink" href="#c.TRTORCH_API" title="Permalink to this definition">
+       <section id="define-trtorch-api">
+        <span id="exhale-define-macros-8h-1a20c1fbeb21757871c52299dc52351b5f">
+        </span>
+        <h1 id="cpp-api-define-macros-8h-1a20c1fbeb21757871c52299dc52351b5f--page-root">
+         Define TRTORCH_API
+         <a class="headerlink" href="#cpp-api-define-macros-8h-1a20c1fbeb21757871c52299dc52351b5f--page-root" title="Permalink to this headline">
           ¶
          </a>
-         <br/>
-        </dt>
-        <dd>
-        </dd>
-       </dl>
+        </h1>
+        <ul class="simple">
+         <li>
+          <p>
+           Defined in
+           <a class="reference internal" href="file_cpp_include_trtorch_macros.h.html#file-cpp-include-trtorch-macros-h">
+            <span class="std std-ref">
+             File macros.h
+            </span>
+           </a>
+          </p>
+         </li>
+        </ul>
+        <section id="define-documentation">
+         <h2 id="define-documentation">
+          Define Documentation
+          <a class="headerlink" href="#define-documentation" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <dl class="cpp macro">
+          <dt id="c.TRTORCH_API">
+           <span class="target" id="macros_8h_1a20c1fbeb21757871c52299dc52351b5f">
+           </span>
+           <code class="sig-name descname">
+            TRTORCH_API
+           </code>
+           <a class="headerlink" href="#c.TRTORCH_API" title="Permalink to this definition">
+            ¶
+           </a>
+           <br/>
+          </dt>
+          <dd>
+          </dd>
+         </dl>
+        </section>
+       </section>
       </article>
      </div>
     </div>
@@ -470,7 +488,7 @@
     <div class="md-footer-meta__inner md-grid">
      <div class="md-footer-copyright">
       <div class="md-footer-copyright__highlight">
-       © Copyright 2020, NVIDIA Corporation.
+       © Copyright 2021, NVIDIA Corporation.
       </div>
       Created using
       <a href="http://www.sphinx-doc.org/">

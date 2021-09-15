@@ -13,16 +13,34 @@ from torch.utils import cpp_extension
 from shutil import copyfile, rmtree
 
 import subprocess
+import platform
+import warnings
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
-__version__ = '0.4.0a0'
+__version__ = '0.5.0a0'
 
 CXX11_ABI = False
+
+JETPACK_VERSION = None
 
 if "--use-cxx11-abi" in sys.argv:
     sys.argv.remove("--use-cxx11-abi")
     CXX11_ABI = True
+
+if platform.uname().processor == "aarch64":
+    if "--jetpack-version" in sys.argv:
+        version_idx = sys.argv.index("--jetpack-version") + 1
+        version = sys.argv[version_idx]
+        sys.argv.remove(version)
+        sys.argv.remove("--jetpack-version")
+        if version == "4.5":
+            JETPACK_VERSION = "4.5"
+        elif version == "4.6":
+            JETPACK_VERSION = "4.6"
+    if not JETPACK_VERSION:
+        warnings.warn("Assuming jetpack version to be 4.6, if not use the --jetpack-version option")
+        JETPACK_VERSION = "4.6"
 
 
 def which(program):
@@ -44,15 +62,17 @@ def which(program):
     return None
 
 
-BAZEL_EXE = which("bazel")
+BAZEL_EXE = which("bazelisk")
 
 if BAZEL_EXE is None:
-    sys.exit("Could not find bazel in PATH")
+    BAZEL_EXE = which("bazel")
+    if BAZEL_EXE is None:
+        sys.exit("Could not find bazel in PATH")
 
 
 def build_libtrtorch_pre_cxx11_abi(develop=True, use_dist_dir=True, cxx11_abi=False):
     cmd = [BAZEL_EXE, "build"]
-    cmd.append("//cpp/api/lib:libtrtorch.so")
+    cmd.append("//cpp/lib:libtrtorch.so")
     if develop:
         cmd.append("--compilation_mode=dbg")
     else:
@@ -63,6 +83,13 @@ def build_libtrtorch_pre_cxx11_abi(develop=True, use_dist_dir=True, cxx11_abi=Fa
         cmd.append("--config=python")
     else:
         print("using CXX11 ABI build")
+
+    if JETPACK_VERSION == "4.5":
+        cmd.append("--platforms=//toolchains:jetpack_4.5")
+        print("Jetpack version: 4.5")
+    elif JETPACK_VERSION == "4.6":
+        cmd.append("--platforms=//toolchains:jetpack_4.6")
+        print("Jetpack version: 4.6")
 
     print("building libtrtorch")
     status_code = subprocess.run(cmd).returncode
@@ -88,7 +115,7 @@ def copy_libtrtorch(multilinux=False):
     if multilinux:
         copyfile(dir_path + "/build/libtrtorch_build/libtrtorch.so", dir_path + '/trtorch/lib/libtrtorch.so')
     else:
-        copyfile(dir_path + "/../bazel-bin/cpp/api/lib/libtrtorch.so", dir_path + '/trtorch/lib/libtrtorch.so')
+        copyfile(dir_path + "/../bazel-bin/cpp/lib/libtrtorch.so", dir_path + '/trtorch/lib/libtrtorch.so')
 
 
 class DevelopCommand(develop):
@@ -207,7 +234,7 @@ setup(name='trtorch',
       long_description=long_description,
       ext_modules=ext_modules,
       install_requires=[
-          'torch>=1.8.0+cu111,<1.9.0',
+          'torch>=1.9.0+cu111,<1.10.0',
       ],
       setup_requires=[],
       cmdclass={

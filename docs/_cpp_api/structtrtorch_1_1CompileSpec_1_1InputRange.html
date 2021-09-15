@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -56,6 +57,11 @@
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
+  </script>
+  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+  <script type="text/x-mathjax-config">
+   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -153,6 +159,9 @@
       <div class="dropdown-content md-hero">
        <a href="https://nvidia.github.io/TRTorch/" title="master">
         master
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.4.0/" title="v0.4.0">
+        v0.4.0
        </a>
        <a href="https://nvidia.github.io/TRTorch/v0.3.0/" title="v0.3.0">
         v0.3.0
@@ -284,6 +293,11 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/vgg-qat.html">
+            Deploying Quantization Aware Trained models in INT8 using TRTorch
+           </a>
+          </li>
+          <li class="md-nav__item">
            <span class="md-nav__link caption">
             <span class="caption-text">
              Python API Documenation
@@ -392,407 +406,413 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <span id="exhale-struct-structtrtorch-1-1compilespec-1-1inputrange">
-       </span>
-       <h1 id="cpp-api-structtrtorch-1-1compilespec-1-1inputrange--page-root">
-        Struct CompileSpec::InputRange
-        <a class="headerlink" href="#cpp-api-structtrtorch-1-1compilespec-1-1inputrange--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <ul class="simple">
-        <li>
+       <section id="struct-compilespec-inputrange">
+        <span id="exhale-struct-structtrtorch-1-1compilespec-1-1inputrange">
+        </span>
+        <h1 id="cpp-api-structtrtorch-1-1compilespec-1-1inputrange--page-root">
+         Struct CompileSpec::InputRange
+         <a class="headerlink" href="#cpp-api-structtrtorch-1-1compilespec-1-1inputrange--page-root" title="Permalink to this headline">
+          ¶
+         </a>
+        </h1>
+        <ul class="simple">
+         <li>
+          <p>
+           Defined in
+           <a class="reference internal" href="file_cpp_include_trtorch_trtorch.h.html#file-cpp-include-trtorch-trtorch-h">
+            <span class="std std-ref">
+             File trtorch.h
+            </span>
+           </a>
+          </p>
+         </li>
+        </ul>
+        <section id="nested-relationships">
+         <h2 id="nested-relationships">
+          Nested Relationships
+          <a class="headerlink" href="#nested-relationships" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
          <p>
-          Defined in
-          <a class="reference internal" href="file_cpp_api_include_trtorch_trtorch.h.html#file-cpp-api-include-trtorch-trtorch-h">
+          This struct is a nested type of
+          <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#exhale-struct-structtrtorch-1-1compilespec">
            <span class="std std-ref">
-            File trtorch.h
+            Struct CompileSpec
            </span>
           </a>
+          .
          </p>
-        </li>
-       </ul>
-       <h2 id="nested-relationships">
-        Nested Relationships
-        <a class="headerlink" href="#nested-relationships" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <p>
-        This struct is a nested type of
-        <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#exhale-struct-structtrtorch-1-1compilespec">
-         <span class="std std-ref">
-          Struct CompileSpec
-         </span>
-        </a>
-        .
-       </p>
-       <h2 id="struct-documentation">
-        Struct Documentation
-        <a class="headerlink" href="#struct-documentation" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <dl class="cpp struct">
-        <dt id="_CPPv4N7trtorch11CompileSpec10InputRangeE">
-         <span class="target" id="structtrtorch_1_1CompileSpec_1_1InputRange">
-         </span>
-         <em class="property">
-          struct
-         </em>
-         <code class="sig-prename descclassname">
-          trtorch::
-          <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpecE" title="trtorch::CompileSpec">
-           CompileSpec
+        </section>
+        <section id="struct-documentation">
+         <h2 id="struct-documentation">
+          Struct Documentation
+          <a class="headerlink" href="#struct-documentation" title="Permalink to this headline">
+           ¶
           </a>
-          <code class="sig-prename descclassname">
-           ::
-          </code>
-         </code>
-         <code class="sig-name descname">
-          InputRange
-         </code>
-         <br/>
-        </dt>
-        <dd>
-         <p>
-          A struct to hold an input range (used by TensorRT Optimization profile)
-         </p>
-         <p>
-          This struct can either hold a single vector representing an input shape, signifying a static input shape or a set of three input shapes representing the min, optiminal and max input shapes allowed for the engine.
-         </p>
-         <div class="breathe-sectiondef docutils container">
-          <p class="breathe-sectiondef-title rubric">
-           Public Functions
-          </p>
-          <dl class="cpp function">
-           <dt id="_CPPv4N7trtorch11CompileSpec10InputRange10InputRangeENSt6vectorI7int64_tEE">
-            <span class="target" id="structtrtorch_1_1CompileSpec_1_1InputRange_1aad0b9526637c0cfface509726eac187a">
-            </span>
-            <code class="sig-name descname">
-             InputRange
+         </h2>
+         <dl class="cpp struct">
+          <dt id="_CPPv4N7trtorch11CompileSpec10InputRangeE">
+           <span class="target" id="structtrtorch_1_1CompileSpec_1_1InputRange">
+           </span>
+           <em class="property">
+            struct
+           </em>
+           <code class="sig-prename descclassname">
+            trtorch::
+            <a class="reference internal" href="structtrtorch_1_1CompileSpec.html#_CPPv4N7trtorch11CompileSpecE" title="trtorch::CompileSpec">
+             CompileSpec
+            </a>
+            <code class="sig-prename descclassname">
+             ::
             </code>
-            <span class="sig-paren">
-             (
-            </span>
-            std::vector&lt;int64_t&gt;
-            <em>
-             opt
-            </em>
-            <span class="sig-paren">
-             )
-            </span>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Construct a new
-             <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Input.html#structtrtorch_1_1CompileSpec_1_1Input">
-              <span class="std std-ref">
-               Input
+           </code>
+           <code class="sig-name descname">
+            InputRange
+           </code>
+           <br/>
+          </dt>
+          <dd>
+           <p>
+            A struct to hold an input range (used by TensorRT Optimization profile)
+           </p>
+           <p>
+            This struct can either hold a single vector representing an input shape, signifying a static input shape or a set of three input shapes representing the min, optiminal and max input shapes allowed for the engine.
+           </p>
+           <div class="breathe-sectiondef docutils container">
+            <p class="breathe-sectiondef-title rubric">
+             Public Functions
+            </p>
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec10InputRange10InputRangeENSt6vectorI7int64_tEE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1InputRange_1aad0b9526637c0cfface509726eac187a">
               </span>
-             </a>
-             Range object for static input size from vector.
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Parameters
-              </strong>
+              <code class="sig-name descname">
+               InputRange
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              std::vector&lt;int64_t&gt;
+              <em>
+               opt
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <br/>
              </dt>
              <dd>
-              <ul class="breatheparameterlist simple">
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   opt
-                  </span>
-                 </code>
-                 :
-                </p>
-               </li>
-              </ul>
+              <p>
+               Construct a new
+               <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Input.html#structtrtorch_1_1CompileSpec_1_1Input">
+                <span class="std std-ref">
+                 Input
+                </span>
+               </a>
+               Range object for static input size from vector.
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     opt
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
              </dd>
             </dl>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4N7trtorch11CompileSpec10InputRange10InputRangeEN3c108ArrayRefI7int64_tEE">
-            <span class="target" id="structtrtorch_1_1CompileSpec_1_1InputRange_1af2cf04230c9fa6e852c6074e587e339b">
-            </span>
-            <code class="sig-name descname">
-             InputRange
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            c10::ArrayRef&lt;int64_t&gt;
-            <em>
-             opt
-            </em>
-            <span class="sig-paren">
-             )
-            </span>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Construct a new
-             <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Input.html#structtrtorch_1_1CompileSpec_1_1Input">
-              <span class="std std-ref">
-               Input
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec10InputRange10InputRangeEN3c108ArrayRefI7int64_tEE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1InputRange_1af2cf04230c9fa6e852c6074e587e339b">
               </span>
-             </a>
-             Range object static input size from c10::ArrayRef (the type produced by tensor.sizes())
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Parameters
-              </strong>
+              <code class="sig-name descname">
+               InputRange
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              c10::ArrayRef&lt;int64_t&gt;
+              <em>
+               opt
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <br/>
              </dt>
              <dd>
-              <ul class="breatheparameterlist simple">
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   opt
-                  </span>
-                 </code>
-                 :
-                </p>
-               </li>
-              </ul>
+              <p>
+               Construct a new
+               <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Input.html#structtrtorch_1_1CompileSpec_1_1Input">
+                <span class="std std-ref">
+                 Input
+                </span>
+               </a>
+               Range object static input size from c10::ArrayRef (the type produced by tensor.sizes())
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     opt
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
              </dd>
             </dl>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4N7trtorch11CompileSpec10InputRange10InputRangeENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE">
-            <span class="target" id="structtrtorch_1_1CompileSpec_1_1InputRange_1a6febb106b2f739b07b5300d9f28ff1be">
-            </span>
-            <code class="sig-name descname">
-             InputRange
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            std::vector&lt;int64_t&gt;
-            <em>
-             min
-            </em>
-            , std::vector&lt;int64_t&gt;
-            <em>
-             opt
-            </em>
-            , std::vector&lt;int64_t&gt;
-            <em>
-             max
-            </em>
-            <span class="sig-paren">
-             )
-            </span>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Construct a new
-             <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Input.html#structtrtorch_1_1CompileSpec_1_1Input">
-              <span class="std std-ref">
-               Input
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec10InputRange10InputRangeENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1InputRange_1a6febb106b2f739b07b5300d9f28ff1be">
               </span>
-             </a>
-             Range object dynamic input size from vectors for min, opt, and max supported sizes.
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Parameters
-              </strong>
+              <code class="sig-name descname">
+               InputRange
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              std::vector&lt;int64_t&gt;
+              <em>
+               min
+              </em>
+              , std::vector&lt;int64_t&gt;
+              <em>
+               opt
+              </em>
+              , std::vector&lt;int64_t&gt;
+              <em>
+               max
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <br/>
              </dt>
              <dd>
-              <ul class="breatheparameterlist simple">
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   min
-                  </span>
-                 </code>
-                 :
-                </p>
-               </li>
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   opt
-                  </span>
-                 </code>
-                 :
-                </p>
-               </li>
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   max
-                  </span>
-                 </code>
-                 :
-                </p>
-               </li>
-              </ul>
+              <p>
+               Construct a new
+               <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Input.html#structtrtorch_1_1CompileSpec_1_1Input">
+                <span class="std std-ref">
+                 Input
+                </span>
+               </a>
+               Range object dynamic input size from vectors for min, opt, and max supported sizes.
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     min
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     opt
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     max
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
              </dd>
             </dl>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4N7trtorch11CompileSpec10InputRange10InputRangeEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE">
-            <span class="target" id="structtrtorch_1_1CompileSpec_1_1InputRange_1a8b33f7f460467554075ac5be6729952d">
-            </span>
-            <code class="sig-name descname">
-             InputRange
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            c10::ArrayRef&lt;int64_t&gt;
-            <em>
-             min
-            </em>
-            , c10::ArrayRef&lt;int64_t&gt;
-            <em>
-             opt
-            </em>
-            , c10::ArrayRef&lt;int64_t&gt;
-            <em>
-             max
-            </em>
-            <span class="sig-paren">
-             )
-            </span>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Construct a new
-             <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Input.html#structtrtorch_1_1CompileSpec_1_1Input">
-              <span class="std std-ref">
-               Input
+            <dl class="cpp function">
+             <dt id="_CPPv4N7trtorch11CompileSpec10InputRange10InputRangeEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1InputRange_1a8b33f7f460467554075ac5be6729952d">
               </span>
-             </a>
-             Range object dynamic input size from c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max supported sizes.
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Parameters
-              </strong>
+              <code class="sig-name descname">
+               InputRange
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              c10::ArrayRef&lt;int64_t&gt;
+              <em>
+               min
+              </em>
+              , c10::ArrayRef&lt;int64_t&gt;
+              <em>
+               opt
+              </em>
+              , c10::ArrayRef&lt;int64_t&gt;
+              <em>
+               max
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <br/>
              </dt>
              <dd>
-              <ul class="breatheparameterlist simple">
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   min
-                  </span>
-                 </code>
-                 :
-                </p>
-               </li>
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   opt
-                  </span>
-                 </code>
-                 :
-                </p>
-               </li>
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   max
-                  </span>
-                 </code>
-                 :
-                </p>
-               </li>
-              </ul>
+              <p>
+               Construct a new
+               <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1Input.html#structtrtorch_1_1CompileSpec_1_1Input">
+                <span class="std std-ref">
+                 Input
+                </span>
+               </a>
+               Range object dynamic input size from c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max supported sizes.
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     min
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     opt
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     max
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
              </dd>
             </dl>
-           </dd>
-          </dl>
-         </div>
-         <div class="breathe-sectiondef docutils container">
-          <p class="breathe-sectiondef-title rubric">
-           Public Members
-          </p>
-          <dl class="cpp var">
-           <dt id="_CPPv4N7trtorch11CompileSpec10InputRange3minE">
-            <span class="target" id="structtrtorch_1_1CompileSpec_1_1InputRange_1a7f17d246b04e8bd7b5cdb56d20196a54">
-            </span>
-            std::vector&lt;int64_t&gt;
-            <code class="sig-name descname">
-             min
-            </code>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Minimum acceptable input size into the engine.
+           </div>
+           <div class="breathe-sectiondef docutils container">
+            <p class="breathe-sectiondef-title rubric">
+             Public Members
             </p>
-           </dd>
-          </dl>
-          <dl class="cpp var">
-           <dt id="_CPPv4N7trtorch11CompileSpec10InputRange3optE">
-            <span class="target" id="structtrtorch_1_1CompileSpec_1_1InputRange_1a20561ea4d5a7927fd52f4e702bb38794">
-            </span>
-            std::vector&lt;int64_t&gt;
-            <code class="sig-name descname">
-             opt
-            </code>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Optimal input size into the engine (gets best performace)
-            </p>
-           </dd>
-          </dl>
-          <dl class="cpp var">
-           <dt id="_CPPv4N7trtorch11CompileSpec10InputRange3maxE">
-            <span class="target" id="structtrtorch_1_1CompileSpec_1_1InputRange_1a6d04c16aca1bc125ab099064a28e2997">
-            </span>
-            std::vector&lt;int64_t&gt;
-            <code class="sig-name descname">
-             max
-            </code>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Maximum acceptable input size into the engine.
-            </p>
-           </dd>
-          </dl>
-         </div>
-        </dd>
-       </dl>
+            <dl class="cpp var">
+             <dt id="_CPPv4N7trtorch11CompileSpec10InputRange3minE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1InputRange_1a7f17d246b04e8bd7b5cdb56d20196a54">
+              </span>
+              std::vector&lt;int64_t&gt;
+              <code class="sig-name descname">
+               min
+              </code>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Minimum acceptable input size into the engine.
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp var">
+             <dt id="_CPPv4N7trtorch11CompileSpec10InputRange3optE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1InputRange_1a20561ea4d5a7927fd52f4e702bb38794">
+              </span>
+              std::vector&lt;int64_t&gt;
+              <code class="sig-name descname">
+               opt
+              </code>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Optimal input size into the engine (gets best performace)
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp var">
+             <dt id="_CPPv4N7trtorch11CompileSpec10InputRange3maxE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1_1InputRange_1a6d04c16aca1bc125ab099064a28e2997">
+              </span>
+              std::vector&lt;int64_t&gt;
+              <code class="sig-name descname">
+               max
+              </code>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Maximum acceptable input size into the engine.
+              </p>
+             </dd>
+            </dl>
+           </div>
+          </dd>
+         </dl>
+        </section>
+       </section>
       </article>
      </div>
     </div>
@@ -835,7 +855,7 @@
     <div class="md-footer-meta__inner md-grid">
      <div class="md-footer-copyright">
       <div class="md-footer-copyright__highlight">
-       © Copyright 2020, NVIDIA Corporation.
+       © Copyright 2021, NVIDIA Corporation.
       </div>
       Created using
       <a href="http://www.sphinx-doc.org/">

@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -57,9 +58,14 @@
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
   </script>
+  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+  <script type="text/x-mathjax-config">
+   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
+  </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
-  <link href="conversion.html" rel="next" title="Conversion Phase"/>
+  <link href="partitioning.html" rel="next" title="Partitioning Phase"/>
   <link href="system_overview.html" rel="prev" title="System Overview"/>
  </head>
  <body data-md-color-accent="light-green" data-md-color-primary="light-green" dir="ltr">
@@ -153,6 +159,9 @@
       <div class="dropdown-content md-hero">
        <a href="https://nvidia.github.io/TRTorch/" title="master">
         master
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.4.0/" title="v0.4.0">
+        v0.4.0
        </a>
        <a href="https://nvidia.github.io/TRTorch/v0.3.0/" title="v0.3.0">
         v0.3.0
@@ -281,6 +290,11 @@
           <li class="md-nav__item">
            <a class="md-nav__link" href="../_notebooks/ssd-object-detection-demo.html">
             Object Detection with TRTorch (SSD)
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/vgg-qat.html">
+            Deploying Quantization Aware Trained models in INT8 using TRTorch
            </a>
           </li>
           <li class="md-nav__item">
@@ -422,6 +436,11 @@
                  </a>
                 </li>
                 <li class="md-nav__item">
+                 <a class="md-nav__link" href="#module-fallback">
+                  Module Fallback
+                 </a>
+                </li>
+                <li class="md-nav__item">
                  <a class="md-nav__link" href="#peephole-optimze">
                   Peephole Optimze
                  </a>
@@ -476,93 +495,100 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <span id="lowering">
-       </span>
-       <h1 id="contributors-lowering--page-root">
-        Lowering Phase
-        <a class="headerlink" href="#contributors-lowering--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <p>
-        The lowering phase is made up out of passes which are operations which map a graph from a high level representation
+       <section id="lowering-phase">
+        <span id="lowering">
+        </span>
+        <h1 id="contributors-lowering--page-root">
+         Lowering Phase
+         <a class="headerlink" href="#contributors-lowering--page-root" title="Permalink to this headline">
+          ¶
+         </a>
+        </h1>
+        <p>
+         The lowering phase is made up out of passes which are operations which map a graph from a high level representation
 to a lower level one. Each pass does something specific for instance inlining method calls. The idea is to
 significantly reduce what the conversion phase needs to be able to handle when actually mapping to TensorRT.
 We aim for closer to 1-&gt;1 op conversion vs looking for applicable subgraphs, limiting the number of converters and
 reduce the scope of each converter.
-       </p>
-       <p>
-        You can see the effects of each pass by setting the log level to
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          Level::kGraph
-         </span>
-        </code>
-       </p>
-       <h2 id="passes-used">
-        Passes Used
-        <a class="headerlink" href="#passes-used" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <h3 id="eliminatecommonsubexpression">
-        EliminateCommonSubexpression
-        <a class="headerlink" href="#eliminatecommonsubexpression" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <blockquote>
-        <div>
-         <p>
-          <a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/common_subexpression_elimination.h">
-           torch/csrc/jit/passes/common_subexpression_elimination.h
+        </p>
+        <p>
+         You can see the effects of each pass by setting the log level to
+         <code class="docutils literal notranslate">
+          <span class="pre">
+           Level::kGraph
+          </span>
+         </code>
+        </p>
+        <section id="passes-used">
+         <h2 id="passes-used">
+          Passes Used
+          <a class="headerlink" href="#passes-used" title="Permalink to this headline">
+           ¶
           </a>
-         </p>
-        </div>
-       </blockquote>
-       <p>
-        Removes common subexpressions in the graph
-       </p>
-       <h3 id="eliminate-dead-code">
-        Eliminate Dead Code
-        <a class="headerlink" href="#eliminate-dead-code" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <blockquote>
-        <div>
-         <p>
-          <a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/dead_code_elimination.h">
-           torch/csrc/jit/passes/dead_code_elimination.h
-          </a>
-         </p>
-        </div>
-       </blockquote>
-       <p>
-        Dead code elimination will check if a node has side effects and not delete it if it does.
-       </p>
-       <h3 id="eliminate-exeception-or-pass-pattern">
-        Eliminate Exeception Or Pass Pattern
-        <a class="headerlink" href="#eliminate-exeception-or-pass-pattern" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <blockquote>
-        <div>
-         <p>
-          <a class="reference external" href="https://github.com/nvidia/trtorch/blob/master/core/lowering/passes/exception_elimination.cpp">
-           trtorch/core/lowering/passes/exception_elimination.cpp
-          </a>
-         </p>
-        </div>
-       </blockquote>
-       <p>
-        A common pattern in scripted modules are dimension gaurds which will throw execptions if
+         </h2>
+         <section id="eliminatecommonsubexpression">
+          <h3 id="eliminatecommonsubexpression">
+           EliminateCommonSubexpression
+           <a class="headerlink" href="#eliminatecommonsubexpression" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <blockquote>
+           <div>
+            <p>
+             <a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/common_subexpression_elimination.h">
+              torch/csrc/jit/passes/common_subexpression_elimination.h
+             </a>
+            </p>
+           </div>
+          </blockquote>
+          <p>
+           Removes common subexpressions in the graph
+          </p>
+         </section>
+         <section id="eliminate-dead-code">
+          <h3 id="eliminate-dead-code">
+           Eliminate Dead Code
+           <a class="headerlink" href="#eliminate-dead-code" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <blockquote>
+           <div>
+            <p>
+             <a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/dead_code_elimination.h">
+              torch/csrc/jit/passes/dead_code_elimination.h
+             </a>
+            </p>
+           </div>
+          </blockquote>
+          <p>
+           Dead code elimination will check if a node has side effects and not delete it if it does.
+          </p>
+         </section>
+         <section id="eliminate-exeception-or-pass-pattern">
+          <h3 id="eliminate-exeception-or-pass-pattern">
+           Eliminate Exeception Or Pass Pattern
+           <a class="headerlink" href="#eliminate-exeception-or-pass-pattern" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <blockquote>
+           <div>
+            <p>
+             <a class="reference external" href="https://github.com/nvidia/trtorch/blob/master/core/lowering/passes/exception_elimination.cpp">
+              trtorch/core/lowering/passes/exception_elimination.cpp
+             </a>
+            </p>
+           </div>
+          </blockquote>
+          <p>
+           A common pattern in scripted modules are dimension gaurds which will throw execptions if
 the input dimension is not what was expected.
-       </p>
-       <div class="highlight-none notranslate">
-        <div class="highlight">
-         <pre><span></span>%1013 : bool = aten::ne(%1012, %24) # ~/.local/lib/python3.6/site-packages/torch/nn/modules/batchnorm.py:248:11
+          </p>
+          <div class="highlight-none notranslate">
+           <div class="highlight">
+            <pre><span></span>%1013 : bool = aten::ne(%1012, %24) # ~/.local/lib/python3.6/site-packages/torch/nn/modules/batchnorm.py:248:11
     = prim::If(%1013) # ~/.local/lib/python3.6/site-packages/torch/nn/modules/batchnorm.py:248:8
     block0():
         = prim::RaiseException(%23) # ~/.local/lib/python3.6/site-packages/torch/nn/modules/batchnorm.py:249:12
@@ -570,70 +596,76 @@ the input dimension is not what was expected.
     block1():
     -&gt; ()
 </pre>
-        </div>
-       </div>
-       <p>
-        Since we are resolving all of this at compile time and there are no execptions in the TensorRT graph, we just remove it.
-       </p>
-       <h3 id="eliminate-redundant-gaurds">
-        Eliminate Redundant Gaurds
-        <a class="headerlink" href="#eliminate-redundant-gaurds" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <blockquote>
-        <div>
-         <p>
-          <a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/guard_elimination.h">
-           torch/csrc/jit/passes/guard_elimination.h
-          </a>
-         </p>
-        </div>
-       </blockquote>
-       <p>
-        Eliminate redundant guards for ops whose outputs are fully determined by their inputs i.e. if inputs to such ops are
+           </div>
+          </div>
+          <p>
+           Since we are resolving all of this at compile time and there are no execptions in the TensorRT graph, we just remove it.
+          </p>
+         </section>
+         <section id="eliminate-redundant-gaurds">
+          <h3 id="eliminate-redundant-gaurds">
+           Eliminate Redundant Gaurds
+           <a class="headerlink" href="#eliminate-redundant-gaurds" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <blockquote>
+           <div>
+            <p>
+             <a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/guard_elimination.h">
+              torch/csrc/jit/passes/guard_elimination.h
+             </a>
+            </p>
+           </div>
+          </blockquote>
+          <p>
+           Eliminate redundant guards for ops whose outputs are fully determined by their inputs i.e. if inputs to such ops are
 guarded we are allowed to remove a guard on ops’ outputs
-       </p>
-       <h3 id="freeze-module">
-        Freeze Module
-        <a class="headerlink" href="#freeze-module" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <blockquote>
-        <div>
-         <p>
-          <a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/freeze_module.h">
-           torch/csrc/jit/passes/freeze_module.h
-          </a>
-         </p>
-        </div>
-       </blockquote>
-       <p>
-        Freeze attributes and inline constants and modules. Propogates constants in the graph.
-       </p>
-       <h3 id="fuse-addmm-branches">
-        Fuse AddMM Branches
-        <a class="headerlink" href="#fuse-addmm-branches" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <blockquote>
-        <div>
-         <p>
-          <a class="reference external" href="https://github.com/nvidia/trtorch/blob/master/core/lowering/passes/fuse_addmm_branches.cpp">
-           trtorch/core/lowering/passes/fuse_addmm_branches.cpp
-          </a>
-         </p>
-        </div>
-       </blockquote>
-       <p>
-        A common pattern in scripted modules is tensors of different dimensions use different constructions for implementing linear layers. We fuse these
+          </p>
+         </section>
+         <section id="freeze-module">
+          <h3 id="freeze-module">
+           Freeze Module
+           <a class="headerlink" href="#freeze-module" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <blockquote>
+           <div>
+            <p>
+             <a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/freeze_module.h">
+              torch/csrc/jit/passes/freeze_module.h
+             </a>
+            </p>
+           </div>
+          </blockquote>
+          <p>
+           Freeze attributes and inline constants and modules. Propogates constants in the graph.
+          </p>
+         </section>
+         <section id="fuse-addmm-branches">
+          <h3 id="fuse-addmm-branches">
+           Fuse AddMM Branches
+           <a class="headerlink" href="#fuse-addmm-branches" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <blockquote>
+           <div>
+            <p>
+             <a class="reference external" href="https://github.com/nvidia/trtorch/blob/master/core/lowering/passes/fuse_addmm_branches.cpp">
+              trtorch/core/lowering/passes/fuse_addmm_branches.cpp
+             </a>
+            </p>
+           </div>
+          </blockquote>
+          <p>
+           A common pattern in scripted modules is tensors of different dimensions use different constructions for implementing linear layers. We fuse these
 different varients into a single one that will get caught by the Unpack AddMM pass.
-       </p>
-       <div class="highlight-none notranslate">
-        <div class="highlight">
-         <pre><span></span>%ret : Tensor = prim::If(%622)
+          </p>
+          <div class="highlight-none notranslate">
+           <div class="highlight">
+            <pre><span></span>%ret : Tensor = prim::If(%622)
 block0():
   %ret.1 : Tensor = aten::addmm(%self.fc.bias, %x9.1, %3677, %3, %3)
   -&gt; (%ret.1)
@@ -642,369 +674,443 @@ block1():
   %output0.1 : Tensor = aten::add_(%output.1, %self.fc.bias, %3)
   -&gt; (%output0.1)
 </pre>
-        </div>
-       </div>
-       <p>
-        We fuse this set of blocks into a graph like this:
-       </p>
-       <div class="highlight-none notranslate">
-        <div class="highlight">
-         <pre><span></span>%ret : Tensor = aten::addmm(%self.fc.bias, %x9.1, %3677, %3, %3)
+           </div>
+          </div>
+          <p>
+           We fuse this set of blocks into a graph like this:
+          </p>
+          <div class="highlight-none notranslate">
+           <div class="highlight">
+            <pre><span></span>%ret : Tensor = aten::addmm(%self.fc.bias, %x9.1, %3677, %3, %3)
 </pre>
-        </div>
-       </div>
-       <h3 id="fuse-linear">
-        Fuse Linear
-        <a class="headerlink" href="#fuse-linear" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <blockquote>
-        <div>
-         <p>
-          <a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/fuse_linear.h">
-           torch/csrc/jit/passes/fuse_linear.h
-          </a>
-         </p>
-        </div>
-       </blockquote>
-       <p>
-        Match the
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          aten::linear
-         </span>
-        </code>
-        pattern and fuse it into a single
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          aten::linear
-         </span>
-        </code>
-        This pass fuse the addmm or matmul + add generated by JIT back to linear
-       </p>
-       <h3 id="fuse-flatten-linear">
-        Fuse Flatten Linear
-        <a class="headerlink" href="#fuse-flatten-linear" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <blockquote>
-        <div>
-         <p>
-          <a class="reference external" href="https://github.com/nvidia/trtorch/blob/master/core/lowering/passes/fuse_flatten_linear.cpp">
-           trtorch/core/lowering/passes/fuse_flatten_linear.cpp
-          </a>
-         </p>
-        </div>
-       </blockquote>
-       <p>
-        TensorRT implicity flattens input layers into fully connected layers when they are higher than 1D. So when there is a
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          aten::flatten
-         </span>
-        </code>
-        -&gt;
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          aten::linear
-         </span>
-        </code>
-        pattern we remove the
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          aten::flatten
-         </span>
-        </code>
-        .
-       </p>
-       <h3 id="lower-graph">
-        Lower Graph
-        <a class="headerlink" href="#lower-graph" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <blockquote>
-        <div>
-         <p>
-          <a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/lower_graph.h">
-           torch/csrc/jit/passes/lower_graph.h
-          </a>
-         </p>
-        </div>
-       </blockquote>
-       <p>
-        Given a graph with of a method which first argument is %self, lower it to a graph where
+           </div>
+          </div>
+         </section>
+         <section id="fuse-linear">
+          <h3 id="fuse-linear">
+           Fuse Linear
+           <a class="headerlink" href="#fuse-linear" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <blockquote>
+           <div>
+            <p>
+             <a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/fuse_linear.h">
+              torch/csrc/jit/passes/fuse_linear.h
+             </a>
+            </p>
+           </div>
+          </blockquote>
+          <p>
+           Match the
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             aten::linear
+            </span>
+           </code>
+           pattern and fuse it into a single
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             aten::linear
+            </span>
+           </code>
+           This pass fuse the addmm or matmul + add generated by JIT back to linear
+          </p>
+         </section>
+         <section id="fuse-flatten-linear">
+          <h3 id="fuse-flatten-linear">
+           Fuse Flatten Linear
+           <a class="headerlink" href="#fuse-flatten-linear" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <blockquote>
+           <div>
+            <p>
+             <a class="reference external" href="https://github.com/nvidia/trtorch/blob/master/core/lowering/passes/fuse_flatten_linear.cpp">
+              trtorch/core/lowering/passes/fuse_flatten_linear.cpp
+             </a>
+            </p>
+           </div>
+          </blockquote>
+          <p>
+           TensorRT implicity flattens input layers into fully connected layers when they are higher than 1D. So when there is a
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             aten::flatten
+            </span>
+           </code>
+           -&gt;
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             aten::linear
+            </span>
+           </code>
+           pattern we remove the
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             aten::flatten
+            </span>
+           </code>
+           .
+          </p>
+         </section>
+         <section id="lower-graph">
+          <h3 id="lower-graph">
+           Lower Graph
+           <a class="headerlink" href="#lower-graph" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <blockquote>
+           <div>
+            <p>
+             <a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/lower_graph.h">
+              torch/csrc/jit/passes/lower_graph.h
+             </a>
+            </p>
+           </div>
+          </blockquote>
+          <p>
+           Given a graph with of a method which first argument is %self, lower it to a graph where
 all attributes accesses are replaced with explicit inputs of the graph
 (rather than results of prim::GetAttr executed on %self). Returns a tuple
 (graph, parameters) where the last module.parameters.size() inputs to the
 graph are the trainable parameters used in this method. The remaining inputs
 are the true inputs to the function.
-       </p>
-       <h3 id="lower-tuples">
-        Lower Tuples
-        <a class="headerlink" href="#lower-tuples" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <blockquote>
-        <div>
-         <p>
-          <a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/lower_tuples.h">
-           torch/csrc/jit/passes/lower_tuples.h
-          </a>
-         </p>
-        </div>
-       </blockquote>
-       <ul class="simple">
-        <li>
-         <p>
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            LowerSimpleTuples
-           </span>
-          </code>
-          :
-         </p>
-        </li>
-       </ul>
-       <p>
-        Removes tuples where TupleConstruct and TupleUnpack are matched but leaves tuples in place across if statements, loops, and as inputs/outputs
-       </p>
-       <ul class="simple">
-        <li>
-         <p>
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            LowerAllTuples
-           </span>
-          </code>
-          :
-         </p>
-        </li>
-       </ul>
-       <p>
-        Removes _all_ tuples and raises an error if some cannot be removed, this is used by ONNX to ensure there are not tuples before conversion, but will not work on graphs whose inputs contain tuples.
-       </p>
-       <h3 id="peephole-optimze">
-        Peephole Optimze
-        <a class="headerlink" href="#peephole-optimze" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <blockquote>
-        <div>
-         <p>
-          <a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/ppeephole_optimze.h">
-           torch/csrc/jit/passes/peephole_optimze.h
-          </a>
-         </p>
-        </div>
-       </blockquote>
-       <p>
-        The intent for this optimization pass is to catch all of the small, easy to catch peephole optimizations you might be interested in doing.
-       </p>
-       <dl class="simple">
-        <dt>
-         Right now, it does:
-        </dt>
-        <dd>
-         <ul class="simple">
-          <li>
-           <p>
-            Eliminate no-op ‘expand’ nodes
-           </p>
-          </li>
-          <li>
-           <p>
-            Simply x.t().t() to x
-           </p>
-          </li>
-         </ul>
-        </dd>
-       </dl>
-       <h3 id="remove-contiguous">
-        Remove Contiguous
-        <a class="headerlink" href="#remove-contiguous" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <blockquote>
-        <div>
-         <p>
-          <a class="reference external" href="https://github.com/nvidia/trtorch/blob/master/core/lowering/passes/remove_contiguous.cpp">
-           trtorch/core/lowering/passes/remove_contiguous.cpp
-          </a>
-         </p>
-        </div>
-       </blockquote>
-       <p>
-        Removes contiguous operators since we are doing TensorRT memory is already contiguous.
-       </p>
-       <h3 id="remove-dropout">
-        Remove Dropout
-        <a class="headerlink" href="#remove-dropout" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <blockquote>
-        <div>
-         <p>
-          <a class="reference external" href="https://github.com/nvidia/trtorch/blob/master/core/lowering/passes/remove_dropout.cpp">
-           trtorch/core/lowering/passes/remove_dropout.cpp
-          </a>
-         </p>
-        </div>
-       </blockquote>
-       <p>
-        Removes dropout operators since we are doing inference.
-       </p>
-       <h3 id="remove-to">
-        Remove To
-        <a class="headerlink" href="#remove-to" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <blockquote>
-        <div>
-         <p>
-          <a class="reference external" href="https://github.com/nvidia/trtorch/blob/master/core/lowering/passes/remove_to.cpp">
-           trtorch/core/lowering/passes/remove_to.cpp
-          </a>
-         </p>
-        </div>
-       </blockquote>
-       <p>
-        Removes
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          aten::to
-         </span>
-        </code>
-        operators that do casting, since TensorRT mangages it itself. It is important that this is one of the last passes run so that
+          </p>
+         </section>
+         <section id="lower-tuples">
+          <h3 id="lower-tuples">
+           Lower Tuples
+           <a class="headerlink" href="#lower-tuples" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <blockquote>
+           <div>
+            <p>
+             <a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/lower_tuples.h">
+              torch/csrc/jit/passes/lower_tuples.h
+             </a>
+            </p>
+           </div>
+          </blockquote>
+          <ul class="simple">
+           <li>
+            <p>
+             <code class="docutils literal notranslate">
+              <span class="pre">
+               LowerSimpleTuples
+              </span>
+             </code>
+             :
+            </p>
+           </li>
+          </ul>
+          <p>
+           Removes tuples where TupleConstruct and TupleUnpack are matched but leaves tuples in place across if statements, loops, and as inputs/outputs
+          </p>
+          <ul class="simple">
+           <li>
+            <p>
+             <code class="docutils literal notranslate">
+              <span class="pre">
+               LowerAllTuples
+              </span>
+             </code>
+             :
+            </p>
+           </li>
+          </ul>
+          <p>
+           Removes _all_ tuples and raises an error if some cannot be removed, this is used by ONNX to ensure there are not tuples before conversion, but will not work on graphs whose inputs contain tuples.
+          </p>
+         </section>
+         <section id="module-fallback">
+          <h3 id="module-fallback">
+           Module Fallback
+           <a class="headerlink" href="#module-fallback" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <blockquote>
+           <div>
+            <p>
+             <cite>
+              trtorch/core/lowering/passes/module_fallback.cpp &lt;https://github.com/nvidia/trtorch/blob/master/core/lowering/passes/module_fallback.cpp&gt;
+             </cite>
+            </p>
+           </div>
+          </blockquote>
+          <p>
+           Module fallback consists of two lowering passes that must be run as a pair. The first pass is run before freezing to place delimiters in the graph around modules
+that should run in PyTorch. The second pass marks nodes between these delimiters after freezing to signify they should run in PyTorch.
+          </p>
+          <ul class="simple">
+           <li>
+            <p>
+             <code class="docutils literal notranslate">
+              <span class="pre">
+               NotateModuleForFallback
+              </span>
+             </code>
+            </p>
+           </li>
+          </ul>
+          <p>
+           Places delimiting nodes around module calls pre freezing to signify where in the graph nodes should run in PyTorch
+          </p>
+          <ul class="simple">
+           <li>
+            <p>
+             <code class="docutils literal notranslate">
+              <span class="pre">
+               MarkNodesForFallback
+              </span>
+             </code>
+            </p>
+           </li>
+          </ul>
+          <p>
+           Looks for delimiters then marks all nodes between the delimiters to tell partitioning to run them in PyTorch
+          </p>
+         </section>
+         <section id="peephole-optimze">
+          <h3 id="peephole-optimze">
+           Peephole Optimze
+           <a class="headerlink" href="#peephole-optimze" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <blockquote>
+           <div>
+            <p>
+             <a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/ppeephole_optimze.h">
+              torch/csrc/jit/passes/peephole_optimze.h
+             </a>
+            </p>
+           </div>
+          </blockquote>
+          <p>
+           The intent for this optimization pass is to catch all of the small, easy to catch peephole optimizations you might be interested in doing.
+          </p>
+          <dl class="simple">
+           <dt>
+            Right now, it does:
+           </dt>
+           <dd>
+            <ul class="simple">
+             <li>
+              <p>
+               Eliminate no-op ‘expand’ nodes
+              </p>
+             </li>
+             <li>
+              <p>
+               Simply x.t().t() to x
+              </p>
+             </li>
+            </ul>
+           </dd>
+          </dl>
+         </section>
+         <section id="remove-contiguous">
+          <h3 id="remove-contiguous">
+           Remove Contiguous
+           <a class="headerlink" href="#remove-contiguous" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <blockquote>
+           <div>
+            <p>
+             <a class="reference external" href="https://github.com/nvidia/trtorch/blob/master/core/lowering/passes/remove_contiguous.cpp">
+              trtorch/core/lowering/passes/remove_contiguous.cpp
+             </a>
+            </p>
+           </div>
+          </blockquote>
+          <p>
+           Removes contiguous operators since we are doing TensorRT memory is already contiguous.
+          </p>
+         </section>
+         <section id="remove-dropout">
+          <h3 id="remove-dropout">
+           Remove Dropout
+           <a class="headerlink" href="#remove-dropout" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <blockquote>
+           <div>
+            <p>
+             <a class="reference external" href="https://github.com/nvidia/trtorch/blob/master/core/lowering/passes/remove_dropout.cpp">
+              trtorch/core/lowering/passes/remove_dropout.cpp
+             </a>
+            </p>
+           </div>
+          </blockquote>
+          <p>
+           Removes dropout operators since we are doing inference.
+          </p>
+         </section>
+         <section id="remove-to">
+          <h3 id="remove-to">
+           Remove To
+           <a class="headerlink" href="#remove-to" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <blockquote>
+           <div>
+            <p>
+             <a class="reference external" href="https://github.com/nvidia/trtorch/blob/master/core/lowering/passes/remove_to.cpp">
+              trtorch/core/lowering/passes/remove_to.cpp
+             </a>
+            </p>
+           </div>
+          </blockquote>
+          <p>
+           Removes
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             aten::to
+            </span>
+           </code>
+           operators that do casting, since TensorRT mangages it itself. It is important that this is one of the last passes run so that
 other passes have a change to move required cast operators out of the main namespace.
-       </p>
-       <h3 id="unpack-addmm">
-        Unpack AddMM
-        <a class="headerlink" href="#unpack-addmm" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <blockquote>
-        <div>
-         <p>
-          <a class="reference external" href="https://github.com/nvidia/trtorch/blob/master/core/lowering/passes/unpack_addmm.cpp">
-           trtorch/core/lowering/passes/unpack_addmm.cpp
-          </a>
-         </p>
-        </div>
-       </blockquote>
-       <p>
-        Unpacks
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          aten::addmm
-         </span>
-        </code>
-        into
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          aten::matmul
-         </span>
-        </code>
-        and
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          aten::add_
-         </span>
-        </code>
-        (with an additional
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          trt::const
-         </span>
-        </code>
-        op to freeze the bias in the TensorRT graph). This lets us reuse the
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          aten::matmul
-         </span>
-        </code>
-        and
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          aten::add_
-         </span>
-        </code>
-        converters instead of needing a dedicated converter.
-       </p>
-       <h3 id="unpack-logsoftmax">
-        Unpack LogSoftmax
-        <a class="headerlink" href="#unpack-logsoftmax" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <blockquote>
-        <div>
-         <p>
-          <a class="reference external" href="https://github.com/nvidia/trtorch/blob/master/core/lowering/passes/unpack_log_softmax.cpp">
-           trtorch/core/lowering/passes/unpack_log_softmax.cpp
-          </a>
-         </p>
-        </div>
-       </blockquote>
-       <p>
-        Unpacks
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          aten::logsoftmax
-         </span>
-        </code>
-        into
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          aten::softmax
-         </span>
-        </code>
-        and
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          aten::log
-         </span>
-        </code>
-        . This lets us reuse the
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          aten::softmax
-         </span>
-        </code>
-        and
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          aten::log
-         </span>
-        </code>
-        converters instead of needing a dedicated converter.
-       </p>
-       <h3 id="unroll-loops">
-        Unroll Loops
-        <a class="headerlink" href="#unroll-loops" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <blockquote>
-        <div>
-         <p>
-          <a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/loop_unrolling.h">
-           torch/csrc/jit/passes/loop_unrolling.h
-          </a>
-         </p>
-        </div>
-       </blockquote>
-       <p>
-        Unrolls the operations of compatable loops (e.g. sufficently short) so that you only have to go through the loop once.
-       </p>
+          </p>
+         </section>
+         <section id="unpack-addmm">
+          <h3 id="unpack-addmm">
+           Unpack AddMM
+           <a class="headerlink" href="#unpack-addmm" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <blockquote>
+           <div>
+            <p>
+             <a class="reference external" href="https://github.com/nvidia/trtorch/blob/master/core/lowering/passes/unpack_addmm.cpp">
+              trtorch/core/lowering/passes/unpack_addmm.cpp
+             </a>
+            </p>
+           </div>
+          </blockquote>
+          <p>
+           Unpacks
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             aten::addmm
+            </span>
+           </code>
+           into
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             aten::matmul
+            </span>
+           </code>
+           and
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             aten::add_
+            </span>
+           </code>
+           (with an additional
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             trt::const
+            </span>
+           </code>
+           op to freeze the bias in the TensorRT graph). This lets us reuse the
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             aten::matmul
+            </span>
+           </code>
+           and
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             aten::add_
+            </span>
+           </code>
+           converters instead of needing a dedicated converter.
+          </p>
+         </section>
+         <section id="unpack-logsoftmax">
+          <h3 id="unpack-logsoftmax">
+           Unpack LogSoftmax
+           <a class="headerlink" href="#unpack-logsoftmax" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <blockquote>
+           <div>
+            <p>
+             <a class="reference external" href="https://github.com/nvidia/trtorch/blob/master/core/lowering/passes/unpack_log_softmax.cpp">
+              trtorch/core/lowering/passes/unpack_log_softmax.cpp
+             </a>
+            </p>
+           </div>
+          </blockquote>
+          <p>
+           Unpacks
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             aten::logsoftmax
+            </span>
+           </code>
+           into
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             aten::softmax
+            </span>
+           </code>
+           and
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             aten::log
+            </span>
+           </code>
+           . This lets us reuse the
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             aten::softmax
+            </span>
+           </code>
+           and
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             aten::log
+            </span>
+           </code>
+           converters instead of needing a dedicated converter.
+          </p>
+         </section>
+         <section id="unroll-loops">
+          <h3 id="unroll-loops">
+           Unroll Loops
+           <a class="headerlink" href="#unroll-loops" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <blockquote>
+           <div>
+            <p>
+             <a class="reference external" href="https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/passes/loop_unrolling.h">
+              torch/csrc/jit/passes/loop_unrolling.h
+             </a>
+            </p>
+           </div>
+          </blockquote>
+          <p>
+           Unrolls the operations of compatable loops (e.g. sufficently short) so that you only have to go through the loop once.
+          </p>
+         </section>
+        </section>
+       </section>
       </article>
      </div>
     </div>
@@ -1027,13 +1133,13 @@ other passes have a change to move required cast operators out of the main names
        </span>
       </div>
      </a>
-     <a class="md-flex md-footer-nav__link md-footer-nav__link--next" href="conversion.html" rel="next" title="Conversion Phase">
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--next" href="partitioning.html" rel="next" title="Partitioning Phase">
       <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
        <span class="md-flex__ellipsis">
         <span class="md-footer-nav__direction">
          Next
         </span>
-        Conversion Phase
+        Partitioning Phase
        </span>
       </div>
       <div class="md-flex__cell md-flex__cell--shrink">
@@ -1047,7 +1153,7 @@ other passes have a change to move required cast operators out of the main names
     <div class="md-footer-meta__inner md-grid">
      <div class="md-footer-copyright">
       <div class="md-footer-copyright__highlight">
-       © Copyright 2020, NVIDIA Corporation.
+       © Copyright 2021, NVIDIA Corporation.
       </div>
       Created using
       <a href="http://www.sphinx-doc.org/">

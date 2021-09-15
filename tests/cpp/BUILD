@@ -16,6 +16,8 @@ test_suite(
         ":test_modules_as_engines",
         ":test_multiple_registered_engines",
         ":test_serialization",
+        ":test_module_fallback",
+        ":test_example_tensors"
     ],
 )
 
@@ -27,12 +29,25 @@ test_suite(
         ":test_modules_as_engines",
         ":test_multiple_registered_engines",
         ":test_serialization",
+        ":test_module_fallback",
+        ":test_example_tensors"
     ],
 )
 
 cc_test(
     name = "test_default_input_types",
     srcs = ["test_default_input_types.cpp"],
+    data = [
+        "//tests/modules:jit_models",
+    ],
+    deps = [
+        ":cpp_api_test",
+    ],
+)
+
+cc_test(
+    name = "test_example_tensors",
+    srcs = ["test_example_tensors.cpp"],
     data = [
         "//tests/modules:jit_models",
     ],
@@ -59,7 +74,7 @@ cc_test(
         "//tests/modules:jit_models",
     ],
     deps = [
-        "//cpp/api:trtorch",
+        "//cpp:trtorch",
         "//tests/util",
         "@googletest//:gtest_main",
     ] + select({
@@ -77,6 +92,23 @@ cc_test(
     deps = [
         ":cpp_api_test",
     ],
+    timeout="long"
+)
+
+cc_test(
+    name = "test_module_fallback",
+    srcs = ["test_module_fallback.cpp"],
+    data = [
+        "//tests/modules:jit_models",
+    ],
+    deps = [
+        "//cpp:trtorch",
+        "//tests/util",
+        "@googletest//:gtest_main",
+    ] + select({
+        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
+        "//conditions:default": ["@libtorch//:libtorch"],
+    })
 )
 
 cc_test(
@@ -94,10 +126,10 @@ cc_test(
     name = "test_multi_gpu_serdes",
     srcs = ["test_multi_gpu_serdes.cpp"],
     data = [
-        ":jit_models",
+        "//tests/modules:jit_models",
     ],
     deps = [
-        ":module_test",
+        ":cpp_api_test",
     ],
 )
 
@@ -105,7 +137,7 @@ cc_library(
     name = "cpp_api_test",
     hdrs = ["cpp_api_test.h"],
     deps = [
-        "//cpp/api:trtorch",
+        "//cpp:trtorch",
         "//tests/util",
         "@googletest//:gtest_main",
     ] + select({

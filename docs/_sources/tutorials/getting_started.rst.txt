@@ -207,7 +207,7 @@ to load in a deployment application. In order to load a TensorRT/TorchScript mod
         "inputs": [trtorch.Input(
                 min_shape=[1, 1, 16, 16],
                 opt_shape=[1, 1, 32, 32],
-                max_shape=[1, 1, 64, 64]
+                max_shape=[1, 1, 64, 64],
                 dtype=torch.half,
             ),
         ],

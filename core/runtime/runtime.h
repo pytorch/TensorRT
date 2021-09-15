@@ -1,5 +1,6 @@
 #pragma once
 #include <map>
+#include <memory>
 #include <utility>
 #include "ATen/core/function_schema.h"
 #include "NvInfer.h"
@@ -11,7 +12,7 @@ namespace core {
 namespace runtime {
 
 using EngineID = int64_t;
-const std::string ABI_VERSION = "2";
+const std::string ABI_VERSION = "3";
 
 struct CudaDevice {
   int64_t id; // CUDA device id
@@ -23,6 +24,7 @@ struct CudaDevice {
   CudaDevice();
   CudaDevice(int64_t gpu_id, nvinfer1::DeviceType device_type);
   CudaDevice(std::string serialized_device_info);
+  CudaDevice& operator=(const CudaDevice& other);
   std::string serialize();
   std::string getSMCapability() const;
   friend std::ostream& operator<<(std::ostream& os, const CudaDevice& device);
@@ -32,24 +34,25 @@ void set_cuda_device(CudaDevice& cuda_device);
 // Gets the current active GPU (DLA will not show up through this)
 CudaDevice get_current_device();
 
+c10::optional<CudaDevice> get_most_compatible_device(const CudaDevice& target_device);
+std::vector<CudaDevice> find_compatible_devices(const CudaDevice& target_device);
+
 std::string serialize_device(CudaDevice& cuda_device);
 CudaDevice deserialize_device(std::string device_info);
 
 struct TRTEngine : torch::CustomClassHolder {
   // Each engine needs it's own runtime object
-  nvinfer1::IRuntime* rt;
-  nvinfer1::ICudaEngine* cuda_engine;
-  nvinfer1::IExecutionContext* exec_ctx;
+  std::shared_ptr<nvinfer1::IRuntime> rt;
+  std::shared_ptr<nvinfer1::ICudaEngine> cuda_engine;
+  std::shared_ptr<nvinfer1::IExecutionContext> exec_ctx;
   std::pair<uint64_t, uint64_t> num_io;
-  EngineID id;
   std::string name;
   CudaDevice device_info;
-  util::logging::TRTorchLogger logger;
 
   std::unordered_map<uint64_t, uint64_t> in_binding_map;
   std::unordered_map<uint64_t, uint64_t> out_binding_map;
 
-  ~TRTEngine();
+  ~TRTEngine() = default;
   TRTEngine(std::string serialized_engine, CudaDevice cuda_device);
   TRTEngine(std::vector<std::string> serialized_info);
   TRTEngine(std::string mod_name, std::string serialized_engine, CudaDevice cuda_device);
