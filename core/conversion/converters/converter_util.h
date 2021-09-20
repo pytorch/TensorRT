@@ -41,6 +41,10 @@ nvinfer1::ILayer* add_elementwise(
     nvinfer1::ITensor* other,
     const std::string& name);
 
+void create_typed_layer(
+    ConversionCtx* ctx,
+    nvinfer1::ILayer* layer);
+
 // If an ITensor is of a type not dtype, add an Identity layer to cast it to dtype
 nvinfer1::ITensor* castITensor(ConversionCtx* ctx, nvinfer1::ITensor* tensor, nvinfer1::DataType dtype);
 

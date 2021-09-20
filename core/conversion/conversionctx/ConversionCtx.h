@@ -11,6 +11,7 @@
 #include <cuda_runtime.h>
 #include "core/util/prelude.h"
 
+
 namespace trtorch {
 namespace core {
 namespace conversion {
@@ -71,6 +72,10 @@ struct ConversionCtx {
 
   std::unordered_map<const torch::jit::Value*, nvinfer1::ITensor*> value_tensor_map;
   std::unordered_map<const torch::jit::Value*, torch::jit::IValue> evaluated_value_map;
+  // Internal flag to enable explicit layer precision
+  bool set_layer_precision = false;
+  nvinfer1::DataType next_precision = nvinfer1::DataType::kFLOAT;
+  std::tuple<double, double> layer_output_dr;
 };
 
 } // namespace conversion

@@ -69,6 +69,7 @@ cc_library(
         "impl/matrix_multiply.cpp",
         "impl/normalize.cpp",
         "impl/pooling.cpp",
+        "impl/precision_handler.cpp",
         "impl/quantization.cpp",
         "impl/reduce.cpp",
         "impl/replication_pad.cpp",

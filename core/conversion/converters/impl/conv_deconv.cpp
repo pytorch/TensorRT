@@ -47,7 +47,6 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
   } else {
     bias = Weights();
   }
-
   // Handle case when weights of conv/deconv is an ITensor. This case happens for QAT networks where
   // conv_weights -> Quantize -> Dequantize -> new_conv_weights -> conv <- input
   // new_conv_weights will be an ITensor because it is an output of Dequantize layer defined in impl/quantization.cpp
@@ -73,6 +72,7 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
     if (transposed) {
       nvinfer1::IDeconvolutionLayer* deconvLayer =
           ctx->net->addDeconvolutionNd(*in, kernel_dims.d[0], filter_dim, kernel_weights, bias.data);
+      create_typed_layer(ctx, deconvLayer);
       deconvLayer->setStrideNd(stride);
       deconvLayer->setDilationNd(dilation);
       deconvLayer->setNbGroups(groups);
@@ -84,6 +84,7 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
     } else {
       nvinfer1::IConvolutionLayer* convLayer =
           ctx->net->addConvolutionNd(*in, kernel_dims.d[0], filter_dim, kernel_weights, bias.data);
+      create_typed_layer(ctx, convLayer);
       convLayer->setStrideNd(stride);
       convLayer->setPaddingMode(nvinfer1::PaddingMode::kCAFFE_ROUND_DOWN);
       convLayer->setPaddingNd(padding);
@@ -134,6 +135,7 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
   if (transposed) {
     // shape of deconvolution's weight: [in, out/groups, ...]
     auto deconv = ctx->net->addDeconvolutionNd(*in, w.shape.d[1] * groups, w.kernel_shape, w.data, bias.data);
+    create_typed_layer(ctx, deconv);
     TRTORCH_CHECK(deconv, "Unable to create deconvolution layer from node: " << *n);
 
     deconv->setStrideNd(stride);
@@ -152,7 +154,7 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
     // shape of convolution's weight: [out, in/groups, ...]
     auto conv = ctx->net->addConvolutionNd(*in, w.shape.d[0], w.kernel_shape, w.data, bias.data);
     TRTORCH_CHECK(conv, "Unable to create convolution layer from node: " << *n);
-
+    create_typed_layer(ctx, conv);
     conv->setStrideNd(stride);
     conv->setPaddingMode(nvinfer1::PaddingMode::kCAFFE_ROUND_DOWN);
     conv->setPaddingNd(padding);

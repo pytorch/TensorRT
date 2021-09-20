@@ -25,7 +25,7 @@ bool GlobalPoolingConverter(
       /*keepDimensions=*/true);
 
   new_layer->setName(util::node_info(n).c_str());
-
+  create_typed_layer(ctx, new_layer);
   auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
 
   LOG_DEBUG("GlobalPoolingConverter: Output tensor shape: " << out_tensor->getDimensions());
@@ -174,6 +174,8 @@ bool PoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& args,
     bool count_inlcude_pad = args[5].unwrapToBool();
 
     new_layer = ctx->net->addPoolingNd(*in, pool_type, kernel_size);
+    create_typed_layer(ctx, new_layer);
+    
     TRTORCH_CHECK(new_layer, "Unable to create Avg Pooling layer from node: " << *n);
     new_layer->setAverageCountExcludesPadding(!count_inlcude_pad);
   } else {

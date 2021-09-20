@@ -117,8 +117,26 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   return outputs;
 }
 
+torch::Tensor start_setting_precision(torch::Tensor input, c10::ScalarType precision){
+  return input;
+}
+
+torch::Tensor start_setting_precision_with_dr(torch::Tensor input, c10::ScalarType precision, double input_min, double input_max, double output_min, double output_max){
+  return input;
+}
+
+torch::Tensor stop_setting_precision(torch::Tensor input){
+  return input;
+}
+
 TORCH_LIBRARY(tensorrt, m) {
   m.def("execute_engine", execute_engine);
+}
+
+TORCH_LIBRARY(trtorch, m) {
+  m.def("start_setting_precision", start_setting_precision);
+  m.def("start_setting_precision_with_dr", start_setting_precision_with_dr);
+  m.def("stop_setting_precision", stop_setting_precision);
 }
 
 } // namespace runtime

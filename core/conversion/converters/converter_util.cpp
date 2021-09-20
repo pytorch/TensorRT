@@ -121,6 +121,16 @@ nvinfer1::ILayer* add_elementwise(
   return ele;
 }
 
+void create_typed_layer(ConversionCtx* ctx, nvinfer1::ILayer* layer){
+  if(ctx->set_layer_precision){
+    LOG_DEBUG("Setting " << layer->getName()  << " precision to " << ctx->next_precision);
+    layer->setPrecision(ctx->next_precision);
+    if (ctx->next_precision == nvinfer1::DataType::kINT8){
+      layer->getOutput(0)->setDynamicRange(std::get<0>(ctx->layer_output_dr), std::get<1>(ctx->layer_output_dr));
+    }
+  }
+}
+
 nvinfer1::ITensor* castITensor(ConversionCtx* ctx, nvinfer1::ITensor* tensor, nvinfer1::DataType dtype) {
   if (tensor->getType() != dtype) {
     std::ostringstream tensor_id;
