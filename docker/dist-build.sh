@@ -19,5 +19,3 @@ pip3 install timm
 # test install
 mkdir -p /opt/trtorch && tar xvf dist/libtrtorch.tar.gz --strip-components 2 -C /opt/trtorch --exclude=LICENSE && pip3 install dist/*.whl
 
-cd tests/modules && python3 ./hub.py
-cd ../..
