@@ -24,9 +24,6 @@ RUN cp ./docker/WORKSPACE.cu.docker  WORKSPACE
 # This script builds both libtrtorch bin/lib/include tarball and the Pythin wheel, in dist/  
 RUN ./docker/dist-build.sh
 
-# This currently does not work with BUILDKIT=1
-# RUN ./docker/dist-test.sh
-
 FROM base as trtorch
 
 # copy source repo
