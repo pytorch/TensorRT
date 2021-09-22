@@ -1,4 +1,4 @@
-ARG BASE=21.07
+ARG BASE=21.08
 FROM nvcr.io/nvidia/pytorch:${BASE}-py3 as base
 
 FROM base as trtorch-builder-base
