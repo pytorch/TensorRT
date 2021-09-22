@@ -26,8 +26,9 @@ auto constant_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
               ctx->set_layer_precision = true;
               ctx->next_precision = trt_dtype;
               ctx->settings.strict_types = true;
-              ctx->AssociateValueAndTensor(n->outputs()[0], in);
-
+              // We are directly setting the input tensor to value_tensor_map as ctx->AssociateValueAndTensor also modifies the name of the tensor which
+              // lead to input_0 name not found in engine bindings.
+              ctx->value_tensor_map[n->outputs()[0]] = in;
               return true;
             }})
   .pattern({"trtorch::start_setting_precision_with_dr(Tensor _0, int _1, float _2, float _3, float _4, float _5) -> (Tensor _0)",
@@ -36,6 +37,7 @@ auto constant_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
               // a layer precision (indicated by integer argument) for the following layers in the network until it sees
               // trtorch::stop_setting_precision op.
               auto in = args[0].ITensorOrFreeze(ctx);
+
               int64_t dtype = args[1].unwrapToInt();
               auto input_min = static_cast<float>(args[2].unwrapToDouble());
               auto input_max = static_cast<float>(args[3].unwrapToDouble());
@@ -54,7 +56,9 @@ auto constant_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
               ctx->set_layer_precision = true;
               ctx->next_precision = trt_dtype;
               ctx->settings.strict_types = true;
-              ctx->AssociateValueAndTensor(n->outputs()[0], in);
+              // We are directly setting the input tensor to value_tensor_map as ctx->AssociateValueAndTensor also modifies the name of the tensor which
+              // lead to input_0 name not found in engine bindings.
+              ctx->value_tensor_map[n->outputs()[0]] = in;
 
               return true;
             }})
@@ -66,7 +70,10 @@ auto constant_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
               auto in = args[0].ITensorOrFreeze(ctx);
               ctx->next_precision = nvinfer1::DataType::kFLOAT;
               ctx->set_layer_precision = false;
-              ctx->AssociateValueAndTensor(n->outputs()[0], in);
+              // We are directly setting the input tensor to value_tensor_map as ctx->AssociateValueAndTensor also modifies the name of the tensor which
+              // lead to input_0 name not found in engine bindings.
+              ctx->value_tensor_map[n->outputs()[0]] = in;
+
               return true;
             }});
 // clang-format on

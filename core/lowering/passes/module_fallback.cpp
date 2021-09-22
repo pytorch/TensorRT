@@ -106,7 +106,7 @@ void MarkNodesForFallback(std::shared_ptr<torch::jit::Graph>& g, bool delete_del
     }
   }
 
-  LOG_DEBUG("After marking operations for torch fallback: " << *g);
+  LOG_GRAPH("After marking operations for torch fallback: " << *g);
 }
 
 } // namespace passes
