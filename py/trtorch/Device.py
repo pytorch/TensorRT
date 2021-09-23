@@ -1,7 +1,7 @@
 import torch
 
 from trtorch import _types
-import logging
+import trtorch.logging
 import trtorch._C
 
 import warnings
@@ -54,11 +54,11 @@ class Device(object):
                 else:
                     self.dla_core = id
                     self.gpu_id = 0
-                    logging.log(logging.log.Level.Warning,
-                                "Setting GPU id to 0 for device because device 0 manages DLA on Xavier")
+                    trtorch.logging.log(trtorch.logging.Level.Warning,
+                                        "Setting GPU id to 0 for device because device 0 manages DLA on Xavier")
 
         elif len(args) == 0:
-            if not "gpu_id" in kwargs or not "dla_core" in kwargs:
+            if "gpu_id" in kwargs or "dla_core" in kwargs:
                 if "dla_core" in kwargs:
                     self.device_type = _types.DeviceType.DLA
                     self.dla_core = kwargs["dla_core"]
@@ -66,11 +66,15 @@ class Device(object):
                         self.gpu_id = kwargs["gpu_id"]
                     else:
                         self.gpu_id = 0
-                        logging.log(logging.log.Level.Warning,
-                                    "Setting GPU id to 0 for device because device 0 manages DLA on Xavier")
+                        trtorch.logging.log(trtorch.logging.Level.Warning,
+                                            "Setting GPU id to 0 for device because device 0 manages DLA on Xavier")
                 else:
                     self.gpu_id = kwargs["gpu_id"]
-                    self.device_type == _types.DeviceType.GPU
+                    self.device_type = _types.DeviceType.GPU
+            else:
+                raise ValueError(
+                    "Either gpu_id or dla_core or both must be defined if no string with device specs is provided as an arg"
+                )
 
         else:
             raise ValueError(
@@ -80,6 +84,7 @@ class Device(object):
         if "allow_gpu_fallback" in kwargs:
             if not isinstance(kwargs["allow_gpu_fallback"], bool):
                 raise TypeError("allow_gpu_fallback must be a bool")
+            self.allow_gpu_fallback = kwargs["allow_gpu_fallback"]
 
     def __str__(self) -> str:
         return "Device(type={}, gpu_id={}".format(self.device_type, self.gpu_id) \
