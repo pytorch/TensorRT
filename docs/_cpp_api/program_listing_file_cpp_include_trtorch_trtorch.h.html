@@ -619,24 +619,6 @@
     <span class="kt">bool</span> <span class="n">explicit_set_dtype</span><span class="p">;</span>
   <span class="p">};</span>
 
-  <span class="k">struct</span> <span class="nc">TRTORCH_API</span> <span class="n">InputRange</span> <span class="p">{</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">min</span><span class="p">;</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">opt</span><span class="p">;</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">max</span><span class="p">;</span>
-    <span class="p">[[</span><span class="n">deprecated</span><span class="p">(</span><span class="s">"trtorch::CompileSpec::InputRange is being deprecated in favor of trtorch::CompileSpec::Input. trtorch::CompileSpec::InputRange will be removed in TRTorch v0.5.0"</span><span class="p">)]]</span> <span class="n">InputRange</span><span class="p">(</span>
-        <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">opt</span><span class="p">);</span>
-    <span class="p">[[</span><span class="n">deprecated</span><span class="p">(</span><span class="s">"trtorch::CompileSpec::InputRange is being deprecated in favor of trtorch::CompileSpec::Input. trtorch::CompileSpec::InputRange will be removed in TRTorch v0.5.0"</span><span class="p">)]]</span> <span class="n">InputRange</span><span class="p">(</span>
-        <span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">opt</span><span class="p">);</span>
-    <span class="p">[[</span><span class="n">deprecated</span><span class="p">(</span><span class="s">"trtorch::CompileSpec::InputRange is being deprecated in favor of trtorch::CompileSpec::Input. trtorch::CompileSpec::InputRange will be removed in TRTorch v0.5.0"</span><span class="p">)]]</span> <span class="n">InputRange</span><span class="p">(</span>
-        <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">min</span><span class="p">,</span>
-        <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">opt</span><span class="p">,</span>
-        <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">max</span><span class="p">);</span>
-    <span class="p">[[</span><span class="n">deprecated</span><span class="p">(</span><span class="s">"trtorch::CompileSpec::InputRange is being deprecated in favor of trtorch::CompileSpec::Input. trtorch::CompileSpec::InputRange will be removed in TRTorch v0.5.0"</span><span class="p">)]]</span> <span class="n">InputRange</span><span class="p">(</span>
-        <span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">min</span><span class="p">,</span>
-        <span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">opt</span><span class="p">,</span>
-        <span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span> <span class="n">max</span><span class="p">);</span>
-  <span class="p">};</span>
-
   <span class="k">struct</span> <span class="nc">TRTORCH_API</span> <span class="n">TorchFallback</span> <span class="p">{</span>
     <span class="kt">bool</span> <span class="n">enabled</span> <span class="o">=</span> <span class="nb">false</span><span class="p">;</span>
 
@@ -653,9 +635,6 @@
     <span class="n">TorchFallback</span><span class="p">(</span><span class="kt">bool</span> <span class="n">enabled</span><span class="p">,</span> <span class="kt">uint64_t</span> <span class="n">min_size</span><span class="p">)</span> <span class="o">:</span> <span class="n">enabled</span><span class="p">(</span><span class="n">enabled</span><span class="p">),</span> <span class="n">min_block_size</span><span class="p">(</span><span class="n">min_size</span><span class="p">)</span> <span class="p">{}</span>
   <span class="p">};</span>
 
-  <span class="p">[[</span><span class="n">deprecated</span><span class="p">(</span><span class="s">"trtorch::CompileSpec::CompileSpec(std::vector&lt;InputRange&gt; input_ranges) is being deprecated in favor of trtorch::CompileSpec::CompileSpec(std::vector&lt;Input&gt; inputs). Please use CompileSpec(std::vector&lt;Input&gt; inputs). trtorch::CompileSpec::CompileSpec(std::vector&lt;InputRange&gt; input_ranges) will be removed in TRTorch v0.5.0"</span><span class="p">)]]</span> <span class="n">CompileSpec</span><span class="p">(</span>
-      <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">InputRange</span><span class="o">&gt;</span> <span class="n">input_ranges</span><span class="p">)</span>
-      <span class="o">:</span> <span class="n">input_ranges</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">input_ranges</span><span class="p">))</span> <span class="p">{}</span>
   <span class="n">CompileSpec</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;&gt;</span> <span class="n">fixed_sizes</span><span class="p">);</span>
 
   <span class="n">CompileSpec</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;&gt;</span> <span class="n">fixed_sizes</span><span class="p">);</span>
@@ -665,15 +644,6 @@
   <span class="c1">// Defaults should reflect TensorRT defaults for BuilderConfig</span>
 
   <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Input</span><span class="o">&gt;</span> <span class="n">inputs</span><span class="p">;</span>
-
-  <span class="p">[[</span><span class="n">deprecated</span><span class="p">(</span>
-      <span class="s">"trtorch::CompileSpec::input_ranges is being deprecated in favor of trtorch::CompileSpec::inputs. trtorch::CompileSpec::input_ranges will be removed in TRTorch v0.5.0"</span><span class="p">)]]</span> <span class="n">std</span><span class="o">::</span>
-      <span class="n">vector</span><span class="o">&lt;</span><span class="n">InputRange</span><span class="o">&gt;</span>
-          <span class="n">input_ranges</span><span class="p">;</span>
-
-  <span class="p">[[</span><span class="n">deprecated</span><span class="p">(</span>
-      <span class="s">"trtorch::CompileSpec::op_precision is being deprecated in favor of trtorch::CompileSpec::enabled_precisions, a set of all enabled precisions to use during compilation, trtorch::CompileSpec::op_precision will be removed in TRTorch v0.5.0"</span><span class="p">)]]</span> <span class="n">DataType</span>
-      <span class="n">op_precision</span> <span class="o">=</span> <span class="n">DataType</span><span class="o">::</span><span class="n">kFloat</span><span class="p">;</span>
 
   <span class="n">std</span><span class="o">::</span><span class="n">set</span><span class="o">&lt;</span><span class="n">DataType</span><span class="o">&gt;</span> <span class="n">enabled_precisions</span> <span class="o">=</span> <span class="p">{</span><span class="n">DataType</span><span class="o">::</span><span class="n">kFloat</span><span class="p">};</span>
 

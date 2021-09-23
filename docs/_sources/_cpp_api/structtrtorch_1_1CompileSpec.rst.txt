@@ -17,7 +17,6 @@ Nested Types
 - :ref:`exhale_struct_structtrtorch_1_1CompileSpec_1_1Device`
 - :ref:`exhale_class_classtrtorch_1_1CompileSpec_1_1Device_1_1DeviceType`
 - :ref:`exhale_struct_structtrtorch_1_1CompileSpec_1_1Input`
-- :ref:`exhale_struct_structtrtorch_1_1CompileSpec_1_1InputRange`
 - :ref:`exhale_class_classtrtorch_1_1CompileSpec_1_1TensorFormat`
 - :ref:`exhale_struct_structtrtorch_1_1CompileSpec_1_1TorchFallback`
 

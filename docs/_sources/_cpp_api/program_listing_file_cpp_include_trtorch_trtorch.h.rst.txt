@@ -226,24 +226,6 @@ Program Listing for File trtorch.h
        bool explicit_set_dtype;
      };
    
-     struct TRTORCH_API InputRange {
-       std::vector<int64_t> min;
-       std::vector<int64_t> opt;
-       std::vector<int64_t> max;
-       [[deprecated("trtorch::CompileSpec::InputRange is being deprecated in favor of trtorch::CompileSpec::Input. trtorch::CompileSpec::InputRange will be removed in TRTorch v0.5.0")]] InputRange(
-           std::vector<int64_t> opt);
-       [[deprecated("trtorch::CompileSpec::InputRange is being deprecated in favor of trtorch::CompileSpec::Input. trtorch::CompileSpec::InputRange will be removed in TRTorch v0.5.0")]] InputRange(
-           c10::ArrayRef<int64_t> opt);
-       [[deprecated("trtorch::CompileSpec::InputRange is being deprecated in favor of trtorch::CompileSpec::Input. trtorch::CompileSpec::InputRange will be removed in TRTorch v0.5.0")]] InputRange(
-           std::vector<int64_t> min,
-           std::vector<int64_t> opt,
-           std::vector<int64_t> max);
-       [[deprecated("trtorch::CompileSpec::InputRange is being deprecated in favor of trtorch::CompileSpec::Input. trtorch::CompileSpec::InputRange will be removed in TRTorch v0.5.0")]] InputRange(
-           c10::ArrayRef<int64_t> min,
-           c10::ArrayRef<int64_t> opt,
-           c10::ArrayRef<int64_t> max);
-     };
-   
      struct TRTORCH_API TorchFallback {
        bool enabled = false;
    
@@ -260,9 +242,6 @@ Program Listing for File trtorch.h
        TorchFallback(bool enabled, uint64_t min_size) : enabled(enabled), min_block_size(min_size) {}
      };
    
-     [[deprecated("trtorch::CompileSpec::CompileSpec(std::vector<InputRange> input_ranges) is being deprecated in favor of trtorch::CompileSpec::CompileSpec(std::vector<Input> inputs). Please use CompileSpec(std::vector<Input> inputs). trtorch::CompileSpec::CompileSpec(std::vector<InputRange> input_ranges) will be removed in TRTorch v0.5.0")]] CompileSpec(
-         std::vector<InputRange> input_ranges)
-         : input_ranges(std::move(input_ranges)) {}
      CompileSpec(std::vector<std::vector<int64_t>> fixed_sizes);
    
      CompileSpec(std::vector<c10::ArrayRef<int64_t>> fixed_sizes);
@@ -272,15 +251,6 @@ Program Listing for File trtorch.h
      // Defaults should reflect TensorRT defaults for BuilderConfig
    
      std::vector<Input> inputs;
-   
-     [[deprecated(
-         "trtorch::CompileSpec::input_ranges is being deprecated in favor of trtorch::CompileSpec::inputs. trtorch::CompileSpec::input_ranges will be removed in TRTorch v0.5.0")]] std::
-         vector<InputRange>
-             input_ranges;
-   
-     [[deprecated(
-         "trtorch::CompileSpec::op_precision is being deprecated in favor of trtorch::CompileSpec::enabled_precisions, a set of all enabled precisions to use during compilation, trtorch::CompileSpec::op_precision will be removed in TRTorch v0.5.0")]] DataType
-         op_precision = DataType::kFloat;
    
      std::set<DataType> enabled_precisions = {DataType::kFloat};
    
