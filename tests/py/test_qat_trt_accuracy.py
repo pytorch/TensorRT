@@ -55,7 +55,7 @@ class TestAccuracy(ModelTestCase):
 
         compile_spec = {
             "inputs": [trtorch.Input([16, 3, 32, 32])],
-            "op_precision": torch.int8,
+            "enabled_precisions": {torch.int8},
             # "enabled_precision": {torch.float32, torch.int8},
         }
 
