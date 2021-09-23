@@ -135,6 +135,26 @@ auto aten_registrations TRTORCH_UNUSED =
                       auto out_tensor = torch::zeros(args.at(n->input(0)).unwrapToIntList().vec(), options);
                       return out_tensor;
                     }})
+        .evaluator({c10::Symbol::fromQualString("aten::zeros_like"),
+                    // aten::zeros_like(Tensor self, *, int? dtype=None, int? layout=None, Device? device=None,
+                    // bool? pin_memory=None, int? memory_format=None) -> (Tensor)
+                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+                      auto options = torch::TensorOptions().layout(torch::kStrided).device(torch::kCUDA);
+
+                      // Input 1 here is the dtype
+                      if (!args.at(n->input(1)).isNone() && !args.at(n->input(1)).IValue()->isNone()) {
+                        options = options.dtype(c10::ScalarType(args.at(n->input(1)).unwrapToInt()));
+                      }
+
+                      if (args.at(n->input(0)).isITensor()){
+                        auto input_size = util::toVec(args.at(n->input(0)).ITensor()->getDimensions());
+                        auto out_tensor = torch::zeros(input_size, options);
+                        return out_tensor;
+                      } else{
+                        auto out_tensor = torch::zeros(args.at(n->input(0)).unwrapToTensor().sizes(), options);
+                        return out_tensor;
+                      }
+                    }})
         .evaluator({c10::Symbol::fromQualString("aten::ones"),
                     // aten::ones(int[] size, *, int? dtype=None, int? layout=None,
                     // Device? device=None, bool? pin_memory=None) -> (Tensor)

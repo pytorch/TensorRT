@@ -52,8 +52,10 @@ auto cumsum_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().patt
        auto zeroTensor = tensor_to_const(ctx, zeroValue);
        auto runningSum = loop->addRecurrence(*zeroTensor);
        auto runningSumTensor = runningSum->getOutput(0);
-
-       auto curSum = ctx->net->addElementWise(*data, *runningSumTensor, nvinfer1::ElementWiseOperation::kSUM);
+       LOG_DEBUG("====CUMSUM runningSumTensor: " << runningSumTensor->getType());
+       LOG_DEBUG("====CUMSUM data: " << data->getType());
+       auto casted_data = castITensor(ctx, data, nvinfer1::DataType::kFLOAT);
+       auto curSum = ctx->net->addElementWise(*casted_data, *runningSumTensor, nvinfer1::ElementWiseOperation::kSUM);
        runningSum->setInput(1, *curSum->getOutput(0));
 
        nvinfer1::ILoopOutputLayer* loopOut =

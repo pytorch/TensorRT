@@ -326,6 +326,22 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     LOG_DEBUG("Output tensor shape: " << out->getDimensions());
                     return true;
                   }})
+        .pattern({"aten::div.Tensor_mode(Tensor self, Tensor other, *, str? rounding_mode) -> (Tensor)",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    // Should implement self / other
+                    auto self = args[0].ITensorOrFreeze(ctx);
+                    auto other = args[1].ITensorOrFreeze(ctx);
+                    auto div =
+                        add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, util::node_info(n));
+
+                    TRTORCH_CHECK(div, "Unable to create div layer from node: " << *n);
+
+                    div->setName(util::node_info(n).c_str());
+                    auto out = ctx->AssociateValueAndTensor(n->outputs()[0], div->getOutput(0));
+
+                    LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+                    return true;
+                  }})
         .pattern({"aten::div.Scalar(Tensor self, Scalar other) -> (Tensor)",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                     auto self = args[0].ITensorOrFreeze(ctx);
