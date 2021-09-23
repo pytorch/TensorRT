@@ -38,6 +38,13 @@ nvinfer1::DataType toTRTDataType(DataType value) {
   }
 }
 
+Device::Device(const core::runtime::CudaDevice& internal_dev) {
+  device_type = DeviceType::kGPU;
+  gpu_id = internal_dev.id;
+  dla_core = -1;
+  allow_gpu_fallback = false;
+}
+
 nvinfer1::TensorFormat toTRTTensorFormat(TensorFormat value) {
   switch (value) {
     case TensorFormat::kChannelLast:

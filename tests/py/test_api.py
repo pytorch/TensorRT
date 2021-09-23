@@ -23,21 +23,12 @@ class TestCompile(ModelTestCase):
             "enabled_precisions": {torch.float}
         }
 
-        trt_mod = trtorch.compile(self.traced_model, compile_spec)
+        trt_mod = trtorch.compile(self.traced_model, **compile_spec)
         same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
         self.assertTrue(same < 2e-2)
 
     def test_compile_script(self):
-        compile_spec = {
-            "inputs": [trtorch.Input(shape=self.input.shape)],
-            "device": {
-                "device_type": trtorch.DeviceType.GPU,
-                "gpu_id": 0,
-            },
-            "enabled_precisions": {torch.float}
-        }
-
-        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
+        trt_mod = trtorch.compile(self.scripted_model, inputs=[self.input], device=trtorch.Device(gpu_id=0), enabled_precisions={torch.float})
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
         self.assertTrue(same < 2e-2)
 
@@ -51,16 +42,33 @@ class TestCompile(ModelTestCase):
             "enabled_precisions": {torch.float}
         }
 
-        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
+        trt_mod = trtorch.compile(self.scripted_model, **compile_spec)
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
         self.assertTrue(same < 2e-2)
 
     def test_device(self):
         compile_spec = {"inputs": [self.input], "device": trtorch.Device("gpu:0"), "enabled_precisions": {torch.float}}
 
-        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
+        trt_mod = trtorch.compile(self.scripted_model, **compile_spec)
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
         self.assertTrue(same < 2e-2)
+
+
+    def test_compile_script_from_dict(self):
+        compile_spec = {
+            "inputs": [trtorch.Input(shape=self.input.shape)],
+            "device": {
+                "device_type": trtorch.DeviceType.GPU,
+                "gpu_id": 0,
+            },
+            "enabled_precisions": {torch.float}
+        }
+
+        trt_mod = trtorch.compile(self.traced_model, **compile_spec)
+        same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
+        self.assertTrue(same < 2e-2)
+
+
 
 
 class TestCompileHalf(ModelTestCase):
@@ -80,7 +88,7 @@ class TestCompileHalf(ModelTestCase):
             "enabled_precisions": {torch.half}
         }
 
-        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
+        trt_mod = trtorch.compile(self.scripted_model, **compile_spec)
         same = (trt_mod(self.input.half()) - self.scripted_model(self.input.half())).abs().max()
         trtorch.logging.log(trtorch.logging.Level.Debug, "Max diff: " + str(same))
         self.assertTrue(same < 3e-2)
@@ -103,7 +111,7 @@ class TestCompileHalfDefault(ModelTestCase):
             "enabled_precisions": {torch.float, torch.half}
         }
 
-        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
+        trt_mod = trtorch.compile(self.scripted_model, **compile_spec)
         same = (trt_mod(self.input.half()) - self.scripted_model(self.input.half())).abs().max()
         trtorch.logging.log(trtorch.logging.Level.Debug, "Max diff: " + str(same))
         self.assertTrue(same < 3e-2)
@@ -132,7 +140,7 @@ class TestFallbackToTorch(ModelTestCase):
             }
         }
 
-        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
+        trt_mod = trtorch.compile(self.scripted_model, **compile_spec)
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
         self.assertTrue(same < 2e-3)
 
@@ -160,7 +168,7 @@ class TestModuleFallbackToTorch(ModelTestCase):
             }
         }
 
-        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
+        trt_mod = trtorch.compile(self.scripted_model, **compile_spec)
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
         self.assertTrue(same < 2e-3)
 
@@ -183,7 +191,7 @@ class TestPTtoTRTtoPT(ModelTestCase):
             }
         }
 
-        trt_engine = trtorch.convert_method_to_trt_engine(self.ts_model, "forward", compile_spec)
+        trt_engine = trtorch.convert_method_to_trt_engine(self.ts_model, "forward", **compile_spec)
         trt_mod = trtorch.embed_engine_in_new_module(trt_engine, trtorch.Device("cuda:0"))
         same = (trt_mod(self.input) - self.ts_model(self.input)).abs().max()
         self.assertTrue(same < 2e-3)

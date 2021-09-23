@@ -64,7 +64,7 @@ def _parse_op_precision(precision: Any) -> _types.dtype:
             raise TypeError("Provided an unsupported dtype as operating precision (support: int8, half, float), got: " +
                             str(precision))
 
-    elif isinstance(precision, _types.DataTypes):
+    elif isinstance(precision, _types.dtype):
         return precision
 
     else:
@@ -169,6 +169,8 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
 
         inputs = [trtorch.Input._from_tensor(i) if isinstance(i, torch.Tensor) else i for i in compile_spec["inputs"]]
         info.inputs = [i._to_internal() for i in inputs]
+
+    assert (len(info.inputs) > 0), "Require at least one input definition to compile model"
 
     if "op_precision" in compile_spec and "enabled_precisions" in compile_spec:
         raise KeyError(
