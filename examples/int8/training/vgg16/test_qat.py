@@ -81,7 +81,7 @@ print("[JIT] Test Loss: {:.5f} Test Acc: {:.2f}%".format(test_loss, 100 * test_a
 import trtorch
 # trtorch.logging.set_reportable_log_level(trtorch.logging.Level.Debug)
 compile_settings = {
-"input_shapes": [[1, 3, 32, 32]],
+"inputs": [trtorch.Input([1, 3, 32, 32])],
 "op_precision": torch.int8 # Run with FP16
 }
 new_mod = torch.jit.load('trained_vgg16_qat.jit.pt')

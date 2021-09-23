@@ -157,21 +157,10 @@ def _parse_torch_fallback(fallback_info: Dict[str, Any]) -> trtorch._C.TorchFall
 
 def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
     info = trtorch._C.CompileSpec()
-    if "input_shapes" not in compile_spec and "inputs" not in compile_spec:
+    if "inputs" not in compile_spec:
         raise KeyError(
             "Module input definitions are requried to compile module. Provide a list of trtorch.Input keyed to \"inputs\" in the compile spec"
         )
-
-    if "input_shapes" in compile_spec and "inputs" in compile_spec:
-        raise KeyError(
-            "Found both key \"input_shapes\", and \"inputs\" in compile spec, please port forward to using only \"inputs\""
-        )
-
-    if "input_shapes" in compile_spec:
-        warnings.warn(
-            "Key \"input_shapes\" is deprecated in favor of \"inputs\". Support for \"input_shapes\" will be removed in TRTorch v0.5.0",
-            DeprecationWarning)
-        info.inputs = _parse_input_ranges(compile_spec["input_shapes"])
 
     if "inputs" in compile_spec:
         if not all([isinstance(i, torch.Tensor) or isinstance(i, trtorch.Input) for i in compile_spec["inputs"]]):
@@ -185,12 +174,6 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
         raise KeyError(
             "Found both key \"op_precision\", and \"enabled_precisions\" in compile spec, please port forward to using only \"enabled_precisions\""
         )
-
-    if "op_precision" in compile_spec:
-        warnings.warn(
-            "Key \"op_precision\" is being deprecated in favor of \"enabled_precision\" which expects a set of precisions to be enabled during compilation (FP32 will always be enabled), Support for \"op_precision\" will be removed in TRTorch v0.5.0",
-            DeprecationWarning)
-        info.enabled_precisions = _parse_enabled_precisions(compile_spec["op_precision"])
 
     if "enabled_precisions" in compile_spec:
         info.enabled_precisions = _parse_enabled_precisions(compile_spec["enabled_precisions"])

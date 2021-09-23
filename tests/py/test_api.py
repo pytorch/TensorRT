@@ -13,38 +13,6 @@ class TestCompile(ModelTestCase):
         self.traced_model = torch.jit.trace(self.model, [self.input])
         self.scripted_model = torch.jit.script(self.model)
 
-    def test_compile_traced_deprecated(self):
-        compile_spec = {
-            "input_shapes": [self.input.shape],
-            "device": {
-                "device_type": trtorch.DeviceType.GPU,
-                "gpu_id": 0,
-                "dla_core": 0,
-                "allow_gpu_fallback": False,
-                "disable_tf32": False
-            }
-        }
-
-        trt_mod = trtorch.compile(self.traced_model, compile_spec)
-        same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
-        self.assertTrue(same < 2e-3)
-
-    def test_compile_script_deprecated(self):
-        compile_spec = {
-            "input_shapes": [self.input.shape],
-            "device": {
-                "device_type": trtorch.DeviceType.GPU,
-                "gpu_id": 0,
-                "dla_core": 0,
-                "allow_gpu_fallback": False,
-                "disable_tf32": False
-            }
-        }
-
-        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
-        same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
-        self.assertTrue(same < 2e-3)
-
     def test_compile_traced(self):
         compile_spec = {
             "inputs": [trtorch.Input(self.input.shape, dtype=torch.float, format=torch.contiguous_format)],
