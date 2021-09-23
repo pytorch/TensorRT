@@ -95,6 +95,11 @@ auto prim_registrations =
                             tensor_holder.hold_tensor(args.at(in).ITensor());
                             auto ival = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
                             list.emplace_back(std::move(ival));
+                          } else if (args.at(in).isIValue() && args.at(in).IValue()->isCustomClass()){
+                            auto tensor_holder = TensorContainer();
+                            tensor_holder.hold_tensor(args.at(in).IValue()->toCustomClass<TensorContainer>().get()->tensor());
+                            auto ival = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
+                            list.emplace_back(std::move(ival));
                           } else {
                             list.emplace_back(std::move(args.at(in).unwrapToTensor()));
                           }

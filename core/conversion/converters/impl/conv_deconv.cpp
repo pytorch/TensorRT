@@ -12,7 +12,7 @@ namespace {
 
 bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) {
   // Input to conv/deconv
-  auto in = args[0].ITensor();
+  auto in = args[0].ITensorOrFreeze(ctx);
 
   // Conv /deconv parameters
   auto stride = util::toDims(args[3].unwrapToIntList());
