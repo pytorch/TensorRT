@@ -206,6 +206,10 @@ docker run -it -v$(pwd)/..:/workspace/TRTorch build_trtorch_wheel /bin/bash /wor
 ```
 Python compilation expects using the tarball based compilation strategy from above.
 
+## Building Docker Image
+`Dockerfile` in `//docker` directory builds an image, based on latest NGC PyTorch container, with TRTorch binaries/libraries/headers installed in /opt/trtorch, and Python wheel installed locally.
+To specify different NGC PyTorch container release as the base, use `--build-arg BASE=21.06` for 21.06 etc.
+
 ## How do I add support for a new op...
 
 ### In TRTorch?

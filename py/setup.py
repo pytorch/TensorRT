@@ -203,7 +203,7 @@ ext_modules = [
             'trtorch/csrc/tensorrt_classes.cpp',
             'trtorch/csrc/register_tensorrt_classes.cpp',
         ],
-        library_dirs=[(dir_path + '/trtorch/lib/'), "/opt/conda/lib/python3.6/config-3.6m-x86_64-linux-gnu"],
+        library_dirs=[(dir_path + '/trtorch/lib/')],
         libraries=["trtorch"],
         include_dirs=[
             dir_path + "trtorch/csrc",
@@ -234,7 +234,7 @@ setup(name='trtorch',
       long_description=long_description,
       ext_modules=ext_modules,
       install_requires=[
-          'torch>=1.9.0+cu111,<1.10.0',
+          'torch>=1.9.0+cu111,<1.11.0',
       ],
       setup_requires=[],
       cmdclass={
