@@ -219,6 +219,53 @@ class TestLoggingAPIs(unittest.TestCase):
         self.assertTrue(color)
 
 
+class TestDevice(unittest.TestCase):
+
+    def test_from_string_constructor(self):
+        device = trtorch.Device("cuda:0")
+        self.assertEqual(device.device_type, trtorch.DeviceType.GPU)
+        self.assertEqual(device.gpu_id, 0)
+
+        device = trtorch.Device("gpu:1")
+        self.assertEqual(device.device_type, trtorch.DeviceType.GPU)
+        self.assertEqual(device.gpu_id, 1)
+
+    def test_from_string_constructor_dla(self):
+        device = trtorch.Device("dla:0")
+        self.assertEqual(device.device_type, trtorch.DeviceType.DLA)
+        self.assertEqual(device.gpu_id, 0)
+        self.assertEqual(device.dla_core, 0)
+
+        device = trtorch.Device("dla:1", allow_gpu_fallback=True)
+        self.assertEqual(device.device_type, trtorch.DeviceType.DLA)
+        self.assertEqual(device.gpu_id, 0)
+        self.assertEqual(device.dla_core, 1)
+        self.assertEqual(device.allow_gpu_fallback, True)
+
+    def test_kwargs_gpu(self):
+        device = trtorch.Device(gpu_id=0)
+        self.assertEqual(device.device_type, trtorch.DeviceType.GPU)
+        self.assertEqual(device.gpu_id, 0)
+
+    def test_kwargs_dla_and_settings(self):
+        device = trtorch.Device(dla_core=1, allow_gpu_fallback=False)
+        self.assertEqual(device.device_type, trtorch.DeviceType.DLA)
+        self.assertEqual(device.gpu_id, 0)
+        self.assertEqual(device.dla_core, 1)
+        self.assertEqual(device.allow_gpu_fallback, False)
+
+        device = trtorch.Device(gpu_id=1, dla_core=0, allow_gpu_fallback=True)
+        self.assertEqual(device.device_type, trtorch.DeviceType.DLA)
+        self.assertEqual(device.gpu_id, 1)
+        self.assertEqual(device.dla_core, 0)
+        self.assertEqual(device.allow_gpu_fallback, True)
+
+    def test_from_torch(self):
+        device = trtorch.Device._from_torch_device(torch.device("cuda:0"))
+        self.assertEqual(device.device_type, trtorch.DeviceType.GPU)
+        self.assertEqual(device.gpu_id, 0)
+
+
 def test_suite():
     suite = unittest.TestSuite()
     suite.addTest(unittest.makeSuite(TestLoggingAPIs))
@@ -231,6 +278,7 @@ def test_suite():
     suite.addTest(
         TestModuleFallbackToTorch.parametrize(TestModuleFallbackToTorch, model=models.resnet18(pretrained=True)))
     suite.addTest(unittest.makeSuite(TestCheckMethodOpSupport))
+    suite.addTest(unittest.makeSuite(TestDevice))
 
     return suite
 
