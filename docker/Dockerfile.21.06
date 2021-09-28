@@ -15,14 +15,13 @@ RUN pip install notebook
 
 FROM builder as trtorch
 
-COPY . /opt/trtorch
-RUN rm /opt/trtorch/WORKSPACE
-COPY ./docker/WORKSPACE.cu.docker  /opt/trtorch/WORKSPACE
+COPY . /opt/trtorch/src
+WORKDIR /opt/trtorch/src
+RUN cp ./docker/WORKSPACE.cu.docker  WORKSPACE
 
-WORKDIR /opt/trtorch
-RUN bazel build //:libtrtorch --compilation_mode opt
+RUN bazel build //:libtrtorch //:bin --compilation_mode opt
 
-WORKDIR /opt/trtorch/py
+WORKDIR /opt/trtorch/src/py
 
 RUN pip install ipywidgets --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host=files.pythonhosted.org
 RUN jupyter nbextension enable --py widgetsnbextension
@@ -32,11 +31,15 @@ RUN apt-get update && apt-get install -y locales ninja-build && rm -rf /var/lib/
 ENV LANG en_US.UTF-8
 ENV LANGUAGE en_US:en
 ENV LC_ALL en_US.UTF-8
-RUN python3 setup.py install --use-cxx11-abi
+RUN MAX_JOBS=1 python3 setup.py install --use-cxx11-abi
 
 RUN conda init bash
 
-ENV LD_LIBRARY_PATH /opt/conda/lib/python3.8/site-packages/torch/lib:$LD_LIBRARY_PATH
+WORKDIR /opt/trtorch/src
+
+RUN cd ./bazel-bin && tar xvf libtrtorch.tar.gz -C /usr/local --strip-components 2 --exclude=LICENSE
+
+ENV LD_LIBRARY_PATH /opt/conda/lib/python3.8/site-packages/torch/lib:${LD_LIBRARY_PATH}
 
 WORKDIR /opt/trtorch/
 CMD /bin/bash
