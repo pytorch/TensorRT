@@ -23,7 +23,7 @@ The main goal is to use TRTorch runtime library `libtrtorchrt.so`, a lightweight
 cd examples/trtorchrt_example/deps
 // Download latest TRTorch release tar file (libtrtorch.tar.gz) from https://github.com/NVIDIA/TRTorch/releases
 tar -xvzf libtrtorch.tar.gz
-unzip libtorch-cxx11-abi-shared-with-deps-1.9.0+cu111.zip
+unzip libtorch-cxx11-abi-shared-with-deps-[PYTORCH_VERSION].zip
 ```
 
 > If cuDNN and TensorRT are not installed on your system / in your LD_LIBRARY_PATH then do the following as well
