@@ -1,4 +1,5 @@
 ARG BASE=21.08
+ARG DOCKER_VERSION=4.0.0
 FROM nvcr.io/nvidia/pytorch:${BASE}-py3 as base
 
 FROM base as trtorch-builder-base
@@ -7,8 +8,8 @@ RUN apt-get update && apt-get install -y curl gnupg
 RUN curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor > /etc/apt/trusted.gpg.d/bazel.gpg
 RUN echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" | tee /etc/apt/sources.list.d/bazel.list
 
-RUN apt-get update && apt-get install -y bazel-4.0.0
-RUN ln -s /usr/bin/bazel-4.0.0 /usr/bin/bazel
+RUN apt-get update && apt-get install -y bazel-${DOCKER_VERSION}
+RUN ln -s /usr/bin/bazel-${DOCKER_VERSION} /usr/bin/bazel
 
 # Workaround for bazel expecting both static and shared versions, we only use shared libraries inside container
 RUN cp /usr/lib/x86_64-linux-gnu/libnvinfer.so /usr/lib/x86_64-linux-gnu/libnvinfer_static.a
