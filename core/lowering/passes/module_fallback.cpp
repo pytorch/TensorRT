@@ -39,7 +39,7 @@ void NotateModuleForFallback(
     if (n->kind() == torch::jit::prim::GetAttr) {
       auto out_type = unmangle_cls_name(c10::toString(n->output(0)->type()));
       if (forced_fallback_modules.find(out_type) != forced_fallback_modules.end()) {
-        LOG_DEBUG(
+        LOG_GRAPH(
             "Notating module for fallback: " << n->s(c10::attr::name) << " (" << out_type << ") [owner: " << mod_name
                                              << " (" << cls_name << ")]");
         auto uses = n->output(0)->uses();
@@ -58,7 +58,7 @@ void NotateModuleForFallback(
   }
 
   if (changed_mod) {
-    LOG_DEBUG("Notated graph: " << *g);
+    LOG_GRAPH("Notated graph: " << *g);
   }
 
   for (const auto sub_mod : mod.named_children()) {
@@ -106,7 +106,7 @@ void MarkNodesForFallback(std::shared_ptr<torch::jit::Graph>& g, bool delete_del
     }
   }
 
-  LOG_DEBUG("After marking operations for torch fallback: " << *g);
+  LOG_GRAPH("After marking operations for torch fallback: " << *g);
 }
 
 } // namespace passes

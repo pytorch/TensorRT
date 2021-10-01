@@ -347,15 +347,19 @@ std::vector<SegmentedBlock> Partition(
     const PartitionInfo& partition_info) {
   LOG_DEBUG(partition_info);
   // segment lowering global graph into blocks
+  LOG_DEBUG("Partitioning graph into PyTorch and TensorRT segmented blocks");
   std::vector<SegmentedBlock> segmented_blocks = segment_graph(block, partition_info);
 
   // resolve nonTensor inputs/outputs
+  LOG_DEBUG("Resolving non-tensor type inputs/outputs (eg: int/float types)");
   resolveNonTensorInputs(segmented_blocks);
 
   // register input/output torch::jit::Value for segmented graphs
+  LOG_DEBUG("Registering input/outputs for segmented blocks");
   registerSegmentsOutputs(segmented_blocks, block);
 
   // run shape analysis on each segmented block
+  LOG_DEBUG("Running shape analysis for all the segmented blocks");
   runShapeAnalysis(segmented_blocks, input_ivalues_map);
 
   return segmented_blocks;
