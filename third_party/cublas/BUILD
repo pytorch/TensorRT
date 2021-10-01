@@ -16,7 +16,6 @@ config_setting(
     constraint_values = [
         "@platforms//cpu:aarch64",
         "@platforms//os:linux",
-        "@//toolchains/jetpack:4.6"
     ]
 )
 

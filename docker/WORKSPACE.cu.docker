@@ -1,4 +1,4 @@
-workspace(name = "TRTorch")
+oworkspace(name = "TRTorch")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
@@ -36,6 +36,11 @@ new_local_repository(
     build_file = "@//third_party/cuda:BUILD",
 )
 
+new_local_repository(
+    name = "cublas",
+    build_file = "@//third_party/cublas:BUILD",
+    path = "/usr",
+)
 
 ####################################################################################
 # Locally installed dependencies (use in cases of custom dependencies or aarch64)
