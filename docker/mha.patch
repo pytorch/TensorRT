@@ -1,8 +1,6 @@
-diff --git a/torch/nn/functional.py b/torch/nn/functional.py
-index 762990ee93..99bef847c9 100644
---- a/torch/nn/functional.py
-+++ b/torch/nn/functional.py
-@@ -4975,7 +4975,7 @@ def multi_head_attention_forward(
+--- torch/nn/functional.py	2021-10-01 16:53:42.827338664 -0700
++++ functional.py	2021-10-01 16:53:34.639338618 -0700
+@@ -4975,7 +4975,7 @@
          f"was expecting embedding dimension of {embed_dim_to_check}, but got {embed_dim}"
      if isinstance(embed_dim, torch.Tensor):
          # embed_dim can be a tensor when JIT tracing
@@ -11,7 +9,7 @@ index 762990ee93..99bef847c9 100644
      else:
          head_dim = embed_dim // num_heads
      assert head_dim * num_heads == embed_dim, f"embed_dim {embed_dim} not divisible by num_heads {num_heads}"
-@@ -5044,6 +5044,7 @@ def multi_head_attention_forward(
+@@ -5044,6 +5044,7 @@
      #
      # reshape q, k, v for multihead attention and make em batch first
      #
