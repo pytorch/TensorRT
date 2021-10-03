@@ -17,5 +17,5 @@ jupyter nbextension enable --py widgetsnbextension
 pip3 install timm
 
 # test install
-mkdir -p /opt/trtorch && tar xvf dist/libtrtorch.tar.gz --strip-components 2 -C /opt/trtorch --exclude=LICENSE && uninstall -y trtorch && pip3 install dist/*.whl
+mkdir -p /opt/trtorch && tar xvf dist/libtrtorch.tar.gz --strip-components 2 -C /opt/trtorch --exclude=LICENSE && pip3 uninstall -y trtorch && pip3 install dist/*.whl
 

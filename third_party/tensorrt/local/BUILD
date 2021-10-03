@@ -89,7 +89,6 @@ cc_library(
         "@cuda//:cudart",
         "@cudnn",
     ] + select({
-        ":aarch64_linux": ["@cublas//:cublas"],
         ":windows": ["@cuda//:cublas"],
         "//conditions:default": ["@cuda//:cublas"],
     }),
@@ -309,7 +308,6 @@ cc_library(
         "@cuda//:cudart",
         "@cudnn",
     ] + select({
-        ":aarch64_linux": ["@cublas//:cublas"],
         ":windows": ["@cuda//:cublas"],
         "//conditions:default": ["@cuda//:cublas"],
     }),
