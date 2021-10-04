@@ -56,7 +56,7 @@ void getSegmentsOutputByRunning(
   for (auto& input : seg_block.raw_inputs()) {
     TRTORCH_CHECK(
         ivalues_maps.count(input),
-        "Could not find torch::jit::Value* " << input->debugName() << " in lowering graph for mini graph input.\n");
+        "Could not find torch::jit::Value* " << input->debugName() << " produced from " << util::node_info(input->node()) << " in lowering graph for mini graph input.\n");
     if (input->node()->kind() == torch::jit::prim::Param) {
       jit_inputs_ivalues.push_back(ivalues_maps[input]);
     } else if (input->type()->isSubtypeOf(torch::jit::TensorType::get())) {
@@ -108,10 +108,8 @@ void runShapeAnalysis(
     std::unordered_map<torch::jit::Value*, torch::jit::IValue>& ivalues_maps) {
   // register every segment's input shape, and it's running output IValues
   for (auto& seg_block : segmented_blocks) {
-    LOG_DEBUG("Segmented graph: " << *seg_block.g());
     torch::jit::ConstantPooling(seg_block.g());
     getSegmentsOutputByRunning(seg_block, ivalues_maps);
-    LOG_DEBUG("=================");
   }
   return;
 }
