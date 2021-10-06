@@ -1,0 +1,1796 @@
+<!DOCTYPE html>
+<html>
+ <head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="width=device-width,initial-scale=1" name="viewport"/>
+  <meta content="ie=edge" http-equiv="x-ua-compatible"/>
+  <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
+  <meta content="Copied to clipboard" name="lang:clipboard.copied"/>
+  <meta content="en" name="lang:search.language"/>
+  <meta content="True" name="lang:search.pipeline.stopwords"/>
+  <meta content="True" name="lang:search.pipeline.trimmer"/>
+  <meta content="No matching documents" name="lang:search.result.none"/>
+  <meta content="1 matching document" name="lang:search.result.one"/>
+  <meta content="# matching documents" name="lang:search.result.other"/>
+  <meta content="[\s\-]+" name="lang:search.tokenizer"/>
+  <link crossorigin="" href="https://fonts.gstatic.com/" rel="preconnect"/>
+  <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,500,700|Roboto:300,400,400i,700&amp;display=fallback" rel="stylesheet"/>
+  <style>
+   body,
+      input {
+        font-family: "Roboto", "Helvetica Neue", Helvetica, Arial, sans-serif
+      }
+
+      code,
+      kbd,
+      pre {
+        font-family: "Roboto Mono", "Courier New", Courier, monospace
+      }
+  </style>
+  <link href="../_static/stylesheets/application.css" rel="stylesheet"/>
+  <link href="../_static/stylesheets/application-palette.css" rel="stylesheet"/>
+  <link href="../_static/stylesheets/application-fixes.css" rel="stylesheet"/>
+  <link href="../_static/fonts/material-icons.css" rel="stylesheet"/>
+  <meta content="84bd00" name="theme-color"/>
+  <script src="../_static/javascripts/modernizr.js">
+  </script>
+  <title>
+   Object Detection with TRTorch (SSD) — TRTorch v0.4.1 documentation
+  </title>
+  <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
+  <link href="../_static/pygments.css" rel="stylesheet" type="text/css"/>
+  <link href="../_static/collapsible-lists/css/tree_view.css" rel="stylesheet" type="text/css"/>
+  <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js">
+  </script>
+  <script src="../_static/jquery.js">
+  </script>
+  <script src="../_static/underscore.js">
+  </script>
+  <script src="../_static/doctools.js">
+  </script>
+  <script src="../_static/language_data.js">
+  </script>
+  <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js">
+  </script>
+  <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
+  </script>
+  <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
+  </script>
+  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
+  </script>
+  <script type="text/x-mathjax-config">
+   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
+  </script>
+  <link href="../genindex.html" rel="index" title="Index"/>
+  <link href="../search.html" rel="search" title="Search"/>
+  <link href="../py_api/trtorch.html" rel="next" title="trtorch"/>
+  <link href="lenet-getting-started.html" rel="prev" title="TRTorch Getting Started - LeNet"/>
+ </head>
+ <body data-md-color-accent="light-green" data-md-color-primary="light-green" dir="ltr">
+  <svg class="md-svg">
+   <defs data-children-count="0">
+    <svg height="448" id="__github" viewbox="0 0 416 448" width="416" xmlns="http://www.w3.org/2000/svg">
+     <path d="M160 304q0 10-3.125 20.5t-10.75 19T128 352t-18.125-8.5-10.75-19T96 304t3.125-20.5 10.75-19T128 256t18.125 8.5 10.75 19T160 304zm160 0q0 10-3.125 20.5t-10.75 19T288 352t-18.125-8.5-10.75-19T256 304t3.125-20.5 10.75-19T288 256t18.125 8.5 10.75 19T320 304zm40 0q0-30-17.25-51T296 232q-10.25 0-48.75 5.25Q229.5 240 208 240t-39.25-2.75Q130.75 232 120 232q-29.5 0-46.75 21T56 304q0 22 8 38.375t20.25 25.75 30.5 15 35 7.375 37.25 1.75h42q20.5 0 37.25-1.75t35-7.375 30.5-15 20.25-25.75T360 304zm56-44q0 51.75-15.25 82.75-9.5 19.25-26.375 33.25t-35.25 21.5-42.5 11.875-42.875 5.5T212 416q-19.5 0-35.5-.75t-36.875-3.125-38.125-7.5-34.25-12.875T37 371.5t-21.5-28.75Q0 312 0 260q0-59.25 34-99-6.75-20.5-6.75-42.5 0-29 12.75-54.5 27 0 47.5 9.875t47.25 30.875Q171.5 96 212 96q37 0 70 8 26.25-20.5 46.75-30.25T376 64q12.75 25.5 12.75 54.5 0 21.75-6.75 42 34 40 34 99.5z" fill="currentColor">
+     </path>
+    </svg>
+   </defs>
+  </svg>
+  <input class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
+  <input class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
+  <label class="md-overlay" data-md-component="overlay" for="__drawer">
+  </label>
+  <a class="md-skip" href="#_notebooks/ssd-object-detection-demo" tabindex="1">
+   Skip to content
+  </a>
+  <header class="md-header" data-md-component="header">
+   <nav class="md-header-nav md-grid">
+    <div class="md-flex navheader">
+     <div class="md-flex__cell md-flex__cell--shrink">
+      <a class="md-header-nav__button md-logo" href="../index.html" title="TRTorch v0.4.1 documentation">
+       <i class="md-icon">
+        
+       </i>
+      </a>
+     </div>
+     <div class="md-flex__cell md-flex__cell--shrink">
+      <label class="md-icon md-icon--menu md-header-nav__button" for="__drawer">
+      </label>
+     </div>
+     <div class="md-flex__cell md-flex__cell--stretch">
+      <div class="md-flex__ellipsis md-header-nav__title" data-md-component="title">
+       <span class="md-header-nav__topic">
+        TRTorch
+       </span>
+       <span class="md-header-nav__topic">
+        Object Detection with TRTorch (SSD)
+       </span>
+      </div>
+     </div>
+     <div class="md-flex__cell md-flex__cell--shrink">
+      <label class="md-icon md-icon--search md-header-nav__button" for="__search">
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+       <label class="md-search__overlay" for="__search">
+       </label>
+       <div class="md-search__inner" role="search">
+        <form action="../search.html" class="md-search__form" method="GET" name="search">
+         <input autocapitalize="off" autocomplete="off" class="md-search__input" data-md-component="query" data-md-state="active" name="q" placeholder="Search" spellcheck="false" type="text"/>
+         <label class="md-icon md-search__icon" for="__search">
+         </label>
+         <button class="md-icon md-search__icon" data-md-component="reset" tabindex="-1" type="reset">
+          
+         </button>
+        </form>
+        <div class="md-search__output">
+         <div class="md-search__scrollwrap" data-md-scrollfix="">
+          <div class="md-search-result" data-md-component="result">
+           <div class="md-search-result__meta">
+            Type to start searching
+           </div>
+           <ol class="md-search-result__list">
+           </ol>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+     </div>
+     <div class="md-flex__cell md-flex__cell--shrink">
+      <div class="md-header-nav__source">
+       <a class="md-source" data-md-source="github" href="https://github.com/nvidia/TRTorch/" title="Go to repository">
+        <div class="md-source__icon">
+         <svg height="28" viewbox="0 0 24 24" width="28" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+          <use height="24" width="24" xlink:href="#__github">
+          </use>
+         </svg>
+        </div>
+        <div class="md-source__repository">
+         TRTorch
+        </div>
+       </a>
+      </div>
+     </div>
+     <div class="md-flex__cell md-flex__cell--shrink dropdown">
+      <button class="dropdownbutton">
+       Versions
+      </button>
+      <div class="dropdown-content md-hero">
+       <a href="https://nvidia.github.io/TRTorch/" title="master">
+        master
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.4.1/" title="v0.4.1">
+        v0.4.1
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.4.0/" title="v0.4.0">
+        v0.4.0
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.3.0/" title="v0.3.0">
+        v0.3.0
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.2.0/" title="v0.2.0">
+        v0.2.0
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.1.0/" title="v0.1.0">
+        v0.1.0
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.0.3/" title="v0.0.3">
+        v0.0.3
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.0.2/" title="v0.0.2">
+        v0.0.2
+       </a>
+       <a href="https://nvidia.github.io/TRTorch/v0.0.1/" title="v0.0.1">
+        v0.0.1
+       </a>
+      </div>
+     </div>
+    </div>
+   </nav>
+  </header>
+  <div class="md-container">
+   <nav class="md-tabs" data-md-component="tabs">
+    <div class="md-tabs__inner md-grid">
+     <ul class="md-tabs__list">
+      <li class="md-tabs__item">
+       <a class="md-tabs__link" href="../index.html">
+        TRTorch v0.4.1 documentation
+       </a>
+      </li>
+     </ul>
+    </div>
+   </nav>
+   <main class="md-main">
+    <div class="md-main__inner md-grid" data-md-component="container">
+     <div class="md-sidebar md-sidebar--primary" data-md-component="navigation">
+      <div class="md-sidebar__scrollwrap">
+       <div class="md-sidebar__inner">
+        <nav class="md-nav md-nav--primary" data-md-level="0">
+         <label class="md-nav__title md-nav__title--site" for="__drawer">
+          <a class="md-nav__button md-logo" href="../index.html" title="TRTorch v0.4.1 documentation">
+           <i class="md-icon">
+            
+           </i>
+          </a>
+          <a href="../index.html" title="TRTorch v0.4.1 documentation">
+           TRTorch
+          </a>
+         </label>
+         <div class="md-nav__source">
+          <a class="md-source" data-md-source="github" href="https://github.com/nvidia/TRTorch/" title="Go to repository">
+           <div class="md-source__icon">
+            <svg height="28" viewbox="0 0 24 24" width="28" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+             <use height="24" width="24" xlink:href="#__github">
+             </use>
+            </svg>
+           </div>
+           <div class="md-source__repository">
+            TRTorch
+           </div>
+          </a>
+         </div>
+         <ul class="md-nav__list">
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Getting Started
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/installation.html">
+            Installation
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/getting_started.html">
+            Getting Started
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/ptq.html">
+            Post Training Quantization (PTQ)
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/trtorchc.html">
+            trtorchc
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/use_from_pytorch.html">
+            Using TRTorch Directly From PyTorch
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/runtime.html">
+            Deploying TRTorch Programs
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/using_dla.html">
+            DLA
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Notebooks
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="lenet-getting-started.html">
+            TRTorch Getting Started - LeNet
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <input class="md-toggle md-nav__toggle" data-md-toggle="toc" id="__toc" type="checkbox"/>
+           <label class="md-nav__link md-nav__link--active" for="__toc">
+            Object Detection with TRTorch (SSD)
+           </label>
+           <a class="md-nav__link md-nav__link--active" href="#">
+            Object Detection with TRTorch (SSD)
+           </a>
+           <nav class="md-nav md-nav--secondary">
+            <label class="md-nav__title" for="__toc">
+             Contents
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix="">
+             <li class="md-nav__item">
+              <a class="md-nav__link" href="#notebooks-ssd-object-detection-demo--page-root">
+               Object Detection with TRTorch (SSD)
+              </a>
+              <nav class="md-nav">
+               <ul class="md-nav__list">
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#Overview">
+                  Overview
+                 </a>
+                 <nav class="md-nav">
+                  <ul class="md-nav__list">
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#Learning-objectives">
+                     Learning objectives
+                    </a>
+                   </li>
+                  </ul>
+                 </nav>
+                </li>
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#Contents">
+                  Contents
+                 </a>
+                 <nav class="md-nav">
+                  <ul class="md-nav__list">
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#Single-Shot-MultiBox-Detector-model-for-object-detection">
+                     Single Shot MultiBox Detector model for object detection
+                    </a>
+                   </li>
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#Model-Description">
+                     Model Description
+                    </a>
+                   </li>
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#Sample-Inference">
+                     Sample Inference
+                    </a>
+                   </li>
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#Visualize-results">
+                     Visualize results
+                    </a>
+                   </li>
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#Benchmark-utility">
+                     Benchmark utility
+                    </a>
+                   </li>
+                  </ul>
+                 </nav>
+                </li>
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#6.-Measuring-Speedup">
+                  6. Measuring Speedup
+                 </a>
+                </li>
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#7.-Conclusion">
+                  7. Conclusion
+                 </a>
+                 <nav class="md-nav">
+                  <ul class="md-nav__list">
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#Details">
+                     Details
+                    </a>
+                   </li>
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#References">
+                     References
+                    </a>
+                   </li>
+                  </ul>
+                 </nav>
+                </li>
+               </ul>
+              </nav>
+             </li>
+             <li class="md-nav__item">
+              <a class="md-nav__extra_link" href="../_sources/_notebooks/ssd-object-detection-demo.ipynb.txt">
+               Show Source
+              </a>
+             </li>
+            </ul>
+           </nav>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Python API Documenation
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/trtorch.html">
+            trtorch
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/logging.html">
+            trtorch.logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             C++ API Documenation
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html">
+            TRTorch C++ API
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Contributor Documentation
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../contributors/system_overview.html">
+            System Overview
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../contributors/writing_converters.html">
+            Writing Converters
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../contributors/useful_links.html">
+            Useful Links for TRTorch Development
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Indices
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../indices/supported_ops.html">
+            Operators Supported
+           </a>
+          </li>
+         </ul>
+        </nav>
+       </div>
+      </div>
+     </div>
+     <div class="md-sidebar md-sidebar--secondary" data-md-component="toc">
+      <div class="md-sidebar__scrollwrap">
+       <div class="md-sidebar__inner">
+        <nav class="md-nav md-nav--secondary">
+         <label class="md-nav__title" for="__toc">
+          Contents
+         </label>
+         <ul class="md-nav__list" data-md-scrollfix="">
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="#notebooks-ssd-object-detection-demo--page-root">
+            Object Detection with TRTorch (SSD)
+           </a>
+           <nav class="md-nav">
+            <ul class="md-nav__list">
+             <li class="md-nav__item">
+              <a class="md-nav__link" href="#Overview">
+               Overview
+              </a>
+              <nav class="md-nav">
+               <ul class="md-nav__list">
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#Learning-objectives">
+                  Learning objectives
+                 </a>
+                </li>
+               </ul>
+              </nav>
+             </li>
+             <li class="md-nav__item">
+              <a class="md-nav__link" href="#Contents">
+               Contents
+              </a>
+              <nav class="md-nav">
+               <ul class="md-nav__list">
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#Single-Shot-MultiBox-Detector-model-for-object-detection">
+                  Single Shot MultiBox Detector model for object detection
+                 </a>
+                </li>
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#Model-Description">
+                  Model Description
+                 </a>
+                </li>
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#Sample-Inference">
+                  Sample Inference
+                 </a>
+                </li>
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#Visualize-results">
+                  Visualize results
+                 </a>
+                </li>
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#Benchmark-utility">
+                  Benchmark utility
+                 </a>
+                </li>
+               </ul>
+              </nav>
+             </li>
+             <li class="md-nav__item">
+              <a class="md-nav__link" href="#6.-Measuring-Speedup">
+               6. Measuring Speedup
+              </a>
+             </li>
+             <li class="md-nav__item">
+              <a class="md-nav__link" href="#7.-Conclusion">
+               7. Conclusion
+              </a>
+              <nav class="md-nav">
+               <ul class="md-nav__list">
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#Details">
+                  Details
+                 </a>
+                </li>
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#References">
+                  References
+                 </a>
+                </li>
+               </ul>
+              </nav>
+             </li>
+            </ul>
+           </nav>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__extra_link" href="../_sources/_notebooks/ssd-object-detection-demo.ipynb.txt">
+            Show Source
+           </a>
+          </li>
+          <li class="md-nav__item" id="searchbox">
+          </li>
+         </ul>
+        </nav>
+       </div>
+      </div>
+     </div>
+     <div class="md-content">
+      <article class="md-content__inner md-typeset" role="main">
+       <style>
+        /* CSS for nbsphinx extension */
+
+/* remove conflicting styling from Sphinx themes */
+div.nbinput.container div.prompt *,
+div.nboutput.container div.prompt *,
+div.nbinput.container div.input_area pre,
+div.nboutput.container div.output_area pre,
+div.nbinput.container div.input_area .highlight,
+div.nboutput.container div.output_area .highlight {
+    border: none;
+    padding: 0;
+    margin: 0;
+    box-shadow: none;
+}
+
+div.nbinput.container > div[class*=highlight],
+div.nboutput.container > div[class*=highlight] {
+    margin: 0;
+}
+
+div.nbinput.container div.prompt *,
+div.nboutput.container div.prompt * {
+    background: none;
+}
+
+div.nboutput.container div.output_area .highlight,
+div.nboutput.container div.output_area pre {
+    background: unset;
+}
+
+div.nboutput.container div.output_area div.highlight {
+    color: unset;  /* override Pygments text color */
+}
+
+/* avoid gaps between output lines */
+div.nboutput.container div[class*=highlight] pre {
+    line-height: normal;
+}
+
+/* input/output containers */
+div.nbinput.container,
+div.nboutput.container {
+    display: -webkit-flex;
+    display: flex;
+    align-items: flex-start;
+    margin: 0;
+    width: 100%;
+}
+@media (max-width: 540px) {
+    div.nbinput.container,
+    div.nboutput.container {
+        flex-direction: column;
+    }
+}
+
+/* input container */
+div.nbinput.container {
+    padding-top: 5px;
+}
+
+/* last container */
+div.nblast.container {
+    padding-bottom: 5px;
+}
+
+/* input prompt */
+div.nbinput.container div.prompt pre {
+    color: #307FC1;
+}
+
+/* output prompt */
+div.nboutput.container div.prompt pre {
+    color: #BF5B3D;
+}
+
+/* all prompts */
+div.nbinput.container div.prompt,
+div.nboutput.container div.prompt {
+    width: 4.5ex;
+    padding-top: 5px;
+    position: relative;
+    user-select: none;
+}
+
+div.nbinput.container div.prompt > div,
+div.nboutput.container div.prompt > div {
+    position: absolute;
+    right: 0;
+    margin-right: 0.3ex;
+}
+
+@media (max-width: 540px) {
+    div.nbinput.container div.prompt,
+    div.nboutput.container div.prompt {
+        width: unset;
+        text-align: left;
+        padding: 0.4em;
+    }
+    div.nboutput.container div.prompt.empty {
+        padding: 0;
+    }
+
+    div.nbinput.container div.prompt > div,
+    div.nboutput.container div.prompt > div {
+        position: unset;
+    }
+}
+
+/* disable scrollbars on prompts */
+div.nbinput.container div.prompt pre,
+div.nboutput.container div.prompt pre {
+    overflow: hidden;
+}
+
+/* input/output area */
+div.nbinput.container div.input_area,
+div.nboutput.container div.output_area {
+    -webkit-flex: 1;
+    flex: 1;
+    overflow: auto;
+}
+@media (max-width: 540px) {
+    div.nbinput.container div.input_area,
+    div.nboutput.container div.output_area {
+        width: 100%;
+    }
+}
+
+/* input area */
+div.nbinput.container div.input_area {
+    border: 1px solid #e0e0e0;
+    border-radius: 2px;
+    /*background: #f5f5f5;*/
+}
+
+/* override MathJax center alignment in output cells */
+div.nboutput.container div[class*=MathJax] {
+    text-align: left !important;
+}
+
+/* override sphinx.ext.imgmath center alignment in output cells */
+div.nboutput.container div.math p {
+    text-align: left;
+}
+
+/* standard error */
+div.nboutput.container div.output_area.stderr {
+    background: #fdd;
+}
+
+/* ANSI colors */
+.ansi-black-fg { color: #3E424D; }
+.ansi-black-bg { background-color: #3E424D; }
+.ansi-black-intense-fg { color: #282C36; }
+.ansi-black-intense-bg { background-color: #282C36; }
+.ansi-red-fg { color: #E75C58; }
+.ansi-red-bg { background-color: #E75C58; }
+.ansi-red-intense-fg { color: #B22B31; }
+.ansi-red-intense-bg { background-color: #B22B31; }
+.ansi-green-fg { color: #00A250; }
+.ansi-green-bg { background-color: #00A250; }
+.ansi-green-intense-fg { color: #007427; }
+.ansi-green-intense-bg { background-color: #007427; }
+.ansi-yellow-fg { color: #DDB62B; }
+.ansi-yellow-bg { background-color: #DDB62B; }
+.ansi-yellow-intense-fg { color: #B27D12; }
+.ansi-yellow-intense-bg { background-color: #B27D12; }
+.ansi-blue-fg { color: #208FFB; }
+.ansi-blue-bg { background-color: #208FFB; }
+.ansi-blue-intense-fg { color: #0065CA; }
+.ansi-blue-intense-bg { background-color: #0065CA; }
+.ansi-magenta-fg { color: #D160C4; }
+.ansi-magenta-bg { background-color: #D160C4; }
+.ansi-magenta-intense-fg { color: #A03196; }
+.ansi-magenta-intense-bg { background-color: #A03196; }
+.ansi-cyan-fg { color: #60C6C8; }
+.ansi-cyan-bg { background-color: #60C6C8; }
+.ansi-cyan-intense-fg { color: #258F8F; }
+.ansi-cyan-intense-bg { background-color: #258F8F; }
+.ansi-white-fg { color: #C5C1B4; }
+.ansi-white-bg { background-color: #C5C1B4; }
+.ansi-white-intense-fg { color: #A1A6B2; }
+.ansi-white-intense-bg { background-color: #A1A6B2; }
+
+.ansi-default-inverse-fg { color: #FFFFFF; }
+.ansi-default-inverse-bg { background-color: #000000; }
+
+.ansi-bold { font-weight: bold; }
+.ansi-underline { text-decoration: underline; }
+
+
+div.nbinput.container div.input_area div[class*=highlight] > pre,
+div.nboutput.container div.output_area div[class*=highlight] > pre,
+div.nboutput.container div.output_area div[class*=highlight].math,
+div.nboutput.container div.output_area.rendered_html,
+div.nboutput.container div.output_area > div.output_javascript,
+div.nboutput.container div.output_area:not(.rendered_html) > img{
+    padding: 5px;
+    margin: 0;
+}
+
+/* fix copybtn overflow problem in chromium (needed for 'sphinx_copybutton') */
+div.nbinput.container div.input_area > div[class^='highlight'],
+div.nboutput.container div.output_area > div[class^='highlight']{
+    overflow-y: hidden;
+}
+
+/* hide copybtn icon on prompts (needed for 'sphinx_copybutton') */
+.prompt a.copybtn {
+    display: none;
+}
+
+/* Some additional styling taken form the Jupyter notebook CSS */
+div.rendered_html table {
+  border: none;
+  border-collapse: collapse;
+  border-spacing: 0;
+  color: black;
+  font-size: 12px;
+  table-layout: fixed;
+}
+div.rendered_html thead {
+  border-bottom: 1px solid black;
+  vertical-align: bottom;
+}
+div.rendered_html tr,
+div.rendered_html th,
+div.rendered_html td {
+  text-align: right;
+  vertical-align: middle;
+  padding: 0.5em 0.5em;
+  line-height: normal;
+  white-space: normal;
+  max-width: none;
+  border: none;
+}
+div.rendered_html th {
+  font-weight: bold;
+}
+div.rendered_html tbody tr:nth-child(odd) {
+  background: #f5f5f5;
+}
+div.rendered_html tbody tr:hover {
+  background: rgba(66, 165, 245, 0.2);
+}
+       </style>
+       <div class="nbinput nblast docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[1]:
+</pre>
+         </div>
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span><span class="c1"># Copyright 2020 NVIDIA Corporation. All Rights Reserved.</span>
+<span class="c1">#</span>
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+<span class="c1"># ==============================================================================</span>
+</pre>
+         </div>
+        </div>
+       </div>
+       <p>
+        <img alt="1a51327d73414a7eabed3876215723c5" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
+       </p>
+       <h1 id="notebooks-ssd-object-detection-demo--page-root">
+        Object Detection with TRTorch (SSD)
+        <a class="headerlink" href="#notebooks-ssd-object-detection-demo--page-root" title="Permalink to this headline">
+         ¶
+        </a>
+       </h1>
+       <hr class="docutils"/>
+       <h2 id="Overview">
+        Overview
+        <a class="headerlink" href="#Overview" title="Permalink to this headline">
+         ¶
+        </a>
+       </h2>
+       <p>
+        In PyTorch 1.0, TorchScript was introduced as a method to separate your PyTorch model from Python, make it portable and optimizable.
+       </p>
+       <p>
+        TRTorch is a compiler that uses TensorRT (NVIDIA’s Deep Learning Optimization SDK and Runtime) to optimize TorchScript code. It compiles standard TorchScript modules into ones that internally run with TensorRT optimizations.
+       </p>
+       <p>
+        TensorRT can take models from any major framework and specifically tune them to perform better on specific target hardware in the NVIDIA family, and TRTorch enables us to continue to remain in the PyTorch ecosystem whilst doing so. This allows us to leverage the great features in PyTorch, including module composability, its flexible tensor implementation, data loaders and more. TRTorch is available to use with both PyTorch and LibTorch.
+       </p>
+       <p>
+        To get more background information on this, we suggest the
+        <strong>
+         lenet-getting-started
+        </strong>
+        notebook as a primer for getting started with TRTorch.
+       </p>
+       <h3 id="Learning-objectives">
+        Learning objectives
+        <a class="headerlink" href="#Learning-objectives" title="Permalink to this headline">
+         ¶
+        </a>
+       </h3>
+       <p>
+        This notebook demonstrates the steps for compiling a TorchScript module with TRTorch on a pretrained SSD network, and running it to test the speedup obtained.
+       </p>
+       <h2 id="Contents">
+        Contents
+        <a class="headerlink" href="#Contents" title="Permalink to this headline">
+         ¶
+        </a>
+       </h2>
+       <ol class="arabic simple">
+        <li>
+         <p>
+          <a class="reference external" href="#1">
+           Requirements
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference external" href="#2">
+           SSD Overview
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference external" href="#3">
+           Creating TorchScript modules
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference external" href="#4">
+           Compiling with TRTorch
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference external" href="#5">
+           Running Inference
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference external" href="#6">
+           Measuring Speedup
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference external" href="#7">
+           Conclusion
+          </a>
+         </p>
+        </li>
+       </ol>
+       <hr class="docutils"/>
+       <p>
+        ## 1. Requirements
+       </p>
+       <p>
+        Follow the steps in
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          notebooks/README
+         </span>
+        </code>
+        to prepare a Docker container, within which you can run this demo notebook.
+       </p>
+       <p>
+        In addition to that, run the following cell to obtain additional libraries specific to this demo.
+       </p>
+       <div class="nbinput nblast docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[2]:
+</pre>
+         </div>
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span><span class="o">%%capture</span>
+<span class="o">%%</span><span class="n">bash</span>
+<span class="c1"># Known working versions</span>
+<span class="n">pip</span> <span class="n">install</span> <span class="n">numpy</span><span class="o">==</span><span class="mf">1.19</span> <span class="n">scipy</span><span class="o">==</span><span class="mf">1.5</span><span class="o">.</span><span class="mi">2</span> <span class="n">Pillow</span><span class="o">==</span><span class="mf">6.2</span><span class="o">.</span><span class="mi">0</span> <span class="n">scikit</span><span class="o">-</span><span class="n">image</span><span class="o">==</span><span class="mf">0.17</span><span class="o">.</span><span class="mi">2</span> <span class="n">matplotlib</span><span class="o">==</span><span class="mf">3.3</span><span class="o">.</span><span class="mi">0</span>
+</pre>
+         </div>
+        </div>
+       </div>
+       <hr class="docutils"/>
+       <p>
+        ## 2. SSD
+       </p>
+       <h3 id="Single-Shot-MultiBox-Detector-model-for-object-detection">
+        Single Shot MultiBox Detector model for object detection
+        <a class="headerlink" href="#Single-Shot-MultiBox-Detector-model-for-object-detection" title="Permalink to this headline">
+         ¶
+        </a>
+       </h3>
+       <table>
+        <colgroup>
+         <col style="width: 38%"/>
+         <col style="width: 62%"/>
+        </colgroup>
+        <thead>
+         <tr class="row-odd">
+          <th class="head">
+           <p>
+            _
+           </p>
+          </th>
+          <th class="head">
+           <p>
+            _
+           </p>
+          </th>
+         </tr>
+        </thead>
+        <tbody>
+         <tr class="row-even">
+          <td>
+           <p>
+            <img alt="alt" src="https://pytorch.org/assets/images/ssd_diagram.png"/>
+           </p>
+          </td>
+          <td>
+           <p>
+            <img alt="image1" src="https://pytorch.org/assets/images/ssd.png"/>
+           </p>
+          </td>
+         </tr>
+        </tbody>
+       </table>
+       <p>
+        PyTorch has a model repository called the PyTorch Hub, which is a source for high quality implementations of common models. We can get our SSD model pretrained on
+        <a class="reference external" href="https://cocodataset.org/#home">
+         COCO
+        </a>
+        from there.
+       </p>
+       <h3 id="Model-Description">
+        Model Description
+        <a class="headerlink" href="#Model-Description" title="Permalink to this headline">
+         ¶
+        </a>
+       </h3>
+       <p>
+        This SSD300 model is based on the
+        <a class="reference external" href="https://arxiv.org/abs/1512.02325">
+         SSD: Single Shot MultiBox Detector
+        </a>
+        paper, which describes SSD as “a method for detecting objects in images using a single deep neural network”. The input size is fixed to 300x300.
+       </p>
+       <p>
+        The main difference between this model and the one described in the paper is in the backbone. Specifically, the VGG model is obsolete and is replaced by the ResNet-50 model.
+       </p>
+       <p>
+        From the
+        <a class="reference external" href="https://arxiv.org/abs/1611.10012">
+         Speed/accuracy trade-offs for modern convolutional object detectors
+        </a>
+        paper, the following enhancements were made to the backbone: * The conv5_x, avgpool, fc and softmax layers were removed from the original classification model. * All strides in conv4_x are set to 1x1.
+       </p>
+       <p>
+        The backbone is followed by 5 additional convolutional layers. In addition to the convolutional layers, we attached 6 detection heads: * The first detection head is attached to the last conv4_x layer. * The other five detection heads are attached to the corresponding 5 additional layers.
+       </p>
+       <p>
+        Detector heads are similar to the ones referenced in the paper, however, they are enhanced by additional BatchNorm layers after each convolution.
+       </p>
+       <p>
+        More information about this SSD model is available at Nvidia’s “DeepLearningExamples” Github
+        <a class="reference external" href="https://github.com/NVIDIA/DeepLearningExamples/tree/master/PyTorch/Detection/SSD">
+         here
+        </a>
+        .
+       </p>
+       <div class="nbinput docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[3]:
+</pre>
+         </div>
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span><span class="kn">import</span> <span class="nn">torch</span>
+
+<span class="c1"># List of available models in PyTorch Hub from Nvidia/DeepLearningExamples</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">hub</span><span class="o">.</span><span class="n">list</span><span class="p">(</span><span class="s1">'NVIDIA/DeepLearningExamples:torchhub'</span><span class="p">)</span>
+</pre>
+         </div>
+        </div>
+       </div>
+       <div class="nboutput docutils container">
+        <div class="prompt empty docutils container">
+        </div>
+        <div class="output_area stderr docutils container">
+         <div class="highlight">
+          <pre>
+Using cache found in /root/.cache/torch/hub/NVIDIA_DeepLearningExamples_torchhub
+</pre>
+         </div>
+        </div>
+       </div>
+       <div class="nboutput nblast docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[3]:
+</pre>
+         </div>
+        </div>
+        <div class="output_area docutils container">
+         <div class="highlight">
+          <pre>
+['checkpoint_from_distributed',
+ 'nvidia_ncf',
+ 'nvidia_ssd',
+ 'nvidia_ssd_processing_utils',
+ 'nvidia_tacotron2',
+ 'nvidia_waveglow',
+ 'unwrap_distributed']
+</pre>
+         </div>
+        </div>
+       </div>
+       <div class="nbinput docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[4]:
+</pre>
+         </div>
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span><span class="c1"># load SSD model pretrained on COCO from Torch Hub</span>
+<span class="n">precision</span> <span class="o">=</span> <span class="s1">'fp32'</span>
+<span class="n">ssd300</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">hub</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">'NVIDIA/DeepLearningExamples:torchhub'</span><span class="p">,</span> <span class="s1">'nvidia_ssd'</span><span class="p">,</span> <span class="n">model_math</span><span class="o">=</span><span class="n">precision</span><span class="p">);</span>
+</pre>
+         </div>
+        </div>
+       </div>
+       <div class="nboutput nblast docutils container">
+        <div class="prompt empty docutils container">
+        </div>
+        <div class="output_area stderr docutils container">
+         <div class="highlight">
+          <pre>
+Using cache found in /root/.cache/torch/hub/NVIDIA_DeepLearningExamples_torchhub
+</pre>
+         </div>
+        </div>
+       </div>
+       <p>
+        Setting
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          precision="fp16"
+         </span>
+        </code>
+        will load a checkpoint trained with mixed precision into architecture enabling execution on Tensor Cores. Handling mixed precision data requires the Apex library.
+       </p>
+       <h3 id="Sample-Inference">
+        Sample Inference
+        <a class="headerlink" href="#Sample-Inference" title="Permalink to this headline">
+         ¶
+        </a>
+       </h3>
+       <p>
+        We can now run inference on the model. This is demonstrated below using sample images from the COCO 2017 Validation set.
+       </p>
+       <div class="nbinput docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[5]:
+</pre>
+         </div>
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span><span class="c1"># Sample images from the COCO validation set</span>
+<span class="n">uris</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s1">'http://images.cocodataset.org/val2017/000000397133.jpg'</span><span class="p">,</span>
+    <span class="s1">'http://images.cocodataset.org/val2017/000000037777.jpg'</span><span class="p">,</span>
+    <span class="s1">'http://images.cocodataset.org/val2017/000000252219.jpg'</span>
+<span class="p">]</span>
+
+<span class="c1"># For convenient and comprehensive formatting of input and output of the model, load a set of utility methods.</span>
+<span class="n">utils</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">hub</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">'NVIDIA/DeepLearningExamples:torchhub'</span><span class="p">,</span> <span class="s1">'nvidia_ssd_processing_utils'</span><span class="p">)</span>
+
+<span class="c1"># Format images to comply with the network input</span>
+<span class="n">inputs</span> <span class="o">=</span> <span class="p">[</span><span class="n">utils</span><span class="o">.</span><span class="n">prepare_input</span><span class="p">(</span><span class="n">uri</span><span class="p">)</span> <span class="k">for</span> <span class="n">uri</span> <span class="ow">in</span> <span class="n">uris</span><span class="p">]</span>
+<span class="n">tensor</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">prepare_tensor</span><span class="p">(</span><span class="n">inputs</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+
+<span class="c1"># The model was trained on COCO dataset, which we need to access in order to</span>
+<span class="c1"># translate class IDs into object names.</span>
+<span class="n">classes_to_labels</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">get_coco_object_dictionary</span><span class="p">()</span>
+</pre>
+         </div>
+        </div>
+       </div>
+       <div class="nboutput docutils container">
+        <div class="prompt empty docutils container">
+        </div>
+        <div class="output_area stderr docutils container">
+         <div class="highlight">
+          <pre>
+Using cache found in /root/.cache/torch/hub/NVIDIA_DeepLearningExamples_torchhub
+</pre>
+         </div>
+        </div>
+       </div>
+       <div class="nboutput nblast docutils container">
+        <div class="prompt empty docutils container">
+        </div>
+        <div class="output_area docutils container">
+         <div class="highlight">
+          <pre>
+Downloading COCO annotations.
+Downloading finished.
+</pre>
+         </div>
+        </div>
+       </div>
+       <div class="nbinput nblast docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[6]:
+</pre>
+         </div>
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span><span class="c1"># Next, we run object detection</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">ssd300</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">)</span>
+<span class="n">detections_batch</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">tensor</span><span class="p">)</span>
+
+<span class="c1"># By default, raw output from SSD network per input image contains 8732 boxes with</span>
+<span class="c1"># localization and class probability distribution.</span>
+<span class="c1"># Let’s filter this output to only get reasonable detections (confidence&gt;40%) in a more comprehensive format.</span>
+<span class="n">results_per_input</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">decode_results</span><span class="p">(</span><span class="n">detections_batch</span><span class="p">)</span>
+<span class="n">best_results_per_input</span> <span class="o">=</span> <span class="p">[</span><span class="n">utils</span><span class="o">.</span><span class="n">pick_best</span><span class="p">(</span><span class="n">results</span><span class="p">,</span> <span class="mf">0.40</span><span class="p">)</span> <span class="k">for</span> <span class="n">results</span> <span class="ow">in</span> <span class="n">results_per_input</span><span class="p">]</span>
+</pre>
+         </div>
+        </div>
+       </div>
+       <h3 id="Visualize-results">
+        Visualize results
+        <a class="headerlink" href="#Visualize-results" title="Permalink to this headline">
+         ¶
+        </a>
+       </h3>
+       <div class="nbinput nblast docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[7]:
+</pre>
+         </div>
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span><span class="kn">from</span> <span class="nn">matplotlib</span> <span class="kn">import</span> <span class="n">pyplot</span> <span class="k">as</span> <span class="n">plt</span>
+<span class="kn">import</span> <span class="nn">matplotlib.patches</span> <span class="k">as</span> <span class="nn">patches</span>
+
+<span class="c1"># The utility plots the images and predicted bounding boxes (with confidence scores).</span>
+<span class="k">def</span> <span class="nf">plot_results</span><span class="p">(</span><span class="n">best_results</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">image_idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">best_results</span><span class="p">)):</span>
+        <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+        <span class="c1"># Show original, denormalized image...</span>
+        <span class="n">image</span> <span class="o">=</span> <span class="n">inputs</span><span class="p">[</span><span class="n">image_idx</span><span class="p">]</span> <span class="o">/</span> <span class="mi">2</span> <span class="o">+</span> <span class="mf">0.5</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">image</span><span class="p">)</span>
+        <span class="c1"># ...with detections</span>
+        <span class="n">bboxes</span><span class="p">,</span> <span class="n">classes</span><span class="p">,</span> <span class="n">confidences</span> <span class="o">=</span> <span class="n">best_results</span><span class="p">[</span><span class="n">image_idx</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">bboxes</span><span class="p">)):</span>
+            <span class="n">left</span><span class="p">,</span> <span class="n">bot</span><span class="p">,</span> <span class="n">right</span><span class="p">,</span> <span class="n">top</span> <span class="o">=</span> <span class="n">bboxes</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+            <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">h</span> <span class="o">=</span> <span class="p">[</span><span class="n">val</span> <span class="o">*</span> <span class="mi">300</span> <span class="k">for</span> <span class="n">val</span> <span class="ow">in</span> <span class="p">[</span><span class="n">left</span><span class="p">,</span> <span class="n">bot</span><span class="p">,</span> <span class="n">right</span> <span class="o">-</span> <span class="n">left</span><span class="p">,</span> <span class="n">top</span> <span class="o">-</span> <span class="n">bot</span><span class="p">]]</span>
+            <span class="n">rect</span> <span class="o">=</span> <span class="n">patches</span><span class="o">.</span><span class="n">Rectangle</span><span class="p">((</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">),</span> <span class="n">w</span><span class="p">,</span> <span class="n">h</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">edgecolor</span><span class="o">=</span><span class="s1">'r'</span><span class="p">,</span> <span class="n">facecolor</span><span class="o">=</span><span class="s1">'none'</span><span class="p">)</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">add_patch</span><span class="p">(</span><span class="n">rect</span><span class="p">)</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">text</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="s2">"</span><span class="si">{}</span><span class="s2"> </span><span class="si">{:.0f}</span><span class="s2">%"</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">classes_to_labels</span><span class="p">[</span><span class="n">classes</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">-</span> <span class="mi">1</span><span class="p">],</span> <span class="n">confidences</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="o">*</span><span class="mi">100</span><span class="p">),</span> <span class="n">bbox</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">facecolor</span><span class="o">=</span><span class="s1">'white'</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">))</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+
+</pre>
+         </div>
+        </div>
+       </div>
+       <div class="nbinput docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[8]:
+</pre>
+         </div>
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span><span class="c1"># Visualize results without TRTorch/TensorRT</span>
+<span class="n">plot_results</span><span class="p">(</span><span class="n">best_results_per_input</span><span class="p">)</span>
+</pre>
+         </div>
+        </div>
+       </div>
+       <div class="nboutput docutils container">
+        <div class="prompt empty docutils container">
+        </div>
+        <div class="output_area docutils container">
+         <img alt="../_images/_notebooks_ssd-object-detection-demo_17_0.png" src="../_images/_notebooks_ssd-object-detection-demo_17_0.png"/>
+        </div>
+       </div>
+       <div class="nboutput docutils container">
+        <div class="prompt empty docutils container">
+        </div>
+        <div class="output_area docutils container">
+         <img alt="../_images/_notebooks_ssd-object-detection-demo_17_1.png" src="../_images/_notebooks_ssd-object-detection-demo_17_1.png"/>
+        </div>
+       </div>
+       <div class="nboutput nblast docutils container">
+        <div class="prompt empty docutils container">
+        </div>
+        <div class="output_area docutils container">
+         <img alt="../_images/_notebooks_ssd-object-detection-demo_17_2.png" src="../_images/_notebooks_ssd-object-detection-demo_17_2.png"/>
+        </div>
+       </div>
+       <h3 id="Benchmark-utility">
+        Benchmark utility
+        <a class="headerlink" href="#Benchmark-utility" title="Permalink to this headline">
+         ¶
+        </a>
+       </h3>
+       <div class="nbinput nblast docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[9]:
+</pre>
+         </div>
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span><span class="kn">import</span> <span class="nn">time</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="kn">import</span> <span class="nn">torch.backends.cudnn</span> <span class="k">as</span> <span class="nn">cudnn</span>
+<span class="n">cudnn</span><span class="o">.</span><span class="n">benchmark</span> <span class="o">=</span> <span class="kc">True</span>
+
+<span class="c1"># Helper function to benchmark the model</span>
+<span class="k">def</span> <span class="nf">benchmark</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">input_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1024</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="s1">'fp32'</span><span class="p">,</span> <span class="n">nwarmup</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">nruns</span><span class="o">=</span><span class="mi">1000</span><span class="p">):</span>
+    <span class="n">input_data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">input_shape</span><span class="p">)</span>
+    <span class="n">input_data</span> <span class="o">=</span> <span class="n">input_data</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">dtype</span><span class="o">==</span><span class="s1">'fp16'</span><span class="p">:</span>
+        <span class="n">input_data</span> <span class="o">=</span> <span class="n">input_data</span><span class="o">.</span><span class="n">half</span><span class="p">()</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Warm up ..."</span><span class="p">)</span>
+    <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">nwarmup</span><span class="p">):</span>
+            <span class="n">features</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">input_data</span><span class="p">)</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">synchronize</span><span class="p">()</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Start timing ..."</span><span class="p">)</span>
+    <span class="n">timings</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">nruns</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
+            <span class="n">start_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+            <span class="n">pred_loc</span><span class="p">,</span> <span class="n">pred_label</span>  <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">input_data</span><span class="p">)</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">synchronize</span><span class="p">()</span>
+            <span class="n">end_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+            <span class="n">timings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">end_time</span> <span class="o">-</span> <span class="n">start_time</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">i</span><span class="o">%</span><span class="k">100</span>==0:
+                <span class="nb">print</span><span class="p">(</span><span class="s1">'Iteration </span><span class="si">%d</span><span class="s1">/</span><span class="si">%d</span><span class="s1">, avg batch time </span><span class="si">%.2f</span><span class="s1"> ms'</span><span class="o">%</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">nruns</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">timings</span><span class="p">)</span><span class="o">*</span><span class="mi">1000</span><span class="p">))</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Input shape:"</span><span class="p">,</span> <span class="n">input_data</span><span class="o">.</span><span class="n">size</span><span class="p">())</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Output location prediction size:"</span><span class="p">,</span> <span class="n">pred_loc</span><span class="o">.</span><span class="n">size</span><span class="p">())</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Output label prediction size:"</span><span class="p">,</span> <span class="n">pred_label</span><span class="o">.</span><span class="n">size</span><span class="p">())</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">'Average batch time: </span><span class="si">%.2f</span><span class="s1"> ms'</span><span class="o">%</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">timings</span><span class="p">)</span><span class="o">*</span><span class="mi">1000</span><span class="p">))</span>
+
+</pre>
+         </div>
+        </div>
+       </div>
+       <p>
+        We check how well the model performs
+        <strong>
+         before
+        </strong>
+        we use TRTorch/TensorRT
+       </p>
+       <div class="nbinput docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[10]:
+</pre>
+         </div>
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span><span class="c1"># Model benchmark without TRTorch/TensorRT</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">ssd300</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">)</span>
+<span class="n">benchmark</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">input_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">128</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">300</span><span class="p">),</span> <span class="n">nruns</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+</pre>
+         </div>
+        </div>
+       </div>
+       <div class="nboutput nblast docutils container">
+        <div class="prompt empty docutils container">
+        </div>
+        <div class="output_area docutils container">
+         <div class="highlight">
+          <pre>
+Warm up ...
+Start timing ...
+Iteration 100/1000, avg batch time 362.25 ms
+Iteration 200/1000, avg batch time 362.47 ms
+Iteration 300/1000, avg batch time 362.57 ms
+Iteration 400/1000, avg batch time 362.75 ms
+Iteration 500/1000, avg batch time 362.80 ms
+Iteration 600/1000, avg batch time 362.86 ms
+Iteration 700/1000, avg batch time 362.93 ms
+Iteration 800/1000, avg batch time 362.96 ms
+Iteration 900/1000, avg batch time 362.96 ms
+Iteration 1000/1000, avg batch time 362.99 ms
+Input shape: torch.Size([128, 3, 300, 300])
+Output location prediction size: torch.Size([128, 4, 8732])
+Output label prediction size: torch.Size([128, 81, 8732])
+Average batch time: 362.99 ms
+</pre>
+         </div>
+        </div>
+       </div>
+       <hr class="docutils"/>
+       <p>
+        ## 3. Creating TorchScript modules
+       </p>
+       <p>
+        To compile with TRTorch, the model must first be in
+        <strong>
+         TorchScript
+        </strong>
+        . TorchScript is a programming language included in PyTorch which removes the Python dependency normal PyTorch models have. This conversion is done via a JIT compiler which given a PyTorch Module will generate an equivalent TorchScript Module. There are two paths that can be used to generate TorchScript:
+        <strong>
+         Tracing
+        </strong>
+        and
+        <strong>
+         Scripting
+        </strong>
+        . - Tracing follows execution of PyTorch generating ops in TorchScript corresponding to what it
+sees. - Scripting does an analysis of the Python code and generates TorchScript, this allows the resulting graph to include control flow which tracing cannot do.
+       </p>
+       <p>
+        Tracing however due to its simplicity is more likely to compile successfully with TRTorch (though both systems are supported).
+       </p>
+       <div class="nbinput nblast docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[11]:
+</pre>
+         </div>
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span><span class="n">model</span> <span class="o">=</span> <span class="n">ssd300</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">)</span>
+<span class="n">traced_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="p">[</span><span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">300</span><span class="p">,</span><span class="mi">300</span><span class="p">))</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">)])</span>
+</pre>
+         </div>
+        </div>
+       </div>
+       <p>
+        If required, we can also save this model and use it independently of Python.
+       </p>
+       <div class="nbinput nblast docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[12]:
+</pre>
+         </div>
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span><span class="c1"># This is just an example, and not required for the purposes of this demo</span>
+<span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">traced_model</span><span class="p">,</span> <span class="s2">"ssd_300_traced.jit.pt"</span><span class="p">)</span>
+</pre>
+         </div>
+        </div>
+       </div>
+       <div class="nbinput docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[13]:
+</pre>
+         </div>
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span><span class="c1"># Obtain the average time taken by a batch of input with Torchscript compiled modules</span>
+<span class="n">benchmark</span><span class="p">(</span><span class="n">traced_model</span><span class="p">,</span> <span class="n">input_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">128</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">300</span><span class="p">),</span> <span class="n">nruns</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
+</pre>
+         </div>
+        </div>
+       </div>
+       <div class="nboutput nblast docutils container">
+        <div class="prompt empty docutils container">
+        </div>
+        <div class="output_area docutils container">
+         <div class="highlight">
+          <pre>
+Warm up ...
+Start timing ...
+Iteration 100/1000, avg batch time 363.09 ms
+Iteration 200/1000, avg batch time 363.00 ms
+Iteration 300/1000, avg batch time 363.09 ms
+Iteration 400/1000, avg batch time 363.05 ms
+Iteration 500/1000, avg batch time 363.08 ms
+Iteration 600/1000, avg batch time 363.07 ms
+Iteration 700/1000, avg batch time 363.09 ms
+Iteration 800/1000, avg batch time 363.06 ms
+Iteration 900/1000, avg batch time 363.08 ms
+Iteration 1000/1000, avg batch time 363.08 ms
+Input shape: torch.Size([128, 3, 300, 300])
+Output location prediction size: torch.Size([128, 4, 8732])
+Output label prediction size: torch.Size([128, 81, 8732])
+Average batch time: 363.08 ms
+</pre>
+         </div>
+        </div>
+       </div>
+       <hr class="docutils"/>
+       <p>
+        ## 4. Compiling with TRTorch TorchScript modules behave just like normal PyTorch modules and are intercompatible. From TorchScript we can now compile a TensorRT based module. This module will still be implemented in TorchScript but all the computation will be done in TensorRT.
+       </p>
+       <div class="nbinput nblast docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[14]:
+</pre>
+         </div>
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span><span class="kn">import</span> <span class="nn">trtorch</span>
+
+<span class="c1"># The compiled module will have precision as specified by "op_precision".</span>
+<span class="c1"># Here, it will have FP16 precision.</span>
+<span class="n">trt_model</span> <span class="o">=</span> <span class="n">trtorch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">traced_model</span><span class="p">,</span> <span class="p">{</span>
+    <span class="s2">"inputs"</span><span class="p">:</span> <span class="p">[</span><span class="n">trtorch</span><span class="o">.</span><span class="n">Input</span><span class="p">((</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">300</span><span class="p">))],</span>
+    <span class="s2">"enabled_precisions"</span><span class="p">:</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">},</span> <span class="c1"># Run with FP16</span>
+    <span class="s2">"workspace_size"</span><span class="p">:</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">20</span>
+<span class="p">})</span>
+</pre>
+         </div>
+        </div>
+       </div>
+       <hr class="docutils"/>
+       <p>
+        ## 5. Running Inference
+       </p>
+       <p>
+        Next, we run object detection
+       </p>
+       <div class="nbinput nblast docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[15]:
+</pre>
+         </div>
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span><span class="c1"># using a TRTorch module is exactly the same as how we usually do inference in PyTorch i.e. model(inputs)</span>
+<span class="n">detections_batch</span> <span class="o">=</span> <span class="n">trt_model</span><span class="p">(</span><span class="n">tensor</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">))</span> <span class="c1"># convert the input to half precision</span>
+
+<span class="c1"># By default, raw output from SSD network per input image contains 8732 boxes with</span>
+<span class="c1"># localization and class probability distribution.</span>
+<span class="c1"># Let’s filter this output to only get reasonable detections (confidence&gt;40%) in a more comprehensive format.</span>
+<span class="n">results_per_input</span> <span class="o">=</span> <span class="n">utils</span><span class="o">.</span><span class="n">decode_results</span><span class="p">(</span><span class="n">detections_batch</span><span class="p">)</span>
+<span class="n">best_results_per_input_trt</span> <span class="o">=</span> <span class="p">[</span><span class="n">utils</span><span class="o">.</span><span class="n">pick_best</span><span class="p">(</span><span class="n">results</span><span class="p">,</span> <span class="mf">0.40</span><span class="p">)</span> <span class="k">for</span> <span class="n">results</span> <span class="ow">in</span> <span class="n">results_per_input</span><span class="p">]</span>
+</pre>
+         </div>
+        </div>
+       </div>
+       <p>
+        Now, let’s visualize our predictions!
+       </p>
+       <div class="nbinput docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[16]:
+</pre>
+         </div>
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span><span class="c1"># Visualize results with TRTorch/TensorRT</span>
+<span class="n">plot_results</span><span class="p">(</span><span class="n">best_results_per_input_trt</span><span class="p">)</span>
+</pre>
+         </div>
+        </div>
+       </div>
+       <div class="nboutput docutils container">
+        <div class="prompt empty docutils container">
+        </div>
+        <div class="output_area docutils container">
+         <img alt="../_images/_notebooks_ssd-object-detection-demo_34_0.png" src="../_images/_notebooks_ssd-object-detection-demo_34_0.png"/>
+        </div>
+       </div>
+       <div class="nboutput docutils container">
+        <div class="prompt empty docutils container">
+        </div>
+        <div class="output_area docutils container">
+         <img alt="../_images/_notebooks_ssd-object-detection-demo_34_1.png" src="../_images/_notebooks_ssd-object-detection-demo_34_1.png"/>
+        </div>
+       </div>
+       <div class="nboutput nblast docutils container">
+        <div class="prompt empty docutils container">
+        </div>
+        <div class="output_area docutils container">
+         <img alt="../_images/_notebooks_ssd-object-detection-demo_34_2.png" src="../_images/_notebooks_ssd-object-detection-demo_34_2.png"/>
+        </div>
+       </div>
+       <p>
+        We get similar results as before!
+       </p>
+       <hr class="docutils"/>
+       <h2 id="6.-Measuring-Speedup">
+        6. Measuring Speedup
+        <a class="headerlink" href="#6.-Measuring-Speedup" title="Permalink to this headline">
+         ¶
+        </a>
+       </h2>
+       <p>
+        We can run the benchmark function again to see the speedup gained! Compare this result with the same batch-size of input in the case without TRTorch/TensorRT above.
+       </p>
+       <div class="nbinput docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[17]:
+</pre>
+         </div>
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span><span class="n">batch_size</span> <span class="o">=</span> <span class="mi">128</span>
+
+<span class="c1"># Recompiling with batch_size we use for evaluating performance</span>
+<span class="n">trt_model</span> <span class="o">=</span> <span class="n">trtorch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">traced_model</span><span class="p">,</span> <span class="p">{</span>
+    <span class="s2">"inputs"</span><span class="p">:</span> <span class="p">[</span><span class="n">trtorch</span><span class="o">.</span><span class="n">Input</span><span class="p">((</span><span class="n">batch_size</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">300</span><span class="p">))],</span>
+    <span class="s2">"enabled_precisions"</span><span class="p">:</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">},</span> <span class="c1"># Run with FP16</span>
+    <span class="s2">"workspace_size"</span><span class="p">:</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">20</span>
+<span class="p">})</span>
+
+<span class="n">benchmark</span><span class="p">(</span><span class="n">trt_model</span><span class="p">,</span> <span class="n">input_shape</span><span class="o">=</span><span class="p">(</span><span class="n">batch_size</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">300</span><span class="p">),</span> <span class="n">nruns</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">"fp16"</span><span class="p">)</span>
+</pre>
+         </div>
+        </div>
+       </div>
+       <div class="nboutput nblast docutils container">
+        <div class="prompt empty docutils container">
+        </div>
+        <div class="output_area docutils container">
+         <div class="highlight">
+          <pre>
+Warm up ...
+Start timing ...
+Iteration 100/1000, avg batch time 72.94 ms
+Iteration 200/1000, avg batch time 72.95 ms
+Iteration 300/1000, avg batch time 73.00 ms
+Iteration 400/1000, avg batch time 73.06 ms
+Iteration 500/1000, avg batch time 73.10 ms
+Iteration 600/1000, avg batch time 73.14 ms
+Iteration 700/1000, avg batch time 73.17 ms
+Iteration 800/1000, avg batch time 73.18 ms
+Iteration 900/1000, avg batch time 73.19 ms
+Iteration 1000/1000, avg batch time 73.21 ms
+Input shape: torch.Size([128, 3, 300, 300])
+Output location prediction size: torch.Size([128, 4, 8732])
+Output label prediction size: torch.Size([128, 81, 8732])
+Average batch time: 73.21 ms
+</pre>
+         </div>
+        </div>
+       </div>
+       <hr class="docutils"/>
+       <h2 id="7.-Conclusion">
+        7. Conclusion
+        <a class="headerlink" href="#7.-Conclusion" title="Permalink to this headline">
+         ¶
+        </a>
+       </h2>
+       <p>
+        In this notebook, we have walked through the complete process of compiling a TorchScript SSD300 model with TRTorch, and tested the performance impact of the optimization. We find that using the TRTorch compiled model, we gain significant speedup in inference without any noticeable drop in performance!
+       </p>
+       <h3 id="Details">
+        Details
+        <a class="headerlink" href="#Details" title="Permalink to this headline">
+         ¶
+        </a>
+       </h3>
+       <p>
+        For detailed information on model input and output, training recipies, inference and performance visit:
+        <a class="reference external" href="https://github.com/NVIDIA/DeepLearningExamples/tree/master/PyTorch/Detection/SSD">
+         github
+        </a>
+        and/or
+        <a class="reference external" href="https://ngc.nvidia.com/catalog/model-scripts/nvidia:ssd_for_pytorch">
+         NGC
+        </a>
+       </p>
+       <h3 id="References">
+        References
+        <a class="headerlink" href="#References" title="Permalink to this headline">
+         ¶
+        </a>
+       </h3>
+       <ul class="simple">
+        <li>
+         <p>
+          <a class="reference external" href="https://arxiv.org/abs/1512.02325">
+           SSD: Single Shot MultiBox Detector
+          </a>
+          paper
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference external" href="https://arxiv.org/abs/1611.10012">
+           Speed/accuracy trade-offs for modern convolutional object detectors
+          </a>
+          paper
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference external" href="https://ngc.nvidia.com/catalog/model-scripts/nvidia:ssd_for_pytorch">
+           SSD on NGC
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference external" href="https://github.com/NVIDIA/DeepLearningExamples/tree/master/PyTorch/Detection/SSD">
+           SSD on github
+          </a>
+         </p>
+        </li>
+       </ul>
+      </article>
+     </div>
+    </div>
+   </main>
+  </div>
+  <footer class="md-footer">
+   <div class="md-footer-nav">
+    <nav class="md-footer-nav__inner md-grid">
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--prev" href="lenet-getting-started.html" rel="prev" title="TRTorch Getting Started - LeNet">
+      <div class="md-flex__cell md-flex__cell--shrink">
+       <i class="md-icon md-icon--arrow-back md-footer-nav__button">
+       </i>
+      </div>
+      <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
+       <span class="md-flex__ellipsis">
+        <span class="md-footer-nav__direction">
+         Previous
+        </span>
+        TRTorch Getting Started - LeNet
+       </span>
+      </div>
+     </a>
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--next" href="../py_api/trtorch.html" rel="next" title="trtorch">
+      <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
+       <span class="md-flex__ellipsis">
+        <span class="md-footer-nav__direction">
+         Next
+        </span>
+        trtorch
+       </span>
+      </div>
+      <div class="md-flex__cell md-flex__cell--shrink">
+       <i class="md-icon md-icon--arrow-forward md-footer-nav__button">
+       </i>
+      </div>
+     </a>
+    </nav>
+   </div>
+   <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+     <div class="md-footer-copyright">
+      <div class="md-footer-copyright__highlight">
+       © Copyright 2021, NVIDIA Corporation.
+      </div>
+      Created using
+      <a href="http://www.sphinx-doc.org/">
+       Sphinx
+      </a>
+      3.1.2.
+             and
+      <a href="https://github.com/bashtage/sphinx-material/">
+       Material for
+              Sphinx
+      </a>
+     </div>
+    </div>
+   </div>
+  </footer>
+  <script src="../_static/javascripts/application.js">
+  </script>
+  <script>
+   app.initialize({version: "1.0.4", url: {base: ".."}})
+  </script>
+ </body>
+</html>

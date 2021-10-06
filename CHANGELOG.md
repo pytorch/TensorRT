@@ -568,4 +568,12 @@ Signed-off-by: Naren Dasan <naren@narendasan.com>
 Signed-off-by: Naren Dasan <narens@nvidia.com>
 
 
+# 0.4.1 (2021-10-06)
+
+### Bug Fixes
+
+* **//core/lowering:** Fixes module level fallback recursion ([2fc612d](https://github.com/NVIDIA/TRTorch/commit/2fc612d))
+* Move some lowering passes to graph level logging ([0266f41](https://github.com/NVIDIA/TRTorch/commit/0266f41))
+* **//py:** Fix trtorch.Device alternate contructor options ([ac26841](https://github.com/NVIDIA/TRTorch/commit/ac26841))
+
 
