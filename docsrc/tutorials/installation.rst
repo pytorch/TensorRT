@@ -66,7 +66,7 @@ the CUDA driver installed and the container must have CUDA)
 
 The correct LibTorch version will be pulled down for you by bazel.
 
-    NOTE: For best compatability with official PyTorch, use torch==1.9.0+cuda111, TensorRT 7.2 and cuDNN 8.1 for CUDA 11.1 however TRTorch itself supports
+    NOTE: For best compatability with official PyTorch, use torch==1.9.1+cuda111, TensorRT 8.0 and cuDNN 8.2 for CUDA 11.1 however TRTorch itself supports
     TensorRT and cuDNN for CUDA versions other than 11.1 for usecases such as using NVIDIA compiled distributions of PyTorch that use other versions of CUDA
     e.g. aarch64 or custom compiled version of PyTorch.
 
@@ -327,7 +327,7 @@ use that library, set the paths to the same path but when you compile make sure 
 Compile C++ Library and Compiler CLI
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-    NOTE: Due to shifting dependency locations between Jetpack 4.5 and 4.6 there is a now a flag to inform bazel of the Jetpack version 
+    NOTE: Due to shifting dependency locations between Jetpack 4.5 and 4.6 there is a now a flag to inform bazel of the Jetpack version
 
     .. code-block:: shell
 

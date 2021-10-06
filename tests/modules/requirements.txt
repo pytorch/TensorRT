@@ -1,3 +1,3 @@
 -f https://download.pytorch.org/whl/torch_stable.html
 timm==v0.4.12
-torch==1.9.0+cu111
+torch==1.9.1+cu111
