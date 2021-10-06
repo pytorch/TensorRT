@@ -18,7 +18,7 @@ import warnings
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
-__version__ = '0.4.0'
+__version__ = '0.4.1'
 
 CXX11_ABI = False
 
