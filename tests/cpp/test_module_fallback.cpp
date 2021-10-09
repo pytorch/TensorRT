@@ -7,7 +7,7 @@
 TEST(CppAPITest, ResNetModuleFallbacksCorrectly) {
   torch::jit::script::Module mod;
   try {
-    mod = torch::jit::load("tests/modules/resnet18_traced.jit.pt");
+    mod = torch::jit::load("tests/modules/resnet18_scripted.jit.pt");
   } catch (const c10::Error& e) {
     std::cerr << "error loading the model\n";
     ASSERT_TRUE(false);
@@ -35,7 +35,7 @@ TEST(CppAPITest, ResNetModuleFallbacksCorrectly) {
 TEST(CppAPITest, MobileNetModuleFallbacksCorrectlyWithOneEngine) {
   torch::jit::script::Module mod;
   try {
-    mod = torch::jit::load("tests/modules/mobilenet_v2_traced.jit.pt");
+    mod = torch::jit::load("tests/modules/mobilenet_v2_scripted.jit.pt");
   } catch (const c10::Error& e) {
     std::cerr << "error loading the model\n";
     ASSERT_TRUE(false);
