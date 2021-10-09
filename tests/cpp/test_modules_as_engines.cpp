@@ -29,7 +29,6 @@ TEST_P(CppAPITests, ModuleToEngineToModuleIsClose) {
   std::vector<at::Tensor> jit_results;
   jit_results.push_back(jit_results_ivalues.toTensor());
 
-  auto forward_graph = mod.get_method("forward");
   std::vector<c10::ArrayRef<int64_t>> input_ranges;
   for (auto in : inputs) {
     input_ranges.push_back(in.sizes());
@@ -43,7 +42,7 @@ TEST_P(CppAPITests, ModuleToEngineToModuleIsClose) {
   auto engine = trtorch::ConvertGraphToTRTEngine(mod, "forward", input_ranges);
   auto trt_mod = trtorch::EmbedEngineInNewModule(engine, compile_spec.device);
 
-  torch::jit::IValue trt_results_ivalues = trtorch::tests::util::RunModuleForward(mod, inputs_ivalues);
+  torch::jit::IValue trt_results_ivalues = trtorch::tests::util::RunModuleForward(trt_mod, inputs_ivalues);
   std::vector<at::Tensor> trt_results;
   trt_results.push_back(trt_results_ivalues.toTensor());
 
