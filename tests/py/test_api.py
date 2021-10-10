@@ -13,38 +13,6 @@ class TestCompile(ModelTestCase):
         self.traced_model = torch.jit.trace(self.model, [self.input])
         self.scripted_model = torch.jit.script(self.model)
 
-    def test_compile_traced_deprecated(self):
-        compile_spec = {
-            "input_shapes": [self.input.shape],
-            "device": {
-                "device_type": trtorch.DeviceType.GPU,
-                "gpu_id": 0,
-                "dla_core": 0,
-                "allow_gpu_fallback": False,
-                "disable_tf32": False
-            }
-        }
-
-        trt_mod = trtorch.compile(self.traced_model, compile_spec)
-        same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
-        self.assertTrue(same < 2e-3)
-
-    def test_compile_script_deprecated(self):
-        compile_spec = {
-            "input_shapes": [self.input.shape],
-            "device": {
-                "device_type": trtorch.DeviceType.GPU,
-                "gpu_id": 0,
-                "dla_core": 0,
-                "allow_gpu_fallback": False,
-                "disable_tf32": False
-            }
-        }
-
-        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
-        same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
-        self.assertTrue(same < 2e-3)
-
     def test_compile_traced(self):
         compile_spec = {
             "inputs": [trtorch.Input(self.input.shape, dtype=torch.float, format=torch.contiguous_format)],
@@ -68,6 +36,27 @@ class TestCompile(ModelTestCase):
             },
             "enabled_precisions": {torch.float}
         }
+
+        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
+        same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
+        self.assertTrue(same < 2e-2)
+
+    def test_from_torch_tensor(self):
+        compile_spec = {
+            "inputs": [self.input],
+            "device": {
+                "device_type": trtorch.DeviceType.GPU,
+                "gpu_id": 0,
+            },
+            "enabled_precisions": {torch.float}
+        }
+
+        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
+        same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
+        self.assertTrue(same < 2e-2)
+
+    def test_device(self):
+        compile_spec = {"inputs": [self.input], "device": trtorch.Device("gpu:0"), "enabled_precisions": {torch.float}}
 
         trt_mod = trtorch.compile(self.scripted_model, compile_spec)
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
@@ -230,6 +219,53 @@ class TestLoggingAPIs(unittest.TestCase):
         self.assertTrue(color)
 
 
+class TestDevice(unittest.TestCase):
+
+    def test_from_string_constructor(self):
+        device = trtorch.Device("cuda:0")
+        self.assertEqual(device.device_type, trtorch.DeviceType.GPU)
+        self.assertEqual(device.gpu_id, 0)
+
+        device = trtorch.Device("gpu:1")
+        self.assertEqual(device.device_type, trtorch.DeviceType.GPU)
+        self.assertEqual(device.gpu_id, 1)
+
+    def test_from_string_constructor_dla(self):
+        device = trtorch.Device("dla:0")
+        self.assertEqual(device.device_type, trtorch.DeviceType.DLA)
+        self.assertEqual(device.gpu_id, 0)
+        self.assertEqual(device.dla_core, 0)
+
+        device = trtorch.Device("dla:1", allow_gpu_fallback=True)
+        self.assertEqual(device.device_type, trtorch.DeviceType.DLA)
+        self.assertEqual(device.gpu_id, 0)
+        self.assertEqual(device.dla_core, 1)
+        self.assertEqual(device.allow_gpu_fallback, True)
+
+    def test_kwargs_gpu(self):
+        device = trtorch.Device(gpu_id=0)
+        self.assertEqual(device.device_type, trtorch.DeviceType.GPU)
+        self.assertEqual(device.gpu_id, 0)
+
+    def test_kwargs_dla_and_settings(self):
+        device = trtorch.Device(dla_core=1, allow_gpu_fallback=False)
+        self.assertEqual(device.device_type, trtorch.DeviceType.DLA)
+        self.assertEqual(device.gpu_id, 0)
+        self.assertEqual(device.dla_core, 1)
+        self.assertEqual(device.allow_gpu_fallback, False)
+
+        device = trtorch.Device(gpu_id=1, dla_core=0, allow_gpu_fallback=True)
+        self.assertEqual(device.device_type, trtorch.DeviceType.DLA)
+        self.assertEqual(device.gpu_id, 1)
+        self.assertEqual(device.dla_core, 0)
+        self.assertEqual(device.allow_gpu_fallback, True)
+
+    def test_from_torch(self):
+        device = trtorch.Device._from_torch_device(torch.device("cuda:0"))
+        self.assertEqual(device.device_type, trtorch.DeviceType.GPU)
+        self.assertEqual(device.gpu_id, 0)
+
+
 def test_suite():
     suite = unittest.TestSuite()
     suite.addTest(unittest.makeSuite(TestLoggingAPIs))
@@ -242,6 +278,7 @@ def test_suite():
     suite.addTest(
         TestModuleFallbackToTorch.parametrize(TestModuleFallbackToTorch, model=models.resnet18(pretrained=True)))
     suite.addTest(unittest.makeSuite(TestCheckMethodOpSupport))
+    suite.addTest(unittest.makeSuite(TestDevice))
 
     return suite
 

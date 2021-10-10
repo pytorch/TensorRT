@@ -16,7 +16,8 @@ test_suite(
         ":test_modules_as_engines",
         ":test_multiple_registered_engines",
         ":test_serialization",
-        ":test_module_fallback"
+        ":test_module_fallback",
+        ":test_example_tensors"
     ],
 )
 
@@ -28,13 +29,25 @@ test_suite(
         ":test_modules_as_engines",
         ":test_multiple_registered_engines",
         ":test_serialization",
-        ":test_module_fallback"
+        ":test_module_fallback",
+        ":test_example_tensors"
     ],
 )
 
 cc_test(
     name = "test_default_input_types",
     srcs = ["test_default_input_types.cpp"],
+    data = [
+        "//tests/modules:jit_models",
+    ],
+    deps = [
+        ":cpp_api_test",
+    ],
+)
+
+cc_test(
+    name = "test_example_tensors",
+    srcs = ["test_example_tensors.cpp"],
     data = [
         "//tests/modules:jit_models",
     ],
