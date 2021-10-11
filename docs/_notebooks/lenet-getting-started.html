@@ -819,7 +819,7 @@ div.rendered_html tbody tr:hover {
         </div>
        </div>
        <p>
-        <img alt="b7a9274f56bc40d49b8ac96da4f5b921" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
+        <img alt="4ad32834008942b1a13a55d1a56e70b2" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
        </p>
        <section id="TRTorch-Getting-Started---LeNet">
         <h1 id="notebooks-lenet-getting-started--page-root">
@@ -925,8 +925,8 @@ import torch.nn.functional as F
 class LeNetFeatExtractor(nn.Module):
     def __init__(self):
         super(LeNetFeatExtractor, self).__init__()
-        self.conv1 = nn.Conv2d(1, 6, 3)
-        self.conv2 = nn.Conv2d(6, 16, 3)
+        self.conv1 = nn.Conv2d(1, 128, 3)
+        self.conv2 = nn.Conv2d(128, 16, 3)
 
     def forward(self, x):
         x = F.max_pool2d(F.relu(self.conv1(x)), (2, 2))
@@ -981,7 +981,7 @@ import numpy as np
 import torch.backends.cudnn as cudnn
 cudnn.benchmark = True
 
-def benchmark(model, input_shape=(1024, 1, 32, 32), dtype='fp32', nwarmup=50, nruns=10000):
+def benchmark(model, input_shape=(1024, 1, 32, 32), dtype='fp32', nwarmup=50, nruns=1000):
     input_data = torch.randn(input_shape)
     input_data = input_data.to("cuda")
     if dtype=='fp16':
@@ -1001,7 +1001,7 @@ def benchmark(model, input_shape=(1024, 1, 32, 32), dtype='fp32', nwarmup=50, nr
             torch.cuda.synchronize()
             end_time = time.time()
             timings.append(end_time - start_time)
-            if i%1000==0:
+            if i%100==0:
                 print('Iteration %d/%d, ave batch time %.2f ms'%(i, nruns, np.mean(timings)*1000))
 
     print("Input shape:", input_data.size())
@@ -1048,8 +1048,8 @@ model.to("cuda").eval()
              <pre>
 LeNet(
   (feat): LeNetFeatExtractor(
-    (conv1): Conv2d(1, 6, kernel_size=(3, 3), stride=(1, 1))
-    (conv2): Conv2d(6, 16, kernel_size=(3, 3), stride=(1, 1))
+    (conv1): Conv2d(1, 128, kernel_size=(3, 3), stride=(1, 1))
+    (conv2): Conv2d(128, 16, kernel_size=(3, 3), stride=(1, 1))
   )
   (classifer): LeNetClassifier(
     (fc1): Linear(in_features=576, out_features=120, bias=True)
@@ -1076,27 +1076,49 @@ LeNet(
             </div>
            </div>
           </div>
-          <div class="nboutput nblast docutils container">
+          <div class="nboutput docutils container">
            <div class="prompt empty docutils container">
            </div>
            <div class="output_area docutils container">
             <div class="highlight">
              <pre>
 Warm up ...
+</pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area stderr docutils container">
+            <div class="highlight">
+             <pre>
+/opt/conda/lib/python3.8/site-packages/torch/nn/functional.py:718: UserWarning: Named tensors and all their associated APIs are an experimental feature and subject to change. Please do not use them for anything important until they are released as stable. (Triggered internally at  ../c10/core/TensorImpl.h:1153.)
+  return torch.max_pool2d(input, kernel_size, stride, padding, dilation, ceil_mode)
+</pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
 Start timing ...
-Iteration 1000/10000, ave batch time 0.58 ms
-Iteration 2000/10000, ave batch time 0.58 ms
-Iteration 3000/10000, ave batch time 0.58 ms
-Iteration 4000/10000, ave batch time 0.58 ms
-Iteration 5000/10000, ave batch time 0.58 ms
-Iteration 6000/10000, ave batch time 0.58 ms
-Iteration 7000/10000, ave batch time 0.58 ms
-Iteration 8000/10000, ave batch time 0.58 ms
-Iteration 9000/10000, ave batch time 0.58 ms
-Iteration 10000/10000, ave batch time 0.58 ms
+Iteration 100/1000, ave batch time 5.14 ms
+Iteration 200/1000, ave batch time 5.13 ms
+Iteration 300/1000, ave batch time 5.13 ms
+Iteration 400/1000, ave batch time 5.13 ms
+Iteration 500/1000, ave batch time 5.13 ms
+Iteration 600/1000, ave batch time 5.13 ms
+Iteration 700/1000, ave batch time 5.13 ms
+Iteration 800/1000, ave batch time 5.13 ms
+Iteration 900/1000, ave batch time 5.13 ms
+Iteration 1000/1000, ave batch time 5.13 ms
 Input shape: torch.Size([1024, 1, 32, 32])
 Output features size: torch.Size([1024, 10])
-Average batch time: 0.58 ms
+Average batch time: 5.13 ms
 </pre>
             </div>
            </div>
@@ -1182,19 +1204,19 @@ LeNet(
              <pre>
 Warm up ...
 Start timing ...
-Iteration 1000/10000, ave batch time 0.58 ms
-Iteration 2000/10000, ave batch time 0.59 ms
-Iteration 3000/10000, ave batch time 0.59 ms
-Iteration 4000/10000, ave batch time 0.59 ms
-Iteration 5000/10000, ave batch time 0.59 ms
-Iteration 6000/10000, ave batch time 0.59 ms
-Iteration 7000/10000, ave batch time 0.59 ms
-Iteration 8000/10000, ave batch time 0.59 ms
-Iteration 9000/10000, ave batch time 0.59 ms
-Iteration 10000/10000, ave batch time 0.59 ms
+Iteration 100/1000, ave batch time 5.13 ms
+Iteration 200/1000, ave batch time 5.13 ms
+Iteration 300/1000, ave batch time 5.13 ms
+Iteration 400/1000, ave batch time 5.13 ms
+Iteration 500/1000, ave batch time 5.13 ms
+Iteration 600/1000, ave batch time 5.13 ms
+Iteration 700/1000, ave batch time 5.13 ms
+Iteration 800/1000, ave batch time 5.13 ms
+Iteration 900/1000, ave batch time 5.13 ms
+Iteration 1000/1000, ave batch time 5.13 ms
 Input shape: torch.Size([1024, 1, 32, 32])
 Output features size: torch.Size([1024, 10])
-Average batch time: 0.59 ms
+Average batch time: 5.13 ms
 </pre>
             </div>
            </div>
@@ -1293,19 +1315,19 @@ RecursiveScriptModule(
              <pre>
 Warm up ...
 Start timing ...
-Iteration 1000/10000, ave batch time 0.59 ms
-Iteration 2000/10000, ave batch time 0.59 ms
-Iteration 3000/10000, ave batch time 0.59 ms
-Iteration 4000/10000, ave batch time 0.59 ms
-Iteration 5000/10000, ave batch time 0.59 ms
-Iteration 6000/10000, ave batch time 0.59 ms
-Iteration 7000/10000, ave batch time 0.59 ms
-Iteration 8000/10000, ave batch time 0.59 ms
-Iteration 9000/10000, ave batch time 0.59 ms
-Iteration 10000/10000, ave batch time 0.59 ms
+Iteration 100/1000, ave batch time 5.16 ms
+Iteration 200/1000, ave batch time 5.15 ms
+Iteration 300/1000, ave batch time 5.14 ms
+Iteration 400/1000, ave batch time 5.14 ms
+Iteration 500/1000, ave batch time 5.14 ms
+Iteration 600/1000, ave batch time 5.14 ms
+Iteration 700/1000, ave batch time 5.14 ms
+Iteration 800/1000, ave batch time 5.14 ms
+Iteration 900/1000, ave batch time 5.14 ms
+Iteration 1000/1000, ave batch time 5.14 ms
 Input shape: torch.Size([1024, 1, 32, 32])
 Output features size: torch.Size([1024, 10])
-Average batch time: 0.59 ms
+Average batch time: 5.14 ms
 </pre>
             </div>
            </div>
@@ -1382,19 +1404,19 @@ torch.jit.save(trt_ts_module, "trt_ts_module.ts")
              <pre>
 Warm up ...
 Start timing ...
-Iteration 1000/10000, ave batch time 0.41 ms
-Iteration 2000/10000, ave batch time 0.41 ms
-Iteration 3000/10000, ave batch time 0.41 ms
-Iteration 4000/10000, ave batch time 0.40 ms
-Iteration 5000/10000, ave batch time 0.40 ms
-Iteration 6000/10000, ave batch time 0.40 ms
-Iteration 7000/10000, ave batch time 0.40 ms
-Iteration 8000/10000, ave batch time 0.40 ms
-Iteration 9000/10000, ave batch time 0.40 ms
-Iteration 10000/10000, ave batch time 0.40 ms
+Iteration 100/1000, ave batch time 2.00 ms
+Iteration 200/1000, ave batch time 1.97 ms
+Iteration 300/1000, ave batch time 1.98 ms
+Iteration 400/1000, ave batch time 1.98 ms
+Iteration 500/1000, ave batch time 1.99 ms
+Iteration 600/1000, ave batch time 1.99 ms
+Iteration 700/1000, ave batch time 1.99 ms
+Iteration 800/1000, ave batch time 1.99 ms
+Iteration 900/1000, ave batch time 1.98 ms
+Iteration 1000/1000, ave batch time 1.98 ms
 Input shape: torch.Size([1024, 1, 32, 32])
 Output features size: torch.Size([1024, 10])
-Average batch time: 0.40 ms
+Average batch time: 1.98 ms
 </pre>
             </div>
            </div>
@@ -1413,7 +1435,7 @@ Average batch time: 0.40 ms
           <div class="nbinput nblast docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[14]:
+             <pre><span></span>[13]:
 </pre>
             </div>
            </div>
@@ -1448,7 +1470,7 @@ torch.jit.save(trt_script_module, "trt_script_module.ts")
           <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[15]:
+             <pre><span></span>[14]:
 </pre>
             </div>
            </div>
@@ -1468,19 +1490,19 @@ torch.jit.save(trt_script_module, "trt_script_module.ts")
              <pre>
 Warm up ...
 Start timing ...
-Iteration 1000/10000, ave batch time 0.40 ms
-Iteration 2000/10000, ave batch time 0.40 ms
-Iteration 3000/10000, ave batch time 0.40 ms
-Iteration 4000/10000, ave batch time 0.40 ms
-Iteration 5000/10000, ave batch time 0.40 ms
-Iteration 6000/10000, ave batch time 0.40 ms
-Iteration 7000/10000, ave batch time 0.40 ms
-Iteration 8000/10000, ave batch time 0.40 ms
-Iteration 9000/10000, ave batch time 0.40 ms
-Iteration 10000/10000, ave batch time 0.40 ms
+Iteration 100/1000, ave batch time 2.02 ms
+Iteration 200/1000, ave batch time 1.98 ms
+Iteration 300/1000, ave batch time 1.97 ms
+Iteration 400/1000, ave batch time 1.96 ms
+Iteration 500/1000, ave batch time 1.96 ms
+Iteration 600/1000, ave batch time 1.96 ms
+Iteration 700/1000, ave batch time 1.96 ms
+Iteration 800/1000, ave batch time 1.96 ms
+Iteration 900/1000, ave batch time 1.96 ms
+Iteration 1000/1000, ave batch time 1.96 ms
 Input shape: torch.Size([1024, 1, 32, 32])
 Output features size: torch.Size([1024, 10])
-Average batch time: 0.40 ms
+Average batch time: 1.96 ms
 </pre>
             </div>
            </div>
