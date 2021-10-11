@@ -839,7 +839,7 @@ div.rendered_html tbody tr:hover {
         </div>
        </div>
        <p>
-        <img alt="6349ecfbc696467fb7b5431d892f6b07" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
+        <img alt="0ffdbddd2d824b96be90489b9946fe00" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
        </p>
        <section id="Object-Detection-with-TRTorch-(SSD)">
         <h1 id="notebooks-ssd-object-detection-demo--page-root">
@@ -961,17 +961,15 @@ div.rendered_html tbody tr:hover {
          <div class="nbinput nblast docutils container">
           <div class="prompt highlight-none notranslate">
            <div class="highlight">
-            <pre><span></span>[2]:
+            <pre><span></span>[ ]:
 </pre>
            </div>
           </div>
           <div class="input_area highlight-ipython3 notranslate">
            <div class="highlight">
             <pre>
-<span></span>%%capture
-%%bash
-# Known working versions
-pip install numpy==1.19 scipy==1.5.2 Pillow==6.2.0 scikit-image==0.17.2 matplotlib==3.3.0
+<span></span># Known working versions
+!pip install numpy==1.21.2 scipy==1.5.2 Pillow==6.2.0 scikit-image==0.17.2 matplotlib==3.3.0
 </pre>
            </div>
           </div>
@@ -1066,7 +1064,7 @@ pip install numpy==1.19 scipy==1.5.2 Pillow==6.2.0 scikit-image==0.17.2 matplotl
            </a>
            .
           </p>
-          <div class="nbinput docutils container">
+          <div class="nbinput nblast docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
              <pre><span></span>[3]:
@@ -1077,8 +1075,22 @@ pip install numpy==1.19 scipy==1.5.2 Pillow==6.2.0 scikit-image==0.17.2 matplotl
             <div class="highlight">
              <pre>
 <span></span>import torch
-
-# List of available models in PyTorch Hub from Nvidia/DeepLearningExamples
+torch.hub._validate_not_a_forked_repo=lambda a,b,c: True
+</pre>
+            </div>
+           </div>
+          </div>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[4]:
+</pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
+<span></span># List of available models in PyTorch Hub from Nvidia/DeepLearningExamples
 torch.hub.list('NVIDIA/DeepLearningExamples:torchhub')
 </pre>
             </div>
@@ -1090,7 +1102,7 @@ torch.hub.list('NVIDIA/DeepLearningExamples:torchhub')
            <div class="output_area stderr docutils container">
             <div class="highlight">
              <pre>
-Using cache found in /root/.cache/torch/hub/NVIDIA_DeepLearningExamples_torchhub
+Downloading: "https://github.com/NVIDIA/DeepLearningExamples/archive/torchhub.zip" to /root/.cache/torch/hub/torchhub.zip
 </pre>
             </div>
            </div>
@@ -1098,20 +1110,18 @@ Using cache found in /root/.cache/torch/hub/NVIDIA_DeepLearningExamples_torchhub
           <div class="nboutput nblast docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[3]:
+             <pre><span></span>[4]:
 </pre>
             </div>
            </div>
            <div class="output_area docutils container">
             <div class="highlight">
              <pre>
-['checkpoint_from_distributed',
- 'nvidia_ncf',
- 'nvidia_ssd',
+['nvidia_ssd',
  'nvidia_ssd_processing_utils',
  'nvidia_tacotron2',
- 'nvidia_waveglow',
- 'unwrap_distributed']
+ 'nvidia_tts_utils',
+ 'nvidia_waveglow']
 </pre>
             </div>
            </div>
@@ -1119,7 +1129,7 @@ Using cache found in /root/.cache/torch/hub/NVIDIA_DeepLearningExamples_torchhub
           <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[4]:
+             <pre><span></span>[5]:
 </pre>
             </div>
            </div>
@@ -1140,6 +1150,7 @@ ssd300 = torch.hub.load('NVIDIA/DeepLearningExamples:torchhub', 'nvidia_ssd', mo
             <div class="highlight">
              <pre>
 Using cache found in /root/.cache/torch/hub/NVIDIA_DeepLearningExamples_torchhub
+Downloading checkpoint from https://api.ngc.nvidia.com/v2/models/nvidia/ssd_pyt_ckpt_amp/versions/20.06.0/files/nvidia_ssdpyt_amp_200703.pt
 </pre>
             </div>
            </div>
@@ -1167,7 +1178,7 @@ Using cache found in /root/.cache/torch/hub/NVIDIA_DeepLearningExamples_torchhub
           <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[5]:
+             <pre><span></span>[6]:
 </pre>
             </div>
            </div>
@@ -1195,7 +1206,7 @@ classes_to_labels = utils.get_coco_object_dictionary()
             </div>
            </div>
           </div>
-          <div class="nboutput docutils container">
+          <div class="nboutput nblast docutils container">
            <div class="prompt empty docutils container">
            </div>
            <div class="output_area stderr docutils container">
@@ -1206,22 +1217,10 @@ Using cache found in /root/.cache/torch/hub/NVIDIA_DeepLearningExamples_torchhub
             </div>
            </div>
           </div>
-          <div class="nboutput nblast docutils container">
-           <div class="prompt empty docutils container">
-           </div>
-           <div class="output_area docutils container">
-            <div class="highlight">
-             <pre>
-Downloading COCO annotations.
-Downloading finished.
-</pre>
-            </div>
-           </div>
-          </div>
-          <div class="nbinput nblast docutils container">
+          <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[6]:
+             <pre><span></span>[7]:
 </pre>
             </div>
            </div>
@@ -1241,6 +1240,18 @@ best_results_per_input = [utils.pick_best(results, 0.40) for results in results_
             </div>
            </div>
           </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area stderr docutils container">
+            <div class="highlight">
+             <pre>
+/opt/conda/lib/python3.8/site-packages/torch/nn/functional.py:718: UserWarning: Named tensors and all their associated APIs are an experimental feature and subject to change. Please do not use them for anything important until they are released as stable. (Triggered internally at  ../c10/core/TensorImpl.h:1153.)
+  return torch.max_pool2d(input, kernel_size, stride, padding, dilation, ceil_mode)
+</pre>
+            </div>
+           </div>
+          </div>
          </section>
          <section id="Visualize-results">
           <h3 id="Visualize-results">
@@ -1252,7 +1263,7 @@ best_results_per_input = [utils.pick_best(results, 0.40) for results in results_
           <div class="nbinput nblast docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[7]:
+             <pre><span></span>[8]:
 </pre>
             </div>
            </div>
@@ -1286,7 +1297,7 @@ def plot_results(best_results):
           <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[8]:
+             <pre><span></span>[9]:
 </pre>
             </div>
            </div>
@@ -1303,21 +1314,21 @@ plot_results(best_results_per_input)
            <div class="prompt empty docutils container">
            </div>
            <div class="output_area docutils container">
-            <img alt="../_images/_notebooks_ssd-object-detection-demo_17_0.png" src="../_images/_notebooks_ssd-object-detection-demo_17_0.png"/>
+            <img alt="../_images/_notebooks_ssd-object-detection-demo_18_0.png" src="../_images/_notebooks_ssd-object-detection-demo_18_0.png"/>
            </div>
           </div>
           <div class="nboutput docutils container">
            <div class="prompt empty docutils container">
            </div>
            <div class="output_area docutils container">
-            <img alt="../_images/_notebooks_ssd-object-detection-demo_17_1.png" src="../_images/_notebooks_ssd-object-detection-demo_17_1.png"/>
+            <img alt="../_images/_notebooks_ssd-object-detection-demo_18_1.png" src="../_images/_notebooks_ssd-object-detection-demo_18_1.png"/>
            </div>
           </div>
           <div class="nboutput nblast docutils container">
            <div class="prompt empty docutils container">
            </div>
            <div class="output_area docutils container">
-            <img alt="../_images/_notebooks_ssd-object-detection-demo_17_2.png" src="../_images/_notebooks_ssd-object-detection-demo_17_2.png"/>
+            <img alt="../_images/_notebooks_ssd-object-detection-demo_18_2.png" src="../_images/_notebooks_ssd-object-detection-demo_18_2.png"/>
            </div>
           </div>
          </section>
@@ -1331,7 +1342,7 @@ plot_results(best_results_per_input)
           <div class="nbinput nblast docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[9]:
+             <pre><span></span>[10]:
 </pre>
             </div>
            </div>
@@ -1365,7 +1376,7 @@ def benchmark(model, input_shape=(1024, 1, 32, 32), dtype='fp32', nwarmup=50, nr
             torch.cuda.synchronize()
             end_time = time.time()
             timings.append(end_time - start_time)
-            if i%100==0:
+            if i%10==0:
                 print('Iteration %d/%d, avg batch time %.2f ms'%(i, nruns, np.mean(timings)*1000))
 
     print("Input shape:", input_data.size())
@@ -1387,7 +1398,7 @@ def benchmark(model, input_shape=(1024, 1, 32, 32), dtype='fp32', nwarmup=50, nr
           <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[10]:
+             <pre><span></span>[11]:
 </pre>
             </div>
            </div>
@@ -1396,7 +1407,7 @@ def benchmark(model, input_shape=(1024, 1, 32, 32), dtype='fp32', nwarmup=50, nr
              <pre>
 <span></span># Model benchmark without TRTorch/TensorRT
 model = ssd300.eval().to("cuda")
-benchmark(model, input_shape=(128, 3, 300, 300), nruns=1000)
+benchmark(model, input_shape=(128, 3, 300, 300), nruns=100)
 </pre>
             </div>
            </div>
@@ -1409,20 +1420,20 @@ benchmark(model, input_shape=(128, 3, 300, 300), nruns=1000)
              <pre>
 Warm up ...
 Start timing ...
-Iteration 100/1000, avg batch time 362.25 ms
-Iteration 200/1000, avg batch time 362.47 ms
-Iteration 300/1000, avg batch time 362.57 ms
-Iteration 400/1000, avg batch time 362.75 ms
-Iteration 500/1000, avg batch time 362.80 ms
-Iteration 600/1000, avg batch time 362.86 ms
-Iteration 700/1000, avg batch time 362.93 ms
-Iteration 800/1000, avg batch time 362.96 ms
-Iteration 900/1000, avg batch time 362.96 ms
-Iteration 1000/1000, avg batch time 362.99 ms
+Iteration 10/100, avg batch time 382.30 ms
+Iteration 20/100, avg batch time 382.72 ms
+Iteration 30/100, avg batch time 382.63 ms
+Iteration 40/100, avg batch time 382.83 ms
+Iteration 50/100, avg batch time 382.90 ms
+Iteration 60/100, avg batch time 382.86 ms
+Iteration 70/100, avg batch time 382.88 ms
+Iteration 80/100, avg batch time 382.86 ms
+Iteration 90/100, avg batch time 382.95 ms
+Iteration 100/100, avg batch time 382.97 ms
 Input shape: torch.Size([128, 3, 300, 300])
 Output location prediction size: torch.Size([128, 4, 8732])
 Output label prediction size: torch.Size([128, 81, 8732])
-Average batch time: 362.99 ms
+Average batch time: 382.97 ms
 </pre>
             </div>
            </div>
@@ -1453,7 +1464,7 @@ sees. - Scripting does an analysis of the Python code and generates TorchScript,
           <div class="nbinput nblast docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[11]:
+             <pre><span></span>[12]:
 </pre>
             </div>
            </div>
@@ -1472,7 +1483,7 @@ traced_model = torch.jit.trace(model, [torch.randn((1,3,300,300)).to("cuda")])
           <div class="nbinput nblast docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[12]:
+             <pre><span></span>[13]:
 </pre>
             </div>
            </div>
@@ -1488,7 +1499,7 @@ torch.jit.save(traced_model, "ssd_300_traced.jit.pt")
           <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[13]:
+             <pre><span></span>[14]:
 </pre>
             </div>
            </div>
@@ -1496,7 +1507,7 @@ torch.jit.save(traced_model, "ssd_300_traced.jit.pt")
             <div class="highlight">
              <pre>
 <span></span># Obtain the average time taken by a batch of input with Torchscript compiled modules
-benchmark(traced_model, input_shape=(128, 3, 300, 300), nruns=1000)
+benchmark(traced_model, input_shape=(128, 3, 300, 300), nruns=100)
 </pre>
             </div>
            </div>
@@ -1509,20 +1520,20 @@ benchmark(traced_model, input_shape=(128, 3, 300, 300), nruns=1000)
              <pre>
 Warm up ...
 Start timing ...
-Iteration 100/1000, avg batch time 363.09 ms
-Iteration 200/1000, avg batch time 363.00 ms
-Iteration 300/1000, avg batch time 363.09 ms
-Iteration 400/1000, avg batch time 363.05 ms
-Iteration 500/1000, avg batch time 363.08 ms
-Iteration 600/1000, avg batch time 363.07 ms
-Iteration 700/1000, avg batch time 363.09 ms
-Iteration 800/1000, avg batch time 363.06 ms
-Iteration 900/1000, avg batch time 363.08 ms
-Iteration 1000/1000, avg batch time 363.08 ms
+Iteration 10/100, avg batch time 382.67 ms
+Iteration 20/100, avg batch time 382.54 ms
+Iteration 30/100, avg batch time 382.73 ms
+Iteration 40/100, avg batch time 382.53 ms
+Iteration 50/100, avg batch time 382.56 ms
+Iteration 60/100, avg batch time 382.50 ms
+Iteration 70/100, avg batch time 382.54 ms
+Iteration 80/100, avg batch time 382.54 ms
+Iteration 90/100, avg batch time 382.57 ms
+Iteration 100/100, avg batch time 382.62 ms
 Input shape: torch.Size([128, 3, 300, 300])
 Output location prediction size: torch.Size([128, 4, 8732])
 Output label prediction size: torch.Size([128, 81, 8732])
-Average batch time: 363.08 ms
+Average batch time: 382.62 ms
 </pre>
             </div>
            </div>
@@ -1534,7 +1545,7 @@ Average batch time: 363.08 ms
           <div class="nbinput nblast docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[14]:
+             <pre><span></span>[15]:
 </pre>
             </div>
            </div>
@@ -1564,7 +1575,7 @@ trt_model = trtorch.compile(traced_model, {
           <div class="nbinput nblast docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[15]:
+             <pre><span></span>[16]:
 </pre>
             </div>
            </div>
@@ -1589,7 +1600,7 @@ best_results_per_input_trt = [utils.pick_best(results, 0.40) for results in resu
           <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[16]:
+             <pre><span></span>[17]:
 </pre>
             </div>
            </div>
@@ -1606,21 +1617,21 @@ plot_results(best_results_per_input_trt)
            <div class="prompt empty docutils container">
            </div>
            <div class="output_area docutils container">
-            <img alt="../_images/_notebooks_ssd-object-detection-demo_34_0.png" src="../_images/_notebooks_ssd-object-detection-demo_34_0.png"/>
+            <img alt="../_images/_notebooks_ssd-object-detection-demo_35_0.png" src="../_images/_notebooks_ssd-object-detection-demo_35_0.png"/>
            </div>
           </div>
           <div class="nboutput docutils container">
            <div class="prompt empty docutils container">
            </div>
            <div class="output_area docutils container">
-            <img alt="../_images/_notebooks_ssd-object-detection-demo_34_1.png" src="../_images/_notebooks_ssd-object-detection-demo_34_1.png"/>
+            <img alt="../_images/_notebooks_ssd-object-detection-demo_35_1.png" src="../_images/_notebooks_ssd-object-detection-demo_35_1.png"/>
            </div>
           </div>
           <div class="nboutput nblast docutils container">
            <div class="prompt empty docutils container">
            </div>
            <div class="output_area docutils container">
-            <img alt="../_images/_notebooks_ssd-object-detection-demo_34_2.png" src="../_images/_notebooks_ssd-object-detection-demo_34_2.png"/>
+            <img alt="../_images/_notebooks_ssd-object-detection-demo_35_2.png" src="../_images/_notebooks_ssd-object-detection-demo_35_2.png"/>
            </div>
           </div>
           <p>
@@ -1642,7 +1653,7 @@ plot_results(best_results_per_input_trt)
          <div class="nbinput docutils container">
           <div class="prompt highlight-none notranslate">
            <div class="highlight">
-            <pre><span></span>[17]:
+            <pre><span></span>[18]:
 </pre>
            </div>
           </div>
@@ -1658,7 +1669,7 @@ trt_model = trtorch.compile(traced_model, {
     "workspace_size": 1 &lt;&lt; 20
 })
 
-benchmark(trt_model, input_shape=(batch_size, 3, 300, 300), nruns=1000, dtype="fp16")
+benchmark(trt_model, input_shape=(batch_size, 3, 300, 300), nruns=100, dtype="fp16")
 </pre>
            </div>
           </div>
@@ -1671,20 +1682,20 @@ benchmark(trt_model, input_shape=(batch_size, 3, 300, 300), nruns=1000, dtype="f
             <pre>
 Warm up ...
 Start timing ...
-Iteration 100/1000, avg batch time 72.94 ms
-Iteration 200/1000, avg batch time 72.95 ms
-Iteration 300/1000, avg batch time 73.00 ms
-Iteration 400/1000, avg batch time 73.06 ms
-Iteration 500/1000, avg batch time 73.10 ms
-Iteration 600/1000, avg batch time 73.14 ms
-Iteration 700/1000, avg batch time 73.17 ms
-Iteration 800/1000, avg batch time 73.18 ms
-Iteration 900/1000, avg batch time 73.19 ms
-Iteration 1000/1000, avg batch time 73.21 ms
+Iteration 10/100, avg batch time 72.90 ms
+Iteration 20/100, avg batch time 72.95 ms
+Iteration 30/100, avg batch time 72.92 ms
+Iteration 40/100, avg batch time 72.94 ms
+Iteration 50/100, avg batch time 72.99 ms
+Iteration 60/100, avg batch time 73.01 ms
+Iteration 70/100, avg batch time 73.04 ms
+Iteration 80/100, avg batch time 73.04 ms
+Iteration 90/100, avg batch time 73.04 ms
+Iteration 100/100, avg batch time 73.06 ms
 Input shape: torch.Size([128, 3, 300, 300])
 Output location prediction size: torch.Size([128, 4, 8732])
 Output label prediction size: torch.Size([128, 81, 8732])
-Average batch time: 73.21 ms
+Average batch time: 73.06 ms
 </pre>
            </div>
           </div>
