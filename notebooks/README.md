@@ -14,7 +14,7 @@ git clone https://github.com/NVIDIA/TRTorch
 Next, build the NVIDIA TRTorch container (from repo root):
 
 ```
-docker build -t trtorch -f notebooks/Dockerfile.notebook .
+docker build -t trtorch -f ./docker/Dockerfile.21.06 .
 ```
 
 Then launch the container with:
@@ -44,3 +44,9 @@ Within the container, the notebooks themselves are located at `/workspace/TRTorc
 
 - [lenet-getting-started.ipynb](lenet-getting-started.ipynb): simple example on a LeNet network.
 - [ssd-object-detection-demo.ipynb](ssd-object-detection-demo.ipynb): demo for compiling a pretrained SSD model using TRTorch.
+- [Resnet50-example.ipynb](Resnet50-example.ipynb): demo on the ResNet-50 network.
+- [vgg-qat.ipynb](vgg-qat.ipynb): Quantization Aware Trained models in INT8 using TRTorch
+
+```python
+
+```
