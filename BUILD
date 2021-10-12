@@ -65,7 +65,7 @@ pkg_tar(
     name = "libtrtorch",
     srcs = [
         "//:LICENSE",
-        "//bzl_def:BUILD.bzl",
+        "//bzl_def:BUILD",
         "//bzl_def:WORKSPACE"
     ],
     extension = "tar.gz",
