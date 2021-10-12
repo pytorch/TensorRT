@@ -35,7 +35,6 @@ cc_test(
   srcs = ["test_fallback_graph_output.cpp"],
   deps = [
       "//tests/util",
-      "//core",
       "@googletest//:gtest_main",
   ] + select({
       ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
@@ -51,7 +50,6 @@ cc_test(
   srcs = ["test_conditionals.cpp"],
   deps = [
       "//tests/util",
-      "//core",
       "@googletest//:gtest_main",
   ] + select({
       ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
