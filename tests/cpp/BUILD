@@ -74,7 +74,6 @@ cc_test(
         "//tests/modules:jit_models",
     ],
     deps = [
-        "//cpp:trtorch",
         "//tests/util",
         "@googletest//:gtest_main",
     ] + select({
@@ -102,7 +101,6 @@ cc_test(
         "//tests/modules:jit_models",
     ],
     deps = [
-        "//cpp:trtorch",
         "//tests/util",
         "@googletest//:gtest_main",
     ] + select({
@@ -137,7 +135,6 @@ cc_library(
     name = "cpp_api_test",
     hdrs = ["cpp_api_test.h"],
     deps = [
-        "//cpp:trtorch",
         "//tests/util",
         "@googletest//:gtest_main",
     ] + select({
