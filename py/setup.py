@@ -72,7 +72,7 @@ if BAZEL_EXE is None:
 
 def build_libtrtorch_pre_cxx11_abi(develop=True, use_dist_dir=True, cxx11_abi=False):
     cmd = [BAZEL_EXE, "build"]
-    cmd.append("//cpp/lib:libtrtorch.so")
+    cmd.append("//:libtrtorch")
     if develop:
         cmd.append("--compilation_mode=dbg")
     else:
@@ -106,7 +106,6 @@ def gen_version_file():
         print("creating version file")
         f.write("__version__ = \"" + __version__ + '\"')
 
-
 def copy_libtrtorch(multilinux=False):
     if not os.path.exists(dir_path + '/trtorch/lib'):
         os.makedirs(dir_path + '/trtorch/lib')
@@ -115,7 +114,7 @@ def copy_libtrtorch(multilinux=False):
     if multilinux:
         copyfile(dir_path + "/build/libtrtorch_build/libtrtorch.so", dir_path + '/trtorch/lib/libtrtorch.so')
     else:
-        copyfile(dir_path + "/../bazel-bin/cpp/lib/libtrtorch.so", dir_path + '/trtorch/lib/libtrtorch.so')
+        os.system("tar -xzf ../bazel-bin/libtrtorch.tar.gz --strip-components=2 -C " + dir_path + "/trtorch")
 
 
 class DevelopCommand(develop):
@@ -258,9 +257,12 @@ setup(name='trtorch',
       python_requires='>=3.6',
       include_package_data=True,
       package_data={
-          'trtorch': ['lib/*.so'],
+          'trtorch': ['lib/*',
+                      'include/trtorch/*.h',
+                      'include/trtorch/core/**/*.h',
+                      'bin/*'],
       },
       exclude_package_data={
-          '': ['*.cpp', '*.h'],
+          '': ['*.cpp'],
           'trtorch': ['csrc/*.cpp'],
       })
