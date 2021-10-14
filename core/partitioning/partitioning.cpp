@@ -160,7 +160,8 @@ void resolveNonTensorInputs(PartitionedGraph& segmented_blocks) { // , std::shar
       }
     }
 
-    // For each non-tensor value in the usage_counts map, keep updating the produce_id to the earliest segmented block that has/produces it.
+    // For each non-tensor value in the usage_counts map, keep updating the produce_id to the earliest segmented block
+    // that has/produces it.
     for (auto& use : usage_counts) {
       // Set the produce_id to the segmented block index that contains/produces this non-tensor torch::jit::Value
       if (segmented_blocks[i].contain_raw_value(use.first)) {
@@ -168,7 +169,6 @@ void resolveNonTensorInputs(PartitionedGraph& segmented_blocks) { // , std::shar
       }
     }
   }
-
 
   std::unordered_set<int> updated_segments;
   for (auto& use : usage_counts) {
@@ -316,7 +316,6 @@ std::vector<SegmentedBlock> segment_graph(torch::jit::Block* block, const Partit
         segmented_blocks.emplace_back(SegmentedBlock::kTorch, std::vector<torch::jit::Node*>{n});
         continue;
       } else if (n->kind() == torch::jit::prim::Loop) {
-
         if (!pytorch_nodes.empty()) {
           segmented_blocks.emplace_back(SegmentedBlock::kTorch, pytorch_nodes);
           pytorch_nodes.clear();
