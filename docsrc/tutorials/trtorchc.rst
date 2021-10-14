@@ -34,8 +34,6 @@ to standard TorchScript. Load with ``torch.jit.load()`` and run like you would r
           --i, --info                       Dumps info messages generated during
                                             compilation onto the console
         --build-debuggable-engine         Creates a debuggable engine
-        --use-strict-types                Restrict operating type to only use set
-                                          operation precision
         --allow-gpu-fallback              (Only used when targeting DLA
                                           (device-type)) Lets engine run layers on
                                           GPU if they are not supported on DLA
@@ -89,8 +87,6 @@ to standard TorchScript. Load with ``torch.jit.load()`` and run like you would r
                                           used to select kernels
         --workspace-size=[workspace_size] Maximum size of workspace given to
                                           TensorRT
-        --max-batch-size=[max_batch_size] Maximum batch size (must be >= 1 to be
-                                          set, 0 means not set)
         -t[threshold],
         --threshold=[threshold]           Maximum acceptable numerical deviation
                                           from standard torchscript output

@@ -207,10 +207,6 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
         assert isinstance(compile_spec["debug"], bool)
         info.debug = compile_spec["debug"]
 
-    if "strict_types" in compile_spec:
-        assert isinstance(compile_spec["strict_types"], bool)
-        info.strict_types = compile_spec["strict_types"]
-
     if "device" in compile_spec:
         info.device = _parse_device(compile_spec["device"])
 
@@ -229,10 +225,6 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
     if "workspace_size" in compile_spec:
         assert type(compile_spec["workspace_size"]) is int
         info.workspace_size = compile_spec["workspace_size"]
-
-    if "max_batch_size" in compile_spec:
-        assert type(compile_spec["max_batch_size"]) is int
-        info.max_batch_size = compile_spec["max_batch_size"]
 
     if "truncate_long_and_double" in compile_spec:
         assert type(compile_spec["truncate_long_and_double"]) is bool
@@ -283,12 +275,10 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]) -> torch.classes.tensorrt.
                         "disable_tf32": False, # Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
                         "refit": False, # enable refit
                         "debug": False, # enable debuggable engine
-                        "strict_types": False, # kernels should strictly run in operating precision
                         "capability": trtorch.EngineCapability.DEFAULT, # Restrict kernel selection to safe gpu kernels or safe dla kernels
                         "num_min_timing_iters": 2, # Number of minimization timing iterations used to select kernels
                         "num_avg_timing_iters": 1, # Number of averaging timing iterations used to select kernels
                         "workspace_size": 0, # Maximum size of workspace given to TensorRT
-                        "max_batch_size": 0, # Maximum batch size (must be >= 1 to be set, 0 means not set)
                         "truncate_long_and_double": False, # Truncate long and double into int and float
                     })
                 }
@@ -340,12 +330,10 @@ def TensorRTCompileSpec(compile_spec: Dict[str, Any]) -> torch.classes.tensorrt.
     backend_spec._set_refit(parsed_spec.refit)
     backend_spec._set_debug(parsed_spec.debug)
     backend_spec._set_refit(parsed_spec.refit)
-    backend_spec._set_strict_types(parsed_spec.strict_types)
     backend_spec._set_capability(int(parsed_spec.capability))
     backend_spec._set_num_min_timing_iters(parsed_spec.num_min_timing_iters)
     backend_spec._set_num_avg_timing_iters(parsed_spec.num_avg_timing_iters)
     backend_spec._set_workspace_size(parsed_spec.workspace_size)
-    backend_spec._set_max_batch_size(parsed_spec.max_batch_size)
     backend_spec._set_truncate_long_and_double(parsed_spec.truncate_long_and_double)
     backend_spec._set_ptq_calibrator(parsed_spec._get_calibrator_handle())
 

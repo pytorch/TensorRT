@@ -18,7 +18,6 @@ class TestToBackendLowering(ModelTestCase):
                     "enabled_precision": {torch.float},
                     "refit": False,
                     "debug": False,
-                    "strict_types": False,
                     "device": {
                         "device_type": trtorch.DeviceType.GPU,
                         "gpu_id": 0,
@@ -28,7 +27,6 @@ class TestToBackendLowering(ModelTestCase):
                     "capability": trtorch.EngineCapability.default,
                     "num_min_timing_iters": 2,
                     "num_avg_timing_iters": 1,
-                    "max_batch_size": 0,
                     "disable_tf32": False,
                 })
         }

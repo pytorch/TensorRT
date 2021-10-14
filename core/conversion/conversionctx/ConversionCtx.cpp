@@ -18,18 +18,11 @@ std::ostream& operator<<(std::ostream& os, const BuilderSettings& s) {
        << "\n    Truncate Long and Double: " << s.truncate_long_and_double                 \
        << "\n    Make Refittable Engine: " << s.refit                                      \
        << "\n    Debuggable Engine: " << s.debug                                           \
-       << "\n    Strict Types: " << s.strict_types                                         \
        << "\n    GPU ID: " << s.device.gpu_id                                              \
        << "\n    Allow GPU Fallback (if running on DLA): " << s.device.allow_gpu_fallback  \
        << "\n    Min Timing Iterations: " << s.num_min_timing_iters                        \
        << "\n    Avg Timing Iterations: " << s.num_avg_timing_iters                        \
        << "\n    Max Workspace Size: " << s.workspace_size;
-
-    if (s.max_batch_size != 0) {
-    os << "\n    Max Batch Size: " << s.max_batch_size;
-    } else {
-    os << "\n    Max Batch Size: Not set";
-    }
 
     os << "\n    Device Type: " << s.device.device_type                                    \
        << "\n    GPU ID: " << s.device.gpu_id;
@@ -105,16 +98,8 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
     cfg->setFlag(nvinfer1::BuilderFlag::kDEBUG);
   }
 
-  if (settings.strict_types) {
-    cfg->setFlag(nvinfer1::BuilderFlag::kSTRICT_TYPES);
-  }
-
   if (settings.device.allow_gpu_fallback) {
     cfg->setFlag(nvinfer1::BuilderFlag::kGPU_FALLBACK);
-  }
-
-  if (settings.max_batch_size != 0) {
-    builder->setMaxBatchSize(settings.max_batch_size);
   }
 
   cfg->setMinTimingIterations(settings.num_min_timing_iters);

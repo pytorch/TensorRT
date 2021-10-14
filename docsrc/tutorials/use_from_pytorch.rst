@@ -38,7 +38,6 @@ at the documentation for the TRTorch ``TensorRTCompileSpec`` API.
                 "enabled_precisions": {torch.float, torch.half},
                 "refit": False,
                 "debug": False,
-                "strict_types": False,
                 "device": {
                     "device_type": trtorch.DeviceType.GPU,
                     "gpu_id": 0,
@@ -48,7 +47,6 @@ at the documentation for the TRTorch ``TensorRTCompileSpec`` API.
                 "capability": trtorch.EngineCapability.default,
                 "num_min_timing_iters": 2,
                 "num_avg_timing_iters": 1,
-                "max_batch_size": 0,
             })
         }
 
@@ -64,4 +62,3 @@ To run explicitly call the function of the method you want to run (vs. how you c
 
     input = torch.randn((1, 3, 300, 300)).to("cuda").to(torch.half)
     print(trt_model.forward(input))
-

@@ -229,8 +229,6 @@ int main(int argc, char** argv) {
 
   args::Flag build_debuggable_engine(
       parser, "build-debuggable-engine", "Creates a debuggable engine", {"build-debuggable-engine"});
-  args::Flag use_strict_types(
-      parser, "use-strict-types", "Restrict operating type to only use set operation precision", {"use-strict-types"});
   args::Flag allow_gpu_fallback(
       parser,
       "allow-gpu-fallback",
@@ -300,8 +298,6 @@ int main(int argc, char** argv) {
       parser, "num_iters", "Number of averaging timing iterations used to select kernels", {"num-avg-timing-iters"});
   args::ValueFlag<uint64_t> workspace_size(
       parser, "workspace_size", "Maximum size of workspace given to TensorRT", {"workspace-size"});
-  args::ValueFlag<uint64_t> max_batch_size(
-      parser, "max_batch_size", "Maximum batch size (must be >= 1 to be set, 0 means not set)", {"max-batch-size"});
   args::ValueFlag<double> threshold(
       parser,
       "threshold",
@@ -455,10 +451,6 @@ int main(int argc, char** argv) {
     compile_settings.debug = true;
   }
 
-  if (use_strict_types) {
-    compile_settings.strict_types = true;
-  }
-
   if (allow_gpu_fallback) {
     compile_settings.device.allow_gpu_fallback = true;
   }
@@ -579,10 +571,6 @@ int main(int argc, char** argv) {
 
   if (workspace_size) {
     compile_settings.workspace_size = args::get(workspace_size);
-  }
-
-  if (max_batch_size) {
-    compile_settings.max_batch_size = args::get(max_batch_size);
   }
 
   if (truncate_long_and_double) {

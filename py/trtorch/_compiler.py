@@ -48,12 +48,10 @@ def compile(module: torch.jit.ScriptModule, compile_spec: Any) -> torch.jit.Scri
                     "enabled_precisions": {torch.float, torch.half}, # Enabling FP16 kernels
                     "refit": false, # enable refit
                     "debug": false, # enable debuggable engine
-                    "strict_types": false, # kernels should strictly run in operating precision
                     "capability": trtorch.EngineCapability.DEFAULT, # Restrict kernel selection to safe gpu kernels or safe dla kernels
                     "num_min_timing_iters": 2, # Number of minimization timing iterations used to select kernels
                     "num_avg_timing_iters": 1, # Number of averaging timing iterations used to select kernels
                     "workspace_size": 0, # Maximum size of workspace given to TensorRT
-                    "max_batch_size": 0, # Maximum batch size (must be >= 1 to be set, 0 means not set)
                     "torch_fallback": {
                         "enabled": True, # Turn on or turn off falling back to PyTorch if operations are not supported in TensorRT
                         "force_fallback_ops": [
@@ -121,12 +119,10 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule, method_name: st
                     "sparse_weights": Enable sparsity for convolution and fully connected layers.
                     "refit": false, # enable refit
                     "debug": false, # enable debuggable engine
-                    "strict_types": false, # kernels should strictly run in operating precision
                     "capability": trtorch.EngineCapability.DEFAULT, # Restrict kernel selection to safe gpu kernels or safe dla kernels
                     "num_min_timing_iters": 2, # Number of minimization timing iterations used to select kernels
                     "num_avg_timing_iters": 1, # Number of averaging timing iterations used to select kernels
                     "workspace_size": 0, # Maximum size of workspace given to TensorRT
-                    "max_batch_size": 0, # Maximum batch size (must be >= 1 to be set, 0 means not set)
                 }
 
             Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using

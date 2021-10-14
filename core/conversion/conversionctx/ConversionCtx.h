@@ -29,7 +29,6 @@ struct BuilderSettings {
   bool disable_tf32 = false;
   bool refit = false;
   bool debug = false;
-  bool strict_types = false;
   bool truncate_long_and_double = false;
   Device device;
   nvinfer1::EngineCapability capability = TRT_ENGINE_CAPABILITY_STANDARD;
@@ -37,7 +36,6 @@ struct BuilderSettings {
   uint64_t num_min_timing_iters = 2;
   uint64_t num_avg_timing_iters = 1;
   uint64_t workspace_size = 0;
-  uint64_t max_batch_size = 0;
 
   BuilderSettings() = default;
   BuilderSettings(const BuilderSettings& other) = default;

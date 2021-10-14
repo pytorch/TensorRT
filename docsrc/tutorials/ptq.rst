@@ -194,7 +194,6 @@ to use ``CacheCalibrator`` to use in INT8 mode.
         "inputs": [trtorch.Input([1, 3, 32, 32])],
         "enabled_precisions": {torch.float, torch.half, torch.int8},
         "calibrator": calibrator,
-        "max_batch_size": 32,
     }
 
   trt_mod = trtorch.compile(model, compile_settings)

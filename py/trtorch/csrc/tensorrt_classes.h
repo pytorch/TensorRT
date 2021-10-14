@@ -144,13 +144,11 @@ struct CompileSpec : torch::CustomClassHolder {
   ADD_FIELD_GET_SET(sparse_weights, bool);
   ADD_FIELD_GET_SET(refit, bool);
   ADD_FIELD_GET_SET(debug, bool);
-  ADD_FIELD_GET_SET(strict_types, bool);
   ADD_ENUM_GET_SET(capability, EngineCapability, static_cast<int64_t>(EngineCapability::kSAFE_DLA));
   ADD_FIELD_GET_SET(num_min_timing_iters, int64_t);
   ADD_FIELD_GET_SET(num_avg_timing_iters, int64_t);
   ADD_FIELD_GET_SET(workspace_size, int64_t);
   ADD_FIELD_GET_SET(truncate_long_and_double, bool);
-  ADD_FIELD_GET_SET(max_batch_size, int64_t);
   ADD_FIELD_GET_SET(device, Device);
   ADD_FIELD_GET_SET(torch_fallback, TorchFallback);
   ADD_FIELD_GET_SET(ptq_calibrator, nvinfer1::IInt8Calibrator*);
@@ -162,7 +160,6 @@ struct CompileSpec : torch::CustomClassHolder {
   bool disable_tf32 = false;
   bool refit = false;
   bool debug = false;
-  bool strict_types = false;
   bool truncate_long_and_double = false;
   Device device;
   TorchFallback torch_fallback;
@@ -170,7 +167,6 @@ struct CompileSpec : torch::CustomClassHolder {
   int64_t num_min_timing_iters = 2;
   int64_t num_avg_timing_iters = 1;
   int64_t workspace_size = 0;
-  int64_t max_batch_size = 0;
 };
 
 } // namespace pyapi
