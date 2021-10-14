@@ -129,6 +129,38 @@ module_fallback_script_model = torch.jit.script(module_fallback_model)
 torch.jit.save(module_fallback_script_model, "module_fallback_scripted.jit.pt")
 
 
+# Sample Looping Modules (for loop fallback testing)
+class LoopFallbackEval(nn.Module):
+
+    def __init__(self):
+        super(LoopFallbackEval, self).__init__()
+
+    def forward(self, x):
+        add_list = torch.empty(0).to(x.device)
+        for i in range(x.shape[1]):
+            add_list = torch.cat((add_list, torch.tensor([x.shape[1]]).to(x.device)), 0)
+        return x + add_list
+
+
+class LoopFallbackNoEval(nn.Module):
+
+    def __init__(self):
+        super(LoopFallbackNoEval, self).__init__()
+
+    def forward(self, x):
+        for _ in range(x.shape[1]):
+            x = x + torch.ones_like(x)
+        return x
+
+
+loop_fallback_eval_model = LoopFallbackEval().eval().cuda()
+loop_fallback_eval_script_model = torch.jit.script(loop_fallback_eval_model)
+torch.jit.save(loop_fallback_eval_script_model, "loop_fallback_eval_scripted.jit.pt")
+loop_fallback_no_eval_model = LoopFallbackNoEval().eval().cuda()
+loop_fallback_no_eval_script_model = torch.jit.script(loop_fallback_no_eval_model)
+torch.jit.save(loop_fallback_no_eval_script_model, "loop_fallback_no_eval_scripted.jit.pt")
+
+
 # Sample Conditional Model (for testing partitioning and fallback in conditionals)
 class FallbackIf(torch.nn.Module):
 
