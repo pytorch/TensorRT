@@ -14,6 +14,7 @@ test_suite(
         ":test_default_input_types",
         ":test_compiled_modules",
         ":test_modules_as_engines",
+        ":test_runtime_thread_safety",
         ":test_multiple_registered_engines",
         ":test_serialization",
         ":test_module_fallback",
@@ -27,6 +28,7 @@ test_suite(
         ":test_default_input_types",
         ":test_compiled_modules",
         ":test_modules_as_engines",
+        ":test_runtime_thread_safety",
         ":test_multiple_registered_engines",
         ":test_serialization",
         ":test_module_fallback",
@@ -93,6 +95,17 @@ cc_test(
         ":cpp_api_test",
     ],
     timeout="long"
+)
+
+cc_test(
+    name = "test_runtime_thread_safety",
+    srcs = ["test_runtime_thread_safety.cpp"],
+    data = [
+        "//tests/modules:jit_models",
+    ],
+    deps = [
+        ":cpp_api_test",
+    ]
 )
 
 cc_test(
