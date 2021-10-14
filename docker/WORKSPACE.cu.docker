@@ -33,7 +33,7 @@ git_repository(
 # This is currently used in pytorch NGC container CI testing.
 local_repository(
     name = "trtorch",
-    path = "/opt/pytorch/trtorch"
+    path = "/opt/conda/lib/python3.8/site-packages/trtorch"
 )
 
 # CUDA should be installed on the system locally
