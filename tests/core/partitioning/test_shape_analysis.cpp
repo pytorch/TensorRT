@@ -63,7 +63,7 @@ TEST(Partitioning, InferSequentialModelSegmentedBlockShapeCorrectly) {
   for (size_t i = 0; i < g->inputs().size(); ++i) {
     inputs_map.insert({g->inputs()[i], inputs[i]});
   }
-  auto input_ivalues_map = trtorch::core::partitioning::generateRandomInputs(inputs_map);
+  auto input_ivalues_map = trtorch::core::partitioning::generateRandomInputs(inputs_map, at::kFloat);
   std::vector<trtorch::core::partitioning::SegmentedBlock> segmented_blocks =
       trtorch::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info);
 
@@ -111,7 +111,7 @@ TEST(Partitioning, InferBranchModelSegmentedBlockShapeCorrectly) {
   for (size_t i = 0; i < g->inputs().size(); ++i) {
     inputs_map.insert({g->inputs()[i], inputs[i]});
   }
-  auto input_ivalues_map = trtorch::core::partitioning::generateRandomInputs(inputs_map);
+  auto input_ivalues_map = trtorch::core::partitioning::generateRandomInputs(inputs_map, at::kFloat);
   std::vector<trtorch::core::partitioning::SegmentedBlock> segmented_blocks =
       trtorch::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info);
 

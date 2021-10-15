@@ -52,6 +52,8 @@ inline std::string GetPyTorchSourceCode(const torch::jit::Node* n) {
   return source_code;
 }
 
+c10::optional<at::ScalarType> getBlockFirstCalcDType(const std::shared_ptr<torch::jit::Block>& b);
+
 } // namespace util
 } // namespace core
 } // namespace trtorch

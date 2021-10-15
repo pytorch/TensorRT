@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <ostream>
 
 #include "NvInfer.h"
 #include "core/ir/ir.h"
@@ -18,10 +19,21 @@ struct SegmentedBlock {
     kTensorRT,
   };
 
+  static std::string target_to_str(SegmentedBlockTarget t) {
+    if (t == SegmentedBlockTarget::kTorch) {
+      return "Torch";
+    } else {
+      return "TensorRT";
+    }
+  }
+
+  using BlockID = uint64_t;
+
   SegmentedBlock() = default;
   SegmentedBlock(SegmentedBlockTarget blk_target) : target_(blk_target), g_(std::make_shared<torch::jit::Graph>()) {}
   SegmentedBlock(SegmentedBlockTarget blk_target, const std::vector<torch::jit::Node*>& nodes);
   SegmentedBlock(SegmentedBlockTarget blk_target, std::shared_ptr<torch::jit::Graph> g) : target_(blk_target), g_(g) {}
+  SegmentedBlock(BlockID id, SegmentedBlockTarget blk_target, const std::vector<torch::jit::Node*>& nodes);
 
   torch::jit::Value* getOrAddInputForValue(torch::jit::Value* v);
   torch::jit::Node* cloneNode(torch::jit::Node* node);
@@ -74,7 +86,10 @@ struct SegmentedBlock {
     return target_;
   }
 
+  friend std::ostream& operator<<(std::ostream& os, const SegmentedBlock& b);
+
  private:
+  BlockID id_;
   SegmentedBlockTarget target_;
   std::vector<ir::Input> in_shape_;
   std::vector<torch::jit::Value*> inputs_;
@@ -83,6 +98,8 @@ struct SegmentedBlock {
   std::shared_ptr<torch::jit::Graph> g_;
   std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_;
 };
+
+std::ostream& operator<<(std::ostream& os, const SegmentedBlock::SegmentedBlockTarget& t);
 
 } // namespace partitioning
 } // namespace core

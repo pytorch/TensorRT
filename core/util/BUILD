@@ -27,6 +27,9 @@ cc_library(
     hdrs = [
         "jit_util.h",
     ],
+    srcs = [
+        "jit_util.cpp"
+    ],
     deps = select({
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default": ["@libtorch//:libtorch"],
