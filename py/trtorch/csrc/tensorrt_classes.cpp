@@ -68,9 +68,9 @@ std::string to_str(TensorFormat value) {
 
 core::ir::Input Input::toInternalInput() {
   if (!input_is_dynamic) {
-    return core::ir::Input(opt, toTRTDataType(dtype), toTRTTensorFormat(format));
+    return core::ir::Input(opt, toTRTDataType(dtype), toTRTTensorFormat(format), explicit_set_dtype);
   } else {
-    return core::ir::Input(min, opt, max, toTRTDataType(dtype), toTRTTensorFormat(format));
+    return core::ir::Input(min, opt, max, toTRTDataType(dtype), toTRTTensorFormat(format), explicit_set_dtype);
   }
 }
 

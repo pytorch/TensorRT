@@ -4,7 +4,7 @@ from torch import nn
 
 import trtorch._C
 from trtorch._types import EngineCapability
-from trtorch._compile_spec import _parse_compile_spec
+from trtorch._compile_spec import _parse_compile_spec, _parse_device
 from trtorch._version import __version__
 from trtorch.Device import Device
 from types import FunctionType
@@ -25,7 +25,10 @@ def compile(module: torch.jit.ScriptModule,
             max_batch_size=0,
             calibrator=None,
             truncate_long_and_double=False,
-            torch_fallback={"enabled": False}) -> torch.jit.ScriptModule:
+            require_full_compilation=True,
+            min_block_size=3,
+            torch_executed_ops=[],
+            torch_executed_modules=[]) -> torch.jit.ScriptModule:
     """Compile a TorchScript module for NVIDIA GPUs using TensorRT
 
     Takes a existing TorchScript module and a set of settings to configure the compiler
@@ -38,7 +41,7 @@ def compile(module: torch.jit.ScriptModule,
             ``torch.nn.Module``
 
     Keyword Arguments:
-        inputs (List[Union(trtorch.Input, torch.Tensor)]): List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
+        inputs (List[Union(trtorch.Input, torch.Tensor)]): **Required** List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
             torch datatypes or trtorch datatypes and you can use either torch devices or the trtorch device type enum
             to select device type. ::
 
@@ -57,7 +60,7 @@ def compile(module: torch.jit.ScriptModule,
         device (Union(trtorch.Device, torch.device, dict)): Target device for TensorRT engines to run on ::
 
             device=trtorch.Device("dla:1", allow_gpu_fallback=True)
-      
+
         disable_tf32 (bool): Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
         sparse_weights (bool): Enable sparsity for convolution and fully connected layers.
         enabled_precision (Set(Union(torch.dtype, trtorch.dtype))): The set of datatypes that TensorRT can use when selecting kernels
@@ -71,19 +74,10 @@ def compile(module: torch.jit.ScriptModule,
         max_batch_size (int): Maximum batch size (must be >= 1 to be set, 0 means not set)
         truncate_long_and_double (bool): Truncate weights provided in int64 or double (float64) to int32 and float32
         calibrator (Union(trtorch._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
-        torch_fallback (dict): Settings related to partial compilation. Partial compilation will run any unsupported operations and any operators or submodules specified by the user in PyTorch ::
-
-            torch_fallback={
-                "enabled": True,
-                "force_fallback_ops": [
-                    "aten::max_pool2d" # List of specific ops to require running in PyTorch
-                ],
-                "force_fallback_modules": [
-                    "mypymod.mytorchmod" # List of specific torch modules to require running in PyTorch
-                ],
-                "min_block_size": 3 # Minimum number of ops an engine must incapsulate to be run in TensorRT
-            }
-
+        require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch
+        min_block_size (int): The minimum number of contiguous TensorRT convertable operations in order to run a set of operations in TensorRT
+        torch_executed_ops (List[str]): List of aten operators that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True
+        torch_executed_modules (List[str]): List of modules that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True
 
     Returns:
         torch.jit.ScriptModule: Compiled TorchScript Module, when run it will execute via TensorRT
@@ -92,6 +86,11 @@ def compile(module: torch.jit.ScriptModule,
     if isinstance(module, torch.jit.ScriptFunction):
         raise TypeError(
             "torch.jit.ScriptFunction currently is not directly supported, wrap the function in a module to compile")
+
+    if require_full_compilation and (len(torch_executed_modules) > 0 or len(torch_executed_ops) > 0):
+        raise ValueError(
+            "require_full_compilation is enabled however the list of modules and ops to run in torch is not empty. Found: torch_executed_ops: " + torch_executed_ops + ", torch_executed_modules: " + torch_executed_modules
+        )
 
     spec = {
         "inputs": inputs,
@@ -109,7 +108,11 @@ def compile(module: torch.jit.ScriptModule,
         "max_batch_size": max_batch_size, # Maximum batch size (must be >= 1 to be set, 0 means not set)
         "calibrator": calibrator,
         "truncate_long_and_double": truncate_long_and_double,
-        "torch_fallback": torch_fallback
+        "torch_fallback": {
+            "enabled": not require_full_compilation,
+            "force_fallback_ops": torch_executed_ops,
+            "force_fallback_modules": torch_executed_modules
+        }
     }
 
     compiled_cpp_mod = trtorch._C.compile_graph(module._c, _parse_compile_spec(spec))
@@ -117,21 +120,23 @@ def compile(module: torch.jit.ScriptModule,
     return compiled_module
 
 
-def convert_method_to_trt_engine(module: torch.jit.ScriptModule, method_name: str, inputs=[],
-            device=Device._current_device(),
-            disable_tf32=False,
-            sparse_weights=False,
-            enabled_precisions=set(),
-            refit=False,
-            debug=False,
-            strict_types=False,
-            capability=EngineCapability.default,
-            num_min_timing_iters=2,
-            num_avg_timing_iters=1,
-            workspace_size=0,
-            max_batch_size=0,
-            truncate_long_and_double=False,
-            calibrator=None) -> str:
+def convert_method_to_trt_engine(module: torch.jit.ScriptModule,
+                                method_name: str,
+                                inputs=[],
+                                device=Device._current_device(),
+                                disable_tf32=False,
+                                sparse_weights=False,
+                                enabled_precisions=set(),
+                                refit=False,
+                                debug=False,
+                                strict_types=False,
+                                capability=EngineCapability.default,
+                                num_min_timing_iters=2,
+                                num_avg_timing_iters=1,
+                                workspace_size=0,
+                                max_batch_size=0,
+                                truncate_long_and_double=False,
+                                calibrator=None) -> str:
     """Convert a TorchScript module method to a serialized TensorRT engine
 
     Converts a specified method of a module to a serialized TensorRT engine given a dictionary of conversion settings
@@ -141,8 +146,8 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule, method_name: st
             ``torch.nn.Module``
         method_name (str): Name of method to convert
 
-    Keyword Args: 
-        inputs (List[Union(trtorch.Input, torch.Tensor)]): List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
+    Keyword Args:
+        inputs (List[Union(trtorch.Input, torch.Tensor)]): **Required** List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
             torch datatypes or trtorch datatypes and you can use either torch devices or the trtorch device type enum
             to select device type. ::
 
@@ -161,7 +166,7 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule, method_name: st
         device (Union(trtorch.Device, torch.device, dict)): Target device for TensorRT engines to run on ::
 
             device=trtorch.Device("dla:1", allow_gpu_fallback=True)
-      
+
         disable_tf32 (bool): Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
         sparse_weights (bool): Enable sparsity for convolution and fully connected layers.
         enabled_precision (Set(Union(torch.dtype, trtorch.dtype))): The set of datatypes that TensorRT can use when selecting kernels
@@ -197,7 +202,6 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule, method_name: st
         "num_avg_timing_iters": num_avg_timing_iters, # Number of averaging timing iterations used to select kernels
         "workspace_size": workspace_size, # Maximum size of workspace given to TensorRT
         "max_batch_size": max_batch_size, # Maximum batch size (must be >= 1 to be set, 0 means not set)
-        "torch_fallback": {"enabled": False},
         "calibrator": calibrator,
         "truncate_long_and_double": truncate_long_and_double
     }
@@ -205,7 +209,7 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule, method_name: st
     return trtorch._C.convert_graph_to_trt_engine(module._c, method_name, _parse_compile_spec(compile_spec))
 
 
-def embed_engine_in_new_module(serialized_engine: bytes, device: Device) -> torch.jit.ScriptModule:
+def embed_engine_in_new_module(serialized_engine: bytes, device=Device._current_device()) -> torch.jit.ScriptModule:
     """Takes a pre-built serialized TensorRT engine and embeds it within a TorchScript module
 
     Takes a pre-built serialied TensorRT engine (as bytes) and embeds it within a TorchScript module.
@@ -215,13 +219,16 @@ def embed_engine_in_new_module(serialized_engine: bytes, device: Device) -> torc
 
     Module can be save with engine embedded with torch.jit.save and moved / loaded according to TRTorch portability rules
 
-    Args:
+    Arguments:
         serialized_engine (bytes): Serialized TensorRT engine from either TRTorch or TensorRT APIs
+
+    Keyword Arguments:
+        device (Union(trtorch.Device, torch.device, dict)): Target device to run engine on. Must be compatible with engine provided. Default: Current active device
 
     Returns:
         torch.jit.ScriptModule: New TorchScript module with engine embedded
     """
-    cpp_mod = trtorch._C.embed_engine_in_new_module(serialized_engine, device._to_internal())
+    cpp_mod = trtorch._C.embed_engine_in_new_module(serialized_engine, _parse_device(device))
     return torch.jit._recursive.wrap_cpp_module(cpp_mod)
 
 
@@ -231,7 +238,7 @@ def check_method_op_support(module: torch.jit.ScriptModule, method_name: str) ->
     Checks if a method of a TorchScript module can be compiled by TRTorch, if not, a list of operators
     that are not supported are printed out and the function returns false, else true.
 
-    Args:
+    Arguments:
         module (torch.jit.ScriptModule): Source module, a result of tracing or scripting a PyTorch
             ``torch.nn.Module``
         method_name (str): Name of method to check

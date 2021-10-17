@@ -321,7 +321,6 @@ PYBIND11_MODULE(_C, m) {
   m.def("set_device", &trtorch::pyapi::set_device, "Set CUDA device id");
   m.def("_get_current_device", &trtorch::pyapi::get_current_device, "Get the current active CUDA device");
 
-
   py::enum_<core::util::logging::LogLevel>(m, "LogLevel", py::arithmetic())
       .value("INTERNAL_ERROR", core::util::logging::LogLevel::kINTERNAL_ERROR)
       .value("ERROR", core::util::logging::LogLevel::kERROR)

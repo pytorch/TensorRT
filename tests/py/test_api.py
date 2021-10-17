@@ -53,6 +53,12 @@ class TestCompile(ModelTestCase):
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
         self.assertTrue(same < 2e-2)
 
+    def test_default_device(self):
+        compile_spec = {"inputs": [self.input], "enabled_precisions": {torch.float}}
+
+        trt_mod = trtorch.compile(self.scripted_model, **compile_spec)
+        same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
+        self.assertTrue(same < 2e-2)
 
     def test_compile_script_from_dict(self):
         compile_spec = {
@@ -133,11 +139,9 @@ class TestFallbackToTorch(ModelTestCase):
                 "allow_gpu_fallback": False,
                 "disable_tf32": False
             },
-            "torch_fallback": {
-                "enabled": True,
-                "forced_fallback_ops": ["aten::max_pool2d"],
-                "min_block_size": 1
-            }
+            "require_full_compilation": False,
+            "torch_executed_ops": ["aten::max_pool2d"],
+            "min_block_size": 1
         }
 
         trt_mod = trtorch.compile(self.scripted_model, **compile_spec)
@@ -161,11 +165,9 @@ class TestModuleFallbackToTorch(ModelTestCase):
                 "allow_gpu_fallback": False,
                 "disable_tf32": False
             },
-            "torch_fallback": {
-                "enabled": True,
-                "forced_fallback_modules": ["torchvision.models.resnet.BasicBlock"],
-                "min_block_size": 1
-            }
+            "require_full_compilation": False,
+            "torch_executed_modules": ["torchvision.models.resnet.BasicBlock"],
+            "min_block_size": 1
         }
 
         trt_mod = trtorch.compile(self.scripted_model, **compile_spec)
