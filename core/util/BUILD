@@ -30,7 +30,9 @@ cc_library(
     srcs = [
         "jit_util.cpp"
     ],
-    deps = select({
+    deps = [
+        ":macros"
+    ] + select({
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default": ["@libtorch//:libtorch"],
     }),
@@ -43,6 +45,7 @@ cc_library(
     ],
     deps = [
         ":exception",
+        "//core/util/logging",
     ],
 )
 

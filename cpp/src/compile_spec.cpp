@@ -286,7 +286,13 @@ CompileSpec::Input::Input(at::Tensor tensor) {
 /* ==========================================*/
 
 core::ir::Input to_internal_input(CompileSpec::Input& i) {
-  return core::ir::Input(i.min_shape, i.opt_shape, i.max_shape, toTRTDataType(i.dtype), toTRTTensorFormat(i.format));
+  return core::ir::Input(
+      i.min_shape,
+      i.opt_shape,
+      i.max_shape,
+      toTRTDataType(i.dtype),
+      toTRTTensorFormat(i.format),
+      i.get_explicit_set_dtype());
 }
 
 std::vector<core::ir::Input> to_vec_internal_inputs(std::vector<CompileSpec::Input>& external) {
@@ -317,21 +323,20 @@ core::CompileSpec to_internal_compile_spec(CompileSpec external) {
     internal.convert_info.engine_settings.enabled_precisions.insert(toTRTDataType(p));
   }
 
-  /* We want default behavior for types to match PyTorch, so in the case the user did not explicitly set the dtype for
-  inputs they will follow PyTorch convetions */
-  for (size_t i = 0; i < external.inputs.size(); i++) {
-    if (!external.inputs[i].get_explicit_set_dtype()) {
-      auto& precisions = internal.convert_info.engine_settings.enabled_precisions;
-      auto& internal_ins = internal.convert_info.inputs;
-      if (precisions.find(nvinfer1::DataType::kINT8) != precisions.end()) {
-        internal_ins[i].dtype = nvinfer1::DataType::kFLOAT;
-      } else if (precisions.find(nvinfer1::DataType::kHALF) != precisions.end()) {
-        internal_ins[i].dtype = nvinfer1::DataType::kHALF;
-      } else {
-        internal_ins[i].dtype = nvinfer1::DataType::kFLOAT;
-      }
-    }
-  }
+  // /* We want default behavior for types to match PyTorch, so in the case the user did not explicitly set the dtype
+  // for inputs they will follow PyTorch convetions */ for (size_t i = 0; i < external.inputs.size(); i++) {
+  //   if (!external.inputs[i].get_explicit_set_dtype()) {
+  //     auto& precisions = internal.convert_info.engine_settings.enabled_precisions;
+  //     auto& internal_ins = internal.convert_info.inputs;
+  //     if (precisions.find(nvinfer1::DataType::kINT8) != precisions.end()) {
+  //       internal_ins[i].dtype = nvinfer1::DataType::kFLOAT;
+  //     } else if (precisions.find(nvinfer1::DataType::kHALF) != precisions.end()) {
+  //       internal_ins[i].dtype = nvinfer1::DataType::kHALF;
+  //     } else {
+  //       internal_ins[i].dtype = nvinfer1::DataType::kFLOAT;
+  //     }
+  //   }
+  // }
 
   internal.convert_info.engine_settings.sparse_weights = external.sparse_weights;
   internal.convert_info.engine_settings.disable_tf32 = external.disable_tf32;

@@ -16,7 +16,8 @@ bool checkSegmentedBlockNumber(
       cnt++;
     }
   }
-  std::cout << "Found count of "  << cnt << " " << target << " blocks (looking for " << target_count << " blocks)" << std::endl;
+  std::cout << "Found count of " << cnt << " " << target << " blocks (looking for " << target_count << " blocks)"
+            << std::endl;
 
   if (target_count != cnt) {
     std::cout << segmented_blocks << std::endl;

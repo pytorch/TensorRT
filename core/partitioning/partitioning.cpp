@@ -299,8 +299,11 @@ bool should_run_in_trt(torch::jit::Node* n, const std::unordered_set<std::string
   return true;
 }
 
-void finalize_block(PartitionedGraph& g, SegmentedBlock::SegmentedBlockTarget kind, std::vector<torch::jit::Node*>& nodes) {
-  SegmentedBlock::BlockID b_id= g.size();
+void finalize_block(
+    PartitionedGraph& g,
+    SegmentedBlock::SegmentedBlockTarget kind,
+    std::vector<torch::jit::Node*>& nodes) {
+  SegmentedBlock::BlockID b_id = g.size();
   LOG_DEBUG("Finalizing in progress " << SegmentedBlock::target_to_str(kind) << " block");
   g.emplace_back(b_id, kind, nodes);
   nodes.clear();
@@ -337,14 +340,17 @@ PartitionedGraph segment_graph(torch::jit::Block* block, const PartitionInfo& pa
       if (in_prog_trt_blk_nodes.size() >= min_block_size) {
         finalize_block(segmented_blocks, SegmentedBlock::kTensorRT, in_prog_trt_blk_nodes);
       } else {
-        LOG_DEBUG("In progress TRT block does not meet minimum block size requirements, therefore folding into in progress PyTorch block");
-        in_prog_pyt_blk_nodes.insert(in_prog_pyt_blk_nodes.end(), in_prog_trt_blk_nodes.begin(), in_prog_trt_blk_nodes.end());
+        LOG_DEBUG(
+            "In progress TRT block does not meet minimum block size requirements, therefore folding into in progress PyTorch block");
+        in_prog_pyt_blk_nodes.insert(
+            in_prog_pyt_blk_nodes.end(), in_prog_trt_blk_nodes.begin(), in_prog_trt_blk_nodes.end());
       }
       in_prog_trt_blk_nodes.clear();
       // if there is a prim::If then this if node will be encapsulated in a SegmentedBlock
       // we shouldn't inject node for this block in dependency analysis process
       if (n->kind() == torch::jit::prim::If) {
-        LOG_DEBUG("Hit a conditional statement, finializing in progress PYT block and creating a new one for the conditional");
+        LOG_DEBUG(
+            "Hit a conditional statement, finializing in progress PYT block and creating a new one for the conditional");
         if (!in_prog_pyt_blk_nodes.empty()) {
           finalize_block(segmented_blocks, SegmentedBlock::kTorch, in_prog_pyt_blk_nodes);
         }
@@ -374,7 +380,8 @@ PartitionedGraph segment_graph(torch::jit::Block* block, const PartitionInfo& pa
   }
 
   if (!in_prog_pyt_blk_nodes.empty()) {
-    in_prog_pyt_blk_nodes.insert(in_prog_pyt_blk_nodes.end(), in_prog_trt_blk_nodes.begin(), in_prog_trt_blk_nodes.end());
+    in_prog_pyt_blk_nodes.insert(
+        in_prog_pyt_blk_nodes.end(), in_prog_trt_blk_nodes.begin(), in_prog_trt_blk_nodes.end());
     finalize_block(segmented_blocks, SegmentedBlock::kTorch, in_prog_pyt_blk_nodes);
   }
 
@@ -383,7 +390,7 @@ PartitionedGraph segment_graph(torch::jit::Block* block, const PartitionInfo& pa
 
 PartitionedGraph Partition(
     torch::jit::Block* block,
-    std::unordered_map<torch::jit::Value*, torch::jit::IValue>& input_ivalues_map,
+    std::unordered_map<const torch::jit::Value*, torch::jit::IValue>& example_tensor_map,
     const PartitionInfo& partition_info) {
   LOG_DEBUG(partition_info);
   // segment lowering global graph into blocks
@@ -397,7 +404,7 @@ PartitionedGraph Partition(
   registerSegmentsOutputs(segmented_blocks, block);
 
   // run shape analysis on each segmented block
-  runShapeAnalysis(segmented_blocks, input_ivalues_map, at::kFloat);
+  runShapeAnalysis(segmented_blocks, example_tensor_map);
 
   LOG_INFO(segmented_blocks);
 

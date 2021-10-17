@@ -16,10 +16,10 @@ TEST(Converters, ATenSqueezeConvertsCorrectly) {
 
   auto in = at::randint(1, 10, {2, 1, 3, 3}, {at::kCUDA});
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
 
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
@@ -43,13 +43,13 @@ TEST(Converters, ATenSqueezeDontNeedSqueezeConvertsCorrectly) {
   auto jit_in = at::clone(in);
   auto jit_in_add = at::clone(in_add);
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in, jit_in_add});
 
   auto trt_in = at::clone(jit_in);
   auto trt_in_add = at::clone(jit_in_add);
 
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in, trt_in_add});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));

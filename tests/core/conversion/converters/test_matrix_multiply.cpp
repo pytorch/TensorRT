@@ -16,10 +16,10 @@ TEST(Converters, ATenMMConvertsCorrectly) {
 
   auto in1 = at::randint(0, 5, {2, 3}, {at::kCUDA});
   auto in2 = at::randint(0, 5, {3, 3}, {at::kCUDA});
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in1, in2});
 
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in1, in2});
   auto trt = trt_results[0].reshape_as(jit_results[0]);
 
@@ -37,10 +37,10 @@ TEST(Converters, ATenMMWithDiffShapesConvertsCorrectly) {
 
   auto in1 = at::randint(0, 5, {2, 3}, {at::kCUDA});
   auto in2 = at::randint(0, 5, {3, 3, 2}, {at::kCUDA});
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in1, in2});
 
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in1, in2});
   auto trt = trt_results[0].reshape_as(jit_results[0]);
 
@@ -58,10 +58,10 @@ TEST(Converters, ATenBMMConvertsCorrectly) {
 
   auto in1 = at::randint(0, 5, {4, 64, 128}, {at::kCUDA});
   auto in2 = at::randint(0, 5, {4, 128, 64}, {at::kCUDA});
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in1, in2});
 
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in1, in2});
   auto trt = trt_results[0].reshape_as(jit_results[0]);
 

@@ -63,10 +63,6 @@ TEST(Partitioning, StitchSequentialModelSegmentedBlockCorrectly) {
   }
   g->registerOutput(tensor_to_constant[parsed_g->outputs()[0]]);
 
-  std::vector<trtorch::core::ir::Input> inputs;
-  inputs.push_back(trtorch::core::ir::Input({3, 3, 16, 16}));
-  trtorch::core::CompileSpec cfg(inputs);
-  cfg.partition_info.enabled = true;
   torch::jit::script::Module mod(c10::QualifiedName("module"));
 
   auto self = g->insertInput(0, "self_1");
@@ -76,6 +72,10 @@ TEST(Partitioning, StitchSequentialModelSegmentedBlockCorrectly) {
   mod.type()->addMethod(cur_method);
   cur_method->setSchema(schema);
 
+  std::vector<trtorch::core::ir::Input> inputs;
+  inputs.push_back(trtorch::core::ir::Input({3, 3, 16, 16}));
+  trtorch::core::CompileSpec cfg(inputs);
+  cfg.partition_info.enabled = true;
   torch::jit::script::Module new_mod = trtorch::core::CompileGraph(mod, cfg);
   auto fallback_g = new_mod.get_method("forward").graph();
   ASSERT_TRUE(checkAllInputsExistInStitchedGraph(fallback_g));
@@ -121,10 +121,6 @@ TEST(Partitioning, StitchBranchModelSegmentedBlockCorrectly) {
   }
   g->registerOutput(tensor_to_constant[parsed_g->outputs()[0]]);
 
-  std::vector<trtorch::core::ir::Input> inputs;
-  inputs.push_back(trtorch::core::ir::Input({3, 3, 16, 16}));
-  trtorch::core::CompileSpec cfg(inputs);
-  cfg.partition_info.enabled = true;
   torch::jit::script::Module mod(c10::QualifiedName("module"));
 
   auto self = g->insertInput(0, "self_1");
@@ -134,6 +130,10 @@ TEST(Partitioning, StitchBranchModelSegmentedBlockCorrectly) {
   mod.type()->addMethod(cur_method);
   cur_method->setSchema(schema);
 
+  std::vector<trtorch::core::ir::Input> inputs;
+  inputs.push_back(trtorch::core::ir::Input({3, 3, 16, 16}));
+  trtorch::core::CompileSpec cfg(inputs);
+  cfg.partition_info.enabled = true;
   torch::jit::script::Module new_mod = trtorch::core::CompileGraph(mod, cfg);
   auto fallback_g = new_mod.get_method("forward").graph();
   ASSERT_TRUE(checkAllInputsExistInStitchedGraph(fallback_g));

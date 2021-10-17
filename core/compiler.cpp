@@ -128,22 +128,6 @@ bool CheckMethodOperatorSupport(const torch::jit::script::Module& mod, std::stri
   return conversion::VerifyConverterSupportForBlock(g->block());
 }
 
-std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::string method_name, CompileSpec cfg) {
-  // Go through Lowering to simplify graph and extract weight parameters
-  auto graph_and_parameters = lowering::Lower(mod, method_name, cfg.lower_info);
-
-  auto convert_cfg = std::move(cfg.convert_info);
-  auto g = graph_and_parameters.first;
-
-  auto params = graph_and_parameters.second;
-  auto named_params = conversion::get_named_params(g->inputs(), params);
-
-  LOG_INFO(*g << "(CompileGraph)\n");
-
-  auto engine = conversion::ConvertBlockToEngine(g->block(), convert_cfg, named_params);
-  return std::move(engine);
-}
-
 void AddSegmentedBlockToGraph(
     std::shared_ptr<torch::jit::Graph>& g,
     partitioning::SegmentedBlock& seg,
@@ -237,15 +221,15 @@ void AddIfBlockToGraph(
 GraphAndMapping ConstructFallbackGraph(
     torch::jit::script::Module& new_mod,
     torch::jit::Block* block,
-    std::unordered_map<torch::jit::Value*, torch::jit::IValue> input_ivalues_map,
+    std::unordered_map<const torch::jit::Value*, torch::jit::IValue> example_tensor_map,
     CompileSpec cfg,
-    conversion::GraphParams named_params) {
+    ir::StaticParams static_params) {
   auto convert_cfg = cfg.convert_info;
   auto partition_info = cfg.partition_info;
 
   auto new_g = std::make_shared<torch::jit::Graph>();
 
-  auto segmented_blocks = partitioning::Partition(block, input_ivalues_map, partition_info);
+  auto segmented_blocks = partitioning::Partition(block, example_tensor_map, partition_info);
 
   // the mapping from lowering graph => fallback global graph
   std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_g;
@@ -259,13 +243,17 @@ GraphAndMapping ConstructFallbackGraph(
     trt_engine_id << reinterpret_cast<const int*>(&seg_block);
 
     if (seg_block.target() == partitioning::SegmentedBlock::kTensorRT) {
+      auto shapes = seg_block.in_shapes();
+      auto types = seg_block.in_types();
       std::vector<ir::Input> inputs;
-      for (auto& shape : seg_block.in_shape()) {
-        inputs.push_back(ir::Input(shape));
+      for (size_t i = 0; i < shapes.size(); i++) {
+        auto in = ir::Input(shapes[i]);
+        in.dtype = util::ScalarTypeToTRTDataType(types[i]);
+        inputs.push_back(in);
       }
       // update the input ranges for each segments
-      convert_cfg.inputs = inputs;
-      auto engine = conversion::ConvertBlockToEngine(seg_block.block(), convert_cfg, named_params);
+      convert_cfg.inputs = ir::associate_specs_with_inputs(seg_block.g(), inputs, static_params);
+      auto engine = conversion::ConvertBlockToEngine(seg_block.block(), convert_cfg, static_params);
       auto temp_g = std::make_shared<torch::jit::Graph>();
       auto device_spec = convert_cfg.engine_settings.device;
       auto cuda_device = runtime::CudaDevice(device_spec.gpu_id, device_spec.device_type);
@@ -281,7 +269,7 @@ GraphAndMapping ConstructFallbackGraph(
         std::vector<GraphAndMapping> graph_and_mappings;
         for (auto cur_block : if_node->blocks()) {
           graph_and_mappings.push_back(
-              ConstructFallbackGraph(new_mod, cur_block, input_ivalues_map, cfg, named_params));
+              ConstructFallbackGraph(new_mod, cur_block, example_tensor_map, cfg, static_params));
         }
         AddIfBlockToGraph(new_g, if_node, graph_and_mappings, old_to_new_g);
 
@@ -299,54 +287,28 @@ GraphAndMapping ConstructFallbackGraph(
   return {new_g, old_to_new_g};
 }
 
-torch::jit::script::Module CompileGraphWithFallback(const torch::jit::script::Module& mod, CompileSpec cfg) {
-  // TODO: Should be doing a functional transform but need PR #31978
-  // [jit] More robust mangling
-  // torch::jit::script::Module new_mod = mod.clone();
-  torch::jit::script::Module new_mod(mod._ivalue()->name() + "_trt");
-  std::vector<std::shared_ptr<torch::jit::Graph>> graphs;
-  for (const torch::jit::script::Method& method : mod.get_methods()) {
-    // Compile only forward methods. forward method contains the entire graph.
-    if (method.name().compare("forward") == 0) {
-      auto new_g = std::make_shared<torch::jit::Graph>();
-      auto graph_and_parameters = lowering::Lower(mod, method.name(), cfg.lower_info);
+std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::string method_name, CompileSpec cfg) {
+  // Go through Lowering to simplify graph and extract weight parameters
+  auto graph_and_parameters = lowering::Lower(mod, method_name, cfg.lower_info);
 
-      auto g = graph_and_parameters.first;
-      auto params = graph_and_parameters.second;
-      auto named_params = conversion::get_named_params(g->inputs(), params);
-      LOG_INFO("(LoweredGraph)\n" << *g);
+  auto convert_cfg = std::move(cfg.convert_info);
+  auto g = graph_and_parameters.first;
 
-      std::unordered_map<torch::jit::Value*, ir::Input> inputs;
-      for (size_t i = 0; i < g->inputs().size(); ++i) {
-        inputs.insert({g->inputs()[i], cfg.convert_info.inputs[i]});
-      }
-      auto input_ivalues_map = partitioning::generateRandomInputs(inputs);
-      auto graph_and_mapping = ConstructFallbackGraph(new_mod, g->block(), input_ivalues_map, cfg, named_params);
-      new_g = graph_and_mapping.first;
-      LOG_INFO("(FallbackGraph)\n" << *new_g);
+  auto params = graph_and_parameters.second;
+  auto static_params = ir::get_static_params(g->inputs(), params);
 
-      // if there is no tensorrt engine self in fallback graph, there is no conversion, we just return the initial
-      // module
-      if (new_g->inputs()[0]->type()->str().find("__torch__") == std::string::npos) {
-        LOG_WARNING("Didn't generate any TensorRT engines, the compiler did nothing\n");
-        return mod;
-      }
+  LOG_INFO(*g << "(CompileGraph)\n");
 
-      auto new_method = new_mod._ivalue()->compilation_unit()->create_function(method.name(), new_g);
-      auto schema = util::GenerateGraphSchema(new_method->name(), new_g);
-      new_mod.type()->addMethod(new_method);
-      new_method->setSchema(schema);
-    }
-  }
+  // Move the user defined inputs to the convert_cfg since some might be static;
+  convert_cfg.inputs = std::move(ir::associate_specs_with_inputs(g, cfg.inputs, static_params));
 
-  return new_mod;
+  auto engine = conversion::ConvertBlockToEngine(g->block(), convert_cfg, static_params);
+  return std::move(engine);
 }
 
-torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod, CompileSpec cfg) {
-  // TODO: not sure how to deal with duplicated code here, so just cut out a branch temporally
-  if (cfg.partition_info.enabled) {
-    return CompileGraphWithFallback(mod, cfg);
-  }
+torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) {
+  torch::jit::Module new_mod(mod._ivalue()->name() + "_trt");
+
   auto device_spec = cfg.convert_info.engine_settings.device;
 
   // GPU default WS size : 1 GB
@@ -362,25 +324,59 @@ torch::jit::script::Module CompileGraph(const torch::jit::script::Module& mod, C
     }
   }
 
-  // TODO: Should be doing a functional transform but need PR #31978
-  // [jit] More robust mangling
-  // torch::jit::script::Module new_mod = mod.clone();
-  torch::jit::script::Module new_mod(mod._ivalue()->name() + "_trt");
-  std::vector<std::shared_ptr<torch::jit::Graph>> graphs;
-  for (const torch::jit::script::Method& method : mod.get_methods()) {
-    // Compile only forward methods. forward method contains the entire graph.
+  for (const torch::jit::Method& method : mod.get_methods()) {
     if (method.name().compare("forward") == 0) {
-      auto engine = ConvertGraphToTRTEngine(mod, method.name(), cfg);
       auto new_g = std::make_shared<torch::jit::Graph>();
-      auto cuda_device = runtime::CudaDevice(device_spec.gpu_id, device_spec.device_type);
-      AddEngineToGraph(new_mod, new_g, engine, cuda_device);
+
+      auto graph_and_parameters = lowering::Lower(mod, method.name(), cfg.lower_info);
+
+      auto g = graph_and_parameters.first;
+      LOG_INFO("Lowered Graph: " << *g);
+      auto params = graph_and_parameters.second;
+      auto static_params = ir::get_static_params(g->inputs(), params);
+
+      cfg.convert_info.inputs = std::move(ir::associate_specs_with_inputs(g, cfg.inputs, static_params));
+
+      // If the user did not explicitly set the input type, then use the first
+      // tensor calculation to infer type.
+      auto first_use_types = util::get_block_first_calc_dtypes_opt(g->block());
+      for (auto& in : g->inputs()) {
+        auto est_type_opt = first_use_types[in];
+        ir::Input& spec = cfg.convert_info.inputs.find(in)->second;
+        if (est_type_opt && !spec.dtype_is_user_defined) {
+          spec.dtype = util::ScalarTypeToTRTDataType(est_type_opt.value());
+        } else if (!est_type_opt && !spec.dtype_is_user_defined) {
+          LOG_WARNING(
+              "Cannot deterime input type from calcuations in graph for input "
+              << in->debugName() << ". Assuming it is Float32. If not, specify input type explicity");
+          spec.dtype = nvinfer1::DataType::kFLOAT;
+        }
+      }
+
+      if (cfg.partition_info.enabled) {
+        auto input_ivalues_map = partitioning::generateRandomInputs(cfg.convert_info.inputs, first_use_types);
+        auto graph_and_mapping = ConstructFallbackGraph(new_mod, g->block(), input_ivalues_map, cfg, static_params);
+        new_g = graph_and_mapping.first;
+        LOG_INFO("Segmented Graph: " << *new_g);
+
+        // if there is no tensorrt engine self in fallback graph, there is no conversion, we just return the initial
+        // module
+        if (new_g->inputs()[0]->type()->str().find("__torch__") == std::string::npos) {
+          LOG_WARNING("Didn't generate any TensorRT engines, the compiler did nothing\n");
+          return mod;
+        }
+      } else {
+        auto engine = conversion::ConvertBlockToEngine(g->block(), cfg.convert_info, static_params);
+        auto device_spec = cfg.convert_info.engine_settings.device;
+        auto cuda_device = runtime::CudaDevice(device_spec.gpu_id, device_spec.device_type);
+        AddEngineToGraph(new_mod, new_g, engine, cuda_device);
+      }
       auto new_method = new_mod._ivalue()->compilation_unit()->create_function(method.name(), new_g);
       auto schema = util::GenerateGraphSchema(new_method->name(), new_g);
       new_mod.type()->addMethod(new_method);
       new_method->setSchema(schema);
     }
   }
-
   return new_mod;
 }
 

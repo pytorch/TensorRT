@@ -11,7 +11,7 @@ bool checkSegmentedBlockInputShape(
   if (segmented_blocks.size() != in_shape.size())
     return false;
   for (size_t i = 0; i < segmented_blocks.size(); ++i) {
-    auto cur_block_in_shapes = segmented_blocks[i].in_shape();
+    auto cur_block_in_shapes = segmented_blocks[i].in_shapes();
     if (cur_block_in_shapes.size() != in_shape[i].size())
       return false;
     for (size_t j = 0; j < cur_block_in_shapes.size(); ++j) {
@@ -59,11 +59,13 @@ TEST(Partitioning, InferSequentialModelSegmentedBlockShapeCorrectly) {
   inputs.push_back(trtorch::core::ir::Input({8, 16, 3, 3}));
   inputs.push_back(trtorch::core::ir::Input({8}));
 
-  std::unordered_map<torch::jit::Value*, trtorch::core::ir::Input> inputs_map;
+  std::unordered_map<const torch::jit::Value*, trtorch::core::ir::Input> inputs_map;
+  std::unordered_map<const torch::jit::Value*, c10::optional<at::ScalarType>> input_types;
   for (size_t i = 0; i < g->inputs().size(); ++i) {
     inputs_map.insert({g->inputs()[i], inputs[i]});
+    input_types.insert({g->inputs()[i], {at::kFloat}});
   }
-  auto input_ivalues_map = trtorch::core::partitioning::generateRandomInputs(inputs_map, at::kFloat);
+  auto input_ivalues_map = trtorch::core::partitioning::generateRandomInputs(inputs_map, input_types);
   std::vector<trtorch::core::partitioning::SegmentedBlock> segmented_blocks =
       trtorch::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info);
 
@@ -107,11 +109,13 @@ TEST(Partitioning, InferBranchModelSegmentedBlockShapeCorrectly) {
   inputs.push_back(trtorch::core::ir::Input({16, 32, 3, 3}));
   inputs.push_back(trtorch::core::ir::Input({16}));
 
-  std::unordered_map<torch::jit::Value*, trtorch::core::ir::Input> inputs_map;
+  std::unordered_map<const torch::jit::Value*, trtorch::core::ir::Input> inputs_map;
+  std::unordered_map<const torch::jit::Value*, c10::optional<at::ScalarType>> input_types;
   for (size_t i = 0; i < g->inputs().size(); ++i) {
     inputs_map.insert({g->inputs()[i], inputs[i]});
+    input_types.insert({g->inputs()[i], {at::kFloat}});
   }
-  auto input_ivalues_map = trtorch::core::partitioning::generateRandomInputs(inputs_map, at::kFloat);
+  auto input_ivalues_map = trtorch::core::partitioning::generateRandomInputs(inputs_map, input_types);
   std::vector<trtorch::core::partitioning::SegmentedBlock> segmented_blocks =
       trtorch::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info);
 

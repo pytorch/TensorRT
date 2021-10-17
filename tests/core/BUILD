@@ -3,6 +3,6 @@ test_suite(
     tests = [
         "//tests/core/conversion:conversion_tests",
         "//tests/core/lowering:lowering_tests",
-        "//tests/core/partitioning:partitioning_test"
+        "//tests/core/partitioning:partitioning_tests"
     ],
 )

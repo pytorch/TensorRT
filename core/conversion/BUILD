@@ -10,7 +10,6 @@ config_setting(
 cc_library(
     name = "conversion",
     srcs = [
-        "InterfaceTypes.cpp",
         "conversion.cpp",
         "conversion_ignorelist.cpp",
     ],

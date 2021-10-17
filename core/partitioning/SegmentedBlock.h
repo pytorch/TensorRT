@@ -1,7 +1,7 @@
 #pragma once
 
-#include <vector>
 #include <ostream>
+#include <vector>
 
 #include "NvInfer.h"
 #include "core/ir/ir.h"
@@ -73,11 +73,17 @@ struct SegmentedBlock {
   bool contain_raw_value(torch::jit::Value* input) {
     return old_to_new_.count(input);
   }
-  void register_inshape(std::vector<ir::Input>& in_shape) {
-    in_shape_ = in_shape;
+  void register_inshapes(std::vector<ir::Input>& in_shapes) {
+    in_shapes_ = in_shapes;
   }
-  const std::vector<ir::Input>& in_shape() const {
-    return in_shape_;
+  const std::vector<ir::Input>& in_shapes() const {
+    return in_shapes_;
+  }
+  void register_intypes(std::vector<at::ScalarType>& in_types) {
+    in_types_ = in_types;
+  }
+  const std::vector<at::ScalarType>& in_types() const {
+    return in_types_;
   }
   void update_target(SegmentedBlockTarget new_target) {
     target_ = new_target;
@@ -91,7 +97,8 @@ struct SegmentedBlock {
  private:
   BlockID id_;
   SegmentedBlockTarget target_;
-  std::vector<ir::Input> in_shape_;
+  std::vector<ir::Input> in_shapes_;
+  std::vector<at::ScalarType> in_types_;
   std::vector<torch::jit::Value*> inputs_;
   std::vector<torch::jit::Value*> outputs_;
   std::vector<torch::jit::Node*> nodes_;
