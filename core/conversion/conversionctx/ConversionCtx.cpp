@@ -58,7 +58,7 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
   net = make_trt(
       builder->createNetworkV2(1U << static_cast<uint32_t>(nvinfer1::NetworkDefinitionCreationFlag::kEXPLICIT_BATCH)));
 
-  LOG_DEBUG(build_settings);
+  LOG_INFO(settings);
   cfg = make_trt(builder->createBuilderConfig());
 
   for (auto p = settings.enabled_precisions.begin(); p != settings.enabled_precisions.end(); ++p) {
