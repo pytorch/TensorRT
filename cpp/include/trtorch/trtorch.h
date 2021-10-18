@@ -517,38 +517,6 @@ struct TRTORCH_API CompileSpec {
   };
 
   /**
-   * @brief A struct to hold fallback info
-   */
-  struct TRTORCH_API TorchFallback {
-    /// enable the automatic fallback feature
-    bool enabled = false;
-
-    /// minimum consecutive operation number that needs to be satisfied to convert to TensorRT
-    uint64_t min_block_size = 1;
-
-    /// A list of names of operations that will explicitly run in PyTorch
-    std::vector<std::string> forced_fallback_ops;
-
-    /// A list of names of modules that will explicitly run in PyTorch
-    std::vector<std::string> forced_fallback_modules;
-
-    /**
-     * @brief Construct a default Torch Fallback object, fallback will be off
-     */
-    TorchFallback() = default;
-
-    /**
-     * @brief Construct from a bool
-     */
-    TorchFallback(bool enabled) : enabled(enabled) {}
-
-    /**
-     * @brief Constructor for setting min_block_size
-     */
-    TorchFallback(bool enabled, uint64_t min_size) : enabled(enabled), min_block_size(min_size) {}
-  };
-
-  /**
    * @brief Construct a new Extra Info object
    * Convienence constructor to set fixed input size from vectors describing
    * size of input tensors. Each entry in the vector represents a input and
@@ -644,11 +612,6 @@ struct TRTORCH_API CompileSpec {
   Device device;
 
   /**
-   * @brief Settings related to partial compilation
-   */
-  TorchFallback torch_fallback;
-
-  /**
    * Sets the restrictions for the engine (CUDA Safety)
    */
   EngineCapability capability = EngineCapability::kSTANDARD;
@@ -676,6 +639,27 @@ struct TRTORCH_API CompileSpec {
    * Calibration dataloaders for each input for post training quantizatiom
    */
   nvinfer1::IInt8Calibrator* ptq_calibrator = nullptr;
+
+  /**
+   * Require the full module be compiled to TensorRT instead of potentially running unsupported operations in PyTorch
+   */
+  bool require_full_compilation = false;
+
+  /**
+   * Minimum number of contiguous supported operators to compile a subgraph to TensorRT
+   */
+  uint64_t min_block_size = 3;
+
+  /**
+   * List of aten operators that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True
+   */
+  std::vector<std::string> torch_executed_ops;
+
+
+  /**
+   * List of modules that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True
+   */
+  std::vector<std::string> torch_executed_modules;
 };
 
 /**

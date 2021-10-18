@@ -323,21 +323,6 @@ core::CompileSpec to_internal_compile_spec(CompileSpec external) {
     internal.convert_info.engine_settings.enabled_precisions.insert(toTRTDataType(p));
   }
 
-  // /* We want default behavior for types to match PyTorch, so in the case the user did not explicitly set the dtype
-  // for inputs they will follow PyTorch convetions */ for (size_t i = 0; i < external.inputs.size(); i++) {
-  //   if (!external.inputs[i].get_explicit_set_dtype()) {
-  //     auto& precisions = internal.convert_info.engine_settings.enabled_precisions;
-  //     auto& internal_ins = internal.convert_info.inputs;
-  //     if (precisions.find(nvinfer1::DataType::kINT8) != precisions.end()) {
-  //       internal_ins[i].dtype = nvinfer1::DataType::kFLOAT;
-  //     } else if (precisions.find(nvinfer1::DataType::kHALF) != precisions.end()) {
-  //       internal_ins[i].dtype = nvinfer1::DataType::kHALF;
-  //     } else {
-  //       internal_ins[i].dtype = nvinfer1::DataType::kFLOAT;
-  //     }
-  //   }
-  // }
-
   internal.convert_info.engine_settings.sparse_weights = external.sparse_weights;
   internal.convert_info.engine_settings.disable_tf32 = external.disable_tf32;
   internal.convert_info.engine_settings.refit = external.refit;
@@ -346,10 +331,19 @@ core::CompileSpec to_internal_compile_spec(CompileSpec external) {
   internal.convert_info.engine_settings.strict_types = external.strict_types;
   internal.convert_info.engine_settings.device.allow_gpu_fallback = external.device.allow_gpu_fallback;
   internal.convert_info.engine_settings.max_batch_size = external.max_batch_size;
-  internal.partition_info.enabled = external.torch_fallback.enabled;
-  internal.partition_info.min_block_size = external.torch_fallback.min_block_size;
-  internal.partition_info.forced_fallback_operators = external.torch_fallback.forced_fallback_ops;
-  internal.lower_info.forced_fallback_modules = external.torch_fallback.forced_fallback_modules;
+
+  TRTORCH_CHECK(!(external.require_full_compilation && (external.torch_executed_ops.size() > 0)),
+                 "require_full_compilation is enabled however the list of ops to run in torch is not empty (Found "
+                  << external.torch_executed_ops.size() << " ops)");
+
+  TRTORCH_CHECK(!(external.require_full_compilation && (external.torch_executed_modules.size() > 0)),
+                 "require_full_compilation is enabled however the list of modules to run in torch is not empty (Found "
+                  << external.torch_executed_modules.size() << " modules)");
+
+  internal.partition_info.enabled = external.require_full_compilation;
+  internal.partition_info.min_block_size = external.min_block_size;
+  internal.partition_info.forced_fallback_operators = std::move(external.torch_executed_ops);
+  internal.lower_info.forced_fallback_modules = std::move(external.torch_executed_modules);
 
   switch (external.device.device_type) {
     case CompileSpec::Device::DeviceType::kDLA:

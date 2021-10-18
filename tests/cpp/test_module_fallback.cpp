@@ -23,8 +23,7 @@ TEST(CppAPITest, ResNetModuleFallbacksCorrectly) {
   }
 
   trtorch::CompileSpec cfg(input_shapes);
-  cfg.torch_fallback.enabled = true;
-  cfg.torch_fallback.forced_fallback_modules.push_back("torchvision.models.resnet.BasicBlock");
+  cfg.torch_executed_modules.push_back("torchvision.models.resnet.BasicBlock");
 
   auto jit_results = mod.forward(jit_inputs_ivalues).toTensor();
   auto trt_mod = trtorch::CompileGraph(mod, cfg);
@@ -51,9 +50,8 @@ TEST(CppAPITest, MobileNetModuleFallbacksCorrectlyWithOneEngine) {
   }
 
   trtorch::CompileSpec cfg(input_shapes);
-  cfg.torch_fallback.enabled = true;
-  cfg.torch_fallback.min_block_size = 5;
-  cfg.torch_fallback.forced_fallback_modules.push_back("torchvision.models.mobilenetv2.ConvBNActivation");
+  cfg.min_block_size = 5;
+  cfg.torch_executed_modules.push_back("torchvision.models.mobilenetv2.ConvBNActivation");
 
   auto jit_results = mod.forward(jit_inputs_ivalues).toTensor();
   auto trt_mod = trtorch::CompileGraph(mod, cfg);
