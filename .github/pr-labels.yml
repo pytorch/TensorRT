@@ -19,6 +19,9 @@
 "component: evaluators":
   - core/conversion/evaluators/**/*
 
+"component: partitioning":
+  - core/partitioning/**/*
+
 "component: runtime":
   - core/runtime/**/*
 

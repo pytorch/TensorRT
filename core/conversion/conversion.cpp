@@ -326,7 +326,7 @@ void EvaluateLoopBlock(ConversionCtx* ctx, const torch::jit::Node* n) {
     MapIValues(ctx, n->outputs(), n->blocks()[0]->inputs(), 0, 1);
     for (auto bn : n->blocks()[0]->nodes()) {
       if (bn->kind() == torch::jit::prim::Loop) {
-        EvaluateLoopBlock(ctx, n);
+        EvaluateLoopBlock(ctx, bn);
       } else if (bn->kind() == torch::jit::prim::If) {
         EvaluateConditionalBlock(ctx, bn, true);
       } else {

@@ -112,6 +112,9 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   }
 
   c10::cuda::CUDAStream stream = c10::cuda::getCurrentCUDAStream(inputs[0].device().index());
+
+  // nvinfer1::IExecutionContext::enqueue is not thread safe and we need a mutex for it.
+  std::unique_lock<std::mutex> lock(compiled_engine->mu);
   compiled_engine->exec_ctx->enqueueV2(gpu_handles.data(), stream, nullptr);
 
   return outputs;

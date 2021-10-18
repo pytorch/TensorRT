@@ -2,6 +2,7 @@
 
 #include <queue>
 #include "core/conversion/conversion.h"
+#include "core/conversion/evaluators/evaluators.h"
 #include "core/partitioning/shape_analysis.h"
 #include "torch/csrc/jit/passes/constant_pooling.h"
 #include "torch/csrc/jit/passes/dead_code_elimination.h"
@@ -114,7 +115,7 @@ std::vector<SegmentedBlock> segmentBlocksWithNonTensorInputs(SegmentedBlock& seg
         pytorch_nodes.push_back(n);
         prev_non_tensor_outputs = containNonTensorOutputs(n);
       } else {
-        // If pytorch_nodes is not empty, the previous nodes were all tensorrt_nodes. Construct a
+        // If pytorch_nodes is not empty, the previous nodes were all pytorch_nodes. Construct a
         // Pytorch segmented_block and clear the pytorch_nodes list to be later used for new Pytorch segments.
         if (!pytorch_nodes.empty()) {
           new_seg_blocks.emplace_back(SegmentedBlock::kTorch, pytorch_nodes);
@@ -131,6 +132,7 @@ std::vector<SegmentedBlock> segmentBlocksWithNonTensorInputs(SegmentedBlock& seg
       new_seg_blocks.emplace_back(SegmentedBlock::kTorch, pytorch_nodes);
     }
   }
+
   return std::move(new_seg_blocks);
 }
 
@@ -158,6 +160,8 @@ void resolveNonTensorInputs(PartitionedGraph& segmented_blocks) { // , std::shar
       }
     }
 
+    // For each non-tensor value in the usage_counts map, keep updating the produce_id to the earliest segmented block
+    // that has/produces it.
     for (auto& use : usage_counts) {
       // Set the produce_id to the segmented block index that contains/produces this non-tensor torch::jit::Value
       if (segmented_blocks[i].contain_raw_value(use.first)) {
@@ -177,9 +181,8 @@ void resolveNonTensorInputs(PartitionedGraph& segmented_blocks) { // , std::shar
         // Segmented Blocks with non-tensor inputs will have to be re-segmented as
         // TRTorch doesn't support non-tensor inputs for a module.
         auto to_inject_blocks = segmentBlocksWithNonTensorInputs(segmented_blocks[first_torch_id]);
-        segmented_blocks.erase(segmented_blocks.begin() + first_torch_id);
-        segmented_blocks.insert(
-            segmented_blocks.begin() + first_torch_id, to_inject_blocks.begin(), to_inject_blocks.end());
+        auto next_iter = segmented_blocks_list.erase(idx_to_iter[first_torch_id]);
+        segmented_blocks_list.insert(next_iter, to_inject_blocks.begin(), to_inject_blocks.end());
         updated_segments.insert(first_torch_id);
       }
     }
@@ -258,6 +261,20 @@ void registerSegmentsOutputs(PartitionedGraph& segmented_blocks, torch::jit::Blo
   return;
 }
 
+bool checkLoopEvaluatable(torch::jit::Node* n) {
+  bool compile_to_trt = true;
+  for (auto bn : n->blocks()[0]->nodes()) {
+    if (bn->kind() == torch::jit::prim::Loop) {
+      compile_to_trt = compile_to_trt && checkLoopEvaluatable(bn);
+    } else if (bn->kind() == torch::jit::prim::If) {
+      compile_to_trt = compile_to_trt && containNonTensorOutputs(bn);
+    } else {
+      compile_to_trt = compile_to_trt && core::conversion::evaluators::shouldEvalAtConversionTime(bn);
+    }
+  }
+  return compile_to_trt;
+}
+
 std::vector<SegmentedBlock> segment_graph(torch::jit::Block* block, const PartitionInfo& partition_info) {
   auto min_block_size = partition_info.min_block_size;
   std::unordered_set<std::string> forced_fallback_operators(
@@ -297,6 +314,17 @@ std::vector<SegmentedBlock> segment_graph(torch::jit::Block* block, const Partit
           pytorch_nodes.clear();
         }
         segmented_blocks.emplace_back(SegmentedBlock::kTorch, std::vector<torch::jit::Node*>{n});
+        continue;
+      } else if (n->kind() == torch::jit::prim::Loop) {
+        if (!pytorch_nodes.empty()) {
+          segmented_blocks.emplace_back(SegmentedBlock::kTorch, pytorch_nodes);
+          pytorch_nodes.clear();
+        }
+        if (checkLoopEvaluatable(n)) {
+          tensorrt_nodes.push_back(n);
+        } else {
+          segmented_blocks.emplace_back(SegmentedBlock::kTorch, std::vector<torch::jit::Node*>{n});
+        }
         continue;
       }
       pytorch_nodes.push_back(n);
