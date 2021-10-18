@@ -8,8 +8,94 @@ from trtorch._version import __version__
 from trtorch.Device import Device
 from types import FunctionType
 
+def compile(module: torch.nn.Module, compile_spec: Any, ir : str = "default") -> torch.jit.ScriptModule:
+    """Compile a Torch module for NVIDIA GPUs using TensorRT
 
-def compile(module: torch.jit.ScriptModule, compile_spec: Any) -> torch.jit.ScriptModule:
+    Takes a existing Torch module and a set of settings to configure the compiler
+    and will convert methods to JIT Graphs which call equivalent TensorRT engines
+
+    Converts specifically the forward method of a TorchScript Module
+
+    Args:
+        module (torch.nn.Module): Source module
+        compile_spec (dict): Compilation settings including operating precision, target device, etc.
+            One key is required which is ``inputs``, describing the input sizes or ranges for inputs
+            to the graph as well as expect types and formats for those inputs. All other keys are optional
+
+            .. code-block:: py
+
+                compile_spec = {
+                    "inputs": [
+                        trtorch.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
+                        trtorch.Input(
+                            min_shape=(1, 224, 224, 3),
+                            opt_shape=(1, 512, 512, 3),
+                            max_shape=(1, 1024, 1024, 3),
+                            dtype=torch.int32
+                            format=torch.channel_last
+                        ) # Dynamic input shape for input #2
+                    ],
+                    "device": {
+                        "device_type": torch.device("cuda"), # Type of device to run engine on (for DLA use trtorch.DeviceType.DLA)
+                        "gpu_id": 0, # Target gpu id to run engine (Use Xavier as gpu id for DLA)
+                        "dla_core": 0, # (DLA only) Target dla core id to run engine
+                        "allow_gpu_fallback": false, # (DLA only) Allow layers unsupported on DLA to run on GPU
+                    },
+                    "disable_tf32": False, # Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
+                    "sparse_weights": Enable sparsity for convolution and fully connected layers.
+                    "enabled_precisions": {torch.float, torch.half}, # Enabling FP16 kernels
+                    "refit": false, # enable refit
+                    "debug": false, # enable debuggable engine
+                    "strict_types": false, # kernels should strictly run in operating precision
+                    "capability": trtorch.EngineCapability.DEFAULT, # Restrict kernel selection to safe gpu kernels or safe dla kernels
+                    "num_min_timing_iters": 2, # Number of minimization timing iterations used to select kernels
+                    "num_avg_timing_iters": 1, # Number of averaging timing iterations used to select kernels
+                    "workspace_size": 0, # Maximum size of workspace given to TensorRT
+                    "max_batch_size": 0, # Maximum batch size (must be >= 1 to be set, 0 means not set)
+                    "torch_fallback": {
+                        "enabled": True, # Turn on or turn off falling back to PyTorch if operations are not supported in TensorRT
+                        "force_fallback_ops": [
+                            "aten::max_pool2d" # List of specific ops to require running in PyTorch
+                        ],
+                        "force_fallback_modules": [
+                            "mypymod.mytorchmod" # List of specific torch modules to require running in PyTorch
+                        ],
+                        "min_block_size": 3 # Minimum number of ops an engine must incapsulate to be run in TensorRT
+                    }
+                }
+
+            Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
+            torch datatypes or trtorch datatypes and you can use either torch devices or the trtorch device type enum
+            to select device type.
+
+    Returns:
+        torch.jit.ScriptModule: Compiled TorchScript Module, when run it will execute via TensorRT
+    """
+    scripted_model = module
+    if ir=="default":
+        try:
+            if isinstance(module, torch.nn.Module):
+                scripted_model = torch.jit.script(module.eval().cuda());
+            else:
+                raise ValueError("Provided ir=" + ir + ", but the input model is of type: " + type(module) + \
+                                 ". Supported combinations are [model: torch.nn.Module | ir=default] and \
+                                 [model: torch.jit.ScriptModule | ir=torchscript (or) ts]")
+        except:
+            raise Exception("Scripting the input model (using torch.jit.script) failed. Please check your input model to ensure it is torchscriptable.")
+    elif ir=="torchscript" or ir=="ts":
+        if isinstance(module, torch.jit.ScriptModule):
+            scripted_model = module
+        else:
+            raise ValueError("Provided ir=" + ir + ", but the input model is of type: " + type(module) + \
+                             ". Supported combinations are [model: torch.nn.Module | ir=default] and \
+                             [model: torch.jit.ScriptModule | ir=torchscript (or) ts]")
+    else:
+        raise ValueError("Invalid IR for the input model. Please provide either a torch.nn.Module or \
+                          torch.jit.ScriptModule")
+
+    return compile_ts(scripted_model, compile_spec)
+
+def compile_ts(module: torch.jit.ScriptModule, compile_spec: Any) -> torch.jit.ScriptModule:
     """Compile a TorchScript module for NVIDIA GPUs using TensorRT
 
     Takes a existing TorchScript module and a set of settings to configure the compiler
