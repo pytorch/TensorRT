@@ -387,7 +387,7 @@ struct TRTORCH_API CompileSpec {
      * / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8)
      *
      * @param shape Input tensor shape
-     * @param dtype Expected data type for the input (Defaults to Float32)
+     * @param dtype Expected data type for the input (Defaults to the type of the weights in the first tensor calculation if detectable else Float32)
      * @param format Expected tensor format for the input (Defaults to contiguous)
      */
     Input(std::vector<int64_t> shape, TensorFormat format = TensorFormat::kContiguous);
@@ -398,7 +398,7 @@ struct TRTORCH_API CompileSpec {
      * tensor format
      *
      * @param shape Input tensor shape
-     * @param dtype Expected data type for the input (Defaults to Float32)
+     * @param dtype Expected data type for the input (Defaults to the type of the weights in the first tensor calculation if detectable else Float32)
      * @param format Expected tensor format for the input (Defaults to contiguous)
      */
     Input(std::vector<int64_t> shape, DataType dtype, TensorFormat format = TensorFormat::kContiguous);
@@ -421,7 +421,7 @@ struct TRTORCH_API CompileSpec {
      * allow the user to configure expected input shape tensor format
      *
      * @param shape Input tensor shape
-     * @param dtype Expected data type for the input (Defaults to Float32)
+     * @param dtype Expected data type for the input (Defaults to the type of the weights in the first tensor calculation if detectable else Float32)
      * @param format Expected tensor format for the input (Defaults to contiguous)
      */
     Input(c10::ArrayRef<int64_t> shape, DataType dtype, TensorFormat format = TensorFormat::kContiguous);
@@ -451,7 +451,7 @@ struct TRTORCH_API CompileSpec {
      * @param min_shape Minimum shape for input tensor
      * @param opt_shape Target optimization shape for input tensor
      * @param max_shape Maximum acceptible shape for input tensor
-     * @param dtype Expected data type for the input (Defaults to Float32)
+     * @param dtype Expected data type for the input (Defaults to the type of the weights in the first tensor calculation if detectable else Float32)
      * @param format Expected tensor format for the input (Defaults to contiguous)
      */
     Input(
@@ -486,7 +486,7 @@ struct TRTORCH_API CompileSpec {
      * @param min_shape Minimum shape for input tensor
      * @param opt_shape Target optimization shape for input tensor
      * @param max_shape Maximum acceptible shape for input tensor
-     * @param dtype Expected data type for the input (Defaults to Float32)
+     * @param dtype Expected data type for the input (Defaults to the type of the weights in the first tensor calculation if detectable else Float32)
      * @param format Expected tensor format for the input (Defaults to contiguous)
      */
     Input(
@@ -506,14 +506,9 @@ struct TRTORCH_API CompileSpec {
      */
     Input(at::Tensor tensor);
 
-    bool get_explicit_set_dtype() {
-      return explicit_set_dtype;
-    }
-
    private:
     friend std::ostream& operator<<(std::ostream& os, const Input& input);
     bool input_is_dynamic;
-    bool explicit_set_dtype;
   };
 
   /**

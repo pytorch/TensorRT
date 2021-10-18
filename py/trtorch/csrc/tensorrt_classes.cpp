@@ -33,6 +33,8 @@ nvinfer1::DataType toTRTDataType(DataType value) {
       return nvinfer1::DataType::kBOOL;
     case DataType::kFloat:
       return nvinfer1::DataType::kFLOAT;
+    case DataType::kUnknown:
+      return nvinfer1::DataType::kFLOAT;
     default:
       TRTORCH_THROW_ERROR("Unknown data type: " << to_str(value));
   }

@@ -73,7 +73,6 @@ std::ostream& operator<<(std::ostream& os, const CompileSpec::Input& input) {
 }
 
 nvinfer1::DataType toTRTDataType(CompileSpec::DataType value) {
-  TRTORCH_CHECK(!(value == CompileSpec::DataType::kUnknown), "Data type is unknown");
   switch (value) {
     case CompileSpec::DataType::kChar:
       return nvinfer1::DataType::kINT8;
@@ -162,8 +161,7 @@ CompileSpec::Input::Input(std::vector<int64_t> shape, TensorFormat format) {
   this->min_shape = shape;
   this->max_shape = shape;
   this->shape = shape;
-  this->dtype = dtype;
-  this->explicit_set_dtype = false;
+  this->dtype = CompileSpec::DataType::kUnknown;
   this->format = format;
   this->input_is_dynamic = false;
 }
@@ -174,7 +172,6 @@ CompileSpec::Input::Input(std::vector<int64_t> shape, DataType dtype, TensorForm
   this->max_shape = shape;
   this->shape = shape;
   this->dtype = dtype;
-  this->explicit_set_dtype = true;
   this->format = format;
   this->input_is_dynamic = false;
 }
@@ -184,8 +181,7 @@ CompileSpec::Input::Input(c10::IntArrayRef shape, TensorFormat format) {
   this->min_shape = core::util::toVec(shape);
   this->max_shape = core::util::toVec(shape);
   this->shape = core::util::toVec(shape);
-  this->dtype = DataType::kFloat;
-  this->explicit_set_dtype = false;
+  this->dtype = CompileSpec::DataType::kUnknown;
   this->format = format;
   this->input_is_dynamic = false;
 }
@@ -196,7 +192,6 @@ CompileSpec::Input::Input(c10::IntArrayRef shape, DataType dtype, TensorFormat f
   this->max_shape = core::util::toVec(shape);
   this->shape = core::util::toVec(shape);
   this->dtype = dtype;
-  this->explicit_set_dtype = true;
   this->format = format;
   this->input_is_dynamic = false;
 }
@@ -210,8 +205,7 @@ CompileSpec::Input::Input(
   this->min_shape = min_shape;
   this->max_shape = max_shape;
   this->shape = core::util::toVec(core::ir::Input(this->min_shape, this->opt_shape, this->max_shape).input_shape);
-  this->dtype = dtype;
-  this->explicit_set_dtype = false;
+  this->dtype = CompileSpec::DataType::kUnknown;
   this->format = format;
   this->input_is_dynamic = true;
 }
@@ -227,7 +221,6 @@ CompileSpec::Input::Input(
   this->max_shape = max_shape;
   this->shape = core::util::toVec(core::ir::Input(this->min_shape, this->opt_shape, this->max_shape).input_shape);
   this->dtype = dtype;
-  this->explicit_set_dtype = true;
   this->format = format;
   this->input_is_dynamic = true;
 }
@@ -241,8 +234,7 @@ CompileSpec::Input::Input(
   this->min_shape = core::util::toVec(min_shape);
   this->max_shape = core::util::toVec(max_shape);
   this->shape = core::util::toVec(core::ir::Input(this->min_shape, this->opt_shape, this->max_shape).input_shape);
-  this->dtype = dtype;
-  this->explicit_set_dtype = false;
+  this->dtype = CompileSpec::DataType::kUnknown;
   this->format = format;
   this->input_is_dynamic = true;
 }
@@ -258,7 +250,6 @@ CompileSpec::Input::Input(
   this->max_shape = core::util::toVec(max_shape);
   this->shape = core::util::toVec(core::ir::Input(this->min_shape, this->opt_shape, this->max_shape).input_shape);
   this->dtype = dtype;
-  this->explicit_set_dtype = true;
   this->format = format;
   this->input_is_dynamic = true;
 }
@@ -269,7 +260,6 @@ CompileSpec::Input::Input(at::Tensor tensor) {
   this->max_shape = tensor.sizes().vec();
   this->shape = tensor.sizes().vec();
   this->dtype = tensor.scalar_type();
-  this->explicit_set_dtype = true;
   TRTORCH_ASSERT(
       tensor.is_contiguous(at::MemoryFormat::ChannelsLast) || tensor.is_contiguous(at::MemoryFormat::Contiguous),
       "Tensor does not have a supported contiguous memory format, supported formats are contiguous or channel_last");
@@ -292,7 +282,7 @@ core::ir::Input to_internal_input(CompileSpec::Input& i) {
       i.max_shape,
       toTRTDataType(i.dtype),
       toTRTTensorFormat(i.format),
-      i.get_explicit_set_dtype());
+      !(i.dtype == CompileSpec::DataType::kUnknown));
 }
 
 std::vector<core::ir::Input> to_vec_internal_inputs(std::vector<CompileSpec::Input>& external) {

@@ -2,6 +2,7 @@ import unittest
 import trtorch
 import torch
 import torchvision.models as models
+import copy
 
 from model_test_case import ModelTestCase
 
@@ -75,8 +76,6 @@ class TestCompile(ModelTestCase):
         self.assertTrue(same < 2e-2)
 
 
-
-
 class TestCompileHalf(ModelTestCase):
 
     def setUp(self):
@@ -135,7 +134,6 @@ class TestFallbackToTorch(ModelTestCase):
             "device": {
                 "device_type": trtorch.DeviceType.GPU,
                 "gpu_id": 0,
-                "dla_core": 0,
                 "allow_gpu_fallback": False,
                 "disable_tf32": False
             },
@@ -161,7 +159,6 @@ class TestModuleFallbackToTorch(ModelTestCase):
             "device": {
                 "device_type": trtorch.DeviceType.GPU,
                 "gpu_id": 0,
-                "dla_core": 0,
                 "allow_gpu_fallback": False,
                 "disable_tf32": False
             },
@@ -187,7 +184,6 @@ class TestPTtoTRTtoPT(ModelTestCase):
             "device": {
                 "device_type": trtorch.DeviceType.GPU,
                 "gpu_id": 0,
-                "dla_core": 0,
                 "allow_gpu_fallback": False,
                 "disable_tf32": False
             }
@@ -197,6 +193,80 @@ class TestPTtoTRTtoPT(ModelTestCase):
         trt_mod = trtorch.embed_engine_in_new_module(trt_engine, trtorch.Device("cuda:0"))
         same = (trt_mod(self.input) - self.ts_model(self.input)).abs().max()
         self.assertTrue(same < 2e-3)
+
+
+class TestInputTypeDefaultsFP32Model(ModelTestCase):
+
+    def setUp(self):
+        self.input = torch.randn((1, 3, 224, 224)).to("cuda")
+
+    def test_input_use_default_fp32(self):
+        ts_model = torch.jit.script(self.model)
+        trt_mod = trtorch.compile(ts_model,
+                                  inputs=[trtorch.Input(self.input.shape)],
+                                  enabled_precisions={torch.float, torch.half})
+        trt_mod(self.input)
+
+    def test_input_respect_user_setting_fp32_weights_fp16_in(self):
+        ts_model = torch.jit.script(self.model)
+        trt_mod = trtorch.compile(ts_model,
+                                  inputs=[self.input.half()],
+                                  enabled_precisions={torch.float, torch.half})
+        trt_mod(self.input.half())
+
+    def test_input_respect_user_setting_fp32_weights_fp16_in_non_constructor(self):
+        ts_model = torch.jit.script(self.model)
+        input_spec = trtorch.Input(self.input.shape)
+        input_spec.dtype = torch.half
+
+        trt_mod = trtorch.compile(ts_model,
+                                  inputs=[input_spec],
+                                  enabled_precisions={torch.float, torch.half})
+        trt_mod(self.input.half())
+
+
+class TestInputTypeDefaultsFP16Model(ModelTestCase):
+
+    def setUp(self):
+        self.input = torch.randn((1, 3, 224, 224)).to("cuda")
+
+    def test_input_use_default_fp16(self):
+        half_mod = torch.jit.script(self.model)
+        half_mod.half()
+
+        trt_mod = trtorch.compile(half_mod,
+                                  inputs=[trtorch.Input(self.input.shape)],
+                                  enabled_precisions={torch.float, torch.half})
+        trt_mod(self.input.half())
+
+    def test_input_use_default_fp16_without_fp16_enabled(self):
+        half_mod = torch.jit.script(self.model)
+        half_mod.half()
+
+        trt_mod = trtorch.compile(half_mod,
+                                  inputs=[trtorch.Input(self.input.shape)])
+        trt_mod(self.input.half())
+
+    def test_input_respect_user_setting_fp16_weights_fp32_in(self):
+        half_mod = torch.jit.script(self.model)
+        half_mod.half()
+
+        trt_mod = trtorch.compile(half_mod,
+                                  inputs=[self.input],
+                                  enabled_precisions={torch.float, torch.half})
+        trt_mod(self.input)
+
+    def test_input_respect_user_setting_fp16_weights_fp32_in_non_constuctor(self):
+        half_mod = torch.jit.script(self.model)
+        half_mod.half()
+
+        input_spec = trtorch.Input(self.input.shape)
+        input_spec.dtype = torch.float
+
+        trt_mod = trtorch.compile(half_mod,
+                                  inputs=[input_spec],
+                                  enabled_precisions={torch.float, torch.half})
+        trt_mod(self.input)
 
 
 class TestCheckMethodOpSupport(unittest.TestCase):
@@ -284,6 +354,8 @@ def test_suite():
     suite.addTest(TestCompileHalf.parametrize(TestCompileHalf, model=models.resnet18(pretrained=True)))
     suite.addTest(TestCompileHalfDefault.parametrize(TestCompileHalfDefault, model=models.resnet18(pretrained=True)))
     suite.addTest(TestPTtoTRTtoPT.parametrize(TestPTtoTRTtoPT, model=models.mobilenet_v2(pretrained=True)))
+    suite.addTest(TestInputTypeDefaultsFP32Model.parametrize(TestInputTypeDefaultsFP32Model, model=models.resnet18(pretrained=True)))
+    suite.addTest(TestInputTypeDefaultsFP16Model.parametrize(TestInputTypeDefaultsFP16Model, model=models.resnet18(pretrained=True)))
     suite.addTest(TestFallbackToTorch.parametrize(TestFallbackToTorch, model=models.resnet18(pretrained=True)))
     suite.addTest(
         TestModuleFallbackToTorch.parametrize(TestModuleFallbackToTorch, model=models.resnet18(pretrained=True)))

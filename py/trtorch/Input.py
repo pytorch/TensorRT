@@ -30,7 +30,7 @@ class Input(object):
 
     shape_mode = None  #: (trtorch.Input._ShapeMode): Is input statically or dynamically shaped
     shape = None  #: (Tuple or Dict): Either a single Tuple or a dict of tuples defining the input shape. Static shaped inputs will have a single tuple. Dynamic inputs will have a dict of the form ``{ "min_shape": Tuple, "opt_shape": Tuple, "max_shape": Tuple }``
-    dtype = _types.dtype.float32  #: The expected data type of the input tensor (default: trtorch.dtype.float32)
+    dtype = _types.dtype.unknown  #: The expected data type of the input tensor (default: trtorch.dtype.float32)
     _explicit_set_dtype = False
     format = _types.TensorFormat.contiguous  #: The expected format of the input tensor (default: trtorch.TensorFormat.NCHW)
 
@@ -133,16 +133,44 @@ class Input(object):
     def _to_internal(self) -> trtorch._C.Input:
         internal_in = trtorch._C.Input()
         if self.shape_mode == Input._ShapeMode.DYNAMIC:
-            internal_in.min = self.shape["min_shape"]
-            internal_in.opt = self.shape["opt_shape"]
-            internal_in.max = self.shape["max_shape"]
+            if not Input._supported_input_size_type(self.shape["min_shape"]):
+                raise TypeError(
+                        "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
+                        + str(type(self.shape["min_shape"])) + " for min_shape")
+            else:
+                internal_in.min = self.shape["min_shape"]
+
+            if not Input._supported_input_size_type(self.shape["opt_shape"]):
+                raise TypeError(
+                        "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
+                        + str(type(self.shape["opt_shape"])) + " for opt_shape")
+            else:
+                internal_in.min = self.shape["op_shape"]
+
+            if not Input._supported_input_size_type(self.shape["max_shape"]):
+                raise TypeError(
+                        "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
+                        + str(type(self.shape["max_shape"])) + " for max_shape")
+            else:
+                internal_in.min = self.shape["opt_shape"]
             internal_in.input_is_dynamic = True
         else:
-            internal_in.opt = self.shape
+            if not Input._supported_input_size_type(self.shape):
+                raise TypeError(
+                        "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
+                        + str(type(self.shape)) + " for shape")
+            else:
+                internal_in.opt = self.shape
             internal_in.input_is_dynamic = False
-        internal_in.dtype = self.dtype
+
+        if self.dtype != _types.dtype.unknown:
+            self._explicit_set_dtype = True
+        else:
+            self._explicit_set_dtype = False
+
+        internal_in.dtype = Input._parse_dtype(self.dtype)
         internal_in._explicit_set_dtype = self._explicit_set_dtype
-        internal_in.format = self.format
+        internal_in.format = Input._parse_format(self.format)
         return internal_in
 
     @staticmethod
@@ -172,7 +200,7 @@ class Input(object):
                     "Provided an unsupported data type as an input data type (support: bool, int32, half, float), got: "
                     + str(dtype))
 
-        elif isinstance(dtype, _types.DataTypes):
+        elif isinstance(dtype, _types.dtype):
             return dtype
 
         else:

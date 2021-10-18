@@ -9,6 +9,8 @@ namespace trtorch {
 namespace core {
 namespace util {
 
+using InputTypeMap = std::unordered_map<const torch::jit::Value*, c10::optional<at::ScalarType>>;
+
 inline std::string node_info(const torch::jit::Node* n) {
   std::stringstream ss;
   ss << *n;
@@ -61,8 +63,7 @@ inline std::string GetPyTorchSourceCode(const torch::jit::Node* n) {
 }
 
 c10::optional<at::ScalarType> get_value_first_calc_dtype_opt(torch::jit::Block* b, torch::jit::Value* in);
-std::unordered_map<const torch::jit::Value*, c10::optional<at::ScalarType>> get_block_first_calc_dtypes_opt(
-    torch::jit::Block* b);
+InputTypeMap get_block_first_calc_dtypes_opt(torch::jit::Block* b);
 
 } // namespace util
 } // namespace core

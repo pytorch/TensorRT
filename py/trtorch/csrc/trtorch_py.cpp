@@ -186,6 +186,7 @@ PYBIND11_MODULE(_C, m) {
       .value("int8", DataType::kChar, "8 bit integer number")
       .value("int32", DataType::kInt32, "32 bit integer number")
       .value("bool", DataType::kChar, "Boolean value")
+      .value("unknown", DataType::kUnknown, "Unknown data type")
       .export_values();
 
   py::enum_<DeviceType>(m, "DeviceType", "Enum to specify device kinds to build TensorRT engines for")

@@ -287,22 +287,45 @@ GraphAndMapping ConstructFallbackGraph(
   return {new_g, old_to_new_g};
 }
 
+
+void MapInputsAndDetermineDTypes(CompileSpec& cfg, std::shared_ptr<torch::jit::Graph>& g, ir::StaticParams& static_params, const util::InputTypeMap& first_use_type_map) {
+  // Associate input specs with inputs
+  cfg.convert_info.inputs = std::move(ir::associate_specs_with_inputs(g, cfg.inputs, static_params));
+
+  for (auto& in : g->inputs()) {
+    auto est_type_opt = first_use_type_map.find(in)->second;
+    ir::Input& spec = cfg.convert_info.inputs.find(in)->second;
+    if (est_type_opt && !spec.dtype_is_user_defined) {
+      // If we can calculate the type from the graph and the type was not defined by the user then use the calculated type
+      LOG_INFO("Since input type is not explicitly defined, infering using first tensor calculation\n  Found input "
+        << in->debugName() << " has type " << est_type_opt.value() << ". If this is incorrect explicitly set dtype for input and file a bug");
+      spec.dtype = util::ScalarTypeToTRTDataType(est_type_opt.value());
+    } else if (!est_type_opt && !spec.dtype_is_user_defined) {
+      // If we cannot calculate the type and the user did not define the type, then default to FP32
+      LOG_WARNING(
+          "Cannot deterime input type from calcuations in graph for input "
+          << in->debugName() << ". Assuming it is Float32. If not, specify input type explicity");
+      spec.dtype = nvinfer1::DataType::kFLOAT;
+    } else {
+      // The user defined the type so no changes are necessary
+    }
+  }
+}
+
 std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::string method_name, CompileSpec cfg) {
   // Go through Lowering to simplify graph and extract weight parameters
   auto graph_and_parameters = lowering::Lower(mod, method_name, cfg.lower_info);
 
-  auto convert_cfg = std::move(cfg.convert_info);
   auto g = graph_and_parameters.first;
-
   auto params = graph_and_parameters.second;
   auto static_params = ir::get_static_params(g->inputs(), params);
+  // Infer the type of an input from the weights of the calculation
+  auto first_use_types = util::get_block_first_calc_dtypes_opt(g->block());
 
-  LOG_INFO(*g << "(CompileGraph)\n");
+  MapInputsAndDetermineDTypes(cfg, g, static_params, first_use_types);
 
-  // Move the user defined inputs to the convert_cfg since some might be static;
-  convert_cfg.inputs = std::move(ir::associate_specs_with_inputs(g, cfg.inputs, static_params));
+  auto engine = conversion::ConvertBlockToEngine(g->block(), cfg.convert_info, static_params);
 
-  auto engine = conversion::ConvertBlockToEngine(g->block(), convert_cfg, static_params);
   return std::move(engine);
 }
 
@@ -331,27 +354,12 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
       auto graph_and_parameters = lowering::Lower(mod, method.name(), cfg.lower_info);
 
       auto g = graph_and_parameters.first;
-      LOG_INFO("Lowered Graph: " << *g);
       auto params = graph_and_parameters.second;
       auto static_params = ir::get_static_params(g->inputs(), params);
-
-      cfg.convert_info.inputs = std::move(ir::associate_specs_with_inputs(g, cfg.inputs, static_params));
-
-      // If the user did not explicitly set the input type, then use the first
-      // tensor calculation to infer type.
+      // Infer the type of an input from the weights of the calculation
       auto first_use_types = util::get_block_first_calc_dtypes_opt(g->block());
-      for (auto& in : g->inputs()) {
-        auto est_type_opt = first_use_types[in];
-        ir::Input& spec = cfg.convert_info.inputs.find(in)->second;
-        if (est_type_opt && !spec.dtype_is_user_defined) {
-          spec.dtype = util::ScalarTypeToTRTDataType(est_type_opt.value());
-        } else if (!est_type_opt && !spec.dtype_is_user_defined) {
-          LOG_WARNING(
-              "Cannot deterime input type from calcuations in graph for input "
-              << in->debugName() << ". Assuming it is Float32. If not, specify input type explicity");
-          spec.dtype = nvinfer1::DataType::kFLOAT;
-        }
-      }
+
+      MapInputsAndDetermineDTypes(cfg, g, static_params, first_use_types);
 
       if (cfg.partition_info.enabled) {
         auto input_ivalues_map = partitioning::generateRandomInputs(cfg.convert_info.inputs, first_use_types);

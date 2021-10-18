@@ -96,9 +96,8 @@ exit_first_calc_dtype:
   return dtype;
 }
 
-std::unordered_map<const torch::jit::Value*, c10::optional<at::ScalarType>> get_block_first_calc_dtypes_opt(
-    torch::jit::Block* b) {
-  std::unordered_map<const torch::jit::Value*, c10::optional<at::ScalarType>> types;
+InputTypeMap get_block_first_calc_dtypes_opt(torch::jit::Block* b) {
+  InputTypeMap types;
 
   for (auto i : b->inputs()) {
     if (i->type() == c10::TensorType::get()) {
