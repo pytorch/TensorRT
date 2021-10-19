@@ -341,6 +341,14 @@ void MapInputsAndDetermineDTypes(
   }
 }
 
+uint64_t GetRecommendedWorkspaceSize(const runtime::CudaDevice& device) {
+  if (device.major < 6) {
+    return 256 * (1 << 20);
+  } else {
+    return 1 << 30;
+  }
+}
+
 std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::string method_name, CompileSpec cfg) {
   // Go through Lowering to simplify graph and extract weight parameters
   auto graph_and_parameters = lowering::Lower(mod, method_name, cfg.lower_info);
@@ -354,6 +362,16 @@ std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::
   // Infer the type of an input from the weights of the calculation
   auto first_use_types = ir::get_block_first_calc_dtypes_opt(g->block());
 
+  // GPU default WS size : 1 GB
+  // Set WS = 256 Mb for Jetson nano/TX1 like platforms whose compute capability is 5.X.
+  auto workspace_size = cfg.convert_info.engine_settings.workspace_size;
+  auto device_spec = cfg.convert_info.engine_settings.device;
+  auto cuda_device = runtime::CudaDevice(device_spec.gpu_id, device_spec.device_type);
+  if (workspace_size == 0) {
+    cfg.convert_info.engine_settings.workspace_size = GetRecommendedWorkspaceSize(cuda_device);
+  }
+
+
   MapInputsAndDetermineDTypes(cfg, g, static_params, first_use_types);
 
   auto engine = conversion::ConvertBlockToEngine(g->block(), cfg.convert_info, static_params);
@@ -364,19 +382,13 @@ std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::
 torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) {
   torch::jit::Module new_mod(mod._ivalue()->name() + "_trt");
 
-  auto device_spec = cfg.convert_info.engine_settings.device;
-
   // GPU default WS size : 1 GB
   // Set WS = 256 Mb for Jetson nano/TX1 like platforms whose compute capability is 5.X.
   auto workspace_size = cfg.convert_info.engine_settings.workspace_size;
-  cudaDeviceProp device_prop;
-  cudaGetDeviceProperties(&device_prop, device_spec.gpu_id);
+  auto device_spec = cfg.convert_info.engine_settings.device;
+  auto cuda_device = runtime::CudaDevice(device_spec.gpu_id, device_spec.device_type);
   if (workspace_size == 0) {
-    if (device_prop.major < 6) {
-      cfg.convert_info.engine_settings.workspace_size = 256 * (1 << 20);
-    } else {
-      cfg.convert_info.engine_settings.workspace_size = 1 << 30;
-    }
+    cfg.convert_info.engine_settings.workspace_size = GetRecommendedWorkspaceSize(cuda_device);
   }
 
   for (const torch::jit::Method& method : mod.get_methods()) {
@@ -420,8 +432,6 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
             conversion::VerifyConverterSupportForBlock(g->block()),
             "Not all operations in graph are supported by the compiler");
         auto engine = conversion::ConvertBlockToEngine(g->block(), cfg.convert_info, static_params);
-        auto device_spec = cfg.convert_info.engine_settings.device;
-        auto cuda_device = runtime::CudaDevice(device_spec.gpu_id, device_spec.device_type);
         AddEngineToGraph(new_mod, new_g, engine, cuda_device);
       }
       auto new_method = new_mod._ivalue()->compilation_unit()->create_function(method.name(), new_g);
