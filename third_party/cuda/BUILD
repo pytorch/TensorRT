@@ -32,7 +32,7 @@ cc_library(
             "bin/nvToolsExt64_1.dll",
         ],
         "//conditions:default": [
-            "ltargets/x86_64-linux/lib/libnvToolsExt.so.1",
+            "targets/x86_64-linux/lib/libnvToolsExt.so.1",
         ],
     }),
 )
