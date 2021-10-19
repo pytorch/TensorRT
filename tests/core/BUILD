@@ -16,6 +16,7 @@ cc_test(
   deps = [
       "//tests/util",
       "//core",
+      "//core/ir",
       "//core/lowering",
       "//core/util:prelude",
       "@googletest//:gtest_main",

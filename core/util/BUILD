@@ -27,9 +27,6 @@ cc_library(
     hdrs = [
         "jit_util.h",
     ],
-    srcs = [
-        "jit_util.cpp"
-    ],
     deps = [
         ":macros"
     ] + select({

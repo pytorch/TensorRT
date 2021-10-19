@@ -25,7 +25,7 @@ def compile(module: torch.jit.ScriptModule,
             max_batch_size=0,
             calibrator=None,
             truncate_long_and_double=False,
-            require_full_compilation=True,
+            require_full_compilation=False,
             min_block_size=3,
             torch_executed_ops=[],
             torch_executed_modules=[]) -> torch.jit.ScriptModule:

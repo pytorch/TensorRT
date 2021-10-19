@@ -491,7 +491,7 @@ std::set<std::string> ConvertableOpsInBlock(const torch::jit::Block* b) {
   return convertable_ops;
 }
 
-bool VerifyConverterSupportForBlock(const torch::jit::Block* b) {
+bool VerifyConverterSupportForBlock(const torch::jit::Block* b, bool suppress_errors) {
   auto unsupported_ops = GetUnsupportedOpsInBlock(b);
 
   if (unsupported_ops.size() != 0) {
@@ -506,16 +506,20 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b) {
     unsupported_msg << "https://www.github.com/nvidia/TRTorch/issues" << std::endl;
     unsupported_msg << std::endl << "In Module:" << std::endl;
 
-    LOG_ERROR(unsupported_msg.str());
+    if (suppress_errors) {
+      LOG_ERROR(unsupported_msg.str());
+    }
 
     for (const auto n : b->nodes()) {
       auto schema = n->maybeSchema();
       if (schema) {
         for (const auto& x : unsupported_ops) {
           if (x.first == schema->operator_name()) {
-            LOG_ERROR(
-                "Unsupported operator: " << *schema << std::endl
-                                         << trtorch::core::util::GetPyTorchSourceCode(n) << std::endl);
+            if (suppress_errors) {
+              LOG_ERROR(
+                  "Unsupported operator: " << *schema << std::endl
+                                          << trtorch::core::util::GetPyTorchSourceCode(n) << std::endl);
+            }
           }
         }
       }
@@ -531,7 +535,9 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b) {
     unsupported_msg
         << "This may be because there are no operators that can be added to the TensorRT graph or all operators have a resolved compile time value."
         << std::endl;
-    LOG_ERROR(unsupported_msg.str());
+    if (suppress_errors) {
+      LOG_ERROR(unsupported_msg.str());
+    }
     return false;
   }
 

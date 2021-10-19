@@ -4,6 +4,7 @@
 #include "torch/script.h"
 #include "core/util/prelude.h"
 #include "core/lowering/lowering.h"
+#include "core/ir/ir.h"
 #include "trtorch/trtorch.h"
 
 TEST(CoreTest, DetectingInputTypeWorksCorrectFP32) {
@@ -18,7 +19,7 @@ TEST(CoreTest, DetectingInputTypeWorksCorrectFP32) {
 	auto graph_and_parameters = trtorch::core::lowering::Lower(mod, "forward", {});
   auto g = graph_and_parameters.first;
 
-	auto input_types = trtorch::core::util::get_block_first_calc_dtypes_opt(g->block());
+	auto input_types = trtorch::core::ir::get_block_first_calc_dtypes_opt(g->block());
 
 	for (auto in : input_types) {
 		c10::optional<at::ScalarType>& detected_type_opt = in.second;
@@ -36,16 +37,16 @@ TEST(CoreTest, DetectingInputTypeWorksCorrectFP16) {
     ASSERT_TRUE(false);
   }
 
-	mod.to(at::kHalf);
+  mod.to(at::kHalf);
 
-	auto graph_and_parameters = trtorch::core::lowering::Lower(mod, "forward", {});
+  auto graph_and_parameters = trtorch::core::lowering::Lower(mod, "forward", {});
   auto g = graph_and_parameters.first;
 
-	auto input_types = trtorch::core::util::get_block_first_calc_dtypes_opt(g->block());
+  auto input_types = trtorch::core::ir::get_block_first_calc_dtypes_opt(g->block());
 
-	for (auto in : input_types) {
-		c10::optional<at::ScalarType>& detected_type_opt = in.second;
-		ASSERT_TRUE(detected_type_opt);
-		ASSERT_TRUE(detected_type_opt.value() == at::kHalf);
-	}
+  for (auto in : input_types) {
+    c10::optional<at::ScalarType>& detected_type_opt = in.second;
+    ASSERT_TRUE(detected_type_opt);
+    ASSERT_TRUE(detected_type_opt.value() == at::kHalf);
+  }
 }

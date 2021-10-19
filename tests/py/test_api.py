@@ -211,6 +211,7 @@ class TestInputTypeDefaultsFP32Model(ModelTestCase):
         ts_model = torch.jit.script(self.model)
         trt_mod = trtorch.compile(ts_model,
                                   inputs=[self.input.half()],
+                                  require_full_compilation=True,
                                   enabled_precisions={torch.float, torch.half})
         trt_mod(self.input.half())
 
@@ -221,6 +222,7 @@ class TestInputTypeDefaultsFP32Model(ModelTestCase):
 
         trt_mod = trtorch.compile(ts_model,
                                   inputs=[input_spec],
+                                  require_full_compilation=True,
                                   enabled_precisions={torch.float, torch.half})
         trt_mod(self.input.half())
 
@@ -253,6 +255,7 @@ class TestInputTypeDefaultsFP16Model(ModelTestCase):
 
         trt_mod = trtorch.compile(half_mod,
                                   inputs=[self.input],
+                                  require_full_compilation=True,
                                   enabled_precisions={torch.float, torch.half})
         trt_mod(self.input)
 
@@ -265,6 +268,7 @@ class TestInputTypeDefaultsFP16Model(ModelTestCase):
 
         trt_mod = trtorch.compile(half_mod,
                                   inputs=[input_spec],
+                                  require_full_compilation=True,
                                   enabled_precisions={torch.float, torch.half})
         trt_mod(self.input)
 

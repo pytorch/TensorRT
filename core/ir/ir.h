@@ -52,6 +52,11 @@ std::vector<const torch::jit::Value*> get_tensor_inputs(
     std::shared_ptr<torch::jit::Graph>& g,
     StaticParams& static_params);
 
+using TypeMap = std::unordered_map<const torch::jit::Value*, c10::optional<at::ScalarType>>;
+
+c10::optional<at::ScalarType> get_value_first_calc_dtype_opt(torch::jit::Block* b, torch::jit::Value* in);
+ir::TypeMap get_block_first_calc_dtypes_opt(torch::jit::Block* b);
+
 } // namespace ir
 } // namespace core
 } // namespace trtorch

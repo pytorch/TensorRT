@@ -25,7 +25,7 @@ std::string ConvertBlockToEngine(
 
 bool OpSupported(const torch::jit::Node* n);
 
-bool VerifyConverterSupportForBlock(const torch::jit::Block* b);
+bool VerifyConverterSupportForBlock(const torch::jit::Block* b, bool suppress_errors=false);
 
 c10::optional<torch::jit::IValue> EvaluateNode(
     ConversionCtx* ctx,
