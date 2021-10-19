@@ -240,6 +240,7 @@ const std::unordered_map<at::ScalarType, nvinfer1::DataType>& get_at_trt_type_ma
       {at::kInt, nvinfer1::DataType::kINT32},
       {at::kChar, nvinfer1::DataType::kINT8},
       {at::kBool, nvinfer1::DataType::kBOOL},
+      {at::kLong, nvinfer1::DataType::kINT32},
   };
   return at_trt_type_map;
 }

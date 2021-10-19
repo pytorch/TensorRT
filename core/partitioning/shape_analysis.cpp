@@ -98,7 +98,16 @@ void getSegmentsOutputByRunning(
   std::vector<ir::Input> input_shape;
   for (auto& i : seg_block.raw_inputs()) {
     if (ivalues_maps[i].isTensor()) {
-      input_shape.push_back(util::toVec(util::toDims(ivalues_maps[i].toTensor().sizes())));
+      // set the input_shape and data_type
+      c10::optional<nvinfer1::DataType> dtype = util::optTypeMetaToTRTDataType(ivalues_maps[i].toTensor().dtype());
+      nvinfer1::DataType nv_dtype;
+      if (dtype == c10::nullopt) {
+        nv_dtype = nvinfer1::DataType::kFLOAT;
+      } else {
+        nv_dtype = dtype.value();
+      }
+      input_shape.push_back(ir::Input(util::toVec(util::toDims(ivalues_maps[i].toTensor().sizes())),
+                                      nv_dtype));
     }
   }
 

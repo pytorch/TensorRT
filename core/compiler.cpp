@@ -261,6 +261,7 @@ GraphAndMapping ConstructFallbackGraph(
     if (seg_block.target() == partitioning::SegmentedBlock::kTensorRT) {
       std::vector<ir::Input> inputs;
       for (auto& shape : seg_block.in_shape()) {
+        // set the input shape with data type, using copy constructor
         inputs.push_back(ir::Input(shape));
       }
       // update the input ranges for each segments
