@@ -387,7 +387,8 @@ struct TRTORCH_API CompileSpec {
      * / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8)
      *
      * @param shape Input tensor shape
-     * @param dtype Expected data type for the input (Defaults to the type of the weights in the first tensor calculation if detectable else Float32)
+     * @param dtype Expected data type for the input (Defaults to the type of the weights in the first tensor
+     * calculation if detectable else Float32)
      * @param format Expected tensor format for the input (Defaults to contiguous)
      */
     Input(std::vector<int64_t> shape, TensorFormat format = TensorFormat::kContiguous);
@@ -398,7 +399,8 @@ struct TRTORCH_API CompileSpec {
      * tensor format
      *
      * @param shape Input tensor shape
-     * @param dtype Expected data type for the input (Defaults to the type of the weights in the first tensor calculation if detectable else Float32)
+     * @param dtype Expected data type for the input (Defaults to the type of the weights in the first tensor
+     * calculation if detectable else Float32)
      * @param format Expected tensor format for the input (Defaults to contiguous)
      */
     Input(std::vector<int64_t> shape, DataType dtype, TensorFormat format = TensorFormat::kContiguous);
@@ -421,7 +423,8 @@ struct TRTORCH_API CompileSpec {
      * allow the user to configure expected input shape tensor format
      *
      * @param shape Input tensor shape
-     * @param dtype Expected data type for the input (Defaults to the type of the weights in the first tensor calculation if detectable else Float32)
+     * @param dtype Expected data type for the input (Defaults to the type of the weights in the first tensor
+     * calculation if detectable else Float32)
      * @param format Expected tensor format for the input (Defaults to contiguous)
      */
     Input(c10::ArrayRef<int64_t> shape, DataType dtype, TensorFormat format = TensorFormat::kContiguous);
@@ -451,7 +454,8 @@ struct TRTORCH_API CompileSpec {
      * @param min_shape Minimum shape for input tensor
      * @param opt_shape Target optimization shape for input tensor
      * @param max_shape Maximum acceptible shape for input tensor
-     * @param dtype Expected data type for the input (Defaults to the type of the weights in the first tensor calculation if detectable else Float32)
+     * @param dtype Expected data type for the input (Defaults to the type of the weights in the first tensor
+     * calculation if detectable else Float32)
      * @param format Expected tensor format for the input (Defaults to contiguous)
      */
     Input(
@@ -486,7 +490,8 @@ struct TRTORCH_API CompileSpec {
      * @param min_shape Minimum shape for input tensor
      * @param opt_shape Target optimization shape for input tensor
      * @param max_shape Maximum acceptible shape for input tensor
-     * @param dtype Expected data type for the input (Defaults to the type of the weights in the first tensor calculation if detectable else Float32)
+     * @param dtype Expected data type for the input (Defaults to the type of the weights in the first tensor
+     * calculation if detectable else Float32)
      * @param format Expected tensor format for the input (Defaults to contiguous)
      */
     Input(
@@ -646,13 +651,14 @@ struct TRTORCH_API CompileSpec {
   uint64_t min_block_size = 3;
 
   /**
-   * List of aten operators that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True
+   * List of aten operators that must be run in PyTorch. An error will be thrown if this list is not empty but
+   * ``require_full_compilation`` is True
    */
   std::vector<std::string> torch_executed_ops;
 
-
   /**
-   * List of modules that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True
+   * List of modules that must be run in PyTorch. An error will be thrown if this list is not empty but
+   * ``require_full_compilation`` is True
    */
   std::vector<std::string> torch_executed_modules;
 };

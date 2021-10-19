@@ -9,7 +9,6 @@ namespace trtorch {
 namespace core {
 namespace util {
 
-
 inline std::string node_info(const torch::jit::Node* n) {
   std::stringstream ss;
   ss << *n;

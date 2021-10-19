@@ -322,13 +322,15 @@ core::CompileSpec to_internal_compile_spec(CompileSpec external) {
   internal.convert_info.engine_settings.device.allow_gpu_fallback = external.device.allow_gpu_fallback;
   internal.convert_info.engine_settings.max_batch_size = external.max_batch_size;
 
-  TRTORCH_CHECK(!(external.require_full_compilation && (external.torch_executed_ops.size() > 0)),
-                 "require_full_compilation is enabled however the list of ops to run in torch is not empty (Found "
-                  << external.torch_executed_ops.size() << " ops)");
+  TRTORCH_CHECK(
+      !(external.require_full_compilation && (external.torch_executed_ops.size() > 0)),
+      "require_full_compilation is enabled however the list of ops to run in torch is not empty (Found "
+          << external.torch_executed_ops.size() << " ops)");
 
-  TRTORCH_CHECK(!(external.require_full_compilation && (external.torch_executed_modules.size() > 0)),
-                 "require_full_compilation is enabled however the list of modules to run in torch is not empty (Found "
-                  << external.torch_executed_modules.size() << " modules)");
+  TRTORCH_CHECK(
+      !(external.require_full_compilation && (external.torch_executed_modules.size() > 0)),
+      "require_full_compilation is enabled however the list of modules to run in torch is not empty (Found "
+          << external.torch_executed_modules.size() << " modules)");
 
   internal.partition_info.enabled = external.require_full_compilation;
   internal.partition_info.min_block_size = external.min_block_size;

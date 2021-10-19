@@ -288,8 +288,11 @@ GraphAndMapping ConstructFallbackGraph(
   return {new_g, old_to_new_g};
 }
 
-
-void MapInputsAndDetermineDTypes(CompileSpec& cfg, std::shared_ptr<torch::jit::Graph>& g, ir::StaticParams& static_params, ir::TypeMap& first_use_type_map) {
+void MapInputsAndDetermineDTypes(
+    CompileSpec& cfg,
+    std::shared_ptr<torch::jit::Graph>& g,
+    ir::StaticParams& static_params,
+    ir::TypeMap& first_use_type_map) {
   // Associate input specs with inputs
   cfg.convert_info.inputs = std::move(ir::associate_specs_with_inputs(g, cfg.inputs, static_params));
 
@@ -297,9 +300,12 @@ void MapInputsAndDetermineDTypes(CompileSpec& cfg, std::shared_ptr<torch::jit::G
     auto est_type_opt = first_use_type_map.find(in)->second;
     ir::Input& spec = cfg.convert_info.inputs.find(in)->second;
     if (est_type_opt && !spec.dtype_is_user_defined) {
-      // If we can calculate the type from the graph and the type was not defined by the user then use the calculated type
-      LOG_INFO("Since input type is not explicitly defined, infering using first tensor calculation\n  Found input "
-        << in->debugName() << " has type " << est_type_opt.value() << ". If this is incorrect explicitly set dtype for input and file a bug");
+      // If we can calculate the type from the graph and the type was not defined by the user then use the calculated
+      // type
+      LOG_INFO(
+          "Since input type is not explicitly defined, infering using first tensor calculation\n  Found input "
+          << in->debugName() << " has type " << est_type_opt.value()
+          << ". If this is incorrect explicitly set dtype for input and file a bug");
       spec.dtype = util::ScalarTypeToTRTDataType(est_type_opt.value());
     } else if (!est_type_opt && !spec.dtype_is_user_defined) {
       // If we cannot calculate the type and the user did not define the type, then default to FP32
@@ -313,7 +319,7 @@ void MapInputsAndDetermineDTypes(CompileSpec& cfg, std::shared_ptr<torch::jit::G
       } else {
         if (util::TRTDataTypeToScalarType(cfg.convert_info.inputs.find(in)->second.dtype) != est_type_opt.value()) {
           std::stringstream ss;
-          ss <<"For input " << in->debugName() << ", found user specified input dtype as ";
+          ss << "For input " << in->debugName() << ", found user specified input dtype as ";
           ss << cfg.convert_info.inputs.find(in)->second.dtype;
           ss << ", however when inspecting the graph, the input type expected was inferred to be ";
           ss << est_type_opt.value() << std::endl;
@@ -340,7 +346,9 @@ std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::
   auto graph_and_parameters = lowering::Lower(mod, method_name, cfg.lower_info);
 
   auto g = graph_and_parameters.first;
-  TRTORCH_CHECK(conversion::VerifyConverterSupportForBlock(g->block()), "Not all operations in graph are supported by the compiler");
+  TRTORCH_CHECK(
+      conversion::VerifyConverterSupportForBlock(g->block()),
+      "Not all operations in graph are supported by the compiler");
   auto params = graph_and_parameters.second;
   auto static_params = ir::get_static_params(g->inputs(), params);
   // Infer the type of an input from the weights of the calculation
@@ -385,17 +393,17 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
 
       MapInputsAndDetermineDTypes(cfg, g, static_params, first_use_types);
 
-      if (cfg.partition_info.enabled
-            && (cfg.lower_info.forced_fallback_modules.size() == 0
-                  && cfg.partition_info.forced_fallback_operators.size() == 0
-                  && conversion::VerifyConverterSupportForBlock(g->block(), true))) {
+      if (cfg.partition_info.enabled &&
+          (cfg.lower_info.forced_fallback_modules.size() == 0 &&
+           cfg.partition_info.forced_fallback_operators.size() == 0 &&
+           conversion::VerifyConverterSupportForBlock(g->block(), true))) {
         LOG_INFO("Skipping partitioning since model is fully supported");
       }
 
-      if (cfg.partition_info.enabled
-            && !(cfg.lower_info.forced_fallback_modules.size() == 0
-                  && cfg.partition_info.forced_fallback_operators.size() == 0
-                  && conversion::VerifyConverterSupportForBlock(g->block(), false))) {
+      if (cfg.partition_info.enabled &&
+          !(cfg.lower_info.forced_fallback_modules.size() == 0 &&
+            cfg.partition_info.forced_fallback_operators.size() == 0 &&
+            conversion::VerifyConverterSupportForBlock(g->block(), false))) {
         auto input_ivalues_map = partitioning::generateRandomInputs(cfg.convert_info.inputs, first_use_types);
         auto graph_and_mapping = ConstructFallbackGraph(new_mod, g->block(), input_ivalues_map, cfg, static_params);
         new_g = graph_and_mapping.first;
@@ -408,7 +416,9 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
           return mod;
         }
       } else {
-        TRTORCH_CHECK(conversion::VerifyConverterSupportForBlock(g->block()), "Not all operations in graph are supported by the compiler");
+        TRTORCH_CHECK(
+            conversion::VerifyConverterSupportForBlock(g->block()),
+            "Not all operations in graph are supported by the compiler");
         auto engine = conversion::ConvertBlockToEngine(g->block(), cfg.convert_info, static_params);
         auto device_spec = cfg.convert_info.engine_settings.device;
         auto cuda_device = runtime::CudaDevice(device_spec.gpu_id, device_spec.device_type);

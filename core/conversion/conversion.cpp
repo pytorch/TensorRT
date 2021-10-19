@@ -518,7 +518,7 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b, bool suppress_er
             if (suppress_errors) {
               LOG_ERROR(
                   "Unsupported operator: " << *schema << std::endl
-                                          << trtorch::core::util::GetPyTorchSourceCode(n) << std::endl);
+                                           << trtorch::core::util::GetPyTorchSourceCode(n) << std::endl);
             }
           }
         }

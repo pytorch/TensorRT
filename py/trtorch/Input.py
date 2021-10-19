@@ -135,30 +135,30 @@ class Input(object):
         if self.shape_mode == Input._ShapeMode.DYNAMIC:
             if not Input._supported_input_size_type(self.shape["min_shape"]):
                 raise TypeError(
-                        "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
-                        + str(type(self.shape["min_shape"])) + " for min_shape")
+                    "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
+                    + str(type(self.shape["min_shape"])) + " for min_shape")
             else:
                 internal_in.min = self.shape["min_shape"]
 
             if not Input._supported_input_size_type(self.shape["opt_shape"]):
                 raise TypeError(
-                        "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
-                        + str(type(self.shape["opt_shape"])) + " for opt_shape")
+                    "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
+                    + str(type(self.shape["opt_shape"])) + " for opt_shape")
             else:
                 internal_in.min = self.shape["op_shape"]
 
             if not Input._supported_input_size_type(self.shape["max_shape"]):
                 raise TypeError(
-                        "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
-                        + str(type(self.shape["max_shape"])) + " for max_shape")
+                    "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
+                    + str(type(self.shape["max_shape"])) + " for max_shape")
             else:
                 internal_in.min = self.shape["opt_shape"]
             internal_in.input_is_dynamic = True
         else:
             if not Input._supported_input_size_type(self.shape):
                 raise TypeError(
-                        "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
-                        + str(type(self.shape)) + " for shape")
+                    "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
+                    + str(type(self.shape)) + " for shape")
             else:
                 internal_in.opt = self.shape
             internal_in.input_is_dynamic = False

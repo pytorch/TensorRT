@@ -306,17 +306,18 @@ def TensorRTCompileSpec(inputs=[],
     compile_spec = {
         "inputs": inputs,
         "device": device,
-        "disable_tf32": disable_tf32, # Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
-        "sparse_weights": sparse_weights, #Enable sparsity for convolution and fully connected layers.
-        "enabled_precisions": enabled_precisions, # Enabling FP16 kernels
-        "refit": refit, # enable refit
-        "debug": debug, # enable debuggable engine
-        "strict_types": strict_types, # kernels should strictly run in operating precision
-        "capability": capability, # Restrict kernel selection to safe gpu kernels or safe dla kernels
-        "num_min_timing_iters": num_min_timing_iters, # Number of minimization timing iterations used to select kernels
-        "num_avg_timing_iters": num_avg_timing_iters, # Number of averaging timing iterations used to select kernels
-        "workspace_size": workspace_size, # Maximum size of workspace given to TensorRT
-        "max_batch_size": max_batch_size, # Maximum batch size (must be >= 1 to be set, 0 means not set)
+        "disable_tf32":
+            disable_tf32,  # Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
+        "sparse_weights": sparse_weights,  #Enable sparsity for convolution and fully connected layers.
+        "enabled_precisions": enabled_precisions,  # Enabling FP16 kernels
+        "refit": refit,  # enable refit
+        "debug": debug,  # enable debuggable engine
+        "strict_types": strict_types,  # kernels should strictly run in operating precision
+        "capability": capability,  # Restrict kernel selection to safe gpu kernels or safe dla kernels
+        "num_min_timing_iters": num_min_timing_iters,  # Number of minimization timing iterations used to select kernels
+        "num_avg_timing_iters": num_avg_timing_iters,  # Number of averaging timing iterations used to select kernels
+        "workspace_size": workspace_size,  # Maximum size of workspace given to TensorRT
+        "max_batch_size": max_batch_size,  # Maximum batch size (must be >= 1 to be set, 0 means not set)
         "calibrator": calibrator,
         "truncate_long_and_double": truncate_long_and_double
     }
