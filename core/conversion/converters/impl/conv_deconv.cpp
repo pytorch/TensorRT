@@ -10,17 +10,18 @@ namespace converters {
 namespace impl {
 namespace {
 
-bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) {
+bool add_conv_deconv(
+    ConversionCtx* ctx,
+    const torch::jit::Node* n,
+    args& args,
+    nvinfer1::Dims& stride,
+    nvinfer1::Dims& padding,
+    nvinfer1::Dims& dilation,
+    bool transposed,
+    nvinfer1::Dims& out_padding,
+    int64_t groups) {
   // Input to conv/deconv
   auto in = args[0].ITensor();
-
-  // Conv /deconv parameters
-  auto stride = util::toDims(args[3].unwrapToIntList());
-  auto padding = util::toDims(args[4].unwrapToIntList());
-  auto dilation = util::toDims(args[5].unwrapToIntList());
-  bool transposed = args[6].unwrapToBool();
-  auto out_padding = util::toDims(args[7].unwrapToIntList());
-  int64_t groups = args[8].unwrapToInt();
 
   // Reshape the parameters to 2D if needed
   if (stride.nbDims == 1) {
@@ -174,28 +175,66 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
   return true;
 }
 
-auto conv_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
-                                             .pattern({
-                                                 R"SIG(aten::_convolution(Tensor input, Tensor weight,
+auto conv_registrations TRTORCH_UNUSED =
+    RegisterNodeConversionPatterns()
+        .pattern({
+            R"SIG(aten::_convolution(Tensor input, Tensor weight,
                                  Tensor? bias, int[] stride, int[] padding,
                                  int[] dilation, bool transposed,
                                  int[] output_padding, int groups, bool benchmark,
                                  bool deterministic, bool cudnn_enabled, bool allow_tf32) -> (Tensor))SIG",
-                                                 [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                                                   return add_conv_deconv(ctx, n, args);
-                                                 }})
-                                             .pattern({
-                                                 R"SIG(aten::_convolution.deprecated(Tensor input, Tensor weight,
+            [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+              // Conv /deconv parameters
+              auto stride = util::toDims(args[3].unwrapToIntList());
+              auto padding = util::toDims(args[4].unwrapToIntList());
+              auto dilation = util::toDims(args[5].unwrapToIntList());
+              bool transposed = args[6].unwrapToBool();
+              auto out_padding = util::toDims(args[7].unwrapToIntList());
+              int64_t groups = args[8].unwrapToInt();
+              return add_conv_deconv(ctx, n, args, stride, padding, dilation, transposed, out_padding, groups);
+            }})
+        .pattern({
+            R"SIG(aten::_convolution.deprecated(Tensor input, Tensor weight,
                                      Tensor? bias, int[] stride, int[] padding,
                                      int[] dilation, bool transposed,
                                      int[] output_padding, int groups, bool benchmark,
                                      bool deterministic, bool cudnn_enabled) -> (Tensor))SIG",
-                                                 [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                                                   // This pattern is only matched for traced JIT models which do not
-                                                   // have allow_tf32 bool in the function signature. The TRT conversion
-                                                   // code is exactly same as the above call.
-                                                   return add_conv_deconv(ctx, n, args);
-                                                 }});
+            [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+              // This pattern is only matched for traced JIT models which do not
+              // have allow_tf32 bool in the function signature. The TRT conversion
+              // code is exactly same as the above call.
+              auto stride = util::toDims(args[3].unwrapToIntList());
+              auto padding = util::toDims(args[4].unwrapToIntList());
+              auto dilation = util::toDims(args[5].unwrapToIntList());
+              bool transposed = args[6].unwrapToBool();
+              auto out_padding = util::toDims(args[7].unwrapToIntList());
+              int64_t groups = args[8].unwrapToInt();
+              return add_conv_deconv(ctx, n, args, stride, padding, dilation, transposed, out_padding, groups);
+            }})
+        .pattern(
+            {R"SIG(aten::conv1d(Tensor input, Tensor weight, Tensor? bias, int[] stride, int[] padding, int[] dilation, int groups) -> Tensor)SIG",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               // Conv /deconv parameters
+               auto stride = util::toDims(args[3].unwrapToIntList());
+               auto padding = util::toDims(args[4].unwrapToIntList());
+               auto dilation = util::toDims(args[5].unwrapToIntList());
+               bool transposed = false;
+               nvinfer1::Dims out_padding{1, {0}};
+               int64_t groups = args[6].unwrapToInt();
+               return add_conv_deconv(ctx, n, args, stride, padding, dilation, transposed, out_padding, groups);
+             }})
+        .pattern(
+            {R"SIG(aten::conv_transpose1d(Tensor input, Tensor weight, Tensor? bias, int[] stride, int[] padding, int[] output_padding, int groups, int[] dilation) -> Tensor)SIG",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               // Conv /deconv parameters
+               auto stride = util::toDims(args[3].unwrapToIntList());
+               auto padding = util::toDims(args[4].unwrapToIntList());
+               auto out_padding = util::toDims(args[5].unwrapToIntList());
+               bool transposed = true;
+               int64_t groups = args[6].unwrapToInt();
+               auto dilation = util::toDims(args[7].unwrapToIntList());
+               return add_conv_deconv(ctx, n, args, stride, padding, dilation, transposed, out_padding, groups);
+             }});
 } // namespace
 } // namespace impl
 } // namespace converters
