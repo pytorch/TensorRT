@@ -115,7 +115,7 @@
        <label class="md-search__overlay" for="__search">
        </label>
        <div class="md-search__inner" role="search">
-        <form action="../search.html" class="md-search__form" method="GET" name="search">
+        <form action="../search.html" class="md-search__form" method="get" name="search">
          <input autocapitalize="off" autocomplete="off" class="md-search__input" data-md-component="query" data-md-state="active" name="q" placeholder="Search" spellcheck="false" type="text"/>
          <label class="md-icon md-search__icon" for="__search">
          </label>
@@ -495,15 +495,6 @@
              <a class="reference internal" href="classtrtorch_1_1CompileSpec_1_1TensorFormat.html#exhale-class-classtrtorch-1-1compilespec-1-1tensorformat">
               <span class="std std-ref">
                Class CompileSpec::TensorFormat
-              </span>
-             </a>
-            </p>
-           </li>
-           <li>
-            <p>
-             <a class="reference internal" href="structtrtorch_1_1CompileSpec_1_1TorchFallback.html#exhale-struct-structtrtorch-1-1compilespec-1-1torchfallback">
-              <span class="std std-ref">
-               Struct CompileSpec::TorchFallback
               </span>
              </a>
             </p>
@@ -1011,27 +1002,6 @@
              </dd>
             </dl>
             <dl class="cpp var">
-             <dt id="_CPPv4N7trtorch11CompileSpec14torch_fallbackE">
-              <span class="target" id="structtrtorch_1_1CompileSpec_1a560b75f8e4fece91b83ea5d477b52fe9">
-              </span>
-              <a class="reference internal" href="#_CPPv4N7trtorch11CompileSpec13TorchFallbackE" title="trtorch::CompileSpec::TorchFallback">
-               TorchFallback
-              </a>
-              <code class="sig-name descname">
-               torch_fallback
-              </code>
-              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec14torch_fallbackE" title="Permalink to this definition">
-               ¶
-              </a>
-              <br/>
-             </dt>
-             <dd>
-              <p>
-               Settings related to partial compilation.
-              </p>
-             </dd>
-            </dl>
-            <dl class="cpp var">
              <dt id="_CPPv4N7trtorch11CompileSpec10capabilityE">
               <span class="target" id="structtrtorch_1_1CompileSpec_1a748993324b88633149f0b036eb6ecae8">
               </span>
@@ -1157,6 +1127,96 @@
              <dd>
               <p>
                Calibration dataloaders for each input for post training quantizatiom
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp var">
+             <dt id="_CPPv4N7trtorch11CompileSpec24require_full_compilationE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1a9022517bfe07fb476978b4ab71af2fa2">
+              </span>
+              bool
+              <code class="sig-name descname">
+               require_full_compilation
+              </code>
+              = false
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec24require_full_compilationE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Require the full module be compiled to TensorRT instead of potentially running unsupported operations in PyTorch
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp var">
+             <dt id="_CPPv4N7trtorch11CompileSpec14min_block_sizeE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1aa189e08bc68a3660aeacbf7b23a4a6de">
+              </span>
+              uint64_t
+              <code class="sig-name descname">
+               min_block_size
+              </code>
+              = 3
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec14min_block_sizeE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Minimum number of contiguous supported operators to compile a subgraph to TensorRT
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp var">
+             <dt id="_CPPv4N7trtorch11CompileSpec18torch_executed_opsE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1a8d1add304d2c0be9e9475daff579f3e9">
+              </span>
+              std::vector&lt;std::string&gt;
+              <code class="sig-name descname">
+               torch_executed_ops
+              </code>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec18torch_executed_opsE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               List of aten operators that must be run in PyTorch. An error will be thrown if this list is not empty but
+               <code class="docutils literal notranslate">
+                <span class="pre">
+                 require_full_compilation
+                </span>
+               </code>
+               is True
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp var">
+             <dt id="_CPPv4N7trtorch11CompileSpec22torch_executed_modulesE">
+              <span class="target" id="structtrtorch_1_1CompileSpec_1ab97366e9045b0d82b290209f02607a10">
+              </span>
+              std::vector&lt;std::string&gt;
+              <code class="sig-name descname">
+               torch_executed_modules
+              </code>
+              <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec22torch_executed_modulesE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               List of modules that must be run in PyTorch. An error will be thrown if this list is not empty but
+               <code class="docutils literal notranslate">
+                <span class="pre">
+                 require_full_compilation
+                </span>
+               </code>
+               is True
               </p>
              </dd>
             </dl>
@@ -2581,7 +2641,7 @@
                        dtype
                       </span>
                      </code>
-                     : Expected data type for the input (Defaults to Float32)
+                     : Expected data type for the input (Defaults to the type of the weights in the first tensor calculation if detectable else Float32)
                     </p>
                    </li>
                    <li>
@@ -2686,7 +2746,7 @@
                        dtype
                       </span>
                      </code>
-                     : Expected data type for the input (Defaults to Float32)
+                     : Expected data type for the input (Defaults to the type of the weights in the first tensor calculation if detectable else Float32)
                     </p>
                    </li>
                    <li>
@@ -2879,7 +2939,7 @@
                        dtype
                       </span>
                      </code>
-                     : Expected data type for the input (Defaults to Float32)
+                     : Expected data type for the input (Defaults to the type of the weights in the first tensor calculation if detectable else Float32)
                     </p>
                    </li>
                    <li>
@@ -3116,7 +3176,7 @@
                        dtype
                       </span>
                      </code>
-                     : Expected data type for the input (Defaults to Float32)
+                     : Expected data type for the input (Defaults to the type of the weights in the first tensor calculation if detectable else Float32)
                     </p>
                    </li>
                    <li>
@@ -3353,7 +3413,7 @@
                        dtype
                       </span>
                      </code>
-                     : Expected data type for the input (Defaults to Float32)
+                     : Expected data type for the input (Defaults to the type of the weights in the first tensor calculation if detectable else Float32)
                     </p>
                    </li>
                    <li>
@@ -3429,28 +3489,6 @@
                   </ul>
                  </dd>
                 </dl>
-               </dd>
-              </dl>
-              <dl class="cpp function">
-               <dt id="_CPPv4N7trtorch11CompileSpec5Input22get_explicit_set_dtypeEv">
-                <span class="target" id="structtrtorch_1_1CompileSpec_1_1Input_1aa2cbd99e4dffe526eb00b45cb700dd9b">
-                </span>
-                bool
-                <code class="sig-name descname">
-                 get_explicit_set_dtype
-                </code>
-                <span class="sig-paren">
-                 (
-                </span>
-                <span class="sig-paren">
-                 )
-                </span>
-                <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec5Input22get_explicit_set_dtypeEv" title="Permalink to this definition">
-                 ¶
-                </a>
-                <br/>
-               </dt>
-               <dd>
                </dd>
               </dl>
              </div>
@@ -4225,200 +4263,6 @@
                   </ul>
                  </dd>
                 </dl>
-               </dd>
-              </dl>
-             </div>
-            </dd>
-           </dl>
-           <dl class="cpp struct">
-            <dt id="_CPPv4N7trtorch11CompileSpec13TorchFallbackE">
-             <span class="target" id="structtrtorch_1_1CompileSpec_1_1TorchFallback">
-             </span>
-             <em class="property">
-              struct
-             </em>
-             <code class="sig-name descname">
-              TorchFallback
-             </code>
-             <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec13TorchFallbackE" title="Permalink to this definition">
-              ¶
-             </a>
-             <br/>
-            </dt>
-            <dd>
-             <p>
-              A struct to hold fallback info.
-             </p>
-             <div class="breathe-sectiondef docutils container">
-              <p class="breathe-sectiondef-title rubric">
-               Public Functions
-              </p>
-              <dl class="cpp function">
-               <dt id="_CPPv4N7trtorch11CompileSpec13TorchFallback13TorchFallbackEv">
-                <span class="target" id="structtrtorch_1_1CompileSpec_1_1TorchFallback_1a4545332f018d1a7b7d6fb270e8a23088">
-                </span>
-                <code class="sig-name descname">
-                 TorchFallback
-                </code>
-                <span class="sig-paren">
-                 (
-                </span>
-                <span class="sig-paren">
-                 )
-                </span>
-                = default
-                <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec13TorchFallback13TorchFallbackEv" title="Permalink to this definition">
-                 ¶
-                </a>
-                <br/>
-               </dt>
-               <dd>
-                <p>
-                 Construct a default Torch Fallback object, fallback will be off.
-                </p>
-               </dd>
-              </dl>
-              <dl class="cpp function">
-               <dt id="_CPPv4N7trtorch11CompileSpec13TorchFallback13TorchFallbackEb">
-                <span class="target" id="structtrtorch_1_1CompileSpec_1_1TorchFallback_1a739d08442353926de60e9d7b89a8ceb8">
-                </span>
-                <code class="sig-name descname">
-                 TorchFallback
-                </code>
-                <span class="sig-paren">
-                 (
-                </span>
-                bool
-                <em>
-                 enabled
-                </em>
-                <span class="sig-paren">
-                 )
-                </span>
-                <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec13TorchFallback13TorchFallbackEb" title="Permalink to this definition">
-                 ¶
-                </a>
-                <br/>
-               </dt>
-               <dd>
-                <p>
-                 Construct from a bool.
-                </p>
-               </dd>
-              </dl>
-              <dl class="cpp function">
-               <dt id="_CPPv4N7trtorch11CompileSpec13TorchFallback13TorchFallbackEb8uint64_t">
-                <span class="target" id="structtrtorch_1_1CompileSpec_1_1TorchFallback_1a44696c72b224aca736ba4ddb74826399">
-                </span>
-                <code class="sig-name descname">
-                 TorchFallback
-                </code>
-                <span class="sig-paren">
-                 (
-                </span>
-                bool
-                <em>
-                 enabled
-                </em>
-                , uint64_t
-                <em>
-                 min_size
-                </em>
-                <span class="sig-paren">
-                 )
-                </span>
-                <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec13TorchFallback13TorchFallbackEb8uint64_t" title="Permalink to this definition">
-                 ¶
-                </a>
-                <br/>
-               </dt>
-               <dd>
-                <p>
-                 Constructor for setting min_block_size.
-                </p>
-               </dd>
-              </dl>
-             </div>
-             <div class="breathe-sectiondef docutils container">
-              <p class="breathe-sectiondef-title rubric">
-               Public Members
-              </p>
-              <dl class="cpp var">
-               <dt id="_CPPv4N7trtorch11CompileSpec13TorchFallback7enabledE">
-                <span class="target" id="structtrtorch_1_1CompileSpec_1_1TorchFallback_1a5b8dd90653a0100214de8ba46882a996">
-                </span>
-                bool
-                <code class="sig-name descname">
-                 enabled
-                </code>
-                = false
-                <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec13TorchFallback7enabledE" title="Permalink to this definition">
-                 ¶
-                </a>
-                <br/>
-               </dt>
-               <dd>
-                <p>
-                 enable the automatic fallback feature
-                </p>
-               </dd>
-              </dl>
-              <dl class="cpp var">
-               <dt id="_CPPv4N7trtorch11CompileSpec13TorchFallback14min_block_sizeE">
-                <span class="target" id="structtrtorch_1_1CompileSpec_1_1TorchFallback_1a7570d5a9fb96ff3c509cb94c3ff4a3d2">
-                </span>
-                uint64_t
-                <code class="sig-name descname">
-                 min_block_size
-                </code>
-                = 1
-                <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec13TorchFallback14min_block_sizeE" title="Permalink to this definition">
-                 ¶
-                </a>
-                <br/>
-               </dt>
-               <dd>
-                <p>
-                 minimum consecutive operation number that needs to be satisfied to convert to TensorRT
-                </p>
-               </dd>
-              </dl>
-              <dl class="cpp var">
-               <dt id="_CPPv4N7trtorch11CompileSpec13TorchFallback19forced_fallback_opsE">
-                <span class="target" id="structtrtorch_1_1CompileSpec_1_1TorchFallback_1a4cc23c4331403cba9d19ef0a07294fc0">
-                </span>
-                std::vector&lt;std::string&gt;
-                <code class="sig-name descname">
-                 forced_fallback_ops
-                </code>
-                <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec13TorchFallback19forced_fallback_opsE" title="Permalink to this definition">
-                 ¶
-                </a>
-                <br/>
-               </dt>
-               <dd>
-                <p>
-                 A list of names of operations that will explicitly run in PyTorch.
-                </p>
-               </dd>
-              </dl>
-              <dl class="cpp var">
-               <dt id="_CPPv4N7trtorch11CompileSpec13TorchFallback23forced_fallback_modulesE">
-                <span class="target" id="structtrtorch_1_1CompileSpec_1_1TorchFallback_1a8a0d2117027e02dc48aa7c7e34a1160e">
-                </span>
-                std::vector&lt;std::string&gt;
-                <code class="sig-name descname">
-                 forced_fallback_modules
-                </code>
-                <a class="headerlink" href="#_CPPv4N7trtorch11CompileSpec13TorchFallback23forced_fallback_modulesE" title="Permalink to this definition">
-                 ¶
-                </a>
-                <br/>
-               </dt>
-               <dd>
-                <p>
-                 A list of names of modules that will explicitly run in PyTorch.
-                </p>
                </dd>
               </dl>
              </div>

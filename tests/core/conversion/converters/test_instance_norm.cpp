@@ -40,11 +40,11 @@ TEST(Converters, ATenInstanceNormConvertsCorrectly) {
   auto trt_in = at::clone(in);
   torch::jit::IValue trt_weight, trt_bias, trt_mean, trt_var;
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {weight, bias, mean, var, use_input_stats});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {weight, bias, mean, var, use_input_stats});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
 
-  params = trtorch::core::conversion::get_named_params(
-      g->inputs(), {trt_weight, trt_bias, trt_mean, trt_var, use_input_stats});
+  params =
+      trtorch::core::ir::get_static_params(g->inputs(), {trt_weight, trt_bias, trt_mean, trt_var, use_input_stats});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
@@ -67,11 +67,11 @@ TEST(Converters, ATenInstanceNormAffineConvertsCorrectly) {
   auto trt_bias = at::clone(bias);
   torch::jit::IValue trt_mean, trt_var;
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {weight, bias, mean, var, use_input_stats});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {weight, bias, mean, var, use_input_stats});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
 
-  params = trtorch::core::conversion::get_named_params(
-      g->inputs(), {trt_weight, trt_bias, trt_mean, trt_var, use_input_stats});
+  params =
+      trtorch::core::ir::get_static_params(g->inputs(), {trt_weight, trt_bias, trt_mean, trt_var, use_input_stats});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
@@ -93,11 +93,11 @@ TEST(Converters, ATenInstanceNormRunningStatsConvertsCorrectly) {
   auto trt_mean = at::clone(mean);
   auto trt_var = at::clone(var);
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {weight, bias, mean, var, use_input_stats});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {weight, bias, mean, var, use_input_stats});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
 
-  params = trtorch::core::conversion::get_named_params(
-      g->inputs(), {trt_weight, trt_bias, trt_mean, trt_var, use_input_stats});
+  params =
+      trtorch::core::ir::get_static_params(g->inputs(), {trt_weight, trt_bias, trt_mean, trt_var, use_input_stats});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
 }

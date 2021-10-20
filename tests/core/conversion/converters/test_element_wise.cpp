@@ -20,7 +20,7 @@ void pointwise_test_helper(
   if (!singleInput) {
     torch_inputs.push_back(at::randint(1, 5, shape2, {at::kCUDA}));
   }
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, torch_inputs);
 
   std::vector<at::Tensor> trt_inputs;
@@ -28,7 +28,7 @@ void pointwise_test_helper(
     trt_inputs.push_back(at::clone(in));
   }
 
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {});
   std::vector<at::Tensor> trt_results;
   if (dynamicInput) {
     trt_results = trtorch::tests::util::RunGraphEngineDynamic(g, params, trt_inputs);

@@ -18,6 +18,7 @@ cc_library(
     strip_include_prefix = "include/",
     deps = [
         "//core",
+        "//core/ir",
         "//core/util:prelude",
     ],
     alwayslink = True,

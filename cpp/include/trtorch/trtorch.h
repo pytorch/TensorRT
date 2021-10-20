@@ -387,7 +387,8 @@ struct TRTORCH_API CompileSpec {
      * / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8)
      *
      * @param shape Input tensor shape
-     * @param dtype Expected data type for the input (Defaults to Float32)
+     * @param dtype Expected data type for the input (Defaults to the type of the weights in the first tensor
+     * calculation if detectable else Float32)
      * @param format Expected tensor format for the input (Defaults to contiguous)
      */
     Input(std::vector<int64_t> shape, TensorFormat format = TensorFormat::kContiguous);
@@ -398,7 +399,8 @@ struct TRTORCH_API CompileSpec {
      * tensor format
      *
      * @param shape Input tensor shape
-     * @param dtype Expected data type for the input (Defaults to Float32)
+     * @param dtype Expected data type for the input (Defaults to the type of the weights in the first tensor
+     * calculation if detectable else Float32)
      * @param format Expected tensor format for the input (Defaults to contiguous)
      */
     Input(std::vector<int64_t> shape, DataType dtype, TensorFormat format = TensorFormat::kContiguous);
@@ -421,7 +423,8 @@ struct TRTORCH_API CompileSpec {
      * allow the user to configure expected input shape tensor format
      *
      * @param shape Input tensor shape
-     * @param dtype Expected data type for the input (Defaults to Float32)
+     * @param dtype Expected data type for the input (Defaults to the type of the weights in the first tensor
+     * calculation if detectable else Float32)
      * @param format Expected tensor format for the input (Defaults to contiguous)
      */
     Input(c10::ArrayRef<int64_t> shape, DataType dtype, TensorFormat format = TensorFormat::kContiguous);
@@ -451,7 +454,8 @@ struct TRTORCH_API CompileSpec {
      * @param min_shape Minimum shape for input tensor
      * @param opt_shape Target optimization shape for input tensor
      * @param max_shape Maximum acceptible shape for input tensor
-     * @param dtype Expected data type for the input (Defaults to Float32)
+     * @param dtype Expected data type for the input (Defaults to the type of the weights in the first tensor
+     * calculation if detectable else Float32)
      * @param format Expected tensor format for the input (Defaults to contiguous)
      */
     Input(
@@ -486,7 +490,8 @@ struct TRTORCH_API CompileSpec {
      * @param min_shape Minimum shape for input tensor
      * @param opt_shape Target optimization shape for input tensor
      * @param max_shape Maximum acceptible shape for input tensor
-     * @param dtype Expected data type for the input (Defaults to Float32)
+     * @param dtype Expected data type for the input (Defaults to the type of the weights in the first tensor
+     * calculation if detectable else Float32)
      * @param format Expected tensor format for the input (Defaults to contiguous)
      */
     Input(
@@ -506,46 +511,9 @@ struct TRTORCH_API CompileSpec {
      */
     Input(at::Tensor tensor);
 
-    bool get_explicit_set_dtype() {
-      return explicit_set_dtype;
-    }
-
    private:
     friend std::ostream& operator<<(std::ostream& os, const Input& input);
     bool input_is_dynamic;
-    bool explicit_set_dtype;
-  };
-
-  /**
-   * @brief A struct to hold fallback info
-   */
-  struct TRTORCH_API TorchFallback {
-    /// enable the automatic fallback feature
-    bool enabled = false;
-
-    /// minimum consecutive operation number that needs to be satisfied to convert to TensorRT
-    uint64_t min_block_size = 1;
-
-    /// A list of names of operations that will explicitly run in PyTorch
-    std::vector<std::string> forced_fallback_ops;
-
-    /// A list of names of modules that will explicitly run in PyTorch
-    std::vector<std::string> forced_fallback_modules;
-
-    /**
-     * @brief Construct a default Torch Fallback object, fallback will be off
-     */
-    TorchFallback() = default;
-
-    /**
-     * @brief Construct from a bool
-     */
-    TorchFallback(bool enabled) : enabled(enabled) {}
-
-    /**
-     * @brief Constructor for setting min_block_size
-     */
-    TorchFallback(bool enabled, uint64_t min_size) : enabled(enabled), min_block_size(min_size) {}
   };
 
   /**
@@ -644,11 +612,6 @@ struct TRTORCH_API CompileSpec {
   Device device;
 
   /**
-   * @brief Settings related to partial compilation
-   */
-  TorchFallback torch_fallback;
-
-  /**
    * Sets the restrictions for the engine (CUDA Safety)
    */
   EngineCapability capability = EngineCapability::kSTANDARD;
@@ -676,6 +639,28 @@ struct TRTORCH_API CompileSpec {
    * Calibration dataloaders for each input for post training quantizatiom
    */
   nvinfer1::IInt8Calibrator* ptq_calibrator = nullptr;
+
+  /**
+   * Require the full module be compiled to TensorRT instead of potentially running unsupported operations in PyTorch
+   */
+  bool require_full_compilation = false;
+
+  /**
+   * Minimum number of contiguous supported operators to compile a subgraph to TensorRT
+   */
+  uint64_t min_block_size = 3;
+
+  /**
+   * List of aten operators that must be run in PyTorch. An error will be thrown if this list is not empty but
+   * ``require_full_compilation`` is True
+   */
+  std::vector<std::string> torch_executed_ops;
+
+  /**
+   * List of modules that must be run in PyTorch. An error will be thrown if this list is not empty but
+   * ``require_full_compilation`` is True
+   */
+  std::vector<std::string> torch_executed_modules;
 };
 
 /**

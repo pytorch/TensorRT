@@ -237,11 +237,11 @@ int main(int argc, char** argv) {
       "(Only used when targeting DLA (device-type)) Lets engine run layers on GPU if they are not supported on DLA",
       {"allow-gpu-fallback"});
 
-  args::Flag allow_torch_fallback(
+  args::Flag require_full_compilation(
       parser,
-      "allow-torch-fallback",
-      "Enable layers to run in torch if they are not supported in TensorRT",
-      {"allow-torch-fallback"});
+      "require-full-compilation",
+      "Require that the model should be fully compiled to TensorRT or throw an error",
+      {"require-full-compilation"});
 
   args::Flag disable_tf32(
       parser, "disable-tf32", "Prevent Float32 layers from using the TF32 data format", {"disable-tf32"});
@@ -276,17 +276,23 @@ int main(int argc, char** argv) {
       "Path to calibration cache file to use for post training quantization",
       {"calibration-cache-file"});
 
-  args::ValueFlagList<std::string> forced_fallback_ops(
+  args::ValueFlagList<std::string> torch_executed_ops(
       parser,
-      "forced_fallback_ops",
-      "(Repeatable) Operator in the graph that should be forced to fallback to Pytorch for execution (allow torch fallback must be set)",
-      {"ffo", "forced-fallback-op"});
+      "torch-executed-ops",
+      "(Repeatable) Operator in the graph that should always be run in PyTorch for execution (partial compilation must be enabled)",
+      {"teo", "torch-executed-ops"});
 
-  args::ValueFlagList<std::string> forced_fallback_mods(
+  args::ValueFlagList<std::string> torch_executed_mods(
       parser,
-      "forced_fallback_mods",
-      "(Repeatable) Module that should be forced to fallback to Pytorch for execution (allow torch fallback must be set)",
-      {"ffm", "forced-fallback-mod"});
+      "torch-executed-mods",
+      "(Repeatable) Module that should always be run in Pytorch for execution (partial compilation must be enabled)",
+      {"tem", "torch-executed-mods"});
+
+  args::ValueFlagList<std::string> min_block_size(
+      parser,
+      "torch-executed-mods",
+      "Minimum number of contiguous TensorRT supported ops to compile a subgraph to TensorRT",
+      {"mbs", "min-block-size"});
 
   args::Flag embed_engine(
       parser,
@@ -478,24 +484,24 @@ int main(int argc, char** argv) {
 
   auto calibrator = trtorch::ptq::make_int8_cache_calibrator(calibration_cache_file_path);
 
-  if (allow_torch_fallback) {
-    compile_settings.torch_fallback = trtorch::CompileSpec::TorchFallback(true);
-  }
+  compile_settings.require_full_compilation = require_full_compilation;
 
-  if (forced_fallback_ops || forced_fallback_mods) {
-    if (!allow_torch_fallback) {
+  if (torch_executed_ops || torch_executed_mods) {
+    if (require_full_compilation) {
       trtorch::logging::log(
           trtorch::logging::Level::kERROR,
-          "Forced fallback ops provided but allow-torch-fallback is not set. Please use --allow-torch-fallback to enable automatic fallback of operators.");
+          "Ops or modules to run in torch were provided but full compilation was requested. Please remove --require-full-compilation to run specified ops and modules in torch.");
       exit(1);
     }
 
-    for (const auto fallback_op : args::get(forced_fallback_ops)) {
-      compile_settings.torch_fallback.forced_fallback_ops.push_back(fallback_op);
+    compile_settings.min_block_size = min_block_size;
+
+    for (const auto _op : args::get(torch_executed_ops)) {
+      compile_settings.torch_executed_ops.push_back(_op);
     }
 
-    for (const auto fallback_mod : args::get(forced_fallback_mods)) {
-      compile_settings.torch_fallback.forced_fallback_modules.push_back(fallback_mod);
+    for (const auto _mod : args::get(torch_executed_mods)) {
+      compile_settings.torch_executed_modules.push_back(_mod);
     }
   }
 
@@ -609,7 +615,7 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  if (!allow_torch_fallback) {
+  if (require_full_compilation) {
     if (!trtorch::CheckMethodOperatorSupport(mod, "forward")) {
       trtorch::logging::log(trtorch::logging::Level::kERROR, "Module is not currently supported by TRTorch");
       return 1;

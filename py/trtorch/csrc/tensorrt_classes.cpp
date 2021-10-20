@@ -33,9 +33,18 @@ nvinfer1::DataType toTRTDataType(DataType value) {
       return nvinfer1::DataType::kBOOL;
     case DataType::kFloat:
       return nvinfer1::DataType::kFLOAT;
+    case DataType::kUnknown:
+      return nvinfer1::DataType::kFLOAT;
     default:
       TRTORCH_THROW_ERROR("Unknown data type: " << to_str(value));
   }
+}
+
+Device::Device(const core::runtime::CudaDevice& internal_dev) {
+  device_type = DeviceType::kGPU;
+  gpu_id = internal_dev.id;
+  dla_core = -1;
+  allow_gpu_fallback = false;
 }
 
 nvinfer1::TensorFormat toTRTTensorFormat(TensorFormat value) {
@@ -61,9 +70,9 @@ std::string to_str(TensorFormat value) {
 
 core::ir::Input Input::toInternalInput() {
   if (!input_is_dynamic) {
-    return core::ir::Input(opt, toTRTDataType(dtype), toTRTTensorFormat(format));
+    return core::ir::Input(opt, toTRTDataType(dtype), toTRTTensorFormat(format), explicit_set_dtype);
   } else {
-    return core::ir::Input(min, opt, max, toTRTDataType(dtype), toTRTTensorFormat(format));
+    return core::ir::Input(min, opt, max, toTRTDataType(dtype), toTRTTensorFormat(format), explicit_set_dtype);
   }
 }
 

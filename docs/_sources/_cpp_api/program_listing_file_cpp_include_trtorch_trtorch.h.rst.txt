@@ -216,30 +216,9 @@ Program Listing for File trtorch.h
    
        Input(at::Tensor tensor);
    
-       bool get_explicit_set_dtype() {
-         return explicit_set_dtype;
-       }
-   
       private:
        friend std::ostream& operator<<(std::ostream& os, const Input& input);
        bool input_is_dynamic;
-       bool explicit_set_dtype;
-     };
-   
-     struct TRTORCH_API TorchFallback {
-       bool enabled = false;
-   
-       uint64_t min_block_size = 1;
-   
-       std::vector<std::string> forced_fallback_ops;
-   
-       std::vector<std::string> forced_fallback_modules;
-   
-       TorchFallback() = default;
-   
-       TorchFallback(bool enabled) : enabled(enabled) {}
-   
-       TorchFallback(bool enabled, uint64_t min_size) : enabled(enabled), min_block_size(min_size) {}
      };
    
      CompileSpec(std::vector<std::vector<int64_t>> fixed_sizes);
@@ -268,8 +247,6 @@ Program Listing for File trtorch.h
    
      Device device;
    
-     TorchFallback torch_fallback;
-   
      EngineCapability capability = EngineCapability::kSTANDARD;
    
      uint64_t num_min_timing_iters = 2;
@@ -280,6 +257,14 @@ Program Listing for File trtorch.h
      uint64_t max_batch_size = 0;
    
      nvinfer1::IInt8Calibrator* ptq_calibrator = nullptr;
+   
+     bool require_full_compilation = false;
+   
+     uint64_t min_block_size = 3;
+   
+     std::vector<std::string> torch_executed_ops;
+   
+     std::vector<std::string> torch_executed_modules;
    };
    
    TRTORCH_API std::string get_build_info();

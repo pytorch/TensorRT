@@ -105,6 +105,15 @@ class Device(object):
         gpu_id = torch_dev.index
         return cls(gpu_id=gpu_id)
 
+    @classmethod
+    def _current_device(cls):
+        try:
+            dev = trtorch._C._get_current_device()
+        except RuntimeError:
+            trtorch.logging.log(trtorch.logging.Level.Error, "Cannot get current device")
+            return None
+        return cls(gpu_id=dev.gpu_id)
+
     @staticmethod
     def _parse_device_str(s):
         s = s.lower()

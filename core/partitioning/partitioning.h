@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iostream>
 #include <vector>
 
 #include "core/ir/ir.h"
@@ -17,10 +18,12 @@ typedef std::vector<SegmentedBlock> PartitionedGraph;
 
 PartitionedGraph segment_graph(torch::jit::Block* block, const PartitionInfo& partition_info);
 
-std::vector<SegmentedBlock> Partition(
+PartitionedGraph Partition(
     torch::jit::Block* block,
-    std::unordered_map<torch::jit::Value*, torch::jit::IValue>& input_ivalues_map,
+    std::unordered_map<const torch::jit::Value*, torch::jit::IValue>& example_tensor_map,
     const PartitionInfo& partition_info);
+
+std::ostream& operator<<(std::ostream& os, const PartitionedGraph& g);
 
 } // namespace partitioning
 } // namespace core

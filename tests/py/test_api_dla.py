@@ -40,7 +40,7 @@ class TestCompile(ModelTestCaseOnDLA):
             "enabled_precisions": {torch.half}
         }
 
-        trt_mod = trtorch.compile(self.traced_model, compile_spec)
+        trt_mod = trtorch.compile(self.traced_model, **compile_spec)
         same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
         self.assertTrue(same < 2e-2)
 
@@ -56,7 +56,7 @@ class TestCompile(ModelTestCaseOnDLA):
             "enabled_precisions": {torch.half}
         }
 
-        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
+        trt_mod = trtorch.compile(self.scripted_model, **compile_spec)
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
         self.assertTrue(same < 2e-2)
 

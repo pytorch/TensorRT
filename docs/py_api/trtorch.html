@@ -115,7 +115,7 @@
        <label class="md-search__overlay" for="__search">
        </label>
        <div class="md-search__inner" role="search">
-        <form action="../search.html" class="md-search__form" method="GET" name="search">
+        <form action="../search.html" class="md-search__form" method="get" name="search">
          <input autocapitalize="off" autocomplete="off" class="md-search__input" data-md-component="query" data-md-state="active" name="q" placeholder="Search" spellcheck="false" type="text"/>
          <label class="md-icon md-search__icon" for="__search">
          </label>
@@ -459,10 +459,10 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
+       <span class="target" id="trtorch-py">
+       </span>
        <section id="module-trtorch">
         <span id="trtorch">
-        </span>
-        <span id="trtorch-py">
         </span>
         <h1 id="py-api-trtorch--page-root">
          trtorch
@@ -515,27 +515,83 @@
             (
            </span>
            <em class="sig-param">
-            <span class="n">
-             module
-            </span>
-            <span class="p">
-             :
-            </span>
-            <span class="n">
-             torch.jit._script.ScriptModule
-            </span>
+            module: torch.jit._script.ScriptModule
            </em>
            ,
            <em class="sig-param">
-            <span class="n">
-             compile_spec
-            </span>
-            <span class="p">
-             :
-            </span>
-            <span class="n">
-             Any
-            </span>
+            inputs=[]
+           </em>
+           ,
+           <em class="sig-param">
+            device=None
+           </em>
+           ,
+           <em class="sig-param">
+            disable_tf32=False
+           </em>
+           ,
+           <em class="sig-param">
+            sparse_weights=False
+           </em>
+           ,
+           <em class="sig-param">
+            enabled_precisions={}
+           </em>
+           ,
+           <em class="sig-param">
+            refit=False
+           </em>
+           ,
+           <em class="sig-param">
+            debug=False
+           </em>
+           ,
+           <em class="sig-param">
+            strict_types=False
+           </em>
+           ,
+           <em class="sig-param">
+            capability=&lt;EngineCapability.default: 0&gt;
+           </em>
+           ,
+           <em class="sig-param">
+            num_min_timing_iters=2
+           </em>
+           ,
+           <em class="sig-param">
+            num_avg_timing_iters=1
+           </em>
+           ,
+           <em class="sig-param">
+            workspace_size=0
+           </em>
+           ,
+           <em class="sig-param">
+            max_batch_size=0
+           </em>
+           ,
+           <em class="sig-param">
+            calibrator=None
+           </em>
+           ,
+           <em class="sig-param">
+            truncate_long_and_double=False
+           </em>
+           ,
+           <em class="sig-param">
+            require_full_compilation=False
+           </em>
+           ,
+           <em class="sig-param">
+            min_block_size=3
+           </em>
+           ,
+           <em class="sig-param">
+            torch_executed_ops=[]
+           </em>
+           ,
+           <em class="sig-param">
+            torch_executed_modules=[]
            </em>
            <span class="sig-paren">
             )
@@ -561,110 +617,424 @@ and will convert methods to JIT Graphs which call equivalent TensorRT engines
              Parameters
             </dt>
             <dd class="field-odd">
+             <p>
+              <strong>
+               module
+              </strong>
+              (
+              <em>
+               torch.jit.ScriptModule
+              </em>
+              ) – Source module, a result of tracing or scripting a PyTorch
+              <code class="docutils literal notranslate">
+               <span class="pre">
+                torch.nn.Module
+               </span>
+              </code>
+             </p>
+            </dd>
+            <dt class="field-even">
+             Keyword Arguments
+            </dt>
+            <dd class="field-even">
              <ul class="simple">
               <li>
                <p>
                 <strong>
-                 module
+                 inputs
                 </strong>
                 (
                 <em>
-                 torch.jit.ScriptModule
+                 List
                 </em>
-                ) – Source module, a result of tracing or scripting a PyTorch
-                <code class="docutils literal notranslate">
-                 <span class="pre">
-                  torch.nn.Module
-                 </span>
-                </code>
+                <em>
+                 [
+                </em>
+                <em>
+                 Union
+                </em>
+                <em>
+                 (
+                </em>
+                <a class="reference internal" href="#trtorch.Input" title="trtorch.Input">
+                 <em>
+                  trtorch.Input
+                 </em>
+                </a>
+                <em>
+                 ,
+                </em>
+                <em>
+                 torch.Tensor
+                </em>
+                <em>
+                 )
+                </em>
+                <em>
+                 ]
+                </em>
+                ) –
+               </p>
+               <p>
+                <strong>
+                 Required
+                </strong>
+                List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
+torch datatypes or trtorch datatypes and you can use either torch devices or the trtorch device type enum
+to select device type.
+               </p>
+               <div class="highlight-cpp notranslate">
+                <div class="highlight">
+                 <pre><span></span>input=[
+    trtorch.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
+    trtorch.Input(
+        min_shape=(1, 224, 224, 3),
+        opt_shape=(1, 512, 512, 3),
+        max_shape=(1, 1024, 1024, 3),
+        dtype=torch.int32
+        format=torch.channel_last
+    ), # Dynamic input shape for input #2
+    torch.randn((1, 3, 224, 244)) # Use an example tensor and let trtorch infer settings
+]
+</pre>
+                </div>
+               </div>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 device
+                </strong>
+                (
+                <em>
+                 Union
+                </em>
+                <em>
+                 (
+                </em>
+                <a class="reference internal" href="#trtorch.Device" title="trtorch.Device">
+                 <em>
+                  trtorch.Device
+                 </em>
+                </a>
+                <em>
+                 ,
+                </em>
+                <em>
+                 torch.device
+                </em>
+                <em>
+                 ,
+                </em>
+                <em>
+                 dict
+                </em>
+                <em>
+                 )
+                </em>
+                ) –
+               </p>
+               <p>
+                Target device for TensorRT engines to run on
+               </p>
+               <div class="highlight-cpp notranslate">
+                <div class="highlight">
+                 <pre><span></span><span class="n">device</span><span class="o">=</span><span class="n">trtorch</span><span class="p">.</span><span class="n">Device</span><span class="p">(</span><span class="s">"dla:1"</span><span class="p">,</span><span class="w"> </span><span class="n">allow_gpu_fallback</span><span class="o">=</span><span class="n">True</span><span class="p">)</span><span class="w"></span>
+</pre>
+                </div>
+               </div>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 disable_tf32
+                </strong>
+                (
+                <em>
+                 bool
+                </em>
+                ) – Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
                </p>
               </li>
               <li>
                <p>
                 <strong>
-                 compile_spec
+                 sparse_weights
                 </strong>
                 (
                 <em>
-                 dict
+                 bool
                 </em>
-                ) –
+                ) – Enable sparsity for convolution and fully connected layers.
                </p>
+              </li>
+              <li>
                <p>
-                Compilation settings including operating precision, target device, etc.
-One key is required which is
+                <strong>
+                 enabled_precision
+                </strong>
+                (
+                <em>
+                 Set
+                </em>
+                <em>
+                 (
+                </em>
+                <em>
+                 Union
+                </em>
+                <em>
+                 (
+                </em>
+                <em>
+                 torch.dtype
+                </em>
+                <em>
+                 ,
+                </em>
+                <a class="reference internal" href="#trtorch.dtype" title="trtorch.dtype">
+                 <em>
+                  trtorch.dtype
+                 </em>
+                </a>
+                <em>
+                 )
+                </em>
+                <em>
+                 )
+                </em>
+                ) – The set of datatypes that TensorRT can use when selecting kernels
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 refit
+                </strong>
+                (
+                <em>
+                 bool
+                </em>
+                ) – Enable refitting
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 debug
+                </strong>
+                (
+                <em>
+                 bool
+                </em>
+                ) – Enable debuggable engine
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 strict_types
+                </strong>
+                (
+                <em>
+                 bool
+                </em>
+                ) – Kernels should strictly run in a particular operating precision. Enabled precision should only have one type in the set
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 capability
+                </strong>
+                (
+                <a class="reference internal" href="#trtorch.EngineCapability" title="trtorch.EngineCapability">
+                 <em>
+                  trtorch.EngineCapability
+                 </em>
+                </a>
+                ) – Restrict kernel selection to safe gpu kernels or safe dla kernels
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 num_min_timing_iters
+                </strong>
+                (
+                <em>
+                 int
+                </em>
+                ) – Number of minimization timing iterations used to select kernels
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 num_avg_timing_iters
+                </strong>
+                (
+                <em>
+                 int
+                </em>
+                ) – Number of averaging timing iterations used to select kernels
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 workspace_size
+                </strong>
+                (
+                <em>
+                 int
+                </em>
+                ) – Maximum size of workspace given to TensorRT
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 max_batch_size
+                </strong>
+                (
+                <em>
+                 int
+                </em>
+                ) – Maximum batch size (must be &gt;= 1 to be set, 0 means not set)
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 truncate_long_and_double
+                </strong>
+                (
+                <em>
+                 bool
+                </em>
+                ) – Truncate weights provided in int64 or double (float64) to int32 and float32
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 calibrator
+                </strong>
+                (
+                <em>
+                 Union
+                </em>
+                <em>
+                 (
+                </em>
+                <em>
+                 trtorch._C.IInt8Calibrator
+                </em>
+                <em>
+                 ,
+                </em>
+                <em>
+                 tensorrt.IInt8Calibrator
+                </em>
+                <em>
+                 )
+                </em>
+                ) – Calibrator object which will provide data to the PTQ system for INT8 Calibration
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 require_full_compilation
+                </strong>
+                (
+                <em>
+                 bool
+                </em>
+                ) – Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 min_block_size
+                </strong>
+                (
+                <em>
+                 int
+                </em>
+                ) – The minimum number of contiguous TensorRT convertable operations in order to run a set of operations in TensorRT
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 torch_executed_ops
+                </strong>
+                (
+                <em>
+                 List
+                </em>
+                <em>
+                 [
+                </em>
+                <em>
+                 str
+                </em>
+                <em>
+                 ]
+                </em>
+                ) – List of aten operators that must be run in PyTorch. An error will be thrown if this list is not empty but
                 <code class="docutils literal notranslate">
                  <span class="pre">
-                  inputs
+                  require_full_compilation
                  </span>
                 </code>
-                , describing the input sizes or ranges for inputs
-to the graph as well as expect types and formats for those inputs. All other keys are optional
+                is True
                </p>
-               <div class="highlight-py notranslate">
-                <div class="highlight">
-                 <pre><span></span><span class="n">compile_spec</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">"inputs"</span><span class="p">:</span> <span class="p">[</span>
-        <span class="n">trtorch</span><span class="o">.</span><span class="n">Input</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)),</span> <span class="c1"># Static NCHW input shape for input #1</span>
-        <span class="n">trtorch</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span>
-            <span class="n">min_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>
-            <span class="n">opt_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">512</span><span class="p">,</span> <span class="mi">512</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>
-            <span class="n">max_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1024</span><span class="p">,</span> <span class="mi">1024</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>
-            <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int32</span>
-            <span class="nb">format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channel_last</span>
-        <span class="p">)</span> <span class="c1"># Dynamic input shape for input #2</span>
-    <span class="p">],</span>
-    <span class="s2">"device"</span><span class="p">:</span> <span class="p">{</span>
-        <span class="s2">"device_type"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">),</span> <span class="c1"># Type of device to run engine on (for DLA use trtorch.DeviceType.DLA)</span>
-        <span class="s2">"gpu_id"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="c1"># Target gpu id to run engine (Use Xavier as gpu id for DLA)</span>
-        <span class="s2">"dla_core"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="c1"># (DLA only) Target dla core id to run engine</span>
-        <span class="s2">"allow_gpu_fallback"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># (DLA only) Allow layers unsupported on DLA to run on GPU</span>
-    <span class="p">},</span>
-    <span class="s2">"disable_tf32"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="c1"># Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas</span>
-    <span class="s2">"sparse_weights"</span><span class="p">:</span> <span class="n">Enable</span> <span class="n">sparsity</span> <span class="k">for</span> <span class="n">convolution</span> <span class="ow">and</span> <span class="n">fully</span> <span class="n">connected</span> <span class="n">layers</span><span class="o">.</span>
-    <span class="s2">"enabled_precisions"</span><span class="p">:</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">},</span> <span class="c1"># Enabling FP16 kernels</span>
-    <span class="s2">"refit"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># enable refit</span>
-    <span class="s2">"debug"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># enable debuggable engine</span>
-    <span class="s2">"strict_types"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># kernels should strictly run in operating precision</span>
-    <span class="s2">"capability"</span><span class="p">:</span> <span class="n">trtorch</span><span class="o">.</span><span class="n">EngineCapability</span><span class="o">.</span><span class="n">DEFAULT</span><span class="p">,</span> <span class="c1"># Restrict kernel selection to safe gpu kernels or safe dla kernels</span>
-    <span class="s2">"num_min_timing_iters"</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="c1"># Number of minimization timing iterations used to select kernels</span>
-    <span class="s2">"num_avg_timing_iters"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="c1"># Number of averaging timing iterations used to select kernels</span>
-    <span class="s2">"workspace_size"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="c1"># Maximum size of workspace given to TensorRT</span>
-    <span class="s2">"max_batch_size"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="c1"># Maximum batch size (must be &gt;= 1 to be set, 0 means not set)</span>
-    <span class="s2">"torch_fallback"</span><span class="p">:</span> <span class="p">{</span>
-        <span class="s2">"enabled"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="c1"># Turn on or turn off falling back to PyTorch if operations are not supported in TensorRT</span>
-        <span class="s2">"force_fallback_ops"</span><span class="p">:</span> <span class="p">[</span>
-            <span class="s2">"aten::max_pool2d"</span> <span class="c1"># List of specific ops to require running in PyTorch</span>
-        <span class="p">],</span>
-        <span class="s2">"force_fallback_modules"</span><span class="p">:</span> <span class="p">[</span>
-            <span class="s2">"mypymod.mytorchmod"</span> <span class="c1"># List of specific torch modules to require running in PyTorch</span>
-        <span class="p">],</span>
-        <span class="s2">"min_block_size"</span><span class="p">:</span> <span class="mi">3</span> <span class="c1"># Minimum number of ops an engine must incapsulate to be run in TensorRT</span>
-    <span class="p">}</span>
-<span class="p">}</span>
-</pre>
-                </div>
-               </div>
+              </li>
+              <li>
                <p>
-                Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
-torch datatypes or trtorch datatypes and you can use either torch devices or the trtorch device type enum
-to select device type.
+                <strong>
+                 torch_executed_modules
+                </strong>
+                (
+                <em>
+                 List
+                </em>
+                <em>
+                 [
+                </em>
+                <em>
+                 str
+                </em>
+                <em>
+                 ]
+                </em>
+                ) – List of modules that must be run in PyTorch. An error will be thrown if this list is not empty but
+                <code class="docutils literal notranslate">
+                 <span class="pre">
+                  require_full_compilation
+                 </span>
+                </code>
+                is True
                </p>
               </li>
              </ul>
             </dd>
-            <dt class="field-even">
+            <dt class="field-odd">
              Returns
             </dt>
-            <dd class="field-even">
+            <dd class="field-odd">
              <p>
               Compiled TorchScript Module, when run it will execute via TensorRT
              </p>
             </dd>
-            <dt class="field-odd">
+            <dt class="field-even">
              Return type
             </dt>
-            <dd class="field-odd">
+            <dd class="field-even">
              <p>
               torch.jit.ScriptModule
              </p>
@@ -684,39 +1054,71 @@ to select device type.
             (
            </span>
            <em class="sig-param">
-            <span class="n">
-             module
-            </span>
-            <span class="p">
-             :
-            </span>
-            <span class="n">
-             torch.jit._script.ScriptModule
-            </span>
+            module: torch.jit._script.ScriptModule
            </em>
            ,
            <em class="sig-param">
-            <span class="n">
-             method_name
-            </span>
-            <span class="p">
-             :
-            </span>
-            <span class="n">
-             str
-            </span>
+            method_name: str
            </em>
            ,
            <em class="sig-param">
-            <span class="n">
-             compile_spec
-            </span>
-            <span class="p">
-             :
-            </span>
-            <span class="n">
-             Any
-            </span>
+            inputs=[]
+           </em>
+           ,
+           <em class="sig-param">
+            device=None
+           </em>
+           ,
+           <em class="sig-param">
+            disable_tf32=False
+           </em>
+           ,
+           <em class="sig-param">
+            sparse_weights=False
+           </em>
+           ,
+           <em class="sig-param">
+            enabled_precisions={}
+           </em>
+           ,
+           <em class="sig-param">
+            refit=False
+           </em>
+           ,
+           <em class="sig-param">
+            debug=False
+           </em>
+           ,
+           <em class="sig-param">
+            strict_types=False
+           </em>
+           ,
+           <em class="sig-param">
+            capability=&lt;EngineCapability.default: 0&gt;
+           </em>
+           ,
+           <em class="sig-param">
+            num_min_timing_iters=2
+           </em>
+           ,
+           <em class="sig-param">
+            num_avg_timing_iters=1
+           </em>
+           ,
+           <em class="sig-param">
+            workspace_size=0
+           </em>
+           ,
+           <em class="sig-param">
+            max_batch_size=0
+           </em>
+           ,
+           <em class="sig-param">
+            truncate_long_and_double=False
+           </em>
+           ,
+           <em class="sig-param">
+            calibrator=None
            </em>
            <span class="sig-paren">
             )
@@ -768,83 +1170,332 @@ to select device type.
                 ) – Name of method to convert
                </p>
               </li>
+             </ul>
+            </dd>
+            <dt class="field-even">
+             Keyword Arguments
+            </dt>
+            <dd class="field-even">
+             <ul class="simple">
               <li>
                <p>
                 <strong>
-                 compile_spec
+                 inputs
                 </strong>
                 (
                 <em>
-                 dict
+                 List
+                </em>
+                <em>
+                 [
+                </em>
+                <em>
+                 Union
+                </em>
+                <em>
+                 (
+                </em>
+                <a class="reference internal" href="#trtorch.Input" title="trtorch.Input">
+                 <em>
+                  trtorch.Input
+                 </em>
+                </a>
+                <em>
+                 ,
+                </em>
+                <em>
+                 torch.Tensor
+                </em>
+                <em>
+                 )
+                </em>
+                <em>
+                 ]
                 </em>
                 ) –
                </p>
                <p>
-                Compilation settings including operating precision, target device, etc.
-One key is required which is
-                <code class="docutils literal notranslate">
-                 <span class="pre">
-                  inputs
-                 </span>
-                </code>
-                , describing the input sizes or ranges for inputs
-to the graph as well as expect types and formats for those inputs. All other keys are optional
+                <strong>
+                 Required
+                </strong>
+                List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
+torch datatypes or trtorch datatypes and you can use either torch devices or the trtorch device type enum
+to select device type.
                </p>
-               <div class="highlight-py notranslate">
+               <div class="highlight-cpp notranslate">
                 <div class="highlight">
-                 <pre><span></span><span class="n">CompileSpec</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">"inputs"</span><span class="p">:</span> <span class="p">[</span>
-        <span class="n">trtorch</span><span class="o">.</span><span class="n">Input</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)),</span> <span class="c1"># Static NCHW input shape for input #1</span>
-        <span class="n">trtorch</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span>
-            <span class="n">min_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>
-            <span class="n">opt_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">512</span><span class="p">,</span> <span class="mi">512</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>
-            <span class="n">max_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1024</span><span class="p">,</span> <span class="mi">1024</span><span class="p">,</span> <span class="mi">3</span><span class="p">),</span>
-            <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int32</span>
-            <span class="nb">format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channel_last</span>
-        <span class="p">)</span> <span class="c1"># Dynamic input shape for input #2</span>
-    <span class="p">],</span>
-    <span class="s2">"device"</span><span class="p">:</span> <span class="p">{</span>
-        <span class="s2">"device_type"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">),</span> <span class="c1"># Type of device to run engine on (for DLA use trtorch.DeviceType.DLA)</span>
-        <span class="s2">"gpu_id"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="c1"># Target gpu id to run engine (Use Xavier as gpu id for DLA)</span>
-        <span class="s2">"dla_core"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="c1"># (DLA only) Target dla core id to run engine</span>
-        <span class="s2">"allow_gpu_fallback"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># (DLA only) Allow layers unsupported on DLA to run on GPU</span>
-    <span class="p">},</span>
-    <span class="s2">"enabled_precisions"</span><span class="p">:</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">},</span> <span class="c1"># Enabling FP16 kernels</span>
-    <span class="c1"># List of datatypes that should be configured for each input. Supported options torch.{float|half|int8|int32|bool}.</span>
-    <span class="s2">"disable_tf32"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="c1"># Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas</span>
-    <span class="s2">"sparse_weights"</span><span class="p">:</span> <span class="n">Enable</span> <span class="n">sparsity</span> <span class="k">for</span> <span class="n">convolution</span> <span class="ow">and</span> <span class="n">fully</span> <span class="n">connected</span> <span class="n">layers</span><span class="o">.</span>
-    <span class="s2">"refit"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># enable refit</span>
-    <span class="s2">"debug"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># enable debuggable engine</span>
-    <span class="s2">"strict_types"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># kernels should strictly run in operating precision</span>
-    <span class="s2">"capability"</span><span class="p">:</span> <span class="n">trtorch</span><span class="o">.</span><span class="n">EngineCapability</span><span class="o">.</span><span class="n">DEFAULT</span><span class="p">,</span> <span class="c1"># Restrict kernel selection to safe gpu kernels or safe dla kernels</span>
-    <span class="s2">"num_min_timing_iters"</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="c1"># Number of minimization timing iterations used to select kernels</span>
-    <span class="s2">"num_avg_timing_iters"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="c1"># Number of averaging timing iterations used to select kernels</span>
-    <span class="s2">"workspace_size"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="c1"># Maximum size of workspace given to TensorRT</span>
-    <span class="s2">"max_batch_size"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="c1"># Maximum batch size (must be &gt;= 1 to be set, 0 means not set)</span>
-<span class="p">}</span>
+                 <pre><span></span>input=[
+    trtorch.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
+    trtorch.Input(
+        min_shape=(1, 224, 224, 3),
+        opt_shape=(1, 512, 512, 3),
+        max_shape=(1, 1024, 1024, 3),
+        dtype=torch.int32
+        format=torch.channel_last
+    ), # Dynamic input shape for input #2
+    torch.randn((1, 3, 224, 244)) # Use an example tensor and let trtorch infer settings
+]
 </pre>
                 </div>
                </div>
+              </li>
+              <li>
                <p>
-                Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
-torch datatypes or trtorch datatypes and you can use either torch devices or the trtorch device type enum
-to select device type.
+                <strong>
+                 device
+                </strong>
+                (
+                <em>
+                 Union
+                </em>
+                <em>
+                 (
+                </em>
+                <a class="reference internal" href="#trtorch.Device" title="trtorch.Device">
+                 <em>
+                  trtorch.Device
+                 </em>
+                </a>
+                <em>
+                 ,
+                </em>
+                <em>
+                 torch.device
+                </em>
+                <em>
+                 ,
+                </em>
+                <em>
+                 dict
+                </em>
+                <em>
+                 )
+                </em>
+                ) –
+               </p>
+               <p>
+                Target device for TensorRT engines to run on
+               </p>
+               <div class="highlight-cpp notranslate">
+                <div class="highlight">
+                 <pre><span></span><span class="n">device</span><span class="o">=</span><span class="n">trtorch</span><span class="p">.</span><span class="n">Device</span><span class="p">(</span><span class="s">"dla:1"</span><span class="p">,</span><span class="w"> </span><span class="n">allow_gpu_fallback</span><span class="o">=</span><span class="n">True</span><span class="p">)</span><span class="w"></span>
+</pre>
+                </div>
+               </div>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 disable_tf32
+                </strong>
+                (
+                <em>
+                 bool
+                </em>
+                ) – Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 sparse_weights
+                </strong>
+                (
+                <em>
+                 bool
+                </em>
+                ) – Enable sparsity for convolution and fully connected layers.
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 enabled_precision
+                </strong>
+                (
+                <em>
+                 Set
+                </em>
+                <em>
+                 (
+                </em>
+                <em>
+                 Union
+                </em>
+                <em>
+                 (
+                </em>
+                <em>
+                 torch.dtype
+                </em>
+                <em>
+                 ,
+                </em>
+                <a class="reference internal" href="#trtorch.dtype" title="trtorch.dtype">
+                 <em>
+                  trtorch.dtype
+                 </em>
+                </a>
+                <em>
+                 )
+                </em>
+                <em>
+                 )
+                </em>
+                ) – The set of datatypes that TensorRT can use when selecting kernels
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 refit
+                </strong>
+                (
+                <em>
+                 bool
+                </em>
+                ) – Enable refitting
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 debug
+                </strong>
+                (
+                <em>
+                 bool
+                </em>
+                ) – Enable debuggable engine
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 strict_types
+                </strong>
+                (
+                <em>
+                 bool
+                </em>
+                ) – Kernels should strictly run in a particular operating precision. Enabled precision should only have one type in the set
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 capability
+                </strong>
+                (
+                <a class="reference internal" href="#trtorch.EngineCapability" title="trtorch.EngineCapability">
+                 <em>
+                  trtorch.EngineCapability
+                 </em>
+                </a>
+                ) – Restrict kernel selection to safe gpu kernels or safe dla kernels
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 num_min_timing_iters
+                </strong>
+                (
+                <em>
+                 int
+                </em>
+                ) – Number of minimization timing iterations used to select kernels
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 num_avg_timing_iters
+                </strong>
+                (
+                <em>
+                 int
+                </em>
+                ) – Number of averaging timing iterations used to select kernels
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 workspace_size
+                </strong>
+                (
+                <em>
+                 int
+                </em>
+                ) – Maximum size of workspace given to TensorRT
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 max_batch_size
+                </strong>
+                (
+                <em>
+                 int
+                </em>
+                ) – Maximum batch size (must be &gt;= 1 to be set, 0 means not set)
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 truncate_long_and_double
+                </strong>
+                (
+                <em>
+                 bool
+                </em>
+                ) – Truncate weights provided in int64 or double (float64) to int32 and float32
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 calibrator
+                </strong>
+                (
+                <em>
+                 Union
+                </em>
+                <em>
+                 (
+                </em>
+                <em>
+                 trtorch._C.IInt8Calibrator
+                </em>
+                <em>
+                 ,
+                </em>
+                <em>
+                 tensorrt.IInt8Calibrator
+                </em>
+                <em>
+                 )
+                </em>
+                ) – Calibrator object which will provide data to the PTQ system for INT8 Calibration
                </p>
               </li>
              </ul>
             </dd>
-            <dt class="field-even">
+            <dt class="field-odd">
              Returns
             </dt>
-            <dd class="field-even">
+            <dd class="field-odd">
              <p>
               Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
              </p>
             </dd>
-            <dt class="field-odd">
+            <dt class="field-even">
              Return type
             </dt>
-            <dd class="field-odd">
+            <dd class="field-even">
              <p>
               bytes
              </p>
@@ -985,11 +1636,11 @@ that are not supported are printed out and the function returns false, else true
             <span class="n">
              device
             </span>
-            <span class="p">
-             :
+            <span class="o">
+             =
             </span>
-            <span class="n">
-             trtorch.Device.Device
+            <span class="default_value">
+             None
             </span>
            </em>
            <span class="sig-paren">
@@ -1035,17 +1686,55 @@ Registers the forward method to execute the TensorRT engine with the function si
              </p>
             </dd>
             <dt class="field-even">
-             Returns
+             Keyword Arguments
             </dt>
             <dd class="field-even">
+             <p>
+              <strong>
+               device
+              </strong>
+              (
+              <em>
+               Union
+              </em>
+              <em>
+               (
+              </em>
+              <a class="reference internal" href="#trtorch.Device" title="trtorch.Device">
+               <em>
+                trtorch.Device
+               </em>
+              </a>
+              <em>
+               ,
+              </em>
+              <em>
+               torch.device
+              </em>
+              <em>
+               ,
+              </em>
+              <em>
+               dict
+              </em>
+              <em>
+               )
+              </em>
+              ) – Target device to run engine on. Must be compatible with engine provided. Default: Current active device
+             </p>
+            </dd>
+            <dt class="field-odd">
+             Returns
+            </dt>
+            <dd class="field-odd">
              <p>
               New TorchScript module with engine embedded
              </p>
             </dd>
-            <dt class="field-odd">
+            <dt class="field-even">
              Return type
             </dt>
-            <dd class="field-odd">
+            <dd class="field-even">
              <p>
               torch.jit.ScriptModule
              </p>
@@ -1132,31 +1821,68 @@ Registers the forward method to execute the TensorRT engine with the function si
             (
            </span>
            <em class="sig-param">
-            <span class="n">
-             compile_spec
-            </span>
-            <span class="p">
-             :
-            </span>
-            <span class="n">
-             Dict
-             <span class="p">
-              [
-             </span>
-             str
-             <span class="p">
-              ,
-             </span>
-             Any
-             <span class="p">
-              ]
-             </span>
-            </span>
+            inputs=[]
+           </em>
+           ,
+           <em class="sig-param">
+            device=None
+           </em>
+           ,
+           <em class="sig-param">
+            disable_tf32=False
+           </em>
+           ,
+           <em class="sig-param">
+            sparse_weights=False
+           </em>
+           ,
+           <em class="sig-param">
+            enabled_precisions={}
+           </em>
+           ,
+           <em class="sig-param">
+            refit=False
+           </em>
+           ,
+           <em class="sig-param">
+            debug=False
+           </em>
+           ,
+           <em class="sig-param">
+            strict_types=False
+           </em>
+           ,
+           <em class="sig-param">
+            capability=&lt;EngineCapability.default: 0&gt;
+           </em>
+           ,
+           <em class="sig-param">
+            num_min_timing_iters=2
+           </em>
+           ,
+           <em class="sig-param">
+            num_avg_timing_iters=1
+           </em>
+           ,
+           <em class="sig-param">
+            workspace_size=0
+           </em>
+           ,
+           <em class="sig-param">
+            max_batch_size=0
+           </em>
+           ,
+           <em class="sig-param">
+            truncate_long_and_double=False
+           </em>
+           ,
+           <em class="sig-param">
+            calibrator=None
            </em>
            <span class="sig-paren">
             )
            </span>
-           → &lt;torch._C.ScriptClass object at 0x7fc8c4e30670&gt;
+           → &lt;torch._C.ScriptClass object at 0x7f2412d57fb0&gt;
            <a class="headerlink" href="#trtorch.TensorRTCompileSpec" title="Permalink to this definition">
             ¶
            </a>
@@ -1167,99 +1893,297 @@ Registers the forward method to execute the TensorRT engine with the function si
            </p>
            <dl class="field-list simple">
             <dt class="field-odd">
-             Parameters
+             Keyword Arguments
             </dt>
             <dd class="field-odd">
-             <p>
-              <strong>
-               compile_spec
-              </strong>
-              (
-              <em>
-               dict
-              </em>
-              ) –
-             </p>
-             <p>
-              Compilation settings including operating precision, target device, etc.
-One key is required which is
-              <code class="docutils literal notranslate">
-               <span class="pre">
-                input_shapes
-               </span>
-              </code>
-              , describing the input sizes or ranges for inputs
-to the graph as well as expect types and formats for those inputs. All other keys are optional.
-Entries for each method to be compiled.
-             </p>
-             <p>
-              Note: Partial compilation of TorchScript modules is not supported through the PyTorch TensorRT backend
-If you need this feature, use trtorch.compile to compile your module. Usage of the resulting module is
-as if you were using the TensorRT integration.
-             </p>
-             <div class="highlight-py notranslate">
-              <div class="highlight">
-               <pre><span></span><span class="n">CompileSpec</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">"forward"</span> <span class="p">:</span> <span class="n">trtorch</span><span class="o">.</span><span class="n">TensorRTCompileSpec</span><span class="p">({</span>
-        <span class="s2">"inputs"</span><span class="p">:</span> <span class="p">[</span>
-            <span class="n">trtorch</span><span class="o">.</span><span class="n">Input</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">)),</span> <span class="c1"># Static input shape for input #1</span>
-            <span class="n">trtorch</span><span class="o">.</span><span class="n">Input</span><span class="p">(</span>
-                <span class="n">min_shape</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">),</span>
-                <span class="n">opt_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">512</span><span class="p">,</span> <span class="mi">512</span><span class="p">),</span>
-                <span class="n">max_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">1024</span><span class="p">,</span> <span class="mi">1024</span><span class="p">),</span>
-                <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int32</span>
-                <span class="nb">format</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">channel_last</span>
-            <span class="p">)</span> <span class="c1"># Dynamic input shape for input #2</span>
-        <span class="p">],</span>
-        <span class="s2">"device"</span><span class="p">:</span> <span class="p">{</span>
-            <span class="s2">"device_type"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">device</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">),</span> <span class="c1"># Type of device to run engine on (for DLA use trtorch.DeviceType.DLA)</span>
-            <span class="s2">"gpu_id"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="c1"># Target gpu id to run engine (Use Xavier as gpu id for DLA)</span>
-            <span class="s2">"dla_core"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="c1"># (DLA only) Target dla core id to run engine</span>
-            <span class="s2">"allow_gpu_fallback"</span><span class="p">:</span> <span class="n">false</span><span class="p">,</span> <span class="c1"># (DLA only) Allow layers unsupported on DLA to run on GPU</span>
-        <span class="p">},</span>
-        <span class="s2">"enabled_precisions"</span><span class="p">:</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">},</span> <span class="c1"># Operating precision set to FP16</span>
-        <span class="s2">"sparse_weights"</span><span class="p">:</span> <span class="n">Enable</span> <span class="n">sparsity</span> <span class="k">for</span> <span class="n">convolution</span> <span class="ow">and</span> <span class="n">fully</span> <span class="n">connected</span> <span class="n">layers</span><span class="o">.</span>
-        <span class="s2">"disable_tf32"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="c1"># Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas</span>
-        <span class="s2">"refit"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="c1"># enable refit</span>
-        <span class="s2">"debug"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="c1"># enable debuggable engine</span>
-        <span class="s2">"strict_types"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="c1"># kernels should strictly run in operating precision</span>
-        <span class="s2">"capability"</span><span class="p">:</span> <span class="n">trtorch</span><span class="o">.</span><span class="n">EngineCapability</span><span class="o">.</span><span class="n">DEFAULT</span><span class="p">,</span> <span class="c1"># Restrict kernel selection to safe gpu kernels or safe dla kernels</span>
-        <span class="s2">"num_min_timing_iters"</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span> <span class="c1"># Number of minimization timing iterations used to select kernels</span>
-        <span class="s2">"num_avg_timing_iters"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="c1"># Number of averaging timing iterations used to select kernels</span>
-        <span class="s2">"workspace_size"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="c1"># Maximum size of workspace given to TensorRT</span>
-        <span class="s2">"max_batch_size"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="c1"># Maximum batch size (must be &gt;= 1 to be set, 0 means not set)</span>
-        <span class="s2">"truncate_long_and_double"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="c1"># Truncate long and double into int and float</span>
-    <span class="p">})</span>
-<span class="p">}</span>
-</pre>
-              </div>
-             </div>
-             <p>
-              Input Sizes can be specified as torch sizes, tuples or lists. Op precisions can be specified using
+             <ul class="simple">
+              <li>
+               <p>
+                <strong>
+                 inputs
+                </strong>
+                (
+                <em>
+                 List
+                </em>
+                <em>
+                 [
+                </em>
+                <em>
+                 Union
+                </em>
+                <em>
+                 (
+                </em>
+                <a class="reference internal" href="#trtorch.Input" title="trtorch.Input">
+                 <em>
+                  trtorch.Input
+                 </em>
+                </a>
+                <em>
+                 ,
+                </em>
+                <em>
+                 torch.Tensor
+                </em>
+                <em>
+                 )
+                </em>
+                <em>
+                 ]
+                </em>
+                ) –
+               </p>
+               <p>
+                <strong>
+                 Required
+                </strong>
+                List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
 torch datatypes or trtorch datatypes and you can use either torch devices or the trtorch device type enum
 to select device type.
-             </p>
-            </dd>
-            <dt class="field-even">
-             Returns
-            </dt>
-            <dd class="field-even">
-             <p>
-              List of methods and formated spec objects to be provided to
-              <code class="docutils literal notranslate">
-               <span class="pre">
-                torch._C._jit_to_tensorrt
-               </span>
-              </code>
-             </p>
-            </dd>
-            <dt class="field-odd">
-             Return type
-            </dt>
-            <dd class="field-odd">
-             <p>
-              torch.classes.tensorrt.CompileSpec
-             </p>
+               </p>
+               <div class="highlight-cpp notranslate">
+                <div class="highlight">
+                 <pre><span></span>input=[
+    trtorch.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
+    trtorch.Input(
+        min_shape=(1, 224, 224, 3),
+        opt_shape=(1, 512, 512, 3),
+        max_shape=(1, 1024, 1024, 3),
+        dtype=torch.int32
+        format=torch.channel_last
+    ), # Dynamic input shape for input #2
+    torch.randn((1, 3, 224, 244)) # Use an example tensor and let trtorch infer settings
+]
+</pre>
+                </div>
+               </div>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 device
+                </strong>
+                (
+                <em>
+                 Union
+                </em>
+                <em>
+                 (
+                </em>
+                <a class="reference internal" href="#trtorch.Device" title="trtorch.Device">
+                 <em>
+                  trtorch.Device
+                 </em>
+                </a>
+                <em>
+                 ,
+                </em>
+                <em>
+                 torch.device
+                </em>
+                <em>
+                 ,
+                </em>
+                <em>
+                 dict
+                </em>
+                <em>
+                 )
+                </em>
+                ) –
+               </p>
+               <p>
+                Target device for TensorRT engines to run on
+               </p>
+               <div class="highlight-cpp notranslate">
+                <div class="highlight">
+                 <pre><span></span><span class="n">device</span><span class="o">=</span><span class="n">trtorch</span><span class="p">.</span><span class="n">Device</span><span class="p">(</span><span class="s">"dla:1"</span><span class="p">,</span><span class="w"> </span><span class="n">allow_gpu_fallback</span><span class="o">=</span><span class="n">True</span><span class="p">)</span><span class="w"></span>
+</pre>
+                </div>
+               </div>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 disable_tf32
+                </strong>
+                (
+                <em>
+                 bool
+                </em>
+                ) – Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 sparse_weights
+                </strong>
+                (
+                <em>
+                 bool
+                </em>
+                ) – Enable sparsity for convolution and fully connected layers.
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 enabled_precision
+                </strong>
+                (
+                <em>
+                 Set
+                </em>
+                <em>
+                 (
+                </em>
+                <em>
+                 Union
+                </em>
+                <em>
+                 (
+                </em>
+                <em>
+                 torch.dtype
+                </em>
+                <em>
+                 ,
+                </em>
+                <a class="reference internal" href="#trtorch.dtype" title="trtorch.dtype">
+                 <em>
+                  trtorch.dtype
+                 </em>
+                </a>
+                <em>
+                 )
+                </em>
+                <em>
+                 )
+                </em>
+                ) – The set of datatypes that TensorRT can use when selecting kernels
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 refit
+                </strong>
+                (
+                <em>
+                 bool
+                </em>
+                ) – Enable refitting
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 debug
+                </strong>
+                (
+                <em>
+                 bool
+                </em>
+                ) – Enable debuggable engine
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 strict_types
+                </strong>
+                (
+                <em>
+                 bool
+                </em>
+                ) – Kernels should strictly run in a particular operating precision. Enabled precision should only have one type in the set
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 capability
+                </strong>
+                (
+                <a class="reference internal" href="#trtorch.EngineCapability" title="trtorch.EngineCapability">
+                 <em>
+                  trtorch.EngineCapability
+                 </em>
+                </a>
+                ) – Restrict kernel selection to safe gpu kernels or safe dla kernels
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 num_min_timing_iters
+                </strong>
+                (
+                <em>
+                 int
+                </em>
+                ) – Number of minimization timing iterations used to select kernels
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 num_avg_timing_iters
+                </strong>
+                (
+                <em>
+                 int
+                </em>
+                ) – Number of averaging timing iterations used to select kernels
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 workspace_size
+                </strong>
+                (
+                <em>
+                 int
+                </em>
+                ) – Maximum size of workspace given to TensorRT
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 max_batch_size
+                </strong>
+                (
+                <em>
+                 int
+                </em>
+                ) – Maximum batch size (must be &gt;= 1 to be set, 0 means not set)
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 truncate_long_and_double
+                </strong>
+                (
+                <em>
+                 bool
+                </em>
+                ) – Truncate weights provided in int64 or double (float64) to int32 and float32
+               </p>
+              </li>
+              <li>
+               <p>
+                <strong>
+                 calibrator
+                </strong>
+                – Calibrator object which will provide data to the PTQ system for INT8 Calibration
+               </p>
+              </li>
+             </ul>
             </dd>
            </dl>
           </dd>
@@ -1556,7 +2480,7 @@ Note: All three of min_shape, opt_shape, max_shape must be provided, there must 
               dtype
              </code>
              <em class="property">
-              = &lt;dtype.float: 0&gt;
+              = &lt;dtype.unknown: 5&gt;
              </em>
              <a class="headerlink" href="#trtorch.Input.dtype" title="Permalink to this definition">
               ¶
@@ -2008,6 +2932,9 @@ Note: All three of min_shape, opt_shape, max_shape must be provided, there must 
              </p>
              <p>
               bool : Boolean value
+             </p>
+             <p>
+              unknown : Unknown data type
              </p>
             </div>
            </blockquote>

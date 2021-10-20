@@ -128,7 +128,10 @@ void AddLayer(ConversionCtx* ctx, const torch::jit::Node* n) {
                        << "please report this error to https://www.github.com/NVIDIA/TRTorch/issues");
 }
 
-void AddInputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> inputs, std::vector<ir::Input>& input_specs) {
+void AddInputs(
+    ConversionCtx* ctx,
+    c10::ArrayRef<const torch::jit::Value*> inputs,
+    std::unordered_map<const torch::jit::Value*, ir::Input>& input_specs) {
   std::vector<const torch::jit::Value*> input_tensors;
   for (auto in : inputs) {
     // Disregarding inputs that are not tensors
@@ -143,24 +146,23 @@ void AddInputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> inputs
   }
 
   std::stringstream ss;
-  ss << "Input Dimension Specs: [\n";
+  ss << "Input Dimension Specs: {" << std::endl;
   for (auto i : input_specs) {
-    ss << "    " << i << ",";
+    ss << "    " << i.first->debugName() << " : " << i.second << ",";
   }
-  ss << ']';
-  LOG_DEBUG(ctx->logger, ss.str());
-
-  TRTORCH_CHECK(
-      input_tensors.size() == input_specs.size(),
-      "Expected dimension specifications for all input tensors"
-          << ", but found " << input_tensors.size() << " input tensors and " << input_specs.size()
-          << " dimension specs (conversion.AddInputs)");
+  ss << '}';
+  auto dbg_str = ss.str();
+  LOG_DEBUG(ctx->logger, dbg_str);
 
   auto profile = ctx->builder->createOptimizationProfile();
 
-  for (size_t i = 0; i < input_tensors.size(); i++) {
-    auto in = input_tensors[i];
-    auto spec = input_specs[i];
+  for (auto input : input_tensors) {
+    const torch::jit::Value* in = input;
+    TRTORCH_CHECK(
+        input_specs.find(in) != input_specs.end(),
+        "Cannot find an input spec associated with input: " << in->debugName());
+    ir::Input& spec = input_specs.find(in)->second;
+
     std::string name = std::string("input_") + std::to_string(ctx->num_inputs);
     LOG_INFO(
         ctx->logger,
@@ -226,7 +228,7 @@ void MarkOutputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> outp
   }
 }
 
-void AddParamsToCtxValueMap(ConversionCtx* ctx, GraphParams& params) {
+void AddParamsToCtxValueMap(ConversionCtx* ctx, ir::StaticParams& params) {
   for (auto p : params) {
     ctx->evaluated_value_map[p.first] = std::move(p.second);
   }
@@ -358,8 +360,8 @@ void EvaluateLoopBlock(ConversionCtx* ctx, const torch::jit::Node* n) {
 void ConvertBlockToNetDef(
     ConversionCtx* ctx,
     const torch::jit::Block* b,
-    ConversionInfo build_info,
-    GraphParams& static_params) {
+    ConversionInfo& build_info,
+    ir::StaticParams& static_params) {
   LOG_INFO(ctx->logger, "Converting Block");
 
   auto inputs = b->inputs();
@@ -435,7 +437,10 @@ void ConvertBlockToNetDef(
 // a serialized TensorRT engine that can be deserialized and run
 
 // Probably should consolidate these two functions
-std::string ConvertBlockToEngine(const torch::jit::Block* b, ConversionInfo build_info, GraphParams& static_params) {
+std::string ConvertBlockToEngine(
+    const torch::jit::Block* b,
+    ConversionInfo build_info,
+    ir::StaticParams& static_params) {
   ConversionCtx ctx(build_info.engine_settings);
   ConvertBlockToNetDef(&ctx, b, build_info, static_params);
   std::string engine = ctx.SerializeEngine();
@@ -486,7 +491,7 @@ std::set<std::string> ConvertableOpsInBlock(const torch::jit::Block* b) {
   return convertable_ops;
 }
 
-bool VerifyConverterSupportForBlock(const torch::jit::Block* b) {
+bool VerifyConverterSupportForBlock(const torch::jit::Block* b, bool suppress_errors) {
   auto unsupported_ops = GetUnsupportedOpsInBlock(b);
 
   if (unsupported_ops.size() != 0) {
@@ -501,16 +506,20 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b) {
     unsupported_msg << "https://www.github.com/nvidia/TRTorch/issues" << std::endl;
     unsupported_msg << std::endl << "In Module:" << std::endl;
 
-    LOG_ERROR(unsupported_msg.str());
+    if (suppress_errors) {
+      LOG_ERROR(unsupported_msg.str());
+    }
 
     for (const auto n : b->nodes()) {
       auto schema = n->maybeSchema();
       if (schema) {
         for (const auto& x : unsupported_ops) {
           if (x.first == schema->operator_name()) {
-            LOG_ERROR(
-                "Unsupported operator: " << *schema << std::endl
-                                         << trtorch::core::util::GetPyTorchSourceCode(n) << std::endl);
+            if (suppress_errors) {
+              LOG_ERROR(
+                  "Unsupported operator: " << *schema << std::endl
+                                           << trtorch::core::util::GetPyTorchSourceCode(n) << std::endl);
+            }
           }
         }
       }
@@ -526,7 +535,9 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b) {
     unsupported_msg
         << "This may be because there are no operators that can be added to the TensorRT graph or all operators have a resolved compile time value."
         << std::endl;
-    LOG_ERROR(unsupported_msg.str());
+    if (suppress_errors) {
+      LOG_ERROR(unsupported_msg.str());
+    }
     return false;
   }
 

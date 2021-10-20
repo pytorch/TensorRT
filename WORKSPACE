@@ -31,6 +31,13 @@ git_repository(
     shallow_since = "1570114335 -0400",
 )
 
+# External dependency for trtorch if you already have precompiled binaries.
+# This is currently used in pytorch NGC container CI testing.
+local_repository(
+    name = "trtorch",
+    path = "/opt/conda/lib/python3.8/site-packages/trtorch"
+)
+
 # CUDA should be installed on the system locally
 new_local_repository(
     name = "cuda",

@@ -115,7 +115,7 @@
        <label class="md-search__overlay" for="__search">
        </label>
        <div class="md-search__inner" role="search">
-        <form action="../search.html" class="md-search__form" method="GET" name="search">
+        <form action="../search.html" class="md-search__form" method="get" name="search">
          <input autocapitalize="off" autocomplete="off" class="md-search__input" data-md-component="query" data-md-state="active" name="q" placeholder="Search" spellcheck="false" type="text"/>
          <label class="md-icon md-search__icon" for="__search">
          </label>
@@ -435,24 +435,24 @@
         </p>
         <div class="highlight-c++ notranslate">
          <div class="highlight">
-          <pre><span></span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;&gt;</span> <span class="n">input_shape</span> <span class="o">=</span> <span class="p">{{</span><span class="mi">32</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">}};</span>
-<span class="k">auto</span> <span class="n">compile_spec</span> <span class="o">=</span> <span class="n">trtorch</span><span class="o">::</span><span class="n">CompileSpec</span><span class="p">({</span><span class="n">input_shape</span><span class="p">});</span>
+          <pre><span></span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">input_shape</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{{</span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">}};</span><span class="w"></span>
+<span class="k">auto</span><span class="w"> </span><span class="n">compile_spec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">trtorch</span><span class="o">::</span><span class="n">CompileSpec</span><span class="p">({</span><span class="n">input_shape</span><span class="p">});</span><span class="w"></span>
 
 <span class="cp"># Set a precision. DLA supports fp16 or int8 only</span>
-<span class="n">compile_spec</span><span class="p">.</span><span class="n">enabled_precisions</span> <span class="o">=</span> <span class="p">{</span><span class="n">torch</span><span class="o">::</span><span class="n">kF16</span><span class="p">};</span>
-<span class="n">compile_spec</span><span class="p">.</span><span class="n">device</span><span class="p">.</span><span class="n">device_type</span> <span class="o">=</span> <span class="n">trtorch</span><span class="o">::</span><span class="n">CompileSpec</span><span class="o">::</span><span class="n">DeviceType</span><span class="o">::</span><span class="n">kDLA</span><span class="p">;</span>
+<span class="n">compile_spec</span><span class="p">.</span><span class="n">enabled_precisions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">torch</span><span class="o">::</span><span class="n">kF16</span><span class="p">};</span><span class="w"></span>
+<span class="n">compile_spec</span><span class="p">.</span><span class="n">device</span><span class="p">.</span><span class="n">device_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">trtorch</span><span class="o">::</span><span class="n">CompileSpec</span><span class="o">::</span><span class="n">DeviceType</span><span class="o">::</span><span class="n">kDLA</span><span class="p">;</span><span class="w"></span>
 
 <span class="cp"># Make sure the gpu id is set to Xavier id for DLA</span>
-<span class="n">compile_spec</span><span class="p">.</span><span class="n">device</span><span class="p">.</span><span class="n">gpu_id</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+<span class="n">compile_spec</span><span class="p">.</span><span class="n">device</span><span class="p">.</span><span class="n">gpu_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
 
 <span class="cp"># Set the DLA core id</span>
-<span class="n">compile_spec</span><span class="p">.</span><span class="n">device</span><span class="p">.</span><span class="n">dla_core</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span>
+<span class="n">compile_spec</span><span class="p">.</span><span class="n">device</span><span class="p">.</span><span class="n">dla_core</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w"></span>
 
 <span class="cp"># If a layer fails to run on DLA it will fallback to GPU</span>
-<span class="n">compile_spec</span><span class="p">.</span><span class="n">device</span><span class="p">.</span><span class="n">allow_gpu_fallback</span> <span class="o">=</span> <span class="nb">true</span><span class="p">;</span>
+<span class="n">compile_spec</span><span class="p">.</span><span class="n">device</span><span class="p">.</span><span class="n">allow_gpu_fallback</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span><span class="w"></span>
 
 <span class="cp"># Set the workspace size</span>
-<span class="n">compile_spec</span><span class="p">.</span><span class="n">workspace_size</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">28</span><span class="p">;</span>
+<span class="n">compile_spec</span><span class="p">.</span><span class="n">workspace_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mi">28</span><span class="p">;</span><span class="w"></span>
 </pre>
          </div>
         </div>

@@ -1,3 +1,10 @@
+config_setting(
+    name = "ci_build_testing",
+    values  = {
+        "define": "trtorch_src=pre_built"
+    }
+)
+
 test_suite(
     name = "tests",
     tests = [

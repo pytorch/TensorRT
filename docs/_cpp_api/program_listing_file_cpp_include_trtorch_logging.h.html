@@ -113,7 +113,7 @@
        <label class="md-search__overlay" for="__search">
        </label>
        <div class="md-search__inner" role="search">
-        <form action="../search.html" class="md-search__form" method="GET" name="search">
+        <form action="../search.html" class="md-search__form" method="get" name="search">
          <input autocapitalize="off" autocomplete="off" class="md-search__input" data-md-component="query" data-md-state="active" name="q" placeholder="Search" spellcheck="false" type="text"/>
          <label class="md-icon md-search__icon" for="__search">
          </label>
@@ -412,39 +412,39 @@
 <span class="cm"> *</span>
 <span class="cm"> * This library is licensed under the BSD-style license found in the</span>
 <span class="cm"> * LICENSE file in the root directory of this source tree.</span>
-<span class="cm"> */</span>
+<span class="cm"> */</span><span class="w"></span>
 <span class="cp">#pragma once</span>
 
-<span class="cp">#include</span> <span class="cpf">&lt;string&gt;</span><span class="cp"></span>
-<span class="cp">#include</span> <span class="cpf">"trtorch/macros.h"</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;string&gt;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"trtorch/macros.h"</span><span class="cp"></span>
 
-<span class="k">namespace</span> <span class="nn">trtorch</span> <span class="p">{</span>
-<span class="k">namespace</span> <span class="nn">logging</span> <span class="p">{</span>
-<span class="k">enum</span> <span class="nc">Level</span> <span class="p">{</span>
-  <span class="n">kINTERNAL_ERROR</span><span class="p">,</span>
-  <span class="n">kERROR</span><span class="p">,</span>
-  <span class="n">kWARNING</span><span class="p">,</span>
-  <span class="n">kINFO</span><span class="p">,</span>
-  <span class="n">kDEBUG</span><span class="p">,</span>
-  <span class="n">kGRAPH</span><span class="p">,</span>
-<span class="p">};</span>
+<span class="k">namespace</span><span class="w"> </span><span class="nn">trtorch</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="k">namespace</span><span class="w"> </span><span class="nn">logging</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="k">enum</span> <span class="nc">Level</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="n">kINTERNAL_ERROR</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="n">kERROR</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="n">kWARNING</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="n">kINFO</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="n">kDEBUG</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="n">kGRAPH</span><span class="p">,</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
 
 <span class="c1">// Are these ones necessary for the user?</span>
-<span class="n">TRTORCH_API</span> <span class="n">std</span><span class="o">::</span><span class="n">string</span> <span class="n">get_logging_prefix</span><span class="p">();</span>
-<span class="n">TRTORCH_API</span> <span class="kt">void</span> <span class="n">set_logging_prefix</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">string</span> <span class="n">prefix</span><span class="p">);</span>
+<span class="n">TRTORCH_API</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">get_logging_prefix</span><span class="p">();</span><span class="w"></span>
+<span class="n">TRTORCH_API</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="n">set_logging_prefix</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">prefix</span><span class="p">);</span><span class="w"></span>
 
-<span class="n">TRTORCH_API</span> <span class="kt">void</span> <span class="n">set_reportable_log_level</span><span class="p">(</span><span class="n">Level</span> <span class="n">lvl</span><span class="p">);</span>
+<span class="n">TRTORCH_API</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="n">set_reportable_log_level</span><span class="p">(</span><span class="n">Level</span><span class="w"> </span><span class="n">lvl</span><span class="p">);</span><span class="w"></span>
 
-<span class="n">TRTORCH_API</span> <span class="kt">void</span> <span class="n">set_is_colored_output_on</span><span class="p">(</span><span class="kt">bool</span> <span class="n">colored_output_on</span><span class="p">);</span>
+<span class="n">TRTORCH_API</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="n">set_is_colored_output_on</span><span class="p">(</span><span class="kt">bool</span><span class="w"> </span><span class="n">colored_output_on</span><span class="p">);</span><span class="w"></span>
 
-<span class="n">TRTORCH_API</span> <span class="n">Level</span> <span class="n">get_reportable_log_level</span><span class="p">();</span>
+<span class="n">TRTORCH_API</span><span class="w"> </span><span class="n">Level</span><span class="w"> </span><span class="n">get_reportable_log_level</span><span class="p">();</span><span class="w"></span>
 
-<span class="n">TRTORCH_API</span> <span class="kt">bool</span> <span class="n">get_is_colored_output_on</span><span class="p">();</span>
+<span class="n">TRTORCH_API</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">get_is_colored_output_on</span><span class="p">();</span><span class="w"></span>
 
 <span class="c1">// Dont know if we want this?</span>
-<span class="n">TRTORCH_API</span> <span class="kt">void</span> <span class="n">log</span><span class="p">(</span><span class="n">Level</span> <span class="n">lvl</span><span class="p">,</span> <span class="n">std</span><span class="o">::</span><span class="n">string</span> <span class="n">msg</span><span class="p">);</span>
-<span class="p">}</span> <span class="c1">// namespace logging</span>
-<span class="p">}</span> <span class="c1">// namespace trtorch</span>
+<span class="n">TRTORCH_API</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="n">log</span><span class="p">(</span><span class="n">Level</span><span class="w"> </span><span class="n">lvl</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">msg</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"> </span><span class="c1">// namespace logging</span>
+<span class="p">}</span><span class="w"> </span><span class="c1">// namespace trtorch</span>
 </pre>
          </div>
         </div>

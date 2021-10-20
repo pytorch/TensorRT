@@ -11,7 +11,7 @@ torch::jit::Stack CreateStack(std::vector<torch::jit::IValue>&& list) {
 
 std::vector<at::Tensor> RunGraph(
     std::shared_ptr<torch::jit::Graph>& g,
-    core::conversion::GraphParams& params,
+    core::ir::StaticParams& params,
     std::vector<at::Tensor> inputs) {
   LOG_DEBUG("Running JIT version");
   std::vector<torch::jit::IValue> inputs_;

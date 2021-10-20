@@ -22,13 +22,13 @@ void conv_test_helper(std::string graph_ir) {
   auto jit_w = at::clone(w);
   auto jit_b = at::clone(b);
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w, jit_b});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {jit_w, jit_b});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
   auto trt_b = at::clone(b);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w, trt_b});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {trt_w, trt_b});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
@@ -64,13 +64,13 @@ TEST(Converters, ATenConvolutionConvertsCorrectly) {
   auto jit_w = at::clone(w);
   auto jit_b = at::clone(b);
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w, jit_b});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {jit_w, jit_b});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
   auto trt_b = at::clone(b);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w, trt_b});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {trt_w, trt_b});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
@@ -103,12 +103,12 @@ TEST(Converters, ATenConvolution1dConvertsCorrectly) {
 
   auto jit_in = at::clone(in);
   auto jit_w = at::clone(w);
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {jit_w});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {trt_w});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
@@ -141,12 +141,12 @@ TEST(Converters, ATenConvolutionNoBiasConvertsCorrectly) {
 
   auto jit_in = at::clone(in);
   auto jit_w = at::clone(w);
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {jit_w});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {trt_w});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
@@ -183,13 +183,13 @@ TEST(Converters, ATenConvolutionWithStrideConvertsCorrectly) {
   auto jit_w = at::clone(w);
   auto jit_b = at::clone(b);
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w, jit_b});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {jit_w, jit_b});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
   auto trt_b = at::clone(b);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w, trt_b});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {trt_w, trt_b});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
@@ -226,13 +226,13 @@ TEST(Converters, ATenConvolutionWithPaddingConvertsCorrectly) {
   auto jit_w = at::clone(w);
   auto jit_b = at::clone(b);
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w, jit_b});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {jit_w, jit_b});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
   auto trt_b = at::clone(b);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w, trt_b});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {trt_w, trt_b});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
@@ -268,13 +268,13 @@ TEST(Converters, ATenConvolution3dConvertsCorrectly) {
   auto jit_w = at::clone(w);
   auto jit_b = at::clone(b);
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w, jit_b});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {jit_w, jit_b});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
   auto trt_b = at::clone(b);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w, trt_b});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {trt_w, trt_b});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
@@ -307,12 +307,12 @@ TEST(Converters, ATenConvolution3dNoBiasConvertsCorrectly) {
 
   auto jit_in = at::clone(in);
   auto jit_w = at::clone(w);
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {jit_w});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {trt_w});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
@@ -348,13 +348,13 @@ TEST(Converters, ATenConvolution3dWithPaddingConvertsCorrectly) {
   auto jit_w = at::clone(w);
   auto jit_b = at::clone(b);
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w, jit_b});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {jit_w, jit_b});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
   auto trt_b = at::clone(b);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w, trt_b});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {trt_w, trt_b});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
@@ -390,13 +390,13 @@ TEST(Converters, ATenConvolution3dWithStrideDilationConvertsCorrectly) {
   auto jit_w = at::clone(w);
   auto jit_b = at::clone(b);
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w, jit_b});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {jit_w, jit_b});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
   auto trt_b = at::clone(b);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w, trt_b});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {trt_w, trt_b});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
@@ -432,13 +432,13 @@ TEST(Converters, ATenConvTransposeConvertsCorrectly) {
   auto jit_w = at::clone(w);
   auto jit_b = at::clone(b);
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w, jit_b});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {jit_w, jit_b});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
   auto trt_b = at::clone(b);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w, trt_b});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {trt_w, trt_b});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
@@ -471,12 +471,12 @@ TEST(Converters, ATenConvTransposeNoBiasConvertsCorrectly) {
 
   auto jit_in = at::clone(in);
   auto jit_w = at::clone(w);
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {jit_w});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {trt_w});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
@@ -513,13 +513,13 @@ TEST(Converters, ATenConvTransposeWithStrideConvertsCorrectly) {
   auto jit_w = at::clone(w);
   auto jit_b = at::clone(b);
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w, jit_b});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {jit_w, jit_b});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
   auto trt_b = at::clone(b);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w, trt_b});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {trt_w, trt_b});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
@@ -556,13 +556,13 @@ TEST(Converters, ATenConvTransposeWithPaddingConvertsCorrectly) {
   auto jit_w = at::clone(w);
   auto jit_b = at::clone(b);
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w, jit_b});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {jit_w, jit_b});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
   auto trt_b = at::clone(b);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w, trt_b});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {trt_w, trt_b});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
@@ -599,13 +599,13 @@ TEST(Converters, ATenConvolutionWithGroupConvertsCorrectly) {
   auto jit_w = at::clone(w);
   auto jit_b = at::clone(b);
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w, jit_b});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {jit_w, jit_b});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
   auto trt_b = at::clone(b);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w, trt_b});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {trt_w, trt_b});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
@@ -642,13 +642,13 @@ TEST(Converters, ATenConvTransposeWithGroupConvertsCorrectly) {
   auto jit_w = at::clone(w);
   auto jit_b = at::clone(b);
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w, jit_b});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {jit_w, jit_b});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
   auto trt_b = at::clone(b);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w, trt_b});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {trt_w, trt_b});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
