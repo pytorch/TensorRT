@@ -26,7 +26,7 @@ COPY . /workspace/trtorch/src
 WORKDIR /workspace/trtorch/src
 RUN cp ./docker/WORKSPACE.cu.docker  WORKSPACE
 
-# This script builds both libtrtorch bin/lib/include tarball and the Pythin wheel, in dist/  
+# This script builds both libtrtorch bin/lib/include tarball and the Pythin wheel, in dist/
 RUN ./docker/dist-build.sh
 
 FROM base as trtorch
@@ -34,7 +34,7 @@ FROM base as trtorch
 # copy source repo
 COPY . /workspace/trtorch
 COPY --from=trtorch-builder  /workspace/trtorch/src/dist/ .
-
+RUN patch -u /opt/conda/lib/python3.8/site-packages/pytorch_quantization/nn/modules/tensor_quantizer.py -i /workspace/trtorch/docker/qat.patch
 RUN conda init bash
 
 RUN pip3 install ipywidgets --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host=files.pythonhosted.org
