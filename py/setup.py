@@ -106,6 +106,7 @@ def gen_version_file():
         print("creating version file")
         f.write("__version__ = \"" + __version__ + '\"')
 
+
 def copy_libtrtorch(multilinux=False):
     if not os.path.exists(dir_path + '/trtorch/lib'):
         os.makedirs(dir_path + '/trtorch/lib')
@@ -171,15 +172,8 @@ class BdistCommand(bdist_wheel):
 class CleanCommand(Command):
     """Custom clean command to tidy up the project root."""
     PY_CLEAN_FILES = [
-        './build',
-        './dist',
-        './trtorch/__pycache__',
-        './trtorch/lib',
-        './trtorch/include',
-        './trtorch/bin',
-        './*.pyc',
-        './*.tgz',
-        './*.egg-info'
+        './build', './dist', './trtorch/__pycache__', './trtorch/lib', './trtorch/include', './trtorch/bin', './*.pyc',
+        './*.tgz', './*.egg-info'
     ]
     description = "Command to tidy up the project root"
     user_options = []
@@ -265,27 +259,16 @@ setup(name='trtorch',
       python_requires='>=3.6',
       include_package_data=True,
       package_data={
-          'trtorch': ['lib/*',
-                      'include/trtorch/*.h',
-                      'include/trtorch/core/*.h',
-                      'include/trtorch/core/conversion/*.h',
-                      'include/trtorch/core/conversion/conversionctx/*.h',
-                      'include/trtorch/core/conversion/converters/*.h',
-                      'include/trtorch/core/conversion/evaluators/*.h',
-                      'include/trtorch/core/conversion/tensorcontainer/*.h',
-                      'include/trtorch/core/conversion/var/*.h',
-                      'include/trtorch/core/ir/*.h',
-                      'include/trtorch/core/lowering/*.h',
-                      'include/trtorch/core/lowering/passes/*.h',
-                      'include/trtorch/core/partitioning/*.h',
-                      'include/trtorch/core/plugins/*.h',
-                      'include/trtorch/core/plugins/impl/*.h',
-                      'include/trtorch/core/runtime/*.h',
-                      'include/trtorch/core/util/*.h',
-                      'include/trtorch/core/util/logging/*.h',
-                      'bin/*',
-                      'BUILD',
-                      'WORKSPACE'],
+          'trtorch': [
+              'lib/*', 'include/trtorch/*.h', 'include/trtorch/core/*.h', 'include/trtorch/core/conversion/*.h',
+              'include/trtorch/core/conversion/conversionctx/*.h', 'include/trtorch/core/conversion/converters/*.h',
+              'include/trtorch/core/conversion/evaluators/*.h', 'include/trtorch/core/conversion/tensorcontainer/*.h',
+              'include/trtorch/core/conversion/var/*.h', 'include/trtorch/core/ir/*.h',
+              'include/trtorch/core/lowering/*.h', 'include/trtorch/core/lowering/passes/*.h',
+              'include/trtorch/core/partitioning/*.h', 'include/trtorch/core/plugins/*.h',
+              'include/trtorch/core/plugins/impl/*.h', 'include/trtorch/core/runtime/*.h',
+              'include/trtorch/core/util/*.h', 'include/trtorch/core/util/logging/*.h', 'bin/*', 'BUILD', 'WORKSPACE'
+          ],
       },
       exclude_package_data={
           '': ['*.cpp'],
