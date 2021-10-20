@@ -171,7 +171,15 @@ class BdistCommand(bdist_wheel):
 class CleanCommand(Command):
     """Custom clean command to tidy up the project root."""
     PY_CLEAN_FILES = [
-        './build', './dist', './trtorch/__pycache__', './trtorch/lib', './*.pyc', './*.tgz', './*.egg-info'
+        './build',
+        './dist',
+        './trtorch/__pycache__',
+        './trtorch/lib',
+        './trtorch/include',
+        './trtorch/bin',
+        './*.pyc',
+        './*.tgz',
+        './*.egg-info'
     ]
     description = "Command to tidy up the project root"
     user_options = []
