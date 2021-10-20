@@ -103,5 +103,3 @@ Indices
    :hidden:
 
    indices/supported_ops
-
-
