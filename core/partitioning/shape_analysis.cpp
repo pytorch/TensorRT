@@ -124,7 +124,12 @@ void getSegmentsOutputByRunning(
       if (dtype == c10::nullopt) {
         TRTORCH_THROW_ERROR("Unsupported input data type " << ivalues_maps[i].toTensor().dtype());
       }
-      input_shapes.push_back(util::toVec(util::toDims(ivalues_maps[i].toTensor().sizes())));
+      if (ivalues_maps[i].toTensor().sizes().size() == 0) {
+        // handle Scalar types, which has sizes of []
+        input_shapes.push_back(util::toVec(util::toDims(c10::List<long int>({1}))));
+      } else {
+        input_shapes.push_back(util::toVec(util::toDims(ivalues_maps[i].toTensor().sizes())));
+      }
       input_types.push_back(ivalues_maps[i].toTensor().scalar_type());
     }
   }
