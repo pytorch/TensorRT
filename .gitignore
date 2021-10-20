@@ -36,6 +36,12 @@ __pycache__
 dist
 bdist
 py/trtorch/_version.py
+py/trtorch/lib
+py/trtorch/include
+py/trtorch/bin
+py/trtorch/BUILD
+py/trtorch/LICENSE
+py/trtorch/WORKSPACE
 py/wheelhouse
 py/.eggs
 notebooks/.ipynb_checkpoints/
