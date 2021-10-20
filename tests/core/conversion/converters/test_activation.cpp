@@ -14,11 +14,11 @@ TEST(Converters, ATenReLUConvertsCorrectly) {
   torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(-5, 5, {5}, {at::kCUDA});
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
 
   in = at::clone(in);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
@@ -34,11 +34,11 @@ TEST(Converters, ATenSigmoidConvertsCorrectly) {
   torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(-5, 5, {5}, {at::kCUDA});
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
 
   in = at::clone(in);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 5e-6));
@@ -54,11 +54,11 @@ TEST(Converters, ATenTanhConvertsCorrectly) {
   torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(-5, 5, {5}, {at::kCUDA});
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
 
   in = at::clone(in);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 7e-6));
@@ -78,11 +78,11 @@ TEST(Converters, ATenHardTanhConvertsCorrectly) {
   torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(-5, 5, {5}, {at::kCUDA});
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
 
   in = at::clone(in);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
@@ -100,11 +100,11 @@ TEST(Converters, ATenHardTanhCustomRangeConvertsCorrectly) {
   torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(-5, 5, {5}, {at::kCUDA});
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
 
   in = at::clone(in);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
@@ -123,11 +123,11 @@ TEST(Converters, ATenPReLUConvertsCorrectly) {
   auto in = at::randint(-5, 5, {5}, {at::kCUDA});
   auto slope = at::randint(-5, 5, {1}, {at::kCUDA});
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {slope});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {slope});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
 
   in = at::clone(in);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {slope});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {slope});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
@@ -146,11 +146,11 @@ TEST(Converters, ATenPReLUMultiChannelConvertsCorrectly) {
   auto in = at::randint(-5, 5, {1, 10, 1, 1}, {at::kCUDA});
   auto slope = at::randint(-5, 5, {10}, {at::kCUDA});
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {slope});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {slope});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
 
   in = at::clone(in);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {slope});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {slope});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
@@ -167,11 +167,11 @@ TEST(Converters, ATenLeakyReluConvertsCorrectly) {
   torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(-5, 5, {5}, {at::kCUDA});
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
 
   in = at::clone(in);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
@@ -190,11 +190,11 @@ TEST(Converters, ATenEluConvertsCorrectly) {
 
   auto in = at::randint(-5, 5, {1, 10, 1, 1}, {at::kCUDA});
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
 
   in = at::clone(in);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
@@ -211,11 +211,11 @@ TEST(Converters, ATenGELUConvertsCorrectly) {
 
   auto in = at::randint(-5, 5, {5}, {at::kCUDA});
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
 
   in = at::clone(in);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
 
   // NOTE: The official tensorrt plugin applies the Gelu activation x * Phi(x), where Phi is the Gaussian cdf,

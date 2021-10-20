@@ -2,5 +2,5 @@ sphinx==3.1.2
 breathe==4.19.2
 exhale
 sphinx_rtd_theme==0.4.3
-sphinx-material==0.0.30
+sphinx-material==0.0.35
 nbsphinx==0.8.6

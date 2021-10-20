@@ -103,6 +103,10 @@ void set_device(const int device_id) {
   core::set_device(device_id);
 }
 
+Device get_current_device() {
+  return Device(core::runtime::get_current_device());
+}
+
 torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec& info) {
   py::gil_scoped_acquire gil;
   auto trt_mod = core::CompileGraph(mod, info.toInternalCompileSpec());
@@ -182,6 +186,7 @@ PYBIND11_MODULE(_C, m) {
       .value("int8", DataType::kChar, "8 bit integer number")
       .value("int32", DataType::kInt32, "32 bit integer number")
       .value("bool", DataType::kChar, "Boolean value")
+      .value("unknown", DataType::kUnknown, "Unknown data type")
       .export_values();
 
   py::enum_<DeviceType>(m, "DeviceType", "Enum to specify device kinds to build TensorRT engines for")
@@ -315,6 +320,7 @@ PYBIND11_MODULE(_C, m) {
   m.def("_set_is_colored_output_on", &logging::set_is_colored_output_on, "Set if the logging output should be colored");
   m.def("_log", &logging::log, "Add a message to the logger");
   m.def("set_device", &trtorch::pyapi::set_device, "Set CUDA device id");
+  m.def("_get_current_device", &trtorch::pyapi::get_current_device, "Get the current active CUDA device");
 
   py::enum_<core::util::logging::LogLevel>(m, "LogLevel", py::arithmetic())
       .value("INTERNAL_ERROR", core::util::logging::LogLevel::kINTERNAL_ERROR)

@@ -17,10 +17,10 @@ TEST(Converters, ATenReplication_pad1dTensorConvertsCorrectly) {
 
   auto in1 = at::randint(1, 10, {1, 3, 4}, {at::kCUDA});
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in1});
 
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in1});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
@@ -38,10 +38,10 @@ TEST(Converters, ATenReplication_pad1dRightZeroTensorConvertsCorrectly) {
 
   auto in1 = at::randint(1, 10, {1, 3, 4}, {at::kCUDA});
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in1});
 
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in1});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
@@ -59,10 +59,10 @@ TEST(Converters, ATenReplication_pad1dTensorConvertsCorrectlyWithDynamic) {
 
   auto in1 = at::randint(1, 10, {1, 3, 4}, {at::kCUDA});
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in1});
 
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngineDynamic(g, params, {in1});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
@@ -80,10 +80,10 @@ TEST(Converters, ATenReplication_pad2dTensorConvertsCorrectly) {
 
   auto in1 = at::randint(1, 10, {1, 3, 4, 5}, {at::kCUDA});
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in1});
 
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in1});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
@@ -101,10 +101,10 @@ TEST(Converters, ATenReplication_pad2dRightBottomZeroTensorConvertsCorrectly) {
 
   auto in1 = at::randint(1, 10, {1, 3, 4, 5}, {at::kCUDA});
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in1});
 
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in1});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
@@ -122,10 +122,10 @@ TEST(Converters, ATenReplication_pad2dTensorConvertsCorrectlyWithDynamic) {
 
   auto in1 = at::randint(1, 10, {1, 3, 4, 5}, {at::kCUDA});
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in1});
 
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngineDynamic(g, params, {in1});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
@@ -143,10 +143,10 @@ TEST(Converters, ATenReplication_pad3dTensorConvertsCorrectly) {
 
   auto in1 = at::randint(1, 10, {1, 3, 4, 5, 3}, {at::kCUDA});
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in1});
 
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in1});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
@@ -164,10 +164,10 @@ TEST(Converters, ATenReplication_pad3dRightBottomBackZeroTensorConvertsCorrectly
 
   auto in1 = at::randint(1, 10, {1, 3, 4, 5, 3}, {at::kCUDA});
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in1});
 
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in1});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
@@ -185,10 +185,10 @@ TEST(Converters, ATenReplication_pad3dTensorConvertsCorrectlyWithDynamic) {
 
   auto in1 = at::randint(1, 10, {1, 3, 4, 5, 3}, {at::kCUDA});
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in1});
 
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngineDynamic(g, params, {in1});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));

@@ -96,6 +96,8 @@ TEST(Lowering, LowerAndPartitionSimpleModuleFallbackCorrectly) {
     trt_inputs_ivalues.push_back(in.clone());
   }
 
+  auto g = mod.get_method("forward").graph();
+
   std::vector<trtorch::core::ir::Input> input_ranges{trtorch::core::ir::Input({1, 1, 16, 16})};
   trtorch::core::CompileSpec cfg(input_ranges);
   cfg.partition_info.enabled = true;
@@ -104,8 +106,8 @@ TEST(Lowering, LowerAndPartitionSimpleModuleFallbackCorrectly) {
   auto jit_results = mod.forward(jit_inputs_ivalues).toTensor();
   auto trt_mod = trtorch::core::CompileGraph(mod, cfg);
 
-  auto g = trt_mod.get_method("forward").graph();
-  auto nodes = g->block()->nodes();
+  auto trt_g = trt_mod.get_method("forward").graph();
+  auto nodes = trt_g->block()->nodes();
   std::size_t curr_node = 0;
   for (const auto n : nodes) {
     if (curr_node == 5) {

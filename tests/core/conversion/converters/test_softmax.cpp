@@ -16,11 +16,11 @@ TEST(Converters, ATenSoftmax1DConvertsCorrectly) {
   torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(0, 5, {5}, {at::kCUDA});
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
 
   in = at::clone(in);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
   auto trt = trt_results[0].reshape_as(jit_results[0]);
 
@@ -40,11 +40,11 @@ TEST(Converters, ATenSoftmaxNDConvertsCorrectlySub3DIndex) {
 
   auto in = at::randint(0, 5, {1, 2, 2, 2, 2}, {at::kCUDA});
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
 
   in = at::clone(in);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
   auto trt = trt_results[0].reshape_as(jit_results[0]);
 
@@ -65,11 +65,11 @@ TEST(Converters, ATenSoftmaxNDConvertsCorrectlyAbove3DIndex) {
   auto in = at::randint(0, 5, {1, 2, 2, 2, 2}, {at::kCUDA});
 
   auto jit_in = at::clone(in);
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape_as(jit_results[0]);
@@ -91,11 +91,11 @@ TEST(Converters, ATenSoftmaxNDConvertsCorrectlyNegtiveOneIndex) {
   auto in = at::randint(0, 5, {1, 2, 2, 2, 2}, {at::kCUDA});
 
   auto jit_in = at::clone(in);
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape_as(jit_results[0]);
@@ -117,11 +117,11 @@ TEST(Converters, ATenSoftmaxNDConvertsCorrectlyNegtiveIndex) {
   auto in = at::randint(0, 5, {1, 2, 2, 2, 2}, {at::kCUDA});
 
   auto jit_in = at::clone(in);
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape_as(jit_results[0]);

@@ -27,7 +27,7 @@ namespace pyapi {
     return static_cast<int64_t>(field_name);                                   \
   }
 
-enum class DataType : int8_t { kFloat, kHalf, kChar, kInt32, kBool };
+enum class DataType : int8_t { kFloat, kHalf, kChar, kInt32, kBool, kUnknown };
 std::string to_str(DataType value);
 nvinfer1::DataType toTRTDataType(DataType value);
 
@@ -73,6 +73,8 @@ struct Device : torch::CustomClassHolder {
         dla_core(0), // dla_core
         allow_gpu_fallback(false) // allow_gpu_fallback
   {}
+
+  Device(const core::runtime::CudaDevice& internal_dev);
 
   ADD_ENUM_GET_SET(device_type, DeviceType, static_cast<int64_t>(DeviceType::kDLA));
   ADD_FIELD_GET_SET(gpu_id, int64_t);

@@ -2,6 +2,7 @@ import unittest
 import trtorch
 import torch
 import torchvision.models as models
+import copy
 
 from model_test_case import ModelTestCase
 
@@ -23,21 +24,15 @@ class TestCompile(ModelTestCase):
             "enabled_precisions": {torch.float}
         }
 
-        trt_mod = trtorch.compile(self.traced_model, compile_spec)
+        trt_mod = trtorch.compile(self.traced_model, **compile_spec)
         same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
         self.assertTrue(same < 2e-2)
 
     def test_compile_script(self):
-        compile_spec = {
-            "inputs": [trtorch.Input(shape=self.input.shape)],
-            "device": {
-                "device_type": trtorch.DeviceType.GPU,
-                "gpu_id": 0,
-            },
-            "enabled_precisions": {torch.float}
-        }
-
-        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
+        trt_mod = trtorch.compile(self.scripted_model,
+                                  inputs=[self.input],
+                                  device=trtorch.Device(gpu_id=0),
+                                  enabled_precisions={torch.float})
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
         self.assertTrue(same < 2e-2)
 
@@ -51,15 +46,36 @@ class TestCompile(ModelTestCase):
             "enabled_precisions": {torch.float}
         }
 
-        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
-        same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
+        trt_mod = trtorch.compile(self.traced_model, **compile_spec)
+        same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
         self.assertTrue(same < 2e-2)
 
     def test_device(self):
         compile_spec = {"inputs": [self.input], "device": trtorch.Device("gpu:0"), "enabled_precisions": {torch.float}}
 
-        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
-        same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
+        trt_mod = trtorch.compile(self.traced_model, **compile_spec)
+        same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
+        self.assertTrue(same < 2e-2)
+
+    def test_default_device(self):
+        compile_spec = {"inputs": [self.input], "enabled_precisions": {torch.float}}
+
+        trt_mod = trtorch.compile(self.traced_model, **compile_spec)
+        same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
+        self.assertTrue(same < 2e-2)
+
+    def test_compile_script_from_dict(self):
+        compile_spec = {
+            "inputs": [trtorch.Input(shape=self.input.shape)],
+            "device": {
+                "device_type": trtorch.DeviceType.GPU,
+                "gpu_id": 0,
+            },
+            "enabled_precisions": {torch.float}
+        }
+
+        trt_mod = trtorch.compile(self.traced_model, **compile_spec)
+        same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
         self.assertTrue(same < 2e-2)
 
 
@@ -80,7 +96,7 @@ class TestCompileHalf(ModelTestCase):
             "enabled_precisions": {torch.half}
         }
 
-        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
+        trt_mod = trtorch.compile(self.scripted_model, **compile_spec)
         same = (trt_mod(self.input.half()) - self.scripted_model(self.input.half())).abs().max()
         trtorch.logging.log(trtorch.logging.Level.Debug, "Max diff: " + str(same))
         self.assertTrue(same < 3e-2)
@@ -103,7 +119,7 @@ class TestCompileHalfDefault(ModelTestCase):
             "enabled_precisions": {torch.float, torch.half}
         }
 
-        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
+        trt_mod = trtorch.compile(self.scripted_model, **compile_spec)
         same = (trt_mod(self.input.half()) - self.scripted_model(self.input.half())).abs().max()
         trtorch.logging.log(trtorch.logging.Level.Debug, "Max diff: " + str(same))
         self.assertTrue(same < 3e-2)
@@ -121,18 +137,15 @@ class TestFallbackToTorch(ModelTestCase):
             "device": {
                 "device_type": trtorch.DeviceType.GPU,
                 "gpu_id": 0,
-                "dla_core": 0,
                 "allow_gpu_fallback": False,
                 "disable_tf32": False
             },
-            "torch_fallback": {
-                "enabled": True,
-                "forced_fallback_ops": ["aten::max_pool2d"],
-                "min_block_size": 1
-            }
+            "require_full_compilation": False,
+            "torch_executed_ops": ["aten::max_pool2d"],
+            "min_block_size": 1
         }
 
-        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
+        trt_mod = trtorch.compile(self.scripted_model, **compile_spec)
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
         self.assertTrue(same < 2e-3)
 
@@ -149,18 +162,15 @@ class TestModuleFallbackToTorch(ModelTestCase):
             "device": {
                 "device_type": trtorch.DeviceType.GPU,
                 "gpu_id": 0,
-                "dla_core": 0,
                 "allow_gpu_fallback": False,
                 "disable_tf32": False
             },
-            "torch_fallback": {
-                "enabled": True,
-                "forced_fallback_modules": ["torchvision.models.resnet.BasicBlock"],
-                "min_block_size": 1
-            }
+            "require_full_compilation": False,
+            "torch_executed_modules": ["torchvision.models.resnet.BasicBlock"],
+            "min_block_size": 1
         }
 
-        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
+        trt_mod = trtorch.compile(self.scripted_model, **compile_spec)
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
         self.assertTrue(same < 2e-3)
 
@@ -169,7 +179,7 @@ class TestPTtoTRTtoPT(ModelTestCase):
 
     def setUp(self):
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
-        self.ts_model = torch.jit.script(self.model)
+        self.ts_model = torch.jit.trace(self.model, [self.input])
 
     def test_pt_to_trt_to_pt(self):
         compile_spec = {
@@ -177,16 +187,92 @@ class TestPTtoTRTtoPT(ModelTestCase):
             "device": {
                 "device_type": trtorch.DeviceType.GPU,
                 "gpu_id": 0,
-                "dla_core": 0,
                 "allow_gpu_fallback": False,
                 "disable_tf32": False
             }
         }
 
-        trt_engine = trtorch.convert_method_to_trt_engine(self.ts_model, "forward", compile_spec)
+        trt_engine = trtorch.convert_method_to_trt_engine(self.ts_model, "forward", **compile_spec)
         trt_mod = trtorch.embed_engine_in_new_module(trt_engine, trtorch.Device("cuda:0"))
         same = (trt_mod(self.input) - self.ts_model(self.input)).abs().max()
         self.assertTrue(same < 2e-3)
+
+
+class TestInputTypeDefaultsFP32Model(ModelTestCase):
+
+    def setUp(self):
+        self.input = torch.randn((1, 3, 224, 224)).to("cuda")
+
+    def test_input_use_default_fp32(self):
+        ts_model = torch.jit.script(self.model)
+        trt_mod = trtorch.compile(ts_model,
+                                  inputs=[trtorch.Input(self.input.shape)],
+                                  enabled_precisions={torch.float, torch.half})
+        trt_mod(self.input)
+
+    def test_input_respect_user_setting_fp32_weights_fp16_in(self):
+        ts_model = torch.jit.script(self.model)
+        trt_mod = trtorch.compile(ts_model,
+                                  inputs=[self.input.half()],
+                                  require_full_compilation=True,
+                                  enabled_precisions={torch.float, torch.half})
+        trt_mod(self.input.half())
+
+    def test_input_respect_user_setting_fp32_weights_fp16_in_non_constructor(self):
+        ts_model = torch.jit.script(self.model)
+        input_spec = trtorch.Input(self.input.shape)
+        input_spec.dtype = torch.half
+
+        trt_mod = trtorch.compile(ts_model,
+                                  inputs=[input_spec],
+                                  require_full_compilation=True,
+                                  enabled_precisions={torch.float, torch.half})
+        trt_mod(self.input.half())
+
+
+class TestInputTypeDefaultsFP16Model(ModelTestCase):
+
+    def setUp(self):
+        self.input = torch.randn((1, 3, 224, 224)).to("cuda")
+
+    def test_input_use_default_fp16(self):
+        half_mod = torch.jit.script(self.model)
+        half_mod.half()
+
+        trt_mod = trtorch.compile(half_mod,
+                                  inputs=[trtorch.Input(self.input.shape)],
+                                  enabled_precisions={torch.float, torch.half})
+        trt_mod(self.input.half())
+
+    def test_input_use_default_fp16_without_fp16_enabled(self):
+        half_mod = torch.jit.script(self.model)
+        half_mod.half()
+
+        trt_mod = trtorch.compile(half_mod, inputs=[trtorch.Input(self.input.shape)])
+        trt_mod(self.input.half())
+
+    def test_input_respect_user_setting_fp16_weights_fp32_in(self):
+        half_mod = torch.jit.script(self.model)
+        half_mod.half()
+
+        trt_mod = trtorch.compile(half_mod,
+                                  inputs=[self.input],
+                                  require_full_compilation=True,
+                                  enabled_precisions={torch.float, torch.half})
+        trt_mod(self.input)
+
+    def test_input_respect_user_setting_fp16_weights_fp32_in_non_constuctor(self):
+        half_mod = torch.jit.script(self.model)
+        half_mod.half()
+
+        input_spec = trtorch.Input(self.input.shape)
+        input_spec.dtype = torch.float
+
+        trt_mod = trtorch.compile(half_mod,
+                                  inputs=[input_spec],
+                                  require_full_compilation=True,
+                                  enabled_precisions={torch.float, torch.half})
+        trt_mod(self.input)
 
 
 class TestCheckMethodOpSupport(unittest.TestCase):
@@ -273,7 +359,13 @@ def test_suite():
     suite.addTest(TestCompile.parametrize(TestCompile, model=models.mobilenet_v2(pretrained=True)))
     suite.addTest(TestCompileHalf.parametrize(TestCompileHalf, model=models.resnet18(pretrained=True)))
     suite.addTest(TestCompileHalfDefault.parametrize(TestCompileHalfDefault, model=models.resnet18(pretrained=True)))
-    suite.addTest(TestPTtoTRTtoPT.parametrize(TestPTtoTRTtoPT, model=models.mobilenet_v2(pretrained=True)))
+    suite.addTest(TestPTtoTRTtoPT.parametrize(TestPTtoTRTtoPT, model=models.resnet18(pretrained=True)))
+    suite.addTest(
+        TestInputTypeDefaultsFP32Model.parametrize(TestInputTypeDefaultsFP32Model,
+                                                   model=models.resnet18(pretrained=True)))
+    suite.addTest(
+        TestInputTypeDefaultsFP16Model.parametrize(TestInputTypeDefaultsFP16Model,
+                                                   model=models.resnet18(pretrained=True)))
     suite.addTest(TestFallbackToTorch.parametrize(TestFallbackToTorch, model=models.resnet18(pretrained=True)))
     suite.addTest(
         TestModuleFallbackToTorch.parametrize(TestModuleFallbackToTorch, model=models.resnet18(pretrained=True)))

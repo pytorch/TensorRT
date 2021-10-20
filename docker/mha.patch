@@ -1,0 +1,19 @@
+--- torch/nn/functional.py	2021-10-01 16:53:42.827338664 -0700
++++ functional.py	2021-10-01 16:53:34.639338618 -0700
+@@ -4975,7 +4975,7 @@
+         f"was expecting embedding dimension of {embed_dim_to_check}, but got {embed_dim}"
+     if isinstance(embed_dim, torch.Tensor):
+         # embed_dim can be a tensor when JIT tracing
+-        head_dim = embed_dim.div(num_heads, rounding_mode='trunc')
++        head_dim = int(embed_dim.div(num_heads, rounding_mode='trunc'))
+     else:
+         head_dim = embed_dim // num_heads
+     assert head_dim * num_heads == embed_dim, f"embed_dim {embed_dim} not divisible by num_heads {num_heads}"
+@@ -5044,6 +5044,7 @@
+     #
+     # reshape q, k, v for multihead attention and make em batch first
+     #
++    bsz = int(bsz)
+     q = q.contiguous().view(tgt_len, bsz * num_heads, head_dim).transpose(0, 1)
+     if static_k is None:
+         k = k.contiguous().view(k.shape[0], bsz * num_heads, head_dim).transpose(0, 1)

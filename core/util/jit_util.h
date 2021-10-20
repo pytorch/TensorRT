@@ -17,6 +17,14 @@ inline std::string node_info(const torch::jit::Node* n) {
   return node_info;
 }
 
+inline std::string value_info(const torch::jit::Value* v) {
+  std::stringstream ss;
+  ss << node_info(v->node());
+  std::string value_info = ss.str();
+  value_info.erase(std::remove(value_info.begin(), value_info.end(), '\n'), value_info.end());
+  return value_info;
+}
+
 inline std::string schema_info(const torch::jit::FunctionSchema* s) {
   std::stringstream ss;
   ss << *s;
