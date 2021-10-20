@@ -32,12 +32,13 @@ TEST(Partitioning, FallbackOnConditionalsCorrectly) {
   }
 
   std::vector<trtorch::core::ir::Input> inputs{trtorch::core::ir::Input({3, 3, 16, 16})};
+  auto g = mod.get_method("forward").graph();
   trtorch::core::CompileSpec cfg(inputs);
   cfg.partition_info.enabled = true;
   torch::jit::script::Module new_mod = trtorch::core::CompileGraph(mod, cfg);
-  auto g = new_mod.get_method("forward").graph();
+  auto new_g = new_mod.get_method("forward").graph();
 
-  auto conditional_engines_count = count_trt_engines_in_conditionals(g);
+  auto conditional_engines_count = count_trt_engines_in_conditionals(new_g);
 
   ASSERT_TRUE(conditional_engines_count == 2);
 }

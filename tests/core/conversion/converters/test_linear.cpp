@@ -19,12 +19,12 @@ TEST(Converters, ATenLinearNoBiasConvertsCorrectly) {
   auto in = at::randint(1, 10, {1, 2}, {at::kCUDA});
   auto w = at::randint(1, 10, {3, 2}, {at::kCUDA});
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {w});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {w});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
 
   in = at::clone(in);
   w = at::clone(w);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {w});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {w});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
@@ -51,13 +51,13 @@ TEST(Converters, ATenLinearBiasConvertsCorrectly) {
   auto jit_w = at::clone(w);
   auto jit_b = at::clone(b);
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w, jit_b});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {jit_w, jit_b});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
   auto trt_b = at::clone(b);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w, trt_b});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {trt_w, trt_b});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));

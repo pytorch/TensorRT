@@ -81,7 +81,7 @@ cc_test(
 )
 
 test_suite(
-    name = "partitioning_test",
+    name = "partitioning_tests",
     tests = [
         ":test_segmentation",
         ":test_shape_analysis",

@@ -72,7 +72,7 @@ class TestAccuracy(ModelTestCase):
             }
         }
 
-        trt_mod = trtorch.compile(self.model, compile_spec)
+        trt_mod = trtorch.compile(self.model, **compile_spec)
         int8_test_acc = self.compute_accuracy(self.testing_dataloader, trt_mod)
         log(Level.Info, "[TRT INT8] Test Acc: {:.2f}%".format(100 * int8_test_acc))
         acc_diff = fp32_test_acc - int8_test_acc

@@ -19,10 +19,10 @@ TEST(Converters, ATenCatPureTensorConvertsCorrectly) {
   auto in1 = at::randint(1, 10, {5}, {at::kCUDA});
   auto in2 = at::randint(1, 10, {5}, {at::kCUDA});
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in1, in2});
 
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in1, in2});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
@@ -43,10 +43,10 @@ TEST(Converters, ATenCatDiffTensorConvertsCorrectly) {
   auto in1 = at::randint(1, 10, {5}, {at::kCUDA});
   auto in2 = at::randint(1, 10, {5}, {at::kCUDA});
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {in2});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {in2});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in1});
 
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {in2});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {in2});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in1});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
@@ -66,10 +66,10 @@ TEST(Converters, ATenCatPureTensorNegDimConvertsCorrectly) {
   auto in1 = at::randint(1, 10, {5, 5}, {at::kCUDA});
   auto in2 = at::randint(1, 10, {5, 5}, {at::kCUDA});
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in1, in2});
 
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in1, in2});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
@@ -90,10 +90,10 @@ TEST(Converters, ATenCatDiffTensorNegDimConvertsCorrectly) {
   auto in1 = at::randint(1, 10, {5, 5}, {at::kCUDA});
   auto in2 = at::randint(1, 10, {5, 5}, {at::kCUDA});
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {in2});
+  auto params = trtorch::core::ir::get_static_params(g->inputs(), {in2});
   auto jit_results = trtorch::tests::util::RunGraph(g, params, {in1});
 
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {in2});
+  params = trtorch::core::ir::get_static_params(g->inputs(), {in2});
   auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in1});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));

@@ -97,6 +97,7 @@ std::pair<std::shared_ptr<torch::jit::Graph>, std::vector<torch::jit::IValue>> L
   // Is this necessary?
   // lowering::LowerBlock(g->block());
 
+  LOG_INFO("Lowered Graph: " << *(graph_and_ivalues.first));
   return graph_and_ivalues;
 }
 

@@ -29,7 +29,7 @@ TEST(LoweringPasses, UnpackHardSwish) {
   torch::jit::parseIR(source_graph, &*sg);
 
   auto in = at::rand({10, 100}, {at::kCUDA});
-  auto sg_params = trtorch::core::conversion::get_named_params(sg->inputs(), {});
+  auto sg_params = trtorch::core::ir::get_static_params(sg->inputs(), {});
   auto sg_results = trtorch::tests::util::RunGraph(sg, sg_params, {in});
 
   trtorch::core::lowering::passes::UnpackHardSwish(sg);
@@ -40,7 +40,7 @@ TEST(LoweringPasses, UnpackHardSwish) {
   ASSERT_TRUE(!torch::jit::findPatternMatches(*tg, *sg).empty());
 
   in = at::clone(in);
-  auto tg_params = trtorch::core::conversion::get_named_params(tg->inputs(), {});
+  auto tg_params = trtorch::core::ir::get_static_params(tg->inputs(), {});
   auto tg_results = trtorch::tests::util::RunGraph(tg, tg_params, {in});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(sg_results[0], tg_results[0], 2e-6));
@@ -69,7 +69,7 @@ TEST(LoweringPasses, UnpackHardInplaceSwish) {
   torch::jit::parseIR(source_graph, &*sg);
 
   auto in = at::rand({10, 100}, {at::kCUDA});
-  auto sg_params = trtorch::core::conversion::get_named_params(sg->inputs(), {});
+  auto sg_params = trtorch::core::ir::get_static_params(sg->inputs(), {});
   auto sg_results = trtorch::tests::util::RunGraph(sg, sg_params, {in});
 
   trtorch::core::lowering::passes::UnpackHardSwish(sg);
@@ -80,7 +80,7 @@ TEST(LoweringPasses, UnpackHardInplaceSwish) {
   ASSERT_TRUE(!torch::jit::findPatternMatches(*tg, *sg).empty());
 
   in = at::clone(in);
-  auto tg_params = trtorch::core::conversion::get_named_params(tg->inputs(), {});
+  auto tg_params = trtorch::core::ir::get_static_params(tg->inputs(), {});
   auto tg_results = trtorch::tests::util::RunGraph(tg, tg_params, {in});
 
   ASSERT_TRUE(trtorch::tests::util::almostEqual(sg_results[0], tg_results[0], 2e-6));

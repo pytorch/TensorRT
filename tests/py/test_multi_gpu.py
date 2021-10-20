@@ -32,7 +32,7 @@ class TestMultiGpuSwitching(ModelTestCase):
             }
         }
 
-        trt_mod = trtorch.compile(self.traced_model, compile_spec)
+        trt_mod = trtorch.compile(self.traced_model, **compile_spec)
         trtorch.set_device(self.target_gpu)
         same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
         trtorch.set_device(0)
@@ -51,7 +51,7 @@ class TestMultiGpuSwitching(ModelTestCase):
             }
         }
 
-        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
+        trt_mod = trtorch.compile(self.scripted_model, **compile_spec)
         trtorch.set_device(self.target_gpu)
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
         trtorch.set_device(0)
@@ -84,7 +84,7 @@ class TestMultiGpuSerializeDeserializeSwitching(ModelTestCase):
             }
         }
 
-        trt_mod = trtorch.compile(self.traced_model, compile_spec)
+        trt_mod = trtorch.compile(self.traced_model, **compile_spec)
         # Changing the device ID deliberately. It should still run on correct device ID by context switching
         trtorch.set_device(1)
         same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
@@ -103,7 +103,7 @@ class TestMultiGpuSerializeDeserializeSwitching(ModelTestCase):
             }
         }
 
-        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
+        trt_mod = trtorch.compile(self.scripted_model, **compile_spec)
         # Changing the device ID deliberately. It should still run on correct device ID by context switching
         trtorch.set_device(1)
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()

@@ -1,5 +1,8 @@
 .. _trtorch_py:
 
+.. automodule trtorch
+   :undoc-members:
+
 trtorch
 ===============
 

@@ -27,7 +27,7 @@ c10::impl::GenericDict TensorRTBackend::compile(c10::IValue mod_val, c10::impl::
 
     auto g = graph_and_ivals.first;
     auto params = graph_and_ivals.second;
-    auto named_params = core::conversion::get_named_params(g->inputs(), params);
+    auto named_params = core::ir::get_static_params(g->inputs(), params);
 
     auto convert_cfg = std::move(cfg.convert_info);
     auto device_spec = convert_cfg.engine_settings.device;
