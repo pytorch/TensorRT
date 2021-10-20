@@ -25,7 +25,8 @@ std::unordered_map<torch::jit::Value*, torch::jit::IValue> generateRandomInputs(
 
 void getSegmentsOutputByRunning(
     SegmentedBlock& seg_block,
-    std::unordered_map<torch::jit::Value*, torch::jit::IValue>& ivalues_maps) {
+    std::unordered_map<torch::jit::Value*, torch::jit::IValue>& ivalues_maps,
+    const PartitionInfo& partition_info) {
   // create a module to run the graph
   auto g = seg_block.g();
   auto copy_g = g->copy();
@@ -99,10 +100,20 @@ void getSegmentsOutputByRunning(
   for (auto& i : seg_block.raw_inputs()) {
     if (ivalues_maps[i].isTensor()) {
       // set the input_shape and data_type
+      at::ScalarType t = c10::optTypeMetaToScalarType(ivalues_maps[i].toTensor().dtype()).value();
+      if (!partition_info.truncate_long_and_double &&
+          (t == at::kLong || t == at::kDouble)) {
+        TRTORCH_THROW_ERROR(
+          "Unable to process subgraph input type of at::kLong/at::kDouble, try to compile model with truncate_long_and_double enabled");
+      } else if(partition_info.truncate_long_and_double && t == at::kLong) {
+        ivalues_maps[i] = ivalues_maps[i].toTensor().to(at::kInt);
+      } else if(partition_info.truncate_long_and_double && t == at::kDouble) {
+        ivalues_maps[i] = ivalues_maps[i].toTensor().to(at::kFloat);
+      }
       c10::optional<nvinfer1::DataType> dtype = util::optTypeMetaToTRTDataType(ivalues_maps[i].toTensor().dtype());
       nvinfer1::DataType nv_dtype;
       if (dtype == c10::nullopt) {
-        nv_dtype = nvinfer1::DataType::kFLOAT;
+        TRTORCH_THROW_ERROR("Unsupported input data type " << ivalues_maps[i].toTensor().dtype());
       } else {
         nv_dtype = dtype.value();
       }
@@ -116,11 +127,12 @@ void getSegmentsOutputByRunning(
 
 void runShapeAnalysis(
     std::vector<SegmentedBlock>& segmented_blocks,
-    std::unordered_map<torch::jit::Value*, torch::jit::IValue>& ivalues_maps) {
+    std::unordered_map<torch::jit::Value*, torch::jit::IValue>& ivalues_maps,
+    const PartitionInfo& partition_info) {
   // register every segment's input shape, and it's running output IValues
   for (auto& seg_block : segmented_blocks) {
     torch::jit::ConstantPooling(seg_block.g());
-    getSegmentsOutputByRunning(seg_block, ivalues_maps);
+    getSegmentsOutputByRunning(seg_block, ivalues_maps, partition_info);
   }
   return;
 }

@@ -11,7 +11,8 @@ std::unordered_map<torch::jit::Value*, torch::jit::IValue> generateRandomInputs(
 
 void runShapeAnalysis(
     std::vector<SegmentedBlock>& segmented_blocks,
-    std::unordered_map<torch::jit::Value*, torch::jit::IValue>& ivalues_maps);
+    std::unordered_map<torch::jit::Value*, torch::jit::IValue>& ivalues_maps,
+    const PartitionInfo& partition_info);
 
 } // namespace partitioning
 } // namespace core

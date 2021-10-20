@@ -358,7 +358,7 @@ std::vector<SegmentedBlock> Partition(
   registerSegmentsOutputs(segmented_blocks, block);
 
   // run shape analysis on each segmented block
-  runShapeAnalysis(segmented_blocks, input_ivalues_map);
+  runShapeAnalysis(segmented_blocks, input_ivalues_map, partition_info);
 
   return segmented_blocks;
 }
