@@ -115,7 +115,7 @@
        <label class="md-search__overlay" for="__search">
        </label>
        <div class="md-search__inner" role="search">
-        <form action="../search.html" class="md-search__form" method="GET" name="search">
+        <form action="../search.html" class="md-search__form" method="get" name="search">
          <input autocapitalize="off" autocomplete="off" class="md-search__input" data-md-component="query" data-md-state="active" name="q" placeholder="Search" spellcheck="false" type="text"/>
          <label class="md-icon md-search__icon" for="__search">
          </label>
@@ -602,27 +602,27 @@ which will do the actual conversion:
          </blockquote>
          <div class="highlight-c++ notranslate">
           <div class="highlight">
-           <pre><span></span><span class="k">auto</span> <span class="n">acthardtanh</span> <span class="n">TRTORCH_UNUSED</span> <span class="o">=</span> <span class="n">RegisterNodeConversionPatterns</span><span class="p">()</span>
-    <span class="p">.</span><span class="n">pattern</span><span class="p">({</span>
-        <span class="s">"aten::hardtanh(Tensor self, Scalar min_val=-1, Scalar max_val=1) -&gt; (Tensor)"</span><span class="p">,</span>
-        <span class="p">[](</span><span class="n">ConversionCtx</span><span class="o">*</span> <span class="n">ctx</span><span class="p">,</span> <span class="k">const</span> <span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Node</span><span class="o">*</span> <span class="n">n</span><span class="p">,</span> <span class="n">args</span><span class="o">&amp;</span> <span class="n">args</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kt">bool</span> <span class="p">{</span>
-            <span class="k">auto</span> <span class="n">in</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">ITensor</span><span class="p">();</span>
-            <span class="k">auto</span> <span class="n">min</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">unwrapToDouble</span><span class="p">();</span>
-            <span class="k">auto</span> <span class="n">max</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="mi">2</span><span class="p">].</span><span class="n">unwrapToDouble</span><span class="p">();</span>
+           <pre><span></span><span class="k">auto</span><span class="w"> </span><span class="n">acthardtanh</span><span class="w"> </span><span class="n">TRTORCH_UNUSED</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RegisterNodeConversionPatterns</span><span class="p">()</span><span class="w"></span>
+<span class="w">    </span><span class="p">.</span><span class="n">pattern</span><span class="p">({</span><span class="w"></span>
+<span class="w">        </span><span class="s">"aten::hardtanh(Tensor self, Scalar min_val=-1, Scalar max_val=1) -&gt; (Tensor)"</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">[](</span><span class="n">ConversionCtx</span><span class="o">*</span><span class="w"> </span><span class="n">ctx</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Node</span><span class="o">*</span><span class="w"> </span><span class="n">n</span><span class="p">,</span><span class="w"> </span><span class="n">args</span><span class="o">&amp;</span><span class="w"> </span><span class="n">args</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="k">auto</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">ITensor</span><span class="p">();</span><span class="w"></span>
+<span class="w">            </span><span class="k">auto</span><span class="w"> </span><span class="n">min</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">unwrapToDouble</span><span class="p">();</span><span class="w"></span>
+<span class="w">            </span><span class="k">auto</span><span class="w"> </span><span class="n">max</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">args</span><span class="p">[</span><span class="mi">2</span><span class="p">].</span><span class="n">unwrapToDouble</span><span class="p">();</span><span class="w"></span>
 
-            <span class="k">auto</span> <span class="n">new_layer</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">-&gt;</span><span class="n">net</span><span class="o">-&gt;</span><span class="n">addActivation</span><span class="p">(</span><span class="o">*</span><span class="n">in</span><span class="p">,</span> <span class="n">nvinfer1</span><span class="o">::</span><span class="n">ActivationType</span><span class="o">::</span><span class="n">kCLIP</span><span class="p">);</span>
-            <span class="n">TRTORCH_CHECK</span><span class="p">(</span><span class="n">new_layer</span><span class="p">,</span> <span class="s">"Unable to create layer for aten::hardtanh"</span><span class="p">);</span>
+<span class="w">            </span><span class="k">auto</span><span class="w"> </span><span class="n">new_layer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ctx</span><span class="o">-&gt;</span><span class="n">net</span><span class="o">-&gt;</span><span class="n">addActivation</span><span class="p">(</span><span class="o">*</span><span class="n">in</span><span class="p">,</span><span class="w"> </span><span class="n">nvinfer1</span><span class="o">::</span><span class="n">ActivationType</span><span class="o">::</span><span class="n">kCLIP</span><span class="p">);</span><span class="w"></span>
+<span class="w">            </span><span class="n">TRTORCH_CHECK</span><span class="p">(</span><span class="n">new_layer</span><span class="p">,</span><span class="w"> </span><span class="s">"Unable to create layer for aten::hardtanh"</span><span class="p">);</span><span class="w"></span>
 
-            <span class="n">new_layer</span><span class="o">-&gt;</span><span class="n">setAlpha</span><span class="p">(</span><span class="n">min</span><span class="p">);</span>
-            <span class="n">new_layer</span><span class="o">-&gt;</span><span class="n">setBeta</span><span class="p">(</span><span class="n">max</span><span class="p">);</span>
+<span class="w">            </span><span class="n">new_layer</span><span class="o">-&gt;</span><span class="n">setAlpha</span><span class="p">(</span><span class="n">min</span><span class="p">);</span><span class="w"></span>
+<span class="w">            </span><span class="n">new_layer</span><span class="o">-&gt;</span><span class="n">setBeta</span><span class="p">(</span><span class="n">max</span><span class="p">);</span><span class="w"></span>
 
-            <span class="n">new_layer</span><span class="o">-&gt;</span><span class="n">setName</span><span class="p">(</span><span class="n">util</span><span class="o">::</span><span class="n">node_info</span><span class="p">(</span><span class="n">n</span><span class="p">).</span><span class="n">c_str</span><span class="p">());</span>
-            <span class="k">auto</span> <span class="n">out_tensor</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">-&gt;</span><span class="n">AssociateValueAndTensor</span><span class="p">(</span><span class="n">n</span><span class="o">-&gt;</span><span class="n">outputs</span><span class="p">()[</span><span class="mi">0</span><span class="p">],</span> <span class="n">new_layer</span><span class="o">-&gt;</span><span class="n">getOutput</span><span class="p">(</span><span class="mi">0</span><span class="p">));</span>
+<span class="w">            </span><span class="n">new_layer</span><span class="o">-&gt;</span><span class="n">setName</span><span class="p">(</span><span class="n">util</span><span class="o">::</span><span class="n">node_info</span><span class="p">(</span><span class="n">n</span><span class="p">).</span><span class="n">c_str</span><span class="p">());</span><span class="w"></span>
+<span class="w">            </span><span class="k">auto</span><span class="w"> </span><span class="n">out_tensor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ctx</span><span class="o">-&gt;</span><span class="n">AssociateValueAndTensor</span><span class="p">(</span><span class="n">n</span><span class="o">-&gt;</span><span class="n">outputs</span><span class="p">()[</span><span class="mi">0</span><span class="p">],</span><span class="w"> </span><span class="n">new_layer</span><span class="o">-&gt;</span><span class="n">getOutput</span><span class="p">(</span><span class="mi">0</span><span class="p">));</span><span class="w"></span>
 
-            <span class="n">LOG_DEBUG</span><span class="p">(</span><span class="s">"Output shape: "</span> <span class="o">&lt;&lt;</span> <span class="n">out_tensor</span><span class="o">-&gt;</span><span class="n">getDimensions</span><span class="p">());</span>
-            <span class="k">return</span> <span class="nb">true</span><span class="p">;</span>
-        <span class="p">}</span>
-    <span class="p">});</span>
+<span class="w">            </span><span class="n">LOG_DEBUG</span><span class="p">(</span><span class="s">"Output shape: "</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">out_tensor</span><span class="o">-&gt;</span><span class="n">getDimensions</span><span class="p">());</span><span class="w"></span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">});</span><span class="w"></span>
 </pre>
           </div>
          </div>

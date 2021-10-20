@@ -115,7 +115,7 @@
        <label class="md-search__overlay" for="__search">
        </label>
        <div class="md-search__inner" role="search">
-        <form action="../search.html" class="md-search__form" method="GET" name="search">
+        <form action="../search.html" class="md-search__form" method="get" name="search">
          <input autocapitalize="off" autocomplete="off" class="md-search__input" data-md-component="query" data-md-state="active" name="q" placeholder="Search" spellcheck="false" type="text"/>
          <label class="md-icon md-search__icon" for="__search">
          </label>
@@ -1062,23 +1062,23 @@ to load in a deployment application. In order to load a TensorRT/TorchScript mod
           </p>
           <div class="highlight-c++ notranslate">
            <div class="highlight">
-            <pre><span></span><span class="cp">#include</span> <span class="cpf">&lt;torch/script.h&gt;</span><span class="c1"> // One-stop header.</span><span class="cp"></span>
+            <pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;torch/script.h&gt;</span><span class="c1"> // One-stop header.</span><span class="cp"></span>
 
-<span class="cp">#include</span> <span class="cpf">&lt;iostream&gt;</span><span class="cp"></span>
-<span class="cp">#include</span> <span class="cpf">&lt;memory&gt;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;memory&gt;</span><span class="cp"></span>
 
-<span class="kt">int</span> <span class="nf">main</span><span class="p">(</span><span class="kt">int</span> <span class="n">argc</span><span class="p">,</span> <span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <span class="n">argv</span><span class="p">[])</span> <span class="p">{</span>
-    <span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Module</span> <span class="k">module</span><span class="p">;</span>
-    <span class="k">try</span> <span class="p">{</span>
-        <span class="c1">// Deserialize the ScriptModule from a file using torch::jit::load().</span>
-        <span class="k">module</span> <span class="o">=</span> <span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">load</span><span class="p">(</span><span class="s">"&lt;PATH TO SAVED TS MOD&gt;"</span><span class="p">);</span>
-    <span class="p">}</span>
-    <span class="k">catch</span> <span class="p">(</span><span class="k">const</span> <span class="n">c10</span><span class="o">::</span><span class="n">Error</span><span class="o">&amp;</span> <span class="n">e</span><span class="p">)</span> <span class="p">{</span>
-        <span class="n">std</span><span class="o">::</span><span class="n">cerr</span> <span class="o">&lt;&lt;</span> <span class="s">"error loading the model</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
-        <span class="k">return</span> <span class="mi">-1</span><span class="p">;</span>
-    <span class="p">}</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">argc</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">argv</span><span class="p">[])</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Module</span><span class="w"> </span><span class="k">module</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="k">try</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="c1">// Deserialize the ScriptModule from a file using torch::jit::load().</span>
+<span class="w">        </span><span class="k">module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">load</span><span class="p">(</span><span class="s">"&lt;PATH TO SAVED TS MOD&gt;"</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">c10</span><span class="o">::</span><span class="n">Error</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">cerr</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"error loading the model</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
 
-    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">"ok</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"ok</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span><span class="w"></span>
 </pre>
            </div>
           </div>
@@ -1093,9 +1093,9 @@ For instance we can do inference with our LeNet module like this:
           </p>
           <div class="highlight-c++ notranslate">
            <div class="highlight">
-            <pre><span></span><span class="n">mod</span><span class="p">.</span><span class="n">eval</span><span class="p">();</span>
-<span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span> <span class="n">in</span> <span class="o">=</span> <span class="n">torch</span><span class="o">::</span><span class="n">randn</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">});</span>
-<span class="k">auto</span> <span class="n">out</span> <span class="o">=</span> <span class="n">mod</span><span class="p">.</span><span class="n">forward</span><span class="p">(</span><span class="n">in</span><span class="p">);</span>
+            <pre><span></span><span class="n">mod</span><span class="p">.</span><span class="n">eval</span><span class="p">();</span><span class="w"></span>
+<span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">randn</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">});</span><span class="w"></span>
+<span class="k">auto</span><span class="w"> </span><span class="n">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mod</span><span class="p">.</span><span class="n">forward</span><span class="p">(</span><span class="n">in</span><span class="p">);</span><span class="w"></span>
 </pre>
            </div>
           </div>
@@ -1104,10 +1104,10 @@ For instance we can do inference with our LeNet module like this:
           </p>
           <div class="highlight-c++ notranslate">
            <div class="highlight">
-            <pre><span></span><span class="n">mod</span><span class="p">.</span><span class="n">eval</span><span class="p">();</span>
-<span class="n">mod</span><span class="p">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">);</span>
-<span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span> <span class="n">in</span> <span class="o">=</span> <span class="n">torch</span><span class="o">::</span><span class="n">randn</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">},</span> <span class="n">torch</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">);</span>
-<span class="k">auto</span> <span class="n">out</span> <span class="o">=</span> <span class="n">mod</span><span class="p">.</span><span class="n">forward</span><span class="p">(</span><span class="n">in</span><span class="p">);</span>
+            <pre><span></span><span class="n">mod</span><span class="p">.</span><span class="n">eval</span><span class="p">();</span><span class="w"></span>
+<span class="n">mod</span><span class="p">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">);</span><span class="w"></span>
+<span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">randn</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">},</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">);</span><span class="w"></span>
+<span class="k">auto</span><span class="w"> </span><span class="n">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mod</span><span class="p">.</span><span class="n">forward</span><span class="p">(</span><span class="n">in</span><span class="p">);</span><span class="w"></span>
 </pre>
            </div>
           </div>
@@ -1139,16 +1139,16 @@ since it takes a bit of time to optimize the module, it would not make sense to 
           </p>
           <div class="highlight-c++ notranslate">
            <div class="highlight">
-            <pre><span></span><span class="cp">#include</span> <span class="cpf">"torch/script.h"</span><span class="cp"></span>
-<span class="cp">#include</span> <span class="cpf">"trtorch/trtorch.h"</span><span class="cp"></span>
-<span class="p">...</span>
+            <pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch/script.h"</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"trtorch/trtorch.h"</span><span class="cp"></span>
+<span class="p">...</span><span class="w"></span>
 
-    <span class="n">mod</span><span class="p">.</span><span class="n">to</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">);</span>
-    <span class="n">mod</span><span class="p">.</span><span class="n">eval</span><span class="p">();</span>
+<span class="w">    </span><span class="n">mod</span><span class="p">.</span><span class="n">to</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">mod</span><span class="p">.</span><span class="n">eval</span><span class="p">();</span><span class="w"></span>
 
-    <span class="k">auto</span> <span class="n">in</span> <span class="o">=</span> <span class="n">torch</span><span class="o">::</span><span class="n">randn</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">},</span> <span class="p">{</span><span class="n">torch</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">});</span>
-    <span class="k">auto</span> <span class="n">trt_mod</span> <span class="o">=</span> <span class="n">trtorch</span><span class="o">::</span><span class="n">CompileGraph</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">trtorch</span><span class="o">::</span><span class="n">CompileSpec</span><span class="o">::</span><span class="n">InputRange</span><span class="o">&gt;</span><span class="p">{{</span><span class="n">in</span><span class="p">.</span><span class="n">sizes</span><span class="p">()}});</span>
-    <span class="k">auto</span> <span class="n">out</span> <span class="o">=</span> <span class="n">trt_mod</span><span class="p">.</span><span class="n">forward</span><span class="p">({</span><span class="n">in</span><span class="p">});</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">randn</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">},</span><span class="w"> </span><span class="p">{</span><span class="n">torch</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">});</span><span class="w"></span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">trt_mod</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">trtorch</span><span class="o">::</span><span class="n">CompileGraph</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">trtorch</span><span class="o">::</span><span class="n">CompileSpec</span><span class="o">::</span><span class="n">InputRange</span><span class="o">&gt;</span><span class="p">{{</span><span class="n">in</span><span class="p">.</span><span class="n">sizes</span><span class="p">()}});</span><span class="w"></span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">trt_mod</span><span class="p">.</span><span class="n">forward</span><span class="p">({</span><span class="n">in</span><span class="p">});</span><span class="w"></span>
 </pre>
            </div>
           </div>
@@ -1160,19 +1160,19 @@ since it takes a bit of time to optimize the module, it would not make sense to 
           </p>
           <div class="highlight-c++ notranslate">
            <div class="highlight">
-            <pre><span></span><span class="cp">#include</span> <span class="cpf">"torch/script.h"</span><span class="cp"></span>
-<span class="cp">#include</span> <span class="cpf">"trtorch/trtorch.h"</span><span class="cp"></span>
-<span class="p">...</span>
+            <pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch/script.h"</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"trtorch/trtorch.h"</span><span class="cp"></span>
+<span class="p">...</span><span class="w"></span>
 
-    <span class="n">mod</span><span class="p">.</span><span class="n">to</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">);</span>
-    <span class="n">mod</span><span class="p">.</span><span class="n">eval</span><span class="p">();</span>
+<span class="w">    </span><span class="n">mod</span><span class="p">.</span><span class="n">to</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">mod</span><span class="p">.</span><span class="n">eval</span><span class="p">();</span><span class="w"></span>
 
-    <span class="k">auto</span> <span class="n">in</span> <span class="o">=</span> <span class="n">torch</span><span class="o">::</span><span class="n">randn</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">},</span> <span class="p">{</span><span class="n">torch</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">}).</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">kHALF</span><span class="p">);</span>
-    <span class="k">auto</span> <span class="n">input_sizes</span> <span class="o">=</span> <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">trtorch</span><span class="o">::</span><span class="n">CompileSpec</span><span class="o">::</span><span class="n">InputRange</span><span class="o">&gt;</span><span class="p">({</span><span class="n">in</span><span class="p">.</span><span class="n">sizes</span><span class="p">()});</span>
-    <span class="n">trtorch</span><span class="o">::</span><span class="n">CompileSpec</span> <span class="nf">info</span><span class="p">(</span><span class="n">input_sizes</span><span class="p">);</span>
-    <span class="n">info</span><span class="p">.</span><span class="n">enable_precisions</span><span class="p">.</span><span class="n">insert</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">kHALF</span><span class="p">);</span>
-    <span class="k">auto</span> <span class="n">trt_mod</span> <span class="o">=</span> <span class="n">trtorch</span><span class="o">::</span><span class="n">CompileGraph</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="n">info</span><span class="p">);</span>
-    <span class="k">auto</span> <span class="n">out</span> <span class="o">=</span> <span class="n">trt_mod</span><span class="p">.</span><span class="n">forward</span><span class="p">({</span><span class="n">in</span><span class="p">});</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">randn</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">},</span><span class="w"> </span><span class="p">{</span><span class="n">torch</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">}).</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">kHALF</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">input_sizes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">trtorch</span><span class="o">::</span><span class="n">CompileSpec</span><span class="o">::</span><span class="n">InputRange</span><span class="o">&gt;</span><span class="p">({</span><span class="n">in</span><span class="p">.</span><span class="n">sizes</span><span class="p">()});</span><span class="w"></span>
+<span class="w">    </span><span class="n">trtorch</span><span class="o">::</span><span class="n">CompileSpec</span><span class="w"> </span><span class="nf">info</span><span class="p">(</span><span class="n">input_sizes</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">info</span><span class="p">.</span><span class="n">enable_precisions</span><span class="p">.</span><span class="n">insert</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">kHALF</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">trt_mod</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">trtorch</span><span class="o">::</span><span class="n">CompileGraph</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span><span class="w"> </span><span class="n">info</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">trt_mod</span><span class="p">.</span><span class="n">forward</span><span class="p">({</span><span class="n">in</span><span class="p">});</span><span class="w"></span>
 </pre>
            </div>
           </div>
@@ -1181,7 +1181,7 @@ since it takes a bit of time to optimize the module, it would not make sense to 
           </p>
           <div class="highlight-c++ notranslate">
            <div class="highlight">
-            <pre><span></span><span class="n">trt_mod</span><span class="p">.</span><span class="n">save</span><span class="p">(</span><span class="s">"&lt;PATH TO SAVED TRT/TS MOD&gt;"</span><span class="p">)</span>
+            <pre><span></span><span class="n">trt_mod</span><span class="p">.</span><span class="n">save</span><span class="p">(</span><span class="s">"&lt;PATH TO SAVED TRT/TS MOD&gt;"</span><span class="p">)</span><span class="w"></span>
 </pre>
            </div>
           </div>
@@ -1195,25 +1195,25 @@ since it takes a bit of time to optimize the module, it would not make sense to 
           </p>
           <div class="highlight-c++ notranslate">
            <div class="highlight">
-            <pre><span></span><span class="cp">#include</span> <span class="cpf">"torch/script.h"</span><span class="cp"></span>
-<span class="cp">#include</span> <span class="cpf">"trtorch/trtorch.h"</span><span class="cp"></span>
+            <pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch/script.h"</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"trtorch/trtorch.h"</span><span class="cp"></span>
 
-<span class="kt">int</span> <span class="nf">main</span><span class="p">(</span><span class="kt">int</span> <span class="n">argc</span><span class="p">,</span> <span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <span class="n">argv</span><span class="p">[])</span> <span class="p">{</span>
-    <span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Module</span> <span class="k">module</span><span class="p">;</span>
-    <span class="k">try</span> <span class="p">{</span>
-        <span class="c1">// Deserialize the ScriptModule from a file using torch::jit::load().</span>
-        <span class="k">module</span> <span class="o">=</span> <span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">load</span><span class="p">(</span><span class="s">"&lt;PATH TO SAVED TRT/TS MOD&gt;"</span><span class="p">);</span>
-    <span class="p">}</span>
-    <span class="k">catch</span> <span class="p">(</span><span class="k">const</span> <span class="n">c10</span><span class="o">::</span><span class="n">Error</span><span class="o">&amp;</span> <span class="n">e</span><span class="p">)</span> <span class="p">{</span>
-        <span class="n">std</span><span class="o">::</span><span class="n">cerr</span> <span class="o">&lt;&lt;</span> <span class="s">"error loading the model</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
-        <span class="k">return</span> <span class="mi">-1</span><span class="p">;</span>
-    <span class="p">}</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">argc</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">argv</span><span class="p">[])</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Module</span><span class="w"> </span><span class="k">module</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="k">try</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="c1">// Deserialize the ScriptModule from a file using torch::jit::load().</span>
+<span class="w">        </span><span class="k">module</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">load</span><span class="p">(</span><span class="s">"&lt;PATH TO SAVED TRT/TS MOD&gt;"</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">c10</span><span class="o">::</span><span class="n">Error</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">cerr</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"error loading the model</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
 
-    <span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span> <span class="n">in</span> <span class="o">=</span> <span class="n">torch</span><span class="o">::</span><span class="n">randn</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">},</span> <span class="n">torch</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">);</span>
-    <span class="k">auto</span> <span class="n">out</span> <span class="o">=</span> <span class="n">mod</span><span class="p">.</span><span class="n">forward</span><span class="p">(</span><span class="n">in</span><span class="p">);</span>
+<span class="w">    </span><span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">randn</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">},</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mod</span><span class="p">.</span><span class="n">forward</span><span class="p">(</span><span class="n">in</span><span class="p">);</span><span class="w"></span>
 
-    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="s">"ok</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span>
-<span class="p">}</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"ok</span><span class="se">\n</span><span class="s">"</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
 </pre>
            </div>
           </div>
@@ -1228,21 +1228,21 @@ since it takes a bit of time to optimize the module, it would not make sense to 
           </p>
           <div class="highlight-c++ notranslate">
            <div class="highlight">
-            <pre><span></span><span class="cp">#include</span> <span class="cpf">"torch/script.h"</span><span class="cp"></span>
-<span class="cp">#include</span> <span class="cpf">"trtorch/trtorch.h"</span><span class="cp"></span>
-<span class="p">...</span>
+            <pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch/script.h"</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"trtorch/trtorch.h"</span><span class="cp"></span>
+<span class="p">...</span><span class="w"></span>
 
-    <span class="n">mod</span><span class="p">.</span><span class="n">to</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">);</span>
-    <span class="n">mod</span><span class="p">.</span><span class="n">eval</span><span class="p">();</span>
+<span class="w">    </span><span class="n">mod</span><span class="p">.</span><span class="n">to</span><span class="p">(</span><span class="n">at</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">mod</span><span class="p">.</span><span class="n">eval</span><span class="p">();</span><span class="w"></span>
 
-    <span class="k">auto</span> <span class="n">in</span> <span class="o">=</span> <span class="n">torch</span><span class="o">::</span><span class="n">randn</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">},</span> <span class="p">{</span><span class="n">torch</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">}).</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">kHALF</span><span class="p">);</span>
-    <span class="k">auto</span> <span class="n">input_sizes</span> <span class="o">=</span> <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">trtorch</span><span class="o">::</span><span class="n">CompileSpec</span><span class="o">::</span><span class="n">InputRange</span><span class="o">&gt;</span><span class="p">({</span><span class="n">in</span><span class="p">.</span><span class="n">sizes</span><span class="p">()});</span>
-    <span class="n">trtorch</span><span class="o">::</span><span class="n">CompileSpec</span> <span class="nf">info</span><span class="p">(</span><span class="n">input_sizes</span><span class="p">);</span>
-    <span class="n">info</span><span class="p">.</span><span class="n">enabled_precisions</span><span class="p">.</span><span class="n">insert</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">kHALF</span><span class="p">);</span>
-    <span class="k">auto</span> <span class="n">trt_mod</span> <span class="o">=</span> <span class="n">trtorch</span><span class="o">::</span><span class="n">ConvertGraphToTRTEngine</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="s">"forward"</span><span class="p">,</span> <span class="n">info</span><span class="p">);</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">ofstream</span> <span class="nf">out</span><span class="p">(</span><span class="s">"/tmp/engine_converted_from_jit.trt"</span><span class="p">);</span>
-    <span class="n">out</span> <span class="o">&lt;&lt;</span> <span class="n">engine</span><span class="p">;</span>
-    <span class="n">out</span><span class="p">.</span><span class="n">close</span><span class="p">();</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">randn</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">},</span><span class="w"> </span><span class="p">{</span><span class="n">torch</span><span class="o">::</span><span class="n">kCUDA</span><span class="p">}).</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">kHALF</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">input_sizes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">trtorch</span><span class="o">::</span><span class="n">CompileSpec</span><span class="o">::</span><span class="n">InputRange</span><span class="o">&gt;</span><span class="p">({</span><span class="n">in</span><span class="p">.</span><span class="n">sizes</span><span class="p">()});</span><span class="w"></span>
+<span class="w">    </span><span class="n">trtorch</span><span class="o">::</span><span class="n">CompileSpec</span><span class="w"> </span><span class="nf">info</span><span class="p">(</span><span class="n">input_sizes</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">info</span><span class="p">.</span><span class="n">enabled_precisions</span><span class="p">.</span><span class="n">insert</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">kHALF</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">trt_mod</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">trtorch</span><span class="o">::</span><span class="n">ConvertGraphToTRTEngine</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span><span class="w"> </span><span class="s">"forward"</span><span class="p">,</span><span class="w"> </span><span class="n">info</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">ofstream</span><span class="w"> </span><span class="nf">out</span><span class="p">(</span><span class="s">"/tmp/engine_converted_from_jit.trt"</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">out</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">engine</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">out</span><span class="p">.</span><span class="n">close</span><span class="p">();</span><span class="w"></span>
 </pre>
            </div>
           </div>
@@ -1491,33 +1491,33 @@ for example we can quickly get the output size by just running the operation in 
            </p>
            <div class="highlight-c++ notranslate">
             <div class="highlight">
-             <pre><span></span><span class="cp">#include</span> <span class="cpf">"torch/script.h"</span><span class="cp"></span>
-<span class="cp">#include</span> <span class="cpf">"trtorch/trtorch.h"</span><span class="cp"></span>
-<span class="cp">#include</span> <span class="cpf">"trtorch/core/conversion/converters/converters.h"</span><span class="cp"></span>
+             <pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch/script.h"</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"trtorch/trtorch.h"</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"trtorch/core/conversion/converters/converters.h"</span><span class="cp"></span>
 
-<span class="k">static</span> <span class="k">auto</span> <span class="n">flatten_converter</span> <span class="o">=</span> <span class="n">trtorch</span><span class="o">::</span><span class="n">core</span><span class="o">::</span><span class="n">conversion</span><span class="o">::</span><span class="n">converters</span><span class="o">::</span><span class="n">RegisterNodeConversionPatterns</span><span class="p">()</span>
-    <span class="p">.</span><span class="n">pattern</span><span class="p">({</span>
-        <span class="s">"aten::flatten.using_ints(Tensor self, int start_dim=0, int end_dim=-1) -&gt; (Tensor)"</span><span class="p">,</span>
-        <span class="p">[](</span><span class="n">trtorch</span><span class="o">::</span><span class="n">core</span><span class="o">::</span><span class="n">conversion</span><span class="o">::</span><span class="n">ConversionCtx</span><span class="o">*</span> <span class="n">ctx</span><span class="p">,</span>
-           <span class="k">const</span> <span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Node</span><span class="o">*</span> <span class="n">n</span><span class="p">,</span>
-           <span class="n">trtorch</span><span class="o">::</span><span class="n">core</span><span class="o">::</span><span class="n">conversion</span><span class="o">::</span><span class="n">converters</span><span class="o">::</span><span class="n">args</span><span class="o">&amp;</span> <span class="n">args</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kt">bool</span> <span class="p">{</span>
-            <span class="k">auto</span> <span class="n">in</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">ITensor</span><span class="p">();</span>
-            <span class="k">auto</span> <span class="n">start_dim</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">unwrapToInt</span><span class="p">();</span>
-            <span class="k">auto</span> <span class="n">end_dim</span> <span class="o">=</span> <span class="n">args</span><span class="p">[</span><span class="mi">2</span><span class="p">].</span><span class="n">unwrapToInt</span><span class="p">();</span>
-            <span class="k">auto</span> <span class="n">in_shape</span> <span class="o">=</span> <span class="n">trtorch</span><span class="o">::</span><span class="n">core</span><span class="o">::</span><span class="n">util</span><span class="o">::</span><span class="n">toVec</span><span class="p">(</span><span class="n">in</span><span class="o">-&gt;</span><span class="n">getDimensions</span><span class="p">());</span>
-            <span class="k">auto</span> <span class="n">out_shape</span> <span class="o">=</span> <span class="n">torch</span><span class="o">::</span><span class="n">flatten</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">rand</span><span class="p">(</span><span class="n">in_shape</span><span class="p">),</span> <span class="n">start_dim</span><span class="p">,</span> <span class="n">end_dim</span><span class="p">).</span><span class="n">sizes</span><span class="p">();</span>
+<span class="k">static</span><span class="w"> </span><span class="k">auto</span><span class="w"> </span><span class="n">flatten_converter</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">trtorch</span><span class="o">::</span><span class="n">core</span><span class="o">::</span><span class="n">conversion</span><span class="o">::</span><span class="n">converters</span><span class="o">::</span><span class="n">RegisterNodeConversionPatterns</span><span class="p">()</span><span class="w"></span>
+<span class="w">    </span><span class="p">.</span><span class="n">pattern</span><span class="p">({</span><span class="w"></span>
+<span class="w">        </span><span class="s">"aten::flatten.using_ints(Tensor self, int start_dim=0, int end_dim=-1) -&gt; (Tensor)"</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">[](</span><span class="n">trtorch</span><span class="o">::</span><span class="n">core</span><span class="o">::</span><span class="n">conversion</span><span class="o">::</span><span class="n">ConversionCtx</span><span class="o">*</span><span class="w"> </span><span class="n">ctx</span><span class="p">,</span><span class="w"></span>
+<span class="w">           </span><span class="k">const</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">jit</span><span class="o">::</span><span class="n">Node</span><span class="o">*</span><span class="w"> </span><span class="n">n</span><span class="p">,</span><span class="w"></span>
+<span class="w">           </span><span class="n">trtorch</span><span class="o">::</span><span class="n">core</span><span class="o">::</span><span class="n">conversion</span><span class="o">::</span><span class="n">converters</span><span class="o">::</span><span class="n">args</span><span class="o">&amp;</span><span class="w"> </span><span class="n">args</span><span class="p">)</span><span class="w"> </span><span class="o">-&gt;</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="k">auto</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">ITensor</span><span class="p">();</span><span class="w"></span>
+<span class="w">            </span><span class="k">auto</span><span class="w"> </span><span class="n">start_dim</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">args</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">unwrapToInt</span><span class="p">();</span><span class="w"></span>
+<span class="w">            </span><span class="k">auto</span><span class="w"> </span><span class="n">end_dim</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">args</span><span class="p">[</span><span class="mi">2</span><span class="p">].</span><span class="n">unwrapToInt</span><span class="p">();</span><span class="w"></span>
+<span class="w">            </span><span class="k">auto</span><span class="w"> </span><span class="n">in_shape</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">trtorch</span><span class="o">::</span><span class="n">core</span><span class="o">::</span><span class="n">util</span><span class="o">::</span><span class="n">toVec</span><span class="p">(</span><span class="n">in</span><span class="o">-&gt;</span><span class="n">getDimensions</span><span class="p">());</span><span class="w"></span>
+<span class="w">            </span><span class="k">auto</span><span class="w"> </span><span class="n">out_shape</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">flatten</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">rand</span><span class="p">(</span><span class="n">in_shape</span><span class="p">),</span><span class="w"> </span><span class="n">start_dim</span><span class="p">,</span><span class="w"> </span><span class="n">end_dim</span><span class="p">).</span><span class="n">sizes</span><span class="p">();</span><span class="w"></span>
 
-            <span class="k">auto</span> <span class="n">shuffle</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">-&gt;</span><span class="n">net</span><span class="o">-&gt;</span><span class="n">addShuffle</span><span class="p">(</span><span class="o">*</span><span class="n">in</span><span class="p">);</span>
-            <span class="n">shuffle</span><span class="o">-&gt;</span><span class="n">setReshapeDimensions</span><span class="p">(</span><span class="n">trtorch</span><span class="o">::</span><span class="n">core</span><span class="o">::</span><span class="n">util</span><span class="o">::</span><span class="n">toDims</span><span class="p">(</span><span class="n">out_shape</span><span class="p">));</span>
-            <span class="n">shuffle</span><span class="o">-&gt;</span><span class="n">setName</span><span class="p">(</span><span class="n">trtorch</span><span class="o">::</span><span class="n">core</span><span class="o">::</span><span class="n">util</span><span class="o">::</span><span class="n">node_info</span><span class="p">(</span><span class="n">n</span><span class="p">).</span><span class="n">c_str</span><span class="p">());</span>
+<span class="w">            </span><span class="k">auto</span><span class="w"> </span><span class="n">shuffle</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ctx</span><span class="o">-&gt;</span><span class="n">net</span><span class="o">-&gt;</span><span class="n">addShuffle</span><span class="p">(</span><span class="o">*</span><span class="n">in</span><span class="p">);</span><span class="w"></span>
+<span class="w">            </span><span class="n">shuffle</span><span class="o">-&gt;</span><span class="n">setReshapeDimensions</span><span class="p">(</span><span class="n">trtorch</span><span class="o">::</span><span class="n">core</span><span class="o">::</span><span class="n">util</span><span class="o">::</span><span class="n">toDims</span><span class="p">(</span><span class="n">out_shape</span><span class="p">));</span><span class="w"></span>
+<span class="w">            </span><span class="n">shuffle</span><span class="o">-&gt;</span><span class="n">setName</span><span class="p">(</span><span class="n">trtorch</span><span class="o">::</span><span class="n">core</span><span class="o">::</span><span class="n">util</span><span class="o">::</span><span class="n">node_info</span><span class="p">(</span><span class="n">n</span><span class="p">).</span><span class="n">c_str</span><span class="p">());</span><span class="w"></span>
 
-            <span class="k">auto</span> <span class="n">out_tensor</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">-&gt;</span><span class="n">AssociateValueAndTensor</span><span class="p">(</span><span class="n">n</span><span class="o">-&gt;</span><span class="n">outputs</span><span class="p">()[</span><span class="mi">0</span><span class="p">],</span> <span class="n">shuffle</span><span class="o">-&gt;</span><span class="n">getOutput</span><span class="p">(</span><span class="mi">0</span><span class="p">));</span>
-            <span class="k">return</span> <span class="nb">true</span><span class="p">;</span>
-        <span class="p">}</span>
-    <span class="p">});</span>
+<span class="w">            </span><span class="k">auto</span><span class="w"> </span><span class="n">out_tensor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ctx</span><span class="o">-&gt;</span><span class="n">AssociateValueAndTensor</span><span class="p">(</span><span class="n">n</span><span class="o">-&gt;</span><span class="n">outputs</span><span class="p">()[</span><span class="mi">0</span><span class="p">],</span><span class="w"> </span><span class="n">shuffle</span><span class="o">-&gt;</span><span class="n">getOutput</span><span class="p">(</span><span class="mi">0</span><span class="p">));</span><span class="w"></span>
+<span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="nb">true</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">});</span><span class="w"></span>
 
-<span class="kt">int</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
-    <span class="p">...</span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="p">...</span><span class="w"></span>
 </pre>
             </div>
            </div>
