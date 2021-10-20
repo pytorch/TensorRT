@@ -371,7 +371,6 @@ std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::
     cfg.convert_info.engine_settings.workspace_size = GetRecommendedWorkspaceSize(cuda_device);
   }
 
-
   MapInputsAndDetermineDTypes(cfg, g, static_params, first_use_types);
 
   auto engine = conversion::ConvertBlockToEngine(g->block(), cfg.convert_info, static_params);
