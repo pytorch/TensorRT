@@ -29,7 +29,10 @@ class TestCompile(ModelTestCase):
         self.assertTrue(same < 2e-2)
 
     def test_compile_script(self):
-        trt_mod = trtorch.compile(self.scripted_model, inputs=[self.input], device=trtorch.Device(gpu_id=0), enabled_precisions={torch.float})
+        trt_mod = trtorch.compile(self.scripted_model,
+                                  inputs=[self.input],
+                                  device=trtorch.Device(gpu_id=0),
+                                  enabled_precisions={torch.float})
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
         self.assertTrue(same < 2e-2)
 
@@ -245,8 +248,7 @@ class TestInputTypeDefaultsFP16Model(ModelTestCase):
         half_mod = torch.jit.script(self.model)
         half_mod.half()
 
-        trt_mod = trtorch.compile(half_mod,
-                                  inputs=[trtorch.Input(self.input.shape)])
+        trt_mod = trtorch.compile(half_mod, inputs=[trtorch.Input(self.input.shape)])
         trt_mod(self.input.half())
 
     def test_input_respect_user_setting_fp16_weights_fp32_in(self):
@@ -358,8 +360,12 @@ def test_suite():
     suite.addTest(TestCompileHalf.parametrize(TestCompileHalf, model=models.resnet18(pretrained=True)))
     suite.addTest(TestCompileHalfDefault.parametrize(TestCompileHalfDefault, model=models.resnet18(pretrained=True)))
     suite.addTest(TestPTtoTRTtoPT.parametrize(TestPTtoTRTtoPT, model=models.mobilenet_v2(pretrained=True)))
-    suite.addTest(TestInputTypeDefaultsFP32Model.parametrize(TestInputTypeDefaultsFP32Model, model=models.resnet18(pretrained=True)))
-    suite.addTest(TestInputTypeDefaultsFP16Model.parametrize(TestInputTypeDefaultsFP16Model, model=models.resnet18(pretrained=True)))
+    suite.addTest(
+        TestInputTypeDefaultsFP32Model.parametrize(TestInputTypeDefaultsFP32Model,
+                                                   model=models.resnet18(pretrained=True)))
+    suite.addTest(
+        TestInputTypeDefaultsFP16Model.parametrize(TestInputTypeDefaultsFP16Model,
+                                                   model=models.resnet18(pretrained=True)))
     suite.addTest(TestFallbackToTorch.parametrize(TestFallbackToTorch, model=models.resnet18(pretrained=True)))
     suite.addTest(
         TestModuleFallbackToTorch.parametrize(TestModuleFallbackToTorch, model=models.resnet18(pretrained=True)))
