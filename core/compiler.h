@@ -13,7 +13,8 @@ namespace trtorch {
 namespace core {
 
 struct CompileSpec {
-  CompileSpec(std::vector<ir::Input> inputs) : convert_info(std::move(inputs)) {}
+  CompileSpec(std::vector<ir::Input> inputs) : inputs(inputs) {}
+  std::vector<ir::Input> inputs;
   conversion::ConversionInfo convert_info;
   lowering::LowerInfo lower_info;
   partitioning::PartitionInfo partition_info;

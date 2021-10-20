@@ -36,8 +36,8 @@ OPTIONS:
     --allow-gpu-fallback              (Only used when targeting DLA
                                       (device-type)) Lets engine run layers on
                                       GPU if they are not supported on DLA
-    --allow-torch-fallback            Enable layers to run in torch if they
-                                      are not supported in TensorRT
+    --require-full-compilation        Require that the model should be fully
+                                      compiled to TensorRT or throw an error
     --disable-tf32                    Prevent Float32 layers from using the
                                       TF32 data format
     --sparse-weights                  Enable sparsity for weights of conv and
@@ -63,18 +63,22 @@ OPTIONS:
     --calibration-cache-file=[file_path]
                                       Path to calibration cache file to use
                                       for post training quantization
-    --ffo=[forced_fallback_ops...],
-    --forced-fallback-op=[forced_fallback_ops...]
+    --teo=[torch-executed-ops...],
+    --torch-executed-ops=[torch-executed-ops...]
                                       (Repeatable) Operator in the graph that
-                                      should be forced to fallback to Pytorch
-                                      for execution (allow torch fallback must
-                                      be set)
-    --ffm=[forced_fallback_mods...],
-    --forced-fallback-mod=[forced_fallback_mods...]
-                                      (Repeatable) Module that should be
-                                      forced to fallback to Pytorch for
-                                      execution (allow torch fallback must be
-                                      set)
+                                      should always be run in PyTorch for
+                                      execution (partial compilation must be
+                                      enabled)
+    --tem=[torch-executed-mods...],
+    --torch-executed-mods=[torch-executed-mods...]
+                                      (Repeatable) Module that should always
+                                      be run in Pytorch for execution (partial
+                                      compilation must be enabled)
+    --mbs=[torch-executed-mods...],
+    --min-block-size=[torch-executed-mods...]
+                                      Minimum number of contiguous TensorRT
+                                      supported ops to compile a subgraph to
+                                      TensorRT
     --embed-engine                    Whether to treat input file as a
                                       serialized TensorRT engine and embed it
                                       into a TorchScript module (device spec

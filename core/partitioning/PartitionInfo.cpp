@@ -14,7 +14,7 @@ std::ostream& operator<<(std::ostream& os, const PartitionInfo& s) {
   if (s.enabled) {
     os << "True";
     os << "\n    \"min_block_size\": " << s.min_block_size \
-       << "\n    \"forced_fallback_operators\": [";
+       << "\n    \"torch_executed_operators\": [";
     for (auto i : s.forced_fallback_operators) {
       os <<"\n        " << i << ',';
     }

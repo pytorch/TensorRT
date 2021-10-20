@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "ATen/Tensor.h"
-#include "core/conversion/conversion.h"
+#include "core/ir/ir.h"
 #include "core/util/prelude.h"
 
 namespace trtorch {
@@ -20,14 +20,14 @@ std::vector<at::Tensor> RunEngine(std::string& eng, std::vector<at::Tensor> inpu
 // Runs an arbitrary JIT graph and returns results
 std::vector<at::Tensor> RunGraph(
     std::shared_ptr<torch::jit::Graph>& g,
-    core::conversion::GraphParams& named_params,
+    core::ir::StaticParams& named_params,
     std::vector<at::Tensor> inputs);
 
 // Runs an arbitrary JIT graph by converting it to TensorRT and running
 // inference and returns results
 std::vector<at::Tensor> RunGraphEngine(
     std::shared_ptr<torch::jit::Graph>& g,
-    core::conversion::GraphParams& named_params,
+    core::ir::StaticParams& named_params,
     std::vector<at::Tensor> inputs,
     nvinfer1::DataType dtype = nvinfer1::DataType::kFLOAT);
 
@@ -35,7 +35,7 @@ std::vector<at::Tensor> RunGraphEngine(
 // TensorRT and running inference and returns results
 std::vector<at::Tensor> RunGraphEngineDynamic(
     std::shared_ptr<torch::jit::Graph>& g,
-    core::conversion::GraphParams& named_params,
+    core::ir::StaticParams& named_params,
     std::vector<at::Tensor> inputs,
     bool dynamic_batch = false);
 

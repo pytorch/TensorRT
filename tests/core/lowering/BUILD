@@ -16,7 +16,6 @@ cc_test(
   srcs = ["test_module_fallback_passes.cpp"],
   deps = [
       "//tests/util",
-      "//core",
       "@googletest//:gtest_main",
   ] + select({
       ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
