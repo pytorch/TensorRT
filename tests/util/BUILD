@@ -20,9 +20,6 @@ cc_library(
         "util.h",
     ],
     deps = [
-        "//core/conversion",
-        "//core/util:prelude",
-        "//cpp:trtorch",
         "@tensorrt//:nvinfer",
     ] + select({
         ":use_pre_cxx11_abi": [
@@ -33,5 +30,15 @@ cc_library(
             "@libtorch//:libtorch",
             "@libtorch//:caffe2",
         ],
+    }) + select({
+        "//tests:ci_build_testing": [
+            "@trtorch//:trtorch",
+            "@trtorch//:trtorch_core_hdrs"
+        ],
+        "//conditions:default": [
+            "//cpp:trtorch",
+            "//core/conversion",
+            "//core/util:prelude"
+        ]
     }),
 )
