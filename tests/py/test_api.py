@@ -46,22 +46,22 @@ class TestCompile(ModelTestCase):
             "enabled_precisions": {torch.float}
         }
 
-        trt_mod = trtorch.compile(self.scripted_model, **compile_spec)
-        same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
+        trt_mod = trtorch.compile(self.traced_model, **compile_spec)
+        same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
         self.assertTrue(same < 2e-2)
 
     def test_device(self):
         compile_spec = {"inputs": [self.input], "device": trtorch.Device("gpu:0"), "enabled_precisions": {torch.float}}
 
-        trt_mod = trtorch.compile(self.scripted_model, **compile_spec)
-        same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
+        trt_mod = trtorch.compile(self.traced_model, **compile_spec)
+        same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
         self.assertTrue(same < 2e-2)
 
     def test_default_device(self):
         compile_spec = {"inputs": [self.input], "enabled_precisions": {torch.float}}
 
-        trt_mod = trtorch.compile(self.scripted_model, **compile_spec)
-        same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
+        trt_mod = trtorch.compile(self.traced_model, **compile_spec)
+        same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
         self.assertTrue(same < 2e-2)
 
     def test_compile_script_from_dict(self):
@@ -179,7 +179,7 @@ class TestPTtoTRTtoPT(ModelTestCase):
 
     def setUp(self):
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
-        self.ts_model = torch.jit.script(self.model)
+        self.ts_model = torch.jit.trace(self.model, [self.input])
 
     def test_pt_to_trt_to_pt(self):
         compile_spec = {
@@ -359,7 +359,7 @@ def test_suite():
     suite.addTest(TestCompile.parametrize(TestCompile, model=models.mobilenet_v2(pretrained=True)))
     suite.addTest(TestCompileHalf.parametrize(TestCompileHalf, model=models.resnet18(pretrained=True)))
     suite.addTest(TestCompileHalfDefault.parametrize(TestCompileHalfDefault, model=models.resnet18(pretrained=True)))
-    suite.addTest(TestPTtoTRTtoPT.parametrize(TestPTtoTRTtoPT, model=models.mobilenet_v2(pretrained=True)))
+    suite.addTest(TestPTtoTRTtoPT.parametrize(TestPTtoTRTtoPT, model=models.resnet18(pretrained=True)))
     suite.addTest(
         TestInputTypeDefaultsFP32Model.parametrize(TestInputTypeDefaultsFP32Model,
                                                    model=models.resnet18(pretrained=True)))
