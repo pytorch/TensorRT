@@ -18,11 +18,20 @@ import warnings
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
-__version__ = '0.5.0a0'
-
 CXX11_ABI = False
 
 JETPACK_VERSION = None
+
+__version__ = '0.5.0a0'
+
+def get_git_revision_short_hash() -> str:
+    return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode('ascii').strip()
+
+if "--release" not in sys.argv:
+    __version__ = __version__ + "+" + get_git_revision_short_hash()
+else:
+    sys.argv.remove("--release")
+
 
 if "--use-cxx11-abi" in sys.argv:
     sys.argv.remove("--use-cxx11-abi")
