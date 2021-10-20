@@ -252,27 +252,6 @@ PYBIND11_MODULE(_C, m) {
       .def("get_batch_size", &nvinfer1::IInt8MinMaxCalibrator::getBatchSize, "Get batch size")
       .def("get_algorithm", &nvinfer1::IInt8MinMaxCalibrator::getAlgorithm, "Get algorithm");
 
-  py::class_<CompileSpec>(m, "CompileSpec")
-      .def(py::init<>())
-      .def("__str__", &trtorch::pyapi::CompileSpec::stringify)
-      .def("_get_calibrator_handle", &CompileSpec::getPTQCalibratorHandle, "[Internal] gets a handle from a calibrator")
-      .def_readwrite("inputs", &CompileSpec::inputs)
-      .def_readwrite("enabled_precisions", &CompileSpec::enabled_precisions)
-      .def_readwrite("ptq_calibrator", &CompileSpec::ptq_calibrator)
-      .def_readwrite("refit", &CompileSpec::refit)
-      .def_readwrite("sparse_weights", &CompileSpec::sparse_weights)
-      .def_readwrite("disable_tf32", &CompileSpec::disable_tf32)
-      .def_readwrite("debug", &CompileSpec::debug)
-      .def_readwrite("strict_types", &CompileSpec::strict_types)
-      .def_readwrite("device", &CompileSpec::device)
-      .def_readwrite("capability", &CompileSpec::capability)
-      .def_readwrite("num_min_timing_iters", &CompileSpec::num_min_timing_iters)
-      .def_readwrite("num_avg_timing_iters", &CompileSpec::num_avg_timing_iters)
-      .def_readwrite("workspace_size", &CompileSpec::workspace_size)
-      .def_readwrite("max_batch_size", &CompileSpec::max_batch_size)
-      .def_readwrite("torch_fallback", &CompileSpec::torch_fallback)
-      .def_readwrite("truncate_long_and_double", &CompileSpec::truncate_long_and_double);
-
   py::class_<Device>(m, "Device")
       .def(py::init<>())
       .def("__str__", &trtorch::pyapi::Device::to_str)
@@ -281,32 +260,9 @@ PYBIND11_MODULE(_C, m) {
       .def_readwrite("dla_core", &Device::dla_core)
       .def_readwrite("allow_gpu_fallback", &Device::allow_gpu_fallback);
 
-  py::class_<TorchFallback>(m, "TorchFallback")
-      .def(py::init<>())
-      .def("__str__", &trtorch::pyapi::TorchFallback::to_str)
-      .def_readwrite("enabled", &TorchFallback::enabled)
-      .def_readwrite("min_block_size", &TorchFallback::min_block_size)
-      .def_readwrite("forced_fallback_operators", &TorchFallback::forced_fallback_operators)
-      .def_readwrite("forced_fallback_modules", &TorchFallback::forced_fallback_modules);
-
   m.doc() =
-      "TRTorch Internal C Bindings: Ahead of Time compilation for PyTorch JIT. A tool to convert PyTorch JIT to TensorRT";
-  m.def(
-      "compile_graph",
-      &trtorch::pyapi::CompileGraph,
-      "Ingest a PyTorch JIT module and convert supported subgraphs to TensorRT engines, returns a JIT module with the engines embedded");
-  m.def(
-      "convert_graph_to_trt_engine",
-      &trtorch::pyapi::ConvertGraphToTRTEngine,
-      "Given a PyTorch JIT Module, convert forward into a TensorRT engine and return a serialized engine");
-  m.def(
-      "check_method_op_support",
-      &trtorch::pyapi::CheckMethodOperatorSupport,
-      "Takes a module and a method name and checks if the method graph contains purely convertable operators");
-  m.def(
-      "embed_engine_in_new_module",
-      &trtorch::pyapi::EmbedEngineInNewModule,
-      "Takes a serialized TensorRT engine and compile spec. Wraps it in the forward method of a new TorchScript module");
+      "Torch-TensorRT Internal C Bindings: A tool to convert PyTorch to TensorRT";
+
   m.def("get_build_info", &get_build_info, "Returns build info about the compiler as a string");
 
   m.def("_get_logging_prefix", &logging::get_logging_prefix, "Get the current prefix for the logging output");
@@ -330,6 +286,57 @@ PYBIND11_MODULE(_C, m) {
       .value("DEBUG", core::util::logging::LogLevel::kDEBUG)
       .value("GRAPH", core::util::logging::LogLevel::kGRAPH)
       .export_values();
+
+
+  py::module ts_sub_mod = m.def_submodule("ts");
+  py::class_<CompileSpec>(ts_sub_mod, "CompileSpec")
+      .def(py::init<>())
+      .def("__str__", &trtorch::pyapi::CompileSpec::stringify)
+      .def("_get_calibrator_handle", &CompileSpec::getPTQCalibratorHandle, "[Internal] gets a handle from a calibrator")
+      .def_readwrite("inputs", &CompileSpec::inputs)
+      .def_readwrite("enabled_precisions", &CompileSpec::enabled_precisions)
+      .def_readwrite("ptq_calibrator", &CompileSpec::ptq_calibrator)
+      .def_readwrite("refit", &CompileSpec::refit)
+      .def_readwrite("sparse_weights", &CompileSpec::sparse_weights)
+      .def_readwrite("disable_tf32", &CompileSpec::disable_tf32)
+      .def_readwrite("debug", &CompileSpec::debug)
+      .def_readwrite("strict_types", &CompileSpec::strict_types)
+      .def_readwrite("device", &CompileSpec::device)
+      .def_readwrite("capability", &CompileSpec::capability)
+      .def_readwrite("num_min_timing_iters", &CompileSpec::num_min_timing_iters)
+      .def_readwrite("num_avg_timing_iters", &CompileSpec::num_avg_timing_iters)
+      .def_readwrite("workspace_size", &CompileSpec::workspace_size)
+      .def_readwrite("max_batch_size", &CompileSpec::max_batch_size)
+      .def_readwrite("torch_fallback", &CompileSpec::torch_fallback)
+      .def_readwrite("truncate_long_and_double", &CompileSpec::truncate_long_and_double);
+
+
+  py::class_<TorchFallback>(ts_sub_mod, "TorchFallback")
+      .def(py::init<>())
+      .def("__str__", &trtorch::pyapi::TorchFallback::to_str)
+      .def_readwrite("enabled", &TorchFallback::enabled)
+      .def_readwrite("min_block_size", &TorchFallback::min_block_size)
+      .def_readwrite("forced_fallback_operators", &TorchFallback::forced_fallback_operators)
+      .def_readwrite("forced_fallback_modules", &TorchFallback::forced_fallback_modules);
+
+  ts_sub_mod.def(
+      "compile_graph",
+      &trtorch::pyapi::CompileGraph,
+      "Ingest a PyTorch JIT module and convert supported subgraphs to TensorRT engines, returns a JIT module with the engines embedded");
+  ts_sub_mod.def(
+      "convert_graph_to_trt_engine",
+      &trtorch::pyapi::ConvertGraphToTRTEngine,
+      "Given a PyTorch JIT Module, convert forward into a TensorRT engine and return a serialized engine");
+  ts_sub_mod.def(
+      "check_method_op_support",
+      &trtorch::pyapi::CheckMethodOperatorSupport,
+      "Takes a module and a method name and checks if the method graph contains purely convertable operators");
+  ts_sub_mod.def(
+      "embed_engine_in_new_module",
+      &trtorch::pyapi::EmbedEngineInNewModule,
+      "Takes a serialized TensorRT engine and compile spec. Wraps it in the forward method of a new TorchScript module");
+
+  ts_sub_mod.doc() = "Torch-TensorRT TorchScript Compiler Internal C Bindings: AOT Compilation for PyTorch JIT to TensorRT";
 }
 
 } // namespace pyapi

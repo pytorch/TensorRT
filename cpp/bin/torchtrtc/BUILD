@@ -8,13 +8,13 @@ config_setting(
 )
 
 cc_binary(
-    name = "trtorchc",
+    name = "torchtrtc",
     srcs = [
         "main.cpp",
     ],
     deps = [
         "//third_party/args",
-        "//cpp:trtorch",
+        "//cpp:torch_tensorrt",
     ] + select({
         ":use_pre_cxx11_abi": [
             "@libtorch_pre_cxx11_abi//:libtorch",

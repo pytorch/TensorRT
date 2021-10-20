@@ -3,8 +3,8 @@ from typing import List, Dict, Any
 
 import torch
 
-from trtorch import _types
-import trtorch._C
+from torch_tensorrt import _enums
+from torch_tensorrt import _C
 
 
 class Input(object):
@@ -30,9 +30,9 @@ class Input(object):
 
     shape_mode = None  #: (trtorch.Input._ShapeMode): Is input statically or dynamically shaped
     shape = None  #: (Tuple or Dict): Either a single Tuple or a dict of tuples defining the input shape. Static shaped inputs will have a single tuple. Dynamic inputs will have a dict of the form ``{ "min_shape": Tuple, "opt_shape": Tuple, "max_shape": Tuple }``
-    dtype = _types.dtype.unknown  #: The expected data type of the input tensor (default: trtorch.dtype.float32)
+    dtype = _enums.dtype.unknown  #: The expected data type of the input tensor (default: trtorch.dtype.float32)
     _explicit_set_dtype = False
-    format = _types.TensorFormat.contiguous  #: The expected format of the input tensor (default: trtorch.TensorFormat.NCHW)
+    format = _enums.TensorFormat.contiguous  #: The expected format of the input tensor (default: trtorch.TensorFormat.NCHW)
 
     def __init__(self, *args, **kwargs):
         """ __init__ Method for trtorch.Input
@@ -130,8 +130,8 @@ class Input(object):
         else:
             raise RuntimeError("Unknown input shape mode")
 
-    def _to_internal(self) -> trtorch._C.Input:
-        internal_in = trtorch._C.Input()
+    def _to_internal(self) -> _C.Input:
+        internal_in = _C.Input()
         if self.shape_mode == Input._ShapeMode.DYNAMIC:
             if not Input._supported_input_size_type(self.shape["min_shape"]):
                 raise TypeError(
@@ -163,7 +163,7 @@ class Input(object):
                 internal_in.opt = self.shape
             internal_in.input_is_dynamic = False
 
-        if self.dtype != _types.dtype.unknown:
+        if self.dtype != _enums.dtype.unknown:
             self._explicit_set_dtype = True
         else:
             self._explicit_set_dtype = False
@@ -185,22 +185,22 @@ class Input(object):
             return False
 
     @staticmethod
-    def _parse_dtype(dtype: Any) -> _types.dtype:
+    def _parse_dtype(dtype: Any) -> _enums.dtype:
         if isinstance(dtype, torch.dtype):
             if dtype == torch.int32:
-                return _types.dtype.int32
+                return _enums.dtype.int32
             elif dtype == torch.half:
-                return _types.dtype.half
+                return _enums.dtype.half
             elif dtype == torch.float:
-                return _types.dtype.float
+                return _enums.dtype.float
             elif dtype == torch.bool:
-                return _types.dtype.bool
+                return _enums.dtype.bool
             else:
                 raise TypeError(
                     "Provided an unsupported data type as an input data type (support: bool, int32, half, float), got: "
                     + str(dtype))
 
-        elif isinstance(dtype, _types.dtype):
+        elif isinstance(dtype, _enums.dtype):
             return dtype
 
         else:
@@ -208,17 +208,17 @@ class Input(object):
                             str(type(dtype)))
 
     @staticmethod
-    def _parse_format(format: Any) -> _types.TensorFormat:
+    def _parse_format(format: Any) -> _enums.TensorFormat:
         if isinstance(format, torch.memory_format):
             if format == torch.contiguous_format:
-                return _types.TensorFormat.contiguous
+                return _enums.TensorFormat.contiguous
             elif format == torch.channels_last:
-                return _types.TensorFormat.channel_last
+                return _enums.TensorFormat.channel_last
             else:
                 raise ValueError(
                     "Provided an unsupported tensor format (support: NHCW/contiguous_format, NHWC/channel_last)")
 
-        elif isinstance(format, _types.TensorFormat):
+        elif isinstance(format, _enums.TensorFormat):
             return format
 
         else:

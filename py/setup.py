@@ -22,7 +22,7 @@ CXX11_ABI = False
 
 JETPACK_VERSION = None
 
-__version__ = '0.5.0a0'
+__version__ = '1.0.0a0'
 
 def get_git_revision_short_hash() -> str:
     return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode('ascii').strip()
@@ -79,9 +79,9 @@ if BAZEL_EXE is None:
         sys.exit("Could not find bazel in PATH")
 
 
-def build_libtrtorch_pre_cxx11_abi(develop=True, use_dist_dir=True, cxx11_abi=False):
+def build_libtorchtrt_pre_cxx11_abi(develop=True, use_dist_dir=True, cxx11_abi=False):
     cmd = [BAZEL_EXE, "build"]
-    cmd.append("//:libtrtorch")
+    cmd.append("//:libtorchtrt")
     if develop:
         cmd.append("--compilation_mode=dbg")
     else:
@@ -100,7 +100,7 @@ def build_libtrtorch_pre_cxx11_abi(develop=True, use_dist_dir=True, cxx11_abi=Fa
         cmd.append("--platforms=//toolchains:jetpack_4.6")
         print("Jetpack version: 4.6")
 
-    print("building libtrtorch")
+    print("building libtorchtrt")
     status_code = subprocess.run(cmd).returncode
 
     if status_code != 0:
@@ -108,23 +108,23 @@ def build_libtrtorch_pre_cxx11_abi(develop=True, use_dist_dir=True, cxx11_abi=Fa
 
 
 def gen_version_file():
-    if not os.path.exists(dir_path + '/trtorch/_version.py'):
-        os.mknod(dir_path + '/trtorch/_version.py')
+    if not os.path.exists(dir_path + '/torch_tensorrt/_version.py'):
+        os.mknod(dir_path + '/torch_tensorrt/_version.py')
 
-    with open(dir_path + '/trtorch/_version.py', 'w') as f:
+    with open(dir_path + '/torch_tensorrt/_version.py', 'w') as f:
         print("creating version file")
         f.write("__version__ = \"" + __version__ + '\"')
 
 
-def copy_libtrtorch(multilinux=False):
-    if not os.path.exists(dir_path + '/trtorch/lib'):
-        os.makedirs(dir_path + '/trtorch/lib')
+def copy_libtorchtrt(multilinux=False):
+    if not os.path.exists(dir_path + '/torch_tensorrt/lib'):
+        os.makedirs(dir_path + '/torch_tensorrt/lib')
 
     print("copying library into module")
     if multilinux:
         copyfile(dir_path + "/build/libtrtorch_build/libtrtorch.so", dir_path + '/trtorch/lib/libtrtorch.so')
     else:
-        os.system("tar -xzf ../bazel-bin/libtrtorch.tar.gz --strip-components=2 -C " + dir_path + "/trtorch")
+        os.system("tar -xzf ../bazel-bin/libtorchtrt.tar.gz --strip-components=2 -C " + dir_path + "/torch_tensorrt")
 
 
 class DevelopCommand(develop):
@@ -138,9 +138,9 @@ class DevelopCommand(develop):
 
     def run(self):
         global CXX11_ABI
-        build_libtrtorch_pre_cxx11_abi(develop=True, cxx11_abi=CXX11_ABI)
+        build_libtorchtrt_pre_cxx11_abi(develop=True, cxx11_abi=CXX11_ABI)
         gen_version_file()
-        copy_libtrtorch()
+        copy_libtorchtrt()
         develop.run(self)
 
 
@@ -155,9 +155,9 @@ class InstallCommand(install):
 
     def run(self):
         global CXX11_ABI
-        build_libtrtorch_pre_cxx11_abi(develop=False, cxx11_abi=CXX11_ABI)
+        build_libtorchtrt_pre_cxx11_abi(develop=False, cxx11_abi=CXX11_ABI)
         gen_version_file()
-        copy_libtrtorch()
+        copy_libtorchtrt()
         install.run(self)
 
 
@@ -172,16 +172,16 @@ class BdistCommand(bdist_wheel):
 
     def run(self):
         global CXX11_ABI
-        build_libtrtorch_pre_cxx11_abi(develop=False, cxx11_abi=CXX11_ABI)
+        build_libtorchtrt_pre_cxx11_abi(develop=False, cxx11_abi=CXX11_ABI)
         gen_version_file()
-        copy_libtrtorch()
+        copy_libtorchtrt()
         bdist_wheel.run(self)
 
 
 class CleanCommand(Command):
     """Custom clean command to tidy up the project root."""
     PY_CLEAN_FILES = [
-        './build', './dist', './trtorch/__pycache__', './trtorch/lib', './trtorch/include', './trtorch/bin', './*.pyc',
+        './build', './dist', './torch_tensorrt/__pycache__', './torch_tensorrt/lib', './torch_tensorrt/include', './torch_tensorrt/bin', './*.pyc',
         './*.tgz', './*.egg-info'
     ]
     description = "Command to tidy up the project root"
@@ -207,25 +207,26 @@ class CleanCommand(Command):
 
 ext_modules = [
     cpp_extension.CUDAExtension(
-        'trtorch._C', [
-            'trtorch/csrc/trtorch_py.cpp',
-            'trtorch/csrc/tensorrt_backend.cpp',
-            'trtorch/csrc/tensorrt_classes.cpp',
-            'trtorch/csrc/register_tensorrt_classes.cpp',
+        'torch_tensorrt._C', [
+            'torch_tensorrt/csrc/torch_tensorrt_py.cpp',
+            'torch_tensorrt/csrc/tensorrt_backend.cpp',
+            'torch_tensorrt/csrc/tensorrt_classes.cpp',
+            'torch_tensorrt/csrc/register_tensorrt_classes.cpp',
         ],
-        library_dirs=[(dir_path + '/trtorch/lib/'), "/opt/conda/lib/python3.6/config-3.6m-x86_64-linux-gnu"],
-        libraries=["trtorch"],
+        library_dirs=[(dir_path + '/torch_tensorrt/lib/'), "/opt/conda/lib/python3.6/config-3.6m-x86_64-linux-gnu"],
+        libraries=["torchtrt"],
         include_dirs=[
-            dir_path + "trtorch/csrc",
-            dir_path + "/../",
+            dir_path + "torch_tensorrt/csrc",
+            dir_path + "torch_tensorrt/include",
             dir_path + "/../bazel-TRTorch/external/tensorrt/include",
+            dir_path + "/../"
         ],
         extra_compile_args=[
             "-Wno-deprecated",
             "-Wno-deprecated-declarations",
         ] + (["-D_GLIBCXX_USE_CXX11_ABI=1"] if CXX11_ABI else ["-D_GLIBCXX_USE_CXX11_ABI=0"]),
         extra_link_args=[
-            "-Wno-deprecated", "-Wno-deprecated-declarations", "-Wl,--no-as-needed", "-ltrtorch",
+            "-Wno-deprecated", "-Wno-deprecated-declarations", "-Wl,--no-as-needed", "-ltorchtrt",
             "-Wl,-rpath,$ORIGIN/lib", "-lpthread", "-ldl", "-lutil", "-lrt", "-lm", "-Xlinker", "-export-dynamic"
         ] + (["-D_GLIBCXX_USE_CXX11_ABI=1"] if CXX11_ABI else ["-D_GLIBCXX_USE_CXX11_ABI=0"]),
         undef_macros=["NDEBUG"])
@@ -234,12 +235,12 @@ ext_modules = [
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
-setup(name='trtorch',
+setup(name='torch_tensorrt',
       version=__version__,
       author='NVIDIA',
       author_email='narens@nvidia.com',
-      url='https://nvidia.github.io/TRTorch',
-      description='A compiler backend for PyTorch JIT targeting NVIDIA GPUs',
+      url='https://nvidia.github.io/torch-tensorrt',
+      description='Torch-TensorRT is a package which allows users to automatically compile PyTorch and TorchScript modules to TensorRT while remaining in PyTorch',
       long_description_content_type='text/markdown',
       long_description=long_description,
       ext_modules=ext_modules,
@@ -258,7 +259,7 @@ setup(name='trtorch',
       license="BSD",
       packages=find_packages(),
       classifiers=[
-          "Development Status :: 4 - Beta", "Environment :: GPU :: NVIDIA CUDA",
+          "Development Status :: 5 - Stable", "Environment :: GPU :: NVIDIA CUDA",
           "License :: OSI Approved :: BSD License", "Intended Audience :: Developers",
           "Intended Audience :: Science/Research", "Operating System :: POSIX :: Linux", "Programming Language :: C++",
           "Programming Language :: Python", "Programming Language :: Python :: Implementation :: CPython",
@@ -268,18 +269,18 @@ setup(name='trtorch',
       python_requires='>=3.6',
       include_package_data=True,
       package_data={
-          'trtorch': [
-              'lib/*', 'include/trtorch/*.h', 'include/trtorch/core/*.h', 'include/trtorch/core/conversion/*.h',
-              'include/trtorch/core/conversion/conversionctx/*.h', 'include/trtorch/core/conversion/converters/*.h',
-              'include/trtorch/core/conversion/evaluators/*.h', 'include/trtorch/core/conversion/tensorcontainer/*.h',
-              'include/trtorch/core/conversion/var/*.h', 'include/trtorch/core/ir/*.h',
-              'include/trtorch/core/lowering/*.h', 'include/trtorch/core/lowering/passes/*.h',
-              'include/trtorch/core/partitioning/*.h', 'include/trtorch/core/plugins/*.h',
-              'include/trtorch/core/plugins/impl/*.h', 'include/trtorch/core/runtime/*.h',
-              'include/trtorch/core/util/*.h', 'include/trtorch/core/util/logging/*.h', 'bin/*', 'BUILD', 'WORKSPACE'
+          'torch_tensorrt': [
+              'lib/*', 'include/torch_tensorrt/*.h', 'include/torch_tensorrt/core/*.h', 'include/torch_tensorrt/core/conversion/*.h',
+              'include/torch_tensorrt/core/conversion/conversionctx/*.h', 'include/torch_tensorrt/core/conversion/converters/*.h',
+              'include/torch_tensorrt/core/conversion/evaluators/*.h', 'include/torch_tensorrt/core/conversion/tensorcontainer/*.h',
+              'include/torch_tensorrt/core/conversion/var/*.h', 'include/torch_tensorrt/core/ir/*.h',
+              'include/torch_tensorrt/core/lowering/*.h', 'include/torch_tensorrt/core/lowering/passes/*.h',
+              'include/torch_tensorrt/core/partitioning/*.h', 'include/torch_tensorrt/core/plugins/*.h',
+              'include/torch_tensorrt/core/plugins/impl/*.h', 'include/torch_tensorrt/core/runtime/*.h',
+              'include/torch_tensorrt/core/util/*.h', 'include/torch_tensorrt/core/util/logging/*.h', 'bin/*', 'BUILD', 'WORKSPACE'
           ],
       },
       exclude_package_data={
           '': ['*.cpp'],
-          'trtorch': ['csrc/*.cpp'],
+          'torch_tensorrt': ['csrc/*.cpp'],
       })

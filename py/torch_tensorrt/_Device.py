@@ -1,8 +1,8 @@
 import torch
 
-from trtorch import _types
-import trtorch.logging
-import trtorch._C
+from torch_tensorrt import _enums
+from torch_tensorrt import logging
+from torch_tensorrt import _C
 
 import warnings
 
@@ -49,28 +49,28 @@ class Device(object):
                 raise TypeError("When specifying Device through positional argument, argument must be str")
             else:
                 (self.device_type, id) = Device._parse_device_str(args[0])
-                if self.device_type == _types.DeviceType.GPU:
+                if self.device_type == _enums.DeviceType.GPU:
                     self.gpu_id = id
                 else:
                     self.dla_core = id
                     self.gpu_id = 0
-                    trtorch.logging.log(trtorch.logging.Level.Warning,
-                                        "Setting GPU id to 0 for device because device 0 manages DLA on Xavier")
+                    logging.log(logging.Level.Warning,
+                                "Setting GPU id to 0 for device because device 0 manages DLA on Xavier")
 
         elif len(args) == 0:
             if "gpu_id" in kwargs or "dla_core" in kwargs:
                 if "dla_core" in kwargs:
-                    self.device_type = _types.DeviceType.DLA
+                    self.device_type = _enums.DeviceType.DLA
                     self.dla_core = kwargs["dla_core"]
                     if "gpu_id" in kwargs:
                         self.gpu_id = kwargs["gpu_id"]
                     else:
                         self.gpu_id = 0
-                        trtorch.logging.log(trtorch.logging.Level.Warning,
-                                            "Setting GPU id to 0 for device because device 0 manages DLA on Xavier")
+                        logging.log(logging.Level.Warning,
+                                    "Setting GPU id to 0 for device because device 0 manages DLA on Xavier")
                 else:
                     self.gpu_id = kwargs["gpu_id"]
-                    self.device_type = _types.DeviceType.GPU
+                    self.device_type = _enums.DeviceType.GPU
             else:
                 raise ValueError(
                     "Either gpu_id or dla_core or both must be defined if no string with device specs is provided as an arg"
@@ -88,10 +88,10 @@ class Device(object):
 
     def __str__(self) -> str:
         return "Device(type={}, gpu_id={}".format(self.device_type, self.gpu_id) \
-            + ")" if self.device_type == _types.DeviceType.GPU else ", dla_core={}, allow_gpu_fallback={}".format(self.dla_core, self.allow_gpu_fallback)
+            + ")" if self.device_type == _enums.DeviceType.GPU else ", dla_core={}, allow_gpu_fallback={}".format(self.dla_core, self.allow_gpu_fallback)
 
-    def _to_internal(self) -> trtorch._C.Device:
-        internal_dev = trtorch._C.Device()
+    def _to_internal(self) -> _C.Device:
+        internal_dev = _C.Device()
         internal_dev.device_type = self.device_type
         internal_dev.gpu_id = self.gpu_id
         internal_dev.dla_core = self.dla_core
@@ -108,9 +108,9 @@ class Device(object):
     @classmethod
     def _current_device(cls):
         try:
-            dev = trtorch._C._get_current_device()
+            dev = _C._get_current_device()
         except RuntimeError:
-            trtorch.logging.log(trtorch.logging.Level.Error, "Cannot get current device")
+            logging.log(logging.Level.Error, "Cannot get current device")
             return None
         return cls(gpu_id=dev.gpu_id)
 
@@ -119,6 +119,6 @@ class Device(object):
         s = s.lower()
         spec = s.split(':')
         if spec[0] == "gpu" or spec[0] == "cuda":
-            return (_types.DeviceType.GPU, int(spec[1]))
+            return (_enums.DeviceType.GPU, int(spec[1]))
         elif spec[0] == "dla":
-            return (_types.DeviceType.DLA, int(spec[1]))
+            return (_enums.DeviceType.DLA, int(spec[1]))

@@ -1,10 +1,10 @@
 from typing import List, Dict, Any, Set
 import torch
-import trtorch._C
-from trtorch import _types
-from trtorch.Input import Input
-from trtorch.Device import Device
-from trtorch._types import EngineCapability
+from torch_tensorrt import _C
+import torch_tensorrt._C.ts as _ts_C
+from torch_tensorrt import _enums
+from torch_tensorrt._Input import Input
+from torch_tensorrt._Device import Device
 
 import warnings
 
@@ -53,19 +53,19 @@ def _parse_input_ranges(input_sizes: List) -> List:
     return parsed_input_sizes
 
 
-def _parse_op_precision(precision: Any) -> _types.dtype:
+def _parse_op_precision(precision: Any) -> _enums.dtype:
     if isinstance(precision, torch.dtype):
         if precision == torch.int8:
-            return _types.dtype.int8
+            return _enums.dtype.int8
         elif precision == torch.half:
-            return _types.dtype.half
+            return _enums.dtype.half
         elif precision == torch.float:
-            return _types.dtype.float
+            return _enums.dtype.float
         else:
             raise TypeError("Provided an unsupported dtype as operating precision (support: int8, half, float), got: " +
                             str(precision))
 
-    elif isinstance(precision, _types.dtype):
+    elif isinstance(precision, _enums.dtype):
         return precision
 
     else:
@@ -83,19 +83,19 @@ def _parse_enabled_precisions(precisions: Any) -> Set:
     return parsed_precisions
 
 
-def _parse_device_type(device: Any) -> _types.DeviceType:
+def _parse_device_type(device: Any) -> _enums.DeviceType:
     if isinstance(device, torch.device):
         if device.type == 'cuda':
-            return _types.DeviceType.gpu
+            return _enums.DeviceType.gpu
         else:
             ValueError("Got a device type other than GPU or DLA (type: " + str(device.type) + ")")
-    elif isinstance(device, _types.DeviceType):
+    elif isinstance(device, _enums.DeviceType):
         return device
     elif isinstance(device, str):
         if device == "gpu" or device == "GPU":
-            return _types.DeviceType.gpu
+            return _enums.DeviceType.gpu
         elif device == "dla" or device == "DLA":
-            return _types.DeviceType.dla
+            return _enums.DeviceType.dla
         else:
             ValueError("Got a device type other than GPU or DLA (type: " + str(device) + ")")
     else:
@@ -103,13 +103,13 @@ def _parse_device_type(device: Any) -> _types.DeviceType:
                         str(type(device)))
 
 
-def _parse_device(device_info: Any) -> trtorch._C.Device:
+def _parse_device(device_info: Any) -> _C.Device:
     if isinstance(device_info, dict):
-        info = trtorch._C.Device()
+        info = _C.Device()
         if "device_type" not in device_info:
             raise KeyError("Device type is required parameter")
         else:
-            assert isinstance(device_info["device_type"], _types.DeviceType)
+            assert isinstance(device_info["device_type"], _enums.DeviceType)
             info.device_type = _parse_device_type(device_info["device_type"])
 
         if "gpu_id" in device_info:
@@ -134,8 +134,8 @@ def _parse_device(device_info: Any) -> trtorch._C.Device:
             "Unsupported data for device specification. Expected either a dict, trtorch.Device or torch.Device")
 
 
-def _parse_torch_fallback(fallback_info: Dict[str, Any]) -> trtorch._C.TorchFallback:
-    info = trtorch._C.TorchFallback()
+def _parse_torch_fallback(fallback_info: Dict[str, Any]) -> _ts_C.TorchFallback:
+    info = _C.TorchFallback()
     if "enabled" not in fallback_info:
         raise KeyError("Enabled is required parameter")
     else:
@@ -156,19 +156,19 @@ def _parse_torch_fallback(fallback_info: Dict[str, Any]) -> trtorch._C.TorchFall
     return info
 
 
-def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
-    info = trtorch._C.CompileSpec()
+def _parse_compile_spec(compile_spec: Dict[str, Any]) -> _ts_C.CompileSpec:
+    info = _ts_C.CompileSpec()
     if "inputs" not in compile_spec:
         raise KeyError(
             "Module input definitions are requried to compile module. Provide a list of trtorch.Input keyed to \"inputs\" in the compile spec"
         )
 
     if "inputs" in compile_spec:
-        if not all([isinstance(i, torch.Tensor) or isinstance(i, trtorch.Input) for i in compile_spec["inputs"]]):
+        if not all([isinstance(i, torch.Tensor) or isinstance(i, Input) for i in compile_spec["inputs"]]):
             raise KeyError("Input specs should be either trtorch.Input or torch.Tensor, found types: {}".format(
                 [typeof(i) for i in compile_spec["inputs"]]))
 
-        inputs = [trtorch.Input._from_tensor(i) if isinstance(i, torch.Tensor) else i for i in compile_spec["inputs"]]
+        inputs = [Input._from_tensor(i) if isinstance(i, torch.Tensor) else i for i in compile_spec["inputs"]]
         info.inputs = [i._to_internal() for i in inputs]
 
     assert (len(info.inputs) > 0), "Require at least one input definition to compile model"
@@ -180,16 +180,6 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
 
     if "enabled_precisions" in compile_spec:
         info.enabled_precisions = _parse_enabled_precisions(compile_spec["enabled_precisions"])
-        # We want default behavior to match PyTorch, so in the case the user did not explicitly set the dtype for inputs they
-        # will follow PyTorch convetions
-        for i in info.inputs:
-            if not i._explicit_set_dtype:
-                if _types.dtype.int8 in info.enabled_precisions:
-                    i.dtype = _types.dtype.float32
-                elif _types.dtype.half in info.enabled_precisions:
-                    i.dtype = _types.dtype.float16
-                else:
-                    i.dtype = _types.dtype.float32
 
     if "calibrator" in compile_spec:
         info.ptq_calibrator = compile_spec["calibrator"]
@@ -218,7 +208,7 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> trtorch._C.CompileSpec:
         info.device = _parse_device(compile_spec["device"])
 
     if "capability" in compile_spec:
-        assert isinstance(compile_spec["capability"], _types.EngineCapability)
+        assert isinstance(compile_spec["capability"], _enums.EngineCapability)
         info.capability = compile_spec["capability"]
 
     if "num_min_timing_iters" in compile_spec:
@@ -255,7 +245,7 @@ def TensorRTCompileSpec(inputs=[],
                         refit=False,
                         debug=False,
                         strict_types=False,
-                        capability=EngineCapability.default,
+                        capability=_enums.EngineCapability.default,
                         num_min_timing_iters=2,
                         num_avg_timing_iters=1,
                         workspace_size=0,

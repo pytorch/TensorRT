@@ -1,8 +1,8 @@
 from enum import Enum
-from trtorch._C import _get_logging_prefix, _set_logging_prefix, \
-                        _get_reportable_log_level, _set_reportable_log_level, \
-                        _get_is_colored_output_on,  _set_is_colored_output_on, \
-                        _log, LogLevel
+from torch_tensorrt._C import _get_logging_prefix, _set_logging_prefix, \
+                              _get_reportable_log_level, _set_reportable_log_level, \
+                              _get_is_colored_output_on,  _set_is_colored_output_on, \
+                               _log, LogLevel
 
 
 class Level(Enum):

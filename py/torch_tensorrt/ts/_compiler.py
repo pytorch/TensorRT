@@ -2,11 +2,10 @@ from typing import List, Dict, Any
 import torch
 from torch import nn
 
-import trtorch._C
-from trtorch._types import EngineCapability
-from trtorch._compile_spec import _parse_compile_spec, _parse_device
-from trtorch._version import __version__
-from trtorch.Device import Device
+import torch_tensorrt._C.ts as _C
+from torch_tensorrt import _enums
+from torch_tensorrt.ts._compile_spec import _parse_compile_spec, _parse_device
+from torch_tensorrt._Device import Device
 from types import FunctionType
 
 
@@ -19,7 +18,7 @@ def compile(module: torch.jit.ScriptModule,
             refit=False,
             debug=False,
             strict_types=False,
-            capability=EngineCapability.default,
+            capability=_enums.EngineCapability.default,
             num_min_timing_iters=2,
             num_avg_timing_iters=1,
             workspace_size=0,
@@ -117,7 +116,7 @@ def compile(module: torch.jit.ScriptModule,
         }
     }
 
-    compiled_cpp_mod = trtorch._C.compile_graph(module._c, _parse_compile_spec(spec))
+    compiled_cpp_mod = _C.compile_graph(module._c, _parse_compile_spec(spec))
     compiled_module = torch.jit._recursive.wrap_cpp_module(compiled_cpp_mod)
     return compiled_module
 
@@ -132,7 +131,7 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule,
                                  refit=False,
                                  debug=False,
                                  strict_types=False,
-                                 capability=EngineCapability.default,
+                                 capability=_enums.EngineCapability.default,
                                  num_min_timing_iters=2,
                                  num_avg_timing_iters=1,
                                  workspace_size=0,
@@ -209,7 +208,7 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule,
         "truncate_long_and_double": truncate_long_and_double
     }
 
-    return trtorch._C.convert_graph_to_trt_engine(module._c, method_name, _parse_compile_spec(compile_spec))
+    return _C.convert_graph_to_trt_engine(module._c, method_name, _parse_compile_spec(compile_spec))
 
 
 def embed_engine_in_new_module(serialized_engine: bytes, device=Device._current_device()) -> torch.jit.ScriptModule:
@@ -231,7 +230,7 @@ def embed_engine_in_new_module(serialized_engine: bytes, device=Device._current_
     Returns:
         torch.jit.ScriptModule: New TorchScript module with engine embedded
     """
-    cpp_mod = trtorch._C.embed_engine_in_new_module(serialized_engine, _parse_device(device))
+    cpp_mod = _C.embed_engine_in_new_module(serialized_engine, _parse_device(device))
     return torch.jit._recursive.wrap_cpp_module(cpp_mod)
 
 
@@ -249,25 +248,4 @@ def check_method_op_support(module: torch.jit.ScriptModule, method_name: str) ->
     Returns:
         bool: True if supported Method
     """
-    return trtorch._C.check_method_op_support(module._c, method_name)
-
-
-def dump_build_info():
-    """Prints build information about the TRTorch distribution to stdout
-    """
-    print(get_build_info())
-
-
-def get_build_info() -> str:
-    """Returns a string containing the build information of TRTorch distribution
-
-    Returns:
-        str: String containing the build information for TRTorch distribution
-    """
-    build_info = trtorch._C.get_build_info()
-    build_info = "TRTorch Version: " + str(__version__) + '\n' + build_info
-    return build_info
-
-
-def set_device(gpu_id):
-    trtorch._C.set_device(gpu_id)
+    return _C.check_method_op_support(module._c, method_name)

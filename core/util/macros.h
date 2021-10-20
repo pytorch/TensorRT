@@ -11,20 +11,20 @@
     l.log(sev, ss.str());        \
   } while (0)
 
-#define LOG_GRAPH_GLOBAL(s) TRTORCH_LOG(core::util::logging::get_logger(), core::util::logging::LogLevel::kGRAPH, s)
-#define LOG_DEBUG_GLOBAL(s) TRTORCH_LOG(core::util::logging::get_logger(), core::util::logging::LogLevel::kDEBUG, s)
-#define LOG_INFO_GLOBAL(s) TRTORCH_LOG(core::util::logging::get_logger(), core::util::logging::LogLevel::kINFO, s)
-#define LOG_WARNING_GLOBAL(s) TRTORCH_LOG(core::util::logging::get_logger(), core::util::logging::LogLevel::kWARNING, s)
-#define LOG_ERROR_GLOBAL(s) TRTORCH_LOG(core::util::logging::get_logger(), core::util::logging::LogLevel::kERROR, s)
+#define LOG_GRAPH_GLOBAL(s) TRTORCH_LOG(trtorch::core::util::logging::get_logger(), trtorch::core::util::logging::LogLevel::kGRAPH, s)
+#define LOG_DEBUG_GLOBAL(s) TRTORCH_LOG(trtorch::core::util::logging::get_logger(), trtorch::core::util::logging::LogLevel::kDEBUG, s)
+#define LOG_INFO_GLOBAL(s) TRTORCH_LOG(trtorch::core::util::logging::get_logger(), trtorch::core::util::logging::LogLevel::kINFO, s)
+#define LOG_WARNING_GLOBAL(s) TRTORCH_LOG(trtorch::core::util::logging::get_logger(), trtorch::core::util::logging::LogLevel::kWARNING, s)
+#define LOG_ERROR_GLOBAL(s) TRTORCH_LOG(trtorch::core::util::logging::get_logger(), trtorch::core::util::logging::LogLevel::kERROR, s)
 #define LOG_INTERNAL_ERROR_GLOBAL(s) \
-  TRTORCH_LOG(core::util::logging::get_logger(), core::util::logging::LogLevel::kINTERNAL_ERROR, s)
+  TRTORCH_LOG(trtorch::core::util::logging::get_logger(), trtorch::core::util::logging::LogLevel::kINTERNAL_ERROR, s)
 
-#define LOG_GRAPH_OWN(l, s) TRTORCH_LOG(l, core::util::logging::LogLevel::kGRAPH, s)
-#define LOG_DEBUG_OWN(l, s) TRTORCH_LOG(l, core::util::logging::LogLevel::kDEBUG, s)
-#define LOG_INFO_OWN(l, s) TRTORCH_LOG(l, core::util::logging::LogLevel::kINFO, s)
-#define LOG_WARNING_OWN(l, s) TRTORCH_LOG(l, core::util::logging::LogLevel::kWARNING, s)
-#define LOG_ERROR_OWN(l, s) TRTORCH_LOG(l, core::util::logging::LogLevel::kERROR, s)
-#define LOG_INTERNAL_ERROR_OWN(l, s) TRTORCH_LOG(l, core::util::logging::LogLevel::kINTERNAL_ERROR, s)
+#define LOG_GRAPH_OWN(l, s) TRTORCH_LOG(l, trtorch::core::util::logging::LogLevel::kGRAPH, s)
+#define LOG_DEBUG_OWN(l, s) TRTORCH_LOG(l, trtorch::core::util::logging::LogLevel::kDEBUG, s)
+#define LOG_INFO_OWN(l, s) TRTORCH_LOG(l, trtorch::core::util::logging::LogLevel::kINFO, s)
+#define LOG_WARNING_OWN(l, s) TRTORCH_LOG(l, trtorch::core::util::logging::LogLevel::kWARNING, s)
+#define LOG_ERROR_OWN(l, s) TRTORCH_LOG(l, trtorch::core::util::logging::LogLevel::kERROR, s)
+#define LOG_INTERNAL_ERROR_OWN(l, s) TRTORCH_LOG(l, trtorch::core::util::logging::LogLevel::kINTERNAL_ERROR, s)
 
 #ifdef _MSC_VER
 

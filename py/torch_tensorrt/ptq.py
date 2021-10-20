@@ -2,19 +2,18 @@ from typing import List, Dict, Any
 import torch
 import os
 
-import trtorch._C
-from trtorch._compile_spec import _parse_compile_spec
-from trtorch._version import __version__
-from trtorch.logging import *
+from torch_tensorrt import _C
+from torch_tensorrt._version import __version__
+from torch_tensorrt.logging import *
 from types import FunctionType
 from enum import Enum
 
 
 class CalibrationAlgo(Enum):
-    ENTROPY_CALIBRATION = trtorch._C.CalibrationAlgo.ENTROPY_CALIBRATION
-    ENTROPY_CALIBRATION_2 = trtorch._C.CalibrationAlgo.ENTROPY_CALIBRATION_2
-    LEGACY_CALIBRATION = trtorch._C.CalibrationAlgo.LEGACY_CALIBRATION
-    MINMAX_CALIBRATION = trtorch._C.CalibrationAlgo.MINMAX_CALIBRATION
+    ENTROPY_CALIBRATION = _C.CalibrationAlgo.ENTROPY_CALIBRATION
+    ENTROPY_CALIBRATION_2 = _C.CalibrationAlgo.ENTROPY_CALIBRATION_2
+    LEGACY_CALIBRATION = _C.CalibrationAlgo.LEGACY_CALIBRATION
+    MINMAX_CALIBRATION = _C.CalibrationAlgo.MINMAX_CALIBRATION
 
 
 def get_cache_mode_batch(self):
@@ -73,7 +72,7 @@ class DataLoaderCalibrator(object):
 
     def __new__(cls, *args, **kwargs):
         dataloader = args[0]
-        algo_type = kwargs.get("algo_type", trtorch.ptq.CalibrationAlgo.ENTROPY_CALIBRATION_2)
+        algo_type = kwargs.get("algo_type", CalibrationAlgo.ENTROPY_CALIBRATION_2)
         cache_file = kwargs.get("cache_file", None)
         use_cache = kwargs.get("use_cache", False)
         device = kwargs.get("device", torch.device("cuda:0"))
@@ -108,13 +107,13 @@ class DataLoaderCalibrator(object):
 
         # Using type metaclass to construct calibrator class based on algorithm type
         if algo_type == CalibrationAlgo.ENTROPY_CALIBRATION:
-            return type('DataLoaderCalibrator', (trtorch._C.IInt8EntropyCalibrator,), attribute_mapping)()
+            return type('DataLoaderCalibrator', (_C.IInt8EntropyCalibrator,), attribute_mapping)()
         elif algo_type == CalibrationAlgo.ENTROPY_CALIBRATION_2:
-            return type('DataLoaderCalibrator', (trtorch._C.IInt8MinMaxCalibrator,), attribute_mapping)()
+            return type('DataLoaderCalibrator', (_C.IInt8MinMaxCalibrator,), attribute_mapping)()
         elif algo_type == CalibrationAlgo.LEGACY_CALIBRATION:
-            return type('DataLoaderCalibrator', (trtorch._C.IInt8LegacyCalibrator,), attribute_mapping)()
+            return type('DataLoaderCalibrator', (_C.IInt8LegacyCalibrator,), attribute_mapping)()
         elif algo_type == CalibrationAlgo.MINMAX_CALIBRATION:
-            return type('DataLoaderCalibrator', (trtorch._C.IInt8MinMaxCalibrator,), attribute_mapping)()
+            return type('DataLoaderCalibrator', (_C.IInt8MinMaxCalibrator,), attribute_mapping)()
         else:
             log(
                 Level.Error,
@@ -135,7 +134,7 @@ class CacheCalibrator(object):
 
     def __new__(cls, *args, **kwargs):
         cache_file = args[0]
-        algo_type = kwargs.get("algo_type", trtorch.ptq.CalibrationAlgo.ENTROPY_CALIBRATION_2)
+        algo_type = kwargs.get("algo_type", CalibrationAlgo.ENTROPY_CALIBRATION_2)
 
         if os.path.isfile(cache_file):
             log(Level.Debug, "Using existing cache_file {} for calibration".format(cache_file))
@@ -153,13 +152,13 @@ class CacheCalibrator(object):
         }
         # Using type metaclass to construct calibrator class based on algorithm type
         if algo_type == CalibrationAlgo.ENTROPY_CALIBRATION:
-            return type('DataLoaderCalibrator', (trtorch._C.IInt8EntropyCalibrator,), attribute_mapping)()
+            return type('DataLoaderCalibrator', (_C.IInt8EntropyCalibrator,), attribute_mapping)()
         elif algo_type == CalibrationAlgo.ENTROPY_CALIBRATION_2:
-            return type('DataLoaderCalibrator', (trtorch._C.IInt8MinMaxCalibrator,), attribute_mapping)()
+            return type('DataLoaderCalibrator', (_C.IInt8MinMaxCalibrator,), attribute_mapping)()
         elif algo_type == CalibrationAlgo.LEGACY_CALIBRATION:
-            return type('DataLoaderCalibrator', (trtorch._C.IInt8LegacyCalibrator,), attribute_mapping)()
+            return type('DataLoaderCalibrator', (_C.IInt8LegacyCalibrator,), attribute_mapping)()
         elif algo_type == CalibrationAlgo.MINMAX_CALIBRATION:
-            return type('DataLoaderCalibrator', (trtorch._C.IInt8MinMaxCalibrator,), attribute_mapping)()
+            return type('DataLoaderCalibrator', (_C.IInt8MinMaxCalibrator,), attribute_mapping)()
         else:
             log(
                 Level.Error,

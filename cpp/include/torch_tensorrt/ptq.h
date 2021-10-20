@@ -17,7 +17,7 @@
 
 #include "NvInfer.h"
 #include "torch/torch.h"
-#include "trtorch/logging.h"
+#include "torch_tensorrt/logging.h"
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
 namespace nvinfer1 {
@@ -25,14 +25,14 @@ class IInt8Calibrator;
 class IInt8EntropyCalibrator2;
 } // namespace nvinfer1
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace ptq {
 bool get_batch_impl(void* bindings[], const char* names[], int nbBindings, torch::Tensor& data);
 }
-} // namespace trtorch
+} // namespace torch_tensorrt
 #endif // DOXYGEN_SHOULD_SKIP_THIS
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace ptq {
 
 /**
@@ -314,7 +314,7 @@ class Int8CacheCalibrator : Algorithm {
  */
 
 template <typename Algorithm = nvinfer1::IInt8EntropyCalibrator2, typename DataLoader>
-TRTORCH_API inline Int8Calibrator<Algorithm, DataLoader> make_int8_calibrator(
+TORCHTRT_API inline Int8Calibrator<Algorithm, DataLoader> make_int8_calibrator(
     DataLoader dataloader,
     const std::string& cache_file_path,
     bool use_cache) {
@@ -348,7 +348,7 @@ TRTORCH_API inline Int8Calibrator<Algorithm, DataLoader> make_int8_calibrator(
  * @return Int8CacheCalibrator<Algorithm>
  */
 template <typename Algorithm = nvinfer1::IInt8EntropyCalibrator2>
-TRTORCH_API inline Int8CacheCalibrator<Algorithm> make_int8_cache_calibrator(const std::string& cache_file_path) {
+TORCHTRT_API inline Int8CacheCalibrator<Algorithm> make_int8_cache_calibrator(const std::string& cache_file_path) {
   return Int8CacheCalibrator<Algorithm>(cache_file_path);
 }
 

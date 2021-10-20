@@ -8,9 +8,9 @@
 #pragma once
 
 #include <string>
-#include "trtorch/macros.h"
+#include "torch_tensorrt/macros.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace logging {
 /**
  * Emum for setting message severity
@@ -31,8 +31,8 @@ enum Level {
 };
 
 // Are these ones necessary for the user?
-TRTORCH_API std::string get_logging_prefix();
-TRTORCH_API void set_logging_prefix(std::string prefix);
+TORCHTRT_API std::string get_logging_prefix();
+TORCHTRT_API void set_logging_prefix(std::string prefix);
 
 /**
  * @brief Sets the level that logging information needs to be to be added to the
@@ -41,7 +41,7 @@ TRTORCH_API void set_logging_prefix(std::string prefix);
  * @param lvl: trtorch::logging::Level - Level that messages need to be at or
  * above to be added to the log
  */
-TRTORCH_API void set_reportable_log_level(Level lvl);
+TORCHTRT_API void set_reportable_log_level(Level lvl);
 
 /**
  * @brief Sets if logging prefix will be colored (helpful when debugging but not
@@ -49,21 +49,21 @@ TRTORCH_API void set_reportable_log_level(Level lvl);
  *
  * @param colored_output_on: bool - If the output will be colored or not
  */
-TRTORCH_API void set_is_colored_output_on(bool colored_output_on);
+TORCHTRT_API void set_is_colored_output_on(bool colored_output_on);
 
 /**
  * @brief Get the current reportable log level
  *
- * @return TRTORCH_API get_reportable_log_level
+ * @return TORCHTRT_API get_reportable_log_level
  */
-TRTORCH_API Level get_reportable_log_level();
+TORCHTRT_API Level get_reportable_log_level();
 
 /**
  * @brief Is colored output enabled?
  *
- * @return TRTORCH_API get_is_colored_output_on
+ * @return TORCHTRT_API get_is_colored_output_on
  */
-TRTORCH_API bool get_is_colored_output_on();
+TORCHTRT_API bool get_is_colored_output_on();
 
 /**
  * @brief Adds a message to the global log
@@ -72,6 +72,6 @@ TRTORCH_API bool get_is_colored_output_on();
  * @param msg: std::string - Message to be logged
  */
 // Dont know if we want this?
-TRTORCH_API void log(Level lvl, std::string msg);
+TORCHTRT_API void log(Level lvl, std::string msg);
 } // namespace logging
 } // namespace trtorch

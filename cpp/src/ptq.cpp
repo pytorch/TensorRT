@@ -1,4 +1,4 @@
-#include "trtorch/ptq.h"
+#include "torch_tensorrt/ptq.h"
 #include "torch/torch.h"
 
 namespace trtorch {
