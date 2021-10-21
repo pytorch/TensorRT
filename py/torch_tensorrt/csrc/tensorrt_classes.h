@@ -50,7 +50,7 @@ struct Input : torch::CustomClassHolder {
   ADD_FIELD_GET_SET(max, std::vector<int64_t>);
   ADD_FIELD_GET_SET(input_is_dynamic, bool);
   ADD_FIELD_GET_SET(explicit_set_dtype, bool);
-  ADD_ENUM_GET_SET(dtype, DataType, static_cast<int64_t>(DataType::kBool));
+  ADD_ENUM_GET_SET(dtype, DataType, static_cast<int64_t>(DataType::kUnknown));
   ADD_ENUM_GET_SET(format, TensorFormat, static_cast<int64_t>(TensorFormat::kContiguous));
 
   core::ir::Input toInternalInput();

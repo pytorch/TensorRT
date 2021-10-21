@@ -1,5 +1,5 @@
 import unittest
-import trtorch
+import torch_tensorrt as torchtrt
 import torch
 import torchvision.models as models
 
@@ -13,19 +13,19 @@ class TestToBackendLowering(ModelTestCase):
         self.scripted_model = torch.jit.script(self.model)
         self.spec = {
             "forward":
-                trtorch.TensorRTCompileSpec({
-                    "inputs": [trtorch.Input([1, 3, 300, 300])],
-                    "enabled_precision": {torch.float},
+                torchtrt.ts.TensorRTCompileSpec(**{
+                    "inputs": [torchtrt.Input([1, 3, 300, 300])],
+                    "enabled_precisions": {torch.float},
                     "refit": False,
                     "debug": False,
                     "strict_types": False,
                     "device": {
-                        "device_type": trtorch.DeviceType.GPU,
+                        "device_type": torchtrt.DeviceType.GPU,
                         "gpu_id": 0,
                         "dla_core": 0,
                         "allow_gpu_fallback": True
                     },
-                    "capability": trtorch.EngineCapability.default,
+                    "capability": torchtrt.EngineCapability.default,
                     "num_min_timing_iters": 2,
                     "num_avg_timing_iters": 1,
                     "max_batch_size": 0,
