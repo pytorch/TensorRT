@@ -8,9 +8,9 @@
 #include "core/util/prelude.h"
 
 #include "c10/util/intrusive_ptr.h"
+#include "core/conversion/converters/converter_util.h"
 #include "core/conversion/tensorcontainer/TensorContainer.h"
 #include "core/util/trt_util.h"
-#include "core/conversion/converters/converter_util.h"
 
 namespace trtorch {
 namespace core {
@@ -214,13 +214,13 @@ void MarkOutputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> outp
           LOG_INFO(
               ctx->logger, "Marking Output " << out->debugName() << " named " << name << " in engine (ctx.MarkOutput)");
           ctx->num_outputs += 1;
-        } else if(out_ivalue.isTuple()) {
+        } else if (out_ivalue.isTuple()) {
           TRTORCH_THROW_ERROR("Tuple type. Only a single tensor or a TensorList type is supported.");
-        } else if(out_ivalue.isList()) {
+        } else if (out_ivalue.isList()) {
           TRTORCH_THROW_ERROR("List type. Only a single tensor or a TensorList type is supported.");
-        } else if(out_ivalue.isScalar()) {
+        } else if (out_ivalue.isScalar()) {
           TRTORCH_THROW_ERROR("Scalar type. Only a single tensor or a TensorList type is supported.");
-        } else if(out_ivalue.isTensor()) {
+        } else if (out_ivalue.isTensor()) {
           // prim::NumToTensor will go to here
           std::string name = std::string("output_") + std::to_string(ctx->num_outputs);
           auto out_tensor = trtorch::core::conversion::converters::tensor_to_const(ctx, out_ivalue.toTensor(), "");

@@ -111,14 +111,13 @@ void getSegmentsOutputByRunning(
     if (ivalues_maps[i].isTensor()) {
       // set the input_shape and data_type
       at::ScalarType t = ivalues_maps[i].toTensor().scalar_type();
-      if (!partition_info.truncate_long_and_double &&
-          (t == at::kLong || t == at::kDouble)) {
+      if (!partition_info.truncate_long_and_double && (t == at::kLong || t == at::kDouble)) {
         TRTORCH_THROW_ERROR(
-          "Unable to process subgraph input type of at::kLong/at::kDouble, try to compile model with truncate_long_and_double enabled");
-      } else if(partition_info.truncate_long_and_double && t == at::kLong) {
+            "Unable to process subgraph input type of at::kLong/at::kDouble, try to compile model with truncate_long_and_double enabled");
+      } else if (partition_info.truncate_long_and_double && t == at::kLong) {
         ivalues_maps[i] = ivalues_maps[i].toTensor().to(at::kInt);
         LOG_WARNING("Truncating graph input type from at::kLong to at::kInt");
-      } else if(partition_info.truncate_long_and_double && t == at::kDouble) {
+      } else if (partition_info.truncate_long_and_double && t == at::kDouble) {
         ivalues_maps[i] = ivalues_maps[i].toTensor().to(at::kFloat);
         LOG_WARNING("Truncating graph input type from at::kDouble to at::kFloat");
       }
