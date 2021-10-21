@@ -1,25 +1,25 @@
-.. _trtorchc:
+.. _torchtrtc:
 
-trtorchc
+torchtrtc
 =================================
 
-``trtorchc`` is a CLI application for using the TRTorch compiler. It serves as an easy way to compile a
-TorchScript Module with TRTorch from the command-line to quickly check support or as part of
+``torchtrtc`` is a CLI application for using the Torch-TensorRT compiler. It serves as an easy way to compile a
+TorchScript Module with Torch-TensorRT from the command-line to quickly check support or as part of
 a deployment pipeline. All basic features of the compiler are supported including post training
 quantization (though you must already have a calibration cache file to use the PTQ feature). The compiler can
 output two formats, either a TorchScript program with the TensorRT engine embedded or
 the TensorRT engine itself as a PLAN file.
 
-All that is required to run the program after compilation is for C++ linking against ``libtrtorch.so``
-or in Python importing the trtorch package. All other aspects of using compiled modules are identical
+All that is required to run the program after compilation is for C++ linking against ``libtorchtrt.so``
+or in Python importing the torch_tensorrt package. All other aspects of using compiled modules are identical
 to standard TorchScript. Load with ``torch.jit.load()`` and run like you would run any other module.
 
 .. code-block:: txt
 
-    trtorchc [input_file_path] [output_file_path]
+    torchtrtc [input_file_path] [output_file_path]
       [input_specs...] {OPTIONS}
 
-      TRTorch is a compiler for TorchScript, it will compile and optimize
+      Torch-TensorRT is a compiler for TorchScript, it will compile and optimize
       TorchScript programs to run on NVIDIA GPUs using TensorRT
 
     OPTIONS:
@@ -128,4 +128,4 @@ e.g.
 
 .. code-block:: shell
 
-    trtorchc tests/modules/ssd_traced.jit.pt ssd_trt.ts "[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@f16%contiguous" -p f16
+    torchtrtc tests/modules/ssd_traced.jit.pt ssd_trt.ts "[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@f16%contiguous" -p f16

@@ -3,7 +3,7 @@
 System Overview
 ================
 
-TRTorch is primarily a C++ Library with a Python API planned. We use Bazel as our build system and target Linux x86_64 and
+Torch-TensorRT is primarily a C++ Library with a Python API planned. We use Bazel as our build system and target Linux x86_64 and
 Linux aarch64 (only natively) right now. The compiler we use is GCC 7.5.0 and the library is untested with compilers before that
 version so there may be compilation errors if you try to use an older compiler.
 
@@ -13,7 +13,7 @@ The repository is structured into:
 * cpp: C++ API
 * tests: tests of the C++ API, the core and converters
 * py: Python API
-* notebooks: Example applications built with TRTorch
+* notebooks: Example applications built with Torch-TensorRT
 * docs: Documentation
 * docsrc: Documentation Source
 * third_party: BUILD files for dependency libraries

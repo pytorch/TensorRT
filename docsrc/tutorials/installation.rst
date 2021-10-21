@@ -25,14 +25,14 @@ You can install the python package using
 
 .. code-block:: sh
 
-    pip3 install trtorch -f https://github.com/NVIDIA/TRTorch/releases
+    pip3 install torch_tensorrt -f https://github.com/NVIDIA/Torch-TensorRT/releases
 
 .. _bin-dist:
 
 C++ Binary Distribution
 ------------------------
 
-Precompiled tarballs for releases are provided here: https://github.com/NVIDIA/TRTorch/releases
+Precompiled tarballs for releases are provided here: https://github.com/NVIDIA/Torch-TensorRT/releases
 
 .. _compile-from-source:
 
@@ -44,7 +44,7 @@ Compiling From Source
 Dependencies for Compilation
 -------------------------------
 
-TRTorch is built with Bazel, so begin by installing it.
+Torch-TensorRT is built with Bazel, so begin by installing it.
 
     * The easiest way is to install bazelisk using the method of you choosing https://github.com/bazelbuild/bazelisk
     * Otherwise you can use the following instructions to install binaries https://docs.bazel.build/versions/master/install.html
@@ -66,7 +66,7 @@ the CUDA driver installed and the container must have CUDA)
 
 The correct LibTorch version will be pulled down for you by bazel.
 
-    NOTE: For best compatability with official PyTorch, use torch==1.9.1+cuda111, TensorRT 8.0 and cuDNN 8.2 for CUDA 11.1 however TRTorch itself supports
+    NOTE: For best compatability with official PyTorch, use torch==1.9.1+cuda111, TensorRT 8.0 and cuDNN 8.2 for CUDA 11.1 however Torch-TensorRT itself supports
     TensorRT and cuDNN for CUDA versions other than 11.1 for usecases such as using NVIDIA compiled distributions of PyTorch that use other versions of CUDA
     e.g. aarch64 or custom compiled version of PyTorch.
 
@@ -77,9 +77,9 @@ You then have two compilation options:
 **Building using cuDNN & TensorRT tarball distributions**
 --------------------------------------------------------------
 
-    This is recommended so as to build TRTorch hermetically and insures any compilation errors are not caused by version issues
+    This is recommended so as to build Torch-TensorRT hermetically and insures any compilation errors are not caused by version issues
 
-    Make sure when running TRTorch that these versions of the libraries are prioritized in your ``$LD_LIBRARY_PATH``
+    Make sure when running Torch-TensorRT that these versions of the libraries are prioritized in your ``$LD_LIBRARY_PATH``
 
 You need to download the tarball distributions of TensorRT and cuDNN from the NVIDIA website.
     * https://developer.nvidia.com/cudnn
@@ -96,7 +96,7 @@ Release Build
 
 .. code-block:: shell
 
-    bazel build //:libtrtorch -c opt --distdir thrid_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]
+    bazel build //:libtorchtrt -c opt --distdir thrid_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]
 
 A tarball with the include files and library can then be found in ``bazel-bin``
 
@@ -109,7 +109,7 @@ To build with debug symbols use the following command
 
 .. code-block:: shell
 
-    bazel build //:libtrtorch -c dbg --distdir thrid_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]
+    bazel build //:libtorchtrt -c dbg --distdir thrid_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]
 
 A tarball with the include files and library can then be found in ``bazel-bin``
 
@@ -120,7 +120,7 @@ To build using the pre-CXX11 ABI use the ``pre_cxx11_abi`` config
 
 .. code-block:: shell
 
-    bazel build //:libtrtorch --config pre_cxx11_abi -c [dbg/opt] --distdir thrid_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]
+    bazel build //:libtorchtrt --config pre_cxx11_abi -c [dbg/opt] --distdir thrid_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]
 
 A tarball with the include files and library can then be found in ``bazel-bin``
 
@@ -180,7 +180,7 @@ Compile using:
 
 .. code-block:: shell
 
-    bazel build //:libtrtorch -c opt
+    bazel build //:libtorchtrt -c opt
 
 A tarball with the include files and library can then be found in ``bazel-bin``
 
@@ -193,7 +193,7 @@ To build with debug symbols use the following command
 
 .. code-block:: shell
 
-    bazel build //:libtrtorch -c dbg
+    bazel build //:libtorchtrt -c dbg
 
 
 A tarball with the include files and library can then be found in ``bazel-bin``
@@ -205,14 +205,14 @@ To build using the pre-CXX11 ABI use the ``pre_cxx11_abi`` config
 
 .. code-block:: shell
 
-    bazel build //:libtrtorch --config pre_cxx11_abi -c [dbg/opt]
+    bazel build //:libtorchtrt --config pre_cxx11_abi -c [dbg/opt]
 
 **Building the Python package**
 --------------------------------
 
 Begin by installing ``ninja``
 
-You can build the Python package using ``setup.py`` (this will also build the correct version of ``libtrtorch.so``)
+You can build the Python package using ``setup.py`` (this will also build the correct version of ``libtorchtrt.so``)
 
 .. code-block:: shell
 
@@ -225,7 +225,7 @@ Debug Build
 
     python3 setup.py develop [--user]
 
-This also compiles a debug build of ``libtrtorch.so``
+This also compiles a debug build of ``libtorchtrt.so``
 
 **Building Natively on aarch64 (Jetson)**
 -------------------------------------------
@@ -334,11 +334,11 @@ Compile C++ Library and Compiler CLI
         --platforms //toolchains:jetpack_4.x
 
 
-Compile TRTorch library using bazel command:
+Compile Torch-TensorRT library using bazel command:
 
 .. code-block:: shell
 
-   bazel build //:libtrtorch --platforms //toolchains:jetpack_4.6
+   bazel build //:libtorchtrt --platforms //toolchains:jetpack_4.6
 
 Compile Python API
 ^^^^^^^^^^^^^^^^^^^^

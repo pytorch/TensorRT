@@ -1,12 +1,12 @@
-.. _trtorch_py:
+.. _torch_tensorrt_py:
 
-.. automodule trtorch
+.. automodule torch_tensorrt
    :undoc-members:
 
-trtorch
+torch_tensorrt
 ===============
 
-.. automodule:: trtorch
+.. automodule:: torch_tensorrt
    :members:
    :undoc-members:
    :show-inheritance:
@@ -20,15 +20,9 @@ Functions
 
 .. autofunction:: convert_method_to_trt_engine
 
-.. autofunction:: check_method_op_support
-
-.. autofunction:: embed_engine_in_new_module
-
 .. autofunction:: get_build_info
 
 .. autofunction:: dump_build_info
-
-.. autofunction:: TensorRTCompileSpec
 
 Classes
 ---------
@@ -59,4 +53,3 @@ Submodules
    :maxdepth: 1
 
    logging
-
