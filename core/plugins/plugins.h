@@ -20,7 +20,7 @@ class PluginRegistrar {
   T instance{};
 };
 
-#define REGISTER_TRTORCH_PLUGIN(name) \
+#define REGISTER_TORCHTRT_PLUGIN(name) \
   static PluginRegistrar<name> pluginRegistrar##name {}
 
 } // namespace impl
