@@ -83,7 +83,7 @@ Input::Input(
       valid_dtype_format_combo(dtype, format),
       "Unsupported combination of dtype and tensor format: ("
           << dtype << ", " << format
-          << "), TRTorch only supports contiguous format (NCHW) except with input type Float32 where channel last (NHWC) is also supported");
+          << "), Torch-TensorRT only supports contiguous format (NCHW) except with input type Float32 where channel last (NHWC) is also supported");
   this->format = format;
   this->dtype_is_user_defined = dtype_is_user_defined;
 }
@@ -136,7 +136,7 @@ Input::Input(
       valid_dtype_format_combo(dtype, format),
       "Unsupported combination of dtype and tensor format: ("
           << dtype << ", " << format
-          << "), TRTorch only supports contiguous format (NCHW) except with input type Float32 where channel last (NHWC) is also supported");
+          << "), Torch-TensorRT only supports contiguous format (NCHW) except with input type Float32 where channel last (NHWC) is also supported");
   this->format = format;
   this->dtype_is_user_defined = dtype_is_user_defined;
 }

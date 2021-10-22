@@ -70,7 +70,7 @@ nvinfer1::DimsExprs NormalizePlugin::getOutputDimensions(
   output.nbDims = keep_dims_ ? inputs[0].nbDims : inputs[0].nbDims - axes_.size();
 
   // For order-0 norm, when the norm dimension is None, it should normalize across all dimensions.
-  // TODO: For dim=None, the axes_ passed would have [0, 0, 0] which is obtained through loop counter in TRTorch.
+  // TODO: For dim=None, the axes_ passed would have [0, 0, 0] which is obtained through loop counter in Torch-TensorRT.
   // Resolve this. For dim=None case, change the axes_ inplace to range(0, axes_.size())
   bool isAxisNone = std::all_of(axes_.begin(), axes_.end(), [](int32_t i) { return i == 0; }) &&
       ((int32_t)axes_.size() == inputs[0].nbDims);

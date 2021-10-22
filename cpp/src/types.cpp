@@ -191,7 +191,8 @@ Input::Input(
   this->opt_shape = opt_shape;
   this->min_shape = min_shape;
   this->max_shape = max_shape;
-  this->shape = torch_tensorrt::core::util::toVec(torch_tensorrt::core::ir::Input(this->min_shape, this->opt_shape, this->max_shape).input_shape);
+  this->shape = torch_tensorrt::core::util::toVec(
+      torch_tensorrt::core::ir::Input(this->min_shape, this->opt_shape, this->max_shape).input_shape);
   this->dtype = DataType::kUnknown;
   this->format = format;
   this->input_is_dynamic = true;
@@ -206,21 +207,19 @@ Input::Input(
   this->opt_shape = opt_shape;
   this->min_shape = min_shape;
   this->max_shape = max_shape;
-  this->shape = torch_tensorrt::core::util::toVec(torch_tensorrt::core::ir::Input(this->min_shape, this->opt_shape, this->max_shape).input_shape);
+  this->shape = torch_tensorrt::core::util::toVec(
+      torch_tensorrt::core::ir::Input(this->min_shape, this->opt_shape, this->max_shape).input_shape);
   this->dtype = dtype;
   this->format = format;
   this->input_is_dynamic = true;
 }
 
-Input::Input(
-    c10::IntArrayRef min_shape,
-    c10::IntArrayRef opt_shape,
-    c10::IntArrayRef max_shape,
-    TensorFormat format) {
+Input::Input(c10::IntArrayRef min_shape, c10::IntArrayRef opt_shape, c10::IntArrayRef max_shape, TensorFormat format) {
   this->opt_shape = torch_tensorrt::core::util::toVec(opt_shape);
   this->min_shape = torch_tensorrt::core::util::toVec(min_shape);
   this->max_shape = torch_tensorrt::core::util::toVec(max_shape);
-  this->shape = torch_tensorrt::core::util::toVec(torch_tensorrt::core::ir::Input(this->min_shape, this->opt_shape, this->max_shape).input_shape);
+  this->shape = torch_tensorrt::core::util::toVec(
+      torch_tensorrt::core::ir::Input(this->min_shape, this->opt_shape, this->max_shape).input_shape);
   this->dtype = DataType::kUnknown;
   this->format = format;
   this->input_is_dynamic = true;
@@ -235,7 +234,8 @@ Input::Input(
   this->opt_shape = torch_tensorrt::core::util::toVec(opt_shape);
   this->min_shape = torch_tensorrt::core::util::toVec(min_shape);
   this->max_shape = torch_tensorrt::core::util::toVec(max_shape);
-  this->shape = torch_tensorrt::core::util::toVec(torch_tensorrt::core::ir::Input(this->min_shape, this->opt_shape, this->max_shape).input_shape);
+  this->shape = torch_tensorrt::core::util::toVec(
+      torch_tensorrt::core::ir::Input(this->min_shape, this->opt_shape, this->max_shape).input_shape);
   this->dtype = dtype;
   this->format = format;
   this->input_is_dynamic = true;

@@ -14,7 +14,8 @@ TEST_P(CppAPITests, ModuleAsEngineIsClose) {
   jit_results.push_back(jit_results_ivalues.toTensor());
   auto trt_results = torch_tensorrt::tests::util::RunModuleForwardAsEngine(mod, inputs);
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), threshold));
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), threshold));
 }
 
 TEST_P(CppAPITests, ModuleToEngineToModuleIsClose) {
@@ -46,7 +47,8 @@ TEST_P(CppAPITests, ModuleToEngineToModuleIsClose) {
   std::vector<at::Tensor> trt_results;
   trt_results.push_back(trt_results_ivalues.toTensor());
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), threshold));
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), threshold));
 }
 
 INSTANTIATE_TEST_SUITE_P(

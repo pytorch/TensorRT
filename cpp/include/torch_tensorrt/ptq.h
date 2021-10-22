@@ -54,7 +54,7 @@ class Int8Calibrator : Algorithm {
    * @brief Construct a new Int8Calibrator object
    *
    * Using the provided DataLoader, construct a calibrator that can be used for
-   * PTQ with TRTorch
+   * PTQ with Torch-TensorRT
    *
    * @param dataloader: std::unqiue_ptr<torch::data::DataLoader> - A unique
    * pointer to the DataLoader, should be what is returned from the
@@ -78,7 +78,7 @@ class Int8Calibrator : Algorithm {
    * @return int
    */
   int getBatchSize() const noexcept override {
-    // HACK: TRTorch only uses explict batch sizing, INT8 Calibrator does not
+    // HACK: Torch-TensorRT only uses explict batch sizing, INT8 Calibrator does not
     // work when reporting the batch size here and having explicity batching.
     // So we just report batch size 1 (warnings will still be printed out).
     return 1;
@@ -204,7 +204,7 @@ class Int8CacheCalibrator : Algorithm {
    * @return int
    */
   int getBatchSize() const noexcept override {
-    // HACK: TRTorch only uses explict batch sizing, INT8 Calibrator does not
+    // HACK: Torch-TensorRT only uses explict batch sizing, INT8 Calibrator does not
     // work when reporting the batch size here and having explicity batching.
     // So we just report batch size 1 (warnings will still be printed out).
     return 1;
@@ -299,7 +299,7 @@ class Int8CacheCalibrator : Algorithm {
  * template parameter.
  *
  * e.g.
- * ``trtorch::ptq::make_int8_calibrator<nvinfer1::IInt8MinMaxCalibrator>(std::move(calibration_dataloader),
+ * ``torch_tensorrt::ptq::make_int8_calibrator<nvinfer1::IInt8MinMaxCalibrator>(std::move(calibration_dataloader),
  * calibration_cache_file, use_cache);``
  * @tparam Algorithm: class nvinfer1::IInt8Calibrator (Default:
  * nvinfer1::IInt8EntropyCalibrator2) - Algorithm to use
@@ -340,7 +340,7 @@ TORCHTRT_API inline Int8Calibrator<Algorithm, DataLoader> make_int8_calibrator(
  * class as a template parameter.
  *
  * e.g.
- * trtorch::ptq::make_int8_cache_calibrator<nvinfer1::IInt8MinMaxCalibrator>(calibration_cache_file);
+ * torch_tensorrt::ptq::make_int8_cache_calibrator<nvinfer1::IInt8MinMaxCalibrator>(calibration_cache_file);
  * @tparam Algorithm: class nvinfer1::IInt8Calibrator (Default:
  * nvinfer1::IInt8EntropyCalibrator2) - Algorithm to use
  * @param cache_file_path: const std::string& - Path to read/write calibration
@@ -353,4 +353,4 @@ TORCHTRT_API inline Int8CacheCalibrator<Algorithm> make_int8_cache_calibrator(co
 }
 
 } // namespace ptq
-} // namespace trtorch
+} // namespace torch_tensorrt

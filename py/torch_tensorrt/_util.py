@@ -1,6 +1,7 @@
 from torch_tensorrt import __version__
 from torch_tensorrt import _C
 
+
 def dump_build_info():
     """Prints build information about the torch_tensorrt distribution to stdout
     """
@@ -19,4 +20,4 @@ def get_build_info() -> str:
 
 
 def set_device(gpu_id):
-		_C.set_device(gpu_id)
+    _C.set_device(gpu_id)

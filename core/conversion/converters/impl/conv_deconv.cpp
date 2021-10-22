@@ -174,28 +174,29 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
   return true;
 }
 
-auto conv_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns()
-                                             .pattern({
-                                                 R"SIG(aten::_convolution(Tensor input, Tensor weight,
+auto conv_registrations TORCHTRT_UNUSED =
+    RegisterNodeConversionPatterns()
+        .pattern({
+            R"SIG(aten::_convolution(Tensor input, Tensor weight,
                                  Tensor? bias, int[] stride, int[] padding,
                                  int[] dilation, bool transposed,
                                  int[] output_padding, int groups, bool benchmark,
                                  bool deterministic, bool cudnn_enabled, bool allow_tf32) -> (Tensor))SIG",
-                                                 [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                                                   return add_conv_deconv(ctx, n, args);
-                                                 }})
-                                             .pattern({
-                                                 R"SIG(aten::_convolution.deprecated(Tensor input, Tensor weight,
+            [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+              return add_conv_deconv(ctx, n, args);
+            }})
+        .pattern({
+            R"SIG(aten::_convolution.deprecated(Tensor input, Tensor weight,
                                      Tensor? bias, int[] stride, int[] padding,
                                      int[] dilation, bool transposed,
                                      int[] output_padding, int groups, bool benchmark,
                                      bool deterministic, bool cudnn_enabled) -> (Tensor))SIG",
-                                                 [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                                                   // This pattern is only matched for traced JIT models which do not
-                                                   // have allow_tf32 bool in the function signature. The TRT conversion
-                                                   // code is exactly same as the above call.
-                                                   return add_conv_deconv(ctx, n, args);
-                                                 }});
+            [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+              // This pattern is only matched for traced JIT models which do not
+              // have allow_tf32 bool in the function signature. The TRT conversion
+              // code is exactly same as the above call.
+              return add_conv_deconv(ctx, n, args);
+            }});
 } // namespace
 } // namespace impl
 } // namespace converters

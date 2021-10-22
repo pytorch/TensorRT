@@ -1,6 +1,6 @@
-"component: trtorchc":
-  - cpp/trtorchc/**/*
-  
+"component: torchtrtc":
+  - cpp/torchtrtc/**/*
+
 "component: api [C++]":
   - cpp/**/*
 

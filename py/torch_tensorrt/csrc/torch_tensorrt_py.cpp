@@ -260,8 +260,7 @@ PYBIND11_MODULE(_C, m) {
       .def_readwrite("dla_core", &Device::dla_core)
       .def_readwrite("allow_gpu_fallback", &Device::allow_gpu_fallback);
 
-  m.doc() =
-      "Torch-TensorRT Internal C Bindings: A tool to convert PyTorch to TensorRT";
+  m.doc() = "Torch-TensorRT Internal C Bindings: A tool to convert PyTorch to TensorRT";
 
   m.def("get_build_info", &get_build_info, "Returns build info about the compiler as a string");
 
@@ -287,7 +286,6 @@ PYBIND11_MODULE(_C, m) {
       .value("GRAPH", core::util::logging::LogLevel::kGRAPH)
       .export_values();
 
-
   py::module ts_sub_mod = m.def_submodule("ts");
   py::class_<CompileSpec>(ts_sub_mod, "CompileSpec")
       .def(py::init<>())
@@ -309,7 +307,6 @@ PYBIND11_MODULE(_C, m) {
       .def_readwrite("max_batch_size", &CompileSpec::max_batch_size)
       .def_readwrite("torch_fallback", &CompileSpec::torch_fallback)
       .def_readwrite("truncate_long_and_double", &CompileSpec::truncate_long_and_double);
-
 
   py::class_<TorchFallback>(ts_sub_mod, "TorchFallback")
       .def(py::init<>())
@@ -336,7 +333,8 @@ PYBIND11_MODULE(_C, m) {
       &trtorch::pyapi::EmbedEngineInNewModule,
       "Takes a serialized TensorRT engine and compile spec. Wraps it in the forward method of a new TorchScript module");
 
-  ts_sub_mod.doc() = "Torch-TensorRT TorchScript Compiler Internal C Bindings: AOT Compilation for PyTorch JIT to TensorRT";
+  ts_sub_mod.doc() =
+      "Torch-TensorRT TorchScript Compiler Internal C Bindings: AOT Compilation for PyTorch JIT to TensorRT";
 }
 
 } // namespace pyapi

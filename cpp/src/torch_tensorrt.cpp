@@ -37,11 +37,11 @@ torch::jit::Module EmbedEngineInNewModule(const std::string& engine, Device devi
   return torch_tensorrt::core::EmbedEngineInNewModule(engine, to_internal_cuda_device(device));
 }
 
-} //namespace ts
+} // namespace torchscript
 
 std::string get_build_info() {
   auto info = torch_tensorrt::core::util::get_build_info();
-  return std::string("TRTorch Version: ") + TORCH_TENSORRT_VERSION + '\n' + info;
+  return std::string("Torch-TensorRT Version: ") + TORCH_TENSORRT_VERSION + '\n' + info;
 }
 
 void dump_build_info() {

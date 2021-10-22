@@ -99,8 +99,9 @@ def _parse_device_type(device: Any) -> _enums.DeviceType:
         else:
             ValueError("Got a device type other than GPU or DLA (type: " + str(device) + ")")
     else:
-        raise TypeError("Device specification must be of type torch.device, string or torch_tensorrt.DeviceType, but got: " +
-                        str(type(device)))
+        raise TypeError(
+            "Device specification must be of type torch.device, string or torch_tensorrt.DeviceType, but got: " +
+            str(type(device)))
 
 
 def _parse_device(device_info: Any) -> _C.Device:

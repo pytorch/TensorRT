@@ -44,10 +44,11 @@ TEST(Converters, ATenGRUCellConvertsCorrectlyWithBiasCheckHidden) {
   auto trt_b_hh = at::clone(b_hh);
 
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results =
-      torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_input, trt_h0, trt_w_ih, trt_w_hh, trt_b_ih, trt_b_hh});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(
+      g, params, {trt_input, trt_h0, trt_w_ih, trt_w_hh, trt_b_ih, trt_b_hh});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-5));
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-5));
 }
 
 TEST(Converters, ATenGRUCellConvertsCorrectlyWithoutBiasCheckHidden) {
@@ -85,7 +86,8 @@ TEST(Converters, ATenGRUCellConvertsCorrectlyWithoutBiasCheckHidden) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_input, trt_h0, trt_w_ih, trt_w_hh});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-5));
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-5));
 }
 
 TEST(Converters, ATenLSTMCellConvertsCorrectlyWithBiasCheckHidden) {
@@ -121,8 +123,8 @@ TEST(Converters, ATenLSTMCellConvertsCorrectlyWithBiasCheckHidden) {
   auto jit_b_hh = at::clone(b_hh);
 
   auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto jit_results =
-      torch_tensorrt::tests::util::RunGraph(g, params, {jit_input, jit_h0, jit_c0, jit_w_ih, jit_w_hh, jit_b_ih, jit_b_hh});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(
+      g, params, {jit_input, jit_h0, jit_c0, jit_w_ih, jit_w_hh, jit_b_ih, jit_b_hh});
 
   auto trt_input = at::clone(input);
   auto trt_h0 = at::clone(h0);
@@ -136,7 +138,8 @@ TEST(Converters, ATenLSTMCellConvertsCorrectlyWithBiasCheckHidden) {
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(
       g, params, {trt_input, trt_h0, trt_c0, trt_w_ih, trt_w_hh, trt_b_ih, trt_b_hh});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-5));
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-5));
 }
 
 TEST(Converters, ATenLSTMCellConvertsCorrectlyWithBiasCheckCell) {
@@ -172,8 +175,8 @@ TEST(Converters, ATenLSTMCellConvertsCorrectlyWithBiasCheckCell) {
   auto jit_b_hh = at::clone(b_hh);
 
   auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto jit_results =
-      torch_tensorrt::tests::util::RunGraph(g, params, {jit_input, jit_h0, jit_c0, jit_w_ih, jit_w_hh, jit_b_ih, jit_b_hh});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(
+      g, params, {jit_input, jit_h0, jit_c0, jit_w_ih, jit_w_hh, jit_b_ih, jit_b_hh});
 
   auto trt_input = at::clone(input);
   auto trt_h0 = at::clone(h0);
@@ -187,7 +190,8 @@ TEST(Converters, ATenLSTMCellConvertsCorrectlyWithBiasCheckCell) {
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(
       g, params, {trt_input, trt_h0, trt_c0, trt_w_ih, trt_w_hh, trt_b_ih, trt_b_hh});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-5));
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-5));
 }
 
 TEST(Converters, ATenLSTMCellConvertsCorrectlyWithoutBiasCheckHidden) {
@@ -228,9 +232,11 @@ TEST(Converters, ATenLSTMCellConvertsCorrectlyWithoutBiasCheckHidden) {
   auto trt_w_hh = at::clone(w_hh);
 
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_input, trt_h0, trt_c0, trt_w_ih, trt_w_hh});
+  auto trt_results =
+      torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_input, trt_h0, trt_c0, trt_w_ih, trt_w_hh});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-5));
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-5));
 }
 
 TEST(Converters, ATenLSTMCellConvertsCorrectlyWithoutBiasCheckCell) {
@@ -271,7 +277,9 @@ TEST(Converters, ATenLSTMCellConvertsCorrectlyWithoutBiasCheckCell) {
   auto trt_w_hh = at::clone(w_hh);
 
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_input, trt_h0, trt_c0, trt_w_ih, trt_w_hh});
+  auto trt_results =
+      torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_input, trt_h0, trt_c0, trt_w_ih, trt_w_hh});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-5));
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-5));
 }

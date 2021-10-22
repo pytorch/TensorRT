@@ -26,7 +26,7 @@ COPY . /workspace/torch_tensorrt/src
 WORKDIR /workspace/torch_tensorrt/src
 RUN cp ./docker/WORKSPACE.docker WORKSPACE
 
-# This script builds both libtrtorch bin/lib/include tarball and the Pythin wheel, in dist/
+# This script builds both libtorchtrt bin/lib/include tarball and the Pythin wheel, in dist/
 RUN ./docker/dist-build.sh
 
 FROM base as torch-tensorrt

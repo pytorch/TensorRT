@@ -5,19 +5,32 @@
 #define GET_MACRO(_1, _2, NAME, ...) NAME
 
 #define TORCHTRT_LOG(l, sev, msg) \
-  do {                           \
-    std::stringstream ss{};      \
-    ss << msg;                   \
-    l.log(sev, ss.str());        \
+  do {                            \
+    std::stringstream ss{};       \
+    ss << msg;                    \
+    l.log(sev, ss.str());         \
   } while (0)
 
-#define LOG_GRAPH_GLOBAL(s) TORCHTRT_LOG(torch_tensorrt::core::util::logging::get_logger(), torch_tensorrt::core::util::logging::LogLevel::kGRAPH, s)
-#define LOG_DEBUG_GLOBAL(s) TORCHTRT_LOG(torch_tensorrt::core::util::logging::get_logger(), torch_tensorrt::core::util::logging::LogLevel::kDEBUG, s)
-#define LOG_INFO_GLOBAL(s) TORCHTRT_LOG(torch_tensorrt::core::util::logging::get_logger(), torch_tensorrt::core::util::logging::LogLevel::kINFO, s)
-#define LOG_WARNING_GLOBAL(s) TORCHTRT_LOG(torch_tensorrt::core::util::logging::get_logger(), torch_tensorrt::core::util::logging::LogLevel::kWARNING, s)
-#define LOG_ERROR_GLOBAL(s) TORCHTRT_LOG(torch_tensorrt::core::util::logging::get_logger(), torch_tensorrt::core::util::logging::LogLevel::kERROR, s)
-#define LOG_INTERNAL_ERROR_GLOBAL(s) \
-  TORCHTRT_LOG(torch_tensorrt::core::util::logging::get_logger(), torch_tensorrt::core::util::logging::LogLevel::kINTERNAL_ERROR, s)
+#define LOG_GRAPH_GLOBAL(s) \
+  TORCHTRT_LOG(             \
+      torch_tensorrt::core::util::logging::get_logger(), torch_tensorrt::core::util::logging::LogLevel::kGRAPH, s)
+#define LOG_DEBUG_GLOBAL(s) \
+  TORCHTRT_LOG(             \
+      torch_tensorrt::core::util::logging::get_logger(), torch_tensorrt::core::util::logging::LogLevel::kDEBUG, s)
+#define LOG_INFO_GLOBAL(s) \
+  TORCHTRT_LOG(            \
+      torch_tensorrt::core::util::logging::get_logger(), torch_tensorrt::core::util::logging::LogLevel::kINFO, s)
+#define LOG_WARNING_GLOBAL(s) \
+  TORCHTRT_LOG(               \
+      torch_tensorrt::core::util::logging::get_logger(), torch_tensorrt::core::util::logging::LogLevel::kWARNING, s)
+#define LOG_ERROR_GLOBAL(s) \
+  TORCHTRT_LOG(             \
+      torch_tensorrt::core::util::logging::get_logger(), torch_tensorrt::core::util::logging::LogLevel::kERROR, s)
+#define LOG_INTERNAL_ERROR_GLOBAL(s)                                  \
+  TORCHTRT_LOG(                                                       \
+      torch_tensorrt::core::util::logging::get_logger(),              \
+      torch_tensorrt::core::util::logging::LogLevel::kINTERNAL_ERROR, \
+      s)
 
 #define LOG_GRAPH_OWN(l, s) TORCHTRT_LOG(l, torch_tensorrt::core::util::logging::LogLevel::kGRAPH, s)
 #define LOG_DEBUG_OWN(l, s) TORCHTRT_LOG(l, torch_tensorrt::core::util::logging::LogLevel::kDEBUG, s)
@@ -55,20 +68,20 @@
 // ----------------------------------------------------------------------------
 
 #define TORCHTRT_THROW_ERROR(msg) \
-  std::stringstream ss{};        \
-  ss << msg;                     \
+  std::stringstream ss{};         \
+  ss << msg;                      \
   throw ::torch_tensorrt::Error(__FILE__, static_cast<uint32_t>(__LINE__), ss.str());
 
-#define TORCHTRT_ASSERT(cond, ...)                                                          \
-  if (!(cond)) {                                                                           \
-    TORCHTRT_THROW_ERROR(                                                                   \
-        #cond << " ASSERT FAILED at " << __FILE__ << ':' << __LINE__                       \
-              << ", consider filing a bug: https://www.github.com/NVIDIA/TRTorch/issues\n" \
-              << __VA_ARGS__);                                                             \
+#define TORCHTRT_ASSERT(cond, ...)                                                                \
+  if (!(cond)) {                                                                                  \
+    TORCHTRT_THROW_ERROR(                                                                         \
+        #cond << " ASSERT FAILED at " << __FILE__ << ':' << __LINE__                              \
+              << ", consider filing a bug: https://www.github.com/NVIDIA/Torch-TensorRT/issues\n" \
+              << __VA_ARGS__);                                                                    \
   }
 
 #define TORCHTRT_CHECK(cond, ...)                                                               \
-  if (!(cond)) {                                                                               \
+  if (!(cond)) {                                                                                \
     TORCHTRT_THROW_ERROR("Expected " << #cond << " to be true but got false\n" << __VA_ARGS__); \
   }
 

@@ -22,7 +22,8 @@ TEST(LoweringPasses, LinearToAddMM) {
       %out: Tensor = aten::add(%b_f, %mm, %1)
       return (%out))IR";
 
-  torch_tensorrt::core::util::logging::get_logger().set_reportable_log_level(torch_tensorrt::core::util::logging::LogLevel::kGRAPH);
+  torch_tensorrt::core::util::logging::get_logger().set_reportable_log_level(
+      torch_tensorrt::core::util::logging::LogLevel::kGRAPH);
   auto sg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(source_graph, &*sg);
   torch_tensorrt::core::lowering::passes::LinearToAddMM(sg);
@@ -45,7 +46,8 @@ TEST(LoweringPasses, LinearToAddMMBiasNone) {
       %mm: Tensor = aten::matmul(%input, %weight)
       return (%mm))IR";
 
-  torch_tensorrt::core::util::logging::get_logger().set_reportable_log_level(torch_tensorrt::core::util::logging::LogLevel::kGRAPH);
+  torch_tensorrt::core::util::logging::get_logger().set_reportable_log_level(
+      torch_tensorrt::core::util::logging::LogLevel::kGRAPH);
   auto sg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(source_graph, &*sg);
   torch_tensorrt::core::lowering::passes::LinearToAddMM(sg);

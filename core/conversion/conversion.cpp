@@ -58,7 +58,7 @@ c10::optional<torch::jit::IValue> EvaluateNode(ConversionCtx* ctx, const torch::
     } else {
       TORCHTRT_THROW_ERROR(
           "Failed to evaluate node: " << *n << "Reason: Node inputs cannot be evaluated at conversion time\n"
-                                      << "File a bug: https://www.github.com/NVIDIA/TRTorch/issues");
+                                      << "File a bug: https://www.github.com/NVIDIA/Torch-TensorRT/issues");
       return {};
     }
   }
@@ -120,12 +120,12 @@ void AddLayer(ConversionCtx* ctx, const torch::jit::Node* n) {
       "Unable to convert node: "
           << util::node_info(n) << " (conversion.AddLayer)\nSchema: " << *schema << "\nConverter for " << schema->name()
           << " requested, but no such converter was found.\nIf you need a converter for this operator, you can try implementing one yourself\n"
-          << "or request a converter: https://www.github.com/NVIDIA/TRTorch/issues");
+          << "or request a converter: https://www.github.com/NVIDIA/Torch-TensorRT/issues");
 
   TORCHTRT_CHECK(
       converter(ctx, n, node_args),
       "Converter for " << *schema << " failed to convert node: " << util::node_info(n)
-                       << "please report this error to https://www.github.com/NVIDIA/TRTorch/issues");
+                       << "please report this error to https://www.github.com/NVIDIA/Torch-TensorRT/issues");
 }
 
 void AddInputs(
@@ -273,7 +273,7 @@ void EvaluateConditionalBlock(ConversionCtx* ctx, const torch::jit::Node* n, boo
   }
   TORCHTRT_CHECK(
       !(contained_in_loop && output_type_includes_tensor),
-      "TRTorch currently cannot compile conditionals within loops");
+      "Torch-TensorRT.TorchScript currently cannot compile conditionals within loops");
 
   auto condition = ctx->evaluated_value_map[n->input(0)].toBool();
   LOG_DEBUG(ctx->logger, "(Conditional Evaluation) Evaluating block " << (int)condition);
@@ -302,7 +302,8 @@ void EvaluateConditionalBlock(ConversionCtx* ctx, const torch::jit::Node* n, boo
       AddLayer(ctx, bn);
     } else {
       TORCHTRT_THROW_ERROR(
-          "TRTorch is unable to compile this conditional, a converter or evaluator is not available for node " << *bn);
+          "Torch-TensorRT.TorchScript is unable to compile this conditional, a converter or evaluator is not available for node "
+          << *bn);
     }
   }
 
@@ -334,7 +335,7 @@ void EvaluateLoopBlock(ConversionCtx* ctx, const torch::jit::Node* n) {
       } else {
         TORCHTRT_CHECK(
             evaluators::shouldEvalAtConversionTime(bn),
-            "TRTorch currently can only compile loops that are evaluatable at conversion time but node "
+            "Torch-TensorRT.TorchScript currently can only compile loops that are evaluatable at conversion time but node "
                 << *bn << " cannot be evaluated.");
         auto eval = EvaluateNode(ctx, bn);
         if (!eval.value().isTensor()) {
@@ -496,14 +497,15 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b, bool suppress_er
 
   if (unsupported_ops.size() != 0) {
     std::stringstream unsupported_msg;
-    unsupported_msg << "Method requested cannot be compiled by TRTorch.\nUnsupported operators listed below:"
-                    << std::endl;
+    unsupported_msg
+        << "Method requested cannot be compiled by Torch-TensorRT.TorchScript.\nUnsupported operators listed below:"
+        << std::endl;
     for (auto s : unsupported_ops) {
       unsupported_msg << "  - " << s.second << std::endl;
     }
     unsupported_msg << "You can either implement converters for these ops in your application or request implementation"
                     << std::endl;
-    unsupported_msg << "https://www.github.com/nvidia/TRTorch/issues" << std::endl;
+    unsupported_msg << "https://www.github.com/nvidia/Torch-TensorRT/issues" << std::endl;
     unsupported_msg << std::endl << "In Module:" << std::endl;
 
     if (suppress_errors) {
@@ -530,7 +532,7 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b, bool suppress_er
   if (ConvertableOpsInBlock(b).size() == 0) {
     std::stringstream unsupported_msg;
     unsupported_msg
-        << "Method requested cannot be compiled by TRTorch.\nThere is no work to be done since the resulting compiled program will contain an engine that is empty."
+        << "Method requested cannot be compiled by Torch-TensorRT.TorchScript.\nThere is no work to be done since the resulting compiled program will contain an engine that is empty."
         << std::endl;
     unsupported_msg
         << "This may be because there are no operators that can be added to the TensorRT graph or all operators have a resolved compile time value."

@@ -347,10 +347,10 @@ auto interpolate_registrations TORCHTRT_UNUSED =
 #else
                  TORCHTRT_CHECK(
                      !(align_corners && ctx->input_is_dynamic),
-                     "TRTorch currently does not support the compilation of dynamc engines from code using using PyTorch [bi/tri]linear interpolation via scale factor and align_corners=True");
+                     "Torch-TensorRT currently does not support the compilation of dynamic engines from code using using PyTorch [bi/tri]linear interpolation via scale factor and align_corners=True");
                  if (align_corners) {
                    // Align corners and scale factor behave slightly different together in TRT and PyTorch so run the
-                   // layer in ATen to maintain consistancy between TRTorch and PyTorch
+                   // layer in ATen to maintain consistancy between Torch-TensorRT and PyTorch
                    // https://pytorch.org/docs/stable/nn.functional.html#torch.nn.functional.interpolate
                    create_plugin(
                        ctx, n, in, "linear1d", in_shape, {}, {}, {scale}, std::string("linear"), align_corners, true);
@@ -411,10 +411,10 @@ auto interpolate_registrations TORCHTRT_UNUSED =
 #else
                  TORCHTRT_CHECK(
                      !(align_corners && ctx->input_is_dynamic),
-                     "TRTorch currently does not support the compilation of dynamc engines from code using PyTorch [bi/tri]linear interpolation via scale factor and align_corners=True");
+                     "Torch-TensorRT currently does not support the compilation of dynamc engines from code using PyTorch [bi/tri]linear interpolation via scale factor and align_corners=True");
                  if (align_corners) {
                    // Align corners and scale factor behave slightly different together in TRT and PyTorch so run the
-                   // layer in ATen to maintain consistancy between TRTorch and PyTorch
+                   // layer in ATen to maintain consistancy between Torch-TensorRT and PyTorch
                    // https://pytorch.org/docs/stable/nn.functional.html#torch.nn.functional.interpolate
                    create_plugin(
                        ctx, n, in, "linear1d", in_shape, {}, {}, {scale}, std::string("linear"), align_corners, true);
@@ -475,10 +475,10 @@ auto interpolate_registrations TORCHTRT_UNUSED =
 #else
                  TORCHTRT_CHECK(
                      !(align_corners && ctx->input_is_dynamic),
-                     "TRTorch currently does not support the compilation of dynamc engines from code using PyTorch [bi/tri]linear interpolation via scale factor and align_corners=True");
+                     "Torch-TensorRT currently does not support the compilation of dynamc engines from code using PyTorch [bi/tri]linear interpolation via scale factor and align_corners=True");
                  if (align_corners) {
                    // Align corners and scale factor behave slightly different together in TRT and PyTorch so run the
-                   // layer in ATen to maintain consistancy between TRTorch and PyTorch
+                   // layer in ATen to maintain consistancy between Torch-TensorRT and PyTorch
                    // https://pytorch.org/docs/stable/nn.functional.html#torch.nn.functional.interpolate
                    create_plugin(
                        ctx,
@@ -562,10 +562,10 @@ auto interpolate_registrations TORCHTRT_UNUSED =
 #else
                  TORCHTRT_CHECK(
                      !(align_corners && ctx->input_is_dynamic),
-                     "TRTorch currently does not support the compilation of dynamc engines from code using PyTorch [bi/tri]linear interpolation via scale factor and align_corners=True");
+                     "Torch-TensorRT currently does not support the compilation of dynamc engines from code using PyTorch [bi/tri]linear interpolation via scale factor and align_corners=True");
                  if (align_corners) {
                    // Align corners and scale factor behave slightly different together in TRT and PyTorch so run the
-                   // layer in ATen to maintain consistancy between TRTorch and PyTorch
+                   // layer in ATen to maintain consistancy between Torch-TensorRT and PyTorch
                    // https://pytorch.org/docs/stable/nn.functional.html#torch.nn.functional.interpolate
                    create_plugin(
                        ctx,
@@ -649,10 +649,10 @@ auto interpolate_registrations TORCHTRT_UNUSED =
 #else
                  TORCHTRT_CHECK(
                      !(align_corners && ctx->input_is_dynamic),
-                     "TRTorch currently does not support the compilation of dynamc engines from code using PyTorch [bi/tri]linear interpolation via scale factor and align_corners=True");
+                     "Torch-TensorRT currently does not support the compilation of dynamc engines from code using PyTorch [bi/tri]linear interpolation via scale factor and align_corners=True");
                  if (align_corners) {
                    // Align corners and scale factor behave slightly different together in TRT and PyTorch so run the
-                   // layer in ATen to maintain consistancy between TRTorch and PyTorch
+                   // layer in ATen to maintain consistancy between Torch-TensorRT and PyTorch
                    // https://pytorch.org/docs/stable/nn.functional.html#torch.nn.functional.interpolate
                    create_plugin(
                        ctx,
@@ -737,10 +737,10 @@ auto interpolate_registrations TORCHTRT_UNUSED =
 #else
                  TORCHTRT_CHECK(
                      !(align_corners && ctx->input_is_dynamic),
-                     "TRTorch currently does not support the compilation of dynamc engines from code using PyTorch [bi/tri]linear interpolation via scale factor and align_corners=True");
+                     "Torch-TensorRT currently does not support the compilation of dynamc engines from code using PyTorch [bi/tri]linear interpolation via scale factor and align_corners=True");
                  if (align_corners) {
                    // Align corners and scale factor behave slightly different together in TRT and PyTorch so run the
-                   // layer in ATen to maintain consistancy between TRTorch and PyTorch
+                   // layer in ATen to maintain consistancy between Torch-TensorRT and PyTorch
                    // https://pytorch.org/docs/stable/nn.functional.html#torch.nn.functional.interpolate
                    create_plugin(
                        ctx,

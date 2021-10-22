@@ -213,7 +213,7 @@ int main(int argc, char** argv) {
   torchtrt::logging::set_logging_prefix("");
 
   args::ArgumentParser parser(
-      "TRTorch is a compiler for TorchScript, it will compile and optimize TorchScript programs to run on NVIDIA GPUs using TensorRT",
+      "torchtrtc is a compiler for TorchScript, it will compile and optimize TorchScript programs to run on NVIDIA GPUs using TensorRT",
       "");
   args::HelpFlag help(parser, "help", "Display this help menu", {'h', "help"});
 
@@ -387,8 +387,7 @@ int main(int argc, char** argv) {
           ranges.push_back(torchtrt::Input(parseSingleDim(shapes), parsed_dtype, parsed_format));
         } else if (shapes.rfind("[", 0) == 0) {
           auto dyn_shapes = parseDynamicDim(shapes);
-          ranges.push_back(
-              torchtrt::Input(dyn_shapes[0], dyn_shapes[1], dyn_shapes[2], parsed_dtype, parsed_format));
+          ranges.push_back(torchtrt::Input(dyn_shapes[0], dyn_shapes[1], dyn_shapes[2], parsed_dtype, parsed_format));
         } else {
           torchtrt::logging::log(torchtrt::logging::Level::kERROR, spec_err_str);
           std::cerr << std::endl << parser;
@@ -617,7 +616,7 @@ int main(int argc, char** argv) {
 
   if (require_full_compilation) {
     if (!torchtrt::ts::CheckMethodOperatorSupport(mod, "forward")) {
-      torchtrt::logging::log(torchtrt::logging::Level::kERROR, "Module is not currently supported by TRTorch");
+      torchtrt::logging::log(torchtrt::logging::Level::kERROR, "Module is not currently supported by Torch-TensorRT");
       return 1;
     }
   }

@@ -38,7 +38,7 @@ TORCHTRT_API void set_logging_prefix(std::string prefix);
  * @brief Sets the level that logging information needs to be to be added to the
  * log
  *
- * @param lvl: trtorch::logging::Level - Level that messages need to be at or
+ * @param lvl: torch_tensorrt::logging::Level - Level that messages need to be at or
  * above to be added to the log
  */
 TORCHTRT_API void set_reportable_log_level(Level lvl);
@@ -68,10 +68,10 @@ TORCHTRT_API bool get_is_colored_output_on();
 /**
  * @brief Adds a message to the global log
  *
- * @param lvl: trtorch::logging::Level - Severity of the message
+ * @param lvl: torch_tensorrt::logging::Level - Severity of the message
  * @param msg: std::string - Message to be logged
  */
 // Dont know if we want this?
 TORCHTRT_API void log(Level lvl, std::string msg);
 } // namespace logging
-} // namespace trtorch
+} // namespace torch_tensorrt

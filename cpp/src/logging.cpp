@@ -67,4 +67,4 @@ void log(Level lvl, std::string msg) {
   torchtrt::core::util::logging::get_logger().log((torchtrt::core::util::logging::LogLevel)(lvl), msg);
 }
 } // namespace logging
-} // namespace torchtrt
+} // namespace torch_tensorrt

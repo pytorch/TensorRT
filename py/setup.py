@@ -24,14 +24,15 @@ JETPACK_VERSION = None
 
 __version__ = '1.0.0a0'
 
+
 def get_git_revision_short_hash() -> str:
     return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode('ascii').strip()
+
 
 if "--release" not in sys.argv:
     __version__ = __version__ + "+" + get_git_revision_short_hash()
 else:
     sys.argv.remove("--release")
-
 
 if "--use-cxx11-abi" in sys.argv:
     sys.argv.remove("--use-cxx11-abi")
@@ -181,8 +182,8 @@ class BdistCommand(bdist_wheel):
 class CleanCommand(Command):
     """Custom clean command to tidy up the project root."""
     PY_CLEAN_FILES = [
-        './build', './dist', './torch_tensorrt/__pycache__', './torch_tensorrt/lib', './torch_tensorrt/include', './torch_tensorrt/bin', './*.pyc',
-        './*.tgz', './*.egg-info'
+        './build', './dist', './torch_tensorrt/__pycache__', './torch_tensorrt/lib', './torch_tensorrt/include',
+        './torch_tensorrt/bin', './*.pyc', './*.tgz', './*.egg-info'
     ]
     description = "Command to tidy up the project root"
     user_options = []
@@ -216,10 +217,8 @@ ext_modules = [
         library_dirs=[(dir_path + '/torch_tensorrt/lib/'), "/opt/conda/lib/python3.6/config-3.6m-x86_64-linux-gnu"],
         libraries=["torchtrt"],
         include_dirs=[
-            dir_path + "torch_tensorrt/csrc",
-            dir_path + "torch_tensorrt/include",
-            dir_path + "/../bazel-TRTorch/external/tensorrt/include",
-            dir_path + "/../"
+            dir_path + "torch_tensorrt/csrc", dir_path + "torch_tensorrt/include",
+            dir_path + "/../bazel-TRTorch/external/tensorrt/include", dir_path + "/../"
         ],
         extra_compile_args=[
             "-Wno-deprecated",
@@ -235,52 +234,57 @@ ext_modules = [
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
-setup(name='torch_tensorrt',
-      version=__version__,
-      author='NVIDIA',
-      author_email='narens@nvidia.com',
-      url='https://nvidia.github.io/torch-tensorrt',
-      description='Torch-TensorRT is a package which allows users to automatically compile PyTorch and TorchScript modules to TensorRT while remaining in PyTorch',
-      long_description_content_type='text/markdown',
-      long_description=long_description,
-      ext_modules=ext_modules,
-      install_requires=[
-          'torch>=1.9.0<1.11.0',
-      ],
-      setup_requires=[],
-      cmdclass={
-          'install': InstallCommand,
-          'clean': CleanCommand,
-          'develop': DevelopCommand,
-          'build_ext': cpp_extension.BuildExtension,
-          'bdist_wheel': BdistCommand,
-      },
-      zip_safe=False,
-      license="BSD",
-      packages=find_packages(),
-      classifiers=[
-          "Development Status :: 5 - Stable", "Environment :: GPU :: NVIDIA CUDA",
-          "License :: OSI Approved :: BSD License", "Intended Audience :: Developers",
-          "Intended Audience :: Science/Research", "Operating System :: POSIX :: Linux", "Programming Language :: C++",
-          "Programming Language :: Python", "Programming Language :: Python :: Implementation :: CPython",
-          "Topic :: Scientific/Engineering", "Topic :: Scientific/Engineering :: Artificial Intelligence",
-          "Topic :: Software Development", "Topic :: Software Development :: Libraries"
-      ],
-      python_requires='>=3.6',
-      include_package_data=True,
-      package_data={
-          'torch_tensorrt': [
-              'lib/*', 'include/torch_tensorrt/*.h', 'include/torch_tensorrt/core/*.h', 'include/torch_tensorrt/core/conversion/*.h',
-              'include/torch_tensorrt/core/conversion/conversionctx/*.h', 'include/torch_tensorrt/core/conversion/converters/*.h',
-              'include/torch_tensorrt/core/conversion/evaluators/*.h', 'include/torch_tensorrt/core/conversion/tensorcontainer/*.h',
-              'include/torch_tensorrt/core/conversion/var/*.h', 'include/torch_tensorrt/core/ir/*.h',
-              'include/torch_tensorrt/core/lowering/*.h', 'include/torch_tensorrt/core/lowering/passes/*.h',
-              'include/torch_tensorrt/core/partitioning/*.h', 'include/torch_tensorrt/core/plugins/*.h',
-              'include/torch_tensorrt/core/plugins/impl/*.h', 'include/torch_tensorrt/core/runtime/*.h',
-              'include/torch_tensorrt/core/util/*.h', 'include/torch_tensorrt/core/util/logging/*.h', 'bin/*', 'BUILD', 'WORKSPACE'
-          ],
-      },
-      exclude_package_data={
-          '': ['*.cpp'],
-          'torch_tensorrt': ['csrc/*.cpp'],
-      })
+setup(
+    name='torch_tensorrt',
+    version=__version__,
+    author='NVIDIA',
+    author_email='narens@nvidia.com',
+    url='https://nvidia.github.io/torch-tensorrt',
+    description=
+    'Torch-TensorRT is a package which allows users to automatically compile PyTorch and TorchScript modules to TensorRT while remaining in PyTorch',
+    long_description_content_type='text/markdown',
+    long_description=long_description,
+    ext_modules=ext_modules,
+    install_requires=[
+        'torch>=1.9.0<1.11.0',
+    ],
+    setup_requires=[],
+    cmdclass={
+        'install': InstallCommand,
+        'clean': CleanCommand,
+        'develop': DevelopCommand,
+        'build_ext': cpp_extension.BuildExtension,
+        'bdist_wheel': BdistCommand,
+    },
+    zip_safe=False,
+    license="BSD",
+    packages=find_packages(),
+    classifiers=[
+        "Development Status :: 5 - Stable", "Environment :: GPU :: NVIDIA CUDA",
+        "License :: OSI Approved :: BSD License", "Intended Audience :: Developers",
+        "Intended Audience :: Science/Research", "Operating System :: POSIX :: Linux", "Programming Language :: C++",
+        "Programming Language :: Python", "Programming Language :: Python :: Implementation :: CPython",
+        "Topic :: Scientific/Engineering", "Topic :: Scientific/Engineering :: Artificial Intelligence",
+        "Topic :: Software Development", "Topic :: Software Development :: Libraries"
+    ],
+    python_requires='>=3.6',
+    include_package_data=True,
+    package_data={
+        'torch_tensorrt': [
+            'lib/*', 'include/torch_tensorrt/*.h', 'include/torch_tensorrt/core/*.h',
+            'include/torch_tensorrt/core/conversion/*.h', 'include/torch_tensorrt/core/conversion/conversionctx/*.h',
+            'include/torch_tensorrt/core/conversion/converters/*.h',
+            'include/torch_tensorrt/core/conversion/evaluators/*.h',
+            'include/torch_tensorrt/core/conversion/tensorcontainer/*.h',
+            'include/torch_tensorrt/core/conversion/var/*.h', 'include/torch_tensorrt/core/ir/*.h',
+            'include/torch_tensorrt/core/lowering/*.h', 'include/torch_tensorrt/core/lowering/passes/*.h',
+            'include/torch_tensorrt/core/partitioning/*.h', 'include/torch_tensorrt/core/plugins/*.h',
+            'include/torch_tensorrt/core/plugins/impl/*.h', 'include/torch_tensorrt/core/runtime/*.h',
+            'include/torch_tensorrt/core/util/*.h', 'include/torch_tensorrt/core/util/logging/*.h', 'bin/*', 'BUILD',
+            'WORKSPACE'
+        ],
+    },
+    exclude_package_data={
+        '': ['*.cpp'],
+        'torch_tensorrt': ['csrc/*.cpp'],
+    })

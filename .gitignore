@@ -6,6 +6,8 @@ bazel-out
 bazel-testlogs
 bazel-TRTorch
 bazel-trtorch-testing
+bazel-torch-tensorrt
+bazel-Torch-TensorRT
 third_party/pytorch
 *.jit
 *.jit.pt

@@ -179,7 +179,7 @@ void resolveNonTensorInputs(PartitionedGraph& segmented_blocks) { // , std::shar
       auto first_torch_id = use_info.torch_use_id.front();
       if (!updated_segments.count(first_torch_id)) {
         // Segmented Blocks with non-tensor inputs will have to be re-segmented as
-        // TRTorch doesn't support non-tensor inputs for a module.
+        // Torch-TensorRT doesn't support non-tensor inputs for a module.
         auto to_inject_blocks = segmentBlocksWithNonTensorInputs(segmented_blocks[first_torch_id]);
         auto next_iter = segmented_blocks_list.erase(idx_to_iter[first_torch_id]);
         segmented_blocks_list.insert(next_iter, to_inject_blocks.begin(), to_inject_blocks.end());
@@ -190,7 +190,7 @@ void resolveNonTensorInputs(PartitionedGraph& segmented_blocks) { // , std::shar
     for (auto i : use_info.tensorrt_use_id) {
       if (!updated_segments.count(i)) {
         // Segmented Blocks with non-tensor inputs will have to be re-segmented as
-        // TRTorch doesn't support non-tensor inputs for a module.
+        // Torch-TensorRT doesn't support non-tensor inputs for a module.
         auto to_inject_blocks = segmentBlocksWithNonTensorInputs(segmented_blocks[i]);
         auto next_iter = segmented_blocks_list.erase(idx_to_iter[i]);
         segmented_blocks_list.insert(next_iter, to_inject_blocks.begin(), to_inject_blocks.end());

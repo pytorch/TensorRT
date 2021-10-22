@@ -9,13 +9,13 @@ namespace impl {
 namespace {
 
 #define convert(unary, trt_type)                                                               \
-  auto unary##_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pattern(        \
+  auto unary##_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pattern(       \
       {"aten::" #unary "(Tensor self) -> Tensor",                                              \
        [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {                 \
          auto in = args[0].ITensor();                                                          \
          auto unary = ctx->net->addUnary(*in, nvinfer1::UnaryOperation::trt_type);             \
                                                                                                \
-         TORCHTRT_CHECK(unary, "Unable to create " #unary " layer from node: " << *n);          \
+         TORCHTRT_CHECK(unary, "Unable to create " #unary " layer from node: " << *n);         \
                                                                                                \
          unary->setName(util::node_info(n).c_str());                                           \
          auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], unary->getOutput(0)); \

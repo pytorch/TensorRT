@@ -42,20 +42,24 @@ TEST(CppAPITest, CanRunMultipleEngines) {
   jit2_results.push_back(jit2_results_ivalues.toTensor());
 
   auto trt_mod1 = torch_tensorrt::ts::CompileModule(mod1, input_shapes);
-  torch::jit::IValue trt1_results_ivalues = torch_tensorrt::tests::util::RunModuleForward(trt_mod1, trt1_inputs_ivalues);
+  torch::jit::IValue trt1_results_ivalues =
+      torch_tensorrt::tests::util::RunModuleForward(trt_mod1, trt1_inputs_ivalues);
   std::vector<at::Tensor> trt1_results;
   trt1_results.push_back(trt1_results_ivalues.toTensor());
 
   auto trt_mod2 = torch_tensorrt::ts::CompileModule(mod2, input_shapes);
-  torch::jit::IValue trt2_results_ivalues = torch_tensorrt::tests::util::RunModuleForward(trt_mod2, trt2_inputs_ivalues);
+  torch::jit::IValue trt2_results_ivalues =
+      torch_tensorrt::tests::util::RunModuleForward(trt_mod2, trt2_inputs_ivalues);
   std::vector<at::Tensor> trt2_results;
   trt2_results.push_back(trt2_results_ivalues.toTensor());
 
   for (size_t i = 0; i < trt1_results.size(); i++) {
-    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit1_results[i], trt1_results[i].reshape_as(jit1_results[i]), 2e-5));
+    ASSERT_TRUE(
+        torch_tensorrt::tests::util::almostEqual(jit1_results[i], trt1_results[i].reshape_as(jit1_results[i]), 2e-5));
   }
 
   for (size_t i = 0; i < trt2_results.size(); i++) {
-    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit2_results[i], trt2_results[i].reshape_as(jit2_results[i]), 2e-5));
+    ASSERT_TRUE(
+        torch_tensorrt::tests::util::almostEqual(jit2_results[i], trt2_results[i].reshape_as(jit2_results[i]), 2e-5));
   }
 }

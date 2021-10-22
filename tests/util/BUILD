@@ -32,8 +32,8 @@ cc_library(
         ],
     }) + select({
         "//tests:ci_build_testing": [
-            "@trtorch//:torch_tensorrt",
-            "@trtorch//:torch_tensorrt_core_hdrs"
+            "@torch_tensorrt//:torch_tensorrt",
+            "@torch_tensorrt//:torch_tensorrt_core_hdrs"
         ],
         "//conditions:default": [
             "//cpp:torch_tensorrt",

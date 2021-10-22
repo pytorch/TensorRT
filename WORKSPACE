@@ -1,4 +1,4 @@
-workspace(name = "TRTorch")
+workspace(name = "Torch-TensorRT")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
@@ -31,11 +31,10 @@ git_repository(
     shallow_since = "1570114335 -0400",
 )
 
-# External dependency for trtorch if you already have precompiled binaries.
-# This is currently used in pytorch NGC container CI testing.
+# External dependency for torch_tensorrt if you already have precompiled binaries.
 local_repository(
-    name = "trtorch",
-    path = "/opt/conda/lib/python3.8/site-packages/trtorch"
+    name = "torch_tensorrt",
+    path = "/opt/conda/lib/python3.8/site-packages/torch_tensorrt"
 )
 
 # CUDA should be installed on the system locally
@@ -133,7 +132,7 @@ http_archive(
 # Testing Dependencies (optional - comment out on aarch64)
 #########################################################################
 pip_install(
-    name = "trtorch_py_deps",
+    name = "torch_tensorrt_py_deps",
     requirements = "//py:requirements.txt",
 )
 

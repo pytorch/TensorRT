@@ -162,5 +162,6 @@ TEST(Converters, ATenTypeAsConvertsCorrectly) {
 
   ASSERT_TRUE(jit_results[0].scalar_type() == trt_results[0].scalar_type());
   ASSERT_TRUE(trt_results[0].scalar_type() == trt_results[1].scalar_type());
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
 }

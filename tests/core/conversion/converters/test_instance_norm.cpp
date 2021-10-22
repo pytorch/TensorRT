@@ -43,11 +43,12 @@ TEST(Converters, ATenInstanceNormConvertsCorrectly) {
   auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {weight, bias, mean, var, use_input_stats});
   auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
 
-  params =
-      torch_tensorrt::core::ir::get_static_params(g->inputs(), {trt_weight, trt_bias, trt_mean, trt_var, use_input_stats});
+  params = torch_tensorrt::core::ir::get_static_params(
+      g->inputs(), {trt_weight, trt_bias, trt_mean, trt_var, use_input_stats});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
 }
 
 TEST(Converters, ATenInstanceNormAffineConvertsCorrectly) {
@@ -70,11 +71,12 @@ TEST(Converters, ATenInstanceNormAffineConvertsCorrectly) {
   auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {weight, bias, mean, var, use_input_stats});
   auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
 
-  params =
-      torch_tensorrt::core::ir::get_static_params(g->inputs(), {trt_weight, trt_bias, trt_mean, trt_var, use_input_stats});
+  params = torch_tensorrt::core::ir::get_static_params(
+      g->inputs(), {trt_weight, trt_bias, trt_mean, trt_var, use_input_stats});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
 }
 
 TEST(Converters, ATenInstanceNormRunningStatsConvertsCorrectly) {
@@ -96,8 +98,9 @@ TEST(Converters, ATenInstanceNormRunningStatsConvertsCorrectly) {
   auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {weight, bias, mean, var, use_input_stats});
   auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
 
-  params =
-      torch_tensorrt::core::ir::get_static_params(g->inputs(), {trt_weight, trt_bias, trt_mean, trt_var, use_input_stats});
+  params = torch_tensorrt::core::ir::get_static_params(
+      g->inputs(), {trt_weight, trt_bias, trt_mean, trt_var, use_input_stats});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
 }

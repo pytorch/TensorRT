@@ -32,7 +32,8 @@ TEST(Converters, ATenBatchNormConvertsCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {gamma, beta, mean, var});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
 }
 
 TEST(Converters, ATenBatchNormShouldUnpackConvertsCorrectly) {
@@ -69,5 +70,6 @@ TEST(Converters, ATenBatchNormShouldUnpackConvertsCorrectly) {
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {trt_gamma, trt_beta, trt_mean, trt_var});
   auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
 }

@@ -56,7 +56,8 @@ TEST_P(CppAPITests, SerializedDynamicModuleIsStillCorrect) {
     pre_serialized_inputs_ivalues.push_back(in.clone());
   }
 
-  auto pre_serialized_mod = torch_tensorrt::ts::CompileModule(mod, torch_tensorrt::ts::CompileSpec(toInputRangesDynamic(input_shapes)));
+  auto pre_serialized_mod =
+      torch_tensorrt::ts::CompileModule(mod, torch_tensorrt::ts::CompileSpec(toInputRangesDynamic(input_shapes)));
   torch::jit::IValue pre_serialized_results_ivalues =
       torch_tensorrt::tests::util::RunModuleForward(pre_serialized_mod, pre_serialized_inputs_ivalues);
   std::vector<at::Tensor> pre_serialized_results;

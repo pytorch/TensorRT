@@ -4,7 +4,7 @@ cc_binary(
     name = "libtorchtrt_plugins.so",
     srcs = [],
     deps = [
-        "//core/plugins:trtorch_plugins"
+        "//core/plugins:torch_tensorrt_plugins"
     ],
     linkstatic = True,
     linkshared = True
@@ -17,7 +17,7 @@ cc_binary(
     linkstatic = True,
     deps = [
         "//core/runtime:runtime",
-        "//core/plugins:trtorch_plugins"
+        "//core/plugins:torch_tensorrt_plugins"
     ],
 )
 

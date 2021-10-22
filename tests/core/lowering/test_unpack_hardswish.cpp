@@ -24,7 +24,8 @@ TEST(LoweringPasses, UnpackHardSwish) {
             %8 = aten::mul(%input, %7)
             return (%8))IR";
 
-  torch_tensorrt::core::util::logging::get_logger().set_reportable_log_level(torch_tensorrt::core::util::logging::LogLevel::kGRAPH);
+  torch_tensorrt::core::util::logging::get_logger().set_reportable_log_level(
+      torch_tensorrt::core::util::logging::LogLevel::kGRAPH);
   auto sg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(source_graph, &*sg);
 
@@ -64,7 +65,8 @@ TEST(LoweringPasses, UnpackHardInplaceSwish) {
             %8 = aten::mul(%input, %7)
             return (%8))IR";
 
-  torch_tensorrt::core::util::logging::get_logger().set_reportable_log_level(torch_tensorrt::core::util::logging::LogLevel::kGRAPH);
+  torch_tensorrt::core::util::logging::get_logger().set_reportable_log_level(
+      torch_tensorrt::core::util::logging::LogLevel::kGRAPH);
   auto sg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(source_graph, &*sg);
 

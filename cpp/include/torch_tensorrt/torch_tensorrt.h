@@ -46,14 +46,14 @@ namespace torch_tensorrt {
  * explictly.
  */
 class TORCHTRT_API DataType {
-  public:
+ public:
   /**
    * Underlying enum class to support the DataType Class
    *
    * In the case that you need to use the DataType class itself, interface
    * using this enum vs. normal instatination
    *
-   * ex. trtorch::DataType type = DataType::kFloat;
+   * ex. torch_tensorrt::DataType type = DataType::kFloat;
    */
   enum Value : int8_t {
     /// FP32
@@ -136,14 +136,14 @@ class TORCHTRT_API DataType {
     return value != other;
   }
 
-  private:
+ private:
   friend std::ostream& operator<<(std::ostream& os, const DataType& dtype);
   Value value;
 };
 
 /*
-  * Setting data structure for Target device
-  */
+ * Setting data structure for Target device
+ */
 struct Device {
   /**
    * Supported Device Types that can be used with TensorRT engines
@@ -155,17 +155,17 @@ struct Device {
    * To use the DataType class itself, interface using the enum vs. normal
    * instatination
    *
-   * ex. trtorch::DeviceType type = DeviceType::kGPU;
+   * ex. torch_tensorrt::DeviceType type = DeviceType::kGPU;
    */
   class DeviceType {
-    public:
+   public:
     /**
      * Underlying enum class to support the DeviceType Class
      *
      * In the case that you need to use the DeviceType class itself, interface
      * using this enum vs. normal instatination
      *
-     * ex. trtorch::DeviceType type = DeviceType::kGPU;
+     * ex. torch_tensorrt::DeviceType type = DeviceType::kGPU;
      */
     enum Value : int8_t {
       /// Target GPU to run engine
@@ -221,7 +221,7 @@ struct Device {
       return value != other.value;
     }
 
-    private:
+   private:
     Value value;
   };
 
@@ -232,13 +232,13 @@ struct Device {
   DeviceType device_type;
 
   /*
-    * Target gpu id
-    */
+   * Target gpu id
+   */
   int64_t gpu_id;
 
   /*
-    * When using DLA core on NVIDIA AGX platforms gpu_id should be set as Xavier device
-    */
+   * When using DLA core on NVIDIA AGX platforms gpu_id should be set as Xavier device
+   */
   int64_t dla_core;
 
   /**
@@ -263,14 +263,14 @@ enum class EngineCapability : int8_t {
 };
 
 class TORCHTRT_API TensorFormat {
-public:
+ public:
   /**
    * Underlying enum class to support the TensorFormat Class
    *
    * In the case that you need to use the TensorFormat class itself, interface
    * using this enum vs. normal instatination
    *
-   * ex. trtorch::TensorFormat type = TensorFormat::kContiguous;
+   * ex. torch_tensorrt::TensorFormat type = TensorFormat::kContiguous;
    */
   enum Value : int8_t {
     /// Contiguous / NCHW / Linear
@@ -347,7 +347,7 @@ public:
     return value != other;
   }
 
-  private:
+ private:
   friend std::ostream& operator<<(std::ostream& os, const TensorFormat& format);
   Value value;
 };
@@ -506,7 +506,7 @@ struct TORCHTRT_API Input {
    */
   Input(at::Tensor tensor);
 
-  private:
+ private:
   friend std::ostream& operator<<(std::ostream& os, const Input& input);
   bool input_is_dynamic;
 };
@@ -520,7 +520,7 @@ struct TORCHTRT_API Input {
 TORCHTRT_API std::string get_build_info();
 
 /**
- * @brief Dump the version information for TRTorch including base libtorch and
+ * @brief Dump the version information for Torch-TensorRT including base libtorch and
  * TensorRT versions to stdout
  *
  */
@@ -537,12 +537,12 @@ TORCHTRT_API void set_device(const int gpu_id);
 
 namespace torchscript {
 /**
- * Settings data structure for TRTorch compilation
+ * Settings data structure for Torch-TensorRT TorchScript compilation
  *
  */
 struct TORCHTRT_API CompileSpec {
   /**
-   * @brief Construct a new Extra Info object
+   * @brief Construct a new Compile Spec object
    * Convienence constructor to set fixed input size from vectors describing
    * size of input tensors. Each entry in the vector represents a input and
    * should be provided in call order.
@@ -699,7 +699,7 @@ struct TORCHTRT_API CompileSpec {
  *
  * Will print out a list of unsupported operators if the graph is unsupported
  *
- * @returns bool: Method is supported by TRTorch
+ * @returns bool: Method is supported by Torch-TensorRT.TorchScript
  */
 TORCHTRT_API bool CheckMethodOperatorSupport(const torch::jit::Module& module, std::string method_name);
 
@@ -707,7 +707,7 @@ TORCHTRT_API bool CheckMethodOperatorSupport(const torch::jit::Module& module, s
  * @brief Compile a TorchScript module for NVIDIA GPUs using TensorRT
  *
  * @param module: torch::jit::Module - Existing TorchScript module
- * @param info: trtorch::CompileSpec - Compilation settings
+ * @param info: torch_tensorrt::CompileSpec - Compilation settings
  *
  * Takes a existing TorchScript module and a set of settings to configure the
  * compiler and will convert methods to JIT Graphs which call equivalent
@@ -724,7 +724,7 @@ TORCHTRT_API torch::jit::Module CompileModule(const torch::jit::Module& module, 
  *
  * @param module: torch::jit::Module - Existing TorchScript module
  * @param method_name: std::string - Name of method to compile
- * @param info: trtorch::CompileSpec - Compilation settings
+ * @param info: torch_tensorrt::CompileSpec - Compilation settings
  *
  * Takes a existing TorchScript module and a set of settings to configure the
  * compiler and will convert selected method to a serialized TensorRT engine

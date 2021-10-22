@@ -1,7 +1,7 @@
 ---
 name: "↔ Op Converter Request"
-about: Submit a proposal/request to support a new PyTorch operator in TRTorch
-title: "↔ [Converter] Add support for my_op in TRTorch"
+about: Submit a proposal/request to support a new PyTorch operator in Torch-TensorRT
+title: "↔ [Converter] Add support for my_op in Torch-TensorRT"
 labels: 'component: converters, feature request'
 assignees: ''
 

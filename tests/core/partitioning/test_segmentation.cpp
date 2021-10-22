@@ -76,8 +76,10 @@ TEST(Partitioning, SegmentSequentialModelCorrectly) {
   partition_info.enabled = true;
   std::vector<torch_tensorrt::core::partitioning::SegmentedBlock> segmented_blocks =
       torch_tensorrt::core::partitioning::segment_graph(g->block(), partition_info);
-  ASSERT_TRUE(checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTensorRT, 2));
-  ASSERT_TRUE(checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTorch, 1));
+  ASSERT_TRUE(
+      checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTensorRT, 2));
+  ASSERT_TRUE(
+      checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTorch, 1));
   ASSERT_TRUE(checkSegmentedBlockNodesMapping(segmented_blocks, g, {{0, 1, 2}, {3}, {4}}));
 }
 
@@ -109,8 +111,10 @@ TEST(Partitioning, SegmentSequentialModelWithMinBlockSizeCorrectly) {
   partition_info.min_block_size = 3;
   std::vector<torch_tensorrt::core::partitioning::SegmentedBlock> segmented_blocks =
       torch_tensorrt::core::partitioning::segment_graph(g->block(), partition_info);
-  ASSERT_TRUE(checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTensorRT, 1));
-  ASSERT_TRUE(checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTorch, 1));
+  ASSERT_TRUE(
+      checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTensorRT, 1));
+  ASSERT_TRUE(
+      checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTorch, 1));
   ASSERT_TRUE(checkSegmentedBlockNodesMapping(segmented_blocks, g, {{0, 1, 2}, {3, 4}}));
 }
 
@@ -142,8 +146,10 @@ TEST(Partitioning, SegmentSequentialModelWithForcedOPCorrectly) {
   partition_info.forced_fallback_operators.push_back("aten::relu");
   std::vector<torch_tensorrt::core::partitioning::SegmentedBlock> segmented_blocks =
       torch_tensorrt::core::partitioning::segment_graph(g->block(), partition_info);
-  ASSERT_TRUE(checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTensorRT, 3));
-  ASSERT_TRUE(checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTorch, 2));
+  ASSERT_TRUE(
+      checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTensorRT, 3));
+  ASSERT_TRUE(
+      checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTorch, 2));
   ASSERT_TRUE(checkSegmentedBlockNodesMapping(segmented_blocks, g, {{0}, {1}, {2}, {3}, {4}}));
 }
 
@@ -175,8 +181,10 @@ TEST(Partitioning, SegmentBranchModelCorrectly) {
   partition_info.enabled = true;
   std::vector<torch_tensorrt::core::partitioning::SegmentedBlock> segmented_blocks =
       torch_tensorrt::core::partitioning::segment_graph(g->block(), partition_info);
-  ASSERT_TRUE(checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTensorRT, 2));
-  ASSERT_TRUE(checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTorch, 1));
+  ASSERT_TRUE(
+      checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTensorRT, 2));
+  ASSERT_TRUE(
+      checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTorch, 1));
   ASSERT_TRUE(checkSegmentedBlockNodesMapping(segmented_blocks, g, {{0, 1}, {2}, {3, 4, 5, 6}}));
 }
 
@@ -209,8 +217,10 @@ TEST(Partitioning, SegmentBranchModelWithMinBlockSizeCorrectly) {
   partition_info.min_block_size = 3;
   std::vector<torch_tensorrt::core::partitioning::SegmentedBlock> segmented_blocks =
       torch_tensorrt::core::partitioning::segment_graph(g->block(), partition_info);
-  ASSERT_TRUE(checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTensorRT, 1));
-  ASSERT_TRUE(checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTorch, 1));
+  ASSERT_TRUE(
+      checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTensorRT, 1));
+  ASSERT_TRUE(
+      checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTorch, 1));
   ASSERT_TRUE(checkSegmentedBlockNodesMapping(segmented_blocks, g, {{0, 1, 2}, {3, 4, 5, 6}}));
 }
 
@@ -247,7 +257,9 @@ TEST(Partitioning, SegmentBranchModelWithForcedFallbackOPCorrectly) {
   partition_info.forced_fallback_operators.push_back("aten::relu");
   torch_tensorrt::core::partitioning::PartitionedGraph segmented_blocks =
       torch_tensorrt::core::partitioning::segment_graph(g->block(), partition_info);
-  ASSERT_TRUE(checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTensorRT, 3));
-  ASSERT_TRUE(checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTorch, 2));
+  ASSERT_TRUE(
+      checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTensorRT, 3));
+  ASSERT_TRUE(
+      checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTorch, 2));
   ASSERT_TRUE(checkSegmentedBlockNodesMapping(segmented_blocks, g, {{0, 1}, {2}, {3}, {4}, {5, 6}}));
 }

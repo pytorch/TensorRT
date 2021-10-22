@@ -7,10 +7,10 @@ namespace conversion {
 #define DEFINE_UNWRAP_TO(ival_type, method_variant)                                                                \
   template <>                                                                                                      \
   inline ival_type Var::unwrapTo<ival_type>() {                                                                    \
-    TORCHTRT_CHECK(                                                                                                 \
+    TORCHTRT_CHECK(                                                                                                \
         isIValue(), "Requested unwrapping of arg assuming it was an IValue, however arg type is " << type_name()); \
     auto ivalue = ptr_.ivalue;                                                                                     \
-    TORCHTRT_CHECK(                                                                                                 \
+    TORCHTRT_CHECK(                                                                                                \
         ivalue->is##method_variant(),                                                                              \
         "Requested unwrapping of arg IValue assuming it was " << typeid(ival_type).name() << " however type is "   \
                                                               << *(ptr_.ivalue->type()));                          \
@@ -20,7 +20,7 @@ namespace conversion {
   inline ival_type Var::unwrapTo(ival_type default_val) {                                                          \
     try {                                                                                                          \
       return this->unwrapTo<ival_type>();                                                                          \
-    } catch (torch_tensorrt::Error & e) {                                                                                 \
+    } catch (torch_tensorrt::Error & e) {                                                                          \
       LOG_DEBUG("In arg unwrapping, returning default value provided (" << e.what() << ")");                       \
       return default_val;                                                                                          \
     }                                                                                                              \

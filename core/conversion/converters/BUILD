@@ -90,7 +90,7 @@ cc_library(
         "//core/conversion/var",
         "//core/conversion/tensorcontainer",
         "//core/conversion/conversionctx",
-        "//core/plugins:trtorch_plugins",
+        "//core/plugins:torch_tensorrt_plugins",
         ":converter_util"
     ] + select({
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],

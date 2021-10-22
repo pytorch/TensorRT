@@ -13,7 +13,7 @@ namespace {
     auto in = args[0].ITensorOrFreeze(ctx);                                                                          \
                                                                                                                      \
     auto new_layer = ctx->net->addActivation(*in, nvinfer1::ActivationType::trt_type);                               \
-    TORCHTRT_CHECK(new_layer, "Unable to create " #act " layer from node: " << *n);                                   \
+    TORCHTRT_CHECK(new_layer, "Unable to create " #act " layer from node: " << *n);                                  \
                                                                                                                      \
     new_layer->setName(util::node_info(n).c_str());                                                                  \
     ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));                                          \
@@ -22,7 +22,7 @@ namespace {
     return true;                                                                                                     \
   }                                                                                                                  \
                                                                                                                      \
-  auto act##_registrations TORCHTRT_UNUSED =                                                                          \
+  auto act##_registrations TORCHTRT_UNUSED =                                                                         \
       RegisterNodeConversionPatterns()                                                                               \
           .pattern(                                                                                                  \
               {"aten::" #act "(Tensor input) -> (Tensor)",                                                           \

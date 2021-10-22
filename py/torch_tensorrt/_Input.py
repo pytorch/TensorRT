@@ -204,8 +204,9 @@ class Input(object):
             return dtype
 
         else:
-            raise TypeError("Input data type needs to be specified with a torch.dtype or a torch_tensorrt.dtype, got: " +
-                            str(type(dtype)))
+            raise TypeError(
+                "Input data type needs to be specified with a torch.dtype or a torch_tensorrt.dtype, got: " +
+                str(type(dtype)))
 
     @staticmethod
     def _parse_format(format: Any) -> _enums.TensorFormat:

@@ -25,11 +25,13 @@ TRTEngine::TRTEngine(std::string serialized_engine, CudaDevice cuda_device) {
 
 TRTEngine::TRTEngine(std::vector<std::string> serialized_info) {
   TORCHTRT_CHECK(
-      serialized_info.size() == ENGINE_IDX + 1, "Program to be deserialized targets an incompatible TRTorch ABI");
+      serialized_info.size() == ENGINE_IDX + 1,
+      "Program to be deserialized targets an incompatible Torch-TensorRT ABI");
   TORCHTRT_CHECK(
       serialized_info[ABI_TARGET_IDX] == ABI_VERSION,
-      "Program to be deserialized targets a different TRTorch ABI Version ("
-          << serialized_info[ABI_TARGET_IDX] << ") than the TRTorch Runtime ABI Version (" << ABI_VERSION << ")");
+      "Program to be deserialized targets a different Torch-TensorRT ABI Version ("
+          << serialized_info[ABI_TARGET_IDX] << ") than the Torch-TensorRT Runtime ABI Version (" << ABI_VERSION
+          << ")");
   std::string _name = serialized_info[NAME_IDX];
   std::string engine_info = serialized_info[ENGINE_IDX];
 
