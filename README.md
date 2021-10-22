@@ -10,9 +10,24 @@ More Information / System Architecture:
 
 - [GTC 2020 Talk](https://developer.nvidia.com/gtc/2020/video/s21671)
 
+
+
+## Building a docker container for Torch-TensorRT Preview
+
+We provide a `Dockerfile` in `docker/` directory. We build `Torch-TensorRT` on top of a `Pytorch NGC container` which provide basic dependencies (like CUDA, CUDNN, CUBLAS, TensorRT, Pytorch and others) The dependency libraries in the container can be found in the <a href="https://docs.nvidia.com/deeplearning/frameworks/pytorch-release-notes/index.html">release notes</a>.  
+
+Please follow this instruction to build a Docker container.
+
+```bash
+docker build -f docker/Dockerfile -t torch_tensorrt_preview:latest .
+```
+
+If you would like to build outside a docker container, please follow the section [Compiling Torch-TensorRT](#compiling-torch-tensorrt)
+
 ## Example Usage
 
 ### C++
+
 ```c++
 #include "torch/script.h"
 #include "torch_tensorrt/torch_tensorrt.h"
@@ -35,6 +50,7 @@ trt_mod.save("trt_torchscript_module.ts");
 ```
 
 ### Python
+
 ```py
 import torch_tensorrt
 
@@ -58,23 +74,25 @@ torch.jit.save(trt_ts_module, "trt_torchscript_module.ts")
 ```
 
 > Notes on running in lower precisions:
+>
 > - Enabled lower precisions with compile_spec.enabled_precisions
 > - The module should be left in FP32 before compilation (FP16 can support half tensor models)
 > - In FP16 only input tensors by default should be FP16, other precisions use FP32. This can be overrided by setting Input::dtype
 
 ## Platform Support
 
-| Platform | Support |
-| -------- | ------- |
-| Linux AMD64 / GPU   | **Supported** |
+| Platform            | Support                                          |
+| ------------------- | ------------------------------------------------ |
+| Linux AMD64 / GPU   | **Supported**                                    |
 | Linux aarch64 / GPU | **Native Compilation Supported on JetPack-4.4+** |
 | Linux aarch64 / DLA | **Native Compilation Supported on JetPack-4.4+** |
-| Windows / GPU       | **Unofficial Support** |
-| Linux ppc64le / GPU | - |
+| Windows / GPU       | **Unofficial Support**                           |
+| Linux ppc64le / GPU | -                                                |
 
 > Note: Refer NVIDIA NGC container(https://ngc.nvidia.com/catalog/containers/nvidia:l4t-pytorch) for PyTorch libraries on JetPack.
 
 ### Dependencies
+
 These are the following dependencies used to verify the testcases. Torch-TensorRT can work with other versions, but the tests are not guaranteed to pass.
 
 - Bazel 4.0.0
@@ -118,10 +136,11 @@ then you have two options.
 > Make sure when running Torch-TensorRT that these versions of the libraries are prioritized in your `$LD_LIBRARY_PATH`
 
 1. You need to download the tarball distributions of TensorRT and cuDNN from the NVIDIA website.
-    - https://developer.nvidia.com/cudnn
-    - https://developer.nvidia.com/tensorrt
+   - https://developer.nvidia.com/cudnn
+   - https://developer.nvidia.com/tensorrt
 2. Place these files in a directory (the directories `third_party/dist_dir/[x86_64-linux-gnu | aarch64-linux-gnu]` exist for this purpose)
 3. Compile using:
+
 ``` shell
 bazel build //:libtorchtrt --compilation_mode opt --distdir third_party/dist_dir/[x86_64-linux-gnu | aarch64-linux-gnu]
 ```
@@ -133,6 +152,7 @@ bazel build //:libtorchtrt --compilation_mode opt --distdir third_party/dist_dir
 
 1. Install TensorRT, CUDA and cuDNN on the system before starting to compile.
 2. In `WORKSPACE` comment out
+
 ```py
 # Downloaded distributions to use with --distdir
 http_archive(
@@ -153,7 +173,9 @@ http_archive(
     strip_prefix = "TensorRT-<VERSION>"
 )
 ```
+
 and uncomment
+
 ```py
 # Locally installed dependencies
 new_local_repository(
@@ -168,20 +190,25 @@ new_local_repository(
    build_file = "@//third_party/tensorrt/local:BUILD"
 )
 ```
+
 3. Compile using:
+
 ``` shell
 bazel build //:libtorchtrt --compilation_mode opt
 ```
 
 ### Debug build
+
 ``` shell
 bazel build //:libtorchtrt --compilation_mode=dbg
 ```
 
 ### Native compilation on NVIDIA Jetson AGX
+
 ``` shell
 bazel build //:libtorchtrt --distdir third_party/dist_dir/aarch64-linux-gnu
 ```
+
 > Note: Please refer [installation](docs/tutorials/installation.html) instructions for Pre-requisites
 
 A tarball with the include files and library can then be found in bazel-bin
@@ -189,7 +216,7 @@ A tarball with the include files and library can then be found in bazel-bin
 ### Running Torch-TensorRT on a JIT Graph
 
 > Make sure to add LibTorch to your LD_LIBRARY_PATH <br>
->`export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/bazel-Torch-TensorRT/external/libtorch/lib`
+> `export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/bazel-Torch-TensorRT/external/libtorch/lib`
 
 ``` shell
 bazel run //cpp/bin/torchtrtc -- $(realpath <PATH TO GRAPH>) out.ts <input-size>
@@ -200,9 +227,11 @@ bazel run //cpp/bin/torchtrtc -- $(realpath <PATH TO GRAPH>) out.ts <input-size>
 To compile the python package for your local machine, just run `python3 setup.py install` in the `//py` directory.
 To build wheel files for different python versions, first build the Dockerfile in ``//py`` then run the following
 command
+
 ```
 docker run -it -v$(pwd)/..:/workspace/Torch-TensorRT build_torch_tensorrt_wheel /bin/bash /workspace/Torch-TensorRT/py/build_whl.sh
 ```
+
 Python compilation expects using the tarball based compilation strategy from above.
 
 ## How do I add support for a new op...
@@ -219,13 +248,13 @@ You can register a converter for your op using the `NodeConverterRegistry` insid
 
 ## Structure of the repo
 
-| Component     | Description                                                  |
-| ------------- | ------------------------------------------------------------ |
-| [**core**](core)  | Main JIT ingest, lowering, conversion and runtime implementations |
-| [**cpp**](cpp)   | C++ API and CLI source |
-| [**examples**](examples)   | Example applications to show different features of Torch-TensorRT |
-| [**py**](py)   | Python API for Torch-TensorRT |
-| [**tests**](tests) | Unit tests for Torch-TensorRT |
+| Component                | Description                                                  |
+| ------------------------ | ------------------------------------------------------------ |
+| [**core**](core)         | Main JIT ingest, lowering, conversion and runtime implementations |
+| [**cpp**](cpp)           | C++ API and CLI source                                       |
+| [**examples**](examples) | Example applications to show different features of Torch-TensorRT |
+| [**py**](py)             | Python API for Torch-TensorRT                                |
+| [**tests**](tests)       | Unit tests for Torch-TensorRT                                |
 
 ## Contributing
 
