@@ -5,7 +5,7 @@
 
 #include "torch/csrc/jit/ir/ir.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace util {
 
@@ -62,4 +62,4 @@ inline std::string GetPyTorchSourceCode(const torch::jit::Node* n) {
 
 } // namespace util
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

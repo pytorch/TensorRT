@@ -22,12 +22,12 @@ TEST(LoweringPasses, UnpackVarLowersCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  auto jit_pre_results = trtorch::tests::util::EvaluateGraphJIT(g, {in});
-  trtorch::core::lowering::passes::UnpackVar(g);
+  auto jit_pre_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
+  torch_tensorrt::core::lowering::passes::UnpackVar(g);
   torch::jit::EliminateCommonSubexpression(g);
-  auto jit_post_results = trtorch::tests::util::EvaluateGraphJIT(g, {in});
+  auto jit_post_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
 }
 
 TEST(LoweringPasses, UnpackVarKeepDimsLowersCorrectly) {
@@ -45,12 +45,12 @@ TEST(LoweringPasses, UnpackVarKeepDimsLowersCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  auto jit_pre_results = trtorch::tests::util::EvaluateGraphJIT(g, {in});
-  trtorch::core::lowering::passes::UnpackVar(g);
+  auto jit_pre_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
+  torch_tensorrt::core::lowering::passes::UnpackVar(g);
   torch::jit::EliminateCommonSubexpression(g);
-  auto jit_post_results = trtorch::tests::util::EvaluateGraphJIT(g, {in});
+  auto jit_post_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
 }
 
 TEST(LoweringPasses, UnpackVarUnbiasedLowersCorrectly) {
@@ -68,12 +68,12 @@ TEST(LoweringPasses, UnpackVarUnbiasedLowersCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  auto jit_pre_results = trtorch::tests::util::EvaluateGraphJIT(g, {in});
-  trtorch::core::lowering::passes::UnpackVar(g);
+  auto jit_pre_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
+  torch_tensorrt::core::lowering::passes::UnpackVar(g);
   torch::jit::EliminateCommonSubexpression(g);
-  auto jit_post_results = trtorch::tests::util::EvaluateGraphJIT(g, {in});
+  auto jit_post_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
 }
 
 TEST(LoweringPasses, UnpackVarUnbiasedKeepDimsLowersCorrectly) {
@@ -91,12 +91,12 @@ TEST(LoweringPasses, UnpackVarUnbiasedKeepDimsLowersCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  auto jit_pre_results = trtorch::tests::util::EvaluateGraphJIT(g, {in});
-  trtorch::core::lowering::passes::UnpackVar(g);
+  auto jit_pre_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
+  torch_tensorrt::core::lowering::passes::UnpackVar(g);
   torch::jit::EliminateCommonSubexpression(g);
-  auto jit_post_results = trtorch::tests::util::EvaluateGraphJIT(g, {in});
+  auto jit_post_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
 }
 
 TEST(LoweringPasses, UnpackStdLowersCorrectly) {
@@ -114,13 +114,13 @@ TEST(LoweringPasses, UnpackStdLowersCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  auto jit_pre_results = trtorch::tests::util::EvaluateGraphJIT(g, {in});
-  trtorch::core::lowering::passes::UnpackStd(g);
-  trtorch::core::lowering::passes::UnpackVar(g);
+  auto jit_pre_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
+  torch_tensorrt::core::lowering::passes::UnpackStd(g);
+  torch_tensorrt::core::lowering::passes::UnpackVar(g);
   torch::jit::EliminateCommonSubexpression(g);
-  auto jit_post_results = trtorch::tests::util::EvaluateGraphJIT(g, {in});
+  auto jit_post_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
 }
 
 TEST(LoweringPasses, UnpackStdKeepDimsLowersCorrectly) {
@@ -138,13 +138,13 @@ TEST(LoweringPasses, UnpackStdKeepDimsLowersCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  auto jit_pre_results = trtorch::tests::util::EvaluateGraphJIT(g, {in});
-  trtorch::core::lowering::passes::UnpackStd(g);
-  trtorch::core::lowering::passes::UnpackVar(g);
+  auto jit_pre_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
+  torch_tensorrt::core::lowering::passes::UnpackStd(g);
+  torch_tensorrt::core::lowering::passes::UnpackVar(g);
   torch::jit::EliminateCommonSubexpression(g);
-  auto jit_post_results = trtorch::tests::util::EvaluateGraphJIT(g, {in});
+  auto jit_post_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
 }
 
 TEST(LoweringPasses, UnpackStdUnbiasedLowersCorrectly) {
@@ -162,13 +162,13 @@ TEST(LoweringPasses, UnpackStdUnbiasedLowersCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  auto jit_pre_results = trtorch::tests::util::EvaluateGraphJIT(g, {in});
-  trtorch::core::lowering::passes::UnpackStd(g);
-  trtorch::core::lowering::passes::UnpackVar(g);
+  auto jit_pre_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
+  torch_tensorrt::core::lowering::passes::UnpackStd(g);
+  torch_tensorrt::core::lowering::passes::UnpackVar(g);
   torch::jit::EliminateCommonSubexpression(g);
-  auto jit_post_results = trtorch::tests::util::EvaluateGraphJIT(g, {in});
+  auto jit_post_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
 }
 
 TEST(LoweringPasses, UnpackStdUnbiasedKeepDimsLowersCorrectly) {
@@ -186,11 +186,11 @@ TEST(LoweringPasses, UnpackStdUnbiasedKeepDimsLowersCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  auto jit_pre_results = trtorch::tests::util::EvaluateGraphJIT(g, {in});
-  trtorch::core::lowering::passes::UnpackStd(g);
-  trtorch::core::lowering::passes::UnpackVar(g);
+  auto jit_pre_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
+  torch_tensorrt::core::lowering::passes::UnpackStd(g);
+  torch_tensorrt::core::lowering::passes::UnpackVar(g);
   torch::jit::EliminateCommonSubexpression(g);
-  auto jit_post_results = trtorch::tests::util::EvaluateGraphJIT(g, {in});
+  auto jit_post_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {in});
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_pre_results[0].toTensor(), jit_post_results[0].toTensor(), 2e-6));
 }

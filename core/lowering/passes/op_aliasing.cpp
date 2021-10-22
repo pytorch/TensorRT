@@ -2,7 +2,7 @@
 
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace lowering {
 namespace passes {
@@ -30,4 +30,4 @@ void AliasOperators(std::shared_ptr<torch::jit::Graph>& graph) {
 } // namespace passes
 } // namespace lowering
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

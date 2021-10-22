@@ -7,14 +7,14 @@
 #include <ATen/ATen.h>
 #include <vector>
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace converters {
 namespace impl {
 namespace {
 
-auto topk_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().pattern(
+auto topk_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pattern(
     {"aten::topk(Tensor self, int k, int dim=-1, bool largest=True, bool sorted=True) -> (Tensor values, Tensor indices)",
      [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
        auto self = args[0].ITensorOrFreeze(ctx);
@@ -43,7 +43,7 @@ auto topk_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().patter
 
        auto new_layer = ctx->net->addTopK(*self, TopKOperation, k, shiftDim);
 
-       TRTORCH_CHECK(new_layer, "Unable to create topk layer from node: " << *n);
+       TORCHTRT_CHECK(new_layer, "Unable to create topk layer from node: " << *n);
 
        auto out0 = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
        auto out1 = ctx->AssociateValueAndTensor(n->outputs()[1], new_layer->getOutput(1));
@@ -59,4 +59,4 @@ auto topk_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().patter
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

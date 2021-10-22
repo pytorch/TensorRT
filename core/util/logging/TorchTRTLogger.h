@@ -3,7 +3,7 @@
 #include <string>
 #include "NvInfer.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace util {
 namespace logging {
@@ -18,10 +18,10 @@ enum class LogLevel : uint8_t {
 };
 
 // Logger for TensorRT info/warning/errors
-class TRTorchLogger : public nvinfer1::ILogger {
+class TorchTRTLogger : public nvinfer1::ILogger {
  public:
-  TRTorchLogger(std::string prefix = "[TRTorch] - ", Severity severity = Severity::kWARNING, bool color = true);
-  TRTorchLogger(std::string prefix = "[TRTorch] - ", LogLevel lvl = LogLevel::kWARNING, bool color = true);
+  TorchTRTLogger(std::string prefix = "[TRTorch] - ", Severity severity = Severity::kWARNING, bool color = true);
+  TorchTRTLogger(std::string prefix = "[TRTorch] - ", LogLevel lvl = LogLevel::kWARNING, bool color = true);
   void log(Severity severity, const char* msg) noexcept override;
   void log(LogLevel lvl, std::string msg);
   void set_logging_prefix(std::string prefix);
@@ -39,9 +39,9 @@ class TRTorchLogger : public nvinfer1::ILogger {
   bool color_;
 };
 
-TRTorchLogger& get_logger();
+TorchTRTLogger& get_logger();
 
 } // namespace logging
 } // namespace util
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

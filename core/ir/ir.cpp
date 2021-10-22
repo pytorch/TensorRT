@@ -1,7 +1,7 @@
 #include "core/ir/ir.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace ir {
 
@@ -14,7 +14,7 @@ InputSpecMap associate_specs_with_inputs(
 }
 
 InputSpecMap pair_input_vals_with_specs(std::vector<const torch::jit::Value*> vals, std::vector<Input> specs) {
-  TRTORCH_CHECK(
+  TORCHTRT_CHECK(
       vals.size() == specs.size(),
       "Expected dimension specifications for all input tensors"
           << ", but found " << vals.size() << " input tensors and " << specs.size() << " dimension specs");
@@ -46,13 +46,13 @@ std::vector<const torch::jit::Value*> get_tensor_inputs(
 }
 
 c10::optional<at::ScalarType> get_value_first_calc_dtype_opt(torch::jit::Block* b, torch::jit::Value* in) {
-  TRTORCH_ASSERT(in->owningGraph() == b->owningGraph(), "Provided input is not part of the provided graph");
+  TORCHTRT_ASSERT(in->owningGraph() == b->owningGraph(), "Provided input is not part of the provided graph");
   c10::optional<at::ScalarType> dtype = {};
 
   auto b_ins = b->inputs();
   std::unordered_set<torch::jit::Value*> b_in_set(b_ins.begin(), b_ins.end());
 
-  TRTORCH_ASSERT(
+  TORCHTRT_ASSERT(
       in->type() == c10::TensorType::get(), "Input is not a tensor, cannot check for dtype based on calculation");
 
   auto consumers = in->uses();
@@ -150,4 +150,4 @@ TypeMap get_block_first_calc_dtypes_opt(torch::jit::Block* b) {
 
 } // namespace ir
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

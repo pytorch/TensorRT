@@ -9,10 +9,10 @@ TEST_P(CppAPITests, InputsFromTensors) {
     trt_inputs_ivalues.push_back(in.clone());
   }
 
-  auto spec = trtorch::CompileSpec({trt_inputs_ivalues[0].toTensor()});
+  auto spec = torch_tensorrt::ts::CompileSpec({trt_inputs_ivalues[0].toTensor()});
 
-  auto trt_mod = trtorch::CompileGraph(mod, spec);
-  torch::jit::IValue trt_results_ivalues = trtorch::tests::util::RunModuleForward(trt_mod, trt_inputs_ivalues);
+  auto trt_mod = torch_tensorrt::ts::CompileModule(mod, spec);
+  torch::jit::IValue trt_results_ivalues = torch_tensorrt::tests::util::RunModuleForward(trt_mod, trt_inputs_ivalues);
   std::vector<at::Tensor> trt_results;
   trt_results.push_back(trt_results_ivalues.toTensor());
 }

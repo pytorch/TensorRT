@@ -3,7 +3,7 @@
 #include "torch/csrc/jit/api/module.h"
 #include "torch/csrc/jit/passes/constant_pooling.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace partitioning {
 
@@ -63,7 +63,7 @@ void getSegmentsOutputByRunning(
 
   // set inputs ivalues, now supports Tensor/Int to pass argumentes between different segments
   for (auto& input : seg_block.raw_inputs()) {
-    TRTORCH_CHECK(
+    TORCHTRT_CHECK(
         ivalues_maps.count(input),
         "Could not find torch::jit::Value* " << input->debugName() << " produced from "
                                              << util::node_info(input->node())
@@ -81,7 +81,7 @@ void getSegmentsOutputByRunning(
     } else if (input->type()->kind() == torch::jit::TypeKind::TupleType) {
       jit_inputs_ivalues.push_back(ivalues_maps[input].toTuple());
     } else {
-      TRTORCH_THROW_ERROR("Unable to find type for value: " << input->debugName() << " to get the ivalues.\n");
+      TORCHTRT_THROW_ERROR("Unable to find type for value: " << input->debugName() << " to get the ivalues.\n");
     }
   }
 
@@ -130,4 +130,4 @@ void runShapeAnalysis(
 
 } // namespace partitioning
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

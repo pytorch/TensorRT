@@ -9,7 +9,7 @@
 #include "core/runtime/runtime.h"
 #include "torch/csrc/jit/api/module.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 
 struct CompileSpec {

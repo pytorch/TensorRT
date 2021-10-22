@@ -3,7 +3,7 @@
 #include "core/conversion/conversionctx/ConversionCtx.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace converters {
@@ -25,4 +25,4 @@ struct Weights {
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

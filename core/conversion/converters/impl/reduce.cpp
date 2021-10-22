@@ -2,14 +2,14 @@
 #include "core/conversion/converters/converters.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace converters {
 namespace impl {
 namespace {
 
-auto reduce_registrations TRTORCH_UNUSED =
+auto reduce_registrations TORCHTRT_UNUSED =
     RegisterNodeConversionPatterns()
         .pattern({"aten::mean(Tensor self, *, ScalarType? dtype=None) -> (Tensor)",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
@@ -22,7 +22,7 @@ auto reduce_registrations TRTORCH_UNUSED =
                     auto mean_layer =
                         ctx->net->addReduce(*in_tensor, nvinfer1::ReduceOperation::kAVG, axis_mask, false);
 
-                    TRTORCH_CHECK(mean_layer, "Unable to create mean layer from node: " << *n);
+                    TORCHTRT_CHECK(mean_layer, "Unable to create mean layer from node: " << *n);
 
                     mean_layer->setName(util::node_info(n).c_str());
                     auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], mean_layer->getOutput(0));
@@ -59,7 +59,7 @@ auto reduce_registrations TRTORCH_UNUSED =
                LOG_DEBUG("Keep dims: " << keepdim);
                LOG_WARNING("Mean converter disregards dtype");
                auto mean_layer = ctx->net->addReduce(*in_tensor, nvinfer1::ReduceOperation::kAVG, axis_mask, keepdim);
-               TRTORCH_CHECK(mean_layer, "Unable to create mean layer from node: " << *n);
+               TORCHTRT_CHECK(mean_layer, "Unable to create mean layer from node: " << *n);
                mean_layer->setName(util::node_info(n).c_str());
                auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], mean_layer->getOutput(0));
                LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
@@ -75,7 +75,7 @@ auto reduce_registrations TRTORCH_UNUSED =
 
                     auto sum_layer = ctx->net->addReduce(*in_tensor, nvinfer1::ReduceOperation::kSUM, axis_mask, false);
 
-                    TRTORCH_CHECK(sum_layer, "Unable to create sum layer from node: " << *n);
+                    TORCHTRT_CHECK(sum_layer, "Unable to create sum layer from node: " << *n);
 
                     sum_layer->setName(util::node_info(n).c_str());
                     auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], sum_layer->getOutput(0));
@@ -114,7 +114,7 @@ auto reduce_registrations TRTORCH_UNUSED =
                LOG_WARNING("Sum converter disregards dtype");
                auto sum_layer = ctx->net->addReduce(*in_tensor, nvinfer1::ReduceOperation::kSUM, axis_mask, keepdim);
 
-               TRTORCH_CHECK(sum_layer, "Unable to create sum layer from node: " << *n);
+               TORCHTRT_CHECK(sum_layer, "Unable to create sum layer from node: " << *n);
 
                sum_layer->setName(util::node_info(n).c_str());
                auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], sum_layer->getOutput(0));
@@ -133,7 +133,7 @@ auto reduce_registrations TRTORCH_UNUSED =
                     auto prod_layer =
                         ctx->net->addReduce(*in_tensor, nvinfer1::ReduceOperation::kPROD, axis_mask, false);
 
-                    TRTORCH_CHECK(prod_layer, "Unable to create sum layer from node: " << *n);
+                    TORCHTRT_CHECK(prod_layer, "Unable to create sum layer from node: " << *n);
 
                     prod_layer->setName(util::node_info(n).c_str());
                     auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], prod_layer->getOutput(0));
@@ -160,7 +160,7 @@ auto reduce_registrations TRTORCH_UNUSED =
                     auto prod_layer =
                         ctx->net->addReduce(*in_tensor, nvinfer1::ReduceOperation::kPROD, axis_mask, keepdim);
 
-                    TRTORCH_CHECK(prod_layer, "Unable to create mean layer from node: " << *n);
+                    TORCHTRT_CHECK(prod_layer, "Unable to create mean layer from node: " << *n);
 
                     prod_layer->setName(util::node_info(n).c_str());
                     auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], prod_layer->getOutput(0));
@@ -177,7 +177,7 @@ auto reduce_registrations TRTORCH_UNUSED =
 
                     auto max_layer = ctx->net->addReduce(*in_tensor, nvinfer1::ReduceOperation::kMAX, axis_mask, false);
 
-                    TRTORCH_CHECK(max_layer, "Unable to create max layer from node: " << *n);
+                    TORCHTRT_CHECK(max_layer, "Unable to create max layer from node: " << *n);
 
                     max_layer->setName(util::node_info(n).c_str());
                     auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], max_layer->getOutput(0));
@@ -194,7 +194,7 @@ auto reduce_registrations TRTORCH_UNUSED =
 
                auto min_layer = ctx->net->addReduce(*in_tensor, nvinfer1::ReduceOperation::kMIN, axis_mask, false);
 
-               TRTORCH_CHECK(min_layer, "Unable to create min layer from node: " << *n);
+               TORCHTRT_CHECK(min_layer, "Unable to create min layer from node: " << *n);
 
                min_layer->setName(util::node_info(n).c_str());
                auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], min_layer->getOutput(0));
@@ -207,4 +207,4 @@ auto reduce_registrations TRTORCH_UNUSED =
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

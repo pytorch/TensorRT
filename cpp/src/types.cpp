@@ -88,7 +88,7 @@ nvinfer1::DataType toTRTDataType(DataType value) {
 }
 
 nvinfer1::TensorFormat toTRTTensorFormat(TensorFormat value) {
-  TRTORCH_CHECK(!(value == TensorFormat::kUnknown), "Tensor format is unknown");
+  TORCHTRT_CHECK(!(value == TensorFormat::kUnknown), "Tensor format is unknown");
   switch (value) {
     case TensorFormat::kChannelsLast:
       return nvinfer1::TensorFormat::kHWC;
@@ -99,7 +99,7 @@ nvinfer1::TensorFormat toTRTTensorFormat(TensorFormat value) {
 }
 
 DataType::DataType(c10::ScalarType t) {
-  TRTORCH_CHECK(
+  TORCHTRT_CHECK(
       t == at::kHalf || t == at::kFloat || t == at::kChar || t == at::kInt || t == at::kBool,
       "Data type is unsupported (" << t << ")");
   switch (t) {
@@ -123,7 +123,7 @@ DataType::DataType(c10::ScalarType t) {
 }
 
 TensorFormat::TensorFormat(at::MemoryFormat t) {
-  TRTORCH_CHECK(
+  TORCHTRT_CHECK(
       t == at::MemoryFormat::Contiguous || t == at::MemoryFormat::ChannelsLast,
       "Tensor format is unsupported (" << t << ")");
 
@@ -138,7 +138,7 @@ TensorFormat::TensorFormat(at::MemoryFormat t) {
 }
 
 Device::DeviceType::DeviceType(c10::DeviceType t) {
-  TRTORCH_CHECK(t == at::kCUDA, "Device type when specified using torch device enum must be torch::kCUDA");
+  TORCHTRT_CHECK(t == at::kCUDA, "Device type when specified using torch device enum must be torch::kCUDA");
   value = DeviceType::kGPU;
 }
 
@@ -164,20 +164,20 @@ Input::Input(std::vector<int64_t> shape, DataType dtype, TensorFormat format) {
 }
 
 Input::Input(c10::IntArrayRef shape, TensorFormat format) {
-  this->opt_shape = trtorch::core::util::toVec(shape);
-  this->min_shape = trtorch::core::util::toVec(shape);
-  this->max_shape = trtorch::core::util::toVec(shape);
-  this->shape = trtorch::core::util::toVec(shape);
+  this->opt_shape = torch_tensorrt::core::util::toVec(shape);
+  this->min_shape = torch_tensorrt::core::util::toVec(shape);
+  this->max_shape = torch_tensorrt::core::util::toVec(shape);
+  this->shape = torch_tensorrt::core::util::toVec(shape);
   this->dtype = DataType::kUnknown;
   this->format = format;
   this->input_is_dynamic = false;
 }
 
 Input::Input(c10::IntArrayRef shape, DataType dtype, TensorFormat format) {
-  this->opt_shape = trtorch::core::util::toVec(shape);
-  this->min_shape = trtorch::core::util::toVec(shape);
-  this->max_shape = trtorch::core::util::toVec(shape);
-  this->shape = trtorch::core::util::toVec(shape);
+  this->opt_shape = torch_tensorrt::core::util::toVec(shape);
+  this->min_shape = torch_tensorrt::core::util::toVec(shape);
+  this->max_shape = torch_tensorrt::core::util::toVec(shape);
+  this->shape = torch_tensorrt::core::util::toVec(shape);
   this->dtype = dtype;
   this->format = format;
   this->input_is_dynamic = false;
@@ -191,7 +191,7 @@ Input::Input(
   this->opt_shape = opt_shape;
   this->min_shape = min_shape;
   this->max_shape = max_shape;
-  this->shape = trtorch::core::util::toVec(trtorch::core::ir::Input(this->min_shape, this->opt_shape, this->max_shape).input_shape);
+  this->shape = torch_tensorrt::core::util::toVec(torch_tensorrt::core::ir::Input(this->min_shape, this->opt_shape, this->max_shape).input_shape);
   this->dtype = DataType::kUnknown;
   this->format = format;
   this->input_is_dynamic = true;
@@ -206,7 +206,7 @@ Input::Input(
   this->opt_shape = opt_shape;
   this->min_shape = min_shape;
   this->max_shape = max_shape;
-  this->shape = trtorch::core::util::toVec(trtorch::core::ir::Input(this->min_shape, this->opt_shape, this->max_shape).input_shape);
+  this->shape = torch_tensorrt::core::util::toVec(torch_tensorrt::core::ir::Input(this->min_shape, this->opt_shape, this->max_shape).input_shape);
   this->dtype = dtype;
   this->format = format;
   this->input_is_dynamic = true;
@@ -217,10 +217,10 @@ Input::Input(
     c10::IntArrayRef opt_shape,
     c10::IntArrayRef max_shape,
     TensorFormat format) {
-  this->opt_shape = trtorch::core::util::toVec(opt_shape);
-  this->min_shape = trtorch::core::util::toVec(min_shape);
-  this->max_shape = trtorch::core::util::toVec(max_shape);
-  this->shape = trtorch::core::util::toVec(trtorch::core::ir::Input(this->min_shape, this->opt_shape, this->max_shape).input_shape);
+  this->opt_shape = torch_tensorrt::core::util::toVec(opt_shape);
+  this->min_shape = torch_tensorrt::core::util::toVec(min_shape);
+  this->max_shape = torch_tensorrt::core::util::toVec(max_shape);
+  this->shape = torch_tensorrt::core::util::toVec(torch_tensorrt::core::ir::Input(this->min_shape, this->opt_shape, this->max_shape).input_shape);
   this->dtype = DataType::kUnknown;
   this->format = format;
   this->input_is_dynamic = true;
@@ -232,10 +232,10 @@ Input::Input(
     c10::IntArrayRef max_shape,
     DataType dtype,
     TensorFormat format) {
-  this->opt_shape = trtorch::core::util::toVec(opt_shape);
-  this->min_shape = trtorch::core::util::toVec(min_shape);
-  this->max_shape = trtorch::core::util::toVec(max_shape);
-  this->shape = trtorch::core::util::toVec(trtorch::core::ir::Input(this->min_shape, this->opt_shape, this->max_shape).input_shape);
+  this->opt_shape = torch_tensorrt::core::util::toVec(opt_shape);
+  this->min_shape = torch_tensorrt::core::util::toVec(min_shape);
+  this->max_shape = torch_tensorrt::core::util::toVec(max_shape);
+  this->shape = torch_tensorrt::core::util::toVec(torch_tensorrt::core::ir::Input(this->min_shape, this->opt_shape, this->max_shape).input_shape);
   this->dtype = dtype;
   this->format = format;
   this->input_is_dynamic = true;
@@ -247,7 +247,7 @@ Input::Input(at::Tensor tensor) {
   this->max_shape = tensor.sizes().vec();
   this->shape = tensor.sizes().vec();
   this->dtype = tensor.scalar_type();
-  TRTORCH_ASSERT(
+  TORCHTRT_ASSERT(
       tensor.is_contiguous(at::MemoryFormat::ChannelsLast) || tensor.is_contiguous(at::MemoryFormat::Contiguous),
       "Tensor does not have a supported contiguous memory format, supported formats are contiguous or channel_last");
   at::MemoryFormat frmt;
@@ -262,8 +262,8 @@ Input::Input(at::Tensor tensor) {
 
 /* ==========================================*/
 
-trtorch::core::ir::Input to_internal_input(Input& i) {
-  return trtorch::core::ir::Input(
+torch_tensorrt::core::ir::Input to_internal_input(Input& i) {
+  return torch_tensorrt::core::ir::Input(
       i.min_shape,
       i.opt_shape,
       i.max_shape,
@@ -272,15 +272,15 @@ trtorch::core::ir::Input to_internal_input(Input& i) {
       !(i.dtype == DataType::kUnknown));
 }
 
-std::vector<trtorch::core::ir::Input> to_vec_internal_inputs(std::vector<Input>& external) {
-  std::vector<trtorch::core::ir::Input> internal;
+std::vector<torch_tensorrt::core::ir::Input> to_vec_internal_inputs(std::vector<Input>& external) {
+  std::vector<torch_tensorrt::core::ir::Input> internal;
   for (auto range : external) {
     internal.push_back(to_internal_input(range));
   }
   return internal;
 }
 
-trtorch::core::runtime::CudaDevice to_internal_cuda_device(Device device) {
+torch_tensorrt::core::runtime::CudaDevice to_internal_cuda_device(Device device) {
   auto device_type = nvinfer1::DeviceType::kGPU;
   switch (device.device_type) {
     case Device::DeviceType::kDLA:
@@ -290,6 +290,6 @@ trtorch::core::runtime::CudaDevice to_internal_cuda_device(Device device) {
     default:
       device_type = nvinfer1::DeviceType::kGPU;
   }
-  return trtorch::core::runtime::CudaDevice(device.gpu_id, device_type);
+  return torch_tensorrt::core::runtime::CudaDevice(device.gpu_id, device_type);
 }
 } // namespace torch_tensorrt

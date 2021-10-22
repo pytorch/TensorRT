@@ -5,14 +5,14 @@
 #include "core/util/prelude.h"
 #include "torch/torch.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace converters {
 namespace impl {
 namespace {
 
-auto constant_pad_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().pattern(
+auto constant_pad_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pattern(
     {"aten::constant_pad_nd(Tensor self, int[] pad, Scalar value=0) -> (Tensor)",
      [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
        auto in = args[0].ITensor();
@@ -22,10 +22,10 @@ auto constant_pad_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns(
        int64_t padSize = padding.size();
        auto value = args[2].unwrapToScalar().to<float>();
 
-       TRTORCH_CHECK(padSize % 2 == 0, "Length of pad must be even but instead it equals " << padSize);
+       TORCHTRT_CHECK(padSize % 2 == 0, "Length of pad must be even but instead it equals " << padSize);
 
        int64_t l_pad = padSize / 2;
-       TRTORCH_CHECK(
+       TORCHTRT_CHECK(
            inRank >= (int64_t)l_pad,
            "Length of pad should be no more than twice the number of "
            "dimensions of the input. Pad length is "
@@ -153,4 +153,4 @@ auto constant_pad_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns(
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

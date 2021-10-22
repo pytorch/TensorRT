@@ -25,14 +25,14 @@ std::string gen_test_graph(const std::string& unary) {
     if (strcmp(#name, "Acosh") == 0)                                                      \
       offset += 1; /*input larger than 1 for acosh*/                                      \
     auto in = at::empty({10}, {at::kCUDA}).uniform_(0 + offset, 0.5 + offset);            \
-    auto params = trtorch::core::ir::get_static_params(g->inputs(), {});                  \
-    auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});                   \
+    auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});                  \
+    auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});                   \
                                                                                           \
     in = at::clone(in);                                                                   \
-    params = trtorch::core::ir::get_static_params(g->inputs(), {});                       \
-    auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});             \
+    params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});                       \
+    auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});             \
                                                                                           \
-    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6)); \
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6)); \
   }
 
 test_unary(cos, Cos);

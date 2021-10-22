@@ -16,15 +16,15 @@ TEST(Converters, ATenSoftmax1DConvertsCorrectly) {
   torch::jit::parseIR(graph, g.get());
 
   auto in = at::randint(0, 5, {5}, {at::kCUDA});
-  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
 
   in = at::clone(in);
-  params = trtorch::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
   auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
 TEST(Converters, ATenSoftmaxNDConvertsCorrectlySub3DIndex) {
@@ -40,15 +40,15 @@ TEST(Converters, ATenSoftmaxNDConvertsCorrectlySub3DIndex) {
 
   auto in = at::randint(0, 5, {1, 2, 2, 2, 2}, {at::kCUDA});
 
-  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
 
   in = at::clone(in);
-  params = trtorch::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
   auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
 TEST(Converters, ATenSoftmaxNDConvertsCorrectlyAbove3DIndex) {
@@ -65,16 +65,16 @@ TEST(Converters, ATenSoftmaxNDConvertsCorrectlyAbove3DIndex) {
   auto in = at::randint(0, 5, {1, 2, 2, 2, 2}, {at::kCUDA});
 
   auto jit_in = at::clone(in);
-  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
-  params = trtorch::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
 TEST(Converters, ATenSoftmaxNDConvertsCorrectlyNegtiveOneIndex) {
@@ -91,16 +91,16 @@ TEST(Converters, ATenSoftmaxNDConvertsCorrectlyNegtiveOneIndex) {
   auto in = at::randint(0, 5, {1, 2, 2, 2, 2}, {at::kCUDA});
 
   auto jit_in = at::clone(in);
-  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
-  params = trtorch::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
 TEST(Converters, ATenSoftmaxNDConvertsCorrectlyNegtiveIndex) {
@@ -117,14 +117,14 @@ TEST(Converters, ATenSoftmaxNDConvertsCorrectlyNegtiveIndex) {
   auto in = at::randint(0, 5, {1, 2, 2, 2, 2}, {at::kCUDA});
 
   auto jit_in = at::clone(in);
-  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
-  params = trtorch::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }

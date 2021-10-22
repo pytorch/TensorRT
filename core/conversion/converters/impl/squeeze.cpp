@@ -7,14 +7,14 @@
 #include <ATen/ATen.h>
 #include <vector>
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace converters {
 namespace impl {
 namespace {
 
-auto squeeze_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().pattern(
+auto squeeze_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pattern(
     {"aten::squeeze.dim(Tensor(a) self, int dim) -> (Tensor(a))",
      [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
        auto self = args[0].ITensorOrFreeze(ctx);
@@ -34,7 +34,7 @@ auto squeeze_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().pat
        }
 
        auto shuffle_layer = ctx->net->addShuffle(*self);
-       TRTORCH_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
+       TORCHTRT_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
        shuffle_layer->setReshapeDimensions(util::squeezeDims(self->getDimensions(), dim));
 
        auto out = ctx->AssociateValueAndTensor(n->outputs()[0], shuffle_layer->getOutput(0));
@@ -49,4 +49,4 @@ auto squeeze_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().pat
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

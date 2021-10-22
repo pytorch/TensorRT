@@ -16,10 +16,10 @@ TEST(LoweringPasses, ReduceToCorrectly) {
         %out : Tensor = aten::to(%x, %dtype, %nb, %copy, %format)
         return (%out))IR";
 
-  trtorch::core::util::logging::get_logger().set_reportable_log_level(trtorch::core::util::logging::LogLevel::kGRAPH);
+  torch_tensorrt::core::util::logging::get_logger().set_reportable_log_level(torch_tensorrt::core::util::logging::LogLevel::kGRAPH);
   auto sg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(source_graph, &*sg);
-  trtorch::core::lowering::passes::ReduceToOperation(sg);
+  torch_tensorrt::core::lowering::passes::ReduceToOperation(sg);
 
   auto tg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(target_graph, &*tg);
@@ -39,10 +39,10 @@ TEST(LoweringPasses, ReduceAtenTypeAsCorrectly) {
         %out : Tensor = aten::to(%input, %other, %5, %5, %6)
         return (%out))IR";
 
-  trtorch::core::util::logging::get_logger().set_reportable_log_level(trtorch::core::util::logging::LogLevel::kGRAPH);
+  torch_tensorrt::core::util::logging::get_logger().set_reportable_log_level(torch_tensorrt::core::util::logging::LogLevel::kGRAPH);
   auto sg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(source_graph, &*sg);
-  trtorch::core::lowering::passes::ReduceToOperation(sg);
+  torch_tensorrt::core::lowering::passes::ReduceToOperation(sg);
 
   auto tg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(target_graph, &*tg);

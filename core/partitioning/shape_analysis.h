@@ -2,7 +2,7 @@
 #include "core/partitioning/SegmentedBlock.h"
 #include "torch/csrc/jit/ir/ir.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace partitioning {
 
@@ -16,4 +16,4 @@ void runShapeAnalysis(
 
 } // namespace partitioning
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

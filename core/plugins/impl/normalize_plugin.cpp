@@ -4,7 +4,7 @@
 #include "core/plugins/plugins.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace plugins {
 namespace impl {
@@ -54,7 +54,7 @@ const char* NormalizePlugin::getPluginVersion() const noexcept {
 }
 
 const char* NormalizePlugin::getPluginNamespace() const noexcept {
-  return "trtorch";
+  return "torch_tensorrt";
 }
 
 nvinfer1::IPluginV2DynamicExt* NormalizePlugin::clone() const noexcept {
@@ -219,7 +219,7 @@ NormalizePluginCreator::NormalizePluginCreator() {
 }
 
 const char* NormalizePluginCreator::getPluginNamespace() const noexcept {
-  return "trtorch";
+  return "torch_tensorrt";
 }
 
 const char* NormalizePluginCreator::getPluginName() const noexcept {
@@ -264,9 +264,9 @@ const nvinfer1::PluginFieldCollection* NormalizePluginCreator::getFieldNames() n
   return nullptr;
 }
 
-REGISTER_TRTORCH_PLUGIN(NormalizePluginCreator);
+REGISTER_TORCHTRT_PLUGIN(NormalizePluginCreator);
 
 } // namespace impl
 } // namespace plugins
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

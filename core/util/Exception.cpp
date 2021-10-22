@@ -4,7 +4,7 @@
 #include <numeric>
 #include <string>
 
-namespace trtorch {
+namespace torch_tensorrt {
 
 Error::Error(const std::string& new_msg, const void* caller) : msg_stack_{new_msg}, caller_(caller) {
   msg_ = msg();
@@ -26,4 +26,4 @@ std::string GetExceptionString(const std::exception& e) {
   return std::string("Exception: ") + e.what();
 }
 
-} // namespace trtorch
+} // namespace torch_tensorrt

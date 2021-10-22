@@ -1,7 +1,7 @@
 #include "tests/util/util.h"
 #include "torch/csrc/jit/runtime/graph_executor.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace tests {
 namespace util {
 
@@ -40,4 +40,4 @@ std::vector<at::Tensor> RunGraph(
 
 } // namespace util
 } // namespace tests
-} // namespace trtorch
+} // namespace torch_tensorrt

@@ -8,7 +8,7 @@
 #include "core/util/prelude.h"
 #include "torch/csrc/jit/ir/ir.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 
@@ -72,6 +72,6 @@ class Var : torch::CustomClassHolder {
 
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt
 
 #include "core/conversion/var/Var_inl.h"

@@ -3,7 +3,7 @@
 #include "core/runtime/runtime.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace runtime {
 
@@ -61,7 +61,7 @@ std::vector<CudaDevice> find_compatible_devices(const CudaDevice& target_device)
         compatible_devices.push_back(device.second);
       }
     } else {
-      TRTORCH_THROW_ERROR(
+      TORCHTRT_THROW_ERROR(
           "Unknown target device type detected from the compiled program (runtime.find_compatible_devices)");
       break;
     }
@@ -70,14 +70,14 @@ std::vector<CudaDevice> find_compatible_devices(const CudaDevice& target_device)
 }
 
 void set_cuda_device(CudaDevice& cuda_device) {
-  TRTORCH_CHECK(
+  TORCHTRT_CHECK(
       (cudaSetDevice(cuda_device.id) == cudaSuccess), "Unable to set device: " << cuda_device << "as active device");
   LOG_DEBUG("Setting " << cuda_device << " as active device");
 }
 
 CudaDevice get_current_device() {
   int device = -1;
-  TRTORCH_CHECK(
+  TORCHTRT_CHECK(
       (cudaGetDevice(reinterpret_cast<int*>(&device)) == cudaSuccess),
       "Unable to get current device (runtime.get_current_device)");
 
@@ -111,4 +111,4 @@ const std::unordered_map<std::string, std::string>& get_dla_supported_SMs() {
 
 } // namespace runtime
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

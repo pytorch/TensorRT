@@ -20,10 +20,10 @@ TEST(LoweringPasses, RemoveDropoutLowersCorrectly) {
       %11 : Tensor = aten::relu(%x.1)
       return (%11))IR";
 
-  trtorch::core::util::logging::get_logger().set_reportable_log_level(trtorch::core::util::logging::LogLevel::kGRAPH);
+  torch_tensorrt::core::util::logging::get_logger().set_reportable_log_level(torch_tensorrt::core::util::logging::LogLevel::kGRAPH);
   auto sg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(source_graph, sg.get());
-  trtorch::core::lowering::passes::RemoveDropout(sg);
+  torch_tensorrt::core::lowering::passes::RemoveDropout(sg);
 
   auto tg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(target_graph, tg.get());
@@ -44,10 +44,10 @@ TEST(LoweringPasses, RemoveDropoutInplaceLowersCorrectly) {
       %11 : Tensor = aten::relu(%x.1)
       return (%11))IR";
 
-  trtorch::core::util::logging::get_logger().set_reportable_log_level(trtorch::core::util::logging::LogLevel::kGRAPH);
+  torch_tensorrt::core::util::logging::get_logger().set_reportable_log_level(torch_tensorrt::core::util::logging::LogLevel::kGRAPH);
   auto sg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(source_graph, sg.get());
-  trtorch::core::lowering::passes::RemoveDropout(sg);
+  torch_tensorrt::core::lowering::passes::RemoveDropout(sg);
 
   auto tg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(target_graph, tg.get());
@@ -68,10 +68,10 @@ TEST(LoweringPasses, RemoveFeatureDropoutLowersCorrectly) {
       %11 : Tensor = aten::relu(%x.1)
       return (%11))IR";
 
-  trtorch::core::util::logging::get_logger().set_reportable_log_level(trtorch::core::util::logging::LogLevel::kGRAPH);
+  torch_tensorrt::core::util::logging::get_logger().set_reportable_log_level(torch_tensorrt::core::util::logging::LogLevel::kGRAPH);
   auto sg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(source_graph, sg.get());
-  trtorch::core::lowering::passes::RemoveDropout(sg);
+  torch_tensorrt::core::lowering::passes::RemoveDropout(sg);
 
   auto tg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(target_graph, tg.get());
@@ -92,10 +92,10 @@ TEST(LoweringPasses, RemoveFeatureDropoutInplaceLowersCorrectly) {
       %11 : Tensor = aten::relu(%x.1)
       return (%11))IR";
 
-  trtorch::core::util::logging::get_logger().set_reportable_log_level(trtorch::core::util::logging::LogLevel::kGRAPH);
+  torch_tensorrt::core::util::logging::get_logger().set_reportable_log_level(torch_tensorrt::core::util::logging::LogLevel::kGRAPH);
   auto sg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(source_graph, sg.get());
-  trtorch::core::lowering::passes::RemoveDropout(sg);
+  torch_tensorrt::core::lowering::passes::RemoveDropout(sg);
 
   auto tg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(target_graph, tg.get());
@@ -116,10 +116,10 @@ TEST(LoweringPasses, RemoveFeatureAlphaDropoutLowersCorrectly) {
       %11 : Tensor = aten::relu(%x.1)
       return (%11))IR";
 
-  trtorch::core::util::logging::get_logger().set_reportable_log_level(trtorch::core::util::logging::LogLevel::kGRAPH);
+  torch_tensorrt::core::util::logging::get_logger().set_reportable_log_level(torch_tensorrt::core::util::logging::LogLevel::kGRAPH);
   auto sg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(source_graph, sg.get());
-  trtorch::core::lowering::passes::RemoveDropout(sg);
+  torch_tensorrt::core::lowering::passes::RemoveDropout(sg);
 
   auto tg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(target_graph, tg.get());
@@ -140,10 +140,10 @@ TEST(LoweringPasses, RemoveFeatureAlphaDropoutInplaceLowersCorrectly) {
       %11 : Tensor = aten::relu(%x.1)
       return (%11))IR";
 
-  trtorch::core::util::logging::get_logger().set_reportable_log_level(trtorch::core::util::logging::LogLevel::kGRAPH);
+  torch_tensorrt::core::util::logging::get_logger().set_reportable_log_level(torch_tensorrt::core::util::logging::LogLevel::kGRAPH);
   auto sg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(source_graph, sg.get());
-  trtorch::core::lowering::passes::RemoveDropout(sg);
+  torch_tensorrt::core::lowering::passes::RemoveDropout(sg);
 
   auto tg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(target_graph, tg.get());

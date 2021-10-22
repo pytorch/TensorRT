@@ -13,15 +13,15 @@
                                                                                          \
     auto in = at::randint(1, 10, input_shape, {at::kCUDA});                              \
     auto jit_in = at::clone(in);                                                         \
-    auto params = trtorch::core::ir::get_static_params(g->inputs(), {});                 \
-    auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});              \
+    auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});                 \
+    auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});              \
                                                                                          \
     auto trt_in = at::clone(in);                                                         \
-    params = trtorch::core::ir::get_static_params(g->inputs(), {});                      \
+    params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});                      \
                                                                                          \
-    auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});        \
+    auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});        \
     auto trt = trt_results[0].reshape(jit_results[0].sizes());                           \
-    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));           \
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));           \
   }                                                                                      \
                                                                                          \
   TEST(Converters, name##DynamicConvertsCorrectly) {                                     \
@@ -32,15 +32,15 @@
                                                                                          \
     auto in = at::randint(1, 10, input_shape, {at::kCUDA});                              \
     auto jit_in = at::clone(in);                                                         \
-    auto params = trtorch::core::ir::get_static_params(g->inputs(), {});                 \
-    auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});              \
+    auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});                 \
+    auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});              \
                                                                                          \
     auto trt_in = at::clone(in);                                                         \
-    params = trtorch::core::ir::get_static_params(g->inputs(), {});                      \
+    params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});                      \
                                                                                          \
-    auto trt_results = trtorch::tests::util::RunGraphEngineDynamic(g, params, {trt_in}); \
+    auto trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {trt_in}); \
     auto trt = trt_results[0].reshape(jit_results[0].sizes());                           \
-    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));           \
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));           \
   }
 
 #define ATEN_INTERPOLATE_STATIC_ONLY_TEST(name, graph_src, input_shape)           \
@@ -52,15 +52,15 @@
                                                                                   \
     auto in = at::randint(1, 10, input_shape, {at::kCUDA});                       \
     auto jit_in = at::clone(in);                                                  \
-    auto params = trtorch::core::ir::get_static_params(g->inputs(), {});          \
-    auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});       \
+    auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});          \
+    auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});       \
                                                                                   \
     auto trt_in = at::clone(in);                                                  \
-    params = trtorch::core::ir::get_static_params(g->inputs(), {});               \
+    params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});               \
                                                                                   \
-    auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in}); \
+    auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in}); \
     auto trt = trt_results[0].reshape(jit_results[0].sizes());                    \
-    ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));    \
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));    \
   }
 
 ATEN_INTERPOLATE_TESTS(

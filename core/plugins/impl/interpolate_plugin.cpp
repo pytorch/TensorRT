@@ -2,7 +2,7 @@
 #include "core/plugins/plugins.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace plugins {
 namespace impl {
@@ -27,8 +27,8 @@ InterpolatePlugin::InterpolatePlugin(
       align_corners_(align_corners),
       use_scales_(use_scales) {
   if (use_scales) {
-    TRTORCH_ASSERT(mode_ != "adaptive_avg_pool2d", "use_scales is not valid for adaptive_avg_pool2d");
-    TRTORCH_ASSERT(
+    TORCHTRT_ASSERT(mode_ != "adaptive_avg_pool2d", "use_scales is not valid for adaptive_avg_pool2d");
+    TORCHTRT_ASSERT(
         scales_.size() != 0, "Attempted to use interpolate plugin without providing scales while use_scales=true");
     at::Tensor input = at::randint(1, 10, in_shape, {at::kCUDA});
     at::Tensor output;
@@ -44,7 +44,7 @@ InterpolatePlugin::InterpolatePlugin(
 
     out_shape_ = output.sizes().vec();
   } else {
-    TRTORCH_ASSERT(
+    TORCHTRT_ASSERT(
         (size_.size() != 0 && out_shape_.size() != 0),
         "Attempted to use interpolate plugin without providing output size while use_scales=false");
   }
@@ -122,7 +122,7 @@ const char* InterpolatePlugin::getPluginVersion() const noexcept {
 }
 
 const char* InterpolatePlugin::getPluginNamespace() const noexcept {
-  return "trtorch";
+  return "torch_tensorrt";
 }
 
 nvinfer1::IPluginV2DynamicExt* InterpolatePlugin::clone() const noexcept {
@@ -327,7 +327,7 @@ InterpolatePluginCreator::InterpolatePluginCreator() {
 }
 
 const char* InterpolatePluginCreator::getPluginNamespace() const noexcept {
-  return "trtorch";
+  return "torch_tensorrt";
 }
 
 const char* InterpolatePluginCreator::getPluginName() const noexcept {
@@ -388,9 +388,9 @@ const nvinfer1::PluginFieldCollection* InterpolatePluginCreator::getFieldNames()
   return nullptr;
 }
 
-REGISTER_TRTORCH_PLUGIN(InterpolatePluginCreator);
+REGISTER_TORCHTRT_PLUGIN(InterpolatePluginCreator);
 
 } // namespace impl
 } // namespace plugins
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

@@ -2,7 +2,7 @@
 
 #include "torch/csrc/jit/ir/ir.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace evaluators {
@@ -16,4 +16,4 @@ at::Tensor createTensorFromList(
 } // namespace evaluators
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

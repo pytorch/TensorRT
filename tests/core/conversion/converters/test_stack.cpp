@@ -19,13 +19,13 @@ TEST(Converters, ATenStackPureTensorConvertsCorrectly) {
   auto in1 = at::randint(1, 10, {4, 4, 4}, {at::kCUDA});
   auto in2 = at::randint(1, 10, {4, 4, 4}, {at::kCUDA});
 
-  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in1, in2});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in1, in2});
 
-  params = trtorch::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in1, in2});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in1, in2});
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
 }
 
 TEST(Converters, ATenStackDiffTensorConvertsCorrectly) {
@@ -43,11 +43,11 @@ TEST(Converters, ATenStackDiffTensorConvertsCorrectly) {
   auto in1 = at::randint(1, 10, {4, 4, 4}, {at::kCUDA});
   auto in2 = at::randint(1, 10, {4, 4, 4}, {at::kCUDA});
 
-  auto params = trtorch::core::ir::get_static_params(g->inputs(), {in2});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in1});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {in2});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in1});
 
-  params = trtorch::core::ir::get_static_params(g->inputs(), {in2});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in1});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {in2});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in1});
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
 }
