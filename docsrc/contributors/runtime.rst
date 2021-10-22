@@ -21,7 +21,7 @@ torch::jit::Value type).
 TensorRT Engine Executor Op
 ----------------------------
 
-When the TRTorch is loaded, it registers an operator in the PyTorch JIT operator library called
+When the Torch-TensorRT is loaded, it registers an operator in the PyTorch JIT operator library called
 ``trt::execute_engine(Tensor[] inputs, __torch__.torch.classes.tensorrt.Engine engine) -> Tensor[]`` which takes an
 instantiated engine and list of inputs. Compiled graphs store this engine in an attribute so that it is portable and serializable.
 When the op is called, an instnantiated engine and input tensors are popped off the runtime stack. These inputs are passed into a generic engine execution function which
@@ -72,8 +72,8 @@ execution.
 ABI Versioning and Serialization Format
 =========================================
 
-TRTorch programs are standard TorchScript with TensorRT engines as objects embedded in the graph. Therefore there is a serialization format
-for the TensorRT engines. The format for TRTorch serialized programs are versioned with an "ABI" version which tells the runtime about runtime compatibility.
+Torch-TensorRT programs are standard TorchScript with TensorRT engines as objects embedded in the graph. Therefore there is a serialization format
+for the TensorRT engines. The format for Torch-TensorRT serialized programs are versioned with an "ABI" version which tells the runtime about runtime compatibility.
 
 > Current ABI version is 3
 

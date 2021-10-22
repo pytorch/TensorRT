@@ -20,23 +20,23 @@ bazel test //tests --compilation_mode=dbg --test_output=errors --jobs=4 --runs_p
 
 `--jobs=4` is useful and is sometimes required to prevent too many processes to use GPU memory and cause CUDA out of memory issues.
 
-### Testing using pre-built TRTorch library
+### Testing using pre-built Torch-TensorRT library
 
-Currently, the default strategy when we run all the tests (`bazel test //tests`) is to build the testing scripts along with the full TRTorch library (`libtrtorch.so`) from scratch. This can lead to increased testing time and might not be needed incase you already have a pre-built TRTorch library that you want to link against.
+Currently, the default strategy when we run all the tests (`bazel test //tests`) is to build the testing scripts along with the full Torch-TensorRT library (`libtorchtrt.so`) from scratch. This can lead to increased testing time and might not be needed incase you already have a pre-built Torch-TensorRT library that you want to link against.
 
-In order to **not** build the entire TRTorch library and only build the test scripts, please use the following command.
-
-```
-bazel test //tests  --compilation_mode=dbg --test_output=summary --define trtorch_src=pre_built --jobs 2
-```
-
- The flag `--define trtorch_src=pre_built` signals bazel to use pre-compiled library as an external dependency for tests. The pre-compiled library path is defined as a `local_repository` rule in root `WORKSPACE` file (`https://github.com/NVIDIA/TRTorch/blob/master/WORKSPACE`).
+In order to **not** build the entire Torch-TensorRT library and only build the test scripts, please use the following command.
 
 ```
-# External dependency for trtorch if you already have precompiled binaries.
+bazel test //tests  --compilation_mode=dbg --test_output=summary --define torchtrt_src=pre_built --jobs 2
+```
+
+ The flag `--define torchtrt_src=pre_built` signals bazel to use pre-compiled library as an external dependency for tests. The pre-compiled library path is defined as a `local_repository` rule in root `WORKSPACE` file (`https://github.com/NVIDIA/Torch-TensorRT/blob/master/WORKSPACE`).
+
+```
+# External dependency for torch_tensorrt if you already have precompiled binaries.
 # This is currently used in pytorch NGC container CI testing.
 local_repository(
-    name = "trtorch",
-    path = "/opt/pytorch/trtorch"
+    name = "torch_tensorrt",
+    path = "/opt/pytorch/torch_tensorrt"
 )
 ```
