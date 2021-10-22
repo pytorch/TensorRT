@@ -3,7 +3,7 @@
 Creating a TorchScript Module
 ------------------------------
 
-Once you have a trained model you want to compile with TRTorch, you need to start by converting that model from Python code to TorchScript code.
+Once you have a trained model you want to compile with Torch-TensorRT, you need to start by converting that model from Python code to TorchScript code.
 PyTorch has detailed documentation on how to do this https://pytorch.org/tutorials/beginner/Intro_to_TorchScript_tutorial.html but briefly here is the
 here is key background information and the process:
 
@@ -82,12 +82,12 @@ include these components. We can run the script compiler on our LeNet module by 
     model = LeNet()
     script_model = torch.jit.script(model)
 
-There are reasons to use one path or another, the PyTorch documentation has information on how to choose. From a TRTorch prespective, there is
+There are reasons to use one path or another, the PyTorch documentation has information on how to choose. From a Torch-TensorRT prespective, there is
 better support (i.e your module is more likely to compile) for traced modules because it doesn't include all the complexities of a complete
 programming language, though both paths supported.
 
 After scripting or tracing your module, you are given back a TorchScript Module. This contains the code and parameters used to run the module stored
-in a intermediate representation that TRTorch can consume.
+in a intermediate representation that Torch-TensorRT can consume.
 
 Here is what the LeNet traced module IR looks like:
 
