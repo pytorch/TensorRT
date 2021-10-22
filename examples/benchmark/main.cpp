@@ -4,7 +4,7 @@
 #include "torch/script.h"
 
 #include "timer.h"
-#include "trtorch/trtorch.h"
+#include "torch_tensorrt/torch_tensorrt.h"
 
 #include <iostream>
 #include <memory>
@@ -120,18 +120,18 @@ int main(int argc, const char* argv[]) {
   at::globalContext().setBenchmarkCuDNN(true);
 
 #ifdef TRT
-  auto compile_spec = trtorch::CompileSpec(dims);
+  auto compile_spec = torch_tensorrt::ts::CompileSpec(dims);
   compile_spec.workspace_size = 1 << 20;
 
 #ifdef HALF
   compile_spec.enabled_precisions.insert(torch::kF16);
 #endif
 
-  auto trt_mod = trtorch::CompileGraph(mod, compile_spec);
+  auto trt_mod = torch_tensorrt::ts::CompileModule(mod, compile_spec);
 
 #ifdef SAVE_ENGINE
   std::cout << "Compiling graph to save as TRT engine (/tmp/engine_converted_from_jit.trt)" << std::endl;
-  auto engine = trtorch::ConvertGraphToTRTEngine(mod, "forward", compile_spec);
+  auto engine = torch_tensorrt::ts::ConvertMethodToTRTEngine(mod, "forward", compile_spec);
   std::ofstream out("/tmp/engine_converted_from_jit.trt");
   out << engine;
   out.close();

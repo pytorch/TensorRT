@@ -1,6 +1,6 @@
 # VGG16 Trained on CIFAR10
 
-This is a recipe to train a VGG network on CIFAR10 to use with the TRTorch PTQ example.
+This is a recipe to train a VGG network on CIFAR10 to use with the Torch-TensorRT PTQ example.
 
 ## Prequisites
 
@@ -49,7 +49,7 @@ After QAT is completed, you should see the checkpoint of QAT model in the `$pwd/
 
 ## Exporting
 
-Use the exporter script to create a torchscript module you can compile with TRTorch
+Use the exporter script to create a torchscript module you can compile with Torch-TensorRT
 
 ### For PTQ
 ```
@@ -67,7 +67,7 @@ python export_qat.py <path-to-checkpoint>
 
 Please expect to see some warnings as indicated above when using `pytorch_quantization` toolkit. You can ignore these warnings and proceed to export the model.
 
-This should generate a torchscript file named `trained_vgg16_qat.jit.pt`. You can use python or C++ API of TRTorch to run this quantized model using TensorRT.
+This should generate a torchscript file named `trained_vgg16_qat.jit.pt`. You can use python or C++ API of Torch-TensorRT to run this quantized model using TensorRT.
 
 ## Citations
 

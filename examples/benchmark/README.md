@@ -1,12 +1,12 @@
 # Benchmarking
 
-This is a quick benchmarking application for TRTorch. It lets you run supported TorchScript modules both in JIT and TRT and returns the average runtime and throughput.
+This is a quick benchmarking application for Torch-TensorRT. It lets you run supported TorchScript modules both in JIT and TRT and returns the average runtime and throughput.
 
 ## Compilation / Usage
 
 Run with bazel:
 
-> Note: Make sure libtorch and TensorRT are in your LD_LIBRARY_PATH before running, if you need a location you can `export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:[WORKSPACE ROOT]/bazel-TRTorch/external/libtorch/lib:[WORKSPACE ROOT]/bazel-TRTorch/external/tensorrt/lib`
+> Note: Make sure libtorch and TensorRT are in your LD_LIBRARY_PATH before running, if you need a location you can `export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:[WORKSPACE ROOT]/bazel-Torch-TensorRT/external/libtorch/lib:[WORKSPACE ROOT]/bazel-Torch-TensorRT/external/tensorrt/lib`
 
 ``` sh
 bazel run //cpp/benchmark --cxxopt="-DNDEBUG" --cxxopt="-DJIT" --cxxopt="-DTRT" -- [PATH TO JIT MODULE FILE] [INPUT SIZE (explicit batch)]
@@ -20,7 +20,7 @@ bazel run //cpp/benchmark  --cxxopt="-DNDEBUG" --cxxopt="-DJIT" --cxxopt="-DTRT"
 
 ### Options
 
-You can run a module with JIT or TRT via TRTorch in either FP32 or FP16. These options are controlled by preprocessor directives.
+You can run a module with JIT or TRT via Torch-TensorRT in either FP32 or FP16. These options are controlled by preprocessor directives.
 
 - To enable JIT profiling, add the argument `--cxxopt="-DJIT"`
 
