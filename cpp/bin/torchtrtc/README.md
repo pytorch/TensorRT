@@ -1,22 +1,22 @@
-# trtorchc
+# torchtrtc
 
-trtorchc is a compiler CLI application using the TRTorch compiler. It serves as an easy way to compile a
-TorchScript Module with TRTorch from the command-line to quickly check support or as part of
+torchtrtc is a compiler CLI application using the Torch-TensorRT compiler. It serves as an easy way to compile a
+TorchScript Module with Torch-TensorRT from the command-line to quickly check support or as part of
 a deployment pipeline. All basic features of the compiler are supported including post training
 quantization (though you must already have a calibration cache file to use). The compiler can
 output two formats, either a TorchScript program with the TensorRT engine embedded or
 the TensorRT engine itself as a PLAN file.
 
-All that is required to run the program after compilation is for C++ linking against libtrtorch.so
+All that is required to run the program after compilation is for C++ linking against libtorchtrt.so
 or in Python importing the trtorch package. All other aspects of using compiled modules are identical
 to standard TorchScript. Load with `torch.jit.load()` and run like you would run any other module.
 
 
 ```
-trtorchc [input_file_path] [output_file_path]
+torchtrtc [input_file_path] [output_file_path]
   [input_specs...] {OPTIONS}
 
-  TRTorch is a compiler for TorchScript, it will compile and optimize
+  Torch-TensorRT is a compiler for TorchScript, it will compile and optimize
   TorchScript programs to run on NVIDIA GPUs using TensorRT
 
 OPTIONS:
@@ -125,5 +125,5 @@ OPTIONS:
 e.g.
 
 ```
-trtorchc tests/modules/ssd_traced.jit.pt ssd_trt.ts "[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@fp16%contiguous" -p f16
+torchtrtc tests/modules/ssd_traced.jit.pt ssd_trt.ts "[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@fp16%contiguous" -p f16
 ```
