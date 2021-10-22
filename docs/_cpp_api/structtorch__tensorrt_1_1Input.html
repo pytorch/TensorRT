@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -299,17 +300,17 @@
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../_notebooks/lenet-getting-started.html">
-            TRTorch Getting Started - LeNet
+            Torch-TensorRT Getting Started - LeNet
            </a>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../_notebooks/ssd-object-detection-demo.html">
-            Object Detection with TRTorch (SSD)
+            Object Detection with Torch-TensorRT (SSD)
            </a>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../_notebooks/vgg-qat.html">
-            Deploying Quantization Aware Trained models in INT8 using TRTorch
+            Deploying Quantization Aware Trained models in INT8 using Torch-TensorRT
            </a>
           </li>
           <li class="md-nav__item">
@@ -409,1101 +410,1129 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <span id="exhale-struct-structtorch-tensorrt-1-1input">
-       </span>
-       <h1 id="cpp-api-structtorch-tensorrt-1-1input--page-root">
-        Struct Input
-        <a class="headerlink" href="#cpp-api-structtorch-tensorrt-1-1input--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <ul class="simple">
-        <li>
-         <p>
-          Defined in
-          <a class="reference internal" href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html#file-cpp-include-torch-tensorrt-torch-tensorrt-h">
-           <span class="std std-ref">
-            File torch_tensorrt.h
-           </span>
-          </a>
-         </p>
-        </li>
-       </ul>
-       <h2 id="struct-documentation">
-        Struct Documentation
-        <a class="headerlink" href="#struct-documentation" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <dl class="cpp struct">
-        <dt id="_CPPv4N14torch_tensorrt5InputE">
-         <span class="target" id="structtorch__tensorrt_1_1Input">
-         </span>
-         <em class="property">
-          struct
-         </em>
-         <code class="sig-prename descclassname">
-          torch_tensorrt
-          <code class="sig-prename descclassname">
-           ::
-          </code>
-         </code>
-         <code class="sig-name descname">
-          Input
-         </code>
-         <a class="headerlink" href="#_CPPv4N14torch_tensorrt5InputE" title="Permalink to this definition">
+       <section id="struct-input">
+        <span id="exhale-struct-structtorch-tensorrt-1-1input">
+        </span>
+        <h1 id="cpp-api-structtorch-tensorrt-1-1input--page-root">
+         Struct Input
+         <a class="headerlink" href="#cpp-api-structtorch-tensorrt-1-1input--page-root" title="Permalink to this headline">
           ¶
          </a>
-         <br/>
-        </dt>
-        <dd>
-         <p>
-          A struct to hold an input range (used by TensorRT Optimization profile)
-         </p>
-         <p>
-          This struct can either hold a single vector representing an input shape, signifying a static input shape or a set of three input shapes representing the min, optiminal and max input shapes allowed for the engine.
-         </p>
-         <div class="breathe-sectiondef docutils container">
-          <p class="breathe-sectiondef-title rubric">
-           Public Functions
+        </h1>
+        <ul class="simple">
+         <li>
+          <p>
+           Defined in
+           <a class="reference internal" href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html#file-cpp-include-torch-tensorrt-torch-tensorrt-h">
+            <span class="std std-ref">
+             File torch_tensorrt.h
+            </span>
+           </a>
           </p>
-          <dl class="cpp function">
-           <dt id="_CPPv4N14torch_tensorrt5Input5InputENSt6vectorI7int64_tEE12TensorFormat">
-            <span class="target" id="structtorch__tensorrt_1_1Input_1a2c8216e7e14f7fdad145d53820eafd89">
-            </span>
-            <code class="sig-name descname">
-             Input
+         </li>
+        </ul>
+        <section id="struct-documentation">
+         <h2 id="struct-documentation">
+          Struct Documentation
+          <a class="headerlink" href="#struct-documentation" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <dl class="cpp struct">
+          <dt id="_CPPv4N14torch_tensorrt5InputE">
+           <span class="target" id="structtorch__tensorrt_1_1Input">
+           </span>
+           <em class="property">
+            struct
+           </em>
+           <code class="sig-prename descclassname">
+            torch_tensorrt
+            <code class="sig-prename descclassname">
+             ::
             </code>
-            <span class="sig-paren">
-             (
-            </span>
-            std::vector&lt;int64_t&gt;
-            <em>
-             shape
-            </em>
-            ,
-            <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
-             TensorFormat
-            </a>
-            <em>
-             format
-            </em>
-            =
-            <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
-             TensorFormat
-            </a>
-            ::kContiguous
-            <span class="sig-paren">
-             )
-            </span>
-            <a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputENSt6vectorI7int64_tEE12TensorFormat" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Construct a new
-             <a class="reference internal" href="#structtorch__tensorrt_1_1Input">
-              <span class="std std-ref">
-               Input
+           </code>
+           <code class="sig-name descname">
+            Input
+           </code>
+           <a class="headerlink" href="#_CPPv4N14torch_tensorrt5InputE" title="Permalink to this definition">
+            ¶
+           </a>
+           <br/>
+          </dt>
+          <dd>
+           <p>
+            A struct to hold an input range (used by TensorRT Optimization profile)
+           </p>
+           <p>
+            This struct can either hold a single vector representing an input shape, signifying a static input shape or a set of three input shapes representing the min, optiminal and max input shapes allowed for the engine.
+           </p>
+           <div class="breathe-sectiondef docutils container">
+            <p class="breathe-sectiondef-title rubric">
+             Public Functions
+            </p>
+            <dl class="cpp function">
+             <dt id="_CPPv4N14torch_tensorrt5Input5InputENSt6vectorI7int64_tEE12TensorFormat">
+              <span class="target" id="structtorch__tensorrt_1_1Input_1a2c8216e7e14f7fdad145d53820eafd89">
               </span>
-             </a>
-             spec object for static input size from vector, optional arguments allow the user to configure expected input shape tensor format. dtype (Expected data type for the input) defaults to PyTorch / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8)
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Parameters
-              </strong>
+              <code class="sig-name descname">
+               Input
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              std::vector&lt;int64_t&gt;
+              <em>
+               shape
+              </em>
+              ,
+              <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
+               TensorFormat
+              </a>
+              <em>
+               format
+              </em>
+              =
+              <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
+               TensorFormat
+              </a>
+              ::
+              <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormat5Value11kContiguousE" title="torch_tensorrt::TensorFormat::kContiguous">
+               kContiguous
+              </a>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputENSt6vectorI7int64_tEE12TensorFormat" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
              </dt>
              <dd>
-              <ul class="breatheparameterlist simple">
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   shape
-                  </span>
-                 </code>
-                 :
-                 <a class="reference internal" href="#structtorch__tensorrt_1_1Input">
-                  <span class="std std-ref">
-                   Input
-                  </span>
-                 </a>
-                 tensor shape
-                </p>
-               </li>
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   dtype
-                  </span>
-                 </code>
-                 : Expected data type for the input (Defaults to the type of the weights in the first tensor calculation if detectable else Float32)
-                </p>
-               </li>
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   format
-                  </span>
-                 </code>
-                 : Expected tensor format for the input (Defaults to contiguous)
-                </p>
-               </li>
-              </ul>
+              <p>
+               Construct a new
+               <a class="reference internal" href="#structtorch__tensorrt_1_1Input">
+                <span class="std std-ref">
+                 Input
+                </span>
+               </a>
+               spec object for static input size from vector, optional arguments allow the user to configure expected input shape tensor format. dtype (Expected data type for the input) defaults to PyTorch / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8)
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     shape
+                    </span>
+                   </code>
+                   :
+                   <a class="reference internal" href="#structtorch__tensorrt_1_1Input">
+                    <span class="std std-ref">
+                     Input
+                    </span>
+                   </a>
+                   tensor shape
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     dtype
+                    </span>
+                   </code>
+                   : Expected data type for the input (Defaults to the type of the weights in the first tensor calculation if detectable else Float32)
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     format
+                    </span>
+                   </code>
+                   : Expected tensor format for the input (Defaults to contiguous)
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
              </dd>
             </dl>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4N14torch_tensorrt5Input5InputENSt6vectorI7int64_tEE8DataType12TensorFormat">
-            <span class="target" id="structtorch__tensorrt_1_1Input_1a95c05ba3ba477e3915953c1a4c915be6">
-            </span>
-            <code class="sig-name descname">
-             Input
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            std::vector&lt;int64_t&gt;
-            <em>
-             shape
-            </em>
-            ,
-            <a class="reference internal" href="classtorch__tensorrt_1_1DataType.html#_CPPv4N14torch_tensorrt8DataTypeE" title="torch_tensorrt::DataType">
-             DataType
-            </a>
-            <em>
-             dtype
-            </em>
-            ,
-            <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
-             TensorFormat
-            </a>
-            <em>
-             format
-            </em>
-            =
-            <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
-             TensorFormat
-            </a>
-            ::kContiguous
-            <span class="sig-paren">
-             )
-            </span>
-            <a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputENSt6vectorI7int64_tEE8DataType12TensorFormat" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Construct a new
-             <a class="reference internal" href="#structtorch__tensorrt_1_1Input">
-              <span class="std std-ref">
-               Input
+            <dl class="cpp function">
+             <dt id="_CPPv4N14torch_tensorrt5Input5InputENSt6vectorI7int64_tEE8DataType12TensorFormat">
+              <span class="target" id="structtorch__tensorrt_1_1Input_1a95c05ba3ba477e3915953c1a4c915be6">
               </span>
-             </a>
-             spec object for static input size from vector, optional arguments allow the user to configure expected input shape tensor format.
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Parameters
-              </strong>
+              <code class="sig-name descname">
+               Input
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              std::vector&lt;int64_t&gt;
+              <em>
+               shape
+              </em>
+              ,
+              <a class="reference internal" href="classtorch__tensorrt_1_1DataType.html#_CPPv4N14torch_tensorrt8DataTypeE" title="torch_tensorrt::DataType">
+               DataType
+              </a>
+              <em>
+               dtype
+              </em>
+              ,
+              <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
+               TensorFormat
+              </a>
+              <em>
+               format
+              </em>
+              =
+              <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
+               TensorFormat
+              </a>
+              ::
+              <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormat5Value11kContiguousE" title="torch_tensorrt::TensorFormat::kContiguous">
+               kContiguous
+              </a>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputENSt6vectorI7int64_tEE8DataType12TensorFormat" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
              </dt>
              <dd>
-              <ul class="breatheparameterlist simple">
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   shape
-                  </span>
-                 </code>
-                 :
-                 <a class="reference internal" href="#structtorch__tensorrt_1_1Input">
-                  <span class="std std-ref">
-                   Input
-                  </span>
-                 </a>
-                 tensor shape
-                </p>
-               </li>
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   dtype
-                  </span>
-                 </code>
-                 : Expected data type for the input (Defaults to the type of the weights in the first tensor calculation if detectable else Float32)
-                </p>
-               </li>
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   format
-                  </span>
-                 </code>
-                 : Expected tensor format for the input (Defaults to contiguous)
-                </p>
-               </li>
-              </ul>
+              <p>
+               Construct a new
+               <a class="reference internal" href="#structtorch__tensorrt_1_1Input">
+                <span class="std std-ref">
+                 Input
+                </span>
+               </a>
+               spec object for static input size from vector, optional arguments allow the user to configure expected input shape tensor format.
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     shape
+                    </span>
+                   </code>
+                   :
+                   <a class="reference internal" href="#structtorch__tensorrt_1_1Input">
+                    <span class="std std-ref">
+                     Input
+                    </span>
+                   </a>
+                   tensor shape
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     dtype
+                    </span>
+                   </code>
+                   : Expected data type for the input (Defaults to the type of the weights in the first tensor calculation if detectable else Float32)
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     format
+                    </span>
+                   </code>
+                   : Expected tensor format for the input (Defaults to contiguous)
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
              </dd>
             </dl>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4N14torch_tensorrt5Input5InputEN3c108ArrayRefI7int64_tEE12TensorFormat">
-            <span class="target" id="structtorch__tensorrt_1_1Input_1a983a2859661e1ce26275918f61632695">
-            </span>
-            <code class="sig-name descname">
-             Input
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            c10::ArrayRef&lt;int64_t&gt;
-            <em>
-             shape
-            </em>
-            ,
-            <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
-             TensorFormat
-            </a>
-            <em>
-             format
-            </em>
-            =
-            <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
-             TensorFormat
-            </a>
-            ::kContiguous
-            <span class="sig-paren">
-             )
-            </span>
-            <a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputEN3c108ArrayRefI7int64_tEE12TensorFormat" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Construct a new
-             <a class="reference internal" href="#structtorch__tensorrt_1_1Input">
-              <span class="std std-ref">
-               Input
+            <dl class="cpp function">
+             <dt id="_CPPv4N14torch_tensorrt5Input5InputEN3c108ArrayRefI7int64_tEE12TensorFormat">
+              <span class="target" id="structtorch__tensorrt_1_1Input_1a983a2859661e1ce26275918f61632695">
               </span>
-             </a>
-             spec object for static input size from c10::ArrayRef (the type produced by tensor.sizes()), vector, optional arguments allow the user to configure expected input shape tensor format dtype (Expected data type for the input) defaults to PyTorch / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8)
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Parameters
-              </strong>
+              <code class="sig-name descname">
+               Input
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              c10::ArrayRef&lt;int64_t&gt;
+              <em>
+               shape
+              </em>
+              ,
+              <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
+               TensorFormat
+              </a>
+              <em>
+               format
+              </em>
+              =
+              <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
+               TensorFormat
+              </a>
+              ::
+              <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormat5Value11kContiguousE" title="torch_tensorrt::TensorFormat::kContiguous">
+               kContiguous
+              </a>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputEN3c108ArrayRefI7int64_tEE12TensorFormat" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
              </dt>
              <dd>
-              <ul class="breatheparameterlist simple">
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   shape
-                  </span>
-                 </code>
-                 :
-                 <a class="reference internal" href="#structtorch__tensorrt_1_1Input">
-                  <span class="std std-ref">
-                   Input
-                  </span>
-                 </a>
-                 tensor shape
-                </p>
-               </li>
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   format
-                  </span>
-                 </code>
-                 : Expected tensor format for the input (Defaults to contiguous)
-                </p>
-               </li>
-              </ul>
+              <p>
+               Construct a new
+               <a class="reference internal" href="#structtorch__tensorrt_1_1Input">
+                <span class="std std-ref">
+                 Input
+                </span>
+               </a>
+               spec object for static input size from c10::ArrayRef (the type produced by tensor.sizes()), vector, optional arguments allow the user to configure expected input shape tensor format dtype (Expected data type for the input) defaults to PyTorch / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8)
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     shape
+                    </span>
+                   </code>
+                   :
+                   <a class="reference internal" href="#structtorch__tensorrt_1_1Input">
+                    <span class="std std-ref">
+                     Input
+                    </span>
+                   </a>
+                   tensor shape
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     format
+                    </span>
+                   </code>
+                   : Expected tensor format for the input (Defaults to contiguous)
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
              </dd>
             </dl>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4N14torch_tensorrt5Input5InputEN3c108ArrayRefI7int64_tEE8DataType12TensorFormat">
-            <span class="target" id="structtorch__tensorrt_1_1Input_1a6aa880180a17dc428745f5818e591e24">
-            </span>
-            <code class="sig-name descname">
-             Input
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            c10::ArrayRef&lt;int64_t&gt;
-            <em>
-             shape
-            </em>
-            ,
-            <a class="reference internal" href="classtorch__tensorrt_1_1DataType.html#_CPPv4N14torch_tensorrt8DataTypeE" title="torch_tensorrt::DataType">
-             DataType
-            </a>
-            <em>
-             dtype
-            </em>
-            ,
-            <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
-             TensorFormat
-            </a>
-            <em>
-             format
-            </em>
-            =
-            <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
-             TensorFormat
-            </a>
-            ::kContiguous
-            <span class="sig-paren">
-             )
-            </span>
-            <a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputEN3c108ArrayRefI7int64_tEE8DataType12TensorFormat" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Construct a new
-             <a class="reference internal" href="#structtorch__tensorrt_1_1Input">
-              <span class="std std-ref">
-               Input
+            <dl class="cpp function">
+             <dt id="_CPPv4N14torch_tensorrt5Input5InputEN3c108ArrayRefI7int64_tEE8DataType12TensorFormat">
+              <span class="target" id="structtorch__tensorrt_1_1Input_1a6aa880180a17dc428745f5818e591e24">
               </span>
-             </a>
-             spec object for static input size from c10::ArrayRef (the type produced by tensor.sizes()), vector, optional arguments allow the user to configure expected input shape tensor format.
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Parameters
-              </strong>
+              <code class="sig-name descname">
+               Input
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              c10::ArrayRef&lt;int64_t&gt;
+              <em>
+               shape
+              </em>
+              ,
+              <a class="reference internal" href="classtorch__tensorrt_1_1DataType.html#_CPPv4N14torch_tensorrt8DataTypeE" title="torch_tensorrt::DataType">
+               DataType
+              </a>
+              <em>
+               dtype
+              </em>
+              ,
+              <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
+               TensorFormat
+              </a>
+              <em>
+               format
+              </em>
+              =
+              <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
+               TensorFormat
+              </a>
+              ::
+              <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormat5Value11kContiguousE" title="torch_tensorrt::TensorFormat::kContiguous">
+               kContiguous
+              </a>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputEN3c108ArrayRefI7int64_tEE8DataType12TensorFormat" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
              </dt>
              <dd>
-              <ul class="breatheparameterlist simple">
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   shape
-                  </span>
-                 </code>
-                 :
-                 <a class="reference internal" href="#structtorch__tensorrt_1_1Input">
-                  <span class="std std-ref">
-                   Input
-                  </span>
-                 </a>
-                 tensor shape
-                </p>
-               </li>
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   dtype
-                  </span>
-                 </code>
-                 : Expected data type for the input (Defaults to the type of the weights in the first tensor calculation if detectable else Float32)
-                </p>
-               </li>
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   format
-                  </span>
-                 </code>
-                 : Expected tensor format for the input (Defaults to contiguous)
-                </p>
-               </li>
-              </ul>
+              <p>
+               Construct a new
+               <a class="reference internal" href="#structtorch__tensorrt_1_1Input">
+                <span class="std std-ref">
+                 Input
+                </span>
+               </a>
+               spec object for static input size from c10::ArrayRef (the type produced by tensor.sizes()), vector, optional arguments allow the user to configure expected input shape tensor format.
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     shape
+                    </span>
+                   </code>
+                   :
+                   <a class="reference internal" href="#structtorch__tensorrt_1_1Input">
+                    <span class="std std-ref">
+                     Input
+                    </span>
+                   </a>
+                   tensor shape
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     dtype
+                    </span>
+                   </code>
+                   : Expected data type for the input (Defaults to the type of the weights in the first tensor calculation if detectable else Float32)
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     format
+                    </span>
+                   </code>
+                   : Expected tensor format for the input (Defaults to contiguous)
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
              </dd>
             </dl>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4N14torch_tensorrt5Input5InputENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE12TensorFormat">
-            <span class="target" id="structtorch__tensorrt_1_1Input_1a9b45781bf07a911ed809b2dcf806ec65">
-            </span>
-            <code class="sig-name descname">
-             Input
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            std::vector&lt;int64_t&gt;
-            <em>
-             min_shape
-            </em>
-            , std::vector&lt;int64_t&gt;
-            <em>
-             opt_shape
-            </em>
-            , std::vector&lt;int64_t&gt;
-            <em>
-             max_shape
-            </em>
-            ,
-            <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
-             TensorFormat
-            </a>
-            <em>
-             format
-            </em>
-            =
-            <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
-             TensorFormat
-            </a>
-            ::kContiguous
-            <span class="sig-paren">
-             )
-            </span>
-            <a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE12TensorFormat" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Construct a new
-             <a class="reference internal" href="#structtorch__tensorrt_1_1Input">
-              <span class="std std-ref">
-               Input
+            <dl class="cpp function">
+             <dt id="_CPPv4N14torch_tensorrt5Input5InputENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE12TensorFormat">
+              <span class="target" id="structtorch__tensorrt_1_1Input_1a9b45781bf07a911ed809b2dcf806ec65">
               </span>
-             </a>
-             spec object dynamic input size from c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max supported sizes. dtype (Expected data type for the input) defaults to PyTorch / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8)
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Parameters
-              </strong>
+              <code class="sig-name descname">
+               Input
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              std::vector&lt;int64_t&gt;
+              <em>
+               min_shape
+              </em>
+              , std::vector&lt;int64_t&gt;
+              <em>
+               opt_shape
+              </em>
+              , std::vector&lt;int64_t&gt;
+              <em>
+               max_shape
+              </em>
+              ,
+              <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
+               TensorFormat
+              </a>
+              <em>
+               format
+              </em>
+              =
+              <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
+               TensorFormat
+              </a>
+              ::
+              <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormat5Value11kContiguousE" title="torch_tensorrt::TensorFormat::kContiguous">
+               kContiguous
+              </a>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE12TensorFormat" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
              </dt>
              <dd>
-              <ul class="breatheparameterlist simple">
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   min_shape
-                  </span>
-                 </code>
-                 : Minimum shape for input tensor
-                </p>
-               </li>
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   opt_shape
-                  </span>
-                 </code>
-                 : Target optimization shape for input tensor
-                </p>
-               </li>
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   max_shape
-                  </span>
-                 </code>
-                 : Maximum acceptible shape for input tensor
-                </p>
-               </li>
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   format
-                  </span>
-                 </code>
-                 : Expected tensor format for the input (Defaults to contiguous)
-                </p>
-               </li>
-              </ul>
+              <p>
+               Construct a new
+               <a class="reference internal" href="#structtorch__tensorrt_1_1Input">
+                <span class="std std-ref">
+                 Input
+                </span>
+               </a>
+               spec object dynamic input size from c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max supported sizes. dtype (Expected data type for the input) defaults to PyTorch / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8)
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     min_shape
+                    </span>
+                   </code>
+                   : Minimum shape for input tensor
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     opt_shape
+                    </span>
+                   </code>
+                   : Target optimization shape for input tensor
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     max_shape
+                    </span>
+                   </code>
+                   : Maximum acceptible shape for input tensor
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     format
+                    </span>
+                   </code>
+                   : Expected tensor format for the input (Defaults to contiguous)
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
              </dd>
             </dl>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4N14torch_tensorrt5Input5InputENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE8DataType12TensorFormat">
-            <span class="target" id="structtorch__tensorrt_1_1Input_1a898d8d54ffd759748398ae2cd98254d8">
-            </span>
-            <code class="sig-name descname">
-             Input
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            std::vector&lt;int64_t&gt;
-            <em>
-             min_shape
-            </em>
-            , std::vector&lt;int64_t&gt;
-            <em>
-             opt_shape
-            </em>
-            , std::vector&lt;int64_t&gt;
-            <em>
-             max_shape
-            </em>
-            ,
-            <a class="reference internal" href="classtorch__tensorrt_1_1DataType.html#_CPPv4N14torch_tensorrt8DataTypeE" title="torch_tensorrt::DataType">
-             DataType
-            </a>
-            <em>
-             dtype
-            </em>
-            ,
-            <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
-             TensorFormat
-            </a>
-            <em>
-             format
-            </em>
-            =
-            <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
-             TensorFormat
-            </a>
-            ::kContiguous
-            <span class="sig-paren">
-             )
-            </span>
-            <a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE8DataType12TensorFormat" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Construct a new
-             <a class="reference internal" href="#structtorch__tensorrt_1_1Input">
-              <span class="std std-ref">
-               Input
+            <dl class="cpp function">
+             <dt id="_CPPv4N14torch_tensorrt5Input5InputENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE8DataType12TensorFormat">
+              <span class="target" id="structtorch__tensorrt_1_1Input_1a898d8d54ffd759748398ae2cd98254d8">
               </span>
-             </a>
-             spec object for a dynamic input size from vectors for minimum shape, optimal shape, and max shape supported sizes optional arguments allow the user to configure expected input shape tensor format.
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Parameters
-              </strong>
+              <code class="sig-name descname">
+               Input
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              std::vector&lt;int64_t&gt;
+              <em>
+               min_shape
+              </em>
+              , std::vector&lt;int64_t&gt;
+              <em>
+               opt_shape
+              </em>
+              , std::vector&lt;int64_t&gt;
+              <em>
+               max_shape
+              </em>
+              ,
+              <a class="reference internal" href="classtorch__tensorrt_1_1DataType.html#_CPPv4N14torch_tensorrt8DataTypeE" title="torch_tensorrt::DataType">
+               DataType
+              </a>
+              <em>
+               dtype
+              </em>
+              ,
+              <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
+               TensorFormat
+              </a>
+              <em>
+               format
+              </em>
+              =
+              <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
+               TensorFormat
+              </a>
+              ::
+              <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormat5Value11kContiguousE" title="torch_tensorrt::TensorFormat::kContiguous">
+               kContiguous
+              </a>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputENSt6vectorI7int64_tEENSt6vectorI7int64_tEENSt6vectorI7int64_tEE8DataType12TensorFormat" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
              </dt>
              <dd>
-              <ul class="breatheparameterlist simple">
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   min_shape
-                  </span>
-                 </code>
-                 : Minimum shape for input tensor
-                </p>
-               </li>
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   opt_shape
-                  </span>
-                 </code>
-                 : Target optimization shape for input tensor
-                </p>
-               </li>
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   max_shape
-                  </span>
-                 </code>
-                 : Maximum acceptible shape for input tensor
-                </p>
-               </li>
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   dtype
-                  </span>
-                 </code>
-                 : Expected data type for the input (Defaults to the type of the weights in the first tensor calculation if detectable else Float32)
-                </p>
-               </li>
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   format
-                  </span>
-                 </code>
-                 : Expected tensor format for the input (Defaults to contiguous)
-                </p>
-               </li>
-              </ul>
+              <p>
+               Construct a new
+               <a class="reference internal" href="#structtorch__tensorrt_1_1Input">
+                <span class="std std-ref">
+                 Input
+                </span>
+               </a>
+               spec object for a dynamic input size from vectors for minimum shape, optimal shape, and max shape supported sizes optional arguments allow the user to configure expected input shape tensor format.
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     min_shape
+                    </span>
+                   </code>
+                   : Minimum shape for input tensor
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     opt_shape
+                    </span>
+                   </code>
+                   : Target optimization shape for input tensor
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     max_shape
+                    </span>
+                   </code>
+                   : Maximum acceptible shape for input tensor
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     dtype
+                    </span>
+                   </code>
+                   : Expected data type for the input (Defaults to the type of the weights in the first tensor calculation if detectable else Float32)
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     format
+                    </span>
+                   </code>
+                   : Expected tensor format for the input (Defaults to contiguous)
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
              </dd>
             </dl>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4N14torch_tensorrt5Input5InputEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE12TensorFormat">
-            <span class="target" id="structtorch__tensorrt_1_1Input_1a6c99d70eb1da005fea790f83a0c005cf">
-            </span>
-            <code class="sig-name descname">
-             Input
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            c10::ArrayRef&lt;int64_t&gt;
-            <em>
-             min_shape
-            </em>
-            , c10::ArrayRef&lt;int64_t&gt;
-            <em>
-             opt_shape
-            </em>
-            , c10::ArrayRef&lt;int64_t&gt;
-            <em>
-             max_shape
-            </em>
-            ,
-            <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
-             TensorFormat
-            </a>
-            <em>
-             format
-            </em>
-            =
-            <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
-             TensorFormat
-            </a>
-            ::kContiguous
-            <span class="sig-paren">
-             )
-            </span>
-            <a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE12TensorFormat" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Construct a new
-             <a class="reference internal" href="#structtorch__tensorrt_1_1Input">
-              <span class="std std-ref">
-               Input
+            <dl class="cpp function">
+             <dt id="_CPPv4N14torch_tensorrt5Input5InputEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE12TensorFormat">
+              <span class="target" id="structtorch__tensorrt_1_1Input_1a6c99d70eb1da005fea790f83a0c005cf">
               </span>
-             </a>
-             spec object dynamic input size from c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max supported sizes. dtype (Expected data type for the input) defaults to PyTorch / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8)
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Parameters
-              </strong>
+              <code class="sig-name descname">
+               Input
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              c10::ArrayRef&lt;int64_t&gt;
+              <em>
+               min_shape
+              </em>
+              , c10::ArrayRef&lt;int64_t&gt;
+              <em>
+               opt_shape
+              </em>
+              , c10::ArrayRef&lt;int64_t&gt;
+              <em>
+               max_shape
+              </em>
+              ,
+              <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
+               TensorFormat
+              </a>
+              <em>
+               format
+              </em>
+              =
+              <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
+               TensorFormat
+              </a>
+              ::
+              <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormat5Value11kContiguousE" title="torch_tensorrt::TensorFormat::kContiguous">
+               kContiguous
+              </a>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE12TensorFormat" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
              </dt>
              <dd>
-              <ul class="breatheparameterlist simple">
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   min_shape
-                  </span>
-                 </code>
-                 : Minimum shape for input tensor
-                </p>
-               </li>
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   opt_shape
-                  </span>
-                 </code>
-                 : Target optimization shape for input tensor
-                </p>
-               </li>
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   max_shape
-                  </span>
-                 </code>
-                 : Maximum acceptible shape for input tensor
-                </p>
-               </li>
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   format
-                  </span>
-                 </code>
-                 : Expected tensor format for the input (Defaults to contiguous)
-                </p>
-               </li>
-              </ul>
+              <p>
+               Construct a new
+               <a class="reference internal" href="#structtorch__tensorrt_1_1Input">
+                <span class="std std-ref">
+                 Input
+                </span>
+               </a>
+               spec object dynamic input size from c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max supported sizes. dtype (Expected data type for the input) defaults to PyTorch / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8)
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     min_shape
+                    </span>
+                   </code>
+                   : Minimum shape for input tensor
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     opt_shape
+                    </span>
+                   </code>
+                   : Target optimization shape for input tensor
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     max_shape
+                    </span>
+                   </code>
+                   : Maximum acceptible shape for input tensor
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     format
+                    </span>
+                   </code>
+                   : Expected tensor format for the input (Defaults to contiguous)
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
              </dd>
             </dl>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4N14torch_tensorrt5Input5InputEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE8DataType12TensorFormat">
-            <span class="target" id="structtorch__tensorrt_1_1Input_1a60447f3c15f82a1ab4f9621a608b7b0a">
-            </span>
-            <code class="sig-name descname">
-             Input
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            c10::ArrayRef&lt;int64_t&gt;
-            <em>
-             min_shape
-            </em>
-            , c10::ArrayRef&lt;int64_t&gt;
-            <em>
-             opt_shape
-            </em>
-            , c10::ArrayRef&lt;int64_t&gt;
-            <em>
-             max_shape
-            </em>
-            ,
-            <a class="reference internal" href="classtorch__tensorrt_1_1DataType.html#_CPPv4N14torch_tensorrt8DataTypeE" title="torch_tensorrt::DataType">
-             DataType
-            </a>
-            <em>
-             dtype
-            </em>
-            ,
-            <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
-             TensorFormat
-            </a>
-            <em>
-             format
-            </em>
-            =
-            <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
-             TensorFormat
-            </a>
-            ::kContiguous
-            <span class="sig-paren">
-             )
-            </span>
-            <a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE8DataType12TensorFormat" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Construct a new
-             <a class="reference internal" href="#structtorch__tensorrt_1_1Input">
-              <span class="std std-ref">
-               Input
+            <dl class="cpp function">
+             <dt id="_CPPv4N14torch_tensorrt5Input5InputEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE8DataType12TensorFormat">
+              <span class="target" id="structtorch__tensorrt_1_1Input_1a60447f3c15f82a1ab4f9621a608b7b0a">
               </span>
-             </a>
-             spec object dynamic input size from c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max supported sizes.
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Parameters
-              </strong>
+              <code class="sig-name descname">
+               Input
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              c10::ArrayRef&lt;int64_t&gt;
+              <em>
+               min_shape
+              </em>
+              , c10::ArrayRef&lt;int64_t&gt;
+              <em>
+               opt_shape
+              </em>
+              , c10::ArrayRef&lt;int64_t&gt;
+              <em>
+               max_shape
+              </em>
+              ,
+              <a class="reference internal" href="classtorch__tensorrt_1_1DataType.html#_CPPv4N14torch_tensorrt8DataTypeE" title="torch_tensorrt::DataType">
+               DataType
+              </a>
+              <em>
+               dtype
+              </em>
+              ,
+              <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
+               TensorFormat
+              </a>
+              <em>
+               format
+              </em>
+              =
+              <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
+               TensorFormat
+              </a>
+              ::
+              <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormat5Value11kContiguousE" title="torch_tensorrt::TensorFormat::kContiguous">
+               kContiguous
+              </a>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEEN3c108ArrayRefI7int64_tEE8DataType12TensorFormat" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
              </dt>
              <dd>
-              <ul class="breatheparameterlist simple">
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   min_shape
-                  </span>
-                 </code>
-                 : Minimum shape for input tensor
-                </p>
-               </li>
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   opt_shape
-                  </span>
-                 </code>
-                 : Target optimization shape for input tensor
-                </p>
-               </li>
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   max_shape
-                  </span>
-                 </code>
-                 : Maximum acceptible shape for input tensor
-                </p>
-               </li>
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   dtype
-                  </span>
-                 </code>
-                 : Expected data type for the input (Defaults to the type of the weights in the first tensor calculation if detectable else Float32)
-                </p>
-               </li>
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   format
-                  </span>
-                 </code>
-                 : Expected tensor format for the input (Defaults to contiguous)
-                </p>
-               </li>
-              </ul>
+              <p>
+               Construct a new
+               <a class="reference internal" href="#structtorch__tensorrt_1_1Input">
+                <span class="std std-ref">
+                 Input
+                </span>
+               </a>
+               spec object dynamic input size from c10::ArrayRef (the type produced by tensor.sizes()) for min, opt, and max supported sizes.
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     min_shape
+                    </span>
+                   </code>
+                   : Minimum shape for input tensor
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     opt_shape
+                    </span>
+                   </code>
+                   : Target optimization shape for input tensor
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     max_shape
+                    </span>
+                   </code>
+                   : Maximum acceptible shape for input tensor
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     dtype
+                    </span>
+                   </code>
+                   : Expected data type for the input (Defaults to the type of the weights in the first tensor calculation if detectable else Float32)
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     format
+                    </span>
+                   </code>
+                   : Expected tensor format for the input (Defaults to contiguous)
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
              </dd>
             </dl>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4N14torch_tensorrt5Input5InputEN2at6TensorE">
-            <span class="target" id="structtorch__tensorrt_1_1Input_1ab22f3643c48f8fea5b4f92566acbfe3d">
-            </span>
-            <code class="sig-name descname">
-             Input
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            at::Tensor
-            <em>
-             tensor
-            </em>
-            <span class="sig-paren">
-             )
-            </span>
-            <a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputEN2at6TensorE" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Construct a new
-             <a class="reference internal" href="#structtorch__tensorrt_1_1Input">
-              <span class="std std-ref">
-               Input
+            <dl class="cpp function">
+             <dt id="_CPPv4N14torch_tensorrt5Input5InputEN2at6TensorE">
+              <span class="target" id="structtorch__tensorrt_1_1Input_1ab22f3643c48f8fea5b4f92566acbfe3d">
               </span>
-             </a>
-             spec object using a torch tensor as an example The tensor’s shape, type and layout inform the spec’s values.
-            </p>
-            <p>
-             Note: You cannot set dynamic shape through this method, you must use an alternative constructor
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Parameters
-              </strong>
+              <code class="sig-name descname">
+               Input
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              at::Tensor
+              <em>
+               tensor
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5InputEN2at6TensorE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
              </dt>
              <dd>
-              <ul class="breatheparameterlist simple">
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   tensor
-                  </span>
-                 </code>
-                 : Reference tensor to set shape, type and layout
-                </p>
-               </li>
-              </ul>
+              <p>
+               Construct a new
+               <a class="reference internal" href="#structtorch__tensorrt_1_1Input">
+                <span class="std std-ref">
+                 Input
+                </span>
+               </a>
+               spec object using a torch tensor as an example The tensor’s shape, type and layout inform the spec’s values.
+              </p>
+              <p>
+               Note: You cannot set dynamic shape through this method, you must use an alternative constructor
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     tensor
+                    </span>
+                   </code>
+                   : Reference tensor to set shape, type and layout
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
              </dd>
             </dl>
-           </dd>
-          </dl>
-         </div>
-         <div class="breathe-sectiondef docutils container">
-          <p class="breathe-sectiondef-title rubric">
-           Public Members
-          </p>
-          <dl class="cpp var">
-           <dt id="_CPPv4N14torch_tensorrt5Input9min_shapeE">
-            <span class="target" id="structtorch__tensorrt_1_1Input_1af95ee167b1e25e1a599a8fc67ffea9ac">
-            </span>
-            std::vector&lt;int64_t&gt;
-            <code class="sig-name descname">
-             min_shape
-            </code>
-            <a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input9min_shapeE" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Minimum acceptable input size into the engine.
+           </div>
+           <div class="breathe-sectiondef docutils container">
+            <p class="breathe-sectiondef-title rubric">
+             Public Members
             </p>
-           </dd>
-          </dl>
-          <dl class="cpp var">
-           <dt id="_CPPv4N14torch_tensorrt5Input9opt_shapeE">
-            <span class="target" id="structtorch__tensorrt_1_1Input_1a63666d30decf34115f642e75f0cf8256">
-            </span>
-            std::vector&lt;int64_t&gt;
-            <code class="sig-name descname">
-             opt_shape
-            </code>
-            <a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input9opt_shapeE" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Optimal input size into the engine (size optimized for given kernels accept any size in min max range)
-            </p>
-           </dd>
-          </dl>
-          <dl class="cpp var">
-           <dt id="_CPPv4N14torch_tensorrt5Input9max_shapeE">
-            <span class="target" id="structtorch__tensorrt_1_1Input_1ad3dfdcaaa9126dcb8dfa08dec085d589">
-            </span>
-            std::vector&lt;int64_t&gt;
-            <code class="sig-name descname">
-             max_shape
-            </code>
-            <a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input9max_shapeE" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Maximum acceptable input size into the engine.
-            </p>
-           </dd>
-          </dl>
-          <dl class="cpp var">
-           <dt id="_CPPv4N14torch_tensorrt5Input5shapeE">
-            <span class="target" id="structtorch__tensorrt_1_1Input_1a26997c30b04c8013a5afadb181b70377">
-            </span>
-            std::vector&lt;int64_t&gt;
-            <code class="sig-name descname">
-             shape
-            </code>
-            <a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5shapeE" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             <a class="reference internal" href="#structtorch__tensorrt_1_1Input">
-              <span class="std std-ref">
-               Input
+            <dl class="cpp var">
+             <dt id="_CPPv4N14torch_tensorrt5Input9min_shapeE">
+              <span class="target" id="structtorch__tensorrt_1_1Input_1af95ee167b1e25e1a599a8fc67ffea9ac">
               </span>
-             </a>
-             shape to be fed to TensorRT, in the event of a dynamic shape, -1’s will hold the place of variable dimensions
-            </p>
-           </dd>
-          </dl>
-          <dl class="cpp var">
-           <dt id="_CPPv4N14torch_tensorrt5Input5dtypeE">
-            <span class="target" id="structtorch__tensorrt_1_1Input_1a05d520340d486851d9e8a4797611895e">
-            </span>
-            <a class="reference internal" href="classtorch__tensorrt_1_1DataType.html#_CPPv4N14torch_tensorrt8DataTypeE" title="torch_tensorrt::DataType">
-             DataType
-            </a>
-            <code class="sig-name descname">
-             dtype
-            </code>
-            <a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5dtypeE" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Expected data type for the input.
-            </p>
-           </dd>
-          </dl>
-          <dl class="cpp var">
-           <dt id="_CPPv4N14torch_tensorrt5Input6formatE">
-            <span class="target" id="structtorch__tensorrt_1_1Input_1ad544c1a1584d2f45bccf0e4963b8d292">
-            </span>
-            <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
-             TensorFormat
-            </a>
-            <code class="sig-name descname">
-             format
-            </code>
-            <a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input6formatE" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Expected tensor format for the input.
-            </p>
-           </dd>
-          </dl>
-         </div>
-        </dd>
-       </dl>
+              std::vector&lt;int64_t&gt;
+              <code class="sig-name descname">
+               min_shape
+              </code>
+              <a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input9min_shapeE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Minimum acceptable input size into the engine.
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp var">
+             <dt id="_CPPv4N14torch_tensorrt5Input9opt_shapeE">
+              <span class="target" id="structtorch__tensorrt_1_1Input_1a63666d30decf34115f642e75f0cf8256">
+              </span>
+              std::vector&lt;int64_t&gt;
+              <code class="sig-name descname">
+               opt_shape
+              </code>
+              <a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input9opt_shapeE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Optimal input size into the engine (size optimized for given kernels accept any size in min max range)
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp var">
+             <dt id="_CPPv4N14torch_tensorrt5Input9max_shapeE">
+              <span class="target" id="structtorch__tensorrt_1_1Input_1ad3dfdcaaa9126dcb8dfa08dec085d589">
+              </span>
+              std::vector&lt;int64_t&gt;
+              <code class="sig-name descname">
+               max_shape
+              </code>
+              <a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input9max_shapeE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Maximum acceptable input size into the engine.
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp var">
+             <dt id="_CPPv4N14torch_tensorrt5Input5shapeE">
+              <span class="target" id="structtorch__tensorrt_1_1Input_1a26997c30b04c8013a5afadb181b70377">
+              </span>
+              std::vector&lt;int64_t&gt;
+              <code class="sig-name descname">
+               shape
+              </code>
+              <a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5shapeE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               <a class="reference internal" href="#structtorch__tensorrt_1_1Input">
+                <span class="std std-ref">
+                 Input
+                </span>
+               </a>
+               shape to be fed to TensorRT, in the event of a dynamic shape, -1’s will hold the place of variable dimensions
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp var">
+             <dt id="_CPPv4N14torch_tensorrt5Input5dtypeE">
+              <span class="target" id="structtorch__tensorrt_1_1Input_1a05d520340d486851d9e8a4797611895e">
+              </span>
+              <a class="reference internal" href="classtorch__tensorrt_1_1DataType.html#_CPPv4N14torch_tensorrt8DataTypeE" title="torch_tensorrt::DataType">
+               DataType
+              </a>
+              <code class="sig-name descname">
+               dtype
+              </code>
+              <a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input5dtypeE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Expected data type for the input.
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp var">
+             <dt id="_CPPv4N14torch_tensorrt5Input6formatE">
+              <span class="target" id="structtorch__tensorrt_1_1Input_1ad544c1a1584d2f45bccf0e4963b8d292">
+              </span>
+              <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#_CPPv4N14torch_tensorrt12TensorFormatE" title="torch_tensorrt::TensorFormat">
+               TensorFormat
+              </a>
+              <code class="sig-name descname">
+               format
+              </code>
+              <a class="headerlink" href="#_CPPv4N14torch_tensorrt5Input6formatE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Expected tensor format for the input.
+              </p>
+             </dd>
+            </dl>
+           </div>
+          </dd>
+         </dl>
+        </section>
+       </section>
       </article>
      </div>
     </div>

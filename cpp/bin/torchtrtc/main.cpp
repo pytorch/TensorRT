@@ -615,7 +615,7 @@ int main(int argc, char** argv) {
   }
 
   if (require_full_compilation) {
-    if (!torchtrt::ts::CheckMethodOperatorSupport(mod, "forward")) {
+    if (!torchtrt::ts::check_method_operator_support(mod, "forward")) {
       torchtrt::logging::log(torchtrt::logging::Level::kERROR, "Module is not currently supported by Torch-TensorRT");
       return 1;
     }

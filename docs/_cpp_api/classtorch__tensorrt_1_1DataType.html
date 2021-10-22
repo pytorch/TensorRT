@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -299,17 +300,17 @@
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../_notebooks/lenet-getting-started.html">
-            TRTorch Getting Started - LeNet
+            Torch-TensorRT Getting Started - LeNet
            </a>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../_notebooks/ssd-object-detection-demo.html">
-            Object Detection with TRTorch (SSD)
+            Object Detection with Torch-TensorRT (SSD)
            </a>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../_notebooks/vgg-qat.html">
-            Deploying Quantization Aware Trained models in INT8 using TRTorch
+            Deploying Quantization Aware Trained models in INT8 using Torch-TensorRT
            </a>
           </li>
           <li class="md-nav__item">
@@ -409,789 +410,793 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <span id="exhale-class-classtorch-tensorrt-1-1datatype">
-       </span>
-       <h1 id="cpp-api-classtorch-tensorrt-1-1datatype--page-root">
-        Class DataType
-        <a class="headerlink" href="#cpp-api-classtorch-tensorrt-1-1datatype--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <ul class="simple">
-        <li>
-         <p>
-          Defined in
-          <a class="reference internal" href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html#file-cpp-include-torch-tensorrt-torch-tensorrt-h">
-           <span class="std std-ref">
-            File torch_tensorrt.h
-           </span>
-          </a>
-         </p>
-        </li>
-       </ul>
-       <h2 id="class-documentation">
-        Class Documentation
-        <a class="headerlink" href="#class-documentation" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <dl class="cpp class">
-        <dt id="_CPPv4N14torch_tensorrt8DataTypeE">
-         <span class="target" id="classtorch__tensorrt_1_1DataType">
-         </span>
-         <em class="property">
-          class
-         </em>
-         <code class="sig-prename descclassname">
-          torch_tensorrt
-          <code class="sig-prename descclassname">
-           ::
-          </code>
-         </code>
-         <code class="sig-name descname">
-          DataType
-         </code>
-         <a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataTypeE" title="Permalink to this definition">
+       <section id="class-datatype">
+        <span id="exhale-class-classtorch-tensorrt-1-1datatype">
+        </span>
+        <h1 id="cpp-api-classtorch-tensorrt-1-1datatype--page-root">
+         Class DataType
+         <a class="headerlink" href="#cpp-api-classtorch-tensorrt-1-1datatype--page-root" title="Permalink to this headline">
           ¶
          </a>
-         <br/>
-        </dt>
-        <dd>
-         <p>
-          Supported Data Types that can be used with TensorRT engines
-         </p>
-         <p>
-          This class is compatable with c10::DataTypes (but will check for TRT support) so there should not be a reason that you need to use this type explictly.
-         </p>
-         <div class="breathe-sectiondef docutils container">
-          <p class="breathe-sectiondef-title rubric">
-           Public Types
+        </h1>
+        <ul class="simple">
+         <li>
+          <p>
+           Defined in
+           <a class="reference internal" href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html#file-cpp-include-torch-tensorrt-torch-tensorrt-h">
+            <span class="std std-ref">
+             File torch_tensorrt.h
+            </span>
+           </a>
           </p>
-          <dl class="cpp enum">
-           <dt id="_CPPv4N14torch_tensorrt8DataType5ValueE">
-            <span class="target" id="classtorch__tensorrt_1_1DataType_1a6335c0e206340d85a1382a5df17bf684">
-            </span>
-            <em class="property">
-             enum
-            </em>
-            <code class="sig-name descname">
-             Value
+         </li>
+        </ul>
+        <section id="class-documentation">
+         <h2 id="class-documentation">
+          Class Documentation
+          <a class="headerlink" href="#class-documentation" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <dl class="cpp class">
+          <dt id="_CPPv4N14torch_tensorrt8DataTypeE">
+           <span class="target" id="classtorch__tensorrt_1_1DataType">
+           </span>
+           <em class="property">
+            class
+           </em>
+           <code class="sig-prename descclassname">
+            torch_tensorrt
+            <code class="sig-prename descclassname">
+             ::
             </code>
-            <a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataType5ValueE" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Underlying enum class to support the
-             <a class="reference internal" href="#classtorch__tensorrt_1_1DataType">
-              <span class="std std-ref">
-               DataType
-              </span>
-             </a>
-             Class
+           </code>
+           <code class="sig-name descname">
+            DataType
+           </code>
+           <a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataTypeE" title="Permalink to this definition">
+            ¶
+           </a>
+           <br/>
+          </dt>
+          <dd>
+           <p>
+            Supported Data Types that can be used with TensorRT engines
+           </p>
+           <p>
+            This class is compatable with c10::DataTypes (but will check for TRT support) so there should not be a reason that you need to use this type explictly.
+           </p>
+           <div class="breathe-sectiondef docutils container">
+            <p class="breathe-sectiondef-title rubric">
+             Public Types
             </p>
-            <p>
-             In the case that you need to use the
-             <a class="reference internal" href="#classtorch__tensorrt_1_1DataType">
-              <span class="std std-ref">
-               DataType
-              </span>
-             </a>
-             class itself, interface using this enum vs. normal instatination
-            </p>
-            <p>
-             ex.
-             <a class="reference internal" href="#classtorch__tensorrt_1_1DataType">
-              <span class="std std-ref">
-               torch_tensorrt::DataType
-              </span>
-             </a>
-             type =
-             <a class="reference internal" href="#classtorch__tensorrt_1_1DataType_1a6335c0e206340d85a1382a5df17bf684a45ceda04c1ab50695a4a6aeaeae99817">
-              <span class="std std-ref">
-               DataType::kFloat
-              </span>
-             </a>
-             ;
-            </p>
-            <p>
-             <em>
-              Values:
-             </em>
-            </p>
-            <dl class="cpp enumerator">
-             <dt id="_CPPv4N14torch_tensorrt8DataType5Value6kFloatE">
-              <span class="target" id="classtorch__tensorrt_1_1DataType_1a6335c0e206340d85a1382a5df17bf684a45ceda04c1ab50695a4a6aeaeae99817">
+            <dl class="cpp enum">
+             <dt id="_CPPv4N14torch_tensorrt8DataType5ValueE">
+              <span class="target" id="classtorch__tensorrt_1_1DataType_1a6335c0e206340d85a1382a5df17bf684">
               </span>
               <em class="property">
-               enumerator
+               enum
               </em>
               <code class="sig-name descname">
-               kFloat
-              </code>
-              <a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataType5Value6kFloatE" title="Permalink to this definition">
-               ¶
-              </a>
-              <br/>
-             </dt>
-             <dd>
-              <p>
-               FP32.
-              </p>
-             </dd>
-            </dl>
-            <dl class="cpp enumerator">
-             <dt id="_CPPv4N14torch_tensorrt8DataType5Value5kHalfE">
-              <span class="target" id="classtorch__tensorrt_1_1DataType_1a6335c0e206340d85a1382a5df17bf684a3733a4b256b56596c5c52de99a196179">
-              </span>
-              <em class="property">
-               enumerator
-              </em>
-              <code class="sig-name descname">
-               kHalf
-              </code>
-              <a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataType5Value5kHalfE" title="Permalink to this definition">
-               ¶
-              </a>
-              <br/>
-             </dt>
-             <dd>
-              <p>
-               FP16.
-              </p>
-             </dd>
-            </dl>
-            <dl class="cpp enumerator">
-             <dt id="_CPPv4N14torch_tensorrt8DataType5Value5kCharE">
-              <span class="target" id="classtorch__tensorrt_1_1DataType_1a6335c0e206340d85a1382a5df17bf684ab97bba9140703786c7aa08baea3ab276">
-              </span>
-              <em class="property">
-               enumerator
-              </em>
-              <code class="sig-name descname">
-               kChar
-              </code>
-              <a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataType5Value5kCharE" title="Permalink to this definition">
-               ¶
-              </a>
-              <br/>
-             </dt>
-             <dd>
-              <p>
-               INT8.
-              </p>
-             </dd>
-            </dl>
-            <dl class="cpp enumerator">
-             <dt id="_CPPv4N14torch_tensorrt8DataType5Value4kIntE">
-              <span class="target" id="classtorch__tensorrt_1_1DataType_1a6335c0e206340d85a1382a5df17bf684aa331051c24898e3701b925251d85c7c1">
-              </span>
-              <em class="property">
-               enumerator
-              </em>
-              <code class="sig-name descname">
-               kInt
-              </code>
-              <a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataType5Value4kIntE" title="Permalink to this definition">
-               ¶
-              </a>
-              <br/>
-             </dt>
-             <dd>
-              <p>
-               INT.
-              </p>
-             </dd>
-            </dl>
-            <dl class="cpp enumerator">
-             <dt id="_CPPv4N14torch_tensorrt8DataType5Value5kBoolE">
-              <span class="target" id="classtorch__tensorrt_1_1DataType_1a6335c0e206340d85a1382a5df17bf684a67f7e5fb797f4da732c5e217cbda4353">
-              </span>
-              <em class="property">
-               enumerator
-              </em>
-              <code class="sig-name descname">
-               kBool
-              </code>
-              <a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataType5Value5kBoolE" title="Permalink to this definition">
-               ¶
-              </a>
-              <br/>
-             </dt>
-             <dd>
-              <p>
-               Bool.
-              </p>
-             </dd>
-            </dl>
-            <dl class="cpp enumerator">
-             <dt id="_CPPv4N14torch_tensorrt8DataType5Value8kUnknownE">
-              <span class="target" id="classtorch__tensorrt_1_1DataType_1a6335c0e206340d85a1382a5df17bf684a140934e6b67dfe841b32eb73bea55358">
-              </span>
-              <em class="property">
-               enumerator
-              </em>
-              <code class="sig-name descname">
-               kUnknown
-              </code>
-              <a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataType5Value8kUnknownE" title="Permalink to this definition">
-               ¶
-              </a>
-              <br/>
-             </dt>
-             <dd>
-              <p>
-               Sentinel value.
-              </p>
-             </dd>
-            </dl>
-           </dd>
-          </dl>
-         </div>
-         <div class="breathe-sectiondef docutils container">
-          <p class="breathe-sectiondef-title rubric">
-           Public Functions
-          </p>
-          <dl class="cpp function">
-           <dt id="_CPPv4N14torch_tensorrt8DataType8DataTypeEv">
-            <span class="target" id="classtorch__tensorrt_1_1DataType_1aeaf580c5f2d949bfe358e47b3824de85">
-            </span>
-            <code class="sig-name descname">
-             DataType
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            <span class="sig-paren">
-             )
-            </span>
-            = default
-            <a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataType8DataTypeEv" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Construct a new Data Type object.
-            </p>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4N14torch_tensorrt8DataType8DataTypeE5Value">
-            <span class="target" id="classtorch__tensorrt_1_1DataType_1a2804fe4287453fd5b5e35f44a382dcdd">
-            </span>
-            <em class="property">
-             constexpr
-            </em>
-            <code class="sig-name descname">
-             DataType
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            <a class="reference internal" href="#_CPPv4N14torch_tensorrt8DataType5ValueE" title="torch_tensorrt::DataType::Value">
-             Value
-            </a>
-            <em>
-             t
-            </em>
-            <span class="sig-paren">
-             )
-            </span>
-            <a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataType8DataTypeE5Value" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             <a class="reference internal" href="#classtorch__tensorrt_1_1DataType">
-              <span class="std std-ref">
-               DataType
-              </span>
-             </a>
-             constructor from enum.
-            </p>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4N14torch_tensorrt8DataType8DataTypeEN3c1010ScalarTypeE">
-            <span class="target" id="classtorch__tensorrt_1_1DataType_1acbffa97b3ab92f05d87fb03cb2b5a7a9">
-            </span>
-            <code class="sig-name descname">
-             DataType
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            c10::ScalarType
-            <em>
-             t
-            </em>
-            <span class="sig-paren">
-             )
-            </span>
-            <a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataType8DataTypeEN3c1010ScalarTypeE" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Construct a new Data Type object from torch type enums.
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Parameters
-              </strong>
-             </dt>
-             <dd>
-              <ul class="breatheparameterlist simple">
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   t
-                  </span>
-                 </code>
-                 :
-                </p>
-               </li>
-              </ul>
-             </dd>
-            </dl>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4NK14torch_tensorrt8DataTypecv5ValueEv">
-            <span class="target" id="classtorch__tensorrt_1_1DataType_1a09bc3c1870d9c469de12095a98e8caa4">
-            </span>
-            <code class="sig-name descname">
-             operator Value
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            <span class="sig-paren">
-             )
-            </span>
-            <em class="property">
-             const
-            </em>
-            <a class="headerlink" href="#_CPPv4NK14torch_tensorrt8DataTypecv5ValueEv" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Get the enum value of the
-             <a class="reference internal" href="#classtorch__tensorrt_1_1DataType">
-              <span class="std std-ref">
-               DataType
-              </span>
-             </a>
-             object.
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Return
-              </strong>
-             </dt>
-             <dd>
-              <p>
                Value
-              </p>
-             </dd>
-            </dl>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4N14torch_tensorrt8DataTypecvbEv">
-            <span class="target" id="classtorch__tensorrt_1_1DataType_1aba0ed97193a870cbddf50c7bc02dd9fb">
-            </span>
-            <code class="sig-name descname">
-             operator bool
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            <span class="sig-paren">
-             )
-            </span>
-            = delete
-            <a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataTypecvbEv" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4NK14torch_tensorrt8DataTypeeqE8DataType">
-            <span class="target" id="classtorch__tensorrt_1_1DataType_1ae8b45ac54760deb077d6dfc4acbd2e2b">
-            </span>
-            <em class="property">
-             constexpr
-            </em>
-            bool
-            <code class="sig-name descname">
-             operator==
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            <a class="reference internal" href="#_CPPv4N14torch_tensorrt8DataTypeE" title="torch_tensorrt::DataType">
-             DataType
-            </a>
-            <em>
-             other
-            </em>
-            <span class="sig-paren">
-             )
-            </span>
-            <em class="property">
-             const
-            </em>
-            <a class="headerlink" href="#_CPPv4NK14torch_tensorrt8DataTypeeqE8DataType" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Comparision operator for
-             <a class="reference internal" href="#classtorch__tensorrt_1_1DataType">
-              <span class="std std-ref">
-               DataType
-              </span>
-             </a>
-             .
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Return
-              </strong>
+              </code>
+              <a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataType5ValueE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
              </dt>
              <dd>
               <p>
-               true
+               Underlying enum class to support the
+               <a class="reference internal" href="#classtorch__tensorrt_1_1DataType">
+                <span class="std std-ref">
+                 DataType
+                </span>
+               </a>
+               Class
               </p>
-             </dd>
-             <dt>
-              <strong>
-               Return
-              </strong>
-             </dt>
-             <dd>
               <p>
-               false
+               In the case that you need to use the
+               <a class="reference internal" href="#classtorch__tensorrt_1_1DataType">
+                <span class="std std-ref">
+                 DataType
+                </span>
+               </a>
+               class itself, interface using this enum vs. normal instatination
               </p>
-             </dd>
-             <dt>
-              <strong>
-               Parameters
-              </strong>
-             </dt>
-             <dd>
-              <ul class="breatheparameterlist simple">
-               <li>
+              <p>
+               ex.
+               <a class="reference internal" href="#classtorch__tensorrt_1_1DataType">
+                <span class="std std-ref">
+                 torch_tensorrt::DataType
+                </span>
+               </a>
+               type =
+               <a class="reference internal" href="#classtorch__tensorrt_1_1DataType_1a6335c0e206340d85a1382a5df17bf684a45ceda04c1ab50695a4a6aeaeae99817">
+                <span class="std std-ref">
+                 DataType::kFloat
+                </span>
+               </a>
+               ;
+              </p>
+              <p>
+               <em>
+                Values:
+               </em>
+              </p>
+              <dl class="cpp enumerator">
+               <dt id="_CPPv4N14torch_tensorrt8DataType5Value6kFloatE">
+                <span class="target" id="classtorch__tensorrt_1_1DataType_1a6335c0e206340d85a1382a5df17bf684a45ceda04c1ab50695a4a6aeaeae99817">
+                </span>
+                <em class="property">
+                 enumerator
+                </em>
+                <code class="sig-name descname">
+                 kFloat
+                </code>
+                <a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataType5Value6kFloatE" title="Permalink to this definition">
+                 ¶
+                </a>
+                <br/>
+               </dt>
+               <dd>
                 <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   other
-                  </span>
-                 </code>
-                 :
+                 FP32.
                 </p>
-               </li>
-              </ul>
-             </dd>
-            </dl>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4NK14torch_tensorrt8DataTypeeqEN8DataType5ValueE">
-            <span class="target" id="classtorch__tensorrt_1_1DataType_1a1232a15ad160b309db10a5ea8dd4e26c">
-            </span>
-            <em class="property">
-             constexpr
-            </em>
-            bool
-            <code class="sig-name descname">
-             operator==
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            <a class="reference internal" href="#_CPPv4N14torch_tensorrt8DataTypeE" title="torch_tensorrt::DataType">
-             DataType
-            </a>
-            ::
-            <a class="reference internal" href="#_CPPv4N14torch_tensorrt8DataType5ValueE" title="torch_tensorrt::DataType::Value">
-             Value
-            </a>
-            <em>
-             other
-            </em>
-            <span class="sig-paren">
-             )
-            </span>
-            <em class="property">
-             const
-            </em>
-            <a class="headerlink" href="#_CPPv4NK14torch_tensorrt8DataTypeeqEN8DataType5ValueE" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Comparision operator for
-             <a class="reference internal" href="#classtorch__tensorrt_1_1DataType">
-              <span class="std std-ref">
-               DataType
-              </span>
-             </a>
-             .
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Return
-              </strong>
-             </dt>
-             <dd>
-              <p>
-               true
-              </p>
-             </dd>
-             <dt>
-              <strong>
-               Return
-              </strong>
-             </dt>
-             <dd>
-              <p>
-               false
-              </p>
-             </dd>
-             <dt>
-              <strong>
-               Parameters
-              </strong>
-             </dt>
-             <dd>
-              <ul class="breatheparameterlist simple">
-               <li>
+               </dd>
+              </dl>
+              <dl class="cpp enumerator">
+               <dt id="_CPPv4N14torch_tensorrt8DataType5Value5kHalfE">
+                <span class="target" id="classtorch__tensorrt_1_1DataType_1a6335c0e206340d85a1382a5df17bf684a3733a4b256b56596c5c52de99a196179">
+                </span>
+                <em class="property">
+                 enumerator
+                </em>
+                <code class="sig-name descname">
+                 kHalf
+                </code>
+                <a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataType5Value5kHalfE" title="Permalink to this definition">
+                 ¶
+                </a>
+                <br/>
+               </dt>
+               <dd>
                 <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   other
-                  </span>
-                 </code>
-                 :
+                 FP16.
                 </p>
-               </li>
-              </ul>
-             </dd>
-            </dl>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4NK14torch_tensorrt8DataTypeneE8DataType">
-            <span class="target" id="classtorch__tensorrt_1_1DataType_1a3fb2cbdb14408da52fa9bb0e0840d7e4">
-            </span>
-            <em class="property">
-             constexpr
-            </em>
-            bool
-            <code class="sig-name descname">
-             operator!=
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            <a class="reference internal" href="#_CPPv4N14torch_tensorrt8DataTypeE" title="torch_tensorrt::DataType">
-             DataType
-            </a>
-            <em>
-             other
-            </em>
-            <span class="sig-paren">
-             )
-            </span>
-            <em class="property">
-             const
-            </em>
-            <a class="headerlink" href="#_CPPv4NK14torch_tensorrt8DataTypeneE8DataType" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Comparision operator for
-             <a class="reference internal" href="#classtorch__tensorrt_1_1DataType">
-              <span class="std std-ref">
-               DataType
-              </span>
-             </a>
-             .
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Return
-              </strong>
-             </dt>
-             <dd>
-              <p>
-               true
-              </p>
-             </dd>
-             <dt>
-              <strong>
-               Return
-              </strong>
-             </dt>
-             <dd>
-              <p>
-               false
-              </p>
-             </dd>
-             <dt>
-              <strong>
-               Parameters
-              </strong>
-             </dt>
-             <dd>
-              <ul class="breatheparameterlist simple">
-               <li>
+               </dd>
+              </dl>
+              <dl class="cpp enumerator">
+               <dt id="_CPPv4N14torch_tensorrt8DataType5Value5kCharE">
+                <span class="target" id="classtorch__tensorrt_1_1DataType_1a6335c0e206340d85a1382a5df17bf684ab97bba9140703786c7aa08baea3ab276">
+                </span>
+                <em class="property">
+                 enumerator
+                </em>
+                <code class="sig-name descname">
+                 kChar
+                </code>
+                <a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataType5Value5kCharE" title="Permalink to this definition">
+                 ¶
+                </a>
+                <br/>
+               </dt>
+               <dd>
                 <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   other
-                  </span>
-                 </code>
-                 :
+                 INT8.
                 </p>
-               </li>
-              </ul>
-             </dd>
-            </dl>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4NK14torch_tensorrt8DataTypeneEN8DataType5ValueE">
-            <span class="target" id="classtorch__tensorrt_1_1DataType_1a25dd020fd88ec93b421c990045c1aba4">
-            </span>
-            <em class="property">
-             constexpr
-            </em>
-            bool
-            <code class="sig-name descname">
-             operator!=
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            <a class="reference internal" href="#_CPPv4N14torch_tensorrt8DataTypeE" title="torch_tensorrt::DataType">
-             DataType
-            </a>
-            ::
-            <a class="reference internal" href="#_CPPv4N14torch_tensorrt8DataType5ValueE" title="torch_tensorrt::DataType::Value">
-             Value
-            </a>
-            <em>
-             other
-            </em>
-            <span class="sig-paren">
-             )
-            </span>
-            <em class="property">
-             const
-            </em>
-            <a class="headerlink" href="#_CPPv4NK14torch_tensorrt8DataTypeneEN8DataType5ValueE" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Comparision operator for
-             <a class="reference internal" href="#classtorch__tensorrt_1_1DataType">
-              <span class="std std-ref">
-               DataType
-              </span>
-             </a>
-             .
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Return
-              </strong>
-             </dt>
-             <dd>
-              <p>
-               true
-              </p>
-             </dd>
-             <dt>
-              <strong>
-               Return
-              </strong>
-             </dt>
-             <dd>
-              <p>
-               false
-              </p>
-             </dd>
-             <dt>
-              <strong>
-               Parameters
-              </strong>
-             </dt>
-             <dd>
-              <ul class="breatheparameterlist simple">
-               <li>
+               </dd>
+              </dl>
+              <dl class="cpp enumerator">
+               <dt id="_CPPv4N14torch_tensorrt8DataType5Value4kIntE">
+                <span class="target" id="classtorch__tensorrt_1_1DataType_1a6335c0e206340d85a1382a5df17bf684aa331051c24898e3701b925251d85c7c1">
+                </span>
+                <em class="property">
+                 enumerator
+                </em>
+                <code class="sig-name descname">
+                 kInt
+                </code>
+                <a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataType5Value4kIntE" title="Permalink to this definition">
+                 ¶
+                </a>
+                <br/>
+               </dt>
+               <dd>
                 <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   other
-                  </span>
-                 </code>
-                 :
+                 INT.
                 </p>
-               </li>
-              </ul>
+               </dd>
+              </dl>
+              <dl class="cpp enumerator">
+               <dt id="_CPPv4N14torch_tensorrt8DataType5Value5kBoolE">
+                <span class="target" id="classtorch__tensorrt_1_1DataType_1a6335c0e206340d85a1382a5df17bf684a67f7e5fb797f4da732c5e217cbda4353">
+                </span>
+                <em class="property">
+                 enumerator
+                </em>
+                <code class="sig-name descname">
+                 kBool
+                </code>
+                <a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataType5Value5kBoolE" title="Permalink to this definition">
+                 ¶
+                </a>
+                <br/>
+               </dt>
+               <dd>
+                <p>
+                 Bool.
+                </p>
+               </dd>
+              </dl>
+              <dl class="cpp enumerator">
+               <dt id="_CPPv4N14torch_tensorrt8DataType5Value8kUnknownE">
+                <span class="target" id="classtorch__tensorrt_1_1DataType_1a6335c0e206340d85a1382a5df17bf684a140934e6b67dfe841b32eb73bea55358">
+                </span>
+                <em class="property">
+                 enumerator
+                </em>
+                <code class="sig-name descname">
+                 kUnknown
+                </code>
+                <a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataType5Value8kUnknownE" title="Permalink to this definition">
+                 ¶
+                </a>
+                <br/>
+               </dt>
+               <dd>
+                <p>
+                 Sentinel value.
+                </p>
+               </dd>
+              </dl>
              </dd>
             </dl>
-           </dd>
-          </dl>
-         </div>
-        </dd>
-       </dl>
+           </div>
+           <div class="breathe-sectiondef docutils container">
+            <p class="breathe-sectiondef-title rubric">
+             Public Functions
+            </p>
+            <dl class="cpp function">
+             <dt id="_CPPv4N14torch_tensorrt8DataType8DataTypeEv">
+              <span class="target" id="classtorch__tensorrt_1_1DataType_1aeaf580c5f2d949bfe358e47b3824de85">
+              </span>
+              <code class="sig-name descname">
+               DataType
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <span class="sig-paren">
+               )
+              </span>
+              = default
+              <a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataType8DataTypeEv" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Construct a new Data Type object.
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4N14torch_tensorrt8DataType8DataTypeE5Value">
+              <span class="target" id="classtorch__tensorrt_1_1DataType_1a2804fe4287453fd5b5e35f44a382dcdd">
+              </span>
+              <em class="property">
+               constexpr
+              </em>
+              <code class="sig-name descname">
+               DataType
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <a class="reference internal" href="#_CPPv4N14torch_tensorrt8DataType5ValueE" title="torch_tensorrt::DataType::Value">
+               Value
+              </a>
+              <em>
+               t
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataType8DataTypeE5Value" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               <a class="reference internal" href="#classtorch__tensorrt_1_1DataType">
+                <span class="std std-ref">
+                 DataType
+                </span>
+               </a>
+               constructor from enum.
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4N14torch_tensorrt8DataType8DataTypeEN3c1010ScalarTypeE">
+              <span class="target" id="classtorch__tensorrt_1_1DataType_1acbffa97b3ab92f05d87fb03cb2b5a7a9">
+              </span>
+              <code class="sig-name descname">
+               DataType
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              c10::ScalarType
+              <em>
+               t
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataType8DataTypeEN3c1010ScalarTypeE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Construct a new Data Type object from torch type enums.
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     t
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4NK14torch_tensorrt8DataTypecv5ValueEv">
+              <span class="target" id="classtorch__tensorrt_1_1DataType_1a09bc3c1870d9c469de12095a98e8caa4">
+              </span>
+              <code class="sig-name descname">
+               operator Value
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <span class="sig-paren">
+               )
+              </span>
+              <em class="property">
+               const
+              </em>
+              <a class="headerlink" href="#_CPPv4NK14torch_tensorrt8DataTypecv5ValueEv" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Get the enum value of the
+               <a class="reference internal" href="#classtorch__tensorrt_1_1DataType">
+                <span class="std std-ref">
+                 DataType
+                </span>
+               </a>
+               object.
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 Value
+                </p>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4N14torch_tensorrt8DataTypecvbEv">
+              <span class="target" id="classtorch__tensorrt_1_1DataType_1aba0ed97193a870cbddf50c7bc02dd9fb">
+              </span>
+              <code class="sig-name descname">
+               operator bool
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <span class="sig-paren">
+               )
+              </span>
+              = delete
+              <a class="headerlink" href="#_CPPv4N14torch_tensorrt8DataTypecvbEv" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4NK14torch_tensorrt8DataTypeeqE8DataType">
+              <span class="target" id="classtorch__tensorrt_1_1DataType_1ae8b45ac54760deb077d6dfc4acbd2e2b">
+              </span>
+              <em class="property">
+               constexpr
+              </em>
+              bool
+              <code class="sig-name descname">
+               operator==
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <a class="reference internal" href="#_CPPv4N14torch_tensorrt8DataTypeE" title="torch_tensorrt::DataType">
+               DataType
+              </a>
+              <em>
+               other
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <em class="property">
+               const
+              </em>
+              <a class="headerlink" href="#_CPPv4NK14torch_tensorrt8DataTypeeqE8DataType" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Comparision operator for
+               <a class="reference internal" href="#classtorch__tensorrt_1_1DataType">
+                <span class="std std-ref">
+                 DataType
+                </span>
+               </a>
+               .
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 true
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 false
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     other
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4NK14torch_tensorrt8DataTypeeqEN8DataType5ValueE">
+              <span class="target" id="classtorch__tensorrt_1_1DataType_1a1232a15ad160b309db10a5ea8dd4e26c">
+              </span>
+              <em class="property">
+               constexpr
+              </em>
+              bool
+              <code class="sig-name descname">
+               operator==
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <a class="reference internal" href="#_CPPv4N14torch_tensorrt8DataTypeE" title="torch_tensorrt::DataType">
+               DataType
+              </a>
+              ::
+              <a class="reference internal" href="#_CPPv4N14torch_tensorrt8DataType5ValueE" title="torch_tensorrt::DataType::Value">
+               Value
+              </a>
+              <em>
+               other
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <em class="property">
+               const
+              </em>
+              <a class="headerlink" href="#_CPPv4NK14torch_tensorrt8DataTypeeqEN8DataType5ValueE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Comparision operator for
+               <a class="reference internal" href="#classtorch__tensorrt_1_1DataType">
+                <span class="std std-ref">
+                 DataType
+                </span>
+               </a>
+               .
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 true
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 false
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     other
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4NK14torch_tensorrt8DataTypeneE8DataType">
+              <span class="target" id="classtorch__tensorrt_1_1DataType_1a3fb2cbdb14408da52fa9bb0e0840d7e4">
+              </span>
+              <em class="property">
+               constexpr
+              </em>
+              bool
+              <code class="sig-name descname">
+               operator!=
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <a class="reference internal" href="#_CPPv4N14torch_tensorrt8DataTypeE" title="torch_tensorrt::DataType">
+               DataType
+              </a>
+              <em>
+               other
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <em class="property">
+               const
+              </em>
+              <a class="headerlink" href="#_CPPv4NK14torch_tensorrt8DataTypeneE8DataType" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Comparision operator for
+               <a class="reference internal" href="#classtorch__tensorrt_1_1DataType">
+                <span class="std std-ref">
+                 DataType
+                </span>
+               </a>
+               .
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 true
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 false
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     other
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt id="_CPPv4NK14torch_tensorrt8DataTypeneEN8DataType5ValueE">
+              <span class="target" id="classtorch__tensorrt_1_1DataType_1a25dd020fd88ec93b421c990045c1aba4">
+              </span>
+              <em class="property">
+               constexpr
+              </em>
+              bool
+              <code class="sig-name descname">
+               operator!=
+              </code>
+              <span class="sig-paren">
+               (
+              </span>
+              <a class="reference internal" href="#_CPPv4N14torch_tensorrt8DataTypeE" title="torch_tensorrt::DataType">
+               DataType
+              </a>
+              ::
+              <a class="reference internal" href="#_CPPv4N14torch_tensorrt8DataType5ValueE" title="torch_tensorrt::DataType::Value">
+               Value
+              </a>
+              <em>
+               other
+              </em>
+              <span class="sig-paren">
+               )
+              </span>
+              <em class="property">
+               const
+              </em>
+              <a class="headerlink" href="#_CPPv4NK14torch_tensorrt8DataTypeneEN8DataType5ValueE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Comparision operator for
+               <a class="reference internal" href="#classtorch__tensorrt_1_1DataType">
+                <span class="std std-ref">
+                 DataType
+                </span>
+               </a>
+               .
+              </p>
+              <p>
+              </p>
+              <dl class="simple">
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 true
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Return
+                </strong>
+               </dt>
+               <dd>
+                <p>
+                 false
+                </p>
+               </dd>
+               <dt>
+                <strong>
+                 Parameters
+                </strong>
+               </dt>
+               <dd>
+                <ul class="breatheparameterlist simple">
+                 <li>
+                  <p>
+                   <code class="docutils literal notranslate">
+                    <span class="pre">
+                     other
+                    </span>
+                   </code>
+                   :
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+           </div>
+          </dd>
+         </dl>
+        </section>
+       </section>
       </article>
      </div>
     </div>

@@ -274,15 +274,15 @@ Program Listing for File torch_tensorrt.h
      std::vector<std::string> torch_executed_modules;
    };
    
-   TORCHTRT_API bool CheckMethodOperatorSupport(const torch::jit::Module& module, std::string method_name);
+   TORCHTRT_API bool check_method_operator_support(const torch::jit::Module& module, std::string method_name);
    
-   TORCHTRT_API torch::jit::Module CompileModule(const torch::jit::Module& module, CompileSpec info);
+   TORCHTRT_API torch::jit::Module compile(const torch::jit::Module& module, CompileSpec info);
    
-   TORCHTRT_API std::string ConvertMethodToTRTEngine(
+   TORCHTRT_API std::string convert_method_to_trt_engine(
        const torch::jit::Module& module,
        std::string method_name,
        CompileSpec info);
    
-   TORCHTRT_API torch::jit::Module EmbedEngineInNewModule(const std::string& engine, Device device);
+   TORCHTRT_API torch::jit::Module embed_engine_in_new_module(const std::string& engine, Device device);
    } // namespace torchscript
    } // namespace torch_tensorrt
