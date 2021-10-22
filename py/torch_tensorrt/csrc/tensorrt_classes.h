@@ -6,7 +6,7 @@
 #include "torch/script.h"
 #include "torch/torch.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace pyapi {
 
 #define ADD_FIELD_GET_SET(field_name, type) \
@@ -18,13 +18,13 @@ namespace pyapi {
   }
 
 // TODO: Make this error message more informative
-#define ADD_ENUM_GET_SET(field_name, type, max_val)                            \
-  void set_##field_name(int64_t val) {                                         \
-    TRTORCH_CHECK(val >= 0 && val <= max_val, "Invalid enum value for field"); \
-    field_name = static_cast<type>(val);                                       \
-  }                                                                            \
-  int64_t get_##field_name() {                                                 \
-    return static_cast<int64_t>(field_name);                                   \
+#define ADD_ENUM_GET_SET(field_name, type, max_val)                             \
+  void set_##field_name(int64_t val) {                                          \
+    TORCHTRT_CHECK(val >= 0 && val <= max_val, "Invalid enum value for field"); \
+    field_name = static_cast<type>(val);                                        \
+  }                                                                             \
+  int64_t get_##field_name() {                                                  \
+    return static_cast<int64_t>(field_name);                                    \
   }
 
 enum class DataType : int8_t { kFloat, kHalf, kChar, kInt32, kBool, kUnknown };
@@ -121,7 +121,7 @@ struct CompileSpec : torch::CustomClassHolder {
 
   void setPrecisions(const std::vector<int64_t>& precisions_raw) {
     for (auto p : precisions_raw) {
-      TRTORCH_CHECK(p >= 0 && p <= static_cast<int64_t>(DataType::kBool), "Invalid enum value for field");
+      TORCHTRT_CHECK(p >= 0 && p <= static_cast<int64_t>(DataType::kBool), "Invalid enum value for field");
       enabled_precisions.insert(static_cast<DataType>(p));
     }
   }
@@ -176,4 +176,4 @@ struct CompileSpec : torch::CustomClassHolder {
 };
 
 } // namespace pyapi
-} // namespace trtorch
+} // namespace torch_tensorrt

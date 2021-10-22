@@ -4,7 +4,8 @@
 #include "torch/csrc/jit/backends/backend_debug_handler.h"
 #include "torch/csrc/jit/backends/backend_preprocess.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
+namespace torchscript {
 namespace backend {
 
 class TensorRTBackend : public torch::jit::PyTorchBackendInterface {
@@ -21,4 +22,5 @@ class TensorRTBackend : public torch::jit::PyTorchBackendInterface {
 };
 
 } // namespace backend
-} // namespace trtorch
+} // namespace torchscript
+} // namespace torch_tensorrt

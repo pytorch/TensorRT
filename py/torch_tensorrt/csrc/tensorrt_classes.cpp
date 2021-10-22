@@ -1,7 +1,7 @@
 
 #include "tensorrt_classes.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace pyapi {
 
 std::string to_str(DataType value) {
@@ -36,7 +36,7 @@ nvinfer1::DataType toTRTDataType(DataType value) {
     case DataType::kUnknown:
       return nvinfer1::DataType::kFLOAT;
     default:
-      TRTORCH_THROW_ERROR("Unknown data type: " << to_str(value));
+      TORCHTRT_THROW_ERROR("Unknown data type: " << to_str(value));
   }
 }
 
@@ -221,13 +221,13 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
   info.convert_info.engine_settings.truncate_long_and_double = truncate_long_and_double;
 
   info.convert_info.engine_settings.capability = toTRTEngineCapability(capability);
-  TRTORCH_CHECK(num_min_timing_iters >= 0, "num_min_timing_iters must be 0 or greater");
+  TORCHTRT_CHECK(num_min_timing_iters >= 0, "num_min_timing_iters must be 0 or greater");
   info.convert_info.engine_settings.num_min_timing_iters = num_min_timing_iters;
-  TRTORCH_CHECK(num_avg_timing_iters >= 0, "num_avg_timing_iters must be 0 or greater");
+  TORCHTRT_CHECK(num_avg_timing_iters >= 0, "num_avg_timing_iters must be 0 or greater");
   info.convert_info.engine_settings.num_avg_timing_iters = num_avg_timing_iters;
-  TRTORCH_CHECK(workspace_size >= 0, "workspace_size must be 0 or greater");
+  TORCHTRT_CHECK(workspace_size >= 0, "workspace_size must be 0 or greater");
   info.convert_info.engine_settings.workspace_size = workspace_size;
-  TRTORCH_CHECK(max_batch_size >= 0, "max_batch_size must be 0 or greater");
+  TORCHTRT_CHECK(max_batch_size >= 0, "max_batch_size must be 0 or greater");
   info.convert_info.engine_settings.max_batch_size = max_batch_size;
   return info;
 }
@@ -263,4 +263,4 @@ std::string CompileSpec::stringify() {
 }
 
 } // namespace pyapi
-} // namespace trtorch
+} // namespace torch_tensorrt

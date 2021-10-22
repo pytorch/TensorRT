@@ -7,7 +7,8 @@
 #include "core/lowering/lowering.h"
 #include "core/runtime/runtime.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
+namespace torchscript {
 namespace backend {
 
 c10::impl::GenericDict TensorRTBackend::compile(c10::IValue mod_val, c10::impl::GenericDict method_compile_spec) {
@@ -21,7 +22,7 @@ c10::impl::GenericDict TensorRTBackend::compile(c10::IValue mod_val, c10::impl::
   for (auto it = spec.begin(), end = spec.end(); it != end; ++it) {
     auto mod_ = mod.clone();
     const auto& method_name = it->key();
-    auto raw_spec = it->value().toCustomClass<trtorch::pyapi::CompileSpec>();
+    auto raw_spec = it->value().toCustomClass<torch_tensorrt::pyapi::CompileSpec>();
     LOG_DEBUG(raw_spec->stringify());
 
     auto cfg = raw_spec->toInternalCompileSpec();
@@ -37,12 +38,12 @@ c10::impl::GenericDict TensorRTBackend::compile(c10::IValue mod_val, c10::impl::
 }
 
 c10::impl::GenericList TensorRTBackend::execute(c10::IValue handle, c10::impl::GenericList inputs) {
-  TRTORCH_ASSERT(inputs.size() > 0, "Trying to execute on empty list of arguments");
+  TORCHTRT_ASSERT(inputs.size() > 0, "Trying to execute on empty list of arguments");
   auto engine = handle.toCustomClass<core::runtime::TRTEngine>();
   std::vector<at::Tensor> in_vec;
   for (size_t i = 0, e = inputs.size(); i < e; ++i) {
     c10::IValue val = inputs[i];
-    TRTORCH_CHECK(val.isTensor(), "TensorRT currently only accepts Tensors as inputs");
+    TORCHTRT_CHECK(val.isTensor(), "TensorRT currently only accepts Tensors as inputs");
     in_vec.push_back(val.toTensor());
   }
   auto outputs = core::runtime::execute_engine(in_vec, engine);
@@ -63,7 +64,7 @@ c10::IValue preprocess(
 #endif
 ) {
   for (auto it = method_compile_spec.begin(), end = method_compile_spec.end(); it != end; ++it) {
-    TRTORCH_CHECK(
+    TORCHTRT_CHECK(
         core::CheckMethodOperatorSupport(mod, it->key().toStringRef()),
         "Method " << it->key().toStringRef() << "cannot be compiled by TRTorch");
   }
@@ -77,4 +78,5 @@ static auto preproc_reg =
 } // namespace
 
 } // namespace backend
-} // namespace trtorch
+} // namespace torchscript
+} // namespace torch_tensorrt

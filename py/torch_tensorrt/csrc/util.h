@@ -6,7 +6,7 @@
 #include <string>
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace pyapi {
 namespace util {
 
@@ -28,4 +28,4 @@ py::function getOverload(const T* self, const std::string& overloadName) {
 
 } // namespace util
 } // namespace pyapi
-} // namespace trtorch
+} // namespace torch_tensorrt

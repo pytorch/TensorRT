@@ -13,7 +13,7 @@
 
 namespace py = pybind11;
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace pyapi {
 
 template <typename Derived>
@@ -28,7 +28,7 @@ class pyCalibratorTrampoline : public Derived {
   bool getBatch(void* bindings[], const char* names[], int nbBindings) noexcept override {
     py::gil_scoped_acquire gil{};
 
-    py::function pyGetBatch = trtorch::pyapi::util::getOverload(static_cast<Derived*>(this), "get_batch");
+    py::function pyGetBatch = torch_tensorrt::pyapi::util::getOverload(static_cast<Derived*>(this), "get_batch");
     std::vector<const char*> namesVec(names, names + nbBindings);
     py::object result = pyGetBatch(namesVec);
     // Copy over into the other data structure.
@@ -43,7 +43,7 @@ class pyCalibratorTrampoline : public Derived {
     py::gil_scoped_acquire gil{};
 
     py::function pyReadCalibrationCache =
-        trtorch::pyapi::util::getOverload(static_cast<Derived*>(this), "read_calibration_cache");
+        torch_tensorrt::pyapi::util::getOverload(static_cast<Derived*>(this), "read_calibration_cache");
     py::buffer cache = pyReadCalibrationCache();
     if (!cache.is_none()) {
       py::buffer_info info = cache.request();
@@ -57,7 +57,7 @@ class pyCalibratorTrampoline : public Derived {
     py::gil_scoped_acquire gil{};
 
     py::function pyWriteCalibrationCache =
-        trtorch::pyapi::util::getOverload(static_cast<Derived*>(this), "write_calibration_cache");
+        torch_tensorrt::pyapi::util::getOverload(static_cast<Derived*>(this), "write_calibration_cache");
 
     py::memoryview cache{py::memoryview::from_buffer(static_cast<const uint8_t*>(ptr), {length}, {sizeof(uint8_t)})};
     pyWriteCalibrationCache(cache);
@@ -169,7 +169,7 @@ void log(core::util::logging::LogLevel lvl, const std::string& msg) {
 PYBIND11_MODULE(_C, m) {
   py::class_<Input>(m, "Input")
       .def(py::init<>())
-      .def("__str__", &trtorch::pyapi::Input::to_str)
+      .def("__str__", &torch_tensorrt::pyapi::Input::to_str)
       .def_readwrite("min", &Input::min)
       .def_readwrite("opt", &Input::opt)
       .def_readwrite("max", &Input::max)
@@ -254,7 +254,7 @@ PYBIND11_MODULE(_C, m) {
 
   py::class_<Device>(m, "Device")
       .def(py::init<>())
-      .def("__str__", &trtorch::pyapi::Device::to_str)
+      .def("__str__", &torch_tensorrt::pyapi::Device::to_str)
       .def_readwrite("device_type", &Device::device_type)
       .def_readwrite("gpu_id", &Device::gpu_id)
       .def_readwrite("dla_core", &Device::dla_core)
@@ -274,8 +274,8 @@ PYBIND11_MODULE(_C, m) {
   m.def("_get_is_colored_output_on", &logging::get_is_colored_output_on, "Get if the logging output will be colored");
   m.def("_set_is_colored_output_on", &logging::set_is_colored_output_on, "Set if the logging output should be colored");
   m.def("_log", &logging::log, "Add a message to the logger");
-  m.def("set_device", &trtorch::pyapi::set_device, "Set CUDA device id");
-  m.def("_get_current_device", &trtorch::pyapi::get_current_device, "Get the current active CUDA device");
+  m.def("set_device", &torch_tensorrt::pyapi::set_device, "Set CUDA device id");
+  m.def("_get_current_device", &torch_tensorrt::pyapi::get_current_device, "Get the current active CUDA device");
 
   py::enum_<core::util::logging::LogLevel>(m, "LogLevel", py::arithmetic())
       .value("INTERNAL_ERROR", core::util::logging::LogLevel::kINTERNAL_ERROR)
@@ -289,7 +289,7 @@ PYBIND11_MODULE(_C, m) {
   py::module ts_sub_mod = m.def_submodule("ts");
   py::class_<CompileSpec>(ts_sub_mod, "CompileSpec")
       .def(py::init<>())
-      .def("__str__", &trtorch::pyapi::CompileSpec::stringify)
+      .def("__str__", &torch_tensorrt::pyapi::CompileSpec::stringify)
       .def("_get_calibrator_handle", &CompileSpec::getPTQCalibratorHandle, "[Internal] gets a handle from a calibrator")
       .def_readwrite("inputs", &CompileSpec::inputs)
       .def_readwrite("enabled_precisions", &CompileSpec::enabled_precisions)
@@ -310,7 +310,7 @@ PYBIND11_MODULE(_C, m) {
 
   py::class_<TorchFallback>(ts_sub_mod, "TorchFallback")
       .def(py::init<>())
-      .def("__str__", &trtorch::pyapi::TorchFallback::to_str)
+      .def("__str__", &torch_tensorrt::pyapi::TorchFallback::to_str)
       .def_readwrite("enabled", &TorchFallback::enabled)
       .def_readwrite("min_block_size", &TorchFallback::min_block_size)
       .def_readwrite("forced_fallback_operators", &TorchFallback::forced_fallback_operators)
@@ -318,19 +318,19 @@ PYBIND11_MODULE(_C, m) {
 
   ts_sub_mod.def(
       "compile_graph",
-      &trtorch::pyapi::CompileGraph,
+      &torch_tensorrt::pyapi::CompileGraph,
       "Ingest a PyTorch JIT module and convert supported subgraphs to TensorRT engines, returns a JIT module with the engines embedded");
   ts_sub_mod.def(
       "convert_graph_to_trt_engine",
-      &trtorch::pyapi::ConvertGraphToTRTEngine,
+      &torch_tensorrt::pyapi::ConvertGraphToTRTEngine,
       "Given a PyTorch JIT Module, convert forward into a TensorRT engine and return a serialized engine");
   ts_sub_mod.def(
       "check_method_op_support",
-      &trtorch::pyapi::CheckMethodOperatorSupport,
+      &torch_tensorrt::pyapi::CheckMethodOperatorSupport,
       "Takes a module and a method name and checks if the method graph contains purely convertable operators");
   ts_sub_mod.def(
       "embed_engine_in_new_module",
-      &trtorch::pyapi::EmbedEngineInNewModule,
+      &torch_tensorrt::pyapi::EmbedEngineInNewModule,
       "Takes a serialized TensorRT engine and compile spec. Wraps it in the forward method of a new TorchScript module");
 
   ts_sub_mod.doc() =
@@ -338,4 +338,4 @@ PYBIND11_MODULE(_C, m) {
 }
 
 } // namespace pyapi
-} // namespace trtorch
+} // namespace torch_tensorrt
