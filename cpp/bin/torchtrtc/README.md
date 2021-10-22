@@ -8,7 +8,7 @@ output two formats, either a TorchScript program with the TensorRT engine embedd
 the TensorRT engine itself as a PLAN file.
 
 All that is required to run the program after compilation is for C++ linking against libtorchtrt.so
-or in Python importing the trtorch package. All other aspects of using compiled modules are identical
+or in Python importing the torch_tensorrt package. All other aspects of using compiled modules are identical
 to standard TorchScript. Load with `torch.jit.load()` and run like you would run any other module.
 
 

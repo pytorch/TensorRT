@@ -31,10 +31,10 @@ auto interpolate_plugin = creator->createPlugin(name, &fc); // fc is the collect
 If you'd like to compile your plugin with Torch-TensorRT,
 
 - Add your implementation to the `impl` directory
-- Add a call `REGISTER_TRTORCH_PLUGINS(MyPluginCreator)`  to `register_plugins.cpp`. `MyPluginCreator` is the plugin creator class which creates your plugin. By adding this to `register_plugins.cpp`, your plugin will be initialized and accessible (added to TensorRT plugin registry) during the `libtorchtrt_plugins.so` library loading.
+- Add a call `REGISTER_TORCHTRT_PLUGIN(MyPluginCreator)`  to `register_plugins.cpp`. `MyPluginCreator` is the plugin creator class which creates your plugin. By adding this to `register_plugins.cpp`, your plugin will be initialized and accessible (added to TensorRT plugin registry) during the `libtorchtrt_plugins.so` library loading.
 - Update the `BUILD` file with the your plugin files and dependencies.
 - Implement a converter op which makes use of your plugin.
 
 Once you've completed the above steps, upon successful compilation of Torch-TensorRT library, your plugin should be available in  `libtorchtrt_plugins.so`.
 
-A sample runtime application on how to run a network with plugins can be found <a href="https://github.com/NVIDIA/Torch-TensorRT/tree/master/examples/trtorchrt_example" >here</a>
+A sample runtime application on how to run a network with plugins can be found <a href="https://github.com/NVIDIA/Torch-TensorRT/tree/master/examples/torchtrt_runtime_example" >here</a>

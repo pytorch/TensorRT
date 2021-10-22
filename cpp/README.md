@@ -18,5 +18,5 @@ bazel build //cpp/lib:libtorchtrt.so -c opt
 ## Usage
 
 ``` c++
-#include "trtorch/trtorch.h"
+#include "torch_tensorrt/torch_tensorrt.h"
 ```
