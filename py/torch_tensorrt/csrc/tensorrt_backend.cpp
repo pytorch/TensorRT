@@ -12,6 +12,7 @@ namespace backend {
 
 c10::impl::GenericDict TensorRTBackend::compile(c10::IValue mod_val, c10::impl::GenericDict method_compile_spec) {
   auto mod = mod_val.toModule();
+
   auto spec = c10::impl::toTypedDict<std::string, at::IValue>(method_compile_spec);
 
   auto handles = c10::impl::GenericDict(
@@ -22,17 +23,12 @@ c10::impl::GenericDict TensorRTBackend::compile(c10::IValue mod_val, c10::impl::
     const auto& method_name = it->key();
     auto raw_spec = it->value().toCustomClass<trtorch::pyapi::CompileSpec>();
     LOG_DEBUG(raw_spec->stringify());
+
     auto cfg = raw_spec->toInternalCompileSpec();
-    auto graph_and_ivals = core::lowering::Lower(mod_, method_name, cfg.lower_info);
-
-    auto g = graph_and_ivals.first;
-    auto params = graph_and_ivals.second;
-    auto named_params = core::ir::get_static_params(g->inputs(), params);
-
     auto convert_cfg = std::move(cfg.convert_info);
     auto device_spec = convert_cfg.engine_settings.device;
     auto device = core::runtime::CudaDevice(device_spec.gpu_id, device_spec.device_type);
-    auto serialized_engine = core::conversion::ConvertBlockToEngine(g->block(), convert_cfg, named_params);
+    auto serialized_engine = core::ConvertGraphToTRTEngine(mod_, method_name, cfg);
     auto engine_handle = c10::make_intrusive<core::runtime::TRTEngine>(it->key(), serialized_engine, device);
     handles.insert(method_name, at::IValue(engine_handle));
   }

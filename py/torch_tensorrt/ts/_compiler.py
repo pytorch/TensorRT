@@ -41,39 +41,39 @@ def compile(module: torch.jit.ScriptModule,
             ``torch.nn.Module``
 
     Keyword Arguments:
-        inputs (List[Union(trtorch.Input, torch.Tensor)]): **Required** List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
-            torch datatypes or trtorch datatypes and you can use either torch devices or the trtorch device type enum
+        inputs (List[Union(torch_tensorrt.Input, torch.Tensor)]): **Required** List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
+            torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum
             to select device type. ::
 
                 input=[
-                    trtorch.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
-                    trtorch.Input(
+                    torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
+                    torch_tensorrt.Input(
                         min_shape=(1, 224, 224, 3),
                         opt_shape=(1, 512, 512, 3),
                         max_shape=(1, 1024, 1024, 3),
                         dtype=torch.int32
                         format=torch.channel_last
                     ), # Dynamic input shape for input #2
-                    torch.randn((1, 3, 224, 244)) # Use an example tensor and let trtorch infer settings
+                    torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
                 ]
 
-        device (Union(trtorch.Device, torch.device, dict)): Target device for TensorRT engines to run on ::
+        device (Union(torch_tensorrt.Device, torch.device, dict)): Target device for TensorRT engines to run on ::
 
-            device=trtorch.Device("dla:1", allow_gpu_fallback=True)
+            device=torch_tensorrt.Device("dla:1", allow_gpu_fallback=True)
 
         disable_tf32 (bool): Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
         sparse_weights (bool): Enable sparsity for convolution and fully connected layers.
-        enabled_precision (Set(Union(torch.dtype, trtorch.dtype))): The set of datatypes that TensorRT can use when selecting kernels
+        enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
         refit (bool): Enable refitting
         debug (bool): Enable debuggable engine
         strict_types (bool): Kernels should strictly run in a particular operating precision. Enabled precision should only have one type in the set
-        capability (trtorch.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
+        capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
         num_min_timing_iters (int): Number of minimization timing iterations used to select kernels
         num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
         workspace_size (int): Maximum size of workspace given to TensorRT
         max_batch_size (int): Maximum batch size (must be >= 1 to be set, 0 means not set)
         truncate_long_and_double (bool): Truncate weights provided in int64 or double (float64) to int32 and float32
-        calibrator (Union(trtorch._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
+        calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
         require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch
         min_block_size (int): The minimum number of contiguous TensorRT convertable operations in order to run a set of operations in TensorRT
         torch_executed_ops (List[str]): List of aten operators that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True
@@ -148,39 +148,39 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule,
         method_name (str): Name of method to convert
 
     Keyword Args:
-        inputs (List[Union(trtorch.Input, torch.Tensor)]): **Required** List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
-            torch datatypes or trtorch datatypes and you can use either torch devices or the trtorch device type enum
+        inputs (List[Union(torch_tensorrt.Input, torch.Tensor)]): **Required** List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
+            torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum
             to select device type. ::
 
                 input=[
-                    trtorch.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
-                    trtorch.Input(
+                    torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
+                    torch_tensorrt.Input(
                         min_shape=(1, 224, 224, 3),
                         opt_shape=(1, 512, 512, 3),
                         max_shape=(1, 1024, 1024, 3),
                         dtype=torch.int32
                         format=torch.channel_last
                     ), # Dynamic input shape for input #2
-                    torch.randn((1, 3, 224, 244)) # Use an example tensor and let trtorch infer settings
+                    torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
                 ]
 
-        device (Union(trtorch.Device, torch.device, dict)): Target device for TensorRT engines to run on ::
+        device (Union(torch_tensorrt.Device, torch.device, dict)): Target device for TensorRT engines to run on ::
 
-            device=trtorch.Device("dla:1", allow_gpu_fallback=True)
+            device=torch_tensorrt.Device("dla:1", allow_gpu_fallback=True)
 
         disable_tf32 (bool): Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
         sparse_weights (bool): Enable sparsity for convolution and fully connected layers.
-        enabled_precision (Set(Union(torch.dtype, trtorch.dtype))): The set of datatypes that TensorRT can use when selecting kernels
+        enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
         refit (bool): Enable refitting
         debug (bool): Enable debuggable engine
         strict_types (bool): Kernels should strictly run in a particular operating precision. Enabled precision should only have one type in the set
-        capability (trtorch.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
+        capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
         num_min_timing_iters (int): Number of minimization timing iterations used to select kernels
         num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
         workspace_size (int): Maximum size of workspace given to TensorRT
         max_batch_size (int): Maximum batch size (must be >= 1 to be set, 0 means not set)
         truncate_long_and_double (bool): Truncate weights provided in int64 or double (float64) to int32 and float32
-        calibrator (Union(trtorch._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
+        calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
 
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
@@ -219,13 +219,13 @@ def embed_engine_in_new_module(serialized_engine: bytes, device=Device._current_
 
         forward(Tensor[]) -> Tensor[]
 
-    Module can be save with engine embedded with torch.jit.save and moved / loaded according to TRTorch portability rules
+    Module can be save with engine embedded with torch.jit.save and moved / loaded according to torch_tensorrt portability rules
 
     Arguments:
-        serialized_engine (bytes): Serialized TensorRT engine from either TRTorch or TensorRT APIs
+        serialized_engine (bytes): Serialized TensorRT engine from either torch_tensorrt or TensorRT APIs
 
     Keyword Arguments:
-        device (Union(trtorch.Device, torch.device, dict)): Target device to run engine on. Must be compatible with engine provided. Default: Current active device
+        device (Union(torch_tensorrt.Device, torch.device, dict)): Target device to run engine on. Must be compatible with engine provided. Default: Current active device
 
     Returns:
         torch.jit.ScriptModule: New TorchScript module with engine embedded
@@ -235,9 +235,9 @@ def embed_engine_in_new_module(serialized_engine: bytes, device=Device._current_
 
 
 def check_method_op_support(module: torch.jit.ScriptModule, method_name: str) -> bool:
-    """Checks to see if a method is fully supported by TRTorch
+    """Checks to see if a method is fully supported by torch_tensorrt
 
-    Checks if a method of a TorchScript module can be compiled by TRTorch, if not, a list of operators
+    Checks if a method of a TorchScript module can be compiled by torch_tensorrt, if not, a list of operators
     that are not supported are printed out and the function returns false, else true.
 
     Arguments:

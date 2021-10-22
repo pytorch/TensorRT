@@ -24,7 +24,7 @@ InputSpecMap pair_input_vals_with_specs(std::vector<const torch::jit::Value*> va
     LOG_DEBUG("Paring " << i << ": " << vals[i]->debugName() << " : " << specs[i]);
     a.insert({vals[i], specs[i]});
   }
-  return std::move(a);
+  return a;
 }
 
 std::vector<const torch::jit::Value*> get_tensor_inputs(

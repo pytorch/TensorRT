@@ -12,19 +12,19 @@ class Device(object):
     Defines a device that can be used to specify target devices for engines
 
     Attributes:
-        device_type (trtorch.DeviceType): Target device type (GPU or DLA). Set implicitly based on if dla_core is specified.
+        device_type (torch_tensorrt.DeviceType): Target device type (GPU or DLA). Set implicitly based on if dla_core is specified.
         gpu_id (int): Device ID for target GPU
         dla_core (int): Core ID for target DLA core
         allow_gpu_fallback (bool): Whether falling back to GPU if DLA cannot support an op should be allowed
     """
 
-    device_type = None  #: (trtorch.DeviceType): Target device type (GPU or DLA). Set implicitly based on if dla_core is specified.
+    device_type = None  #: (torch_tensorrt.DeviceType): Target device type (GPU or DLA). Set implicitly based on if dla_core is specified.
     gpu_id = -1  #: (int) Device ID for target GPU
     dla_core = -1  #: (int) Core ID for target DLA core
     allow_gpu_fallback = False  #: (bool) Whether falling back to GPU if DLA cannot support an op should be allowed
 
     def __init__(self, *args, **kwargs):
-        """ __init__ Method for trtorch.Device
+        """ __init__ Method for torch_tensorrt.Device
 
         Device accepts one of a few construction patterns
 

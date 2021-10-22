@@ -133,7 +133,7 @@ std::vector<SegmentedBlock> segmentBlocksWithNonTensorInputs(SegmentedBlock& seg
     }
   }
 
-  return std::move(new_seg_blocks);
+  return new_seg_blocks;
 }
 
 void resolveNonTensorInputs(PartitionedGraph& segmented_blocks) { // , std::shared_ptr<torch::jit::Graph> g
@@ -385,7 +385,7 @@ PartitionedGraph segment_graph(torch::jit::Block* block, const PartitionInfo& pa
     finalize_block(segmented_blocks, SegmentedBlock::kTorch, in_prog_pyt_blk_nodes);
   }
 
-  return std::move(segmented_blocks);
+  return segmented_blocks;
 }
 
 PartitionedGraph Partition(

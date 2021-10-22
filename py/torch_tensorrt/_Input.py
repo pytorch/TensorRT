@@ -12,7 +12,7 @@ class Input(object):
     Defines an input to a module in terms of expected shape, data type and tensor format.
 
     Attributes:
-        shape_mode (trtorch.Input._ShapeMode): Is input statically or dynamically shaped
+        shape_mode (torch_tensorrt.Input._ShapeMode): Is input statically or dynamically shaped
         shape (Tuple or Dict): Either a single Tuple or a dict of tuples defining the input shape.
             Static shaped inputs will have a single tuple. Dynamic inputs will have a dict of the form
             ``{
@@ -20,22 +20,22 @@ class Input(object):
                 "opt_shape": Tuple,
                 "max_shape": Tuple
             }``
-        dtype (trtorch.dtype): The expected data type of the input tensor (default: trtorch.dtype.float32)
-        format (trtorch.TensorFormat): The expected format of the input tensor (default: trtorch.TensorFormat.NCHW)
+        dtype (torch_tensorrt.dtype): The expected data type of the input tensor (default: torch_tensorrt.dtype.float32)
+        format (torch_tensorrt.TensorFormat): The expected format of the input tensor (default: torch_tensorrt.TensorFormat.NCHW)
     """
 
     class _ShapeMode(Enum):
         STATIC = 0
         DYNAMIC = 1
 
-    shape_mode = None  #: (trtorch.Input._ShapeMode): Is input statically or dynamically shaped
+    shape_mode = None  #: (torch_tensorrt.Input._ShapeMode): Is input statically or dynamically shaped
     shape = None  #: (Tuple or Dict): Either a single Tuple or a dict of tuples defining the input shape. Static shaped inputs will have a single tuple. Dynamic inputs will have a dict of the form ``{ "min_shape": Tuple, "opt_shape": Tuple, "max_shape": Tuple }``
-    dtype = _enums.dtype.unknown  #: The expected data type of the input tensor (default: trtorch.dtype.float32)
+    dtype = _enums.dtype.unknown  #: The expected data type of the input tensor (default: torch_tensorrt.dtype.float32)
     _explicit_set_dtype = False
-    format = _enums.TensorFormat.contiguous  #: The expected format of the input tensor (default: trtorch.TensorFormat.NCHW)
+    format = _enums.TensorFormat.contiguous  #: The expected format of the input tensor (default: torch_tensorrt.TensorFormat.NCHW)
 
     def __init__(self, *args, **kwargs):
-        """ __init__ Method for trtorch.Input
+        """ __init__ Method for torch_tensorrt.Input
 
         Input accepts one of a few construction patterns
 
@@ -50,13 +50,13 @@ class Input(object):
                 Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implictly this sets Input's shape_mode to DYNAMIC
             max_shape (Tuple or List, optional): Max size of input tensor's shape range
                 Note: All three of min_shape, opt_shape, max_shape must be provided, there must be no positional arguments, shape must not be defined and implictly this sets Input's shape_mode to DYNAMIC
-            dtype (torch.dtype or trtorch.dtype): Expected data type for input tensor (default: trtorch.dtype.float32)
-            format (torch.memory_format or trtorch.TensorFormat): The expected format of the input tensor (default: trtorch.TensorFormat.NCHW)
+            dtype (torch.dtype or torch_tensorrt.dtype): Expected data type for input tensor (default: torch_tensorrt.dtype.float32)
+            format (torch.memory_format or torch_tensorrt.TensorFormat): The expected format of the input tensor (default: torch_tensorrt.TensorFormat.NCHW)
 
         Examples:
             - Input([1,3,32,32], dtype=torch.float32, format=torch.channel_last)
-            - Input(shape=(1,3,32,32), dtype=trtorch.dtype.int32, format=trtorch.TensorFormat.NCHW)
-            - Input(min_shape=(1,3,32,32), opt_shape=[2,3,32,32], max_shape=(3,3,32,32)) #Implicitly dtype=trtorch.dtype.float32, format=trtorch.TensorFormat.NCHW
+            - Input(shape=(1,3,32,32), dtype=torch_tensorrt.dtype.int32, format=torch_tensorrt.TensorFormat.NCHW)
+            - Input(min_shape=(1,3,32,32), opt_shape=[2,3,32,32], max_shape=(3,3,32,32)) #Implicitly dtype=torch_tensorrt.dtype.float32, format=torch_tensorrt.TensorFormat.NCHW
         """
         if len(args) == 1:
             if not Input._supported_input_size_type(args[0]):
@@ -204,7 +204,7 @@ class Input(object):
             return dtype
 
         else:
-            raise TypeError("Input data type needs to be specified with a torch.dtype or a trtorch.dtype, got: " +
+            raise TypeError("Input data type needs to be specified with a torch.dtype or a torch_tensorrt.dtype, got: " +
                             str(type(dtype)))
 
     @staticmethod
@@ -223,7 +223,7 @@ class Input(object):
 
         else:
             raise TypeError(
-                "Tensor format needs to be specified with either torch.memory_format or trtorch.TensorFormat")
+                "Tensor format needs to be specified with either torch.memory_format or torch_tensorrt.TensorFormat")
 
     @classmethod
     def _from_tensor(cls, t: torch.Tensor):

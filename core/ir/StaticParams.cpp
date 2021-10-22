@@ -20,7 +20,7 @@ StaticParams get_static_params(c10::ArrayRef<torch::jit::Value*> inputs, std::ve
   TRTORCH_CHECK(
       static_params.size() == params.size(),
       "Graph parameter parsing failed, mismatched number of static parameters and IValues")
-  return std::move(static_params);
+  return static_params;
 }
 
 } // namespace ir
