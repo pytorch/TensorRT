@@ -1,8 +1,13 @@
 #!/bin/bash
 
-mkdir -p dist && cd py \
-    && MAX_JOBS=1 LANG=en_US.UTF-8 LANGUAGE=en_US:en LC_ALL=en_US.UTF-8 python3 setup.py bdist_wheel --use-cxx11-abi \
-    && cp -r dist/* ../dist/
+TOP_DIR=$(cd $(dirname $0); pwd)/..
+
+cd ${TOP_DIR} \
+    && mkdir -p dist && cd py \
+    && MAX_JOBS=1 LANG=en_US.UTF-8 LANGUAGE=en_US:en LC_ALL=en_US.UTF-8 \
+	       python3 setup.py bdist_wheel --use-cxx11-abi $* || exit 1
+								
+cd ${TOP_DIR} && cp -r dist/* ../dist/
 
 pip3 install ipywidgets --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host=files.pythonhosted.org
 jupyter nbextension enable --py widgetsnbextension

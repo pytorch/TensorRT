@@ -65,7 +65,7 @@ Python API Documenation
    :hidden:
 
    py_api/torch_tensorrt
-   py_api/torch_tensorrt_ts
+   py_api/ts
    py_api/logging
 
 C++ API Documenation
