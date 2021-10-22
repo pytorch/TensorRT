@@ -14,7 +14,7 @@ git clone https://github.com/NVIDIA/Torch-TensorRT
 Next, build the NVIDIA Torch-TensorRT container (from repo root):
 
 ```
-docker build -t torch_tensorrt -f ./docker/Dockerfile.21.06 .
+docker build -t torch_tensorrt -f ./docker/Dockerfile .
 ```
 
 Then launch the container with:
