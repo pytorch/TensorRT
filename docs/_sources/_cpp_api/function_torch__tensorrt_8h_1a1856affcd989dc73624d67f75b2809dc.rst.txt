@@ -1,0 +1,13 @@
+.. _exhale_function_torch__tensorrt_8h_1a1856affcd989dc73624d67f75b2809dc:
+
+Function torch_tensorrt::torchscript::CompileModule
+===================================================
+
+- Defined in :ref:`file_cpp_include_torch_tensorrt_torch_tensorrt.h`
+
+
+Function Documentation
+----------------------
+
+
+.. doxygenfunction:: torch_tensorrt::torchscript::CompileModule(const torch::jit::Module&, CompileSpec)

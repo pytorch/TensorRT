@@ -3,7 +3,6 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -37,7 +36,7 @@
   <script src="../_static/javascripts/modernizr.js">
   </script>
   <title>
-   Deploying Quantization Aware Trained models in INT8 using TRTorch — TRTorch master documentation
+   Deploying Quantization Aware Trained models in INT8 using TRTorch — Torch-TensorRT master documentation
   </title>
   <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/pygments.css" rel="stylesheet" type="text/css"/>
@@ -65,7 +64,7 @@
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
-  <link href="../py_api/trtorch.html" rel="next" title="trtorch"/>
+  <link href="../py_api/torch_tensorrt.html" rel="next" title="torch_tensorrt"/>
   <link href="ssd-object-detection-demo.html" rel="prev" title="Object Detection with TRTorch (SSD)"/>
  </head>
  <body data-md-color-accent="light-green" data-md-color-primary="light-green" dir="ltr">
@@ -88,7 +87,7 @@
    <nav class="md-header-nav md-grid">
     <div class="md-flex navheader">
      <div class="md-flex__cell md-flex__cell--shrink">
-      <a class="md-header-nav__button md-logo" href="../index.html" title="TRTorch master documentation">
+      <a class="md-header-nav__button md-logo" href="../index.html" title="Torch-TensorRT master documentation">
        <i class="md-icon">
         
        </i>
@@ -101,7 +100,7 @@
      <div class="md-flex__cell md-flex__cell--stretch">
       <div class="md-flex__ellipsis md-header-nav__title" data-md-component="title">
        <span class="md-header-nav__topic">
-        TRTorch
+        Torch-TensorRT
        </span>
        <span class="md-header-nav__topic">
         Deploying Quantization Aware Trained models in INT8 using TRTorch
@@ -139,7 +138,7 @@
      </div>
      <div class="md-flex__cell md-flex__cell--shrink">
       <div class="md-header-nav__source">
-       <a class="md-source" data-md-source="github" href="https://github.com/nvidia/TRTorch/" title="Go to repository">
+       <a class="md-source" data-md-source="github" href="https://github.com/nvidia/Torch-TensorRT/" title="Go to repository">
         <div class="md-source__icon">
          <svg height="28" viewbox="0 0 24 24" width="28" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
           <use height="24" width="24" xlink:href="#__github">
@@ -147,7 +146,7 @@
          </svg>
         </div>
         <div class="md-source__repository">
-         TRTorch
+         Torch-TensorRT
         </div>
        </a>
       </div>
@@ -157,31 +156,31 @@
        Versions
       </button>
       <div class="dropdown-content md-hero">
-       <a href="https://nvidia.github.io/TRTorch/" title="master">
+       <a href="https://nvidia.github.io/Torch-TensorRT/" title="master">
         master
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.4.1/" title="v0.4.1">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.4.1/" title="v0.4.1">
         v0.4.1
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.4.0/" title="v0.4.0">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.4.0/" title="v0.4.0">
         v0.4.0
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.3.0/" title="v0.3.0">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.3.0/" title="v0.3.0">
         v0.3.0
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.2.0/" title="v0.2.0">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.2.0/" title="v0.2.0">
         v0.2.0
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.1.0/" title="v0.1.0">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.1.0/" title="v0.1.0">
         v0.1.0
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.0.3/" title="v0.0.3">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.0.3/" title="v0.0.3">
         v0.0.3
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.0.2/" title="v0.0.2">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.0.2/" title="v0.0.2">
         v0.0.2
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.0.1/" title="v0.0.1">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.0.1/" title="v0.0.1">
         v0.0.1
        </a>
       </div>
@@ -195,7 +194,7 @@
      <ul class="md-tabs__list">
       <li class="md-tabs__item">
        <a class="md-tabs__link" href="../index.html">
-        TRTorch master documentation
+        Torch-TensorRT master documentation
        </a>
       </li>
      </ul>
@@ -208,17 +207,17 @@
        <div class="md-sidebar__inner">
         <nav class="md-nav md-nav--primary" data-md-level="0">
          <label class="md-nav__title md-nav__title--site" for="__drawer">
-          <a class="md-nav__button md-logo" href="../index.html" title="TRTorch master documentation">
+          <a class="md-nav__button md-logo" href="../index.html" title="Torch-TensorRT master documentation">
            <i class="md-icon">
             
            </i>
           </a>
-          <a href="../index.html" title="TRTorch master documentation">
-           TRTorch
+          <a href="../index.html" title="Torch-TensorRT master documentation">
+           Torch-TensorRT
           </a>
          </label>
          <div class="md-nav__source">
-          <a class="md-source" data-md-source="github" href="https://github.com/nvidia/TRTorch/" title="Go to repository">
+          <a class="md-source" data-md-source="github" href="https://github.com/nvidia/Torch-TensorRT/" title="Go to repository">
            <div class="md-source__icon">
             <svg height="28" viewbox="0 0 24 24" width="28" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
              <use height="24" width="24" xlink:href="#__github">
@@ -226,7 +225,7 @@
             </svg>
            </div>
            <div class="md-source__repository">
-            TRTorch
+            Torch-TensorRT
            </div>
           </a>
          </div>
@@ -244,8 +243,28 @@
            </a>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="../tutorials/getting_started.html">
-            Getting Started
+           <a class="md-nav__link" href="../tutorials/getting_started_with_cpp_api.html">
+            Getting Started with C++
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/getting_started_with_python_api.html">
+            Using Torch-TensorRT in Python
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/creating_torchscript_module_in_python.html">
+            Creating a TorchScript Module
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/creating_torchscript_module_in_python.html#working-with-torchscript-in-python">
+            Working with TorchScript in Python
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">
+            Saving TorchScript Module to Disk
            </a>
           </li>
           <li class="md-nav__item">
@@ -254,18 +273,18 @@
            </a>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="../tutorials/trtorchc.html">
-            trtorchc
+           <a class="md-nav__link" href="../tutorials/torchtrtc.html">
+            torchtrtc
            </a>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../tutorials/use_from_pytorch.html">
-            Using TRTorch Directly From PyTorch
+            Using Torch-TensorRT Directly From PyTorch
            </a>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../tutorials/runtime.html">
-            Deploying TRTorch Programs
+            Deploying Torch-TensorRT Programs
            </a>
           </li>
           <li class="md-nav__item">
@@ -333,25 +352,18 @@
            </span>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/trtorch.html">
-            trtorch
+           <a class="md-nav__link" href="../py_api/torch_tensorrt.html">
+            torch_tensorrt
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/ts.html">
+            torch_tensorrt.ts
            </a>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../py_api/logging.html">
-            trtorch.logging
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <span class="md-nav__link caption">
-            <span class="caption-text">
-             C++ API Documenation
-            </span>
-           </span>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html">
-            TRTorch C++ API
+            torch_tensorrt.logging
            </a>
           </li>
           <li class="md-nav__item">
@@ -373,7 +385,7 @@
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../contributors/useful_links.html">
-            Useful Links for TRTorch Development
+            Useful Links for Torch-TensorRT Development
            </a>
           </li>
           <li class="md-nav__item">
@@ -676,390 +688,388 @@ div.rendered_html tbody tr:hover {
   background: rgba(66, 165, 245, 0.2);
 }
        </style>
-       <section id="Deploying-Quantization-Aware-Trained-models-in-INT8-using-TRTorch">
-        <h1 id="notebooks-vgg-qat--page-root">
-         Deploying Quantization Aware Trained models in INT8 using TRTorch
-         <a class="headerlink" href="#notebooks-vgg-qat--page-root" title="Permalink to this headline">
-          ¶
-         </a>
-        </h1>
-        <section id="Overview">
-         <h2 id="Overview">
-          Overview
-          <a class="headerlink" href="#Overview" title="Permalink to this headline">
-           ¶
+       <h1 id="notebooks-vgg-qat--page-root">
+        Deploying Quantization Aware Trained models in INT8 using TRTorch
+        <a class="headerlink" href="#notebooks-vgg-qat--page-root" title="Permalink to this headline">
+         ¶
+        </a>
+       </h1>
+       <h2 id="Overview">
+        Overview
+        <a class="headerlink" href="#Overview" title="Permalink to this headline">
+         ¶
+        </a>
+       </h2>
+       <p>
+        Quantization Aware training (QAT) simulates quantization during training by quantizing weights and activation layers. This will help to reduce the loss in accuracy when we convert the network trained in FP32 to INT8 for faster inference. QAT introduces additional nodes in the graph which will be used to learn the dynamic ranges of weights and activation layers. In this notebook, we illustrate the following steps from training to inference of a QAT model in TRTorch.
+       </p>
+       <ol class="arabic simple">
+        <li>
+         <p>
+          <a class="reference external" href="#1">
+           Requirements
           </a>
-         </h2>
-         <p>
-          Quantization Aware training (QAT) simulates quantization during training by quantizing weights and activation layers. This will help to reduce the loss in accuracy when we convert the network trained in FP32 to INT8 for faster inference. QAT introduces additional nodes in the graph which will be used to learn the dynamic ranges of weights and activation layers. In this notebook, we illustrate the following steps from training to inference of a QAT model in TRTorch.
          </p>
-         <ol class="arabic simple">
-          <li>
-           <p>
-            <a class="reference external" href="#1">
-             Requirements
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference external" href="#2">
-             VGG16 Overview
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference external" href="#3">
-             Training a baseline VGG16 model
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference external" href="#4">
-             Apply Quantization
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference external" href="#5">
-             Model calibration
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference external" href="#6">
-             Quantization Aware training
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference external" href="#7">
-             Export to Torchscript
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference external" href="#8">
-             Inference using TRTorch
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference external" href="#8">
-             References
-            </a>
-           </p>
-          </li>
-         </ol>
+        </li>
+        <li>
          <p>
-          ## 1. Requirements Please install the required dependencies and import these libraries accordingly
+          <a class="reference external" href="#2">
+           VGG16 Overview
+          </a>
          </p>
-         <div class="nbinput docutils container">
-          <div class="prompt highlight-none notranslate">
-           <div class="highlight">
-            <pre><span></span>[2]:
+        </li>
+        <li>
+         <p>
+          <a class="reference external" href="#3">
+           Training a baseline VGG16 model
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference external" href="#4">
+           Apply Quantization
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference external" href="#5">
+           Model calibration
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference external" href="#6">
+           Quantization Aware training
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference external" href="#7">
+           Export to Torchscript
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference external" href="#8">
+           Inference using TRTorch
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference external" href="#8">
+           References
+          </a>
+         </p>
+        </li>
+       </ol>
+       <p>
+        ## 1. Requirements Please install the required dependencies and import these libraries accordingly
+       </p>
+       <div class="nbinput docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[2]:
 </pre>
-           </div>
-          </div>
-          <div class="input_area highlight-ipython3 notranslate">
-           <div class="highlight">
-            <pre>
-<span></span>import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
-import torch.utils.data as data
-import torchvision.transforms as transforms
-import torchvision.datasets as datasets
-import trtorch
-
-from torch.utils.tensorboard import SummaryWriter
-
-from pytorch_quantization import nn as quant_nn
-from pytorch_quantization import quant_modules
-from pytorch_quantization.tensor_quant import QuantDescriptor
-from pytorch_quantization import calib
-from tqdm import tqdm
-
-import os
-import sys
-sys.path.insert(0, "../examples/int8/training/vgg16")
-from vgg16 import vgg16
-
-</pre>
-           </div>
-          </div>
          </div>
-         <div class="nboutput nblast docutils container">
-          <div class="prompt empty docutils container">
-          </div>
-          <div class="output_area stderr docutils container">
-           <div class="highlight">
-            <pre>
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torch.nn</span> <span class="k">as</span> <span class="nn">nn</span>
+<span class="kn">import</span> <span class="nn">torch.nn.functional</span> <span class="k">as</span> <span class="nn">F</span>
+<span class="kn">import</span> <span class="nn">torch.optim</span> <span class="k">as</span> <span class="nn">optim</span>
+<span class="kn">import</span> <span class="nn">torch.utils.data</span> <span class="k">as</span> <span class="nn">data</span>
+<span class="kn">import</span> <span class="nn">torchvision.transforms</span> <span class="k">as</span> <span class="nn">transforms</span>
+<span class="kn">import</span> <span class="nn">torchvision.datasets</span> <span class="k">as</span> <span class="nn">datasets</span>
+<span class="kn">import</span> <span class="nn">trtorch</span>
+
+<span class="kn">from</span> <span class="nn">torch.utils.tensorboard</span> <span class="kn">import</span> <span class="n">SummaryWriter</span>
+
+<span class="kn">from</span> <span class="nn">pytorch_quantization</span> <span class="kn">import</span> <span class="n">nn</span> <span class="k">as</span> <span class="n">quant_nn</span>
+<span class="kn">from</span> <span class="nn">pytorch_quantization</span> <span class="kn">import</span> <span class="n">quant_modules</span>
+<span class="kn">from</span> <span class="nn">pytorch_quantization.tensor_quant</span> <span class="kn">import</span> <span class="n">QuantDescriptor</span>
+<span class="kn">from</span> <span class="nn">pytorch_quantization</span> <span class="kn">import</span> <span class="n">calib</span>
+<span class="kn">from</span> <span class="nn">tqdm</span> <span class="kn">import</span> <span class="n">tqdm</span>
+
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="s2">"../examples/int8/training/vgg16"</span><span class="p">)</span>
+<span class="kn">from</span> <span class="nn">vgg16</span> <span class="kn">import</span> <span class="n">vgg16</span>
+
+</pre>
+         </div>
+        </div>
+       </div>
+       <div class="nboutput nblast docutils container">
+        <div class="prompt empty docutils container">
+        </div>
+        <div class="output_area stderr docutils container">
+         <div class="highlight">
+          <pre>
 WARNING: Logging before flag parsing goes to stderr.
 E0831 15:09:13.151450 140586428176192 amp_wrapper.py:31] AMP is not avaialble.
 </pre>
-           </div>
-          </div>
          </div>
-         <p>
-          ## 2. VGG16 Overview ### Very Deep Convolutional Networks for Large-Scale Image Recognition VGG is one of the earliest family of image classification networks that first used small (3x3) convolution filters and achieved significant improvements on ImageNet recognition challenge. The network architecture looks as follows
-          <img alt="db485e72215749b1b3e43387176ae5e4" src="https://neurohive.io/wp-content/uploads/2018/11/vgg16-1-e1542731207177.png"/>
-         </p>
-         <p>
-          ## 3. Training a baseline VGG16 model We train VGG16 on CIFAR10 dataset. Define training and testing datasets and dataloaders. This will download the CIFAR 10 data in your
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            data
-           </span>
-          </code>
-          directory. Data preprocessing is performed using
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            torchvision
-           </span>
-          </code>
-          transforms.
-         </p>
-         <div class="nbinput docutils container">
-          <div class="prompt highlight-none notranslate">
-           <div class="highlight">
-            <pre><span></span>[3]:
+        </div>
+       </div>
+       <p>
+        ## 2. VGG16 Overview ### Very Deep Convolutional Networks for Large-Scale Image Recognition VGG is one of the earliest family of image classification networks that first used small (3x3) convolution filters and achieved significant improvements on ImageNet recognition challenge. The network architecture looks as follows
+        <img alt="909cbe36f28d429da743d41f7d3f8659" src="https://neurohive.io/wp-content/uploads/2018/11/vgg16-1-e1542731207177.png"/>
+       </p>
+       <p>
+        ## 3. Training a baseline VGG16 model We train VGG16 on CIFAR10 dataset. Define training and testing datasets and dataloaders. This will download the CIFAR 10 data in your
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          data
+         </span>
+        </code>
+        directory. Data preprocessing is performed using
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          torchvision
+         </span>
+        </code>
+        transforms.
+       </p>
+       <div class="nbinput docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[3]:
 </pre>
-           </div>
-          </div>
-          <div class="input_area highlight-ipython3 notranslate">
-           <div class="highlight">
-            <pre>
-<span></span>classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
-
-# ========== Define Training dataset and dataloaders =============#
-training_dataset = datasets.CIFAR10(root='./data',
-                                        train=True,
-                                        download=True,
-                                        transform=transforms.Compose([
-                                            transforms.RandomCrop(32, padding=4),
-                                            transforms.RandomHorizontalFlip(),
-                                            transforms.ToTensor(),
-                                            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-                                        ]))
-
-training_dataloader = torch.utils.data.DataLoader(training_dataset,
-                                                      batch_size=32,
-                                                      shuffle=True,
-                                                      num_workers=2)
-
-# ========== Define Testing dataset and dataloaders =============#
-testing_dataset = datasets.CIFAR10(root='./data',
-                                   train=False,
-                                   download=True,
-                                   transform=transforms.Compose([
-                                       transforms.ToTensor(),
-                                       transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-                                   ]))
-
-testing_dataloader = torch.utils.data.DataLoader(testing_dataset,
-                                                 batch_size=16,
-                                                 shuffle=False,
-                                                 num_workers=2)
-
-</pre>
-           </div>
-          </div>
          </div>
-         <div class="nboutput nblast docutils container">
-          <div class="prompt empty docutils container">
-          </div>
-          <div class="output_area docutils container">
-           <div class="highlight">
-            <pre>
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span><span class="n">classes</span> <span class="o">=</span> <span class="p">(</span><span class="s1">'plane'</span><span class="p">,</span> <span class="s1">'car'</span><span class="p">,</span> <span class="s1">'bird'</span><span class="p">,</span> <span class="s1">'cat'</span><span class="p">,</span> <span class="s1">'deer'</span><span class="p">,</span> <span class="s1">'dog'</span><span class="p">,</span> <span class="s1">'frog'</span><span class="p">,</span> <span class="s1">'horse'</span><span class="p">,</span> <span class="s1">'ship'</span><span class="p">,</span> <span class="s1">'truck'</span><span class="p">)</span>
+
+<span class="c1"># ========== Define Training dataset and dataloaders =============#</span>
+<span class="n">training_dataset</span> <span class="o">=</span> <span class="n">datasets</span><span class="o">.</span><span class="n">CIFAR10</span><span class="p">(</span><span class="n">root</span><span class="o">=</span><span class="s1">'./data'</span><span class="p">,</span>
+                                        <span class="n">train</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                                        <span class="n">download</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                                        <span class="n">transform</span><span class="o">=</span><span class="n">transforms</span><span class="o">.</span><span class="n">Compose</span><span class="p">([</span>
+                                            <span class="n">transforms</span><span class="o">.</span><span class="n">RandomCrop</span><span class="p">(</span><span class="mi">32</span><span class="p">,</span> <span class="n">padding</span><span class="o">=</span><span class="mi">4</span><span class="p">),</span>
+                                            <span class="n">transforms</span><span class="o">.</span><span class="n">RandomHorizontalFlip</span><span class="p">(),</span>
+                                            <span class="n">transforms</span><span class="o">.</span><span class="n">ToTensor</span><span class="p">(),</span>
+                                            <span class="n">transforms</span><span class="o">.</span><span class="n">Normalize</span><span class="p">((</span><span class="mf">0.4914</span><span class="p">,</span> <span class="mf">0.4822</span><span class="p">,</span> <span class="mf">0.4465</span><span class="p">),</span> <span class="p">(</span><span class="mf">0.2023</span><span class="p">,</span> <span class="mf">0.1994</span><span class="p">,</span> <span class="mf">0.2010</span><span class="p">)),</span>
+                                        <span class="p">]))</span>
+
+<span class="n">training_dataloader</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">(</span><span class="n">training_dataset</span><span class="p">,</span>
+                                                      <span class="n">batch_size</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span>
+                                                      <span class="n">shuffle</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                                                      <span class="n">num_workers</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+
+<span class="c1"># ========== Define Testing dataset and dataloaders =============#</span>
+<span class="n">testing_dataset</span> <span class="o">=</span> <span class="n">datasets</span><span class="o">.</span><span class="n">CIFAR10</span><span class="p">(</span><span class="n">root</span><span class="o">=</span><span class="s1">'./data'</span><span class="p">,</span>
+                                   <span class="n">train</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                                   <span class="n">download</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                                   <span class="n">transform</span><span class="o">=</span><span class="n">transforms</span><span class="o">.</span><span class="n">Compose</span><span class="p">([</span>
+                                       <span class="n">transforms</span><span class="o">.</span><span class="n">ToTensor</span><span class="p">(),</span>
+                                       <span class="n">transforms</span><span class="o">.</span><span class="n">Normalize</span><span class="p">((</span><span class="mf">0.4914</span><span class="p">,</span> <span class="mf">0.4822</span><span class="p">,</span> <span class="mf">0.4465</span><span class="p">),</span> <span class="p">(</span><span class="mf">0.2023</span><span class="p">,</span> <span class="mf">0.1994</span><span class="p">,</span> <span class="mf">0.2010</span><span class="p">)),</span>
+                                   <span class="p">]))</span>
+
+<span class="n">testing_dataloader</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">utils</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">DataLoader</span><span class="p">(</span><span class="n">testing_dataset</span><span class="p">,</span>
+                                                 <span class="n">batch_size</span><span class="o">=</span><span class="mi">16</span><span class="p">,</span>
+                                                 <span class="n">shuffle</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                                                 <span class="n">num_workers</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+
+</pre>
+         </div>
+        </div>
+       </div>
+       <div class="nboutput nblast docutils container">
+        <div class="prompt empty docutils container">
+        </div>
+        <div class="output_area docutils container">
+         <div class="highlight">
+          <pre>
 Files already downloaded and verified
 Files already downloaded and verified
 </pre>
-           </div>
-          </div>
          </div>
-         <div class="nbinput nblast docutils container">
-          <div class="prompt highlight-none notranslate">
-           <div class="highlight">
-            <pre><span></span>[4]:
+        </div>
+       </div>
+       <div class="nbinput nblast docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[4]:
 </pre>
-           </div>
-          </div>
-          <div class="input_area highlight-ipython3 notranslate">
-           <div class="highlight">
-            <pre>
-<span></span>def train(model, dataloader, crit, opt, epoch):
-#     global writer
-    model.train()
-    running_loss = 0.0
-    for batch, (data, labels) in enumerate(dataloader):
-        data, labels = data.cuda(), labels.cuda(non_blocking=True)
-        opt.zero_grad()
-        out = model(data)
-        loss = crit(out, labels)
-        loss.backward()
-        opt.step()
-
-        running_loss += loss.item()
-        if batch % 500 == 499:
-            print("Batch: [%5d | %5d] loss: %.3f" % (batch + 1, len(dataloader), running_loss / 100))
-            running_loss = 0.0
-
-def test(model, dataloader, crit, epoch):
-    global writer
-    global classes
-    total = 0
-    correct = 0
-    loss = 0.0
-    class_probs = []
-    class_preds = []
-    model.eval()
-    with torch.no_grad():
-        for data, labels in dataloader:
-            data, labels = data.cuda(), labels.cuda(non_blocking=True)
-            out = model(data)
-            loss += crit(out, labels)
-            preds = torch.max(out, 1)[1]
-            class_probs.append([F.softmax(i, dim=0) for i in out])
-            class_preds.append(preds)
-            total += labels.size(0)
-            correct += (preds == labels).sum().item()
-
-    test_probs = torch.cat([torch.stack(batch) for batch in class_probs])
-    test_preds = torch.cat(class_preds)
-
-    return loss / total, correct / total
-
-def save_checkpoint(state, ckpt_path="checkpoint.pth"):
-    torch.save(state, ckpt_path)
-    print("Checkpoint saved")
-</pre>
-           </div>
-          </div>
          </div>
-         <p>
-          <em>
-           Define the VGG model that we are going to perfom QAT on.
-          </em>
-         </p>
-         <div class="nbinput nblast docutils container">
-          <div class="prompt highlight-none notranslate">
-           <div class="highlight">
-            <pre><span></span>[5]:
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span><span class="k">def</span> <span class="nf">train</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dataloader</span><span class="p">,</span> <span class="n">crit</span><span class="p">,</span> <span class="n">opt</span><span class="p">,</span> <span class="n">epoch</span><span class="p">):</span>
+<span class="c1">#     global writer</span>
+    <span class="n">model</span><span class="o">.</span><span class="n">train</span><span class="p">()</span>
+    <span class="n">running_loss</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="k">for</span> <span class="n">batch</span><span class="p">,</span> <span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">labels</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">dataloader</span><span class="p">):</span>
+        <span class="n">data</span><span class="p">,</span> <span class="n">labels</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">cuda</span><span class="p">(),</span> <span class="n">labels</span><span class="o">.</span><span class="n">cuda</span><span class="p">(</span><span class="n">non_blocking</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">opt</span><span class="o">.</span><span class="n">zero_grad</span><span class="p">()</span>
+        <span class="n">out</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="n">loss</span> <span class="o">=</span> <span class="n">crit</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="n">labels</span><span class="p">)</span>
+        <span class="n">loss</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
+        <span class="n">opt</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+
+        <span class="n">running_loss</span> <span class="o">+=</span> <span class="n">loss</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">batch</span> <span class="o">%</span> <span class="mi">500</span> <span class="o">==</span> <span class="mi">499</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">"Batch: [</span><span class="si">%5d</span><span class="s2"> | </span><span class="si">%5d</span><span class="s2">] loss: </span><span class="si">%.3f</span><span class="s2">"</span> <span class="o">%</span> <span class="p">(</span><span class="n">batch</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">dataloader</span><span class="p">),</span> <span class="n">running_loss</span> <span class="o">/</span> <span class="mi">100</span><span class="p">))</span>
+            <span class="n">running_loss</span> <span class="o">=</span> <span class="mf">0.0</span>
+
+<span class="k">def</span> <span class="nf">test</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">dataloader</span><span class="p">,</span> <span class="n">crit</span><span class="p">,</span> <span class="n">epoch</span><span class="p">):</span>
+    <span class="k">global</span> <span class="n">writer</span>
+    <span class="k">global</span> <span class="n">classes</span>
+    <span class="n">total</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">correct</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">loss</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="n">class_probs</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">class_preds</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">model</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+    <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">data</span><span class="p">,</span> <span class="n">labels</span> <span class="ow">in</span> <span class="n">dataloader</span><span class="p">:</span>
+            <span class="n">data</span><span class="p">,</span> <span class="n">labels</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">cuda</span><span class="p">(),</span> <span class="n">labels</span><span class="o">.</span><span class="n">cuda</span><span class="p">(</span><span class="n">non_blocking</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">out</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+            <span class="n">loss</span> <span class="o">+=</span> <span class="n">crit</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="n">labels</span><span class="p">)</span>
+            <span class="n">preds</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">out</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">class_probs</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">F</span><span class="o">.</span><span class="n">softmax</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">dim</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">out</span><span class="p">])</span>
+            <span class="n">class_preds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">preds</span><span class="p">)</span>
+            <span class="n">total</span> <span class="o">+=</span> <span class="n">labels</span><span class="o">.</span><span class="n">size</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+            <span class="n">correct</span> <span class="o">+=</span> <span class="p">(</span><span class="n">preds</span> <span class="o">==</span> <span class="n">labels</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span><span class="o">.</span><span class="n">item</span><span class="p">()</span>
+
+    <span class="n">test_probs</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">([</span><span class="n">torch</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">batch</span><span class="p">)</span> <span class="k">for</span> <span class="n">batch</span> <span class="ow">in</span> <span class="n">class_probs</span><span class="p">])</span>
+    <span class="n">test_preds</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">cat</span><span class="p">(</span><span class="n">class_preds</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">loss</span> <span class="o">/</span> <span class="n">total</span><span class="p">,</span> <span class="n">correct</span> <span class="o">/</span> <span class="n">total</span>
+
+<span class="k">def</span> <span class="nf">save_checkpoint</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">ckpt_path</span><span class="o">=</span><span class="s2">"checkpoint.pth"</span><span class="p">):</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">ckpt_path</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Checkpoint saved"</span><span class="p">)</span>
 </pre>
-           </div>
-          </div>
-          <div class="input_area highlight-ipython3 notranslate">
-           <div class="highlight">
-            <pre>
-<span></span># CIFAR 10 has 10 classes
-model = vgg16(num_classes=len(classes), init_weights=False)
-model = model.cuda()
-</pre>
-           </div>
-          </div>
          </div>
-         <div class="nbinput nblast docutils container">
-          <div class="prompt highlight-none notranslate">
-           <div class="highlight">
-            <pre><span></span>[6]:
+        </div>
+       </div>
+       <p>
+        <em>
+         Define the VGG model that we are going to perfom QAT on.
+        </em>
+       </p>
+       <div class="nbinput nblast docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[5]:
 </pre>
-           </div>
-          </div>
-          <div class="input_area highlight-ipython3 notranslate">
-           <div class="highlight">
-            <pre>
-<span></span># Declare Learning rate
-lr = 0.1
-state = {}
-state["lr"] = lr
-
-# Use cross entropy loss for classification and SGD optimizer
-crit = nn.CrossEntropyLoss()
-opt = optim.SGD(model.parameters(), lr=state["lr"], momentum=0.9, weight_decay=1e-4)
-
-
-# Adjust learning rate based on epoch number
-def adjust_lr(optimizer, epoch):
-    global state
-    new_lr = lr * (0.5**(epoch // 12)) if state["lr"] &gt; 1e-7 else state["lr"]
-    if new_lr != state["lr"]:
-        state["lr"] = new_lr
-        print("Updating learning rate: {}".format(state["lr"]))
-        for param_group in optimizer.param_groups:
-            param_group["lr"] = state["lr"]
-</pre>
-           </div>
-          </div>
          </div>
-         <div class="nbinput docutils container">
-          <div class="prompt highlight-none notranslate">
-           <div class="highlight">
-            <pre><span></span>[7]:
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span><span class="c1"># CIFAR 10 has 10 classes</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">vgg16</span><span class="p">(</span><span class="n">num_classes</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">classes</span><span class="p">),</span> <span class="n">init_weights</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
 </pre>
-           </div>
-          </div>
-          <div class="input_area highlight-ipython3 notranslate">
-           <div class="highlight">
-            <pre>
-<span></span># Train the model for 25 epochs to get ~80% accuracy.
-num_epochs=25
-for epoch in range(num_epochs):
-    adjust_lr(opt, epoch)
-    print('Epoch: [%5d / %5d] LR: %f' % (epoch + 1, num_epochs, state["lr"]))
-
-    train(model, training_dataloader, crit, opt, epoch)
-    test_loss, test_acc = test(model, testing_dataloader, crit, epoch)
-
-    print("Test Loss: {:.5f} Test Acc: {:.2f}%".format(test_loss, 100 * test_acc))
-
-save_checkpoint({'epoch': epoch + 1,
-                 'model_state_dict': model.state_dict(),
-                 'acc': test_acc,
-                 'opt_state_dict': opt.state_dict(),
-                 'state': state},
-                ckpt_path="vgg16_base_ckpt")
-</pre>
-           </div>
-          </div>
          </div>
-         <div class="nboutput docutils container">
-          <div class="prompt empty docutils container">
-          </div>
-          <div class="output_area docutils container">
-           <div class="highlight">
-            <pre>
+        </div>
+       </div>
+       <div class="nbinput nblast docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[6]:
+</pre>
+         </div>
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span><span class="c1"># Declare Learning rate</span>
+<span class="n">lr</span> <span class="o">=</span> <span class="mf">0.1</span>
+<span class="n">state</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="n">state</span><span class="p">[</span><span class="s2">"lr"</span><span class="p">]</span> <span class="o">=</span> <span class="n">lr</span>
+
+<span class="c1"># Use cross entropy loss for classification and SGD optimizer</span>
+<span class="n">crit</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">CrossEntropyLoss</span><span class="p">()</span>
+<span class="n">opt</span> <span class="o">=</span> <span class="n">optim</span><span class="o">.</span><span class="n">SGD</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">parameters</span><span class="p">(),</span> <span class="n">lr</span><span class="o">=</span><span class="n">state</span><span class="p">[</span><span class="s2">"lr"</span><span class="p">],</span> <span class="n">momentum</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span> <span class="n">weight_decay</span><span class="o">=</span><span class="mf">1e-4</span><span class="p">)</span>
+
+
+<span class="c1"># Adjust learning rate based on epoch number</span>
+<span class="k">def</span> <span class="nf">adjust_lr</span><span class="p">(</span><span class="n">optimizer</span><span class="p">,</span> <span class="n">epoch</span><span class="p">):</span>
+    <span class="k">global</span> <span class="n">state</span>
+    <span class="n">new_lr</span> <span class="o">=</span> <span class="n">lr</span> <span class="o">*</span> <span class="p">(</span><span class="mf">0.5</span><span class="o">**</span><span class="p">(</span><span class="n">epoch</span> <span class="o">//</span> <span class="mi">12</span><span class="p">))</span> <span class="k">if</span> <span class="n">state</span><span class="p">[</span><span class="s2">"lr"</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mf">1e-7</span> <span class="k">else</span> <span class="n">state</span><span class="p">[</span><span class="s2">"lr"</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">new_lr</span> <span class="o">!=</span> <span class="n">state</span><span class="p">[</span><span class="s2">"lr"</span><span class="p">]:</span>
+        <span class="n">state</span><span class="p">[</span><span class="s2">"lr"</span><span class="p">]</span> <span class="o">=</span> <span class="n">new_lr</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"Updating learning rate: </span><span class="si">{}</span><span class="s2">"</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">state</span><span class="p">[</span><span class="s2">"lr"</span><span class="p">]))</span>
+        <span class="k">for</span> <span class="n">param_group</span> <span class="ow">in</span> <span class="n">optimizer</span><span class="o">.</span><span class="n">param_groups</span><span class="p">:</span>
+            <span class="n">param_group</span><span class="p">[</span><span class="s2">"lr"</span><span class="p">]</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="s2">"lr"</span><span class="p">]</span>
+</pre>
+         </div>
+        </div>
+       </div>
+       <div class="nbinput docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[7]:
+</pre>
+         </div>
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span><span class="c1"># Train the model for 25 epochs to get ~80% accuracy.</span>
+<span class="n">num_epochs</span><span class="o">=</span><span class="mi">25</span>
+<span class="k">for</span> <span class="n">epoch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_epochs</span><span class="p">):</span>
+    <span class="n">adjust_lr</span><span class="p">(</span><span class="n">opt</span><span class="p">,</span> <span class="n">epoch</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">'Epoch: [</span><span class="si">%5d</span><span class="s1"> / </span><span class="si">%5d</span><span class="s1">] LR: </span><span class="si">%f</span><span class="s1">'</span> <span class="o">%</span> <span class="p">(</span><span class="n">epoch</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">num_epochs</span><span class="p">,</span> <span class="n">state</span><span class="p">[</span><span class="s2">"lr"</span><span class="p">]))</span>
+
+    <span class="n">train</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">training_dataloader</span><span class="p">,</span> <span class="n">crit</span><span class="p">,</span> <span class="n">opt</span><span class="p">,</span> <span class="n">epoch</span><span class="p">)</span>
+    <span class="n">test_loss</span><span class="p">,</span> <span class="n">test_acc</span> <span class="o">=</span> <span class="n">test</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">testing_dataloader</span><span class="p">,</span> <span class="n">crit</span><span class="p">,</span> <span class="n">epoch</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Test Loss: </span><span class="si">{:.5f}</span><span class="s2"> Test Acc: </span><span class="si">{:.2f}</span><span class="s2">%"</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">test_loss</span><span class="p">,</span> <span class="mi">100</span> <span class="o">*</span> <span class="n">test_acc</span><span class="p">))</span>
+
+<span class="n">save_checkpoint</span><span class="p">({</span><span class="s1">'epoch'</span><span class="p">:</span> <span class="n">epoch</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span>
+                 <span class="s1">'model_state_dict'</span><span class="p">:</span> <span class="n">model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span>
+                 <span class="s1">'acc'</span><span class="p">:</span> <span class="n">test_acc</span><span class="p">,</span>
+                 <span class="s1">'opt_state_dict'</span><span class="p">:</span> <span class="n">opt</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span>
+                 <span class="s1">'state'</span><span class="p">:</span> <span class="n">state</span><span class="p">},</span>
+                <span class="n">ckpt_path</span><span class="o">=</span><span class="s2">"vgg16_base_ckpt"</span><span class="p">)</span>
+</pre>
+         </div>
+        </div>
+       </div>
+       <div class="nboutput docutils container">
+        <div class="prompt empty docutils container">
+        </div>
+        <div class="output_area docutils container">
+         <div class="highlight">
+          <pre>
 Epoch: [    1 /    25] LR: 0.100000
 </pre>
-           </div>
-          </div>
          </div>
-         <div class="nboutput docutils container">
-          <div class="prompt empty docutils container">
-          </div>
-          <div class="output_area stderr docutils container">
-           <div class="highlight">
-            <pre>
+        </div>
+       </div>
+       <div class="nboutput docutils container">
+        <div class="prompt empty docutils container">
+        </div>
+        <div class="output_area stderr docutils container">
+         <div class="highlight">
+          <pre>
 /home/dperi/Downloads/py3/lib/python3.6/site-packages/torch/nn/functional.py:718: UserWarning: Named tensors and all their associated APIs are an experimental feature and subject to change. Please do not use them for anything important until they are released as stable. (Triggered internally at  /pytorch/c10/core/TensorImpl.h:1156.)
   return torch.max_pool2d(input, kernel_size, stride, padding, dilation, ceil_mode)
 </pre>
-           </div>
-          </div>
          </div>
-         <div class="nboutput nblast docutils container">
-          <div class="prompt empty docutils container">
-          </div>
-          <div class="output_area docutils container">
-           <div class="highlight">
-            <pre>
+        </div>
+       </div>
+       <div class="nboutput nblast docutils container">
+        <div class="prompt empty docutils container">
+        </div>
+        <div class="output_area docutils container">
+         <div class="highlight">
+          <pre>
 Batch: [  500 |  1563] loss: 12.466
 Batch: [ 1000 |  1563] loss: 10.726
 Batch: [ 1500 |  1563] loss: 10.289
@@ -1188,65 +1198,65 @@ Batch: [ 1500 |  1563] loss: 2.874
 Test Loss: 0.03345 Test Acc: 83.15%
 Checkpoint saved
 </pre>
-           </div>
-          </div>
          </div>
-         <p>
-          ## 4. Apply Quantization
-         </p>
-         <p>
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            quant_modules.initialize()
-           </span>
-          </code>
-          will ensure quantized version of modules will be called instead of original modules. For example, when you define a model with convolution, linear, pooling layers,
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            QuantConv2d
-           </span>
-          </code>
-          ,
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            QuantLinear
-           </span>
-          </code>
-          and
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            QuantPooling
-           </span>
-          </code>
-          will be called.
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            QuantConv2d
-           </span>
-          </code>
-          basically wraps quantizer nodes around inputs and weights of regular
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            Conv2d
-           </span>
-          </code>
-          . Please refer to all the quantized modules in pytorch-quantization toolkit for more information. A
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            QuantConv2d
-           </span>
-          </code>
-          is represented in
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            pytorch-quantization
-           </span>
-          </code>
-          toolkit as follows.
-         </p>
-         <div class="highlight-none notranslate">
-          <div class="highlight">
-           <pre><span></span>def forward(self, input):
+        </div>
+       </div>
+       <p>
+        ## 4. Apply Quantization
+       </p>
+       <p>
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          quant_modules.initialize()
+         </span>
+        </code>
+        will ensure quantized version of modules will be called instead of original modules. For example, when you define a model with convolution, linear, pooling layers,
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          QuantConv2d
+         </span>
+        </code>
+        ,
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          QuantLinear
+         </span>
+        </code>
+        and
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          QuantPooling
+         </span>
+        </code>
+        will be called.
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          QuantConv2d
+         </span>
+        </code>
+        basically wraps quantizer nodes around inputs and weights of regular
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          Conv2d
+         </span>
+        </code>
+        . Please refer to all the quantized modules in pytorch-quantization toolkit for more information. A
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          QuantConv2d
+         </span>
+        </code>
+        is represented in
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          pytorch-quantization
+         </span>
+        </code>
+        toolkit as follows.
+       </p>
+       <div class="highlight-none notranslate">
+        <div class="highlight">
+         <pre><span></span>def forward(self, input):
         # the actual quantization happens in the next level of the class hierarchy
         quant_input, quant_weight = self._quant(input)
 
@@ -1262,230 +1272,230 @@ Checkpoint saved
 
         return output
 </pre>
-          </div>
+        </div>
+       </div>
+       <div class="nbinput nblast docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[8]:
+</pre>
          </div>
-         <div class="nbinput nblast docutils container">
-          <div class="prompt highlight-none notranslate">
-           <div class="highlight">
-            <pre><span></span>[8]:
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span><span class="n">quant_modules</span><span class="o">.</span><span class="n">initialize</span><span class="p">()</span>
 </pre>
-           </div>
-          </div>
-          <div class="input_area highlight-ipython3 notranslate">
-           <div class="highlight">
-            <pre>
-<span></span>quant_modules.initialize()
-</pre>
-           </div>
-          </div>
          </div>
-         <div class="nbinput nblast docutils container">
-          <div class="prompt highlight-none notranslate">
-           <div class="highlight">
-            <pre><span></span>[9]:
+        </div>
+       </div>
+       <div class="nbinput nblast docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[9]:
 </pre>
-           </div>
-          </div>
-          <div class="input_area highlight-ipython3 notranslate">
-           <div class="highlight">
-            <pre>
-<span></span># All the regular conv, FC layers will be converted to their quantozed counterparts due to quant_modules.initialize()
-qat_model = vgg16(num_classes=len(classes), init_weights=False)
-qat_model = qat_model.cuda()
-</pre>
-           </div>
-          </div>
          </div>
-         <div class="nbinput nblast docutils container">
-          <div class="prompt highlight-none notranslate">
-           <div class="highlight">
-            <pre><span></span>[10]:
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span><span class="c1"># All the regular conv, FC layers will be converted to their quantozed counterparts due to quant_modules.initialize()</span>
+<span class="n">qat_model</span> <span class="o">=</span> <span class="n">vgg16</span><span class="p">(</span><span class="n">num_classes</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">classes</span><span class="p">),</span> <span class="n">init_weights</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">qat_model</span> <span class="o">=</span> <span class="n">qat_model</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
 </pre>
-           </div>
-          </div>
-          <div class="input_area highlight-ipython3 notranslate">
-           <div class="highlight">
-            <pre>
-<span></span># vgg16_base_ckpt is the checkpoint generated from Step 3 : Training a baseline VGG16 model.
-ckpt = torch.load("./vgg16_base_ckpt")
-modified_state_dict={}
-for key, val in ckpt["model_state_dict"].items():
-    # Remove 'module.' from the key names
-    if key.startswith('module'):
-        modified_state_dict[key[7:]] = val
-    else:
-        modified_state_dict[key] = val
-
-# Load the pre-trained checkpoint
-qat_model.load_state_dict(modified_state_dict)
-opt.load_state_dict(ckpt["opt_state_dict"])
-</pre>
-           </div>
-          </div>
          </div>
-         <p>
-          ## 5. Model Calibration
-         </p>
-         <p>
-          The quantizer nodes introduced in the model around desired layers capture the dynamic range (min_value, max_value) that is observed by the layer. Calibration is the process of computing the dynamic range of these layers by passing calibration data, which is usually a subset of training or validation data. There are different ways of calibration:
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            max
-           </span>
-          </code>
-          ,
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            histogram
-           </span>
-          </code>
-          and
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            entropy
-           </span>
-          </code>
-          . We use
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            max
-           </span>
-          </code>
-          calibration technique as it is simple and effective.
-         </p>
-         <div class="nbinput nblast docutils container">
-          <div class="prompt highlight-none notranslate">
-           <div class="highlight">
-            <pre><span></span>[11]:
+        </div>
+       </div>
+       <div class="nbinput nblast docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[10]:
 </pre>
-           </div>
-          </div>
-          <div class="input_area highlight-ipython3 notranslate">
-           <div class="highlight">
-            <pre>
-<span></span>def compute_amax(model, **kwargs):
-    # Load calib result
-    for name, module in model.named_modules():
-        if isinstance(module, quant_nn.TensorQuantizer):
-            if module._calibrator is not None:
-                if isinstance(module._calibrator, calib.MaxCalibrator):
-                    module.load_calib_amax()
-                else:
-                    module.load_calib_amax(**kwargs)
-            print(F"{name:40}: {module}")
-    model.cuda()
-
-def collect_stats(model, data_loader, num_batches):
-    """Feed data to the network and collect statistics"""
-    # Enable calibrators
-    for name, module in model.named_modules():
-        if isinstance(module, quant_nn.TensorQuantizer):
-            if module._calibrator is not None:
-                module.disable_quant()
-                module.enable_calib()
-            else:
-                module.disable()
-
-    # Feed data to the network for collecting stats
-    for i, (image, _) in tqdm(enumerate(data_loader), total=num_batches):
-        model(image.cuda())
-        if i &gt;= num_batches:
-            break
-
-    # Disable calibrators
-    for name, module in model.named_modules():
-        if isinstance(module, quant_nn.TensorQuantizer):
-            if module._calibrator is not None:
-                module.enable_quant()
-                module.disable_calib()
-            else:
-                module.enable()
-
-def calibrate_model(model, model_name, data_loader, num_calib_batch, calibrator, hist_percentile, out_dir):
-    """
-        Feed data to the network and calibrate.
-        Arguments:
-            model: classification model
-            model_name: name to use when creating state files
-            data_loader: calibration data set
-            num_calib_batch: amount of calibration passes to perform
-            calibrator: type of calibration to use (max/histogram)
-            hist_percentile: percentiles to be used for historgram calibration
-            out_dir: dir to save state files in
-    """
-
-    if num_calib_batch &gt; 0:
-        print("Calibrating model")
-        with torch.no_grad():
-            collect_stats(model, data_loader, num_calib_batch)
-
-        if not calibrator == "histogram":
-            compute_amax(model, method="max")
-            calib_output = os.path.join(
-                out_dir,
-                F"{model_name}-max-{num_calib_batch*data_loader.batch_size}.pth")
-            torch.save(model.state_dict(), calib_output)
-        else:
-            for percentile in hist_percentile:
-                print(F"{percentile} percentile calibration")
-                compute_amax(model, method="percentile")
-                calib_output = os.path.join(
-                    out_dir,
-                    F"{model_name}-percentile-{percentile}-{num_calib_batch*data_loader.batch_size}.pth")
-                torch.save(model.state_dict(), calib_output)
-
-            for method in ["mse", "entropy"]:
-                print(F"{method} calibration")
-                compute_amax(model, method=method)
-                calib_output = os.path.join(
-                    out_dir,
-                    F"{model_name}-{method}-{num_calib_batch*data_loader.batch_size}.pth")
-                torch.save(model.state_dict(), calib_output)
-</pre>
-           </div>
-          </div>
          </div>
-         <div class="nbinput docutils container">
-          <div class="prompt highlight-none notranslate">
-           <div class="highlight">
-            <pre><span></span>[12]:
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span><span class="c1"># vgg16_base_ckpt is the checkpoint generated from Step 3 : Training a baseline VGG16 model.</span>
+<span class="n">ckpt</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">"./vgg16_base_ckpt"</span><span class="p">)</span>
+<span class="n">modified_state_dict</span><span class="o">=</span><span class="p">{}</span>
+<span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">ckpt</span><span class="p">[</span><span class="s2">"model_state_dict"</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+    <span class="c1"># Remove 'module.' from the key names</span>
+    <span class="k">if</span> <span class="n">key</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s1">'module'</span><span class="p">):</span>
+        <span class="n">modified_state_dict</span><span class="p">[</span><span class="n">key</span><span class="p">[</span><span class="mi">7</span><span class="p">:]]</span> <span class="o">=</span> <span class="n">val</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">modified_state_dict</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">val</span>
+
+<span class="c1"># Load the pre-trained checkpoint</span>
+<span class="n">qat_model</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">modified_state_dict</span><span class="p">)</span>
+<span class="n">opt</span><span class="o">.</span><span class="n">load_state_dict</span><span class="p">(</span><span class="n">ckpt</span><span class="p">[</span><span class="s2">"opt_state_dict"</span><span class="p">])</span>
 </pre>
-           </div>
-          </div>
-          <div class="input_area highlight-ipython3 notranslate">
-           <div class="highlight">
-            <pre>
-<span></span>#Calibrate the model using max calibration technique.
-with torch.no_grad():
-    calibrate_model(
-        model=qat_model,
-        model_name="vgg16",
-        data_loader=training_dataloader,
-        num_calib_batch=32,
-        calibrator="max",
-        hist_percentile=[99.9, 99.99, 99.999, 99.9999],
-        out_dir="./")
-</pre>
-           </div>
-          </div>
          </div>
-         <div class="nboutput docutils container">
-          <div class="prompt empty docutils container">
-          </div>
-          <div class="output_area docutils container">
-           <div class="highlight">
-            <pre>
+        </div>
+       </div>
+       <p>
+        ## 5. Model Calibration
+       </p>
+       <p>
+        The quantizer nodes introduced in the model around desired layers capture the dynamic range (min_value, max_value) that is observed by the layer. Calibration is the process of computing the dynamic range of these layers by passing calibration data, which is usually a subset of training or validation data. There are different ways of calibration:
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          max
+         </span>
+        </code>
+        ,
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          histogram
+         </span>
+        </code>
+        and
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          entropy
+         </span>
+        </code>
+        . We use
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          max
+         </span>
+        </code>
+        calibration technique as it is simple and effective.
+       </p>
+       <div class="nbinput nblast docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[11]:
+</pre>
+         </div>
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span><span class="k">def</span> <span class="nf">compute_amax</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="c1"># Load calib result</span>
+    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">module</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">named_modules</span><span class="p">():</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">quant_nn</span><span class="o">.</span><span class="n">TensorQuantizer</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">module</span><span class="o">.</span><span class="n">_calibrator</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">module</span><span class="o">.</span><span class="n">_calibrator</span><span class="p">,</span> <span class="n">calib</span><span class="o">.</span><span class="n">MaxCalibrator</span><span class="p">):</span>
+                    <span class="n">module</span><span class="o">.</span><span class="n">load_calib_amax</span><span class="p">()</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">module</span><span class="o">.</span><span class="n">load_calib_amax</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">F</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">:</span><span class="s2">40</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">module</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">model</span><span class="o">.</span><span class="n">cuda</span><span class="p">()</span>
+
+<span class="k">def</span> <span class="nf">collect_stats</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">data_loader</span><span class="p">,</span> <span class="n">num_batches</span><span class="p">):</span>
+    <span class="sd">"""Feed data to the network and collect statistics"""</span>
+    <span class="c1"># Enable calibrators</span>
+    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">module</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">named_modules</span><span class="p">():</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">quant_nn</span><span class="o">.</span><span class="n">TensorQuantizer</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">module</span><span class="o">.</span><span class="n">_calibrator</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">module</span><span class="o">.</span><span class="n">disable_quant</span><span class="p">()</span>
+                <span class="n">module</span><span class="o">.</span><span class="n">enable_calib</span><span class="p">()</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">module</span><span class="o">.</span><span class="n">disable</span><span class="p">()</span>
+
+    <span class="c1"># Feed data to the network for collecting stats</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="ow">in</span> <span class="n">tqdm</span><span class="p">(</span><span class="nb">enumerate</span><span class="p">(</span><span class="n">data_loader</span><span class="p">),</span> <span class="n">total</span><span class="o">=</span><span class="n">num_batches</span><span class="p">):</span>
+        <span class="n">model</span><span class="p">(</span><span class="n">image</span><span class="o">.</span><span class="n">cuda</span><span class="p">())</span>
+        <span class="k">if</span> <span class="n">i</span> <span class="o">&gt;=</span> <span class="n">num_batches</span><span class="p">:</span>
+            <span class="k">break</span>
+
+    <span class="c1"># Disable calibrators</span>
+    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">module</span> <span class="ow">in</span> <span class="n">model</span><span class="o">.</span><span class="n">named_modules</span><span class="p">():</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">quant_nn</span><span class="o">.</span><span class="n">TensorQuantizer</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">module</span><span class="o">.</span><span class="n">_calibrator</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">module</span><span class="o">.</span><span class="n">enable_quant</span><span class="p">()</span>
+                <span class="n">module</span><span class="o">.</span><span class="n">disable_calib</span><span class="p">()</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">module</span><span class="o">.</span><span class="n">enable</span><span class="p">()</span>
+
+<span class="k">def</span> <span class="nf">calibrate_model</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">model_name</span><span class="p">,</span> <span class="n">data_loader</span><span class="p">,</span> <span class="n">num_calib_batch</span><span class="p">,</span> <span class="n">calibrator</span><span class="p">,</span> <span class="n">hist_percentile</span><span class="p">,</span> <span class="n">out_dir</span><span class="p">):</span>
+    <span class="sd">"""</span>
+<span class="sd">        Feed data to the network and calibrate.</span>
+<span class="sd">        Arguments:</span>
+<span class="sd">            model: classification model</span>
+<span class="sd">            model_name: name to use when creating state files</span>
+<span class="sd">            data_loader: calibration data set</span>
+<span class="sd">            num_calib_batch: amount of calibration passes to perform</span>
+<span class="sd">            calibrator: type of calibration to use (max/histogram)</span>
+<span class="sd">            hist_percentile: percentiles to be used for historgram calibration</span>
+<span class="sd">            out_dir: dir to save state files in</span>
+<span class="sd">    """</span>
+
+    <span class="k">if</span> <span class="n">num_calib_batch</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"Calibrating model"</span><span class="p">)</span>
+        <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+            <span class="n">collect_stats</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">data_loader</span><span class="p">,</span> <span class="n">num_calib_batch</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">calibrator</span> <span class="o">==</span> <span class="s2">"histogram"</span><span class="p">:</span>
+            <span class="n">compute_amax</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">"max"</span><span class="p">)</span>
+            <span class="n">calib_output</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                <span class="n">out_dir</span><span class="p">,</span>
+                <span class="sa">F</span><span class="s2">"</span><span class="si">{</span><span class="n">model_name</span><span class="si">}</span><span class="s2">-max-</span><span class="si">{</span><span class="n">num_calib_batch</span><span class="o">*</span><span class="n">data_loader</span><span class="o">.</span><span class="n">batch_size</span><span class="si">}</span><span class="s2">.pth"</span><span class="p">)</span>
+            <span class="n">torch</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span> <span class="n">calib_output</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">percentile</span> <span class="ow">in</span> <span class="n">hist_percentile</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">F</span><span class="s2">"</span><span class="si">{</span><span class="n">percentile</span><span class="si">}</span><span class="s2"> percentile calibration"</span><span class="p">)</span>
+                <span class="n">compute_amax</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">"percentile"</span><span class="p">)</span>
+                <span class="n">calib_output</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                    <span class="n">out_dir</span><span class="p">,</span>
+                    <span class="sa">F</span><span class="s2">"</span><span class="si">{</span><span class="n">model_name</span><span class="si">}</span><span class="s2">-percentile-</span><span class="si">{</span><span class="n">percentile</span><span class="si">}</span><span class="s2">-</span><span class="si">{</span><span class="n">num_calib_batch</span><span class="o">*</span><span class="n">data_loader</span><span class="o">.</span><span class="n">batch_size</span><span class="si">}</span><span class="s2">.pth"</span><span class="p">)</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span> <span class="n">calib_output</span><span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">method</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"mse"</span><span class="p">,</span> <span class="s2">"entropy"</span><span class="p">]:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">F</span><span class="s2">"</span><span class="si">{</span><span class="n">method</span><span class="si">}</span><span class="s2"> calibration"</span><span class="p">)</span>
+                <span class="n">compute_amax</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="n">method</span><span class="p">)</span>
+                <span class="n">calib_output</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+                    <span class="n">out_dir</span><span class="p">,</span>
+                    <span class="sa">F</span><span class="s2">"</span><span class="si">{</span><span class="n">model_name</span><span class="si">}</span><span class="s2">-</span><span class="si">{</span><span class="n">method</span><span class="si">}</span><span class="s2">-</span><span class="si">{</span><span class="n">num_calib_batch</span><span class="o">*</span><span class="n">data_loader</span><span class="o">.</span><span class="n">batch_size</span><span class="si">}</span><span class="s2">.pth"</span><span class="p">)</span>
+                <span class="n">torch</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span> <span class="n">calib_output</span><span class="p">)</span>
+</pre>
+         </div>
+        </div>
+       </div>
+       <div class="nbinput docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[12]:
+</pre>
+         </div>
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span><span class="c1">#Calibrate the model using max calibration technique.</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="n">calibrate_model</span><span class="p">(</span>
+        <span class="n">model</span><span class="o">=</span><span class="n">qat_model</span><span class="p">,</span>
+        <span class="n">model_name</span><span class="o">=</span><span class="s2">"vgg16"</span><span class="p">,</span>
+        <span class="n">data_loader</span><span class="o">=</span><span class="n">training_dataloader</span><span class="p">,</span>
+        <span class="n">num_calib_batch</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span>
+        <span class="n">calibrator</span><span class="o">=</span><span class="s2">"max"</span><span class="p">,</span>
+        <span class="n">hist_percentile</span><span class="o">=</span><span class="p">[</span><span class="mf">99.9</span><span class="p">,</span> <span class="mf">99.99</span><span class="p">,</span> <span class="mf">99.999</span><span class="p">,</span> <span class="mf">99.9999</span><span class="p">],</span>
+        <span class="n">out_dir</span><span class="o">=</span><span class="s2">"./"</span><span class="p">)</span>
+</pre>
+         </div>
+        </div>
+       </div>
+       <div class="nboutput docutils container">
+        <div class="prompt empty docutils container">
+        </div>
+        <div class="output_area docutils container">
+         <div class="highlight">
+          <pre>
 Calibrating model
 </pre>
-           </div>
-          </div>
          </div>
-         <div class="nboutput docutils container">
-          <div class="prompt empty docutils container">
-          </div>
-          <div class="output_area stderr docutils container">
-           <div class="highlight">
-            <pre>
+        </div>
+       </div>
+       <div class="nboutput docutils container">
+        <div class="prompt empty docutils container">
+        </div>
+        <div class="output_area stderr docutils container">
+         <div class="highlight">
+          <pre>
 100%|██████████| 32/32 [00:00&lt;00:00, 85.05it/s]
 W0831 15:32:46.956144 140586428176192 tensor_quantizer.py:173] Disable MaxCalibrator
 W0831 15:32:46.957227 140586428176192 tensor_quantizer.py:173] Disable MaxCalibrator
@@ -1525,28 +1535,28 @@ W0831 15:32:46.980288 140586428176192 tensor_quantizer.py:237] Load calibrated a
 W0831 15:32:46.987690 140586428176192 tensor_quantizer.py:237] Load calibrated amax, shape=torch.Size([]).
 W0831 15:32:57.002152 140586428176192 tensor_quantizer.py:237] Load calibrated amax, shape=torch.Size([64, 1, 1, 1]).
 </pre>
-           </div>
-          </div>
          </div>
-         <div class="nboutput docutils container">
-          <div class="prompt empty docutils container">
-          </div>
-          <div class="output_area docutils container">
-           <div class="highlight">
-            <pre>
+        </div>
+       </div>
+       <div class="nboutput docutils container">
+        <div class="prompt empty docutils container">
+        </div>
+        <div class="output_area docutils container">
+         <div class="highlight">
+          <pre>
 features.0._input_quantizer             : TensorQuantizer(8bit narrow fake per-tensor amax=2.7537 calibrator=MaxCalibrator scale=1.0 quant)
 features.0._weight_quantizer            : TensorQuantizer(8bit narrow fake axis=0 amax=[0.0287, 4.4272](64) calibrator=MaxCalibrator scale=1.0 quant)
 features.3._input_quantizer             : TensorQuantizer(8bit narrow fake per-tensor amax=30.1997 calibrator=MaxCalibrator scale=1.0 quant)
 </pre>
-           </div>
-          </div>
          </div>
-         <div class="nboutput docutils container">
-          <div class="prompt empty docutils container">
-          </div>
-          <div class="output_area stderr docutils container">
-           <div class="highlight">
-            <pre>
+        </div>
+       </div>
+       <div class="nboutput docutils container">
+        <div class="prompt empty docutils container">
+        </div>
+        <div class="output_area stderr docutils container">
+         <div class="highlight">
+          <pre>
 W0831 15:32:57.006651 140586428176192 tensor_quantizer.py:237] Load calibrated amax, shape=torch.Size([]).
 W0831 15:32:57.009306 140586428176192 tensor_quantizer.py:237] Load calibrated amax, shape=torch.Size([128, 1, 1, 1]).
 W0831 15:32:57.011739 140586428176192 tensor_quantizer.py:237] Load calibrated amax, shape=torch.Size([]).
@@ -1576,15 +1586,15 @@ W0831 15:32:57.043280 140586428176192 tensor_quantizer.py:237] Load calibrated a
 W0831 15:32:57.044521 140586428176192 tensor_quantizer.py:237] Load calibrated amax, shape=torch.Size([]).
 W0831 15:32:57.045206 140586428176192 tensor_quantizer.py:237] Load calibrated amax, shape=torch.Size([10, 1]).
 </pre>
-           </div>
-          </div>
          </div>
-         <div class="nboutput nblast docutils container">
-          <div class="prompt empty docutils container">
-          </div>
-          <div class="output_area docutils container">
-           <div class="highlight">
-            <pre>
+        </div>
+       </div>
+       <div class="nboutput nblast docutils container">
+        <div class="prompt empty docutils container">
+        </div>
+        <div class="output_area docutils container">
+         <div class="highlight">
+          <pre>
 features.3._weight_quantizer            : TensorQuantizer(8bit narrow fake axis=0 amax=[0.0137, 2.2506](64) calibrator=MaxCalibrator scale=1.0 quant)
 features.7._input_quantizer             : TensorQuantizer(8bit narrow fake per-tensor amax=16.2026 calibrator=MaxCalibrator scale=1.0 quant)
 features.7._weight_quantizer            : TensorQuantizer(8bit narrow fake axis=0 amax=[0.0602, 1.3986](128) calibrator=MaxCalibrator scale=1.0 quant)
@@ -1615,109 +1625,109 @@ classifier.3._weight_quantizer          : TensorQuantizer(8bit narrow fake axis=
 classifier.6._input_quantizer           : TensorQuantizer(8bit narrow fake per-tensor amax=8.7469 calibrator=MaxCalibrator scale=1.0 quant)
 classifier.6._weight_quantizer          : TensorQuantizer(8bit narrow fake axis=0 amax=[0.3125, 0.4321](10) calibrator=MaxCalibrator scale=1.0 quant)
 </pre>
-           </div>
-          </div>
          </div>
-         <p>
-          ## 6. Quantization Aware Training
-         </p>
-         <p>
-          In this phase, we finetune the model weights and leave the quantizer node values frozen. The dynamic ranges for each layer obtained from the calibration are kept constant while the weights of the model are finetuned to be close to the accuracy of original FP32 model (model without quantizer nodes) is preserved. Usually the finetuning of QAT model should be quick compared to the full training of the original model. Use QAT to fine-tune for around 10% of the original training schedule with an
+        </div>
+       </div>
+       <p>
+        ## 6. Quantization Aware Training
+       </p>
+       <p>
+        In this phase, we finetune the model weights and leave the quantizer node values frozen. The dynamic ranges for each layer obtained from the calibration are kept constant while the weights of the model are finetuned to be close to the accuracy of original FP32 model (model without quantizer nodes) is preserved. Usually the finetuning of QAT model should be quick compared to the full training of the original model. Use QAT to fine-tune for around 10% of the original training schedule with an
 annealing learning-rate. Please refer to Achieving FP32 Accuracy for INT8 Inference Using Quantization Aware Training with NVIDIA TensorRT for detailed recommendations. For this VGG model, it is enough to finetune for 1 epoch to get acceptable accuracy. During finetuning with QAT, the quantization is applied as a composition of
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            max
-           </span>
-          </code>
-          ,
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            clamp
-           </span>
-          </code>
-          ,
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            round
-           </span>
-          </code>
-          and
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            mul
-           </span>
-          </code>
-          ops.
-         </p>
-         <div class="highlight-none notranslate">
-          <div class="highlight">
-           <pre><span></span># amax is absolute maximum value for an input
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          max
+         </span>
+        </code>
+        ,
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          clamp
+         </span>
+        </code>
+        ,
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          round
+         </span>
+        </code>
+        and
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          mul
+         </span>
+        </code>
+        ops.
+       </p>
+       <div class="highlight-none notranslate">
+        <div class="highlight">
+         <pre><span></span># amax is absolute maximum value for an input
 # The upper bound for integer quantization (127 for int8)
 max_bound = torch.tensor((2.0**(num_bits - 1 + int(unsigned))) - 1.0, device=amax.device)
 scale = max_bound / amax
 outputs = torch.clamp((inputs * scale).round_(), min_bound, max_bound)
 </pre>
-          </div>
-         </div>
-         <p>
-          tensor_quant function in
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            pytorch_quantization
-           </span>
-          </code>
-          toolkit is responsible for the above tensor quantization. Usually, per channel quantization is recommended for weights, while per tensor quantization is recommended for activations in a network. During inference, we use
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            torch.fake_quantize_per_tensor_affine
-           </span>
-          </code>
-          and
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            torch.fake_quantize_per_channel_affine
-           </span>
-          </code>
-          to perform quantization as this is easier to convert into corresponding TensorRT operators. Please refer to next sections for more details on
+        </div>
+       </div>
+       <p>
+        tensor_quant function in
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          pytorch_quantization
+         </span>
+        </code>
+        toolkit is responsible for the above tensor quantization. Usually, per channel quantization is recommended for weights, while per tensor quantization is recommended for activations in a network. During inference, we use
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          torch.fake_quantize_per_tensor_affine
+         </span>
+        </code>
+        and
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          torch.fake_quantize_per_channel_affine
+         </span>
+        </code>
+        to perform quantization as this is easier to convert into corresponding TensorRT operators. Please refer to next sections for more details on
 how these operators are exported in torchscript and converted in TRTorch.
-         </p>
-         <div class="nbinput docutils container">
-          <div class="prompt highlight-none notranslate">
-           <div class="highlight">
-            <pre><span></span>[13]:
+       </p>
+       <div class="nbinput docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[13]:
 </pre>
-           </div>
-          </div>
-          <div class="input_area highlight-ipython3 notranslate">
-           <div class="highlight">
-            <pre>
-<span></span># Finetune the QAT model for 1 epoch
-num_epochs=1
-for epoch in range(num_epochs):
-    adjust_lr(opt, epoch)
-    print('Epoch: [%5d / %5d] LR: %f' % (epoch + 1, num_epochs, state["lr"]))
-
-    train(qat_model, training_dataloader, crit, opt, epoch)
-    test_loss, test_acc = test(qat_model, testing_dataloader, crit, epoch)
-
-    print("Test Loss: {:.5f} Test Acc: {:.2f}%".format(test_loss, 100 * test_acc))
-
-save_checkpoint({'epoch': epoch + 1,
-                 'model_state_dict': qat_model.state_dict(),
-                 'acc': test_acc,
-                 'opt_state_dict': opt.state_dict(),
-                 'state': state},
-                ckpt_path="vgg16_qat_ckpt")
-</pre>
-           </div>
-          </div>
          </div>
-         <div class="nboutput nblast docutils container">
-          <div class="prompt empty docutils container">
-          </div>
-          <div class="output_area docutils container">
-           <div class="highlight">
-            <pre>
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span><span class="c1"># Finetune the QAT model for 1 epoch</span>
+<span class="n">num_epochs</span><span class="o">=</span><span class="mi">1</span>
+<span class="k">for</span> <span class="n">epoch</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_epochs</span><span class="p">):</span>
+    <span class="n">adjust_lr</span><span class="p">(</span><span class="n">opt</span><span class="p">,</span> <span class="n">epoch</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s1">'Epoch: [</span><span class="si">%5d</span><span class="s1"> / </span><span class="si">%5d</span><span class="s1">] LR: </span><span class="si">%f</span><span class="s1">'</span> <span class="o">%</span> <span class="p">(</span><span class="n">epoch</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">num_epochs</span><span class="p">,</span> <span class="n">state</span><span class="p">[</span><span class="s2">"lr"</span><span class="p">]))</span>
+
+    <span class="n">train</span><span class="p">(</span><span class="n">qat_model</span><span class="p">,</span> <span class="n">training_dataloader</span><span class="p">,</span> <span class="n">crit</span><span class="p">,</span> <span class="n">opt</span><span class="p">,</span> <span class="n">epoch</span><span class="p">)</span>
+    <span class="n">test_loss</span><span class="p">,</span> <span class="n">test_acc</span> <span class="o">=</span> <span class="n">test</span><span class="p">(</span><span class="n">qat_model</span><span class="p">,</span> <span class="n">testing_dataloader</span><span class="p">,</span> <span class="n">crit</span><span class="p">,</span> <span class="n">epoch</span><span class="p">)</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"Test Loss: </span><span class="si">{:.5f}</span><span class="s2"> Test Acc: </span><span class="si">{:.2f}</span><span class="s2">%"</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">test_loss</span><span class="p">,</span> <span class="mi">100</span> <span class="o">*</span> <span class="n">test_acc</span><span class="p">))</span>
+
+<span class="n">save_checkpoint</span><span class="p">({</span><span class="s1">'epoch'</span><span class="p">:</span> <span class="n">epoch</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span>
+                 <span class="s1">'model_state_dict'</span><span class="p">:</span> <span class="n">qat_model</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span>
+                 <span class="s1">'acc'</span><span class="p">:</span> <span class="n">test_acc</span><span class="p">,</span>
+                 <span class="s1">'opt_state_dict'</span><span class="p">:</span> <span class="n">opt</span><span class="o">.</span><span class="n">state_dict</span><span class="p">(),</span>
+                 <span class="s1">'state'</span><span class="p">:</span> <span class="n">state</span><span class="p">},</span>
+                <span class="n">ckpt_path</span><span class="o">=</span><span class="s2">"vgg16_qat_ckpt"</span><span class="p">)</span>
+</pre>
+         </div>
+        </div>
+       </div>
+       <div class="nboutput nblast docutils container">
+        <div class="prompt empty docutils container">
+        </div>
+        <div class="output_area docutils container">
+         <div class="highlight">
+          <pre>
 Updating learning rate: 0.1
 Epoch: [    1 /     1] LR: 0.100000
 Batch: [  500 |  1563] loss: 2.694
@@ -1726,85 +1736,85 @@ Batch: [ 1500 |  1563] loss: 2.624
 Test Loss: 0.03277 Test Acc: 83.58%
 Checkpoint saved
 </pre>
-           </div>
-          </div>
          </div>
-         <p>
-          ## 7. Export to Torchscript Export the model to Torch script. Trace the model and convert it into torchscript for deployment. To learn more about Torchscript, please refer to
-          <a class="reference external" href="https://pytorch.org/docs/stable/jit.html">
-           https://pytorch.org/docs/stable/jit.html
-          </a>
-          . Setting
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            quant_nn.TensorQuantizer.use_fb_fake_quant
-           </span>
-           <span class="pre">
-            =
-           </span>
-           <span class="pre">
-            True
-           </span>
-          </code>
-          enables the QAT model to use
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            torch.fake_quantize_per_tensor_affine
-           </span>
-          </code>
-          and
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            torch.fake_quantize_per_channel_affine
-           </span>
-          </code>
-          operators instead of
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            tensor_quant
-           </span>
-          </code>
-          function to export quantization operators. In torchscript, they
+        </div>
+       </div>
+       <p>
+        ## 7. Export to Torchscript Export the model to Torch script. Trace the model and convert it into torchscript for deployment. To learn more about Torchscript, please refer to
+        <a class="reference external" href="https://pytorch.org/docs/stable/jit.html">
+         https://pytorch.org/docs/stable/jit.html
+        </a>
+        . Setting
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          quant_nn.TensorQuantizer.use_fb_fake_quant
+         </span>
+         <span class="pre">
+          =
+         </span>
+         <span class="pre">
+          True
+         </span>
+        </code>
+        enables the QAT model to use
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          torch.fake_quantize_per_tensor_affine
+         </span>
+        </code>
+        and
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          torch.fake_quantize_per_channel_affine
+         </span>
+        </code>
+        operators instead of
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          tensor_quant
+         </span>
+        </code>
+        function to export quantization operators. In torchscript, they
 are represented as
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            aten::fake_quantize_per_tensor_affine
-           </span>
-          </code>
-          and
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            aten::fake_quantize_per_channel_affine
-           </span>
-          </code>
-          .
-         </p>
-         <div class="nbinput docutils container">
-          <div class="prompt highlight-none notranslate">
-           <div class="highlight">
-            <pre><span></span>[16]:
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          aten::fake_quantize_per_tensor_affine
+         </span>
+        </code>
+        and
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          aten::fake_quantize_per_channel_affine
+         </span>
+        </code>
+        .
+       </p>
+       <div class="nbinput docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[16]:
 </pre>
-           </div>
-          </div>
-          <div class="input_area highlight-ipython3 notranslate">
-           <div class="highlight">
-            <pre>
-<span></span>quant_nn.TensorQuantizer.use_fb_fake_quant = True
-with torch.no_grad():
-    data = iter(testing_dataloader)
-    images, _ = data.next()
-    jit_model = torch.jit.trace(qat_model, images.to("cuda"))
-    torch.jit.save(jit_model, "trained_vgg16_qat.jit.pt")
-</pre>
-           </div>
-          </div>
          </div>
-         <div class="nboutput nblast docutils container">
-          <div class="prompt empty docutils container">
-          </div>
-          <div class="output_area stderr docutils container">
-           <div class="highlight">
-            <pre>
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span><span class="n">quant_nn</span><span class="o">.</span><span class="n">TensorQuantizer</span><span class="o">.</span><span class="n">use_fb_fake_quant</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="nb">iter</span><span class="p">(</span><span class="n">testing_dataloader</span><span class="p">)</span>
+    <span class="n">images</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">next</span><span class="p">()</span>
+    <span class="n">jit_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">qat_model</span><span class="p">,</span> <span class="n">images</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">))</span>
+    <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">jit_model</span><span class="p">,</span> <span class="s2">"trained_vgg16_qat.jit.pt"</span><span class="p">)</span>
+</pre>
+         </div>
+        </div>
+       </div>
+       <div class="nboutput nblast docutils container">
+        <div class="prompt empty docutils container">
+        </div>
+        <div class="output_area stderr docutils container">
+         <div class="highlight">
+          <pre>
 E0831 15:41:34.662368 140586428176192 tensor_quantizer.py:120] Fake quantize mode doesn't use scale explicitly!
 E0831 15:41:34.664751 140586428176192 tensor_quantizer.py:120] Fake quantize mode doesn't use scale explicitly!
 E0831 15:41:34.671072 140586428176192 tensor_quantizer.py:120] Fake quantize mode doesn't use scale explicitly!
@@ -1934,109 +1944,107 @@ E0831 15:41:35.129700 140586428176192 tensor_quantizer.py:120] Fake quantize mod
 E0831 15:41:35.132617 140586428176192 tensor_quantizer.py:120] Fake quantize mode doesn't use scale explicitly!
 E0831 15:41:35.133241 140586428176192 tensor_quantizer.py:120] Fake quantize mode doesn't use scale explicitly!
 </pre>
-           </div>
-          </div>
          </div>
-         <p>
-          ## 8. Inference using TRTorch In this phase, we run the exported torchscript graph of VGG QAT using TRTorch. TRTorch is a Pytorch-TensorRT compiler which converts Torchscript graphs into TensorRT. TensorRT 8.0 supports inference of quantization aware trained models and introduces new APIs;
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            QuantizeLayer
-           </span>
-          </code>
-          and
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            DequantizeLayer
-           </span>
-          </code>
-          . We can observe the entire VGG QAT graph quantization nodes from the debug log of TRTorch. To enable debug logging, you can set
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            trtorch.logging.set_reportable_log_level(trtorch.logging.Level.Debug)
-           </span>
-          </code>
-          . For example,
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            QuantConv2d
-           </span>
-          </code>
-          layer from
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            pytorch_quantization
-           </span>
-          </code>
-          toolkit is represented as follows in Torchscript
-         </p>
-         <div class="highlight-none notranslate">
-          <div class="highlight">
-           <pre><span></span>%quant_input : Tensor = aten::fake_quantize_per_tensor_affine(%x, %636, %637, %638, %639)
+        </div>
+       </div>
+       <p>
+        ## 8. Inference using TRTorch In this phase, we run the exported torchscript graph of VGG QAT using TRTorch. TRTorch is a Pytorch-TensorRT compiler which converts Torchscript graphs into TensorRT. TensorRT 8.0 supports inference of quantization aware trained models and introduces new APIs;
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          QuantizeLayer
+         </span>
+        </code>
+        and
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          DequantizeLayer
+         </span>
+        </code>
+        . We can observe the entire VGG QAT graph quantization nodes from the debug log of TRTorch. To enable debug logging, you can set
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          trtorch.logging.set_reportable_log_level(trtorch.logging.Level.Debug)
+         </span>
+        </code>
+        . For example,
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          QuantConv2d
+         </span>
+        </code>
+        layer from
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          pytorch_quantization
+         </span>
+        </code>
+        toolkit is represented as follows in Torchscript
+       </p>
+       <div class="highlight-none notranslate">
+        <div class="highlight">
+         <pre><span></span>%quant_input : Tensor = aten::fake_quantize_per_tensor_affine(%x, %636, %637, %638, %639)
 %quant_weight : Tensor = aten::fake_quantize_per_channel_affine(%394, %640, %641, %637, %638, %639)
 %input.2 : Tensor = aten::_convolution(%quant_input, %quant_weight, %395, %687, %688, %689, %643, %690, %642, %643, %643, %644, %644)
 </pre>
-          </div>
-         </div>
-         <p>
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            aten::fake_quantize_per_*_affine
-           </span>
-          </code>
-          is converted into
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            QuantizeLayer
-           </span>
-          </code>
-          +
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            DequantizeLayer
-           </span>
-          </code>
-          in TRTorch internally. Please refer to quantization op converters in TRTorch.
-         </p>
-         <div class="nbinput docutils container">
-          <div class="prompt highlight-none notranslate">
-           <div class="highlight">
-            <pre><span></span>[17]:
+        </div>
+       </div>
+       <p>
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          aten::fake_quantize_per_*_affine
+         </span>
+        </code>
+        is converted into
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          QuantizeLayer
+         </span>
+        </code>
+        +
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          DequantizeLayer
+         </span>
+        </code>
+        in TRTorch internally. Please refer to quantization op converters in TRTorch.
+       </p>
+       <div class="nbinput docutils container">
+        <div class="prompt highlight-none notranslate">
+         <div class="highlight">
+          <pre><span></span>[17]:
 </pre>
-           </div>
-          </div>
-          <div class="input_area highlight-ipython3 notranslate">
-           <div class="highlight">
-            <pre>
-<span></span>qat_model = torch.jit.load("trained_vgg16_qat.jit.pt").eval()
-
-compile_spec = {"inputs": [trtorch.Input([16, 3, 32, 32])],
-                "op_precision": torch.int8,
-                }
-trt_mod = trtorch.compile(qat_model, compile_spec)
-
-test_loss, test_acc = test(trt_mod, testing_dataloader, crit, 0)
-print("VGG QAT accuracy using TensorRT: {:.2f}%".format(100 * test_acc))
-</pre>
-           </div>
-          </div>
          </div>
-         <div class="nboutput nblast docutils container">
-          <div class="prompt empty docutils container">
-          </div>
-          <div class="output_area docutils container">
-           <div class="highlight">
-            <pre>
+        </div>
+        <div class="input_area highlight-ipython3 notranslate">
+         <div class="highlight">
+          <pre>
+<span></span><span class="n">qat_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">"trained_vgg16_qat.jit.pt"</span><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+
+<span class="n">compile_spec</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"inputs"</span><span class="p">:</span> <span class="p">[</span><span class="n">trtorch</span><span class="o">.</span><span class="n">Input</span><span class="p">([</span><span class="mi">16</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">])],</span>
+                <span class="s2">"op_precision"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">int8</span><span class="p">,</span>
+                <span class="p">}</span>
+<span class="n">trt_mod</span> <span class="o">=</span> <span class="n">trtorch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">qat_model</span><span class="p">,</span> <span class="n">compile_spec</span><span class="p">)</span>
+
+<span class="n">test_loss</span><span class="p">,</span> <span class="n">test_acc</span> <span class="o">=</span> <span class="n">test</span><span class="p">(</span><span class="n">trt_mod</span><span class="p">,</span> <span class="n">testing_dataloader</span><span class="p">,</span> <span class="n">crit</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"VGG QAT accuracy using TensorRT: </span><span class="si">{:.2f}</span><span class="s2">%"</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="mi">100</span> <span class="o">*</span> <span class="n">test_acc</span><span class="p">))</span>
+</pre>
+         </div>
+        </div>
+       </div>
+       <div class="nboutput nblast docutils container">
+        <div class="prompt empty docutils container">
+        </div>
+        <div class="output_area docutils container">
+         <div class="highlight">
+          <pre>
 VGG QAT accuracy using TensorRT: 83.59%
 </pre>
-           </div>
-          </div>
          </div>
-         <p>
-          ## 9. References * Very Deep Convolution Networks for large scale Image Recognition * Achieving FP32 Accuracy for INT8 Inference Using Quantization Aware Training with NVIDIA TensorRT * QAT workflow for VGG16 * Deploying VGG QAT model in C++ using TRTorch * Pytorch-quantization toolkit from NVIDIA * Pytorch quantization toolkit userguide * Quantization basics
-         </p>
-        </section>
-       </section>
+        </div>
+       </div>
+       <p>
+        ## 9. References * Very Deep Convolution Networks for large scale Image Recognition * Achieving FP32 Accuracy for INT8 Inference Using Quantization Aware Training with NVIDIA TensorRT * QAT workflow for VGG16 * Deploying VGG QAT model in C++ using TRTorch * Pytorch-quantization toolkit from NVIDIA * Pytorch quantization toolkit userguide * Quantization basics
+       </p>
       </article>
      </div>
     </div>
@@ -2059,13 +2067,13 @@ VGG QAT accuracy using TensorRT: 83.59%
        </span>
       </div>
      </a>
-     <a class="md-flex md-footer-nav__link md-footer-nav__link--next" href="../py_api/trtorch.html" rel="next" title="trtorch">
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--next" href="../py_api/torch_tensorrt.html" rel="next" title="torch_tensorrt">
       <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
        <span class="md-flex__ellipsis">
         <span class="md-footer-nav__direction">
          Next
         </span>
-        trtorch
+        torch_tensorrt
        </span>
       </div>
       <div class="md-flex__cell md-flex__cell--shrink">

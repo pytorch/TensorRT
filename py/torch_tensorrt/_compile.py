@@ -49,7 +49,41 @@ def _module_ir(module: Any, ir: str) -> _IRType.ts:
 
 
 def compile(module: Any, ir="default", inputs=[], enabled_precisions=set([_enums.dtype.float]), **kwargs):
+    """Compile a PyTorch module for NVIDIA GPUs using TensorRT
 
+    Takes a existing PyTorch module and a set of settings to configure the compiler
+    and using the path specified in ``ir`` lower and compile the module to TensorRT
+    returning a PyTorch Module back
+
+    Converts specifically the forward method of a Module
+
+    Arguments:
+        module (Union(torch.nn.Module,torch.jit.ScriptModule): Source module
+
+    Keyword Arguments:
+        inputs (List[Union(torch_tensorrt.Input, torch.Tensor)]): **Required** List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
+            torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum
+            to select device type. ::
+
+                input=[
+                    torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
+                    torch_tensorrt.Input(
+                        min_shape=(1, 224, 224, 3),
+                        opt_shape=(1, 512, 512, 3),
+                        max_shape=(1, 1024, 1024, 3),
+                        dtype=torch.int32
+                        format=torch.channel_last
+                    ), # Dynamic input shape for input #2
+                    torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
+                ]
+
+        enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
+        ir (str): The requested strategy to compile. (Options: default - Let Torch-TensorRT decide, ts - TorchScript with scripting path)
+        **kwargs: Additional settings for the specific requested strategy (See submodules for more info)
+
+    Returns:
+        torch.nn.Module: Compiled Module, when run it will execute via TensorRT
+    """
     target_ir = _module_ir(module, ir)
     if target_ir == _IRType.ts:
         ts_mod = module
@@ -71,6 +105,37 @@ def convert_method_to_trt_engine(module: Any,
                                  inputs=[],
                                  enabled_precisions=set([_enums.dtype.float]),
                                  **kwargs):
+    """Convert a TorchScript module method to a serialized TensorRT engine
+
+    Converts a specified method of a module to a serialized TensorRT engine given a dictionary of conversion settings
+
+    Arguments:
+        module (Union(torch.nn.Module,torch.jit.ScriptModule): Source module
+
+    Keyword Arguments:
+        inputs (List[Union(torch_tensorrt.Input, torch.Tensor)]): **Required** List of specifications of input shape, dtype and memory layout for inputs to the module. This argument is required. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
+            torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum
+            to select device type. ::
+
+                input=[
+                    torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
+                    torch_tensorrt.Input(
+                        min_shape=(1, 224, 224, 3),
+                        opt_shape=(1, 512, 512, 3),
+                        max_shape=(1, 1024, 1024, 3),
+                        dtype=torch.int32
+                        format=torch.channel_last
+                    ), # Dynamic input shape for input #2
+                    torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
+                ]
+
+        enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
+        ir (str): The requested strategy to compile. (Options: default - Let Torch-TensorRT decide, ts - TorchScript with scripting path)
+        **kwargs: Additional settings for the specific requested strategy (See submodules for more info)
+
+    Returns:
+        bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
+    """
     target_ir = _module_ir(module, ir)
     if target_ir == _IRType.ts:
         ts_mod = module

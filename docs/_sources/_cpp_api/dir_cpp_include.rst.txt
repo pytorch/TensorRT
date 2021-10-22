@@ -14,7 +14,7 @@ Directory include
 Subdirectories
 --------------
 
-- :ref:`dir_cpp_include_trtorch`
+- :ref:`dir_cpp_include_torch_tensorrt`
 
 
 

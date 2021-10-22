@@ -1,0 +1,101 @@
+
+.. _file_cpp_include_torch_tensorrt_torch_tensorrt.h:
+
+File torch_tensorrt.h
+=====================
+
+|exhale_lsh| :ref:`Parent directory <dir_cpp_include_torch_tensorrt>` (``cpp/include/torch_tensorrt``)
+
+.. |exhale_lsh| unicode:: U+021B0 .. UPWARDS ARROW WITH TIP LEFTWARDS
+
+.. contents:: Contents
+   :local:
+   :backlinks: none
+
+Definition (``cpp/include/torch_tensorrt/torch_tensorrt.h``)
+------------------------------------------------------------
+
+
+.. toctree::
+   :maxdepth: 1
+
+   program_listing_file_cpp_include_torch_tensorrt_torch_tensorrt.h.rst
+
+
+
+
+
+Includes
+--------
+
+
+- ``cuda_runtime.h``
+
+- ``iostream``
+
+- ``memory``
+
+- ``set``
+
+- ``string``
+
+- ``torch_tensorrt/macros.h`` (:ref:`file_cpp_include_torch_tensorrt_macros.h`)
+
+- ``vector``
+
+
+
+
+
+
+Namespaces
+----------
+
+
+- :ref:`namespace_torch_tensorrt`
+
+- :ref:`namespace_torch_tensorrt__torchscript`
+
+
+Classes
+-------
+
+
+- :ref:`exhale_struct_structtorch__tensorrt_1_1Device`
+
+- :ref:`exhale_struct_structtorch__tensorrt_1_1Input`
+
+- :ref:`exhale_struct_structtorch__tensorrt_1_1torchscript_1_1CompileSpec`
+
+- :ref:`exhale_class_classtorch__tensorrt_1_1DataType`
+
+- :ref:`exhale_class_classtorch__tensorrt_1_1Device_1_1DeviceType`
+
+- :ref:`exhale_class_classtorch__tensorrt_1_1TensorFormat`
+
+
+Enums
+-----
+
+
+- :ref:`exhale_enum_torch__tensorrt_8h_1a3fbe5d72e4fc624dbd038853079620eb`
+
+
+Functions
+---------
+
+
+- :ref:`exhale_function_torch__tensorrt_8h_1ad6a4ee8ca6c8f6e5519eb1128ec7f4a1`
+
+- :ref:`exhale_function_torch__tensorrt_8h_1ac4ab8313ae72c2c899ea31548b528528`
+
+- :ref:`exhale_function_torch__tensorrt_8h_1ad1acd06eaeaffbbcf6e7ebf426891384`
+
+- :ref:`exhale_function_torch__tensorrt_8h_1a4bc55f6e32e621ab6486c06c175d08a7`
+
+- :ref:`exhale_function_torch__tensorrt_8h_1a1856affcd989dc73624d67f75b2809dc`
+
+- :ref:`exhale_function_torch__tensorrt_8h_1a0ca79002dd29a268b4100dde4e84d5d2`
+
+- :ref:`exhale_function_torch__tensorrt_8h_1a3b42b05ed55a5444a544d91778619e6c`
+
