@@ -8,7 +8,7 @@
 #include "core/util/prelude.h"
 #include "torch/custom_class.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace runtime {
 
@@ -85,4 +85,4 @@ const std::unordered_map<std::string, std::string>& get_dla_supported_SMs();
 
 } // namespace runtime
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

@@ -7,7 +7,7 @@
 #include "torch/csrc/jit/passes/constant_pooling.h"
 #include "torch/csrc/jit/passes/dead_code_elimination.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace partitioning {
 
@@ -422,4 +422,4 @@ std::ostream& operator<<(std::ostream& os, const PartitionedGraph& g) {
 
 } // namespace partitioning
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

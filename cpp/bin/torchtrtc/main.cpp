@@ -623,12 +623,12 @@ int main(int argc, char** argv) {
   }
 
   if (save_engine) {
-    auto engine = torchtrt::ts::ConvertGraphToTRTEngine(mod, "forward", compile_settings);
+    auto engine = torchtrt::ts::ConvertMethodToTRTEngine(mod, "forward", compile_settings);
     std::ofstream out(real_output_path);
     out << engine;
     out.close();
   } else {
-    auto trt_mod = torchtrt::ts::CompileGraph(mod, compile_settings);
+    auto trt_mod = torchtrt::ts::CompileModule(mod, compile_settings);
 
     if (!no_threshold_check &&
         (compile_settings.enabled_precisions.size() == 1 &&

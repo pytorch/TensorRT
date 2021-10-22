@@ -25,7 +25,7 @@
 #include "core/partitioning/partitioning.h"
 #include "core/runtime/runtime.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 
 void AddEngineToGraph(
@@ -356,7 +356,7 @@ std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::
   auto graph_and_parameters = lowering::Lower(mod, method_name, cfg.lower_info);
 
   auto g = graph_and_parameters.first;
-  TRTORCH_CHECK(
+  TORCHTRT_CHECK(
       conversion::VerifyConverterSupportForBlock(g->block()),
       "Not all operations in graph are supported by the compiler");
   auto params = graph_and_parameters.second;
@@ -429,7 +429,7 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
           return mod;
         }
       } else {
-        TRTORCH_CHECK(
+        TORCHTRT_CHECK(
             conversion::VerifyConverterSupportForBlock(g->block()),
             "Not all operations in graph are supported by the compiler");
         auto engine = conversion::ConvertBlockToEngine(g->block(), cfg.convert_info, static_params);
@@ -459,8 +459,8 @@ torch::jit::script::Module EmbedEngineInNewModule(const std::string& engine, run
 }
 
 void set_device(const int gpu_id) {
-  TRTORCH_ASSERT(cudaSetDevice(gpu_id) == cudaSuccess, "Unable to set CUDA device: " << gpu_id);
+  TORCHTRT_ASSERT(cudaSetDevice(gpu_id) == cudaSuccess, "Unable to set CUDA device: " << gpu_id);
 }
 
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

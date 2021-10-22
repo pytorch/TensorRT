@@ -1,7 +1,7 @@
 #include "core/conversion/converters/converters.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace converters {
@@ -13,7 +13,7 @@ namespace {
     auto in = args[0].ITensorOrFreeze(ctx);                                                                          \
                                                                                                                      \
     auto new_layer = ctx->net->addActivation(*in, nvinfer1::ActivationType::trt_type);                               \
-    TRTORCH_CHECK(new_layer, "Unable to create " #act " layer from node: " << *n);                                   \
+    TORCHTRT_CHECK(new_layer, "Unable to create " #act " layer from node: " << *n);                                   \
                                                                                                                      \
     new_layer->setName(util::node_info(n).c_str());                                                                  \
     ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));                                          \
@@ -22,7 +22,7 @@ namespace {
     return true;                                                                                                     \
   }                                                                                                                  \
                                                                                                                      \
-  auto act##_registrations TRTORCH_UNUSED =                                                                          \
+  auto act##_registrations TORCHTRT_UNUSED =                                                                          \
       RegisterNodeConversionPatterns()                                                                               \
           .pattern(                                                                                                  \
               {"aten::" #act "(Tensor input) -> (Tensor)",                                                           \
@@ -40,7 +40,7 @@ convert(tanh, kTANH);
 
 #undef convert
 
-auto acthardtanh TRTORCH_UNUSED =
+auto acthardtanh TORCHTRT_UNUSED =
     RegisterNodeConversionPatterns()
         .pattern({"aten::hardtanh(Tensor self, Scalar min_val=-1, Scalar max_val=1) -> (Tensor)",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
@@ -49,7 +49,7 @@ auto acthardtanh TRTORCH_UNUSED =
                     auto max = args[2].unwrapToDouble();
 
                     auto new_layer = ctx->net->addActivation(*in, nvinfer1::ActivationType::kCLIP);
-                    TRTORCH_CHECK(new_layer, "Unable to create layer for aten::hardtanh");
+                    TORCHTRT_CHECK(new_layer, "Unable to create layer for aten::hardtanh");
 
                     new_layer->setAlpha(min);
                     new_layer->setBeta(max);
@@ -68,7 +68,7 @@ auto acthardtanh TRTORCH_UNUSED =
                     auto max = args[2].unwrapToDouble();
 
                     auto new_layer = ctx->net->addActivation(*in, nvinfer1::ActivationType::kCLIP);
-                    TRTORCH_CHECK(new_layer, "Unable to create layer for aten::hardtanh");
+                    TORCHTRT_CHECK(new_layer, "Unable to create layer for aten::hardtanh");
 
                     new_layer->setAlpha(min);
                     new_layer->setBeta(max);
@@ -98,7 +98,7 @@ auto acthardtanh TRTORCH_UNUSED =
                        "Input shape is not broadcastable inserting shuffle layers to reshape to "
                        << util::toDims(slopes.sizes()));
                    auto in_shuffle = ctx->net->addShuffle(*in);
-                   TRTORCH_CHECK(in_shuffle, "Unable to create resize layer for aten::prelu input");
+                   TORCHTRT_CHECK(in_shuffle, "Unable to create resize layer for aten::prelu input");
                    in_shuffle->setReshapeDimensions(util::toDims(slopes.sizes()));
                    in_shuffle->setName(
                        std::string("[Reshape in to " + util::toStr(util::toDims(slopes.sizes())) + " for broadcasting]")
@@ -114,7 +114,7 @@ auto acthardtanh TRTORCH_UNUSED =
 
                if (to_reshape) {
                  auto out_shuffle = ctx->net->addShuffle(*out_tensor);
-                 TRTORCH_CHECK(out_shuffle, "Unable to create resize layer for aten::prelu output");
+                 TORCHTRT_CHECK(out_shuffle, "Unable to create resize layer for aten::prelu output");
                  out_shuffle->setReshapeDimensions(original_shape);
                  out_shuffle->setName(
                      (std::string("[Reshape back to ") + util::toStr(original_shape) + std::string("]")).c_str());
@@ -158,7 +158,7 @@ auto acthardtanh TRTORCH_UNUSED =
                     auto alpha = args[1].unwrapToDouble();
 
                     auto new_layer = ctx->net->addActivation(*in, nvinfer1::ActivationType::kELU);
-                    TRTORCH_CHECK(new_layer, "Unable to create layer for aten::elu");
+                    TORCHTRT_CHECK(new_layer, "Unable to create layer for aten::elu");
                     new_layer->setAlpha(alpha);
 
                     new_layer->setName(util::node_info(n).c_str());
@@ -171,7 +171,7 @@ auto acthardtanh TRTORCH_UNUSED =
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                     auto in = args[0].ITensorOrFreeze(ctx);
                     nvinfer1::DataType type = in->getType();
-                    TRTORCH_CHECK(
+                    TORCHTRT_CHECK(
                         type == nvinfer1::DataType::kFLOAT || type == nvinfer1::DataType::kHALF,
                         "gelu only supports kFLOAT and kHALF");
                     std::string pluginName = "CustomGeluPluginDynamic";
@@ -189,7 +189,7 @@ auto acthardtanh TRTORCH_UNUSED =
                     auto creator = getPluginRegistry()->getPluginCreator("CustomGeluPluginDynamic", "1", "");
                     auto gelu_plugin = creator->createPlugin("gelu", &fc);
 
-                    TRTORCH_CHECK(gelu_plugin, "Unable to create gelu plugin from TensorRT plugin registry" << *n);
+                    TORCHTRT_CHECK(gelu_plugin, "Unable to create gelu plugin from TensorRT plugin registry" << *n);
                     auto new_layer =
                         ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(&in), 1, *gelu_plugin);
                     new_layer->setName(util::node_info(n).c_str());
@@ -204,4 +204,4 @@ auto acthardtanh TRTORCH_UNUSED =
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

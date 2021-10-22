@@ -5,7 +5,7 @@
 #include "NvInfer.h"
 #include "torch/custom_class.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 
@@ -24,4 +24,4 @@ struct TensorContainer : torch::CustomClassHolder {
 
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

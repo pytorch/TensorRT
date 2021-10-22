@@ -4,16 +4,16 @@
 #include "NvInferPluginUtils.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace plugins {
 namespace impl {
-// Helper class which registers a plugin in trtorch namespace
+// Helper class which registers a plugin in torch_tensorrt namespace
 template <typename T>
 class PluginRegistrar {
  public:
   PluginRegistrar() {
-    getPluginRegistry()->registerCreator(instance, "trtorch");
+    getPluginRegistry()->registerCreator(instance, "torch_tensorrt");
   }
 
  private:
@@ -26,4 +26,4 @@ class PluginRegistrar {
 } // namespace impl
 } // namespace plugins
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

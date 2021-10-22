@@ -717,7 +717,7 @@ TORCHTRT_API bool CheckMethodOperatorSupport(const torch::jit::Module& module, s
  *
  * @return: A new module trageting a TensorRT engine
  */
-TORCHTRT_API torch::jit::Module CompileGraph(const torch::jit::Module& module, CompileSpec info);
+TORCHTRT_API torch::jit::Module CompileModule(const torch::jit::Module& module, CompileSpec info);
 
 /**
  * @brief Compile a TorchScript method for NVIDIA GPUs using TensorRT
@@ -733,7 +733,7 @@ TORCHTRT_API torch::jit::Module CompileGraph(const torch::jit::Module& module, C
  * @return: std::string: Serialized TensorRT engine equivilant to the method
  * graph
  */
-TORCHTRT_API std::string ConvertGraphToTRTEngine(
+TORCHTRT_API std::string ConvertMethodToTRTEngine(
     const torch::jit::Module& module,
     std::string method_name,
     CompileSpec info);

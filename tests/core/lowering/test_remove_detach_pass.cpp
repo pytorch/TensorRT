@@ -17,10 +17,10 @@ TEST(LoweringPasses, RemoveDetachCorrectly) {
       %3 = aten::sin(%input)
       return (%3))IR";
 
-  trtorch::core::util::logging::get_logger().set_reportable_log_level(trtorch::core::util::logging::LogLevel::kGRAPH);
+  torch_tensorrt::core::util::logging::get_logger().set_reportable_log_level(torch_tensorrt::core::util::logging::LogLevel::kGRAPH);
   auto sg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(source_graph, sg.get());
-  trtorch::core::lowering::passes::RemoveNOPs(sg);
+  torch_tensorrt::core::lowering::passes::RemoveNOPs(sg);
 
   auto tg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(target_graph, tg.get());

@@ -8,7 +8,7 @@
 #include "core/partitioning/PartitionInfo.h"
 #include "torch/csrc/jit/ir/ir.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace partitioning {
 
@@ -110,4 +110,4 @@ std::ostream& operator<<(std::ostream& os, const SegmentedBlock::SegmentedBlockT
 
 } // namespace partitioning
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

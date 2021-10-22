@@ -32,11 +32,11 @@ cc_library(
         ],
     }) + select({
         "//tests:ci_build_testing": [
-            "@trtorch//:trtorch",
-            "@trtorch//:trtorch_core_hdrs"
+            "@trtorch//:torch_tensorrt",
+            "@trtorch//:torch_tensorrt_core_hdrs"
         ],
         "//conditions:default": [
-            "//cpp:trtorch",
+            "//cpp:torch_tensorrt",
             "//core/conversion",
             "//core/util:prelude"
         ]

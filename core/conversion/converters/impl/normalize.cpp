@@ -4,7 +4,7 @@
 #include "core/util/prelude.h"
 #include "torch/torch.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace converters {
@@ -37,14 +37,14 @@ void create_plugin(
       axes[i] += inputnbDims;
     }
     if (axes[i] > inputnbDims - 1) {
-      TRTORCH_THROW_ERROR("Axis of normalization layer cannot exceed input rank");
+      TORCHTRT_THROW_ERROR("Axis of normalization layer cannot exceed input rank");
     }
   }
 
-  auto creator = getPluginRegistry()->getPluginCreator("NormalizePlugin", "1", "trtorch");
+  auto creator = getPluginRegistry()->getPluginCreator("NormalizePlugin", "1", "torch_tensorrt");
   auto plugin = creator->createPlugin(name, &fc);
   auto normalize_layer = ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(&in), 1, *plugin);
-  TRTORCH_CHECK(normalize_layer, "Unable to create normalization plugin from node" << *n);
+  TORCHTRT_CHECK(normalize_layer, "Unable to create normalization plugin from node" << *n);
 
   normalize_layer->setName(util::node_info(n).c_str());
 
@@ -53,7 +53,7 @@ void create_plugin(
   LOG_DEBUG("Normalize layer output tensor shape: " << layer_output->getDimensions());
 }
 
-auto normalize_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().pattern(
+auto normalize_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pattern(
     {"aten::norm.ScalarOpt_dim(Tensor self, Scalar? p, int[1] dim, bool keepdim=False) -> (Tensor)",
      [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
        auto in = args[0].ITensor();
@@ -65,7 +65,7 @@ auto normalize_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().p
        LOG_DEBUG("Order of normalize_plugin: " << order);
        LOG_DEBUG("Axis: " << axes);
        LOG_DEBUG("keep_dims: " << keep_dims);
-       create_plugin(ctx, n, in, order, axes, keep_dims, "NormalizePlugintrtorch");
+       create_plugin(ctx, n, in, order, axes, keep_dims, "NormalizePluginTorchTRT");
        return true;
      }
 
@@ -76,4 +76,4 @@ auto normalize_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().p
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

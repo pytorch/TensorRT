@@ -7,7 +7,7 @@
 #include "NvInfer.h"
 #include "torch/csrc/jit/ir/ir.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace ir {
 
@@ -59,4 +59,4 @@ ir::TypeMap get_block_first_calc_dtypes_opt(torch::jit::Block* b);
 
 } // namespace ir
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

@@ -134,8 +134,8 @@ cc_test(
 )
 
 cc_test(
-    name = "test_multi_gpu_serdes",
-    srcs = ["test_multi_gpu_serdes.cpp"],
+    name = "test_multi_gpu_serde",
+    srcs = ["test_multi_gpu_serde.cpp"],
     data = [
         "//tests/modules:jit_models",
     ],

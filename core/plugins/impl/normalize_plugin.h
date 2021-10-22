@@ -15,7 +15,7 @@
 
 // using namespace nvinfer1;
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace plugins {
 namespace impl {
@@ -126,4 +126,4 @@ class NormalizePluginCreator : public nvinfer1::IPluginCreator {
 } // namespace impl
 } // namespace plugins
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

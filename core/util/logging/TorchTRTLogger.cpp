@@ -1,4 +1,4 @@
-#include "core/util/logging/TRTorchLogger.h"
+#include "core/util/logging/TorchTRTLogger.h"
 
 #include <iostream>
 #include <string>
@@ -9,20 +9,20 @@
 #define TERM_GREEN "\033[0;32m";
 #define TERM_MAGENTA "\033[1;35m";
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace trt = nvinfer1;
 
 namespace util {
 namespace logging {
 
-TRTorchLogger::TRTorchLogger(std::string prefix, Severity severity, bool color)
+TorchTRTLogger::TorchTRTLogger(std::string prefix, Severity severity, bool color)
     : prefix_(prefix), reportable_severity_((LogLevel)severity), color_(color) {}
 
-TRTorchLogger::TRTorchLogger(std::string prefix, LogLevel lvl, bool color)
+TorchTRTLogger::TorchTRTLogger(std::string prefix, LogLevel lvl, bool color)
     : prefix_(prefix), reportable_severity_(lvl), color_(color) {}
 
-void TRTorchLogger::log(LogLevel lvl, std::string msg) {
+void TorchTRTLogger::log(LogLevel lvl, std::string msg) {
   // suppress messages with severity enum value greater than the reportable
   if (lvl > reportable_severity_) {
     return;
@@ -84,61 +84,61 @@ void TRTorchLogger::log(LogLevel lvl, std::string msg) {
   std::cerr << prefix_ << msg << std::endl;
 }
 
-void TRTorchLogger::log(Severity severity, const char* msg) noexcept {
+void TorchTRTLogger::log(Severity severity, const char* msg) noexcept {
   LogLevel lvl = (LogLevel)severity;
   log(lvl, std::string(msg));
 }
 
-void TRTorchLogger::set_logging_prefix(std::string prefix) {
+void TorchTRTLogger::set_logging_prefix(std::string prefix) {
   prefix_ = prefix;
 }
 
-void TRTorchLogger::set_reportable_severity(Severity severity) {
+void TorchTRTLogger::set_reportable_severity(Severity severity) {
   reportable_severity_ = (LogLevel)severity;
 }
 
-void TRTorchLogger::set_reportable_log_level(LogLevel lvl) {
+void TorchTRTLogger::set_reportable_log_level(LogLevel lvl) {
   reportable_severity_ = lvl;
 }
 
-void TRTorchLogger::set_is_colored_output_on(bool colored_output_on) {
+void TorchTRTLogger::set_is_colored_output_on(bool colored_output_on) {
   color_ = colored_output_on;
 }
 
-std::string TRTorchLogger::get_logging_prefix() {
+std::string TorchTRTLogger::get_logging_prefix() {
   return prefix_;
 }
 
-nvinfer1::ILogger::Severity TRTorchLogger::get_reportable_severity() {
+nvinfer1::ILogger::Severity TorchTRTLogger::get_reportable_severity() {
   return (Severity)reportable_severity_;
 }
 
-LogLevel TRTorchLogger::get_reportable_log_level() {
+LogLevel TorchTRTLogger::get_reportable_log_level() {
   return reportable_severity_;
 }
 
-bool TRTorchLogger::get_is_colored_output_on() {
+bool TorchTRTLogger::get_is_colored_output_on() {
   return color_;
 }
 
 namespace {
 
-TRTorchLogger& get_global_logger() {
+TorchTRTLogger& get_global_logger() {
 #ifndef NDEBUG
-  static TRTorchLogger global_logger("[TRTorch - Debug Build] - ", LogLevel::kDEBUG, true);
+  static TorchTRTLogger global_logger("[Torch-TensorRT - Debug Build] - ", LogLevel::kDEBUG, true);
 #else
-  static TRTorchLogger global_logger("[TRTorch] - ", LogLevel::kWARNING, false);
+  static TorchTRTLogger global_logger("[Torch-TensorRT] - ", LogLevel::kWARNING, false);
 #endif
   return global_logger;
 }
 
 } // namespace
 
-TRTorchLogger& get_logger() {
+TorchTRTLogger& get_logger() {
   return get_global_logger();
 }
 
 } // namespace logging
 } // namespace util
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

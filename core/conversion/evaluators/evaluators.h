@@ -9,7 +9,7 @@
 #include "core/conversion/tensorcontainer/TensorContainer.h"
 #include "core/conversion/var/Var.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace evaluators {
@@ -91,4 +91,4 @@ class RegisterNodeEvaluators {
 } // namespace evaluators
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

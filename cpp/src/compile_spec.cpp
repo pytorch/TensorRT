@@ -11,9 +11,9 @@ namespace torch_tensorrt {
 // Defined in types.cpp
 nvinfer1::DataType toTRTDataType(DataType value);
 nvinfer1::TensorFormat toTRTTensorFormat(TensorFormat value);
-trtorch::core::ir::Input to_internal_input(Input& i);
-std::vector<trtorch::core::ir::Input> to_vec_internal_inputs(std::vector<Input>& external);
-trtorch::core::runtime::CudaDevice to_internal_cuda_device(Device device);
+torchtrt::core::ir::Input to_internal_input(Input& i);
+std::vector<torchtrt::core::ir::Input> to_vec_internal_inputs(std::vector<Input>& external);
+torchtrt::core::runtime::CudaDevice to_internal_cuda_device(Device device);
 
 namespace torchscript {
 CompileSpec::CompileSpec(std::vector<c10::ArrayRef<int64_t>> fixed_sizes) {
@@ -28,8 +28,8 @@ CompileSpec::CompileSpec(std::vector<std::vector<int64_t>> fixed_sizes) {
   }
 }
 
-trtorch::core::CompileSpec to_internal_compile_spec(CompileSpec external) {
-  trtorch::core::CompileSpec internal(to_vec_internal_inputs(external.inputs));
+torchtrt::core::CompileSpec to_internal_compile_spec(CompileSpec external) {
+  torchtrt::core::CompileSpec internal(to_vec_internal_inputs(external.inputs));
 
   for (auto p : external.enabled_precisions) {
     internal.convert_info.engine_settings.enabled_precisions.insert(toTRTDataType(p));
@@ -44,12 +44,12 @@ trtorch::core::CompileSpec to_internal_compile_spec(CompileSpec external) {
   internal.convert_info.engine_settings.device.allow_gpu_fallback = external.device.allow_gpu_fallback;
   internal.convert_info.engine_settings.max_batch_size = external.max_batch_size;
 
-  TRTORCH_CHECK(
+  TORCHTRT_CHECK(
       !(external.require_full_compilation && (external.torch_executed_ops.size() > 0)),
       "require_full_compilation is enabled however the list of ops to run in torch is not empty (Found "
           << external.torch_executed_ops.size() << " ops)");
 
-  TRTORCH_CHECK(
+  TORCHTRT_CHECK(
       !(external.require_full_compilation && (external.torch_executed_modules.size() > 0)),
       "require_full_compilation is enabled however the list of modules to run in torch is not empty (Found "
           << external.torch_executed_modules.size() << " modules)");

@@ -13,8 +13,8 @@ TEST(Evaluators, PrimConstantEvaluatesCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  auto jit_results = trtorch::tests::util::EvaluateGraphJIT(g, {});
-  auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {});
+  auto jit_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {});
+  auto trt_results = torch_tensorrt::tests::util::EvaluateGraph(g->block(), {});
 
   ASSERT_TRUE(jit_results[0] == trt_results[0]);
 }
@@ -31,8 +31,8 @@ TEST(Evaluators, PrimListUnpackEvaluatesCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  auto jit_results = trtorch::tests::util::EvaluateGraphJIT(g, {});
-  auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {});
+  auto jit_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {});
+  auto trt_results = torch_tensorrt::tests::util::EvaluateGraph(g->block(), {});
 
   ASSERT_TRUE(jit_results[0] == trt_results[0]);
   ASSERT_TRUE(jit_results[1] == trt_results[1]);
@@ -48,8 +48,8 @@ TEST(Evaluators, NumToTensorEvaluatesCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  auto jit_results = trtorch::tests::util::EvaluateGraphJIT(g, {});
-  auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {});
+  auto jit_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {});
+  auto trt_results = torch_tensorrt::tests::util::EvaluateGraph(g->block(), {});
 
   ASSERT_TRUE(jit_results[0] == trt_results[0]);
 }

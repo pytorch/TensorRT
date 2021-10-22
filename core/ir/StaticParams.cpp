@@ -3,7 +3,7 @@
 #include "core/ir/ir.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace ir {
 
@@ -17,7 +17,7 @@ StaticParams get_static_params(c10::ArrayRef<torch::jit::Value*> inputs, std::ve
     }
   }
 
-  TRTORCH_CHECK(
+  TORCHTRT_CHECK(
       static_params.size() == params.size(),
       "Graph parameter parsing failed, mismatched number of static parameters and IValues")
   return static_params;
@@ -25,4 +25,4 @@ StaticParams get_static_params(c10::ArrayRef<torch::jit::Value*> inputs, std::ve
 
 } // namespace ir
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt
