@@ -36,12 +36,12 @@ If you would like to build outside a docker container, please follow the section
 // Set input datatypes. Allowerd options torch::{kFloat, kHalf, kChar, kInt32, kBool}
 // Size of input_dtypes should match number of inputs to the network.
 // If input_dtypes is not set, default precision follows traditional PyT / TRT rules
-auto input = torch_tensorrt::CompileSpec::Input(dims, torch::kHalf)
-auto compile_settings = torch_tensorrt::CompileSpec({input});
+auto input = torch_tensorrt::Input(dims, torch::kHalf)
+auto compile_settings = torch_tensorrt::ts::CompileSpec({input});
 // FP16 execution
 compile_settings.enabled_precisions = {torch::kHalf};
 // Compile module
-auto trt_mod = torch_tensorrt::CompileGraph(ts_mod, compile_settings);
+auto trt_mod = torch_tensorrt::ts::CompileModule(ts_mod, compile_settings);
 // Run like normal
 auto results = trt_mod.forward({in_tensor});
 // Save module for later
