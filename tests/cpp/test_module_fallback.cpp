@@ -26,7 +26,7 @@ TEST(CppAPITest, ResNetModuleFallbacksCorrectly) {
   cfg.torch_executed_modules.push_back("torchvision.models.resnet.BasicBlock");
 
   auto jit_results = mod.forward(jit_inputs_ivalues).toTensor();
-  auto trt_mod = torch_tensorrt::ts::CompileModule(mod, cfg);
+  auto trt_mod = torch_tensorrt::ts::compile(mod, cfg);
   auto trt_results = trt_mod.forward(trt_inputs_ivalues).toTensor();
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results, trt_results, 2e-6));
 }
@@ -54,7 +54,7 @@ TEST(CppAPITest, MobileNetModuleFallbacksCorrectlyWithOneEngine) {
   cfg.torch_executed_modules.push_back("torchvision.models.mobilenetv2.ConvBNActivation");
 
   auto jit_results = mod.forward(jit_inputs_ivalues).toTensor();
-  auto trt_mod = torch_tensorrt::ts::CompileModule(mod, cfg);
+  auto trt_mod = torch_tensorrt::ts::compile(mod, cfg);
 
   auto g = trt_mod.get_method("forward").graph();
   auto nodes = g->block()->nodes();

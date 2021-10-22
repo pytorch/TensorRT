@@ -58,7 +58,7 @@ TEST_P(AccuracyTests, INT8AccuracyIsClose) {
   torch::Tensor jit_accuracy = (jit_correct / jit_total) * 100;
 
   // Compile Graph
-  auto trt_mod = torch_tensorrt::ts::CompileModule(mod, compile_spec);
+  auto trt_mod = torch_tensorrt::ts::compile(mod, compile_spec);
 
   // Check the INT8 accuracy in TRT
   torch::Tensor trt_correct = torch::zeros({1}, {torch::kCUDA}), trt_total = torch::zeros({1}, {torch::kCUDA});

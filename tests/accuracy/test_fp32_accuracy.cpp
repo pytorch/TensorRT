@@ -29,7 +29,7 @@ TEST_P(AccuracyTests, FP32AccuracyIsClose) {
   auto compile_spec = torch_tensorrt::ts::CompileSpec({input_shape});
   compile_spec.enabled_precisions.insert(torch::kF32);
 
-  auto trt_mod = torch_tensorrt::ts::CompileModule(mod, compile_spec);
+  auto trt_mod = torch_tensorrt::ts::compile(mod, compile_spec);
 
   torch::Tensor trt_correct = torch::zeros({1}, {torch::kCUDA}), trt_total = torch::zeros({1}, {torch::kCUDA});
   for (auto batch : *eval_dataloader) {

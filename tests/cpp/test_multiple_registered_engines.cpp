@@ -41,13 +41,13 @@ TEST(CppAPITest, CanRunMultipleEngines) {
   std::vector<at::Tensor> jit2_results;
   jit2_results.push_back(jit2_results_ivalues.toTensor());
 
-  auto trt_mod1 = torch_tensorrt::ts::CompileModule(mod1, input_shapes);
+  auto trt_mod1 = torch_tensorrt::ts::compile(mod1, input_shapes);
   torch::jit::IValue trt1_results_ivalues =
       torch_tensorrt::tests::util::RunModuleForward(trt_mod1, trt1_inputs_ivalues);
   std::vector<at::Tensor> trt1_results;
   trt1_results.push_back(trt1_results_ivalues.toTensor());
 
-  auto trt_mod2 = torch_tensorrt::ts::CompileModule(mod2, input_shapes);
+  auto trt_mod2 = torch_tensorrt::ts::compile(mod2, input_shapes);
   torch::jit::IValue trt2_results_ivalues =
       torch_tensorrt::tests::util::RunModuleForward(trt_mod2, trt2_inputs_ivalues);
   std::vector<at::Tensor> trt2_results;
