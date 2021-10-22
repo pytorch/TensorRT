@@ -600,7 +600,7 @@ int main(int argc, char** argv) {
   // Instead of compiling, just embed engine in a PyTorch module
   if (embed_engine) {
     std::string serialized_engine = read_buf(real_input_path);
-    auto trt_mod = torchtrt::ts::EmbedEngineInNewModule(serialized_engine, compile_settings.device);
+    auto trt_mod = torchtrt::ts::embed_engine_in_new_module(serialized_engine, compile_settings.device);
     trt_mod.save(real_output_path);
     return 0;
   }
@@ -615,19 +615,19 @@ int main(int argc, char** argv) {
   }
 
   if (require_full_compilation) {
-    if (!torchtrt::ts::CheckMethodOperatorSupport(mod, "forward")) {
+    if (!torchtrt::ts::check_method_operator_support(mod, "forward")) {
       torchtrt::logging::log(torchtrt::logging::Level::kERROR, "Module is not currently supported by Torch-TensorRT");
       return 1;
     }
   }
 
   if (save_engine) {
-    auto engine = torchtrt::ts::ConvertMethodToTRTEngine(mod, "forward", compile_settings);
+    auto engine = torchtrt::ts::convert_method_to_trt_engine(mod, "forward", compile_settings);
     std::ofstream out(real_output_path);
     out << engine;
     out.close();
   } else {
-    auto trt_mod = torchtrt::ts::CompileModule(mod, compile_settings);
+    auto trt_mod = torchtrt::ts::compile(mod, compile_settings);
 
     if (!no_threshold_check &&
         (compile_settings.enabled_precisions.size() == 1 &&

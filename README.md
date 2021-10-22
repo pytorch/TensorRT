@@ -14,7 +14,7 @@ More Information / System Architecture:
 
 ## Building a docker container for Torch-TensorRT Preview
 
-We provide a `Dockerfile` in `docker/` directory. We build `Torch-TensorRT` on top of a `Pytorch NGC container` which provide basic dependencies (like CUDA, CUDNN, CUBLAS, TensorRT, Pytorch and others) The dependency libraries in the container can be found in the <a href="https://docs.nvidia.com/deeplearning/frameworks/pytorch-release-notes/index.html">release notes</a>.  
+We provide a `Dockerfile` in `docker/` directory. We build `Torch-TensorRT` on top of a `Pytorch NGC container` which provide basic dependencies (like CUDA, CUDNN, CUBLAS, TensorRT, Pytorch and others) The dependency libraries in the container can be found in the <a href="https://docs.nvidia.com/deeplearning/frameworks/pytorch-release-notes/index.html">release notes</a>.
 
 Please follow this instruction to build a Docker container.
 
@@ -41,7 +41,7 @@ auto compile_settings = torch_tensorrt::ts::CompileSpec({input});
 // FP16 execution
 compile_settings.enabled_precisions = {torch::kHalf};
 // Compile module
-auto trt_mod = torch_tensorrt::ts::CompileModule(ts_mod, compile_settings);
+auto trt_mod = torch_tensorrt::ts::compile(ts_mod, compile_settings);
 // Run like normal
 auto results = trt_mod.forward({in_tensor});
 // Save module for later

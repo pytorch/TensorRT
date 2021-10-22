@@ -14,7 +14,7 @@ TEST_P(CppAPITests, CompiledModuleIsClose) {
   std::vector<at::Tensor> jit_results;
   jit_results.push_back(jit_results_ivalues.toTensor());
 
-  auto trt_mod = torch_tensorrt::ts::CompileModule(mod, input_shapes);
+  auto trt_mod = torch_tensorrt::ts::compile(mod, input_shapes);
 
   // Deliberately changing the device ID. torch_tensorrt runtime should correct the Device ID internally
   torch_tensorrt::set_device(1);

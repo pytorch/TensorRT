@@ -15,7 +15,7 @@ TEST_P(CppAPITests, InputsUseDefaultFP32) {
   auto spec = torch_tensorrt::ts::CompileSpec({in});
   spec.enabled_precisions.insert(torch_tensorrt::DataType::kHalf);
 
-  auto trt_mod = torch_tensorrt::ts::CompileModule(mod, spec);
+  auto trt_mod = torch_tensorrt::ts::compile(mod, spec);
   torch::jit::IValue trt_results_ivalues = torch_tensorrt::tests::util::RunModuleForward(trt_mod, trt_inputs_ivalues);
   std::vector<at::Tensor> trt_results;
   trt_results.push_back(trt_results_ivalues.toTensor());
@@ -38,7 +38,7 @@ TEST_P(CppAPITests, InputsUseDefaultFP16) {
 
   mod.to(torch::kHalf);
 
-  auto trt_mod = torch_tensorrt::ts::CompileModule(mod, spec);
+  auto trt_mod = torch_tensorrt::ts::compile(mod, spec);
   torch::jit::IValue trt_results_ivalues = torch_tensorrt::tests::util::RunModuleForward(trt_mod, trt_inputs_ivalues);
   std::vector<at::Tensor> trt_results;
   trt_results.push_back(trt_results_ivalues.toTensor());
@@ -60,7 +60,7 @@ TEST_P(CppAPITests, InputsUseDefaultFP16WithoutFP16Enabled) {
 
   mod.to(torch::kHalf);
 
-  auto trt_mod = torch_tensorrt::ts::CompileModule(mod, spec);
+  auto trt_mod = torch_tensorrt::ts::compile(mod, spec);
   torch::jit::IValue trt_results_ivalues = torch_tensorrt::tests::util::RunModuleForward(trt_mod, trt_inputs_ivalues);
   std::vector<at::Tensor> trt_results;
   trt_results.push_back(trt_results_ivalues.toTensor());
@@ -84,7 +84,7 @@ TEST_P(CppAPITests, InputsRespectUserSettingFP16WeightsFP32In) {
 
   mod.to(torch::kHalf);
 
-  auto trt_mod = torch_tensorrt::ts::CompileModule(mod, spec);
+  auto trt_mod = torch_tensorrt::ts::compile(mod, spec);
   torch::jit::IValue trt_results_ivalues = torch_tensorrt::tests::util::RunModuleForward(trt_mod, trt_inputs_ivalues);
   std::vector<at::Tensor> trt_results;
   trt_results.push_back(trt_results_ivalues.toTensor());
@@ -106,7 +106,7 @@ TEST_P(CppAPITests, InputsRespectUserSettingFP32WeightsFP16In) {
   auto spec = torch_tensorrt::ts::CompileSpec({in});
   spec.enabled_precisions.insert(torch_tensorrt::DataType::kHalf);
 
-  auto trt_mod = torch_tensorrt::ts::CompileModule(mod, spec);
+  auto trt_mod = torch_tensorrt::ts::compile(mod, spec);
   torch::jit::IValue trt_results_ivalues = torch_tensorrt::tests::util::RunModuleForward(trt_mod, trt_inputs_ivalues);
   std::vector<at::Tensor> trt_results;
   trt_results.push_back(trt_results_ivalues.toTensor());

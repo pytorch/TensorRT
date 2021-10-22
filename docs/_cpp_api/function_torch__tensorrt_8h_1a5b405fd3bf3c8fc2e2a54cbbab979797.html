@@ -37,7 +37,7 @@
   <script src="../_static/javascripts/modernizr.js">
   </script>
   <title>
-   Define TORCHTRT_HIDDEN — Torch-TensorRT master documentation
+   Function torch_tensorrt::torchscript::check_method_operator_support — Torch-TensorRT master documentation
   </title>
   <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/pygments.css" rel="stylesheet" type="text/css"/>
@@ -79,7 +79,7 @@
   <input class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
   <label class="md-overlay" data-md-component="overlay" for="__drawer">
   </label>
-  <a class="md-skip" href="#_cpp_api/define_macros_8h_1ad19939408f7be171a74a89928b36eb59" tabindex="1">
+  <a class="md-skip" href="#_cpp_api/function_torch__tensorrt_8h_1a5b405fd3bf3c8fc2e2a54cbbab979797" tabindex="1">
    Skip to content
   </a>
   <header class="md-header" data-md-component="header">
@@ -102,7 +102,7 @@
         Torch-TensorRT
        </span>
        <span class="md-header-nav__topic">
-        Define TORCHTRT_HIDDEN
+        Function torch_tensorrt::torchscript::check_method_operator_support
        </span>
       </div>
      </div>
@@ -383,21 +383,21 @@
          </label>
          <ul class="md-nav__list" data-md-scrollfix="">
           <li class="md-nav__item">
-           <a class="md-nav__link" href="#cpp-api-define-macros-8h-1ad19939408f7be171a74a89928b36eb59--page-root">
-            Define TORCHTRT_HIDDEN
+           <a class="md-nav__link" href="#cpp-api-function-torch-tensorrt-8h-1a5b405fd3bf3c8fc2e2a54cbbab979797--page-root">
+            Function torch_tensorrt::torchscript::check_method_operator_support
            </a>
            <nav class="md-nav">
             <ul class="md-nav__list">
              <li class="md-nav__item">
-              <a class="md-nav__link" href="#define-documentation">
-               Define Documentation
+              <a class="md-nav__link" href="#function-documentation">
+               Function Documentation
               </a>
              </li>
             </ul>
            </nav>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__extra_link" href="../_sources/_cpp_api/define_macros_8h_1ad19939408f7be171a74a89928b36eb59.rst.txt">
+           <a class="md-nav__extra_link" href="../_sources/_cpp_api/function_torch__tensorrt_8h_1a5b405fd3bf3c8fc2e2a54cbbab979797.rst.txt">
             Show Source
            </a>
           </li>
@@ -410,12 +410,12 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <section id="define-torchtrt-hidden">
-        <span id="exhale-define-macros-8h-1ad19939408f7be171a74a89928b36eb59">
+       <section id="function-torch-tensorrt-torchscript-check-method-operator-support">
+        <span id="exhale-function-torch-tensorrt-8h-1a5b405fd3bf3c8fc2e2a54cbbab979797">
         </span>
-        <h1 id="cpp-api-define-macros-8h-1ad19939408f7be171a74a89928b36eb59--page-root">
-         Define TORCHTRT_HIDDEN
-         <a class="headerlink" href="#cpp-api-define-macros-8h-1ad19939408f7be171a74a89928b36eb59--page-root" title="Permalink to this headline">
+        <h1 id="cpp-api-function-torch-tensorrt-8h-1a5b405fd3bf3c8fc2e2a54cbbab979797--page-root">
+         Function torch_tensorrt::torchscript::check_method_operator_support
+         <a class="headerlink" href="#cpp-api-function-torch-tensorrt-8h-1a5b405fd3bf3c8fc2e2a54cbbab979797--page-root" title="Permalink to this headline">
           ¶
          </a>
         </h1>
@@ -423,34 +423,114 @@
          <li>
           <p>
            Defined in
-           <a class="reference internal" href="file_cpp_include_torch_tensorrt_macros.h.html#file-cpp-include-torch-tensorrt-macros-h">
+           <a class="reference internal" href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html#file-cpp-include-torch-tensorrt-torch-tensorrt-h">
             <span class="std std-ref">
-             File macros.h
+             File torch_tensorrt.h
             </span>
            </a>
           </p>
          </li>
         </ul>
-        <section id="define-documentation">
-         <h2 id="define-documentation">
-          Define Documentation
-          <a class="headerlink" href="#define-documentation" title="Permalink to this headline">
+        <section id="function-documentation">
+         <h2 id="function-documentation">
+          Function Documentation
+          <a class="headerlink" href="#function-documentation" title="Permalink to this headline">
            ¶
           </a>
          </h2>
-         <dl class="cpp macro">
-          <dt id="c.TORCHTRT_HIDDEN">
-           <span class="target" id="macros_8h_1ad19939408f7be171a74a89928b36eb59">
+         <dl class="cpp function">
+          <dt id="_CPPv4N14torch_tensorrt11torchscript29check_method_operator_supportERKN5torch3jit6ModuleENSt6stringE">
+           <span class="target" id="torch__tensorrt_8h_1a5b405fd3bf3c8fc2e2a54cbbab979797">
            </span>
-           <code class="sig-name descname">
-            TORCHTRT_HIDDEN
+           TORCHTRT_API bool
+           <code class="sig-prename descclassname">
+            torch_tensorrt::torchscript
+            <code class="sig-prename descclassname">
+             ::
+            </code>
            </code>
-           <a class="headerlink" href="#c.TORCHTRT_HIDDEN" title="Permalink to this definition">
+           <code class="sig-name descname">
+            check_method_operator_support
+           </code>
+           <span class="sig-paren">
+            (
+           </span>
+           <em class="property">
+            const
+           </em>
+           torch::jit::Module &amp;
+           <em>
+            module
+           </em>
+           , std::string
+           <em>
+            method_name
+           </em>
+           <span class="sig-paren">
+            )
+           </span>
+           <a class="headerlink" href="#_CPPv4N14torch_tensorrt11torchscript29check_method_operator_supportERKN5torch3jit6ModuleENSt6stringE" title="Permalink to this definition">
             ¶
            </a>
            <br/>
           </dt>
           <dd>
+           <p>
+            Check to see if a module is fully supported by the compiler.
+           </p>
+           <p>
+           </p>
+           <p>
+            Takes a module and a method name and checks if the method graph contains purely convertable operators
+           </p>
+           <dl class="simple">
+            <dt>
+             <strong>
+              Parameters
+             </strong>
+            </dt>
+            <dd>
+             <ul class="breatheparameterlist simple">
+              <li>
+               <p>
+                <code class="docutils literal notranslate">
+                 <span class="pre">
+                  module
+                 </span>
+                </code>
+                : torch::jit::script::Module - Existing TorchScript module
+               </p>
+              </li>
+              <li>
+               <p>
+                <code class="docutils literal notranslate">
+                 <span class="pre">
+                  method_name
+                 </span>
+                </code>
+                : std::string - Name of method to compile
+               </p>
+              </li>
+             </ul>
+            </dd>
+           </dl>
+           <p>
+            Will print out a list of unsupported operators if the graph is unsupported
+           </p>
+           <p>
+           </p>
+           <dl class="simple">
+            <dt>
+             <strong>
+              Return
+             </strong>
+            </dt>
+            <dd>
+             <p>
+              bool: Method is supported by Torch-TensorRT.TorchScript
+             </p>
+            </dd>
+           </dl>
           </dd>
          </dl>
         </section>

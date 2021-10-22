@@ -13,7 +13,7 @@ TEST_P(CppAPITests, CompiledModuleIsClose) {
   std::vector<at::Tensor> jit_results;
   jit_results.push_back(jit_results_ivalues.toTensor());
 
-  auto trt_mod = torch_tensorrt::ts::CompileModule(mod, input_shapes);
+  auto trt_mod = torch_tensorrt::ts::compile(mod, input_shapes);
   torch::jit::IValue trt_results_ivalues = torch_tensorrt::tests::util::RunModuleForward(trt_mod, trt_inputs_ivalues);
   std::vector<at::Tensor> trt_results;
   trt_results.push_back(trt_results_ivalues.toTensor());

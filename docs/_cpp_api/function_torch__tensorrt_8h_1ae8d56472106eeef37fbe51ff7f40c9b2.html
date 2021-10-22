@@ -37,7 +37,7 @@
   <script src="../_static/javascripts/modernizr.js">
   </script>
   <title>
-   Define TORCHTRT_HIDDEN — Torch-TensorRT master documentation
+   Function torch_tensorrt::torchscript::convert_method_to_trt_engine — Torch-TensorRT master documentation
   </title>
   <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/pygments.css" rel="stylesheet" type="text/css"/>
@@ -79,7 +79,7 @@
   <input class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
   <label class="md-overlay" data-md-component="overlay" for="__drawer">
   </label>
-  <a class="md-skip" href="#_cpp_api/define_macros_8h_1ad19939408f7be171a74a89928b36eb59" tabindex="1">
+  <a class="md-skip" href="#_cpp_api/function_torch__tensorrt_8h_1ae8d56472106eeef37fbe51ff7f40c9b2" tabindex="1">
    Skip to content
   </a>
   <header class="md-header" data-md-component="header">
@@ -102,7 +102,7 @@
         Torch-TensorRT
        </span>
        <span class="md-header-nav__topic">
-        Define TORCHTRT_HIDDEN
+        Function torch_tensorrt::torchscript::convert_method_to_trt_engine
        </span>
       </div>
      </div>
@@ -383,21 +383,21 @@
          </label>
          <ul class="md-nav__list" data-md-scrollfix="">
           <li class="md-nav__item">
-           <a class="md-nav__link" href="#cpp-api-define-macros-8h-1ad19939408f7be171a74a89928b36eb59--page-root">
-            Define TORCHTRT_HIDDEN
+           <a class="md-nav__link" href="#cpp-api-function-torch-tensorrt-8h-1ae8d56472106eeef37fbe51ff7f40c9b2--page-root">
+            Function torch_tensorrt::torchscript::convert_method_to_trt_engine
            </a>
            <nav class="md-nav">
             <ul class="md-nav__list">
              <li class="md-nav__item">
-              <a class="md-nav__link" href="#define-documentation">
-               Define Documentation
+              <a class="md-nav__link" href="#function-documentation">
+               Function Documentation
               </a>
              </li>
             </ul>
            </nav>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__extra_link" href="../_sources/_cpp_api/define_macros_8h_1ad19939408f7be171a74a89928b36eb59.rst.txt">
+           <a class="md-nav__extra_link" href="../_sources/_cpp_api/function_torch__tensorrt_8h_1ae8d56472106eeef37fbe51ff7f40c9b2.rst.txt">
             Show Source
            </a>
           </li>
@@ -410,12 +410,12 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <section id="define-torchtrt-hidden">
-        <span id="exhale-define-macros-8h-1ad19939408f7be171a74a89928b36eb59">
+       <section id="function-torch-tensorrt-torchscript-convert-method-to-trt-engine">
+        <span id="exhale-function-torch-tensorrt-8h-1ae8d56472106eeef37fbe51ff7f40c9b2">
         </span>
-        <h1 id="cpp-api-define-macros-8h-1ad19939408f7be171a74a89928b36eb59--page-root">
-         Define TORCHTRT_HIDDEN
-         <a class="headerlink" href="#cpp-api-define-macros-8h-1ad19939408f7be171a74a89928b36eb59--page-root" title="Permalink to this headline">
+        <h1 id="cpp-api-function-torch-tensorrt-8h-1ae8d56472106eeef37fbe51ff7f40c9b2--page-root">
+         Function torch_tensorrt::torchscript::convert_method_to_trt_engine
+         <a class="headerlink" href="#cpp-api-function-torch-tensorrt-8h-1ae8d56472106eeef37fbe51ff7f40c9b2--page-root" title="Permalink to this headline">
           ¶
          </a>
         </h1>
@@ -423,34 +423,128 @@
          <li>
           <p>
            Defined in
-           <a class="reference internal" href="file_cpp_include_torch_tensorrt_macros.h.html#file-cpp-include-torch-tensorrt-macros-h">
+           <a class="reference internal" href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html#file-cpp-include-torch-tensorrt-torch-tensorrt-h">
             <span class="std std-ref">
-             File macros.h
+             File torch_tensorrt.h
             </span>
            </a>
           </p>
          </li>
         </ul>
-        <section id="define-documentation">
-         <h2 id="define-documentation">
-          Define Documentation
-          <a class="headerlink" href="#define-documentation" title="Permalink to this headline">
+        <section id="function-documentation">
+         <h2 id="function-documentation">
+          Function Documentation
+          <a class="headerlink" href="#function-documentation" title="Permalink to this headline">
            ¶
           </a>
          </h2>
-         <dl class="cpp macro">
-          <dt id="c.TORCHTRT_HIDDEN">
-           <span class="target" id="macros_8h_1ad19939408f7be171a74a89928b36eb59">
+         <dl class="cpp function">
+          <dt id="_CPPv4N14torch_tensorrt11torchscript28convert_method_to_trt_engineERKN5torch3jit6ModuleENSt6stringE11CompileSpec">
+           <span class="target" id="torch__tensorrt_8h_1ae8d56472106eeef37fbe51ff7f40c9b2">
            </span>
-           <code class="sig-name descname">
-            TORCHTRT_HIDDEN
+           TORCHTRT_API std::string
+           <code class="sig-prename descclassname">
+            torch_tensorrt::torchscript
+            <code class="sig-prename descclassname">
+             ::
+            </code>
            </code>
-           <a class="headerlink" href="#c.TORCHTRT_HIDDEN" title="Permalink to this definition">
+           <code class="sig-name descname">
+            convert_method_to_trt_engine
+           </code>
+           <span class="sig-paren">
+            (
+           </span>
+           <em class="property">
+            const
+           </em>
+           torch::jit::Module &amp;
+           <em>
+            module
+           </em>
+           , std::string
+           <em>
+            method_name
+           </em>
+           ,
+           <a class="reference internal" href="structtorch__tensorrt_1_1torchscript_1_1CompileSpec.html#_CPPv4N14torch_tensorrt11torchscript11CompileSpecE" title="torch_tensorrt::torchscript::CompileSpec">
+            CompileSpec
+           </a>
+           <em>
+            info
+           </em>
+           <span class="sig-paren">
+            )
+           </span>
+           <a class="headerlink" href="#_CPPv4N14torch_tensorrt11torchscript28convert_method_to_trt_engineERKN5torch3jit6ModuleENSt6stringE11CompileSpec" title="Permalink to this definition">
             ¶
            </a>
            <br/>
           </dt>
           <dd>
+           <p>
+            Compile a TorchScript method for NVIDIA GPUs using TensorRT.
+           </p>
+           <p>
+           </p>
+           <p>
+            Takes a existing TorchScript module and a set of settings to configure the compiler and will convert selected method to a serialized TensorRT engine which can be run with TensorRT
+           </p>
+           <dl class="simple">
+            <dt>
+             <strong>
+              Parameters
+             </strong>
+            </dt>
+            <dd>
+             <ul class="breatheparameterlist simple">
+              <li>
+               <p>
+                <code class="docutils literal notranslate">
+                 <span class="pre">
+                  module
+                 </span>
+                </code>
+                : torch::jit::Module - Existing TorchScript module
+               </p>
+              </li>
+              <li>
+               <p>
+                <code class="docutils literal notranslate">
+                 <span class="pre">
+                  method_name
+                 </span>
+                </code>
+                : std::string - Name of method to compile
+               </p>
+              </li>
+              <li>
+               <p>
+                <code class="docutils literal notranslate">
+                 <span class="pre">
+                  info
+                 </span>
+                </code>
+                : torch_tensorrt::CompileSpec - Compilation settings
+               </p>
+              </li>
+             </ul>
+            </dd>
+           </dl>
+           <p>
+           </p>
+           <dl class="simple">
+            <dt>
+             <strong>
+              Return
+             </strong>
+            </dt>
+            <dd>
+             <p>
+              : std::string: Serialized TensorRT engine equivilant to the method graph
+             </p>
+            </dd>
+           </dl>
           </dd>
          </dl>
         </section>

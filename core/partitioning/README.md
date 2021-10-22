@@ -62,6 +62,6 @@ torchtrt::ts::CompileSpec cfg(input_sizes);
 cfg.torch_fallback = torchtrt::CompileSpec::TorchFallback(true);
 cfg.torch_fallback.min_block_size = 2;
 cfg.torch_fallback.forced_fallback_ops.push_back("aten::relu");
-auto trt_mod = torchtrt::ts::CompileModule(mod, cfg);
+auto trt_mod = torchtrt::ts::compile(mod, cfg);
 auto out = trt_mod.forward({in});
 ```

@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -65,7 +66,7 @@
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
   <link href="lowering.html" rel="next" title="Lowering Phase"/>
-  <link href="../py_api/torch_tensorrt_ts.html" rel="prev" title="torch_tensorrt"/>
+  <link href="../py_api/ts.html" rel="prev" title="torch_tensorrt.ts"/>
  </head>
  <body data-md-color-accent="light-green" data-md-color-primary="light-green" dir="ltr">
   <svg class="md-svg">
@@ -301,17 +302,17 @@
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../_notebooks/lenet-getting-started.html">
-            TRTorch Getting Started - LeNet
+            Torch-TensorRT Getting Started - LeNet
            </a>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../_notebooks/ssd-object-detection-demo.html">
-            Object Detection with TRTorch (SSD)
+            Object Detection with Torch-TensorRT (SSD)
            </a>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../_notebooks/vgg-qat.html">
-            Deploying Quantization Aware Trained models in INT8 using TRTorch
+            Deploying Quantization Aware Trained models in INT8 using Torch-TensorRT
            </a>
           </li>
           <li class="md-nav__item">
@@ -327,8 +328,8 @@
            </a>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/torch_tensorrt_ts.html">
-            torch_tensorrt
+           <a class="md-nav__link" href="../py_api/ts.html">
+            torch_tensorrt.ts
            </a>
           </li>
           <li class="md-nav__item">
@@ -489,161 +490,173 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <span id="id1">
-       </span>
-       <h1 id="contributors-system-overview--page-root">
-        System Overview
-        <a class="headerlink" href="#contributors-system-overview--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <p>
-        Torch-TensorRT is primarily a C++ Library with a Python API planned. We use Bazel as our build system and target Linux x86_64 and
+       <section id="system-overview">
+        <span id="id1">
+        </span>
+        <h1 id="contributors-system-overview--page-root">
+         System Overview
+         <a class="headerlink" href="#contributors-system-overview--page-root" title="Permalink to this headline">
+          ¶
+         </a>
+        </h1>
+        <p>
+         Torch-TensorRT is primarily a C++ Library with a Python API planned. We use Bazel as our build system and target Linux x86_64 and
 Linux aarch64 (only natively) right now. The compiler we use is GCC 7.5.0 and the library is untested with compilers before that
 version so there may be compilation errors if you try to use an older compiler.
-       </p>
-       <p>
-        The repository is structured into:
-       </p>
-       <ul class="simple">
-        <li>
-         <p>
-          core: Main compiler source code
-         </p>
-        </li>
-        <li>
-         <p>
-          cpp: C++ API
-         </p>
-        </li>
-        <li>
-         <p>
-          tests: tests of the C++ API, the core and converters
-         </p>
-        </li>
-        <li>
-         <p>
-          py: Python API
-         </p>
-        </li>
-        <li>
-         <p>
-          notebooks: Example applications built with Torch-TensorRT
-         </p>
-        </li>
-        <li>
-         <p>
-          docs: Documentation
-         </p>
-        </li>
-        <li>
-         <p>
-          docsrc: Documentation Source
-         </p>
-        </li>
-        <li>
-         <p>
-          third_party: BUILD files for dependency libraries
-         </p>
-        </li>
-        <li>
-         <p>
-          toolchains: Toolchains for different platforms
-         </p>
-        </li>
-       </ul>
-       <p>
-        The C++ API is unstable and subject to change until the library matures, though most work is done under the hood in the core.
-       </p>
-       <p>
-        The core has a couple major parts: The top level compiler interface which coordinates ingesting a module, lowering,
+        </p>
+        <p>
+         The repository is structured into:
+        </p>
+        <ul class="simple">
+         <li>
+          <p>
+           core: Main compiler source code
+          </p>
+         </li>
+         <li>
+          <p>
+           cpp: C++ API
+          </p>
+         </li>
+         <li>
+          <p>
+           tests: tests of the C++ API, the core and converters
+          </p>
+         </li>
+         <li>
+          <p>
+           py: Python API
+          </p>
+         </li>
+         <li>
+          <p>
+           notebooks: Example applications built with Torch-TensorRT
+          </p>
+         </li>
+         <li>
+          <p>
+           docs: Documentation
+          </p>
+         </li>
+         <li>
+          <p>
+           docsrc: Documentation Source
+          </p>
+         </li>
+         <li>
+          <p>
+           third_party: BUILD files for dependency libraries
+          </p>
+         </li>
+         <li>
+          <p>
+           toolchains: Toolchains for different platforms
+          </p>
+         </li>
+        </ul>
+        <p>
+         The C++ API is unstable and subject to change until the library matures, though most work is done under the hood in the core.
+        </p>
+        <p>
+         The core has a couple major parts: The top level compiler interface which coordinates ingesting a module, lowering,
 converting and generating a new module and returning it back to the user. The there are the three main phases of the
 compiler, the lowering phase, the conversion phase, and the execution phase.
-       </p>
-       <h2 id="compiler-phases">
-        Compiler Phases
-        <a class="headerlink" href="#compiler-phases" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <div class="toctree-wrapper compound">
-       </div>
-       <h3 id="lowering">
-        Lowering
-        <a class="headerlink" href="#lowering" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        <a class="reference internal" href="lowering.html#lowering">
-         <span class="std std-ref">
-          Lowering Phase
-         </span>
-        </a>
-       </p>
-       <p>
-        The lowering is made up of a set of passes (some from PyTorch and some specific to Torch-TensorRT)
+        </p>
+        <section id="compiler-phases">
+         <h2 id="compiler-phases">
+          Compiler Phases
+          <a class="headerlink" href="#compiler-phases" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <div class="toctree-wrapper compound">
+         </div>
+         <section id="lowering">
+          <h3 id="lowering">
+           Lowering
+           <a class="headerlink" href="#lowering" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           <a class="reference internal" href="lowering.html#lowering">
+            <span class="std std-ref">
+             Lowering Phase
+            </span>
+           </a>
+          </p>
+          <p>
+           The lowering is made up of a set of passes (some from PyTorch and some specific to Torch-TensorRT)
 run over the graph IR to map the large PyTorch opset to a reduced opset that is easier to convert to
 TensorRT.
-       </p>
-       <h3 id="partitioning">
-        Partitioning
-        <a class="headerlink" href="#partitioning" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        :ref:
-        <a href="#id2">
-         <span class="problematic" id="id3">
-          `
-         </span>
-        </a>
-        partitioning
-       </p>
-       <p>
-        The phase is optional and enabled by the user. It instructs the compiler to seperate nodes into ones that should run in PyTorch and ones that should run in TensorRT.
+          </p>
+         </section>
+         <section id="partitioning">
+          <h3 id="partitioning">
+           Partitioning
+           <a class="headerlink" href="#partitioning" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           :ref:
+           <a href="#id2">
+            <span class="problematic" id="id3">
+             `
+            </span>
+           </a>
+           partitioning
+          </p>
+          <p>
+           The phase is optional and enabled by the user. It instructs the compiler to seperate nodes into ones that should run in PyTorch and ones that should run in TensorRT.
 Criteria for seperation include: Lack of a converter, operator is explicitly set to run in PyTorch by the user or the node has a flag which tells partitioning to
 run in PyTorch by the module fallback passes.
-       </p>
-       <h3 id="conversion">
-        Conversion
-        <a class="headerlink" href="#conversion" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        <a class="reference internal" href="conversion.html#conversion">
-         <span class="std std-ref">
-          Conversion Phase
-         </span>
-        </a>
-       </p>
-       <p>
-        In the conversion phase we traverse the lowered graph and construct an equivalent TensorRT graph.
+          </p>
+         </section>
+         <section id="conversion">
+          <h3 id="conversion">
+           Conversion
+           <a class="headerlink" href="#conversion" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           <a class="reference internal" href="conversion.html#conversion">
+            <span class="std std-ref">
+             Conversion Phase
+            </span>
+           </a>
+          </p>
+          <p>
+           In the conversion phase we traverse the lowered graph and construct an equivalent TensorRT graph.
 The conversion phase is made up of three main components, a context to manage compile time data,
 a evaluator library which will execute operations that can be resolved at compile time and a converter
 library which maps an op from JIT to TensorRT.
-       </p>
-       <h3 id="compilation-and-runtime">
-        Compilation and Runtime
-        <a class="headerlink" href="#compilation-and-runtime" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        <a class="reference internal" href="../tutorials/runtime.html#runtime">
-         <span class="std std-ref">
-          Deploying Torch-TensorRT Programs
-         </span>
-        </a>
-       </p>
-       <p>
-        The final compilation phase constructs a TorchScript program to run the converted TensorRT engine. It
+          </p>
+         </section>
+         <section id="compilation-and-runtime">
+          <h3 id="compilation-and-runtime">
+           Compilation and Runtime
+           <a class="headerlink" href="#compilation-and-runtime" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           <a class="reference internal" href="../tutorials/runtime.html#runtime">
+            <span class="std std-ref">
+             Deploying Torch-TensorRT Programs
+            </span>
+           </a>
+          </p>
+          <p>
+           The final compilation phase constructs a TorchScript program to run the converted TensorRT engine. It
 takes a serialized engine and instantiates it within a engine manager, then the compiler will
 build out a JIT graph that references this engine and wraps it in a module to return to the user.
 When the user executes the module, the JIT program run in the JIT runtime extended by Torch-TensorRT with the data providied from the user.
-       </p>
+          </p>
+         </section>
+        </section>
+       </section>
       </article>
      </div>
     </div>
@@ -652,7 +665,7 @@ When the user executes the module, the JIT program run in the JIT runtime extend
   <footer class="md-footer">
    <div class="md-footer-nav">
     <nav class="md-footer-nav__inner md-grid">
-     <a class="md-flex md-footer-nav__link md-footer-nav__link--prev" href="../py_api/torch_tensorrt_ts.html" rel="prev" title="torch_tensorrt">
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--prev" href="../py_api/ts.html" rel="prev" title="torch_tensorrt.ts">
       <div class="md-flex__cell md-flex__cell--shrink">
        <i class="md-icon md-icon--arrow-back md-footer-nav__button">
        </i>
@@ -662,7 +675,7 @@ When the user executes the module, the JIT program run in the JIT runtime extend
         <span class="md-footer-nav__direction">
          Previous
         </span>
-        torch_tensorrt
+        torch_tensorrt.ts
        </span>
       </div>
      </a>

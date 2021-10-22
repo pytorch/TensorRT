@@ -40,8 +40,8 @@ TEST_P(CppAPITests, ModuleToEngineToModuleIsClose) {
   cudaGetDevice(&device_id);
   compile_spec.device.device_type = torch_tensorrt::Device::DeviceType::kGPU;
   compile_spec.device.gpu_id = device_id;
-  auto engine = torch_tensorrt::ts::ConvertMethodToTRTEngine(mod, "forward", input_ranges);
-  auto trt_mod = torch_tensorrt::ts::EmbedEngineInNewModule(engine, compile_spec.device);
+  auto engine = torch_tensorrt::ts::convert_method_to_trt_engine(mod, "forward", input_ranges);
+  auto trt_mod = torch_tensorrt::ts::embed_engine_in_new_module(engine, compile_spec.device);
 
   torch::jit::IValue trt_results_ivalues = torch_tensorrt::tests::util::RunModuleForward(trt_mod, inputs_ivalues);
   std::vector<at::Tensor> trt_results;

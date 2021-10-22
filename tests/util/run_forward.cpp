@@ -18,7 +18,7 @@ std::vector<at::Tensor> RunModuleForwardAsEngine(torch::jit::Module& mod, std::v
     input_ranges.push_back(in.sizes());
   }
 
-  auto engine = torch_tensorrt::ts::ConvertMethodToTRTEngine(mod, "forward", input_ranges);
+  auto engine = torch_tensorrt::ts::convert_method_to_trt_engine(mod, "forward", input_ranges);
   return RunEngine(engine, inputs);
 }
 

@@ -701,7 +701,7 @@ struct TORCHTRT_API CompileSpec {
  *
  * @returns bool: Method is supported by Torch-TensorRT.TorchScript
  */
-TORCHTRT_API bool CheckMethodOperatorSupport(const torch::jit::Module& module, std::string method_name);
+TORCHTRT_API bool check_method_operator_support(const torch::jit::Module& module, std::string method_name);
 
 /**
  * @brief Compile a TorchScript module for NVIDIA GPUs using TensorRT
@@ -717,7 +717,7 @@ TORCHTRT_API bool CheckMethodOperatorSupport(const torch::jit::Module& module, s
  *
  * @return: A new module trageting a TensorRT engine
  */
-TORCHTRT_API torch::jit::Module CompileModule(const torch::jit::Module& module, CompileSpec info);
+TORCHTRT_API torch::jit::Module compile(const torch::jit::Module& module, CompileSpec info);
 
 /**
  * @brief Compile a TorchScript method for NVIDIA GPUs using TensorRT
@@ -733,7 +733,7 @@ TORCHTRT_API torch::jit::Module CompileModule(const torch::jit::Module& module, 
  * @return: std::string: Serialized TensorRT engine equivilant to the method
  * graph
  */
-TORCHTRT_API std::string ConvertMethodToTRTEngine(
+TORCHTRT_API std::string convert_method_to_trt_engine(
     const torch::jit::Module& module,
     std::string method_name,
     CompileSpec info);
@@ -751,6 +751,6 @@ TORCHTRT_API std::string ConvertMethodToTRTEngine(
  *
  * @return: A new module trageting a TensorRT engine
  */
-TORCHTRT_API torch::jit::Module EmbedEngineInNewModule(const std::string& engine, Device device);
+TORCHTRT_API torch::jit::Module embed_engine_in_new_module(const std::string& engine, Device device);
 } // namespace torchscript
 } // namespace torch_tensorrt

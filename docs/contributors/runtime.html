@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -306,17 +307,17 @@
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../_notebooks/lenet-getting-started.html">
-            TRTorch Getting Started - LeNet
+            Torch-TensorRT Getting Started - LeNet
            </a>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../_notebooks/ssd-object-detection-demo.html">
-            Object Detection with TRTorch (SSD)
+            Object Detection with Torch-TensorRT (SSD)
            </a>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../_notebooks/vgg-qat.html">
-            Deploying Quantization Aware Trained models in INT8 using TRTorch
+            Deploying Quantization Aware Trained models in INT8 using Torch-TensorRT
            </a>
           </li>
           <li class="md-nav__item">
@@ -332,8 +333,8 @@
            </a>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/torch_tensorrt_ts.html">
-            torch_tensorrt
+           <a class="md-nav__link" href="../py_api/ts.html">
+            torch_tensorrt.ts
            </a>
           </li>
           <li class="md-nav__item">
@@ -436,185 +437,197 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <span id="execution">
-       </span>
-       <h1 id="contributors-runtime--page-root">
-        Runtime Phase
-        <a class="headerlink" href="#contributors-runtime--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <p>
-        The Runtime phase is responsible for constructing self standing TorchScript graphs with embedded TensorRT engines and serving as the runtime
+       <section id="runtime-phase">
+        <span id="execution">
+        </span>
+        <h1 id="contributors-runtime--page-root">
+         Runtime Phase
+         <a class="headerlink" href="#contributors-runtime--page-root" title="Permalink to this headline">
+          ¶
+         </a>
+        </h1>
+        <p>
+         The Runtime phase is responsible for constructing self standing TorchScript graphs with embedded TensorRT engines and serving as the runtime
 when these engines are called. The main interface accepts a serialized TensorRT engine. The execution phase
 will deserialize and wrap this engine in a class which maintains a execution context for each engine
 and some metadata about its inputs and outputs and is compatable with the TorchScript interpreter so that
 it can be moved around and used like other TorchScript IValues. The engine is run by providing it and inputs
 to the
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          tensorrt::execute_engine
-         </span>
-        </code>
-        operator which will take the engine and its inputs and return the results of engine exeuction.
-       </p>
-       <h2 id="background">
-        Background
-        <a class="headerlink" href="#background" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <p>
-        PyTorch JIT’s runtime is based around a stack machine, all operators pop off arguments from the stack, pass them to
+         <code class="docutils literal notranslate">
+          <span class="pre">
+           tensorrt::execute_engine
+          </span>
+         </code>
+         operator which will take the engine and its inputs and return the results of engine exeuction.
+        </p>
+        <section id="background">
+         <h2 id="background">
+          Background
+          <a class="headerlink" href="#background" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <p>
+          PyTorch JIT’s runtime is based around a stack machine, all operators pop off arguments from the stack, pass them to
 some implementation of the operator then push results back onto the stack. The actual elements of the stack
 are
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          torch::jit::IValues
-         </span>
-        </code>
-        , the same type we evaluate in the conversion phase (the realization of the abstract
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            torch::jit::IValues
+           </span>
+          </code>
+          , the same type we evaluate in the conversion phase (the realization of the abstract
 torch::jit::Value type).
-       </p>
-       <h2 id="tensorrt-engine-executor-op">
-        TensorRT Engine Executor Op
-        <a class="headerlink" href="#tensorrt-engine-executor-op" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <p>
-        When the Torch-TensorRT is loaded, it registers an operator in the PyTorch JIT operator library called
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          trt::execute_engine(Tensor[]
-         </span>
-         <span class="pre">
-          inputs,
-         </span>
-         <span class="pre">
-          __torch__.torch.classes.tensorrt.Engine
-         </span>
-         <span class="pre">
-          engine)
-         </span>
-         <span class="pre">
-          -&gt;
-         </span>
-         <span class="pre">
-          Tensor[]
-         </span>
-        </code>
-        which takes an
+         </p>
+        </section>
+        <section id="tensorrt-engine-executor-op">
+         <h2 id="tensorrt-engine-executor-op">
+          TensorRT Engine Executor Op
+          <a class="headerlink" href="#tensorrt-engine-executor-op" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <p>
+          When the Torch-TensorRT is loaded, it registers an operator in the PyTorch JIT operator library called
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            trt::execute_engine(Tensor[]
+           </span>
+           <span class="pre">
+            inputs,
+           </span>
+           <span class="pre">
+            __torch__.torch.classes.tensorrt.Engine
+           </span>
+           <span class="pre">
+            engine)
+           </span>
+           <span class="pre">
+            -&gt;
+           </span>
+           <span class="pre">
+            Tensor[]
+           </span>
+          </code>
+          which takes an
 instantiated engine and list of inputs. Compiled graphs store this engine in an attribute so that it is portable and serializable.
 When the op is called, an instnantiated engine and input tensors are popped off the runtime stack. These inputs are passed into a generic engine execution function which
 will run the tensors through the TensorRT engine and return new tensors as results. These tensors are pushed on to the
 stack so that the next op whatever it is can use it.
-       </p>
-       <h2 id="constructing-the-resulting-graph">
-        Constructing the Resulting Graph
-        <a class="headerlink" href="#constructing-the-resulting-graph" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <p>
-        Once the engine is deserialized and instantiated, the compiler will construct a graph that will execute the engine when the module is called.
+         </p>
+        </section>
+        <section id="constructing-the-resulting-graph">
+         <h2 id="constructing-the-resulting-graph">
+          Constructing the Resulting Graph
+          <a class="headerlink" href="#constructing-the-resulting-graph" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <p>
+          Once the engine is deserialized and instantiated, the compiler will construct a graph that will execute the engine when the module is called.
 Here is an example:
-       </p>
-       <div class="highlight-cpp notranslate">
-        <div class="highlight">
-         <pre><span></span><span class="n">graph</span><span class="p">(</span><span class="o">%</span><span class="nl">self_1</span> <span class="p">:</span> <span class="n">__torch__</span><span class="p">.</span><span class="n">torchvision</span><span class="p">.</span><span class="n">models</span><span class="p">.</span><span class="n">resnet</span><span class="p">.</span><span class="n">___torch_mangle_4847</span><span class="p">.</span><span class="n">ResNet_trt</span><span class="p">,</span>
-  <span class="o">%</span><span class="nl">input_0</span> <span class="p">:</span> <span class="n">Tensor</span><span class="p">)</span><span class="o">:</span>
-    <span class="o">%</span><span class="mi">1</span> <span class="o">:</span> <span class="n">__torch__</span><span class="p">.</span><span class="n">torch</span><span class="p">.</span><span class="n">classes</span><span class="p">.</span><span class="n">tensorrt</span><span class="p">.</span><span class="n">Engine</span> <span class="o">=</span> <span class="n">prim</span><span class="o">::</span><span class="n">GetAttr</span><span class="p">[</span><span class="n">name</span><span class="o">=</span><span class="s">"__torch___torchvision_models_resnet____torch_mangle_4847_ResNet_trt_engine"</span><span class="p">](</span><span class="o">%</span><span class="n">self_1</span><span class="p">)</span>
-    <span class="o">%</span><span class="mi">3</span> <span class="o">:</span> <span class="n">Tensor</span><span class="p">[]</span> <span class="o">=</span> <span class="n">prim</span><span class="o">::</span><span class="n">ListConstruct</span><span class="p">(</span><span class="o">%</span><span class="n">input_0</span><span class="p">)</span>
-    <span class="o">%</span><span class="mi">4</span> <span class="o">:</span> <span class="n">Tensor</span><span class="p">[]</span> <span class="o">=</span> <span class="n">trt</span><span class="o">::</span><span class="n">execute_engine</span><span class="p">(</span><span class="o">%</span><span class="mi">3</span><span class="p">,</span> <span class="o">%</span><span class="mi">1</span><span class="p">)</span>
-    <span class="o">%</span><span class="mi">5</span> <span class="o">:</span> <span class="n">Tensor</span> <span class="o">=</span> <span class="n">prim</span><span class="o">::</span><span class="n">ListUnpack</span><span class="p">(</span><span class="o">%</span><span class="mi">4</span><span class="p">)</span>
-<span class="k">return</span> <span class="p">(</span><span class="o">%</span><span class="mi">5</span><span class="p">)</span>
+         </p>
+         <div class="highlight-cpp notranslate">
+          <div class="highlight">
+           <pre><span></span><span class="n">graph</span><span class="p">(</span><span class="o">%</span><span class="nl">self_1</span> <span class="p">:</span><span class="w"> </span><span class="n">__torch__</span><span class="p">.</span><span class="n">torchvision</span><span class="p">.</span><span class="n">models</span><span class="p">.</span><span class="n">resnet</span><span class="p">.</span><span class="n">___torch_mangle_4847</span><span class="p">.</span><span class="n">ResNet_trt</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="o">%</span><span class="nl">input_0</span> <span class="p">:</span><span class="w"> </span><span class="n">Tensor</span><span class="p">)</span><span class="o">:</span><span class="w"></span>
+<span class="w">    </span><span class="o">%</span><span class="mi">1</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">__torch__</span><span class="p">.</span><span class="n">torch</span><span class="p">.</span><span class="n">classes</span><span class="p">.</span><span class="n">tensorrt</span><span class="p">.</span><span class="n">Engine</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">prim</span><span class="o">::</span><span class="n">GetAttr</span><span class="p">[</span><span class="n">name</span><span class="o">=</span><span class="s">"__torch___torchvision_models_resnet____torch_mangle_4847_ResNet_trt_engine"</span><span class="p">](</span><span class="o">%</span><span class="n">self_1</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="o">%</span><span class="mi">3</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Tensor</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">prim</span><span class="o">::</span><span class="n">ListConstruct</span><span class="p">(</span><span class="o">%</span><span class="n">input_0</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="o">%</span><span class="mi">4</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Tensor</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">trt</span><span class="o">::</span><span class="n">execute_engine</span><span class="p">(</span><span class="o">%</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="o">%</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="o">%</span><span class="mi">5</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Tensor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">prim</span><span class="o">::</span><span class="n">ListUnpack</span><span class="p">(</span><span class="o">%</span><span class="mi">4</span><span class="p">)</span><span class="w"></span>
+<span class="k">return</span><span class="w"> </span><span class="p">(</span><span class="o">%</span><span class="mi">5</span><span class="p">)</span><span class="w"></span>
 </pre>
-        </div>
-       </div>
-       <p>
-        You can see the engine attribute in the graph and the
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          trt::execute_engine
-         </span>
-        </code>
-        op taking a list of input tensors and an engine in
+          </div>
+         </div>
+         <p>
+          You can see the engine attribute in the graph and the
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            trt::execute_engine
+           </span>
+          </code>
+          op taking a list of input tensors and an engine in
 and produces a list of output tensors which is returned. When
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          forward
-         </span>
-        </code>
-        is called on the module this graph is executed, thereby
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            forward
+           </span>
+          </code>
+          is called on the module this graph is executed, thereby
 running the TensorRT engine.
-       </p>
-       <p>
-        In the case of multiple outputs, the compiled graph may repack output tensors into a Tuple to return back to the user.
-       </p>
-       <div class="highlight-cpp notranslate">
-        <div class="highlight">
-         <pre><span></span><span class="n">graph</span><span class="p">(</span><span class="o">%</span><span class="nl">self_1</span> <span class="p">:</span> <span class="n">__torch__</span><span class="p">.</span><span class="n">PyTorch</span><span class="p">.</span><span class="n">Detection</span><span class="p">.</span><span class="n">SSD</span><span class="p">.</span><span class="n">src</span><span class="p">.</span><span class="n">model</span><span class="p">.</span><span class="n">SSD300_trt</span><span class="p">,</span>
-  <span class="o">%</span><span class="nl">input_0</span> <span class="p">:</span> <span class="n">Tensor</span><span class="p">)</span><span class="o">:</span>
-    <span class="o">%</span><span class="mi">1</span> <span class="o">:</span> <span class="n">__torch__</span><span class="p">.</span><span class="n">torch</span><span class="p">.</span><span class="n">classes</span><span class="p">.</span><span class="n">tensorrt</span><span class="p">.</span><span class="n">Engine</span> <span class="o">=</span> <span class="n">prim</span><span class="o">::</span><span class="n">GetAttr</span><span class="p">[</span><span class="n">name</span><span class="o">=</span><span class="s">"__torch___PyTorch_Detection_SSD_src_model_SSD300_trt_engine"</span><span class="p">](</span><span class="o">%</span><span class="n">self_1</span><span class="p">)</span>
-    <span class="o">%</span><span class="mi">3</span> <span class="o">:</span> <span class="n">Tensor</span><span class="p">[]</span> <span class="o">=</span> <span class="n">prim</span><span class="o">::</span><span class="n">ListConstruct</span><span class="p">(</span><span class="o">%</span><span class="n">input_0</span><span class="p">)</span>
-    <span class="o">%</span><span class="mi">4</span> <span class="o">:</span> <span class="n">Tensor</span><span class="p">[]</span> <span class="o">=</span> <span class="n">trt</span><span class="o">::</span><span class="n">execute_engine</span><span class="p">(</span><span class="o">%</span><span class="mi">3</span><span class="p">,</span> <span class="o">%</span><span class="mi">1</span><span class="p">)</span>
-    <span class="o">%</span><span class="mi">5</span> <span class="o">:</span> <span class="n">Tensor</span><span class="p">,</span> <span class="o">%</span><span class="mi">6</span> <span class="o">:</span> <span class="n">Tensor</span> <span class="o">=</span> <span class="n">prim</span><span class="o">::</span><span class="n">ListUnpack</span><span class="p">(</span><span class="o">%</span><span class="mi">4</span><span class="p">)</span>
-    <span class="o">%</span><span class="mi">7</span> <span class="o">:</span> <span class="p">(</span><span class="n">Tensor</span><span class="p">,</span> <span class="n">Tensor</span><span class="p">)</span> <span class="o">=</span> <span class="n">prim</span><span class="o">::</span><span class="n">TupleConstruct</span><span class="p">(</span><span class="o">%</span><span class="mi">5</span><span class="p">,</span> <span class="o">%</span><span class="mi">6</span><span class="p">)</span>
-<span class="k">return</span> <span class="p">(</span><span class="o">%</span><span class="mi">7</span><span class="p">)</span>
+         </p>
+         <p>
+          In the case of multiple outputs, the compiled graph may repack output tensors into a Tuple to return back to the user.
+         </p>
+         <div class="highlight-cpp notranslate">
+          <div class="highlight">
+           <pre><span></span><span class="n">graph</span><span class="p">(</span><span class="o">%</span><span class="nl">self_1</span> <span class="p">:</span><span class="w"> </span><span class="n">__torch__</span><span class="p">.</span><span class="n">PyTorch</span><span class="p">.</span><span class="n">Detection</span><span class="p">.</span><span class="n">SSD</span><span class="p">.</span><span class="n">src</span><span class="p">.</span><span class="n">model</span><span class="p">.</span><span class="n">SSD300_trt</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="o">%</span><span class="nl">input_0</span> <span class="p">:</span><span class="w"> </span><span class="n">Tensor</span><span class="p">)</span><span class="o">:</span><span class="w"></span>
+<span class="w">    </span><span class="o">%</span><span class="mi">1</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">__torch__</span><span class="p">.</span><span class="n">torch</span><span class="p">.</span><span class="n">classes</span><span class="p">.</span><span class="n">tensorrt</span><span class="p">.</span><span class="n">Engine</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">prim</span><span class="o">::</span><span class="n">GetAttr</span><span class="p">[</span><span class="n">name</span><span class="o">=</span><span class="s">"__torch___PyTorch_Detection_SSD_src_model_SSD300_trt_engine"</span><span class="p">](</span><span class="o">%</span><span class="n">self_1</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="o">%</span><span class="mi">3</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Tensor</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">prim</span><span class="o">::</span><span class="n">ListConstruct</span><span class="p">(</span><span class="o">%</span><span class="n">input_0</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="o">%</span><span class="mi">4</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Tensor</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">trt</span><span class="o">::</span><span class="n">execute_engine</span><span class="p">(</span><span class="o">%</span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="o">%</span><span class="mi">1</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="o">%</span><span class="mi">5</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Tensor</span><span class="p">,</span><span class="w"> </span><span class="o">%</span><span class="mi">6</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Tensor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">prim</span><span class="o">::</span><span class="n">ListUnpack</span><span class="p">(</span><span class="o">%</span><span class="mi">4</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="o">%</span><span class="mi">7</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="p">(</span><span class="n">Tensor</span><span class="p">,</span><span class="w"> </span><span class="n">Tensor</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">prim</span><span class="o">::</span><span class="n">TupleConstruct</span><span class="p">(</span><span class="o">%</span><span class="mi">5</span><span class="p">,</span><span class="w"> </span><span class="o">%</span><span class="mi">6</span><span class="p">)</span><span class="w"></span>
+<span class="k">return</span><span class="w"> </span><span class="p">(</span><span class="o">%</span><span class="mi">7</span><span class="p">)</span><span class="w"></span>
 </pre>
-        </div>
-       </div>
-       <h2 id="serialization-and-deserialization">
-        Serialization and Deserialization
-        <a class="headerlink" href="#serialization-and-deserialization" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <p>
-        Serialization and deserialization of TensorRT engines embedded in TorchScript graphs are handled by the holder class for the engine and TorchBind.
+          </div>
+         </div>
+        </section>
+        <section id="serialization-and-deserialization">
+         <h2 id="serialization-and-deserialization">
+          Serialization and Deserialization
+          <a class="headerlink" href="#serialization-and-deserialization" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <p>
+          Serialization and deserialization of TensorRT engines embedded in TorchScript graphs are handled by the holder class for the engine and TorchBind.
 When a TorchScript module is saved, the pickler will run serilization on the cuda engine and store the serialized engine in the zip file created.
 When deserializing, the depickler will call a constructor for the engine holder class with the serialized engine so that it can be set up again for
 execution.
-       </p>
-       <h1 id="abi-versioning-and-serialization-format">
-        ABI Versioning and Serialization Format
-        <a class="headerlink" href="#abi-versioning-and-serialization-format" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <p>
-        Torch-TensorRT programs are standard TorchScript with TensorRT engines as objects embedded in the graph. Therefore there is a serialization format
+         </p>
+        </section>
+       </section>
+       <section id="abi-versioning-and-serialization-format">
+        <h1 id="abi-versioning-and-serialization-format">
+         ABI Versioning and Serialization Format
+         <a class="headerlink" href="#abi-versioning-and-serialization-format" title="Permalink to this headline">
+          ¶
+         </a>
+        </h1>
+        <p>
+         Torch-TensorRT programs are standard TorchScript with TensorRT engines as objects embedded in the graph. Therefore there is a serialization format
 for the TensorRT engines. The format for Torch-TensorRT serialized programs are versioned with an “ABI” version which tells the runtime about runtime compatibility.
-       </p>
-       <p>
-        &gt; Current ABI version is 3
-       </p>
-       <p>
-        The format is a vector of serialized strings. They encode the following information
-       </p>
-       <ul class="simple">
-        <li>
-         <p>
-          ABI Version for the program
-         </p>
-        </li>
-        <li>
-         <p>
-          Name of the TRT engine
-         </p>
-        </li>
-        <li>
-         <p>
-          Device information: Includes the target device the engine was built on, SM capability and other device information. This information is used at deserialization time to select the correct device to run the engine
-         </p>
-        </li>
-        <li>
-         <p>
-          Serialized TensorRT engine
-         </p>
-        </li>
-       </ul>
+        </p>
+        <p>
+         &gt; Current ABI version is 3
+        </p>
+        <p>
+         The format is a vector of serialized strings. They encode the following information
+        </p>
+        <ul class="simple">
+         <li>
+          <p>
+           ABI Version for the program
+          </p>
+         </li>
+         <li>
+          <p>
+           Name of the TRT engine
+          </p>
+         </li>
+         <li>
+          <p>
+           Device information: Includes the target device the engine was built on, SM capability and other device information. This information is used at deserialization time to select the correct device to run the engine
+          </p>
+         </li>
+         <li>
+          <p>
+           Serialized TensorRT engine
+          </p>
+         </li>
+        </ul>
+       </section>
       </article>
      </div>
     </div>
