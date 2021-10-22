@@ -377,7 +377,7 @@ std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::
 
   auto engine = conversion::ConvertBlockToEngine(g->block(), cfg.convert_info, static_params);
 
-  return std::move(engine);
+  return engine;
 }
 
 torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) {

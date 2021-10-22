@@ -31,4 +31,4 @@ torch::jit::script::Module EmbedEngineInNewModule(const std::string& engine, run
 void set_device(const int gpu_id);
 
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt
