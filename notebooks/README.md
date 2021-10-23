@@ -38,7 +38,8 @@ in, for example:
 ```http://[host machine]:8888/?token=aae96ae9387cd28151868fee318c3b3581a2d794f3b25c6b```
 
 
-Within the container, the notebooks themselves are located at `/workspace/Torch-TensorRT/notebooks`.
+Within the container, the notebooks themselves are located at `/workspace/torch_tensorrt/notebooks`. To reach them in Jupyter, click on the folder marked 
+`torch_tensorrt`, then the folder marked `notebooks`.
 
 ## 2. Notebook list
 
