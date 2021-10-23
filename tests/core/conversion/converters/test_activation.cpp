@@ -203,7 +203,8 @@ TEST(Converters, ATenEluConvertsCorrectly) {
 TEST(Converters, ATenGELUConvertsCorrectly) {
   const auto graph = R"IR(
       graph(%0 : Tensor):
-        %3 : Tensor = aten::gelu(%0)
+        %1 : bool = prim::Constant[value=0]()
+        %3 : Tensor = aten::gelu(%0, %1)
         return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
