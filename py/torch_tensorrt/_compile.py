@@ -3,8 +3,10 @@ from torch_tensorrt import _enums
 import torch_tensorrt.ts
 from torch_tensorrt import logging
 import torch
+from torch import fx
 from enum import Enum
 
+print(torch.fx.GraphModule)
 
 class _IRType(Enum):
     """Enum to set the minimum required logging level to print a message to stdout
@@ -89,6 +91,7 @@ def compile(module: Any, ir="default", inputs=[], enabled_precisions=set([_enums
         ts_mod = module
         if isinstance(module, torch.nn.Module):
             logging.log(
+                logging.Level.Info,
                 "Module was provided as a torch.nn.Module, trying to script the module with torch.jit.script. In the event of a failure please preconvert your module to TorchScript"
             )
             ts_mod = torch.jit.script(module)
