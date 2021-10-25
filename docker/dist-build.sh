@@ -2,7 +2,7 @@
 
 mkdir -p dist
 
-cd py && MAX_JOBS=1 LANG=en_US.UTF-8 LANGUAGE=en_US:en LC_ALL=en_US.UTF-8 python3 setup.py bdist_wheel --use-cxx11-abi
+cd py && MAX_JOBS=1 LANG=en_US.UTF-8 LANGUAGE=en_US:en LC_ALL=en_US.UTF-8 python3 setup.py bdist_wheel --use-cxx11-abi --release
 
 cd ..
 
