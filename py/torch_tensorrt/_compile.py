@@ -6,8 +6,6 @@ import torch
 from torch import fx
 from enum import Enum
 
-print(torch.fx.GraphModule)
-
 class _IRType(Enum):
     """Enum to set the minimum required logging level to print a message to stdout
     """
