@@ -14,6 +14,7 @@ git clone https://github.com/NVIDIA/Torch-TensorRT
 Next, build the NVIDIA Torch-TensorRT container (from repo root):
 
 ```
+cd Torch-TensorRT
 docker build -t torch_tensorrt -f ./docker/Dockerfile .
 ```
 
@@ -26,6 +27,7 @@ docker run --runtime=nvidia -it --rm --ipc=host --net=host torch_tensorrt
 Within the docker interactive bash session, start Jupyter with
 
 ```
+cd /opt/pytorch/torch_tensorrt/notebooks
 jupyter notebook --allow-root --ip 0.0.0.0 --port 8888
 ```
 
@@ -38,8 +40,7 @@ in, for example:
 ```http://[host machine]:8888/?token=aae96ae9387cd28151868fee318c3b3581a2d794f3b25c6b```
 
 
-Within the container, the notebooks themselves are located at `/workspace/torch_tensorrt/notebooks`. To reach them in Jupyter, click on the folder marked 
-`torch_tensorrt`, then the folder marked `notebooks`.
+Within the container, the notebooks themselves are located at `/opt/pytorch/torch_tensorrt/notebooks`.
 
 ## 2. Notebook list
 
