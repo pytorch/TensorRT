@@ -52,5 +52,8 @@ ENV PATH /opt/conda/lib/python3.8/site-packages/torch_tensorrt/bin:${PATH}
 
 WORKDIR /workspace
 RUN mv /workspace/torch_tensorrt /opt/pytorch/torch_tensorrt
+# Make the notebooks visible to Jupyter in the current WORKDIR
+RUN mkdir torch_tensorrt
+RUN ln -s /opt/pytorch/torch_tensorrt/notebooks /workspace/torch_tensorrt/notebooks
 
 CMD /bin/bash
