@@ -21,13 +21,13 @@ docker build -t torch_tensorrt -f ./docker/Dockerfile .
 Then launch the container with:
 
 ```
-docker run --runtime=nvidia -it --rm --ipc=host --net=host torch_tensorrt
+docker run --gpus=all --rm -it -v $PWD:/Torch-TensorRT --net=host torch_tensorrt bash
 ```
 
 Within the docker interactive bash session, start Jupyter with
 
 ```
-cd /opt/pytorch/torch_tensorrt/notebooks
+cd /Torch-TensorRT/notebooks
 jupyter notebook --allow-root --ip 0.0.0.0 --port 8888
 ```
 
@@ -40,7 +40,7 @@ in, for example:
 ```http://[host machine]:8888/?token=aae96ae9387cd28151868fee318c3b3581a2d794f3b25c6b```
 
 
-Within the container, the notebooks themselves are located at `/opt/pytorch/torch_tensorrt/notebooks`.
+Within the container, the notebooks themselves are located at `/Torch-TensorRT/notebooks`.
 
 ## 2. Notebook list
 
