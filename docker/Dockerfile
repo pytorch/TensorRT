@@ -38,20 +38,21 @@ FROM base as torch-tensorrt
 
 # copy source repo
 COPY . /workspace/torch_tensorrt
-COPY --from=torch-tensorrt-builder  /workspace/torch_tensorrt/src/dist/ .
+COPY --from=torch-tensorrt-builder  /workspace/torch_tensorrt/src/py/dist/ .
 RUN patch -u /opt/conda/lib/python3.8/site-packages/pytorch_quantization/nn/modules/tensor_quantizer.py -i /workspace/torch_tensorrt/docker/qat.patch
 RUN conda init bash
 
 RUN pip3 install ipywidgets --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host=files.pythonhosted.org
 RUN jupyter nbextension enable --py widgetsnbextension
 
-RUN pip3 install *.whl && rm -fr /workspace/torch_tensorrt/dist/* *.whl
+RUN pip3 install *.whl && rm -fr /workspace/torch_tensorrt/py/dist/* *.whl
 
 ENV LD_LIBRARY_PATH /opt/conda/lib/python3.8/site-packages/torch/lib:/opt/conda/lib/python3.8/site-packages/torch_tensorrt/lib:${LD_LIBRARY_PATH}
 ENV PATH /opt/conda/lib/python3.8/site-packages/torch_tensorrt/bin:${PATH}
 
 WORKDIR /workspace
 RUN mv /workspace/torch_tensorrt /opt/pytorch/torch_tensorrt
+RUN cp /opt/pytorch/torch_tensorrt/docker/WORKSPACE.docker /opt/pytorch/torch_tensorrt/WORKSPACE
 RUN mkdir torch_tensorrt
 RUN ln -s /opt/pytorch/torch_tensorrt/notebooks /workspace/torch_tensorrt/notebooks
 
