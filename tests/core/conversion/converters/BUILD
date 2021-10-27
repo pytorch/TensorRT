@@ -145,7 +145,7 @@ test_suite(
         ":test_interpolate",
         ":test_layer_norm",
         ":test_linear",
-        ":test_lstm_cell",
+        #":test_lstm_cell",
         ":test_matrix_multiply",
         ":test_normalize",
         ":test_pooling",
