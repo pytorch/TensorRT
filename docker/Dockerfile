@@ -39,7 +39,6 @@ FROM base as torch-tensorrt
 # copy source repo
 COPY . /workspace/torch_tensorrt
 COPY --from=torch-tensorrt-builder  /workspace/torch_tensorrt/src/py/dist/ .
-RUN patch -u /opt/conda/lib/python3.8/site-packages/pytorch_quantization/nn/modules/tensor_quantizer.py -i /workspace/torch_tensorrt/docker/qat.patch
 RUN conda init bash
 
 RUN pip3 install ipywidgets --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host=files.pythonhosted.org
