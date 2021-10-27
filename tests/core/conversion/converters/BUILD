@@ -153,7 +153,6 @@ test_suite(
         ":test_replication_pad",
         ":test_select",
         ":test_shuffle",
-        ":test_softmax",
         ":test_squeeze",
         ":test_stack",
         ":test_topk",
