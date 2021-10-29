@@ -36,6 +36,8 @@ class Var : torch::CustomClassHolder {
   double unwrapToDouble();
   bool unwrapToBool(bool default_val);
   bool unwrapToBool();
+  std::string unwrapToString(std::string default_val);
+  std::string unwrapToString();
   c10::Scalar unwrapToScalar(c10::Scalar default_val);
   c10::Scalar unwrapToScalar();
   c10::List<int64_t> unwrapToIntList(c10::List<int64_t> default_val);

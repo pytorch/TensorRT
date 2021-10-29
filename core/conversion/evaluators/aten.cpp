@@ -33,6 +33,7 @@ DEFINE_GENERIC_TWO_INPUT_EVALUATOR(
         "aten::eq.bool(bool a, bool b) -> (bool)",
         "aten::eq.int(int a, int b) -> (bool)",
         "aten::eq.float(float a, float b) -> (bool)",
+        "aten::eq.str(str a, str b) -> (bool)",
         "aten::eq.int_float(int a, float b) -> (bool)",
         "aten::eq.float_int(float a, int b) -> (bool)",
     }));

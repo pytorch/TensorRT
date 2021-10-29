@@ -57,6 +57,17 @@
                  << node_kind << " evaluator b arg:" << args.at(n->input(1)).IValue()->type()->str()); \
              return {};                                                                                \
            }                                                                                           \
+         } else if (args.at(n->input(0)).IValue()->isString()) {                                       \
+           auto a = args.at(n->input(0)).unwrapToString();                                             \
+           if (args.at(n->input(1)).IValue()->isString()) {                                            \
+             auto b = args.at(n->input(1)).unwrapToString();                                           \
+             return operation;                                                                         \
+           } else {                                                                                    \
+             TRTORCH_THROW_ERROR(                                                                      \
+                 "Unimplemented data type for "                                                        \
+                 << node_kind << " evaluator b arg:" << args.at(n->input(1)).IValue()->type()->str()); \
+             return {};                                                                                \
+           }                                                                                           \
          } else {                                                                                      \
            TRTORCH_THROW_ERROR(                                                                        \
                "Unimplemented data type for "                                                          \
