@@ -98,7 +98,12 @@ DEFINE_GENERIC_TWO_INPUT_EVALUATOR(
         "aten::ge.float_int(float a, int b) -> (bool)",
     }));
 
-DEFINE_TWO_INPUT_SIMPLE_EVALUATOR(and, "aten::__and__", a&& b, bool, {"aten::__and__(int a, int b) -> (bool)"});
+DEFINE_TWO_INPUT_SIMPLE_EVALUATOR(
+    and,
+    "aten::__and__",
+    a&& b,
+    bool,
+    std::set<std::string>({"aten::__and__(int a, int b) -> (bool)", "aten::__and__.bool(bool a, bool b) -> (bool)"}));
 DEFINE_TWO_INPUT_SIMPLE_EVALUATOR(or, "aten::__or__", a || b, bool, {"aten::__or__(int a, int b) -> (bool)"});
 DEFINE_TWO_INPUT_SIMPLE_EVALUATOR(
     xor,
