@@ -51,6 +51,8 @@ TEST_P(CppAPITests, ModuleToEngineToModuleIsClose) {
       torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), threshold));
 }
 
+#ifndef DISABLE_TEST_IN_CI
+
 INSTANTIATE_TEST_SUITE_P(
     ModuleAsEngineForwardIsCloseSuite,
     CppAPITests,
@@ -63,3 +65,5 @@ INSTANTIATE_TEST_SUITE_P(
         PathAndInSize({"tests/modules/mobilenet_v2_scripted.jit.pt", {{1, 3, 224, 224}}, 2e-5}),
         PathAndInSize({"tests/modules/efficientnet_b0_scripted.jit.pt", {{1, 3, 224, 224}}, 2e-5}),
         PathAndInSize({"tests/modules/vit_scripted.jit.pt", {{1, 3, 224, 224}}, 8e-2})));
+
+#endif

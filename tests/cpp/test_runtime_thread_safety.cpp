@@ -5,6 +5,8 @@
 #include "torch/script.h"
 #include "torch_tensorrt/torch_tensorrt.h"
 
+#ifndef DISABLE_TEST_IN_CI
+
 void run_infer(
     int thread_id,
     torch::jit::Module& mod,
@@ -81,3 +83,4 @@ TEST(CppAPITests, RuntimeThreadSafety) {
   }
   ASSERT_TRUE(flag);
 }
+#endif

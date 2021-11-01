@@ -4,6 +4,8 @@
 #include "torch/script.h"
 #include "torch_tensorrt/torch_tensorrt.h"
 
+#ifndef DISABLE_TEST_IN_CI
+
 TEST(CppAPITest, CanRunMultipleEngines) {
   torch::jit::script::Module mod1;
   torch::jit::script::Module mod2;
@@ -63,3 +65,4 @@ TEST(CppAPITest, CanRunMultipleEngines) {
         torch_tensorrt::tests::util::almostEqual(jit2_results[i], trt2_results[i].reshape_as(jit2_results[i]), 2e-5));
   }
 }
+#endif

@@ -4,6 +4,8 @@
 #include "torch/script.h"
 #include "torch_tensorrt/torch_tensorrt.h"
 
+#ifndef DISABLE_TEST_IN_CI
+
 TEST(CppAPITest, ResNetModuleFallbacksCorrectly) {
   torch::jit::script::Module mod;
   try {
@@ -69,3 +71,4 @@ TEST(CppAPITest, MobileNetModuleFallbacksCorrectlyWithOneEngine) {
   auto trt_results = trt_mod.forward(trt_inputs_ivalues).toTensor();
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results, trt_results, 2e-6));
 }
+#endif
