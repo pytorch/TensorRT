@@ -1,7 +1,7 @@
 #include "core/util/prelude.h"
 #include "torch/script.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace tests {
 namespace util {
 
@@ -31,4 +31,4 @@ bool exactlyEqual(const at::Tensor& a, const at::Tensor& b) {
 
 } // namespace util
 } // namespace tests
-} // namespace trtorch
+} // namespace torch_tensorrt

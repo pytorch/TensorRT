@@ -6,7 +6,7 @@
 #include "core/runtime/runtime.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace runtime {
 
@@ -49,7 +49,7 @@ CudaDevice select_cuda_device(const CudaDevice& engine_device) {
   // TODO: I think this logic could be way simpler at execution time since if the tensors arent on the right
   // device, its not going to run. We should just set device to engine device and maybe reset and memcpy tensors
   // back to orginal device if needed.
-  TRTORCH_CHECK(
+  TORCHTRT_CHECK(
       new_target_device_opt,
       "No compatible device found on system to run program.\n Program targets "
           << engine_device << "\n Available targets: \n"
@@ -82,11 +82,11 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
 
   for (size_t i = 0; i < inputs.size(); i++) {
     uint64_t pyt_idx = compiled_engine->in_binding_map[i];
-    TRTORCH_CHECK(
+    TORCHTRT_CHECK(
         inputs[pyt_idx].is_cuda(),
         "Expected input tensors to have device cuda, found device " << inputs[pyt_idx].device());
     auto expected_type = util::TRTDataTypeToScalarType(compiled_engine->exec_ctx->getEngine().getBindingDataType(i));
-    TRTORCH_CHECK(
+    TORCHTRT_CHECK(
         inputs[pyt_idx].dtype() == expected_type,
         "Expected input tensors to have type " << expected_type << ", found type " << inputs[pyt_idx].dtype());
     auto dims = core::util::toDimsPad(inputs[pyt_idx].sizes(), 1);
@@ -97,7 +97,7 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
     gpu_handles.push_back(contig_inputs.back().data_ptr());
   }
 
-  TRTORCH_CHECK(
+  TORCHTRT_CHECK(
       compiled_engine->exec_ctx->allInputDimensionsSpecified(), "Not enough inputs provided (runtime.RunCudaEngine)");
 
   std::vector<at::Tensor> outputs(compiled_engine->num_io.second);
@@ -126,4 +126,4 @@ TORCH_LIBRARY(tensorrt, m) {
 
 } // namespace runtime
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

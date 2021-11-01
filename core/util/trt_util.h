@@ -123,7 +123,7 @@ inline std::ostream& operator<<(std::ostream& stream, const nvinfer1::EngineCapa
 }
 } // namespace nvinfer1
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace util {
 
@@ -161,4 +161,4 @@ const std::unordered_map<at::ScalarType, nvinfer1::DataType>& get_aten_trt_type_
 
 } // namespace util
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

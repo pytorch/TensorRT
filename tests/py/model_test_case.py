@@ -1,5 +1,4 @@
 import unittest
-import trtorch
 import torch
 import torchvision.models as models
 

@@ -1,7 +1,7 @@
 import unittest
 import os
-import trtorch
-from trtorch.logging import *
+import torch_tensorrt as torchtrt
+from torch_tensorrt.logging import *
 import torch
 import tensorrt as trt
 import torch.nn as nn
@@ -103,18 +103,18 @@ class TestAccuracy(ModelTestCase):
         log(Level.Info, "[Pyt FP32] Test Acc: {:.2f}%".format(100 * fp32_test_acc))
 
         compile_spec = {
-            "inputs": [trtorch.Input([1, 3, 32, 32])],
-            "enabled_precision": {torch.float, torch.int8},
+            "inputs": [torchtrt.Input([1, 3, 32, 32])],
+            "enabled_precisions": {torch.float, torch.int8},
             "calibrator": self.calibrator,
             "device": {
-                "device_type": trtorch.DeviceType.GPU,
+                "device_type": torchtrt.DeviceType.GPU,
                 "gpu_id": 0,
                 "dla_core": 0,
                 "allow_gpu_fallback": False,
             }
         }
 
-        trt_mod = trtorch.compile(self.model, compile_spec)
+        trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
         int8_test_acc = self.compute_accuracy(self.testing_dataloader, trt_mod)
         log(Level.Info, "[TRT INT8] Test Acc: {:.2f}%".format(100 * int8_test_acc))
         acc_diff = fp32_test_acc - int8_test_acc
@@ -124,7 +124,7 @@ class TestAccuracy(ModelTestCase):
 def test_suite():
     suite = unittest.TestSuite()
     # You need a pre-trained VGG cifar10 model to run this test. Please follow instructions at
-    # https://github.com/NVIDIA/TRTorch/tree/master/cpp/ptq/training/vgg16 to export this model.
+    # https://github.com/NVIDIA/torchtrt/tree/master/cpp/ptq/training/vgg16 to export this model.
     suite.addTest(TestAccuracy.parametrize(TestAccuracy, model=torch.jit.load('./trained_vgg16.jit.pt')))
 
     return suite

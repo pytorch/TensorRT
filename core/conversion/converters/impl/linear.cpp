@@ -1,14 +1,14 @@
 #include "core/conversion/converters/converters.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace converters {
 namespace impl {
 namespace {
 
-auto linear_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().pattern(
+auto linear_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pattern(
     {"aten::linear(Tensor input, Tensor weight, Tensor? bias = None) -> (Tensor)",
      [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
        // PyTorch follows in: Nx*xIN, W: OUTxIN, B: OUT, out: Nx*xOUT
@@ -18,7 +18,7 @@ auto linear_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().patt
 
        LOG_DEBUG("Input tensor shape: " << in->getDimensions());
 
-       TRTORCH_ASSERT(
+       TORCHTRT_ASSERT(
            shape.size() >= 2,
            "aten::linear expects input tensors to be of shape [N,..., in features], but found input Tensor less than 2D");
 
@@ -52,7 +52,7 @@ auto linear_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().patt
          new_layer = ctx->net->addFullyConnected(*in, w.num_output_maps, w.data, Weights().data);
        }
 
-       TRTORCH_CHECK(new_layer, "Unable to create linear layer from node: " << *n);
+       TORCHTRT_CHECK(new_layer, "Unable to create linear layer from node: " << *n);
 
        new_layer->setName(util::node_info(n).c_str());
        auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
@@ -66,4 +66,4 @@ auto linear_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().patt
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

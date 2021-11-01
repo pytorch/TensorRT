@@ -5,7 +5,7 @@
 #include "gtest/gtest.h"
 #include "tests/util/util.h"
 #include "torch/script.h"
-#include "trtorch/trtorch.h"
+#include "torch_tensorrt/torch_tensorrt.h"
 
 TEST(CoreTest, DetectingInputTypeWorksCorrectFP32) {
   torch::jit::script::Module mod;
@@ -16,10 +16,10 @@ TEST(CoreTest, DetectingInputTypeWorksCorrectFP32) {
     ASSERT_TRUE(false);
   }
 
-  auto graph_and_parameters = trtorch::core::lowering::Lower(mod, "forward", {});
+  auto graph_and_parameters = torch_tensorrt::core::lowering::Lower(mod, "forward", {});
   auto g = graph_and_parameters.first;
 
-  auto input_types = trtorch::core::ir::get_block_first_calc_dtypes_opt(g->block());
+  auto input_types = torch_tensorrt::core::ir::get_block_first_calc_dtypes_opt(g->block());
 
   for (auto in : input_types) {
     c10::optional<at::ScalarType>& detected_type_opt = in.second;
@@ -39,10 +39,10 @@ TEST(CoreTest, DetectingInputTypeWorksCorrectFP16) {
 
   mod.to(at::kHalf);
 
-  auto graph_and_parameters = trtorch::core::lowering::Lower(mod, "forward", {});
+  auto graph_and_parameters = torch_tensorrt::core::lowering::Lower(mod, "forward", {});
   auto g = graph_and_parameters.first;
 
-  auto input_types = trtorch::core::ir::get_block_first_calc_dtypes_opt(g->block());
+  auto input_types = torch_tensorrt::core::ir::get_block_first_calc_dtypes_opt(g->block());
 
   for (auto in : input_types) {
     c10::optional<at::ScalarType>& detected_type_opt = in.second;

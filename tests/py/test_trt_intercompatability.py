@@ -1,5 +1,5 @@
 import unittest
-import trtorch
+import torch_tensorrt as torchtrt
 import torch
 import torchvision.models as models
 import tensorrt as trt
@@ -15,9 +15,9 @@ class TestPyTorchToTRTEngine(ModelTestCase):
 
     def test_pt_to_trt(self):
         compile_spec = {
-            "inputs": [trtorch.Input(self.input.shape)],
+            "inputs": [torchtrt.Input(self.input.shape)],
             "device": {
-                "device_type": trtorch.DeviceType.GPU,
+                "device_type": torchtrt.DeviceType.GPU,
                 "gpu_id": 0,
                 "dla_core": 0,
                 "allow_gpu_fallback": False,
@@ -25,7 +25,7 @@ class TestPyTorchToTRTEngine(ModelTestCase):
             }
         }
 
-        trt_engine = trtorch.convert_method_to_trt_engine(self.ts_model, "forward", compile_spec)
+        trt_engine = torchtrt.ts.convert_method_to_trt_engine(self.ts_model, "forward", **compile_spec)
 
         TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
         with trt.Runtime(TRT_LOGGER) as rt:

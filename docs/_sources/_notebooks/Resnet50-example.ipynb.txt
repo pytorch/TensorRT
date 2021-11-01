@@ -28,7 +28,7 @@
    "source": [
     "<img src=\"http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png\" style=\"width: 90px; float: right;\">\n",
     "\n",
-    "# TRTorch Getting Started - ResNet 50"
+    "# Torch-TensorRT Getting Started - ResNet 50"
    ]
   },
   {
@@ -41,7 +41,7 @@
     "\n",
     "When deploying on NVIDIA GPUs TensorRT, NVIDIA's Deep Learning Optimization SDK and Runtime is able to take models from any major framework and specifically tune them to perform better on specific target hardware in the NVIDIA family be it an A100, TITAN V, Jetson Xavier or NVIDIA's Deep Learning Accelerator. TensorRT performs a couple sets of optimizations to achieve this. TensorRT fuses layers and tensors in the model graph, it then uses a large kernel library to select implementations that perform best on the target GPU. TensorRT also has strong support for reduced operating precision execution which allows users to leverage the Tensor Cores on Volta and newer GPUs as well as reducing memory and computation footprints on device.\n",
     "\n",
-    "TRTorch is a compiler that uses TensorRT to optimize TorchScript code, compiling standard TorchScript modules into ones that internally run with TensorRT optimizations. This enables you to continue to remain in the PyTorch ecosystem, using all the great features PyTorch has such as module composability, its flexible tensor implementation, data loaders and more. TRTorch is available to use with both PyTorch and LibTorch."
+    "Torch-TensorRT is a compiler that uses TensorRT to optimize TorchScript code, compiling standard TorchScript modules into ones that internally run with TensorRT optimizations. This enables you to continue to remain in the PyTorch ecosystem, using all the great features PyTorch has such as module composability, its flexible tensor implementation, data loaders and more. Torch-TensorRT is available to use with both PyTorch and LibTorch."
    ]
   },
   {
@@ -50,13 +50,13 @@
    "source": [
     "### Learning objectives\n",
     "\n",
-    "This notebook demonstrates the steps for compiling a TorchScript module with TRTorch on a pretrained ResNet-50 network, and running it to test the speedup obtained.\n",
+    "This notebook demonstrates the steps for compiling a TorchScript module with Torch-TensorRT on a pretrained ResNet-50 network, and running it to test the speedup obtained.\n",
     "\n",
     "## Content\n",
     "1. [Requirements](#1)\n",
     "1. [ResNet-50 Overview](#2)\n",
     "1. [Creating TorchScript modules](#3)\n",
-    "1. [Compiling with TRTorch](#4)\n",
+    "1. [Compiling with Torch-TensorRT](#4)\n",
     "1. [Conclusion](#5)"
    ]
   },
@@ -375,7 +375,7 @@
     }
    ],
    "source": [
-    "# Model benchmark without TRTorch/TensorRT\n",
+    "# Model benchmark without Torch-TensorRT\n",
     "model = resnet50_model.eval().to(\"cuda\")\n",
     "benchmark(model, input_shape=(128, 3, 224, 224), nruns=100)"
    ]
@@ -387,12 +387,12 @@
     "<a id=\"3\"></a>\n",
     "## 3. Creating TorchScript modules\n",
     "\n",
-    "To compile with TRTorch, the model must first be in **TorchScript**. TorchScript is a programming language included in PyTorch which removes the Python dependency normal PyTorch models have. This conversion is done via a JIT compiler which given a PyTorch Module will generate an equivalent TorchScript Module. There are two paths that can be used to generate TorchScript: **Tracing** and **Scripting**. \n",
+    "To compile with Torch-TensorRT, the model must first be in **TorchScript**. TorchScript is a programming language included in PyTorch which removes the Python dependency normal PyTorch models have. This conversion is done via a JIT compiler which given a PyTorch Module will generate an equivalent TorchScript Module. There are two paths that can be used to generate TorchScript: **Tracing** and **Scripting**. \n",
     "\n",
     "- Tracing follows execution of PyTorch generating ops in TorchScript corresponding to what it sees. \n",
     "- Scripting does an analysis of the Python code and generates TorchScript, this allows the resulting graph to include control flow which tracing cannot do. \n",
     "\n",
-    "Tracing is more likely to compile successfully with TRTorch due to simplicity (though both systems are supported). We start with an example of the traced model in TorchScript."
+    "Tracing is more likely to compile successfully with Torch-TensorRT due to simplicity (though both systems are supported). We start with an example of the traced model in TorchScript."
    ]
   },
   {
@@ -470,7 +470,7 @@
    "metadata": {},
    "source": [
     "<a id=\"4\"></a>\n",
-    "## 4. Compiling with TRTorch"
+    "## 4. Compiling with Torch-TensorRT"
    ]
   },
   {
@@ -479,7 +479,7 @@
    "source": [
     "TorchScript modules behave just like normal PyTorch modules and are intercompatible. From TorchScript we can now compile a TensorRT based module. This module will still be implemented in TorchScript but all the computation will be done in TensorRT.\n",
     "\n",
-    "As mentioned earlier, we start with an example of TRTorch compilation with the traced model.\n",
+    "As mentioned earlier, we start with an example of Torch-TensorRT compilation with the traced model.\n",
     "\n",
     "Note that we show benchmarking results of two precisions: FP32 (single precision) and FP16 (half precision)."
    ]
@@ -497,12 +497,12 @@
    "metadata": {},
    "outputs": [],
    "source": [
-    "import trtorch\n",
+    "import torch_tensorrt\n",
     "\n",
     "# The compiled module will have precision as specified by \"op_precision\".\n",
     "# Here, it will have FP16 precision.\n",
-    "trt_model_fp32 = trtorch.compile(traced_model, {\n",
-    "    \"inputs\": [trtorch.Input((128, 3, 224, 224))],\n",
+    "trt_model_fp32 = torch_tensorrt.compile(traced_model, {\n",
+    "    \"inputs\": [torch_tensorrt.Input((128, 3, 224, 224))],\n",
     "    \"enabled_precisions\": {torch.float32}, # Run with FP32\n",
     "    \"workspace_size\": 1 << 20\n",
     "})\n",
@@ -554,12 +554,12 @@
    "metadata": {},
    "outputs": [],
    "source": [
-    "import trtorch\n",
+    "import torch_tensorrt\n",
     "\n",
     "# The compiled module will have precision as specified by \"op_precision\".\n",
     "# Here, it will have FP16 precision.\n",
-    "trt_model = trtorch.compile(traced_model, {\n",
-    "    \"inputs\": [trtorch.Input((128, 3, 224, 224))],\n",
+    "trt_model = torch_tensorrt.compile(traced_model, {\n",
+    "    \"inputs\": [torch_tensorrt.Input((128, 3, 224, 224))],\n",
     "    \"enabled_precisions\": {torch.float, torch.half}, # Run with FP16\n",
     "    \"workspace_size\": 1 << 20\n",
     "})\n"
@@ -604,18 +604,11 @@
     "<a id=\"5\"></a>\n",
     "## 5. Conclusion\n",
     "\n",
-    "In this notebook, we have walked through the complete process of compiling TorchScript models with TRTorch for ResNet-50 model and test the performance impact of the optimization. With TRTorch, we observe a speedup of **1.4X** with FP32, and **3.0X** with FP16.\n",
+    "In this notebook, we have walked through the complete process of compiling TorchScript models with Torch-TensorRT for ResNet-50 model and test the performance impact of the optimization. With Torch-TensorRT, we observe a speedup of **1.4X** with FP32, and **3.0X** with FP16.\n",
     "\n",
     "### What's next\n",
-    "Now it's time to try TRTorch on your own model. Fill out issues at https://github.com/NVIDIA/TRTorch. Your involvement will help future development of TRTorch.\n"
+    "Now it's time to try Torch-TensorRT on your own model. Fill out issues at https://github.com/NVIDIA/Torch-TensorRT. Your involvement will help future development of Torch-TensorRT.\n"
    ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "metadata": {},
-   "outputs": [],
-   "source": []
   }
  ],
  "metadata": {
@@ -634,7 +627,7 @@
    "name": "python",
    "nbconvert_exporter": "python",
    "pygments_lexer": "ipython3",
-   "version": "3.8.10"
+   "version": "3.6.13"
   }
  },
  "nbformat": 4,

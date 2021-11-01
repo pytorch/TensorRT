@@ -8,7 +8,7 @@ config_setting(
 )
 
 cc_library(
-    name = "trtorch_plugins",
+    name = "torch_tensorrt_plugins",
     hdrs = [
         "impl/interpolate_plugin.h",
         "impl/normalize_plugin.h",

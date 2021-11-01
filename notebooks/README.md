@@ -1,5 +1,5 @@
 # Jupyter demo notebooks
-This folder contains demo notebooks for TRTorch.
+This folder contains demo notebooks for Torch-TensorRT.
 
 ## 1. Requirements
 
@@ -8,19 +8,19 @@ The most convenient way to run these notebooks is via a docker container, which 
 First, clone the repository:
 
 ```
-git clone https://github.com/NVIDIA/TRTorch
+git clone https://github.com/NVIDIA/Torch-TensorRT
 ```
 
-Next, build the NVIDIA TRTorch container (from repo root):
+Next, build the NVIDIA Torch-TensorRT container (from repo root):
 
 ```
-docker build -t trtorch -f ./docker/Dockerfile.21.06 .
+docker build -t torch_tensorrt -f ./docker/Dockerfile .
 ```
 
 Then launch the container with:
 
 ```
-docker run --runtime=nvidia -it --rm --ipc=host --net=host trtorch
+docker run --runtime=nvidia -it --rm --ipc=host --net=host torch_tensorrt
 ```
 
 Within the docker interactive bash session, start Jupyter with
@@ -38,14 +38,15 @@ in, for example:
 ```http://[host machine]:8888/?token=aae96ae9387cd28151868fee318c3b3581a2d794f3b25c6b```
 
 
-Within the container, the notebooks themselves are located at `/workspace/TRTorch/notebooks`.
+Within the container, the notebooks themselves are located at `/workspace/torch_tensorrt/notebooks`. To reach them in Jupyter, click on the folder marked 
+`torch_tensorrt`, then the folder marked `notebooks`.
 
 ## 2. Notebook list
 
 - [lenet-getting-started.ipynb](lenet-getting-started.ipynb): simple example on a LeNet network.
-- [ssd-object-detection-demo.ipynb](ssd-object-detection-demo.ipynb): demo for compiling a pretrained SSD model using TRTorch.
+- [ssd-object-detection-demo.ipynb](ssd-object-detection-demo.ipynb): demo for compiling a pretrained SSD model using Torch-TensorRT.
 - [Resnet50-example.ipynb](Resnet50-example.ipynb): demo on the ResNet-50 network.
-- [vgg-qat.ipynb](vgg-qat.ipynb): Quantization Aware Trained models in INT8 using TRTorch
+- [vgg-qat.ipynb](vgg-qat.ipynb): Quantization Aware Trained models in INT8 using Torch-TensorRT
 
 ```python
 

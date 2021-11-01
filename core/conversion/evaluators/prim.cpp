@@ -14,7 +14,7 @@
 #include "core/conversion/evaluators/evaluators.h"
 #include "core/util/trt_util.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace evaluators {
@@ -113,11 +113,11 @@ auto prim_registrations =
                           auto pyt_input = input.IValue()->toTensor();
                           return static_cast<int>(pyt_input.scalar_type());
                         } else {
-                          TRTORCH_THROW_ERROR("Unsupported input type in prim::dtype operator");
+                          TORCHTRT_THROW_ERROR("Unsupported input type in prim::dtype operator");
                           return {};
                         }
                       } else {
-                        TRTORCH_THROW_ERROR("Unsupported input type in prim::dtype operator");
+                        TORCHTRT_THROW_ERROR("Unsupported input type in prim::dtype operator");
                         return {};
                       }
                     },
@@ -147,7 +147,7 @@ auto prim_registrations =
                             auto b = args.at(n->input(1)).unwrapToDouble();
                             return a < b ? a : b;
                           } else {
-                            TRTORCH_THROW_ERROR(
+                            TORCHTRT_THROW_ERROR(
                                 "Unimplemented data type for " << n->kind().toQualString() << " evaluator b arg: "
                                                                << args.at(n->input(1)).IValue()->type()->str());
                             return {};
@@ -161,19 +161,19 @@ auto prim_registrations =
                             auto b = args.at(n->input(1)).unwrapToDouble();
                             return a < b ? a : b;
                           } else {
-                            TRTORCH_THROW_ERROR(
+                            TORCHTRT_THROW_ERROR(
                                 "Unimplemented data type for " << n->kind().toQualString() << " evaluator b arg: "
                                                                << args.at(n->input(1)).IValue()->type()->str());
                             return {};
                           }
                         } else {
-                          TRTORCH_THROW_ERROR(
+                          TORCHTRT_THROW_ERROR(
                               "Unimplemented data type for " << n->kind().toQualString() << " evaluator a arg: "
                                                              << args.at(n->input(0)).IValue()->type()->str());
                           return {};
                         }
                       } else {
-                        TRTORCH_THROW_ERROR("Unimplemented " << n->kind().toQualString() << " evaluator case");
+                        TORCHTRT_THROW_ERROR("Unimplemented " << n->kind().toQualString() << " evaluator case");
                         return {};
                       }
                     },
@@ -208,7 +208,7 @@ auto prim_registrations =
                             auto b = args.at(n->input(1)).unwrapToDouble();
                             return a > b ? a : b;
                           } else {
-                            TRTORCH_THROW_ERROR(
+                            TORCHTRT_THROW_ERROR(
                                 "Unimplemented data type for " << n->kind().toQualString() << " evaluator b arg: "
                                                                << args.at(n->input(1)).IValue()->type()->str());
                             return {};
@@ -222,19 +222,19 @@ auto prim_registrations =
                             auto b = args.at(n->input(1)).unwrapToDouble();
                             return a > b ? a : b;
                           } else {
-                            TRTORCH_THROW_ERROR(
+                            TORCHTRT_THROW_ERROR(
                                 "Unimplemented data type for " << n->kind().toQualString() << " evaluator b arg: "
                                                                << args.at(n->input(1)).IValue()->type()->str());
                             return {};
                           }
                         } else {
-                          TRTORCH_THROW_ERROR(
+                          TORCHTRT_THROW_ERROR(
                               "Unimplemented data type for " << n->kind().toQualString() << " evaluator a arg: "
                                                              << args.at(n->input(0)).IValue()->type()->str());
                           return {};
                         }
                       } else {
-                        TRTORCH_THROW_ERROR("Unimplemented " << n->kind().toQualString() << " evaluator case");
+                        TORCHTRT_THROW_ERROR("Unimplemented " << n->kind().toQualString() << " evaluator case");
                         return {};
                       }
                     },
@@ -270,11 +270,11 @@ auto prim_registrations =
         .evaluator({c10::Symbol::fromQualString("prim::RaiseException"),
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                       auto exception = args.at(n->input(0)).IValue();
-                      TRTORCH_THROW_ERROR("Error from TorchScript: " << *exception);
+                      TORCHTRT_THROW_ERROR("Error from TorchScript: " << *exception);
                       return {};
                     }});
 }
 } // namespace evaluators
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

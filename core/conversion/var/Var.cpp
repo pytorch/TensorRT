@@ -4,7 +4,7 @@
 #include "core/conversion/var/Var.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 
@@ -91,7 +91,7 @@ nvinfer1::ITensor* Var::ITensorOrFreeze(ConversionCtx* ctx) {
     LOG_DEBUG(ctx->logger, "Found IValue containing object of type " << *(ptr_.ivalue->type()));
   }
 
-  TRTORCH_CHECK(
+  TORCHTRT_CHECK(
       isITensor() || (isIValue() && (ptr_.ivalue->isTensor() || ptr_.ivalue->isCustomClass())),
       "Requested either IValue containing a Tensor, or ITensor, however Var type is " << type_name());
 
@@ -116,7 +116,7 @@ nvinfer1::ITensor* Var::ITensorOrFreeze(ConversionCtx* ctx) {
 }
 
 const torch::jit::IValue* Var::IValue() const {
-  TRTORCH_CHECK(isIValue(), "Requested IValue from Var, however Var type is " << type_name());
+  TORCHTRT_CHECK(isIValue(), "Requested IValue from Var, however Var type is " << type_name());
   if (type_ == Type::kIValue) {
     return ptr_.ivalue;
   } else {
@@ -125,7 +125,7 @@ const torch::jit::IValue* Var::IValue() const {
 }
 
 nvinfer1::ITensor* Var::ITensor() const {
-  TRTORCH_CHECK(isITensor(), "Requested ITensor from Var, however Var type is " << type_name());
+  TORCHTRT_CHECK(isITensor(), "Requested ITensor from Var, however Var type is " << type_name());
   if (type_ == Type::kITensor) {
     return ptr_.tensor;
   } else {
@@ -159,4 +159,4 @@ bool Var::isNone() const {
 
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

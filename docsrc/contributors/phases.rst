@@ -15,7 +15,7 @@ Lowering
 ^^^^^^^^^^^
 :ref:`lowering`
 
-The lowering is made up of a set of passes (some from PyTorch and some specific to TRTorch)
+The lowering is made up of a set of passes (some from PyTorch and some specific to Torch-TensorRT)
 run over the graph IR to map the large PyTorch opset to a reduced opset that is easier to convert to
 TensorRT.
 
@@ -43,4 +43,4 @@ Compilation and Runtime
 The final compilation phase constructs a TorchScript program to run the converted TensorRT engine. It
 takes a serialized engine and instantiates it within a engine manager, then the compiler will
 build out a JIT graph that references this engine and wraps it in a module to return to the user.
-When the user executes the module, the JIT program run in the JIT runtime extended by TRTorch with the data providied from the user.
+When the user executes the module, the JIT program run in the JIT runtime extended by Torch-TensorRT with the data providied from the user.

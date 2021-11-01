@@ -15,10 +15,6 @@ cc_test(
   srcs = ["test_detecting_input_type.cpp"],
   deps = [
       "//tests/util",
-      "//core",
-      "//core/ir",
-      "//core/lowering",
-      "//core/util:prelude",
       "@googletest//:gtest_main",
   ] + select({
       ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],

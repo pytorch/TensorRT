@@ -1,22 +1,22 @@
 # C++ API
 
-Targets in module create the user facing C++ library for the TRTorch core.
+Targets in module create the user facing C++ library for the Torch-TensorRT core.
 
-## Building libtrtorch.so
+## Building libtorchtrt.so
 
 ### Debug build
 ``` shell
-bazel build //cpp/lib:libtrtorch.so --compilation_mode=dbg
+bazel build //cpp/lib:libtorchtrt.so --compilation_mode=dbg
 ```
 
 ### Release build
 
 ``` shell
-bazel build //cpp/lib:libtrtorch.so -c opt
+bazel build //cpp/lib:libtorchtrt.so -c opt
 ```
 
 ## Usage
 
 ``` c++
-#include "trtorch/trtorch.h"
+#include "torch_tensorrt/torch_tensorrt.h"
 ```

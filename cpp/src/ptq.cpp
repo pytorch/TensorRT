@@ -1,7 +1,7 @@
-#include "trtorch/ptq.h"
+#include "torch_tensorrt/ptq.h"
 #include "torch/torch.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace ptq {
 
 bool get_batch_impl(void* bindings[], const char* names[], int nbBindings, torch::Tensor& data) {
@@ -13,4 +13,4 @@ bool get_batch_impl(void* bindings[], const char* names[], int nbBindings, torch
 }
 
 } // namespace ptq
-} // namespace trtorch
+} // namespace torch_tensorrt

@@ -3,7 +3,7 @@
 #include <sstream>
 #include <utility>
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 
@@ -45,12 +45,12 @@ std::ostream& operator<<(std::ostream& os, const BuilderSettings& s) {
 ConversionCtx::ConversionCtx(BuilderSettings build_settings)
     : settings(build_settings),
       logger(
-          "[TRTorch Conversion Context] - ",
+          "[Torch-TensorRT TorchScript Conversion Context] - ",
           util::logging::get_logger().get_reportable_severity(),
           util::logging::get_logger().get_is_colored_output_on()) {
   // TODO: Support FP16 and FP32 from JIT information
   if (settings.device.gpu_id) {
-    TRTORCH_CHECK(
+    TORCHTRT_CHECK(
         cudaSetDevice(settings.device.gpu_id) == cudaSuccess, "Unable to set gpu id: " << settings.device.gpu_id);
   }
 
@@ -64,11 +64,13 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
   for (auto p = settings.enabled_precisions.begin(); p != settings.enabled_precisions.end(); ++p) {
     switch (*p) {
       case nvinfer1::DataType::kHALF:
-        TRTORCH_CHECK(builder->platformHasFastFp16(), "Requested inference in FP16 but platform does not support FP16");
+        TORCHTRT_CHECK(
+            builder->platformHasFastFp16(), "Requested inference in FP16 but platform does not support FP16");
         cfg->setFlag(nvinfer1::BuilderFlag::kFP16);
         break;
       case nvinfer1::DataType::kINT8:
-        TRTORCH_CHECK(builder->platformHasFastInt8(), "Requested inference in INT8 but platform does not support INT8");
+        TORCHTRT_CHECK(
+            builder->platformHasFastInt8(), "Requested inference in INT8 but platform does not support INT8");
         cfg->setFlag(nvinfer1::BuilderFlag::kINT8);
         if (!settings.calibrator) {
           LOG_INFO(
@@ -82,7 +84,7 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
       case nvinfer1::DataType::kINT32:
       case nvinfer1::DataType::kBOOL:
       default:
-        TRTORCH_THROW_ERROR(
+        TORCHTRT_THROW_ERROR(
             "Requested kernel precision that is unsupported: " << *p << " options are float, half, int8");
     }
   }
@@ -125,11 +127,11 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
 
   if (settings.device.device_type == nvinfer1::DeviceType::kDLA) {
     auto nbDLACores = builder->getNbDLACores();
-    TRTORCH_CHECK(
+    TORCHTRT_CHECK(
         static_cast<int>(settings.device.dla_core) < nbDLACores,
         "Configured DLA Core ID: " << settings.device.dla_core
                                    << " not available. Total number of available DLA Cores: " << nbDLACores);
-    TRTORCH_CHECK(
+    TORCHTRT_CHECK(
         settings.enabled_precisions.find(nvinfer1::DataType::kFLOAT) == settings.enabled_precisions.end(),
         "DLA supports only fp16 or int8 precision");
     cfg->setDLACore(settings.device.dla_core);
@@ -157,12 +159,12 @@ std::string ConversionCtx::SerializeEngine() {
 #if NV_TENSORRT_MAJOR > 7
   auto serialized_network = builder->buildSerializedNetwork(*net, *cfg);
   if (!serialized_network) {
-    TRTORCH_THROW_ERROR("Building serialized network failed in TensorRT");
+    TORCHTRT_THROW_ERROR("Building serialized network failed in TensorRT");
   }
 #else
   auto engine = builder->buildEngineWithConfig(*net, *cfg);
   if (!engine) {
-    TRTORCH_THROW_ERROR("Building TensorRT engine failed");
+    TORCHTRT_THROW_ERROR("Building TensorRT engine failed");
   }
   auto serialized_network = engine->serialize();
   engine->destroy();
@@ -190,4 +192,4 @@ bool ConversionCtx::CheckLayerAddition(const torch::jit::Node* n) {
 
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

@@ -6,7 +6,7 @@
 #include "c10/util/irange.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace evaluators {
@@ -69,15 +69,15 @@ c10::optional<torch::jit::IValue> toIValue(const torch::jit::Value* v) {
     }
   } else if (type->cast<c10::ListType>() && node->kindOf(c10::attr::value) == torch::jit::AttributeKind::ival) {
     const auto& list = node->ival(c10::attr::value);
-    TRTORCH_ASSERT(list.isList(), "Is not a list");
+    TORCHTRT_ASSERT(list.isList(), "Is not a list");
     return list;
   } else if (type->cast<c10::DictType>() && node->kindOf(c10::attr::value) == torch::jit::AttributeKind::ival) {
     const auto& dict = node->ival(c10::attr::value);
-    TRTORCH_ASSERT(dict.isGenericDict(), "Is not a dict");
+    TORCHTRT_ASSERT(dict.isGenericDict(), "Is not a dict");
     return dict;
   } else if (type->cast<c10::TupleType>() && node->kindOf(c10::attr::value) == torch::jit::AttributeKind::ival) {
     const auto& tup = node->ival(c10::attr::value);
-    TRTORCH_ASSERT(tup.isTuple(), "Is not a tuple");
+    TORCHTRT_ASSERT(tup.isTuple(), "Is not a tuple");
     return tup;
   } else if (type == c10::StringType::get()) {
     const auto& s = node->s(c10::attr::value);
@@ -108,13 +108,13 @@ void checkListInputType(const c10::TypePtr& elem_type, bool empty_list) {
                  "is the type of elements in the list for Python 2)";
       }
     }
-    TRTORCH_THROW_ERROR(error.str());
+    TORCHTRT_THROW_ERROR(error.str());
   }
 }
 
 void checkSequenceSize(int64_t n, int64_t dim, int64_t seq_size) {
   if (seq_size != n) {
-    TRTORCH_THROW_ERROR("Expected sequence of length " << n << " at dim " << dim << " (got " << seq_size << ")");
+    TORCHTRT_THROW_ERROR("Expected sequence of length " << n << " at dim " << dim << " (got " << seq_size << ")");
   }
 }
 
@@ -196,10 +196,10 @@ void recursiveStore(
       } else if (tenElementSize == static_cast<int>(c10::elementSize(at::ScalarType::Half))) {
         storeLastDimensionHalf(data, sizes, strides, dim, tenElementSize, seq);
       } else {
-        TRTORCH_THROW_ERROR("Found unsupported data type in arguments for aten::tensor");
+        TORCHTRT_THROW_ERROR("Found unsupported data type in arguments for aten::tensor");
       }
     } else {
-      TRTORCH_THROW_ERROR("Found unsupported data type in arguments for aten::tensor");
+      TORCHTRT_THROW_ERROR("Found unsupported data type in arguments for aten::tensor");
     }
   }
 }
@@ -238,7 +238,7 @@ at::Tensor createTensorFromList(
   /// Gets shape of tensor to be created
   auto sizes = compute_sizes(data);
   checkListInputType(elem_type, sizes.size() == 1 && sizes[0] == 0);
-  at::ScalarType initial_scalar_type = c10::scalarTypeFromJitType(elem_type);
+  at::ScalarType initial_scalar_type = c10::scalarTypeFromJitType(*elem_type);
   if (initial_scalar_type == at::ScalarType::Double) {
     initial_scalar_type = at::typeMetaToScalarType(c10::get_default_dtype());
   }
@@ -266,4 +266,4 @@ at::Tensor createTensorFromList(
 } // namespace evaluators
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

@@ -11,7 +11,7 @@
 #include "core/util/prelude.h"
 #include "torch/csrc/jit/passes/subgraph_rewrite.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace lowering {
 namespace passes {
@@ -71,4 +71,4 @@ void LinearToAddMM(std::shared_ptr<torch::jit::Graph>& graph) {
 } // namespace passes
 } // namespace lowering
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

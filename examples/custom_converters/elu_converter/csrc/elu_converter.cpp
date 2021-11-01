@@ -3,11 +3,11 @@
 
 namespace my_custom_converters {
 
-auto actelu = trtorch::core::conversion::converters::RegisterNodeConversionPatterns().pattern(
+auto actelu = torch_tensorrt::core::conversion::converters::RegisterNodeConversionPatterns().pattern(
     {"aten::elu(Tensor self, Scalar alpha=1, Scalar scale=1, Scalar input_scale=1) -> (Tensor)",
-     [](trtorch::core::conversion::ConversionCtx* ctx,
+     [](torch_tensorrt::core::conversion::ConversionCtx* ctx,
         const torch::jit::Node* n,
-        trtorch::core::conversion::converters::args& args) -> bool {
+        torch_tensorrt::core::conversion::converters::args& args) -> bool {
        auto in = args[0].ITensorOrFreeze(ctx);
        auto alpha = args[1].unwrapToDouble();
 
@@ -17,7 +17,7 @@ auto actelu = trtorch::core::conversion::converters::RegisterNodeConversionPatte
        }
 
        new_layer->setAlpha(alpha);
-       new_layer->setName(trtorch::core::util::node_info(n).c_str());
+       new_layer->setName(torch_tensorrt::core::util::node_info(n).c_str());
        ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
 
        return true;

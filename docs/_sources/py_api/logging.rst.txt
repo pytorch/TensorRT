@@ -1,11 +1,11 @@
-trtorch.logging
+torch_tensorrt.logging
 ----------------------
 
-.. currentmodule:: trtorch.logging
+.. currentmodule:: torch_tensorrt.logging
 
-.. automodule:: trtorch.logging
+.. automodule:: torch_tensorrt.logging
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. autoclass:: py trtorch.logging.Level
+.. autoclass:: py torch_tensorrt.logging.Level

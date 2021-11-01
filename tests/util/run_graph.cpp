@@ -1,7 +1,7 @@
 #include "tests/util/util.h"
 #include "torch/csrc/jit/runtime/graph_executor.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace tests {
 namespace util {
 
@@ -16,7 +16,8 @@ std::vector<at::Tensor> RunGraph(
   LOG_DEBUG("Running JIT version");
   std::vector<torch::jit::IValue> inputs_;
   for (auto in : inputs) {
-    inputs_.push_back(torch::jit::IValue(in.clone()));
+    auto inp = in.contiguous();
+    inputs_.push_back(torch::jit::IValue(inp.clone()));
   }
 
   for (auto* in : g->inputs()) {
@@ -40,4 +41,4 @@ std::vector<at::Tensor> RunGraph(
 
 } // namespace util
 } // namespace tests
-} // namespace trtorch
+} // namespace torch_tensorrt

@@ -11,7 +11,7 @@
 // Hopefully makes it easer to merge codebases later and still gives better
 // errors
 
-namespace trtorch {
+namespace torch_tensorrt {
 
 class Error : public std::exception {
   std::vector<std::string> msg_stack_;
@@ -91,4 +91,4 @@ inline std::string str(const std::string& str) {
 inline std::string str(const char* c_str) {
   return c_str;
 }
-} // namespace trtorch
+} // namespace torch_tensorrt

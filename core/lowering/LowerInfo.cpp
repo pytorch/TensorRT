@@ -4,7 +4,7 @@
 
 #include "core/lowering/lowering.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace lowering {
 
@@ -20,4 +20,4 @@ std::ostream& operator<<(std::ostream& os, const LowerInfo& l) {
 
 } // namespace lowering
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

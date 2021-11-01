@@ -2,7 +2,7 @@
 
 #include "torch/csrc/jit/ir/ir.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace lowering {
 namespace passes {
@@ -37,4 +37,4 @@ void UnpackHardSwish(std::shared_ptr<torch::jit::Graph>& graph);
 } // namespace passes
 } // namespace lowering
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

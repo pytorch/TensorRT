@@ -2,7 +2,7 @@
 #include "core/util/prelude.h"
 #include "torch/torch.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace converters {
@@ -24,7 +24,7 @@ nvinfer1::ITensor* addPadding(
 
     LOG_DEBUG("Original shape: " << dims << ", reshaping to: " << newDims);
     auto shuffle_layer = ctx->net->addShuffle(*tensor);
-    TRTORCH_CHECK(shuffle_layer, "Unable to create shuffle layer");
+    TORCHTRT_CHECK(shuffle_layer, "Unable to create shuffle layer");
     shuffle_layer->setReshapeDimensions(newDims);
     shuffle_layer->setZeroIsPlaceholder(use_zeros);
     shuffle_layer->setName((util::node_info(n) + " [Reshape to " + util::toStr(newDims) + ']').c_str());
@@ -49,7 +49,7 @@ nvinfer1::ITensor* addUnpadding(
     }
     LOG_DEBUG("Original shape: " << dims << ", reshaping to: " << newDims);
     auto shuffle_layer = ctx->net->addShuffle(*tensor);
-    TRTORCH_CHECK(shuffle_layer, "Unable to create shuffle layer");
+    TORCHTRT_CHECK(shuffle_layer, "Unable to create shuffle layer");
     shuffle_layer->setReshapeDimensions(newDims);
     shuffle_layer->setZeroIsPlaceholder(use_zeros);
     shuffle_layer->setName((util::node_info(n) + " [Reshape to " + util::toStr(newDims) + "]").c_str());
@@ -127,7 +127,7 @@ nvinfer1::ITensor* castITensor(ConversionCtx* ctx, nvinfer1::ITensor* tensor, nv
     tensor_id << reinterpret_cast<int*>(tensor);
 
     auto id_layer = ctx->net->addIdentity(*tensor);
-    TRTORCH_CHECK(id_layer, "Unable to create identity layer for ITensor: " << tensor_id.str());
+    TORCHTRT_CHECK(id_layer, "Unable to create identity layer for ITensor: " << tensor_id.str());
     auto casted_tensor = id_layer->getOutput(0);
     casted_tensor->setType(dtype);
 
@@ -156,7 +156,7 @@ nvinfer1::ITensor* tensor_to_const(ConversionCtx* ctx, at::Tensor t, const std::
 
   auto weights = Weights();
   if ((t.scalar_type() == at::kLong || t.scalar_type() == at::kDouble) && !ctx->settings.truncate_long_and_double) {
-    TRTORCH_THROW_ERROR(
+    TORCHTRT_THROW_ERROR(
         "Unable to freeze tensor of type Int64/Float64 into constant layer, try to compile model with truncate_long_and_double enabled");
   } else if (t.scalar_type() == at::kLong && ctx->settings.truncate_long_and_double) {
     weights = converters::Weights(ctx, t.toType(at::kInt));
@@ -169,7 +169,7 @@ nvinfer1::ITensor* tensor_to_const(ConversionCtx* ctx, at::Tensor t, const std::
   }
 
   auto const_layer = ctx->net->addConstant(weights.shape, weights.data);
-  TRTORCH_CHECK(const_layer, "Unable to freeze tensor");
+  TORCHTRT_CHECK(const_layer, "Unable to freeze tensor");
 
   auto out = const_layer->getOutput(0);
 
@@ -195,4 +195,4 @@ nvinfer1::ITensor* tensor_to_const(ConversionCtx* ctx, at::Tensor t, const std::
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

@@ -3,7 +3,7 @@
 #include "gtest/gtest.h"
 #include "tests/util/util.h"
 #include "torch/script.h"
-#include "trtorch/trtorch.h"
+#include "torch_tensorrt/torch_tensorrt.h"
 
 void run_infer(
     int thread_id,
@@ -40,20 +40,20 @@ TEST(CppAPITests, RuntimeThreadSafety) {
   inputs_jit.push_back(in_jit.clone());
   inputs_trt.push_back(in_trt.clone());
 
-  std::vector<trtorch::CompileSpec::Input> input_ranges;
+  std::vector<torch_tensorrt::Input> input_ranges;
   for (auto in : inputs_trt) {
     input_ranges.push_back({std::vector<int64_t>{1, 3, 224, 224},
                             std::vector<int64_t>{1, 3, 224, 224},
                             std::vector<int64_t>{16, 3, 224, 224},
                             torch::kFloat});
   }
-  auto compile_settings = trtorch::CompileSpec(input_ranges);
+  auto compile_settings = torch_tensorrt::ts::CompileSpec(input_ranges);
 
   // FP32 execution
   compile_settings.enabled_precisions = {torch::kFloat};
   compile_settings.strict_types = true;
-  auto trt_mod = trtorch::CompileGraph(mod, compile_settings);
-  std::cout << "trtorch::CompileGraph" << std::endl;
+  auto trt_mod = torch_tensorrt::ts::compile(mod, compile_settings);
+  std::cout << "torch_tensorrt::ts::compile" << std::endl;
 
   int num_threads = 10;
   std::vector<torch::jit::IValue> out_vec(num_threads), trt_out_vec(num_threads);
@@ -76,7 +76,7 @@ TEST(CppAPITests, RuntimeThreadSafety) {
 
   bool flag = true;
   for (int i = 0; i < num_threads; i++) {
-    bool f = trtorch::tests::util::almostEqual(out_vec[i].toTensor(), trt_out_vec[i].toTensor(), 1e-2);
+    bool f = torch_tensorrt::tests::util::almostEqual(out_vec[i].toTensor(), trt_out_vec[i].toTensor(), 1e-2);
     flag = flag && f;
   }
   ASSERT_TRUE(flag);

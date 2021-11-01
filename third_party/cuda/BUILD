@@ -14,7 +14,7 @@ cc_library(
             "lib/x64/cudart.lib",
         ],
         "//conditions:default": [
-            "targets/x86_64-linux/lib/libcudart.so",
+            "lib64/libcudart.so",
         ],
     }),
     hdrs = glob([
@@ -32,7 +32,7 @@ cc_library(
             "bin/nvToolsExt64_1.dll",
         ],
         "//conditions:default": [
-            "targets/x86_64-linux/lib/libnvToolsExt.so.1",
+            "lib64/libnvToolsExt.so.1",
         ],
     }),
 )
@@ -44,7 +44,7 @@ cc_library(
             "bin/*.dll",
         ],
         "//conditions:default": glob([
-            "targets/x86_64-linux/lib/**/lib*.so",
+            "lib64/**/lib*.so",
         ]),
     }),
     hdrs = glob([
@@ -63,7 +63,7 @@ cc_library(
             "lib/x64/cublas.lib",
         ]),
         "//conditions:default": glob([
-            "targets/x86_64-linux/lib/**/*libcublas.so",
+            "lib64/**/*libcublas.so",
         ]),
     }),
     hdrs = glob([

@@ -52,7 +52,6 @@ cc_test(
   srcs = ["test_loop_fallback.cpp"],
   deps = [
       "//tests/util",
-      "//core",
       "@googletest//:gtest_main",
   ] + select({
       ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
@@ -85,7 +84,7 @@ test_suite(
         ":test_shape_analysis",
         ":test_tensorrt_conversion",
         ":test_stitched_graph",
-        ":test_fallback_graph_output",
+        #":test_fallback_graph_output",
         ":test_loop_fallback",
         ":test_conditionals"
     ]

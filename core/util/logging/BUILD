@@ -10,10 +10,10 @@ config_setting(
 cc_library(
     name = "logging",
     srcs = [
-        "TRTorchLogger.cpp",
+        "TorchTRTLogger.cpp",
     ],
     hdrs = [
-        "TRTorchLogger.h",
+        "TorchTRTLogger.h",
     ],
     deps = [
         "@tensorrt//:nvinfer",
@@ -27,6 +27,6 @@ load("@rules_pkg//:pkg.bzl", "pkg_tar")
 
 pkg_tar(
     name = "include",
-    srcs = ["TRTorchLogger.h"],
+    srcs = ["TorchTRTLogger.h"],
     package_dir = "core/util/logging",
 )
