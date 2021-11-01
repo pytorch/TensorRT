@@ -66,7 +66,7 @@ the CUDA driver installed and the container must have CUDA)
 
 The correct LibTorch version will be pulled down for you by bazel.
 
-    NOTE: For best compatability with official PyTorch, use torch==1.9.1+cuda111, TensorRT 8.0 and cuDNN 8.2 for CUDA 11.1 however Torch-TensorRT itself supports
+    NOTE: For best compatability with official PyTorch, use torch==1.10.0+cuda113, TensorRT 8.0 and cuDNN 8.2 for CUDA 11.3 however Torch-TensorRT itself supports
     TensorRT and cuDNN for CUDA versions other than 11.1 for usecases such as using NVIDIA compiled distributions of PyTorch that use other versions of CUDA
     e.g. aarch64 or custom compiled version of PyTorch.
 
