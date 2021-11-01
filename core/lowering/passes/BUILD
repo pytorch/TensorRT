@@ -10,6 +10,7 @@ config_setting(
 cc_library(
     name = "passes",
     srcs = [
+        "conv1d_to_convolution.cpp",
         "conv2d_to_convolution.cpp",
         "conv3d_to_convolution.cpp",
         "exception_elimination.cpp",
