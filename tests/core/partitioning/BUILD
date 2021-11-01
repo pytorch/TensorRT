@@ -84,7 +84,7 @@ test_suite(
         ":test_shape_analysis",
         ":test_tensorrt_conversion",
         ":test_stitched_graph",
-        #":test_fallback_graph_output",
+        ":test_fallback_graph_output",
         ":test_loop_fallback",
         ":test_conditionals"
     ]

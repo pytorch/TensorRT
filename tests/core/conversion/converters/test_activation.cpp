@@ -200,7 +200,6 @@ TEST(Converters, ATenEluConvertsCorrectly) {
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
-#if 0
 TEST(Converters, ATenGELUConvertsCorrectly) {
   const auto graph = R"IR(
       graph(%0 : Tensor):
@@ -227,4 +226,3 @@ TEST(Converters, ATenGELUConvertsCorrectly) {
 
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 5e-3));
 }
-#endif

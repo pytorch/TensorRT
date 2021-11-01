@@ -12,12 +12,12 @@ test_suite(
     name = "api_tests",
     tests = [
         ":test_default_input_types",
-        #":test_compiled_modules",
-        #":test_modules_as_engines",
-        #":test_runtime_thread_safety",
-        #":test_multiple_registered_engines",
+        ":test_compiled_modules",
+        ":test_modules_as_engines",
+        ":test_runtime_thread_safety",
+        ":test_multiple_registered_engines",
         ":test_serialization",
-        #":test_module_fallback",
+        ":test_module_fallback",
         ":test_example_tensors"
     ],
 )
@@ -26,12 +26,12 @@ test_suite(
     name = "aarch64_api_tests",
     tests = [
         ":test_default_input_types",
-        #":test_compiled_modules",
-        #":test_modules_as_engines",
-        #":test_runtime_thread_safety",
-        #":test_multiple_registered_engines",
+        ":test_compiled_modules",
+        ":test_modules_as_engines",
+        ":test_runtime_thread_safety",
+        ":test_multiple_registered_engines",
         ":test_serialization",
-        #":test_module_fallback",
+        ":test_module_fallback",
         ":test_example_tensors"
     ],
 )
