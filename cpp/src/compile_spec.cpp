@@ -335,6 +335,7 @@ core::CompileSpec to_internal_compile_spec(CompileSpec external) {
   internal.partition_info.enabled = external.require_full_compilation;
   internal.partition_info.min_block_size = external.min_block_size;
   internal.partition_info.forced_fallback_operators = std::move(external.torch_executed_ops);
+  internal.partition_info.truncate_long_and_double = external.truncate_long_and_double;
   internal.lower_info.forced_fallback_modules = std::move(external.torch_executed_modules);
 
   switch (external.device.device_type) {
