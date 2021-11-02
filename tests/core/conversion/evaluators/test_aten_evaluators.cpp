@@ -512,3 +512,71 @@ TEST(Evaluators, ATenIsFloatingPointEvaluatesFalseCorrectly) {
 
   ASSERT_TRUE(jit_results[0] == trt_results[0]);
 }
+
+TEST(Evaluators, EqStrResultIsTrueEvaluatesCorrectly) {
+  const auto graph = R"IR(
+      graph():
+        %1 : str = prim::Constant[value="res3"]()
+        %2 : str = prim::Constant[value="res3"]()
+        %3 : bool = aten::eq(%1, %2)
+        return (%3))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto jit_results = trtorch::tests::util::EvaluateGraphJIT(g, {});
+  auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {});
+
+  ASSERT_TRUE(jit_results[0] == trt_results[0]);
+}
+
+TEST(Evaluators, EqStrResultIsFalseEvaluatesCorrectly) {
+  const auto graph = R"IR(
+      graph():
+        %1 : str = prim::Constant[value="res3"]()
+        %2 : str = prim::Constant[value="res4"]()
+        %3 : bool = aten::eq(%1, %2)
+        return (%3))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto jit_results = trtorch::tests::util::EvaluateGraphJIT(g, {});
+  auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {});
+
+  ASSERT_TRUE(jit_results[0] == trt_results[0]);
+}
+
+TEST(Evaluators, AndBoolResultIsTrueEvaluatesCorrectly) {
+  const auto graph = R"IR(
+      graph():
+        %1 : bool = prim::Constant[value=1]()
+        %2 : bool = prim::Constant[value=1]()
+        %3 : bool = aten::__and__(%1, %2)
+        return (%3))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto jit_results = trtorch::tests::util::EvaluateGraphJIT(g, {});
+  auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {});
+
+  ASSERT_TRUE(jit_results[0] == trt_results[0]);
+}
+
+TEST(Evaluators, AndBoolResultIsFalseEvaluatesCorrectly) {
+  const auto graph = R"IR(
+      graph():
+        %1 : bool = prim::Constant[value=1]()
+        %2 : bool = prim::Constant[value=0]()
+        %3 : bool = aten::__and__(%1, %2)
+        return (%3))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto jit_results = trtorch::tests::util::EvaluateGraphJIT(g, {});
+  auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {});
+
+  ASSERT_TRUE(jit_results[0] == trt_results[0]);
+}
