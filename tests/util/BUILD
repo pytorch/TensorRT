@@ -10,7 +10,7 @@ config_setting(
 config_setting(
     name = "ci_build_testing",
     values  = {
-        "define": "torchtrt_src=pre_built"
+        "define": "torchtrt_src=prebuilt"
     }
 )
 
