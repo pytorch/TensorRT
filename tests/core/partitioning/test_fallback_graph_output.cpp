@@ -5,6 +5,8 @@
 #include "tests/util/util.h"
 #include "torch/script.h"
 
+#ifndef DISABLE_TEST_IN_CI
+
 TEST(Partitioning, ComputeResNet50FallbackGraphCorrectly) {
   torch::jit::script::Module mod;
   try {
@@ -100,3 +102,4 @@ TEST(Partitioning, ComputeResNet50HalfFallbackGraphCorrectly) {
   // Lower threshold because FP16
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results, trt_results, 2e-1));
 }
+#endif

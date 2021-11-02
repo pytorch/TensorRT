@@ -4,6 +4,8 @@
 #include "tests/util/util.h"
 #include "torch/csrc/jit/ir/irparser.h"
 
+#ifndef DISABLE_TEST_IN_CI
+
 TEST(Converters, ATenSoftmax1DConvertsCorrectly) {
   const auto graph = R"IR(
       graph(%0 : Tensor):
@@ -128,3 +130,4 @@ TEST(Converters, ATenSoftmaxNDConvertsCorrectlyNegtiveIndex) {
 
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
+#endif

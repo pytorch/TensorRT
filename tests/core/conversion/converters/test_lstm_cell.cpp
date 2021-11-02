@@ -4,6 +4,8 @@
 #include "tests/util/util.h"
 #include "torch/csrc/jit/ir/irparser.h"
 
+#ifndef DISABLE_TEST_IN_CI
+
 TEST(Converters, ATenGRUCellConvertsCorrectlyWithBiasCheckHidden) {
   const auto graph = R"IR(
       graph(%0 : Tensor,
@@ -283,3 +285,5 @@ TEST(Converters, ATenLSTMCellConvertsCorrectlyWithoutBiasCheckCell) {
   ASSERT_TRUE(
       torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-5));
 }
+
+#endif
