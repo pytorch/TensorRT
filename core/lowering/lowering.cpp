@@ -14,7 +14,7 @@
 #include "core/lowering/passes/passes.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace lowering {
 
@@ -46,6 +46,8 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, LowerInfo lower_info) {
   passes::RemoveContiguous(g);
   passes::RemoveDropout(g);
   passes::LinearToAddMM(g);
+  passes::Conv1DToConvolution(g);
+  passes::ConvTransposed1DToConvolution(g);
   passes::Conv2DToConvolution(g);
   passes::Conv3DToConvolution(g);
   passes::FuseAddMMBranches(g);
@@ -86,12 +88,12 @@ std::pair<std::shared_ptr<torch::jit::Graph>, std::vector<torch::jit::IValue>> L
   LOG_GRAPH("LibTorch Lowering");
   auto graph_and_ivalues = torch::jit::LowerGraph(*g, lowered_mod._ivalue());
 
-  // Go through TRTorch Lowering to reformat graph to be conversion friendly
+  // Go through Torch-TensorRT Lowering to reformat graph to be conversion friendly
   // and also segment for accelerators and executors (TRT-DLA, TRT-GPU  , PYT)
   // unfreeze_module is used to not perform constant folding on weights in the network.
   // In quantization aware trained (QAT) models, weights are passed through quantize and
   // dequantize nodes which should not be folded. So unfreeze_module is set to True for QAT models.
-  LOG_GRAPH("TRTorch Graph Lowering");
+  LOG_GRAPH("Torch-TensorRT.TorchScript Graph Lowering");
   lowering::LowerGraph(graph_and_ivalues.first, lower_info);
 
   // Is this necessary?
@@ -103,4 +105,4 @@ std::pair<std::shared_ptr<torch::jit::Graph>, std::vector<torch::jit::IValue>> L
 
 } // namespace lowering
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

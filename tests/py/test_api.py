@@ -1,5 +1,5 @@
 import unittest
-import trtorch
+import torch_tensorrt as torchtrt
 import torch
 import torchvision.models as models
 import copy
@@ -16,22 +16,22 @@ class TestCompile(ModelTestCase):
 
     def test_compile_traced(self):
         compile_spec = {
-            "inputs": [trtorch.Input(self.input.shape, dtype=torch.float, format=torch.contiguous_format)],
+            "inputs": [torchtrt.Input(self.input.shape, dtype=torch.float, format=torch.contiguous_format)],
             "device": {
-                "device_type": trtorch.DeviceType.GPU,
+                "device_type": torchtrt.DeviceType.GPU,
                 "gpu_id": 0,
             },
             "enabled_precisions": {torch.float}
         }
 
-        trt_mod = trtorch.compile(self.traced_model, **compile_spec)
+        trt_mod = torchtrt.ts.compile(self.traced_model, **compile_spec)
         same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
         self.assertTrue(same < 2e-2)
 
     def test_compile_script(self):
-        trt_mod = trtorch.compile(self.scripted_model,
+        trt_mod = torchtrt.ts.compile(self.scripted_model,
                                   inputs=[self.input],
-                                  device=trtorch.Device(gpu_id=0),
+                                  device=torchtrt.Device(gpu_id=0),
                                   enabled_precisions={torch.float})
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
         self.assertTrue(same < 2e-2)
@@ -40,41 +40,41 @@ class TestCompile(ModelTestCase):
         compile_spec = {
             "inputs": [self.input],
             "device": {
-                "device_type": trtorch.DeviceType.GPU,
+                "device_type": torchtrt.DeviceType.GPU,
                 "gpu_id": 0,
             },
             "enabled_precisions": {torch.float}
         }
 
-        trt_mod = trtorch.compile(self.traced_model, **compile_spec)
+        trt_mod = torchtrt.ts.compile(self.traced_model, **compile_spec)
         same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
         self.assertTrue(same < 2e-2)
 
     def test_device(self):
-        compile_spec = {"inputs": [self.input], "device": trtorch.Device("gpu:0"), "enabled_precisions": {torch.float}}
+        compile_spec = {"inputs": [self.input], "device": torchtrt.Device("gpu:0"), "enabled_precisions": {torch.float}}
 
-        trt_mod = trtorch.compile(self.traced_model, **compile_spec)
+        trt_mod = torchtrt.ts.compile(self.traced_model, **compile_spec)
         same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
         self.assertTrue(same < 2e-2)
 
     def test_default_device(self):
         compile_spec = {"inputs": [self.input], "enabled_precisions": {torch.float}}
 
-        trt_mod = trtorch.compile(self.traced_model, **compile_spec)
+        trt_mod = torchtrt.ts.compile(self.traced_model, **compile_spec)
         same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
         self.assertTrue(same < 2e-2)
 
     def test_compile_script_from_dict(self):
         compile_spec = {
-            "inputs": [trtorch.Input(shape=self.input.shape)],
+            "inputs": [torchtrt.Input(shape=self.input.shape)],
             "device": {
-                "device_type": trtorch.DeviceType.GPU,
+                "device_type": torchtrt.DeviceType.GPU,
                 "gpu_id": 0,
             },
             "enabled_precisions": {torch.float}
         }
 
-        trt_mod = trtorch.compile(self.traced_model, **compile_spec)
+        trt_mod = torchtrt.ts.compile(self.traced_model, **compile_spec)
         same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
         self.assertTrue(same < 2e-2)
 
@@ -88,17 +88,17 @@ class TestCompileHalf(ModelTestCase):
 
     def test_compile_script_half(self):
         compile_spec = {
-            "inputs": [trtorch.Input(shape=self.input.shape, dtype=torch.half)],
+            "inputs": [torchtrt.Input(shape=self.input.shape, dtype=torch.half)],
             "device": {
-                "device_type": trtorch.DeviceType.GPU,
+                "device_type": torchtrt.DeviceType.GPU,
                 "gpu_id": 0,
             },
             "enabled_precisions": {torch.half}
         }
 
-        trt_mod = trtorch.compile(self.scripted_model, **compile_spec)
+        trt_mod = torchtrt.ts.compile(self.scripted_model, **compile_spec)
         same = (trt_mod(self.input.half()) - self.scripted_model(self.input.half())).abs().max()
-        trtorch.logging.log(trtorch.logging.Level.Debug, "Max diff: " + str(same))
+        torchtrt.logging.log(torchtrt.logging.Level.Debug, "Max diff: " + str(same))
         self.assertTrue(same < 3e-2)
 
 
@@ -111,17 +111,17 @@ class TestCompileHalfDefault(ModelTestCase):
 
     def test_compile_script_half_by_default(self):
         compile_spec = {
-            "inputs": [trtorch.Input(shape=self.input.shape)],
+            "inputs": [torchtrt.Input(shape=self.input.shape)],
             "device": {
-                "device_type": trtorch.DeviceType.GPU,
+                "device_type": torchtrt.DeviceType.GPU,
                 "gpu_id": 0,
             },
             "enabled_precisions": {torch.float, torch.half}
         }
 
-        trt_mod = trtorch.compile(self.scripted_model, **compile_spec)
+        trt_mod = torchtrt.ts.compile(self.scripted_model, **compile_spec)
         same = (trt_mod(self.input.half()) - self.scripted_model(self.input.half())).abs().max()
-        trtorch.logging.log(trtorch.logging.Level.Debug, "Max diff: " + str(same))
+        torchtrt.logging.log(torchtrt.logging.Level.Debug, "Max diff: " + str(same))
         self.assertTrue(same < 3e-2)
 
 
@@ -133,9 +133,9 @@ class TestFallbackToTorch(ModelTestCase):
 
     def test_compile_script(self):
         compile_spec = {
-            "inputs": [trtorch.Input(self.input.shape)],
+            "inputs": [torchtrt.Input(self.input.shape)],
             "device": {
-                "device_type": trtorch.DeviceType.GPU,
+                "device_type": torchtrt.DeviceType.GPU,
                 "gpu_id": 0,
                 "allow_gpu_fallback": False,
                 "disable_tf32": False
@@ -145,7 +145,7 @@ class TestFallbackToTorch(ModelTestCase):
             "min_block_size": 1
         }
 
-        trt_mod = trtorch.compile(self.scripted_model, **compile_spec)
+        trt_mod = torchtrt.ts.compile(self.scripted_model, **compile_spec)
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
         self.assertTrue(same < 2e-3)
 
@@ -158,9 +158,9 @@ class TestModuleFallbackToTorch(ModelTestCase):
 
     def test_compile_script(self):
         compile_spec = {
-            "inputs": [trtorch.Input(self.input.shape)],
+            "inputs": [torchtrt.Input(self.input.shape)],
             "device": {
-                "device_type": trtorch.DeviceType.GPU,
+                "device_type": torchtrt.DeviceType.GPU,
                 "gpu_id": 0,
                 "allow_gpu_fallback": False,
                 "disable_tf32": False
@@ -170,7 +170,7 @@ class TestModuleFallbackToTorch(ModelTestCase):
             "min_block_size": 1
         }
 
-        trt_mod = trtorch.compile(self.scripted_model, **compile_spec)
+        trt_mod = torchtrt.ts.compile(self.scripted_model, **compile_spec)
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
         self.assertTrue(same < 2e-3)
 
@@ -183,17 +183,17 @@ class TestPTtoTRTtoPT(ModelTestCase):
 
     def test_pt_to_trt_to_pt(self):
         compile_spec = {
-            "inputs": [trtorch.Input(self.input.shape)],
+            "inputs": [torchtrt.Input(self.input.shape)],
             "device": {
-                "device_type": trtorch.DeviceType.GPU,
+                "device_type": torchtrt.DeviceType.GPU,
                 "gpu_id": 0,
                 "allow_gpu_fallback": False,
                 "disable_tf32": False
             }
         }
 
-        trt_engine = trtorch.convert_method_to_trt_engine(self.ts_model, "forward", **compile_spec)
-        trt_mod = trtorch.embed_engine_in_new_module(trt_engine, trtorch.Device("cuda:0"))
+        trt_engine = torchtrt.ts.convert_method_to_trt_engine(self.ts_model, "forward", **compile_spec)
+        trt_mod = torchtrt.ts.embed_engine_in_new_module(trt_engine, torchtrt.Device("cuda:0"))
         same = (trt_mod(self.input) - self.ts_model(self.input)).abs().max()
         self.assertTrue(same < 2e-3)
 
@@ -205,14 +205,14 @@ class TestInputTypeDefaultsFP32Model(ModelTestCase):
 
     def test_input_use_default_fp32(self):
         ts_model = torch.jit.script(self.model)
-        trt_mod = trtorch.compile(ts_model,
-                                  inputs=[trtorch.Input(self.input.shape)],
+        trt_mod = torchtrt.ts.compile(ts_model,
+                                  inputs=[torchtrt.Input(self.input.shape)],
                                   enabled_precisions={torch.float, torch.half})
         trt_mod(self.input)
 
     def test_input_respect_user_setting_fp32_weights_fp16_in(self):
         ts_model = torch.jit.script(self.model)
-        trt_mod = trtorch.compile(ts_model,
+        trt_mod = torchtrt.ts.compile(ts_model,
                                   inputs=[self.input.half()],
                                   require_full_compilation=True,
                                   enabled_precisions={torch.float, torch.half})
@@ -220,10 +220,10 @@ class TestInputTypeDefaultsFP32Model(ModelTestCase):
 
     def test_input_respect_user_setting_fp32_weights_fp16_in_non_constructor(self):
         ts_model = torch.jit.script(self.model)
-        input_spec = trtorch.Input(self.input.shape)
+        input_spec = torchtrt.Input(self.input.shape)
         input_spec.dtype = torch.half
 
-        trt_mod = trtorch.compile(ts_model,
+        trt_mod = torchtrt.ts.compile(ts_model,
                                   inputs=[input_spec],
                                   require_full_compilation=True,
                                   enabled_precisions={torch.float, torch.half})
@@ -239,8 +239,8 @@ class TestInputTypeDefaultsFP16Model(ModelTestCase):
         half_mod = torch.jit.script(self.model)
         half_mod.half()
 
-        trt_mod = trtorch.compile(half_mod,
-                                  inputs=[trtorch.Input(self.input.shape)],
+        trt_mod = torchtrt.ts.compile(half_mod,
+                                  inputs=[torchtrt.Input(self.input.shape)],
                                   enabled_precisions={torch.float, torch.half})
         trt_mod(self.input.half())
 
@@ -248,14 +248,14 @@ class TestInputTypeDefaultsFP16Model(ModelTestCase):
         half_mod = torch.jit.script(self.model)
         half_mod.half()
 
-        trt_mod = trtorch.compile(half_mod, inputs=[trtorch.Input(self.input.shape)])
+        trt_mod = torchtrt.ts.compile(half_mod, inputs=[torchtrt.Input(self.input.shape)])
         trt_mod(self.input.half())
 
     def test_input_respect_user_setting_fp16_weights_fp32_in(self):
         half_mod = torch.jit.script(self.model)
         half_mod.half()
 
-        trt_mod = trtorch.compile(half_mod,
+        trt_mod = torchtrt.ts.compile(half_mod,
                                   inputs=[self.input],
                                   require_full_compilation=True,
                                   enabled_precisions={torch.float, torch.half})
@@ -265,10 +265,10 @@ class TestInputTypeDefaultsFP16Model(ModelTestCase):
         half_mod = torch.jit.script(self.model)
         half_mod.half()
 
-        input_spec = trtorch.Input(self.input.shape)
+        input_spec = torchtrt.Input(self.input.shape)
         input_spec.dtype = torch.float
 
-        trt_mod = trtorch.compile(half_mod,
+        trt_mod = torchtrt.ts.compile(half_mod,
                                   inputs=[input_spec],
                                   require_full_compilation=True,
                                   enabled_precisions={torch.float, torch.half})
@@ -282,73 +282,73 @@ class TestCheckMethodOpSupport(unittest.TestCase):
         self.module = torch.jit.trace(module, torch.ones((1, 3, 224, 224)).to("cuda"))
 
     def test_check_support(self):
-        self.assertTrue(trtorch.check_method_op_support(self.module, "forward"))
+        self.assertTrue(torchtrt.ts.check_method_op_support(self.module, "forward"))
 
 
 class TestLoggingAPIs(unittest.TestCase):
 
     def test_logging_prefix(self):
         new_prefix = "Python API Test: "
-        trtorch.logging.set_logging_prefix(new_prefix)
-        logging_prefix = trtorch.logging.get_logging_prefix()
+        torchtrt.logging.set_logging_prefix(new_prefix)
+        logging_prefix = torchtrt.logging.get_logging_prefix()
         self.assertEqual(new_prefix, logging_prefix)
 
     def test_reportable_log_level(self):
-        new_level = trtorch.logging.Level.Error
-        trtorch.logging.set_reportable_log_level(new_level)
-        level = trtorch.logging.get_reportable_log_level()
+        new_level = torchtrt.logging.Level.Error
+        torchtrt.logging.set_reportable_log_level(new_level)
+        level = torchtrt.logging.get_reportable_log_level()
         self.assertEqual(new_level, level)
 
     def test_is_colored_output_on(self):
-        trtorch.logging.set_is_colored_output_on(True)
-        color = trtorch.logging.get_is_colored_output_on()
+        torchtrt.logging.set_is_colored_output_on(True)
+        color = torchtrt.logging.get_is_colored_output_on()
         self.assertTrue(color)
 
 
 class TestDevice(unittest.TestCase):
 
     def test_from_string_constructor(self):
-        device = trtorch.Device("cuda:0")
-        self.assertEqual(device.device_type, trtorch.DeviceType.GPU)
+        device = torchtrt.Device("cuda:0")
+        self.assertEqual(device.device_type, torchtrt.DeviceType.GPU)
         self.assertEqual(device.gpu_id, 0)
 
-        device = trtorch.Device("gpu:1")
-        self.assertEqual(device.device_type, trtorch.DeviceType.GPU)
+        device = torchtrt.Device("gpu:1")
+        self.assertEqual(device.device_type, torchtrt.DeviceType.GPU)
         self.assertEqual(device.gpu_id, 1)
 
     def test_from_string_constructor_dla(self):
-        device = trtorch.Device("dla:0")
-        self.assertEqual(device.device_type, trtorch.DeviceType.DLA)
+        device = torchtrt.Device("dla:0")
+        self.assertEqual(device.device_type, torchtrt.DeviceType.DLA)
         self.assertEqual(device.gpu_id, 0)
         self.assertEqual(device.dla_core, 0)
 
-        device = trtorch.Device("dla:1", allow_gpu_fallback=True)
-        self.assertEqual(device.device_type, trtorch.DeviceType.DLA)
+        device = torchtrt.Device("dla:1", allow_gpu_fallback=True)
+        self.assertEqual(device.device_type, torchtrt.DeviceType.DLA)
         self.assertEqual(device.gpu_id, 0)
         self.assertEqual(device.dla_core, 1)
         self.assertEqual(device.allow_gpu_fallback, True)
 
     def test_kwargs_gpu(self):
-        device = trtorch.Device(gpu_id=0)
-        self.assertEqual(device.device_type, trtorch.DeviceType.GPU)
+        device = torchtrt.Device(gpu_id=0)
+        self.assertEqual(device.device_type, torchtrt.DeviceType.GPU)
         self.assertEqual(device.gpu_id, 0)
 
     def test_kwargs_dla_and_settings(self):
-        device = trtorch.Device(dla_core=1, allow_gpu_fallback=False)
-        self.assertEqual(device.device_type, trtorch.DeviceType.DLA)
+        device = torchtrt.Device(dla_core=1, allow_gpu_fallback=False)
+        self.assertEqual(device.device_type, torchtrt.DeviceType.DLA)
         self.assertEqual(device.gpu_id, 0)
         self.assertEqual(device.dla_core, 1)
         self.assertEqual(device.allow_gpu_fallback, False)
 
-        device = trtorch.Device(gpu_id=1, dla_core=0, allow_gpu_fallback=True)
-        self.assertEqual(device.device_type, trtorch.DeviceType.DLA)
+        device = torchtrt.Device(gpu_id=1, dla_core=0, allow_gpu_fallback=True)
+        self.assertEqual(device.device_type, torchtrt.DeviceType.DLA)
         self.assertEqual(device.gpu_id, 1)
         self.assertEqual(device.dla_core, 0)
         self.assertEqual(device.allow_gpu_fallback, True)
 
     def test_from_torch(self):
-        device = trtorch.Device._from_torch_device(torch.device("cuda:0"))
-        self.assertEqual(device.device_type, trtorch.DeviceType.GPU)
+        device = torchtrt.Device._from_torch_device(torch.device("cuda:0"))
+        self.assertEqual(device.device_type, torchtrt.DeviceType.GPU)
         self.assertEqual(device.gpu_id, 0)
 
 

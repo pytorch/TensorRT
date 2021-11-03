@@ -2,7 +2,7 @@
 #include "core/util/prelude.h"
 #include "torch/csrc/jit/frontend/function_schema_parser.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace converters {
@@ -140,4 +140,4 @@ RegisterNodeConversionPatterns& RegisterNodeConversionPatterns::RegisterNodeConv
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

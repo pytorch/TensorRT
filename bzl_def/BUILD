@@ -16,13 +16,13 @@ config_setting(
 )
 
 cc_library(
-    name = "libtrtorch",
+    name = "libtorchtrt",
     srcs = select({
     ":windows": [
-        "lib/x64/trtorch.dll",
+        "lib/x64/torchtrt.dll",
     ],
     "//conditions:default": [
-        "lib/libtrtorch.so",
+        "lib/libtorchtrt.so",
     ],
     }),
     hdrs = glob([
@@ -33,47 +33,47 @@ cc_library(
 )
 
 cc_library(
-    name = "libtrtorchrt",
+    name = "libtorchtrt_runtime",
     srcs = select({
         ":windows": [
-            "lib/x64/trtorchrt.dll"
+            "lib/x64/torchtrt_runtime.dll"
         ],
         "//conditions:default": [
-            "lib/libtrtorchrt.so"
+            "lib/libtorchtrt_runtime.so"
         ]
     })
 )
 
 cc_library(
-    name = "libtrtorch_plugins",
+    name = "libtorchtrt_plugins",
     srcs = select({
         ":windows": [
-            "lib/x64/trtorch_plugins.dll"
+            "lib/x64/torchtrt_plugins.dll"
         ],
         "//conditions:default": [
-            "lib/libtrtorch_plugins.so"
+            "lib/libtorchtrt_plugins.so"
         ]
     }),
     hdrs = glob([
-        "include/trtorch/core/plugins/**/*.h",
+        "include/torch_tensorrt/core/plugins/**/*.h",
     ]),
     strip_include_prefix = "include",
     includes = ["include/"]
 )
 
 cc_library(
-    name = "trtorch_core_hdrs",
+    name = "torch_tensorrt_core_hdrs",
     hdrs = glob([
-        "include/trtorch/core/**/*.h"
+        "include/torch_tensorrt/core/**/*.h"
     ]),
-    strip_include_prefix = "include/trtorch",
-    includes = ["include/trtorch/"]
+    strip_include_prefix = "include/torch_tensorrt",
+    includes = ["include/torch_tensorrt/"]
 )
 
 # Alias for ease of use
 cc_library(
-    name = "trtorch",
+    name = "torch_tensorrt",
     deps = [
-        ":libtrtorch",
+        ":libtorchtrt",
     ]
 )

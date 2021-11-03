@@ -3,7 +3,7 @@
 #include "core/runtime/runtime.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace runtime {
 
@@ -45,4 +45,4 @@ std::string DeviceList::dump_list() {
 
 } // namespace runtime
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

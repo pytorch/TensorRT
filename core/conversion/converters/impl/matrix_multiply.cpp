@@ -2,14 +2,14 @@
 #include "core/conversion/converters/converters.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace converters {
 namespace impl {
 namespace {
 
-auto mm_registrations TRTORCH_UNUSED =
+auto mm_registrations TORCHTRT_UNUSED =
     RegisterNodeConversionPatterns()
         .pattern({"aten::matmul(Tensor self, Tensor other) -> (Tensor)",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
@@ -26,7 +26,7 @@ auto mm_registrations TRTORCH_UNUSED =
                     auto mm_layer = ctx->net->addMatrixMultiply(
                         *self, nvinfer1::MatrixOperation::kNONE, *other, nvinfer1::MatrixOperation::kNONE);
 
-                    TRTORCH_CHECK(mm_layer, "Unable to create matrix multiplication node: " << *n);
+                    TORCHTRT_CHECK(mm_layer, "Unable to create matrix multiplication node: " << *n);
                     mm_layer->setName(util::node_info(n).c_str());
                     auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], mm_layer->getOutput(0));
 
@@ -42,31 +42,31 @@ auto mm_registrations TRTORCH_UNUSED =
                nvinfer1::Dims mat2Dims = mat2->getDimensions();
 
                // check dimensions
-               TRTORCH_CHECK(
+               TORCHTRT_CHECK(
                    selfDims.nbDims == 3,
                    "Expected 3-dimensional tensor, but got "
                        << selfDims.nbDims
                        << "-dimensional tensor for argument #1 'batch1' (while checking arguments for bmm)");
-               TRTORCH_CHECK(
+               TORCHTRT_CHECK(
                    mat2Dims.nbDims == 3,
                    "Expected 3-dimensional tensor, but got "
                        << mat2Dims.nbDims
                        << "-dimensional tensor for argument #2 'batch2' (while checking arguments for bmm)");
 
                // Self and mat2 should have same size at dimension 0
-               TRTORCH_CHECK(
+               TORCHTRT_CHECK(
                    selfDims.d[0] == mat2Dims.d[0],
                    "Expected tensor to have size " << selfDims.d[0] << " at dimension 0, but got size " << mat2Dims.d[0]
                                                    << " for argument #2 'batch2' (while checking arguments for bmm)");
                // The size of mat2 at dimension 1 should be the same as that of self at dimension 2.
-               TRTORCH_CHECK(
+               TORCHTRT_CHECK(
                    selfDims.d[2] == mat2Dims.d[1],
                    "Expected tensor to have size " << selfDims.d[2] << " at dimension 1, but got size " << mat2Dims.d[1]
                                                    << " for argument #2 'batch2' (while checking arguments for bmm)");
 
                auto mm_layer = ctx->net->addMatrixMultiply(
                    *self, nvinfer1::MatrixOperation::kNONE, *mat2, nvinfer1::MatrixOperation::kNONE);
-               TRTORCH_CHECK(mm_layer, "Unable to create matrix multiplication node: " << *n);
+               TORCHTRT_CHECK(mm_layer, "Unable to create matrix multiplication node: " << *n);
 
                mm_layer->setName(util::node_info(n).c_str());
                auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], mm_layer->getOutput(0));
@@ -79,4 +79,4 @@ auto mm_registrations TRTORCH_UNUSED =
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

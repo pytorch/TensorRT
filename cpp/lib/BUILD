@@ -1,42 +1,42 @@
 package(default_visibility = ["//visibility:public"])
 
 cc_binary(
-    name = "libtrtorch_plugins.so",
+    name = "libtorchtrt_plugins.so",
     srcs = [],
     deps = [
-        "//core/plugins:trtorch_plugins"
+        "//core/plugins:torch_tensorrt_plugins"
     ],
     linkstatic = True,
     linkshared = True
 )
 
 cc_binary(
-    name = "libtrtorchrt.so",
+    name = "libtorchtrt_runtime.so",
     srcs = [],
     linkshared = True,
     linkstatic = True,
     deps = [
         "//core/runtime:runtime",
-        "//core/plugins:trtorch_plugins"
+        "//core/plugins:torch_tensorrt_plugins"
     ],
 )
 
 cc_binary(
-    name = "libtrtorch.so",
+    name = "libtorchtrt.so",
     srcs = [],
     linkshared = True,
     linkstatic = True,
     deps = [
-        "//cpp:trtorch",
+        "//cpp:torch_tensorrt",
     ],
 )
 
 cc_binary(
-    name = "trtorch.dll",
+    name = "torch_tensorrt.dll",
     srcs = [],
     linkshared = True,
     linkstatic = True,
     deps = [
-        "//cpp/api:trtorch",
+        "//cpp:torch_tensorrt",
     ],
 )

@@ -26,15 +26,15 @@ TEST_P(AccuracyTests, DLAFP16AccuracyIsClose) {
   torch::Tensor jit_accuracy = (jit_correct / jit_total) * 100;
 
   std::vector<std::vector<int64_t>> input_shape = {{32, 3, 32, 32}};
-  auto compile_spec = trtorch::CompileSpec({input_shape});
+  auto compile_spec = torch_tensorrt::ts::CompileSpec({input_shape});
   compile_spec.enabled_precisions = {torch::kF16};
-  compile_spec.device.device_type = trtorch::CompileSpec::Device::DeviceType::kDLA;
+  compile_spec.device.device_type = torch_tensorrt::CompileSpec::Device::DeviceType::kDLA;
   compile_spec.device.gpu_id = 0;
   compile_spec.device.dla_core = 1;
   compile_spec.device.allow_gpu_fallback = true;
   compile_spec.workspace_size = 1 << 28;
 
-  auto trt_mod = trtorch::CompileGraph(mod, compile_spec);
+  auto trt_mod = torch_tensorrt::ts::compile(mod, compile_spec);
 
   torch::Tensor trt_correct = torch::zeros({1}, {torch::kCUDA}), trt_total = torch::zeros({1}, {torch::kCUDA});
   for (auto batch : *eval_dataloader) {
@@ -51,7 +51,7 @@ TEST_P(AccuracyTests, DLAFP16AccuracyIsClose) {
 
   torch::Tensor trt_accuracy = (trt_correct / trt_total) * 100;
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_accuracy, trt_accuracy, 3));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_accuracy, trt_accuracy, 3));
 }
 
 INSTANTIATE_TEST_SUITE_P(

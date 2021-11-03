@@ -2,7 +2,7 @@
 #include "core/conversion/converters/converters.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace converters {
@@ -48,7 +48,7 @@ bool AdaptivePoolingConverter(
 
   auto orig_dims = in->getDimensions();
   bool expandDims = (orig_dims.nbDims < 4);
-  TRTORCH_CHECK(orig_dims.nbDims > 2, "Unable to create pooling layer from node: " << *n);
+  TORCHTRT_CHECK(orig_dims.nbDims > 2, "Unable to create pooling layer from node: " << *n);
   if (expandDims) {
     in = addPadding(ctx, n, in, 4, false, false);
   }
@@ -102,11 +102,11 @@ bool AdaptivePoolingConverter(
   LOG_WARNING(
       "Adaptive pooling layer will be using Aten library kernels in pytorch for execution. TensorRT does not support adaptive pooling natively. Consider switching to non-adaptive pooling if this is an issue");
 
-  auto creator = getPluginRegistry()->getPluginCreator("Interpolate", "1", "trtorch");
+  auto creator = getPluginRegistry()->getPluginCreator("Interpolate", "1", "torch_tensorrt");
   auto interpolate_plugin = creator->createPlugin(mode.c_str(), &fc);
 
   new_layer = ctx->net->addPluginV2(reinterpret_cast<nvinfer1::ITensor* const*>(&in), 1, *interpolate_plugin);
-  TRTORCH_CHECK(new_layer, "Unable to create pooling (interpolation) plugin from node" << *n);
+  TORCHTRT_CHECK(new_layer, "Unable to create pooling (interpolation) plugin from node" << *n);
 
   new_layer->setName(util::node_info(n).c_str());
   auto layer_output = addUnpadding(ctx, n, new_layer->getOutput(0), orig_dims.nbDims, false, false);
@@ -122,7 +122,7 @@ bool PoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& args,
 
   // Max Pool needs at least 4D input
   auto orig_dims = in->getDimensions();
-  TRTORCH_CHECK(orig_dims.nbDims > 2, "Unable to create pooling layer from node: " << *n);
+  TORCHTRT_CHECK(orig_dims.nbDims > 2, "Unable to create pooling layer from node: " << *n);
   bool expandDims = (orig_dims.nbDims < 4);
 
   if (expandDims) {
@@ -159,7 +159,7 @@ bool PoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& args,
   if (pool_type == nvinfer1::PoolingType::kMAX) {
     auto dilation = util::toDims(args[4].unwrapToIntList());
 
-    TRTORCH_CHECK(
+    TORCHTRT_CHECK(
         dilation == util::toDims(std::vector<int64_t>(dilation.nbDims, 1)),
         "Pooling dilation is not supported in TensorRT");
 
@@ -168,16 +168,16 @@ bool PoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& args,
     ceil_mode = args[5].unwrapToBool();
 
     new_layer = ctx->net->addPoolingNd(*in, pool_type, kernel_size);
-    TRTORCH_CHECK(new_layer, "Unable to create Max Pooling layer from node: " << *n);
+    TORCHTRT_CHECK(new_layer, "Unable to create Max Pooling layer from node: " << *n);
   } else if (pool_type == nvinfer1::PoolingType::kAVERAGE) {
     ceil_mode = args[4].unwrapToBool();
     bool count_inlcude_pad = args[5].unwrapToBool();
 
     new_layer = ctx->net->addPoolingNd(*in, pool_type, kernel_size);
-    TRTORCH_CHECK(new_layer, "Unable to create Avg Pooling layer from node: " << *n);
+    TORCHTRT_CHECK(new_layer, "Unable to create Avg Pooling layer from node: " << *n);
     new_layer->setAverageCountExcludesPadding(!count_inlcude_pad);
   } else {
-    TRTORCH_THROW_ERROR("Unsupported pool mode!");
+    TORCHTRT_THROW_ERROR("Unsupported pool mode!");
   }
 
   auto padding_mode =
@@ -190,7 +190,7 @@ bool PoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& args,
 
   if (stride.nbDims != 2 && ctx->settings.device.device_type == nvinfer1::DeviceType::kDLA) {
     if (!ctx->settings.device.allow_gpu_fallback) {
-      TRTORCH_THROW_ERROR("DLA Pooling stride is limited to 2D, allow GPU fallback");
+      TORCHTRT_THROW_ERROR("DLA Pooling stride is limited to 2D, allow GPU fallback");
     } else {
       LOG_WARNING("DLA Pooling stride is limited to 2D, will run on GPU");
     }
@@ -203,7 +203,7 @@ bool PoolingConverter(ConversionCtx* ctx, const torch::jit::Node* n, args& args,
   return true;
 } // namespace
 
-auto pooling_registrations TRTORCH_UNUSED =
+auto pooling_registrations TORCHTRT_UNUSED =
     RegisterNodeConversionPatterns()
         .pattern(
             {"aten::max_pool1d(Tensor self, int[1] kernel_size, int[1] stride=[], int[1] padding=[], int[1] dilation=[], bool ceil_mode=False) -> (Tensor)",
@@ -252,4 +252,4 @@ auto pooling_registrations TRTORCH_UNUSED =
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

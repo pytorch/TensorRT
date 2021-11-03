@@ -2,7 +2,7 @@
 #include "core/conversion/converters/converters.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace converters {
@@ -11,7 +11,7 @@ namespace {
 
 #if NV_TENSORRT_MAJOR > 7
 // clang-format off
-auto quantization_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
+auto quantization_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns()
   .pattern({"aten::fake_quantize_per_tensor_affine(Tensor self, float scale, int zero_point, int quant_min, int quant_max) -> (Tensor)",
             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
               // This aten operator is generated from torch.fake_quantize_per_tensor_affine op in Pytorch python API.
@@ -60,4 +60,4 @@ auto quantization_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns(
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

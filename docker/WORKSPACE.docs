@@ -1,4 +1,4 @@
-workspace(name = "TRTorch")
+workspace(name = "Torch-TensorRT")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
@@ -85,11 +85,11 @@ new_local_repository(
 # Testing Dependencies (optional - comment out on aarch64)
 #########################################################################
 pip3_import(
-    name = "trtorch_py_deps",
+    name = "torch_tensorrt_py_deps",
     requirements = "//py:requirements.txt"
 )
 
-load("@trtorch_py_deps//:requirements.bzl", "pip_install")
+load("@torch_tensorrt_py_deps//:requirements.bzl", "pip_install")
 pip_install()
 
 pip3_import(

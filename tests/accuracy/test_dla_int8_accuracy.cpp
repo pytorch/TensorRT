@@ -1,7 +1,7 @@
 #include "accuracy_test.h"
 #include "datasets/cifar10.h"
 #include "torch/torch.h"
-#include "trtorch/ptq.h"
+#include "torch_tensorrt/ptq.h"
 
 TEST_P(AccuracyTests, DLAINT8AccuracyIsClose) {
   auto calibration_dataset =
@@ -14,12 +14,13 @@ TEST_P(AccuracyTests, DLAINT8AccuracyIsClose) {
 
   std::string calibration_cache_file = "/tmp/vgg16_TRT_ptq_calibration.cache";
 
-  auto calibrator = trtorch::ptq::make_int8_calibrator(std::move(calibration_dataloader), calibration_cache_file, true);
-  // auto calibrator = trtorch::ptq::make_int8_cache_calibrator(calibration_cache_file);
+  auto calibrator =
+      torch_tensorrt::ptq::make_int8_calibrator(std::move(calibration_dataloader), calibration_cache_file, true);
+  // auto calibrator = torch_tensorrt::ptq::make_int8_cache_calibrator(calibration_cache_file);
 
   std::vector<std::vector<int64_t>> input_shape = {{32, 3, 32, 32}};
   // Configure settings for compilation
-  auto compile_spec = trtorch::CompileSpec({input_shape});
+  auto compile_spec = torch_tensorrt::ts::CompileSpec({input_shape});
   // Set operating precision to INT8
   compile_spec.enabled_precisions = {torch::kF16, torch::kI8};
   // Use the TensorRT Entropy Calibrator
@@ -29,7 +30,7 @@ TEST_P(AccuracyTests, DLAINT8AccuracyIsClose) {
   // Set a larger workspace
   compile_spec.workspace_size = 1 << 28;
 
-  compile_spec.device.device_type = trtorch::CompileSpec::Device::DeviceType::kDLA;
+  compile_spec.device.device_type = torch_tensorrt::Device::DeviceType::kDLA;
   compile_spec.device.gpu_id = 0;
   compile_spec.device.dla_core = 1;
   compile_spec.device.allow_gpu_fallback = true;
@@ -60,7 +61,7 @@ TEST_P(AccuracyTests, DLAINT8AccuracyIsClose) {
   torch::Tensor jit_accuracy = (jit_correct / jit_total) * 100;
 
   // Compile Graph
-  auto trt_mod = trtorch::CompileGraph(mod, compile_spec);
+  auto trt_mod = torch_tensorrt::ts::compile(mod, compile_spec);
 
   // Check the INT8 accuracy in TRT
   torch::Tensor trt_correct = torch::zeros({1}, {torch::kCUDA}), trt_total = torch::zeros({1}, {torch::kCUDA});
@@ -77,7 +78,7 @@ TEST_P(AccuracyTests, DLAINT8AccuracyIsClose) {
   }
   torch::Tensor trt_accuracy = (trt_correct / trt_total) * 100;
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_accuracy, trt_accuracy, 3));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_accuracy, trt_accuracy, 3));
 }
 
 INSTANTIATE_TEST_SUITE_P(

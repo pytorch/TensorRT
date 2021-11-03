@@ -37,7 +37,7 @@
   <script src="../_static/javascripts/modernizr.js">
   </script>
   <title>
-   Deploying Quantization Aware Trained models in INT8 using TRTorch — TRTorch master documentation
+   Deploying Quantization Aware Trained models in INT8 using Torch-TensorRT — Torch-TensorRT master documentation
   </title>
   <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/pygments.css" rel="stylesheet" type="text/css"/>
@@ -65,8 +65,8 @@
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
-  <link href="../py_api/trtorch.html" rel="next" title="trtorch"/>
-  <link href="ssd-object-detection-demo.html" rel="prev" title="Object Detection with TRTorch (SSD)"/>
+  <link href="../py_api/torch_tensorrt.html" rel="next" title="torch_tensorrt"/>
+  <link href="ssd-object-detection-demo.html" rel="prev" title="Object Detection with Torch-TensorRT (SSD)"/>
  </head>
  <body data-md-color-accent="light-green" data-md-color-primary="light-green" dir="ltr">
   <svg class="md-svg">
@@ -88,7 +88,7 @@
    <nav class="md-header-nav md-grid">
     <div class="md-flex navheader">
      <div class="md-flex__cell md-flex__cell--shrink">
-      <a class="md-header-nav__button md-logo" href="../index.html" title="TRTorch master documentation">
+      <a class="md-header-nav__button md-logo" href="../index.html" title="Torch-TensorRT master documentation">
        <i class="md-icon">
         
        </i>
@@ -101,10 +101,10 @@
      <div class="md-flex__cell md-flex__cell--stretch">
       <div class="md-flex__ellipsis md-header-nav__title" data-md-component="title">
        <span class="md-header-nav__topic">
-        TRTorch
+        Torch-TensorRT
        </span>
        <span class="md-header-nav__topic">
-        Deploying Quantization Aware Trained models in INT8 using TRTorch
+        Deploying Quantization Aware Trained models in INT8 using Torch-TensorRT
        </span>
       </div>
      </div>
@@ -139,7 +139,7 @@
      </div>
      <div class="md-flex__cell md-flex__cell--shrink">
       <div class="md-header-nav__source">
-       <a class="md-source" data-md-source="github" href="https://github.com/nvidia/TRTorch/" title="Go to repository">
+       <a class="md-source" data-md-source="github" href="https://github.com/nvidia/Torch-TensorRT/" title="Go to repository">
         <div class="md-source__icon">
          <svg height="28" viewbox="0 0 24 24" width="28" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
           <use height="24" width="24" xlink:href="#__github">
@@ -147,7 +147,7 @@
          </svg>
         </div>
         <div class="md-source__repository">
-         TRTorch
+         Torch-TensorRT
         </div>
        </a>
       </div>
@@ -157,31 +157,31 @@
        Versions
       </button>
       <div class="dropdown-content md-hero">
-       <a href="https://nvidia.github.io/TRTorch/" title="master">
+       <a href="https://nvidia.github.io/Torch-TensorRT/" title="master">
         master
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.4.1/" title="v0.4.1">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.4.1/" title="v0.4.1">
         v0.4.1
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.4.0/" title="v0.4.0">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.4.0/" title="v0.4.0">
         v0.4.0
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.3.0/" title="v0.3.0">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.3.0/" title="v0.3.0">
         v0.3.0
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.2.0/" title="v0.2.0">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.2.0/" title="v0.2.0">
         v0.2.0
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.1.0/" title="v0.1.0">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.1.0/" title="v0.1.0">
         v0.1.0
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.0.3/" title="v0.0.3">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.0.3/" title="v0.0.3">
         v0.0.3
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.0.2/" title="v0.0.2">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.0.2/" title="v0.0.2">
         v0.0.2
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.0.1/" title="v0.0.1">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.0.1/" title="v0.0.1">
         v0.0.1
        </a>
       </div>
@@ -195,7 +195,7 @@
      <ul class="md-tabs__list">
       <li class="md-tabs__item">
        <a class="md-tabs__link" href="../index.html">
-        TRTorch master documentation
+        Torch-TensorRT master documentation
        </a>
       </li>
      </ul>
@@ -208,17 +208,17 @@
        <div class="md-sidebar__inner">
         <nav class="md-nav md-nav--primary" data-md-level="0">
          <label class="md-nav__title md-nav__title--site" for="__drawer">
-          <a class="md-nav__button md-logo" href="../index.html" title="TRTorch master documentation">
+          <a class="md-nav__button md-logo" href="../index.html" title="Torch-TensorRT master documentation">
            <i class="md-icon">
             
            </i>
           </a>
-          <a href="../index.html" title="TRTorch master documentation">
-           TRTorch
+          <a href="../index.html" title="Torch-TensorRT master documentation">
+           Torch-TensorRT
           </a>
          </label>
          <div class="md-nav__source">
-          <a class="md-source" data-md-source="github" href="https://github.com/nvidia/TRTorch/" title="Go to repository">
+          <a class="md-source" data-md-source="github" href="https://github.com/nvidia/Torch-TensorRT/" title="Go to repository">
            <div class="md-source__icon">
             <svg height="28" viewbox="0 0 24 24" width="28" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
              <use height="24" width="24" xlink:href="#__github">
@@ -226,7 +226,7 @@
             </svg>
            </div>
            <div class="md-source__repository">
-            TRTorch
+            Torch-TensorRT
            </div>
           </a>
          </div>
@@ -244,8 +244,28 @@
            </a>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="../tutorials/getting_started.html">
-            Getting Started
+           <a class="md-nav__link" href="../tutorials/getting_started_with_cpp_api.html">
+            Getting Started with C++
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/getting_started_with_python_api.html">
+            Using Torch-TensorRT in Python
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/creating_torchscript_module_in_python.html">
+            Creating a TorchScript Module
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/creating_torchscript_module_in_python.html#working-with-torchscript-in-python">
+            Working with TorchScript in Python
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">
+            Saving TorchScript Module to Disk
            </a>
           </li>
           <li class="md-nav__item">
@@ -254,18 +274,18 @@
            </a>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="../tutorials/trtorchc.html">
-            trtorchc
+           <a class="md-nav__link" href="../tutorials/torchtrtc.html">
+            torchtrtc
            </a>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../tutorials/use_from_pytorch.html">
-            Using TRTorch Directly From PyTorch
+            Using Torch-TensorRT Directly From PyTorch
            </a>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../tutorials/runtime.html">
-            Deploying TRTorch Programs
+            Deploying Torch-TensorRT Programs
            </a>
           </li>
           <li class="md-nav__item">
@@ -282,21 +302,21 @@
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="lenet-getting-started.html">
-            TRTorch Getting Started - LeNet
+            Torch-TensorRT Getting Started - LeNet
            </a>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="ssd-object-detection-demo.html">
-            Object Detection with TRTorch (SSD)
+            Object Detection with Torch-TensorRT (SSD)
            </a>
           </li>
           <li class="md-nav__item">
            <input class="md-toggle md-nav__toggle" data-md-toggle="toc" id="__toc" type="checkbox"/>
            <label class="md-nav__link md-nav__link--active" for="__toc">
-            Deploying Quantization Aware Trained models in INT8 using TRTorch
+            Deploying Quantization Aware Trained models in INT8 using Torch-TensorRT
            </label>
            <a class="md-nav__link md-nav__link--active" href="#">
-            Deploying Quantization Aware Trained models in INT8 using TRTorch
+            Deploying Quantization Aware Trained models in INT8 using Torch-TensorRT
            </a>
            <nav class="md-nav md-nav--secondary">
             <label class="md-nav__title" for="__toc">
@@ -305,7 +325,7 @@
             <ul class="md-nav__list" data-md-scrollfix="">
              <li class="md-nav__item">
               <a class="md-nav__link" href="#notebooks-vgg-qat--page-root">
-               Deploying Quantization Aware Trained models in INT8 using TRTorch
+               Deploying Quantization Aware Trained models in INT8 using Torch-TensorRT
               </a>
               <nav class="md-nav">
                <ul class="md-nav__list">
@@ -333,25 +353,18 @@
            </span>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/trtorch.html">
-            trtorch
+           <a class="md-nav__link" href="../py_api/torch_tensorrt.html">
+            torch_tensorrt
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/ts.html">
+            torch_tensorrt.ts
            </a>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../py_api/logging.html">
-            trtorch.logging
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <span class="md-nav__link caption">
-            <span class="caption-text">
-             C++ API Documenation
-            </span>
-           </span>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html">
-            TRTorch C++ API
+            torch_tensorrt.logging
            </a>
           </li>
           <li class="md-nav__item">
@@ -373,7 +386,7 @@
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../contributors/useful_links.html">
-            Useful Links for TRTorch Development
+            Useful Links for Torch-TensorRT Development
            </a>
           </li>
           <li class="md-nav__item">
@@ -403,7 +416,7 @@
          <ul class="md-nav__list" data-md-scrollfix="">
           <li class="md-nav__item">
            <a class="md-nav__link" href="#notebooks-vgg-qat--page-root">
-            Deploying Quantization Aware Trained models in INT8 using TRTorch
+            Deploying Quantization Aware Trained models in INT8 using Torch-TensorRT
            </a>
            <nav class="md-nav">
             <ul class="md-nav__list">
@@ -676,9 +689,9 @@ div.rendered_html tbody tr:hover {
   background: rgba(66, 165, 245, 0.2);
 }
        </style>
-       <section id="Deploying-Quantization-Aware-Trained-models-in-INT8-using-TRTorch">
+       <section id="Deploying-Quantization-Aware-Trained-models-in-INT8-using-Torch-TensorRT">
         <h1 id="notebooks-vgg-qat--page-root">
-         Deploying Quantization Aware Trained models in INT8 using TRTorch
+         Deploying Quantization Aware Trained models in INT8 using Torch-TensorRT
          <a class="headerlink" href="#notebooks-vgg-qat--page-root" title="Permalink to this headline">
           ¶
          </a>
@@ -691,7 +704,7 @@ div.rendered_html tbody tr:hover {
           </a>
          </h2>
          <p>
-          Quantization Aware training (QAT) simulates quantization during training by quantizing weights and activation layers. This will help to reduce the loss in accuracy when we convert the network trained in FP32 to INT8 for faster inference. QAT introduces additional nodes in the graph which will be used to learn the dynamic ranges of weights and activation layers. In this notebook, we illustrate the following steps from training to inference of a QAT model in TRTorch.
+          Quantization Aware training (QAT) simulates quantization during training by quantizing weights and activation layers. This will help to reduce the loss in accuracy when we convert the network trained in FP32 to INT8 for faster inference. QAT introduces additional nodes in the graph which will be used to learn the dynamic ranges of weights and activation layers. In this notebook, we illustrate the following steps from training to inference of a QAT model in Torch-TensorRT.
          </p>
          <ol class="arabic simple">
           <li>
@@ -746,7 +759,7 @@ div.rendered_html tbody tr:hover {
           <li>
            <p>
             <a class="reference external" href="#8">
-             Inference using TRTorch
+             Inference using Torch-TensorRT
             </a>
            </p>
           </li>
@@ -778,7 +791,7 @@ import torch.optim as optim
 import torch.utils.data as data
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
-import trtorch
+import torch_tensorrt
 
 from torch.utils.tensorboard import SummaryWriter
 
@@ -811,7 +824,7 @@ E0831 15:09:13.151450 140586428176192 amp_wrapper.py:31] AMP is not avaialble.
          </div>
          <p>
           ## 2. VGG16 Overview ### Very Deep Convolutional Networks for Large-Scale Image Recognition VGG is one of the earliest family of image classification networks that first used small (3x3) convolution filters and achieved significant improvements on ImageNet recognition challenge. The network architecture looks as follows
-          <img alt="db485e72215749b1b3e43387176ae5e4" src="https://neurohive.io/wp-content/uploads/2018/11/vgg16-1-e1542731207177.png"/>
+          <img alt="734bad409d064ef981ca1a65ced63da8" src="https://neurohive.io/wp-content/uploads/2018/11/vgg16-1-e1542731207177.png"/>
          </p>
          <p>
           ## 3. Training a baseline VGG16 model We train VGG16 on CIFAR10 dataset. Define training and testing datasets and dataloaders. This will download the CIFAR 10 data in your
@@ -1679,7 +1692,7 @@ outputs = torch.clamp((inputs * scale).round_(), min_bound, max_bound)
            </span>
           </code>
           to perform quantization as this is easier to convert into corresponding TensorRT operators. Please refer to next sections for more details on
-how these operators are exported in torchscript and converted in TRTorch.
+how these operators are exported in torchscript and converted in Torch-TensorRT.
          </p>
          <div class="nbinput docutils container">
           <div class="prompt highlight-none notranslate">
@@ -1938,7 +1951,7 @@ E0831 15:41:35.133241 140586428176192 tensor_quantizer.py:120] Fake quantize mod
           </div>
          </div>
          <p>
-          ## 8. Inference using TRTorch In this phase, we run the exported torchscript graph of VGG QAT using TRTorch. TRTorch is a Pytorch-TensorRT compiler which converts Torchscript graphs into TensorRT. TensorRT 8.0 supports inference of quantization aware trained models and introduces new APIs;
+          ## 8. Inference using Torch-TensorRT In this phase, we run the exported torchscript graph of VGG QAT using Torch-TensorRT. Torch-TensorRT is a Pytorch-TensorRT compiler which converts Torchscript graphs into TensorRT. TensorRT 8.0 supports inference of quantization aware trained models and introduces new APIs;
           <code class="docutils literal notranslate">
            <span class="pre">
             QuantizeLayer
@@ -1950,10 +1963,10 @@ E0831 15:41:35.133241 140586428176192 tensor_quantizer.py:120] Fake quantize mod
             DequantizeLayer
            </span>
           </code>
-          . We can observe the entire VGG QAT graph quantization nodes from the debug log of TRTorch. To enable debug logging, you can set
+          . We can observe the entire VGG QAT graph quantization nodes from the debug log of Torch-TensorRT. To enable debug logging, you can set
           <code class="docutils literal notranslate">
            <span class="pre">
-            trtorch.logging.set_reportable_log_level(trtorch.logging.Level.Debug)
+            torch_tensorrt.logging.set_reportable_log_level(torch_tensorrt.logging.Level.Debug)
            </span>
           </code>
           . For example,
@@ -1996,7 +2009,7 @@ E0831 15:41:35.133241 140586428176192 tensor_quantizer.py:120] Fake quantize mod
             DequantizeLayer
            </span>
           </code>
-          in TRTorch internally. Please refer to quantization op converters in TRTorch.
+          in Torch-TensorRT internally. Please refer to quantization op converters in Torch-TensorRT.
          </p>
          <div class="nbinput docutils container">
           <div class="prompt highlight-none notranslate">
@@ -2010,10 +2023,10 @@ E0831 15:41:35.133241 140586428176192 tensor_quantizer.py:120] Fake quantize mod
             <pre>
 <span></span>qat_model = torch.jit.load("trained_vgg16_qat.jit.pt").eval()
 
-compile_spec = {"inputs": [trtorch.Input([16, 3, 32, 32])],
+compile_spec = {"inputs": [torch_tensorrt.Input([16, 3, 32, 32])],
                 "op_precision": torch.int8,
                 }
-trt_mod = trtorch.compile(qat_model, compile_spec)
+trt_mod = torch_tensorrt.compile(qat_model, compile_spec)
 
 test_loss, test_acc = test(trt_mod, testing_dataloader, crit, 0)
 print("VGG QAT accuracy using TensorRT: {:.2f}%".format(100 * test_acc))
@@ -2033,7 +2046,7 @@ VGG QAT accuracy using TensorRT: 83.59%
           </div>
          </div>
          <p>
-          ## 9. References * Very Deep Convolution Networks for large scale Image Recognition * Achieving FP32 Accuracy for INT8 Inference Using Quantization Aware Training with NVIDIA TensorRT * QAT workflow for VGG16 * Deploying VGG QAT model in C++ using TRTorch * Pytorch-quantization toolkit from NVIDIA * Pytorch quantization toolkit userguide * Quantization basics
+          ## 9. References * Very Deep Convolution Networks for large scale Image Recognition * Achieving FP32 Accuracy for INT8 Inference Using Quantization Aware Training with NVIDIA TensorRT * QAT workflow for VGG16 * Deploying VGG QAT model in C++ using Torch-TensorRT * Pytorch-quantization toolkit from NVIDIA * Pytorch quantization toolkit userguide * Quantization basics
          </p>
         </section>
        </section>
@@ -2045,7 +2058,7 @@ VGG QAT accuracy using TensorRT: 83.59%
   <footer class="md-footer">
    <div class="md-footer-nav">
     <nav class="md-footer-nav__inner md-grid">
-     <a class="md-flex md-footer-nav__link md-footer-nav__link--prev" href="ssd-object-detection-demo.html" rel="prev" title="Object Detection with TRTorch (SSD)">
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--prev" href="ssd-object-detection-demo.html" rel="prev" title="Object Detection with Torch-TensorRT (SSD)">
       <div class="md-flex__cell md-flex__cell--shrink">
        <i class="md-icon md-icon--arrow-back md-footer-nav__button">
        </i>
@@ -2055,17 +2068,17 @@ VGG QAT accuracy using TensorRT: 83.59%
         <span class="md-footer-nav__direction">
          Previous
         </span>
-        Object Detection with TRTorch (SSD)
+        Object Detection with Torch-TensorRT (SSD)
        </span>
       </div>
      </a>
-     <a class="md-flex md-footer-nav__link md-footer-nav__link--next" href="../py_api/trtorch.html" rel="next" title="trtorch">
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--next" href="../py_api/torch_tensorrt.html" rel="next" title="torch_tensorrt">
       <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
        <span class="md-flex__ellipsis">
         <span class="md-footer-nav__direction">
          Next
         </span>
-        trtorch
+        torch_tensorrt
        </span>
       </div>
       <div class="md-flex__cell md-flex__cell--shrink">

@@ -25,16 +25,16 @@ TEST(Converters, ATenBoolToFP32DTypeConvertsCorrectly) {
   auto in = at::randint(1, 10, {3, 4, 3}, {at::kCUDA});
 
   auto jit_in = at::clone(in);
-  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
-  params = trtorch::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
   ASSERT_TRUE(jit_results[0].scalar_type() == trt.scalar_type());
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
 TEST(Converters, ATenBoolToINT32DTypeConvertsCorrectly) {
@@ -56,16 +56,16 @@ TEST(Converters, ATenBoolToINT32DTypeConvertsCorrectly) {
   auto in = at::randint(1, 10, {3, 4, 3}, {at::kCUDA});
 
   auto jit_in = at::clone(in);
-  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
-  params = trtorch::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
   ASSERT_TRUE(jit_results[0].scalar_type() == trt.scalar_type());
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
 TEST(Converters, ATenBoolToINT32DeviceDTypeConvertsCorrectly) {
@@ -87,17 +87,17 @@ TEST(Converters, ATenBoolToINT32DeviceDTypeConvertsCorrectly) {
   auto in = at::randint(1, 10, {3, 4, 3}, {at::kCUDA});
 
   auto jit_in = at::clone(in);
-  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
-  params = trtorch::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
   ASSERT_TRUE(jit_results[0].scalar_type() == trt.scalar_type());
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
 TEST(Converters, ATenBoolToINT32TensorConvertsCorrectly) {
@@ -122,17 +122,17 @@ TEST(Converters, ATenBoolToINT32TensorConvertsCorrectly) {
 
   auto jit_in = at::clone(in);
   auto jit_in2 = at::clone(in2);
-  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in, jit_in2});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in, jit_in2});
 
   auto trt_in = at::clone(in);
   auto trt_in2 = at::clone(in2);
-  params = trtorch::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in, trt_in2});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in, trt_in2});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
   ASSERT_TRUE(jit_results[0].scalar_type() == trt.scalar_type());
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
 TEST(Converters, ATenTypeAsConvertsCorrectly) {
@@ -152,15 +152,16 @@ TEST(Converters, ATenTypeAsConvertsCorrectly) {
   auto in1 = at::randint(1, 3, {3, 4, 3}, {at::kCUDA}).to(at::kFloat);
   auto in2 = at::randint(1, 3, {3, 4, 3}, {at::kCUDA});
   // Lower aten::type_as to aten::to.other
-  trtorch::core::lowering::passes::ReduceToOperation(g);
+  torch_tensorrt::core::lowering::passes::ReduceToOperation(g);
 
-  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in1, in2});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in1, in2});
 
-  params = trtorch::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in1, in2});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in1, in2});
 
   ASSERT_TRUE(jit_results[0].scalar_type() == trt_results[0].scalar_type());
   ASSERT_TRUE(trt_results[0].scalar_type() == trt_results[1].scalar_type());
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
 }

@@ -26,10 +26,10 @@ TEST_P(AccuracyTests, FP32AccuracyIsClose) {
   torch::Tensor jit_accuracy = (jit_correct / jit_total) * 100;
 
   std::vector<std::vector<int64_t>> input_shape = {{32, 3, 32, 32}};
-  auto compile_spec = trtorch::CompileSpec({input_shape});
+  auto compile_spec = torch_tensorrt::ts::CompileSpec({input_shape});
   compile_spec.enabled_precisions.insert(torch::kF32);
 
-  auto trt_mod = trtorch::CompileGraph(mod, compile_spec);
+  auto trt_mod = torch_tensorrt::ts::compile(mod, compile_spec);
 
   torch::Tensor trt_correct = torch::zeros({1}, {torch::kCUDA}), trt_total = torch::zeros({1}, {torch::kCUDA});
   for (auto batch : *eval_dataloader) {
@@ -46,7 +46,7 @@ TEST_P(AccuracyTests, FP32AccuracyIsClose) {
 
   torch::Tensor trt_accuracy = (trt_correct / trt_total) * 100;
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_accuracy, trt_accuracy, 3));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_accuracy, trt_accuracy, 3));
 }
 
 INSTANTIATE_TEST_SUITE_P(

@@ -7,7 +7,7 @@ cc_binary(
         "timer.h",
     ],
     deps = [
-        "//cpp:trtorch",
+        "//cpp:torch_tensorrt",
         "@libtorch",
         "@libtorch//:caffe2",
     ],

@@ -37,7 +37,7 @@
   <script src="../_static/javascripts/modernizr.js">
   </script>
   <title>
-   Object Detection with TRTorch (SSD) — TRTorch master documentation
+   Object Detection with Torch-TensorRT (SSD) — Torch-TensorRT master documentation
   </title>
   <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/pygments.css" rel="stylesheet" type="text/css"/>
@@ -65,8 +65,8 @@
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
-  <link href="vgg-qat.html" rel="next" title="Deploying Quantization Aware Trained models in INT8 using TRTorch"/>
-  <link href="lenet-getting-started.html" rel="prev" title="TRTorch Getting Started - LeNet"/>
+  <link href="vgg-qat.html" rel="next" title="Deploying Quantization Aware Trained models in INT8 using Torch-TensorRT"/>
+  <link href="lenet-getting-started.html" rel="prev" title="Torch-TensorRT Getting Started - LeNet"/>
  </head>
  <body data-md-color-accent="light-green" data-md-color-primary="light-green" dir="ltr">
   <svg class="md-svg">
@@ -88,7 +88,7 @@
    <nav class="md-header-nav md-grid">
     <div class="md-flex navheader">
      <div class="md-flex__cell md-flex__cell--shrink">
-      <a class="md-header-nav__button md-logo" href="../index.html" title="TRTorch master documentation">
+      <a class="md-header-nav__button md-logo" href="../index.html" title="Torch-TensorRT master documentation">
        <i class="md-icon">
         
        </i>
@@ -101,10 +101,10 @@
      <div class="md-flex__cell md-flex__cell--stretch">
       <div class="md-flex__ellipsis md-header-nav__title" data-md-component="title">
        <span class="md-header-nav__topic">
-        TRTorch
+        Torch-TensorRT
        </span>
        <span class="md-header-nav__topic">
-        Object Detection with TRTorch (SSD)
+        Object Detection with Torch-TensorRT (SSD)
        </span>
       </div>
      </div>
@@ -139,7 +139,7 @@
      </div>
      <div class="md-flex__cell md-flex__cell--shrink">
       <div class="md-header-nav__source">
-       <a class="md-source" data-md-source="github" href="https://github.com/nvidia/TRTorch/" title="Go to repository">
+       <a class="md-source" data-md-source="github" href="https://github.com/nvidia/Torch-TensorRT/" title="Go to repository">
         <div class="md-source__icon">
          <svg height="28" viewbox="0 0 24 24" width="28" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
           <use height="24" width="24" xlink:href="#__github">
@@ -147,7 +147,7 @@
          </svg>
         </div>
         <div class="md-source__repository">
-         TRTorch
+         Torch-TensorRT
         </div>
        </a>
       </div>
@@ -157,31 +157,31 @@
        Versions
       </button>
       <div class="dropdown-content md-hero">
-       <a href="https://nvidia.github.io/TRTorch/" title="master">
+       <a href="https://nvidia.github.io/Torch-TensorRT/" title="master">
         master
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.4.1/" title="v0.4.1">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.4.1/" title="v0.4.1">
         v0.4.1
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.4.0/" title="v0.4.0">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.4.0/" title="v0.4.0">
         v0.4.0
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.3.0/" title="v0.3.0">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.3.0/" title="v0.3.0">
         v0.3.0
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.2.0/" title="v0.2.0">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.2.0/" title="v0.2.0">
         v0.2.0
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.1.0/" title="v0.1.0">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.1.0/" title="v0.1.0">
         v0.1.0
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.0.3/" title="v0.0.3">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.0.3/" title="v0.0.3">
         v0.0.3
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.0.2/" title="v0.0.2">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.0.2/" title="v0.0.2">
         v0.0.2
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.0.1/" title="v0.0.1">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.0.1/" title="v0.0.1">
         v0.0.1
        </a>
       </div>
@@ -195,7 +195,7 @@
      <ul class="md-tabs__list">
       <li class="md-tabs__item">
        <a class="md-tabs__link" href="../index.html">
-        TRTorch master documentation
+        Torch-TensorRT master documentation
        </a>
       </li>
      </ul>
@@ -208,17 +208,17 @@
        <div class="md-sidebar__inner">
         <nav class="md-nav md-nav--primary" data-md-level="0">
          <label class="md-nav__title md-nav__title--site" for="__drawer">
-          <a class="md-nav__button md-logo" href="../index.html" title="TRTorch master documentation">
+          <a class="md-nav__button md-logo" href="../index.html" title="Torch-TensorRT master documentation">
            <i class="md-icon">
             
            </i>
           </a>
-          <a href="../index.html" title="TRTorch master documentation">
-           TRTorch
+          <a href="../index.html" title="Torch-TensorRT master documentation">
+           Torch-TensorRT
           </a>
          </label>
          <div class="md-nav__source">
-          <a class="md-source" data-md-source="github" href="https://github.com/nvidia/TRTorch/" title="Go to repository">
+          <a class="md-source" data-md-source="github" href="https://github.com/nvidia/Torch-TensorRT/" title="Go to repository">
            <div class="md-source__icon">
             <svg height="28" viewbox="0 0 24 24" width="28" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
              <use height="24" width="24" xlink:href="#__github">
@@ -226,7 +226,7 @@
             </svg>
            </div>
            <div class="md-source__repository">
-            TRTorch
+            Torch-TensorRT
            </div>
           </a>
          </div>
@@ -244,8 +244,28 @@
            </a>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="../tutorials/getting_started.html">
-            Getting Started
+           <a class="md-nav__link" href="../tutorials/getting_started_with_cpp_api.html">
+            Getting Started with C++
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/getting_started_with_python_api.html">
+            Using Torch-TensorRT in Python
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/creating_torchscript_module_in_python.html">
+            Creating a TorchScript Module
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/creating_torchscript_module_in_python.html#working-with-torchscript-in-python">
+            Working with TorchScript in Python
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">
+            Saving TorchScript Module to Disk
            </a>
           </li>
           <li class="md-nav__item">
@@ -254,18 +274,18 @@
            </a>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="../tutorials/trtorchc.html">
-            trtorchc
+           <a class="md-nav__link" href="../tutorials/torchtrtc.html">
+            torchtrtc
            </a>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../tutorials/use_from_pytorch.html">
-            Using TRTorch Directly From PyTorch
+            Using Torch-TensorRT Directly From PyTorch
            </a>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../tutorials/runtime.html">
-            Deploying TRTorch Programs
+            Deploying Torch-TensorRT Programs
            </a>
           </li>
           <li class="md-nav__item">
@@ -282,16 +302,16 @@
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="lenet-getting-started.html">
-            TRTorch Getting Started - LeNet
+            Torch-TensorRT Getting Started - LeNet
            </a>
           </li>
           <li class="md-nav__item">
            <input class="md-toggle md-nav__toggle" data-md-toggle="toc" id="__toc" type="checkbox"/>
            <label class="md-nav__link md-nav__link--active" for="__toc">
-            Object Detection with TRTorch (SSD)
+            Object Detection with Torch-TensorRT (SSD)
            </label>
            <a class="md-nav__link md-nav__link--active" href="#">
-            Object Detection with TRTorch (SSD)
+            Object Detection with Torch-TensorRT (SSD)
            </a>
            <nav class="md-nav md-nav--secondary">
             <label class="md-nav__title" for="__toc">
@@ -300,7 +320,7 @@
             <ul class="md-nav__list" data-md-scrollfix="">
              <li class="md-nav__item">
               <a class="md-nav__link" href="#notebooks-ssd-object-detection-demo--page-root">
-               Object Detection with TRTorch (SSD)
+               Object Detection with Torch-TensorRT (SSD)
               </a>
               <nav class="md-nav">
                <ul class="md-nav__list">
@@ -389,7 +409,7 @@
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="vgg-qat.html">
-            Deploying Quantization Aware Trained models in INT8 using TRTorch
+            Deploying Quantization Aware Trained models in INT8 using Torch-TensorRT
            </a>
           </li>
           <li class="md-nav__item">
@@ -400,25 +420,18 @@
            </span>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/trtorch.html">
-            trtorch
+           <a class="md-nav__link" href="../py_api/torch_tensorrt.html">
+            torch_tensorrt
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/ts.html">
+            torch_tensorrt.ts
            </a>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../py_api/logging.html">
-            trtorch.logging
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <span class="md-nav__link caption">
-            <span class="caption-text">
-             C++ API Documenation
-            </span>
-           </span>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html">
-            TRTorch C++ API
+            torch_tensorrt.logging
            </a>
           </li>
           <li class="md-nav__item">
@@ -440,7 +453,7 @@
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../contributors/useful_links.html">
-            Useful Links for TRTorch Development
+            Useful Links for Torch-TensorRT Development
            </a>
           </li>
           <li class="md-nav__item">
@@ -470,7 +483,7 @@
          <ul class="md-nav__list" data-md-scrollfix="">
           <li class="md-nav__item">
            <a class="md-nav__link" href="#notebooks-ssd-object-detection-demo--page-root">
-            Object Detection with TRTorch (SSD)
+            Object Detection with Torch-TensorRT (SSD)
            </a>
            <nav class="md-nav">
             <ul class="md-nav__list">
@@ -839,11 +852,11 @@ div.rendered_html tbody tr:hover {
         </div>
        </div>
        <p>
-        <img alt="0c89fd1b91e7470bb17027c901cd4cb3" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
+        <img alt="1225e37209cb40c4a3bacbfb4006af69" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
        </p>
-       <section id="Object-Detection-with-TRTorch-(SSD)">
+       <section id="Object-Detection-with-Torch-TensorRT-(SSD)">
         <h1 id="notebooks-ssd-object-detection-demo--page-root">
-         Object Detection with TRTorch (SSD)
+         Object Detection with Torch-TensorRT (SSD)
          <a class="headerlink" href="#notebooks-ssd-object-detection-demo--page-root" title="Permalink to this headline">
           ¶
          </a>
@@ -860,17 +873,17 @@ div.rendered_html tbody tr:hover {
           In PyTorch 1.0, TorchScript was introduced as a method to separate your PyTorch model from Python, make it portable and optimizable.
          </p>
          <p>
-          TRTorch is a compiler that uses TensorRT (NVIDIA’s Deep Learning Optimization SDK and Runtime) to optimize TorchScript code. It compiles standard TorchScript modules into ones that internally run with TensorRT optimizations.
+          Torch-TensorRT is a compiler that uses TensorRT (NVIDIA’s Deep Learning Optimization SDK and Runtime) to optimize TorchScript code. It compiles standard TorchScript modules into ones that internally run with TensorRT optimizations.
          </p>
          <p>
-          TensorRT can take models from any major framework and specifically tune them to perform better on specific target hardware in the NVIDIA family, and TRTorch enables us to continue to remain in the PyTorch ecosystem whilst doing so. This allows us to leverage the great features in PyTorch, including module composability, its flexible tensor implementation, data loaders and more. TRTorch is available to use with both PyTorch and LibTorch.
+          TensorRT can take models from any major framework and specifically tune them to perform better on specific target hardware in the NVIDIA family, and Torch-TensorRT enables us to continue to remain in the PyTorch ecosystem whilst doing so. This allows us to leverage the great features in PyTorch, including module composability, its flexible tensor implementation, data loaders and more. Torch-TensorRT is available to use with both PyTorch and LibTorch.
          </p>
          <p>
           To get more background information on this, we suggest the
           <strong>
            lenet-getting-started
           </strong>
-          notebook as a primer for getting started with TRTorch.
+          notebook as a primer for getting started with Torch-TensorRT.
          </p>
          <section id="Learning-objectives">
           <h3 id="Learning-objectives">
@@ -880,7 +893,7 @@ div.rendered_html tbody tr:hover {
            </a>
           </h3>
           <p>
-           This notebook demonstrates the steps for compiling a TorchScript module with TRTorch on a pretrained SSD network, and running it to test the speedup obtained.
+           This notebook demonstrates the steps for compiling a TorchScript module with Torch-TensorRT on a pretrained SSD network, and running it to test the speedup obtained.
           </p>
          </section>
         </section>
@@ -916,7 +929,7 @@ div.rendered_html tbody tr:hover {
           <li>
            <p>
             <a class="reference external" href="#4">
-             Compiling with TRTorch
+             Compiling with Torch-TensorRT
             </a>
            </p>
           </li>
@@ -1304,7 +1317,7 @@ def plot_results(best_results):
            <div class="input_area highlight-ipython3 notranslate">
             <div class="highlight">
              <pre>
-<span></span># Visualize results without TRTorch/TensorRT
+<span></span># Visualize results without Torch-TensorRT
 plot_results(best_results_per_input)
 </pre>
             </div>
@@ -1393,7 +1406,7 @@ def benchmark(model, input_shape=(1024, 1, 32, 32), dtype='fp32', nwarmup=50, nr
            <strong>
             before
            </strong>
-           we use TRTorch/TensorRT
+           we use Torch-TensorRT
           </p>
           <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
@@ -1405,7 +1418,7 @@ def benchmark(model, input_shape=(1024, 1, 32, 32), dtype='fp32', nwarmup=50, nr
            <div class="input_area highlight-ipython3 notranslate">
             <div class="highlight">
              <pre>
-<span></span># Model benchmark without TRTorch/TensorRT
+<span></span># Model benchmark without Torch-TensorRT
 model = ssd300.eval().to("cuda")
 benchmark(model, input_shape=(128, 3, 300, 300), nruns=100)
 </pre>
@@ -1443,7 +1456,7 @@ Average batch time: 382.97 ms
            ## 3. Creating TorchScript modules
           </p>
           <p>
-           To compile with TRTorch, the model must first be in
+           To compile with Torch-TensorRT, the model must first be in
            <strong>
             TorchScript
            </strong>
@@ -1455,11 +1468,11 @@ Average batch time: 382.97 ms
            <strong>
             Scripting
            </strong>
-           . - Tracing follows execution of PyTorch generating ops in TorchScript corresponding to what it
-sees. - Scripting does an analysis of the Python code and generates TorchScript, this allows the resulting graph to include control flow which tracing cannot do.
+           . - Tracing follows execution of PyTorch generating ops in TorchScript corresponding to
+what it sees. - Scripting does an analysis of the Python code and generates TorchScript, this allows the resulting graph to include control flow which tracing cannot do.
           </p>
           <p>
-           Tracing however due to its simplicity is more likely to compile successfully with TRTorch (though both systems are supported).
+           Tracing however due to its simplicity is more likely to compile successfully with Torch-TensorRT (though both systems are supported).
           </p>
           <div class="nbinput nblast docutils container">
            <div class="prompt highlight-none notranslate">
@@ -1540,7 +1553,7 @@ Average batch time: 382.62 ms
           </div>
           <hr class="docutils"/>
           <p>
-           ## 4. Compiling with TRTorch TorchScript modules behave just like normal PyTorch modules and are intercompatible. From TorchScript we can now compile a TensorRT based module. This module will still be implemented in TorchScript but all the computation will be done in TensorRT.
+           ## 4. Compiling with Torch-TensorRT TorchScript modules behave just like normal PyTorch modules and are intercompatible. From TorchScript we can now compile a TensorRT based module. This module will still be implemented in TorchScript but all the computation will be done in TensorRT.
           </p>
           <div class="nbinput nblast docutils container">
            <div class="prompt highlight-none notranslate">
@@ -1552,12 +1565,12 @@ Average batch time: 382.62 ms
            <div class="input_area highlight-ipython3 notranslate">
             <div class="highlight">
              <pre>
-<span></span>import trtorch
+<span></span>import torch_tensorrt
 
 # The compiled module will have precision as specified by "op_precision".
 # Here, it will have FP16 precision.
-trt_model = trtorch.compile(traced_model, {
-    "inputs": [trtorch.Input((3, 3, 300, 300))],
+trt_model = torch_tensorrt.compile(traced_model, {
+    "inputs": [torch_tensorrt.Input((3, 3, 300, 300))],
     "enabled_precisions": {torch.float, torch.half}, # Run with FP16
     "workspace_size": 1 &lt;&lt; 20
 })
@@ -1582,7 +1595,7 @@ trt_model = trtorch.compile(traced_model, {
            <div class="input_area highlight-ipython3 notranslate">
             <div class="highlight">
              <pre>
-<span></span># using a TRTorch module is exactly the same as how we usually do inference in PyTorch i.e. model(inputs)
+<span></span># using a Torch-TensorRT module is exactly the same as how we usually do inference in PyTorch i.e. model(inputs)
 detections_batch = trt_model(tensor.to(torch.half)) # convert the input to half precision
 
 # By default, raw output from SSD network per input image contains 8732 boxes with
@@ -1607,7 +1620,7 @@ best_results_per_input_trt = [utils.pick_best(results, 0.40) for results in resu
            <div class="input_area highlight-ipython3 notranslate">
             <div class="highlight">
              <pre>
-<span></span># Visualize results with TRTorch/TensorRT
+<span></span># Visualize results with Torch-TensorRT
 plot_results(best_results_per_input_trt)
 </pre>
             </div>
@@ -1648,7 +1661,7 @@ plot_results(best_results_per_input_trt)
           </a>
          </h2>
          <p>
-          We can run the benchmark function again to see the speedup gained! Compare this result with the same batch-size of input in the case without TRTorch/TensorRT above.
+          We can run the benchmark function again to see the speedup gained! Compare this result with the same batch-size of input in the case without Torch-TensorRT above.
          </p>
          <div class="nbinput docutils container">
           <div class="prompt highlight-none notranslate">
@@ -1663,8 +1676,8 @@ plot_results(best_results_per_input_trt)
 <span></span>batch_size = 128
 
 # Recompiling with batch_size we use for evaluating performance
-trt_model = trtorch.compile(traced_model, {
-    "inputs": [trtorch.Input((batch_size, 3, 300, 300))],
+trt_model = torch_tensorrt.compile(traced_model, {
+    "inputs": [torch_tensorrt.Input((batch_size, 3, 300, 300))],
     "enabled_precisions": {torch.float, torch.half}, # Run with FP16
     "workspace_size": 1 &lt;&lt; 20
 })
@@ -1710,7 +1723,7 @@ Average batch time: 73.06 ms
           </a>
          </h2>
          <p>
-          In this notebook, we have walked through the complete process of compiling a TorchScript SSD300 model with TRTorch, and tested the performance impact of the optimization. We find that using the TRTorch compiled model, we gain significant speedup in inference without any noticeable drop in performance!
+          In this notebook, we have walked through the complete process of compiling a TorchScript SSD300 model with Torch-TensorRT, and tested the performance impact of the optimization. We find that using the Torch-TensorRT compiled model, we gain significant speedup in inference without any noticeable drop in performance!
          </p>
          <section id="Details">
           <h3 id="Details">
@@ -1780,7 +1793,7 @@ Average batch time: 73.06 ms
   <footer class="md-footer">
    <div class="md-footer-nav">
     <nav class="md-footer-nav__inner md-grid">
-     <a class="md-flex md-footer-nav__link md-footer-nav__link--prev" href="lenet-getting-started.html" rel="prev" title="TRTorch Getting Started - LeNet">
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--prev" href="lenet-getting-started.html" rel="prev" title="Torch-TensorRT Getting Started - LeNet">
       <div class="md-flex__cell md-flex__cell--shrink">
        <i class="md-icon md-icon--arrow-back md-footer-nav__button">
        </i>
@@ -1790,17 +1803,17 @@ Average batch time: 73.06 ms
         <span class="md-footer-nav__direction">
          Previous
         </span>
-        TRTorch Getting Started - LeNet
+        Torch-TensorRT Getting Started - LeNet
        </span>
       </div>
      </a>
-     <a class="md-flex md-footer-nav__link md-footer-nav__link--next" href="vgg-qat.html" rel="next" title="Deploying Quantization Aware Trained models in INT8 using TRTorch">
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--next" href="vgg-qat.html" rel="next" title="Deploying Quantization Aware Trained models in INT8 using Torch-TensorRT">
       <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
        <span class="md-flex__ellipsis">
         <span class="md-footer-nav__direction">
          Next
         </span>
-        Deploying Quantization Aware Trained models in INT8 using TRTorch
+        Deploying Quantization Aware Trained models in INT8 using Torch-TensorRT
        </span>
       </div>
       <div class="md-flex__cell md-flex__cell--shrink">

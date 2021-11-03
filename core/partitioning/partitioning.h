@@ -10,7 +10,7 @@
 #include "core/util/prelude.h"
 #include "torch/csrc/jit/ir/ir.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace partitioning {
 
@@ -27,4 +27,4 @@ std::ostream& operator<<(std::ostream& os, const PartitionedGraph& g);
 
 } // namespace partitioning
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

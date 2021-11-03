@@ -7,7 +7,7 @@
 #include "core/ir/ir.h"
 #include "torch/csrc/jit/ir/ir.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 
@@ -35,4 +35,4 @@ c10::optional<torch::jit::IValue> EvaluateNode(
 
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

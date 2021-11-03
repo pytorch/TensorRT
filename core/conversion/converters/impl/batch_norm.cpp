@@ -3,7 +3,7 @@
 #include "core/util/prelude.h"
 #include "torch/torch.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace converters {
@@ -39,7 +39,7 @@ void _batch_norm(
   LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
 }
 
-auto batch_norm_registrations TRTORCH_UNUSED =
+auto batch_norm_registrations TORCHTRT_UNUSED =
     RegisterNodeConversionPatterns()
         .pattern({
             R"SIG(aten::batch_norm(Tensor input, Tensor? gamma, Tensor? beta,
@@ -71,7 +71,7 @@ auto batch_norm_registrations TRTORCH_UNUSED =
               LOG_DEBUG("momentum disregarded");
               LOG_DEBUG("training disregarded");
               LOG_DEBUG("cudnn disregarded");
-              TRTORCH_CHECK(orig_shape.nbDims > 2, "Unable to create batch normalization layer from node: " << *n);
+              TORCHTRT_CHECK(orig_shape.nbDims > 2, "Unable to create batch normalization layer from node: " << *n);
 
               // Expand spatial dims from 1D to 2D if needed
               bool expandDims = (orig_shape.nbDims < 4);
@@ -164,7 +164,7 @@ auto batch_norm_registrations TRTORCH_UNUSED =
               auto creator = getPluginRegistry()->getPluginCreator("InstanceNormalization_TRT", "1", "");
               auto instance_norm_plugin = creator->createPlugin("instance_norm", &fc);
 
-              TRTORCH_CHECK(
+              TORCHTRT_CHECK(
                   instance_norm_plugin, "Unable to create instance_norm plugin from TensorRT plugin registry" << *n);
 
               auto new_layer =
@@ -180,4 +180,4 @@ auto batch_norm_registrations TRTORCH_UNUSED =
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

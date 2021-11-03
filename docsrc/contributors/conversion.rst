@@ -32,7 +32,7 @@ inputs and assemble an array of resources to pass to the converter. Inputs can b
       static value has been evaluated
 
 *  The input is from a node that has not been converted
-   *  TRTorch will error out here
+   *  Torch-TensorRT will error out here
 
 Node Evaluation
 -----------------

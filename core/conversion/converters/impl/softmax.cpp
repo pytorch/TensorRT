@@ -1,13 +1,13 @@
 #include "core/conversion/converters/converters.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace converters {
 namespace impl {
 namespace {
 
-static auto softmax_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().pattern(
+static auto softmax_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pattern(
     {"aten::softmax.int(Tensor self, int dim, int? dtype=None) -> (Tensor)",
      [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
        auto in = args[0].ITensorOrFreeze(ctx);
@@ -33,7 +33,7 @@ static auto softmax_registrations TRTORCH_UNUSED = RegisterNodeConversionPattern
        LOG_DEBUG("Softmax converted dim " << dim);
        auto softmax = ctx->net->addSoftMax(*in);
 
-       TRTORCH_CHECK(softmax, "Unable to create softmax layer from node: " << *n);
+       TORCHTRT_CHECK(softmax, "Unable to create softmax layer from node: " << *n);
        LOG_DEBUG("Disregarding dtype argument");
 
        if (shape.size() > 1) {
@@ -68,4 +68,4 @@ static auto softmax_registrations TRTORCH_UNUSED = RegisterNodeConversionPattern
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

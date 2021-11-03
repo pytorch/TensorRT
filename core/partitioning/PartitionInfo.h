@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace partitioning {
 
@@ -19,4 +19,4 @@ std::ostream& operator<<(std::ostream& os, const PartitionInfo& s);
 
 } // namespace partitioning
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

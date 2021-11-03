@@ -10,7 +10,7 @@ using namespace ::c10::prim;
 } // namespace jit
 } // namespace torch
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace lowering {
 
@@ -42,4 +42,4 @@ void DropUnusedNodes(torch::jit::Block* b) {
 
 } // namespace lowering
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

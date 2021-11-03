@@ -16,14 +16,14 @@ TEST(Converters, ATenMMConvertsCorrectly) {
 
   auto in1 = at::randint(0, 5, {2, 3}, {at::kCUDA});
   auto in2 = at::randint(0, 5, {3, 3}, {at::kCUDA});
-  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in1, in2});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in1, in2});
 
-  params = trtorch::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in1, in2});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in1, in2});
   auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
 TEST(Converters, ATenMMWithDiffShapesConvertsCorrectly) {
@@ -37,14 +37,14 @@ TEST(Converters, ATenMMWithDiffShapesConvertsCorrectly) {
 
   auto in1 = at::randint(0, 5, {2, 3}, {at::kCUDA});
   auto in2 = at::randint(0, 5, {3, 3, 2}, {at::kCUDA});
-  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in1, in2});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in1, in2});
 
-  params = trtorch::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in1, in2});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in1, in2});
   auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
 TEST(Converters, ATenBMMConvertsCorrectly) {
@@ -58,12 +58,12 @@ TEST(Converters, ATenBMMConvertsCorrectly) {
 
   auto in1 = at::randint(0, 5, {4, 64, 128}, {at::kCUDA});
   auto in2 = at::randint(0, 5, {4, 128, 64}, {at::kCUDA});
-  auto params = trtorch::core::ir::get_static_params(g->inputs(), {});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in1, in2});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in1, in2});
 
-  params = trtorch::core::ir::get_static_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in1, in2});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in1, in2});
   auto trt = trt_results[0].reshape_as(jit_results[0]);
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }

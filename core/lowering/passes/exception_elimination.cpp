@@ -10,7 +10,7 @@
 
 #include <vector>
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace lowering {
 namespace passes {
@@ -104,4 +104,4 @@ void EliminateExceptionOrPassPattern(std::shared_ptr<Graph> graph) {
 } // namespace passes
 } // namespace lowering
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

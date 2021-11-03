@@ -4,7 +4,7 @@
 #include "gtest/gtest.h"
 #include "tests/util/util.h"
 #include "torch/script.h"
-#include "trtorch/trtorch.h"
+#include "torch_tensorrt/torch_tensorrt.h"
 
 using PathAndInSize = std::tuple<std::string, std::vector<std::vector<int64_t>>, float>;
 

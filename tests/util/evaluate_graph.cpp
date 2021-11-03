@@ -8,7 +8,7 @@
 #include "core/util/jit_util.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace tests {
 namespace util {
 
@@ -17,13 +17,13 @@ std::vector<torch::jit::IValue> EvaluateGraph(const torch::jit::Block* b, std::v
 
   core::conversion::ConversionCtx* ctx = new core::conversion::ConversionCtx({});
 
-  TRTORCH_CHECK(inputs.size() == b->inputs().size(), "Amount of provided inputs do not match number of graph inputs");
+  TORCHTRT_CHECK(inputs.size() == b->inputs().size(), "Amount of provided inputs do not match number of graph inputs");
   for (size_t i = 0; i < inputs.size(); i++) {
     ctx->AssociateValueAndIValue(b->inputs()[i], inputs[i]);
   }
   LOG_DEBUG("Checking nodes");
   for (const auto n : b->nodes()) {
-    TRTORCH_CHECK(
+    TORCHTRT_CHECK(
         core::conversion::evaluators::shouldEvalAtConversionTime(n),
         "Test graph contains non evaluatable nodes: " << *n);
     auto eval = core::conversion::EvaluateNode(ctx, n);
@@ -35,7 +35,7 @@ std::vector<torch::jit::IValue> EvaluateGraph(const torch::jit::Block* b, std::v
           LOG_DEBUG(
               ctx->logger,
               "Found the evaluated value(s) to be " << eval_output
-                                                    << " for node: " << trtorch::core::util::node_info(n));
+                                                    << " for node: " << torch_tensorrt::core::util::node_info(n));
           ctx->AssociateValueAndIValue(n->output(i), eval_output);
         }
       } else if (!eval.value().isTensor()) {
@@ -51,7 +51,7 @@ std::vector<torch::jit::IValue> EvaluateGraph(const torch::jit::Block* b, std::v
   std::vector<torch::jit::IValue> outputs;
   for (auto o : b->outputs()) {
     auto it = ctx->evaluated_value_map.find(o);
-    TRTORCH_CHECK(
+    TORCHTRT_CHECK(
         it != ctx->evaluated_value_map.end(),
         "No corresponding IValue found for TorchScript Value: " << o->debugName());
     outputs.push_back(it->second);
@@ -83,4 +83,4 @@ std::vector<torch::jit::IValue> EvaluateGraphJIT(
 
 } // namespace util
 } // namespace tests
-} // namespace trtorch
+} // namespace torch_tensorrt

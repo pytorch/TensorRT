@@ -6,7 +6,7 @@
 #include "ATen/Version.h"
 #include "NvInferVersion.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace util {
 inline std::string get_build_info() {
@@ -18,4 +18,4 @@ inline std::string get_build_info() {
 }
 } // namespace util
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt
