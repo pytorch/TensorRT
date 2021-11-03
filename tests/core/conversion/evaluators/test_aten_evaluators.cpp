@@ -524,8 +524,8 @@ TEST(Evaluators, EqStrResultIsTrueEvaluatesCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  auto jit_results = trtorch::tests::util::EvaluateGraphJIT(g, {});
-  auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {});
+  auto jit_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {});
+  auto trt_results = torch_tensorrt::tests::util::EvaluateGraph(g->block(), {});
 
   ASSERT_TRUE(jit_results[0] == trt_results[0]);
 }
@@ -541,8 +541,8 @@ TEST(Evaluators, EqStrResultIsFalseEvaluatesCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  auto jit_results = trtorch::tests::util::EvaluateGraphJIT(g, {});
-  auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {});
+  auto jit_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {});
+  auto trt_results = torch_tensorrt::tests::util::EvaluateGraph(g->block(), {});
 
   ASSERT_TRUE(jit_results[0] == trt_results[0]);
 }
@@ -558,8 +558,8 @@ TEST(Evaluators, AndBoolResultIsTrueEvaluatesCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  auto jit_results = trtorch::tests::util::EvaluateGraphJIT(g, {});
-  auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {});
+  auto jit_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {});
+  auto trt_results = torch_tensorrt::tests::util::EvaluateGraph(g->block(), {});
 
   ASSERT_TRUE(jit_results[0] == trt_results[0]);
 }
@@ -575,8 +575,8 @@ TEST(Evaluators, AndBoolResultIsFalseEvaluatesCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  auto jit_results = trtorch::tests::util::EvaluateGraphJIT(g, {});
-  auto trt_results = trtorch::tests::util::EvaluateGraph(g->block(), {});
+  auto jit_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {});
+  auto trt_results = torch_tensorrt::tests::util::EvaluateGraph(g->block(), {});
 
   ASSERT_TRUE(jit_results[0] == trt_results[0]);
 }
