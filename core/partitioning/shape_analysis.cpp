@@ -112,7 +112,7 @@ void getSegmentsOutputByRunning(
       // set the input_shape and data_type
       at::ScalarType t = ivalues_maps[i].toTensor().scalar_type();
       if (!partition_info.truncate_long_and_double && (t == at::kLong || t == at::kDouble)) {
-        TRTORCH_THROW_ERROR(
+        TORCHTRT_THROW_ERROR(
             "Unable to process subgraph input type of at::kLong/at::kDouble, try to compile model with truncate_long_and_double enabled");
       } else if (partition_info.truncate_long_and_double && t == at::kLong) {
         ivalues_maps[i] = ivalues_maps[i].toTensor().to(at::kInt);
@@ -123,7 +123,7 @@ void getSegmentsOutputByRunning(
       }
       c10::optional<nvinfer1::DataType> dtype = util::optTypeMetaToTRTDataType(ivalues_maps[i].toTensor().dtype());
       if (dtype == c10::nullopt) {
-        TRTORCH_THROW_ERROR("Unsupported input data type " << ivalues_maps[i].toTensor().dtype());
+        TORCHTRT_THROW_ERROR("Unsupported input data type " << ivalues_maps[i].toTensor().dtype());
       }
       if (ivalues_maps[i].toTensor().sizes().size() == 0) {
         // handle Scalar types, which has sizes of []

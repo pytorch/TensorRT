@@ -215,15 +215,15 @@ void MarkOutputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> outp
               ctx->logger, "Marking Output " << out->debugName() << " named " << name << " in engine (ctx.MarkOutput)");
           ctx->num_outputs += 1;
         } else if (out_ivalue.isTuple()) {
-          TRTORCH_THROW_ERROR("Tuple type. Only a single tensor or a TensorList type is supported.");
+          TORCHTRT_THROW_ERROR("Tuple type. Only a single tensor or a TensorList type is supported.");
         } else if (out_ivalue.isList()) {
-          TRTORCH_THROW_ERROR("List type. Only a single tensor or a TensorList type is supported.");
+          TORCHTRT_THROW_ERROR("List type. Only a single tensor or a TensorList type is supported.");
         } else if (out_ivalue.isScalar()) {
-          TRTORCH_THROW_ERROR("Scalar type. Only a single tensor or a TensorList type is supported.");
+          TORCHTRT_THROW_ERROR("Scalar type. Only a single tensor or a TensorList type is supported.");
         } else if (out_ivalue.isTensor()) {
           // prim::NumToTensor will go to here
           std::string name = std::string("output_") + std::to_string(ctx->num_outputs);
-          auto out_tensor = trtorch::core::conversion::converters::tensor_to_const(ctx, out_ivalue.toTensor(), "");
+          auto out_tensor = converters::tensor_to_const(ctx, out_ivalue.toTensor(), "");
           out_tensor->setName(name.c_str());
           ctx->net->markOutput(*out_tensor);
           LOG_INFO(
