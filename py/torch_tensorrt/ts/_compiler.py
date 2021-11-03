@@ -95,8 +95,7 @@ def compile(module: torch.jit.ScriptModule,
     spec = {
         "inputs": inputs,
         "device": device,
-        "disable_tf32":
-            disable_tf32,  # Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
+        "disable_tf32": disable_tf32,  # Force FP32 layers to use traditional as FP32 format
         "sparse_weights": sparse_weights,  #Enable sparsity for convolution and fully connected layers.
         "enabled_precisions": enabled_precisions,  # Enabling FP16 kernels
         "refit": refit,  # enable refit
@@ -111,8 +110,9 @@ def compile(module: torch.jit.ScriptModule,
         "truncate_long_and_double": truncate_long_and_double,
         "torch_fallback": {
             "enabled": not require_full_compilation,
-            "force_fallback_ops": torch_executed_ops,
-            "force_fallback_modules": torch_executed_modules
+            "forced_fallback_ops": torch_executed_ops,
+            "forced_fallback_modules": torch_executed_modules,
+            "min_block_size": min_block_sizexs
         }
     }
 
