@@ -54,7 +54,7 @@ torchtrt::core::CompileSpec to_internal_compile_spec(CompileSpec external) {
       "require_full_compilation is enabled however the list of modules to run in torch is not empty (Found "
           << external.torch_executed_modules.size() << " modules)");
 
-  internal.partition_info.enabled = external.require_full_compilation;
+  internal.partition_info.enabled = !external.require_full_compilation;
   internal.partition_info.min_block_size = external.min_block_size;
   internal.partition_info.forced_fallback_operators = std::move(external.torch_executed_ops);
   internal.lower_info.forced_fallback_modules = std::move(external.torch_executed_modules);
