@@ -526,24 +526,37 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b, bool suppress_er
     unsupported_msg << "https://www.github.com/nvidia/Torch-TensorRT/issues" << std::endl;
     unsupported_msg << std::endl << "In Module:" << std::endl;
 
-    if (suppress_errors) {
+    if (!suppress_errors) {
       LOG_ERROR(unsupported_msg.str());
     }
 
+    std::unordered_map<std::string, std::unordered_set<std::string>> unsupported_node_locations;
     for (const auto n : b->nodes()) {
       auto schema = n->maybeSchema();
       if (schema) {
         for (const auto& x : unsupported_ops) {
           if (x.first == schema->operator_name()) {
-            if (suppress_errors) {
-              LOG_ERROR(
-                  "Unsupported operator: " << *schema << std::endl
-                                           << torch_tensorrt::core::util::GetPyTorchSourceCode(n) << std::endl);
+            auto loc = unsupported_node_locations.find(x.second);
+            if (loc == unsupported_node_locations.end()) {
+              unsupported_node_locations.insert({x.second, {torch_tensorrt::core::util::GetPyTorchSourceCode(n)}});
+            } else  {
+              loc->second.insert(torch_tensorrt::core::util::GetPyTorchSourceCode(n));
             }
           }
         }
       }
     }
+
+    for (const auto& type : unsupported_node_locations) {
+      std::stringstream traceback;
+      traceback << "Unsupported operator: " << type.first << std::endl;
+      for (const auto& str : type.second) {
+        traceback << str;
+      }
+      auto tb_str = traceback.str();
+      LOG_ERROR(tb_str);
+    }
+
     return false;
   }
 
@@ -555,7 +568,7 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b, bool suppress_er
     unsupported_msg
         << "This may be because there are no operators that can be added to the TensorRT graph or all operators have a resolved compile time value."
         << std::endl;
-    if (suppress_errors) {
+    if (!suppress_errors) {
       LOG_ERROR(unsupported_msg.str());
     }
     return false;
