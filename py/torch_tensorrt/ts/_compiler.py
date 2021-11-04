@@ -112,7 +112,7 @@ def compile(module: torch.jit.ScriptModule,
             "enabled": not require_full_compilation,
             "forced_fallback_ops": torch_executed_ops,
             "forced_fallback_modules": torch_executed_modules,
-            "min_block_size": min_block_sizexs
+            "min_block_size": min_block_size
         }
     }
 
