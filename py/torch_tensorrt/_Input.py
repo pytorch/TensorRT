@@ -145,14 +145,14 @@ class Input(object):
                     "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
                     + str(type(self.shape["opt_shape"])) + " for opt_shape")
             else:
-                internal_in.min = self.shape["opt_shape"]
+                internal_in.opt = self.shape["opt_shape"]
 
             if not Input._supported_input_size_type(self.shape["max_shape"]):
                 raise TypeError(
                     "Input shape specifications for inputs are required to be a List, tuple or torch.Size, found type: "
                     + str(type(self.shape["max_shape"])) + " for max_shape")
             else:
-                internal_in.min = self.shape["opt_shape"]
+                internal_in.max = self.shape["max_shape"]
             internal_in.input_is_dynamic = True
         else:
             if not Input._supported_input_size_type(self.shape):

@@ -1,9 +1,16 @@
+# Building a Torch-TensorRT container
 
-## Use the container for pytorch1.10+cuda11.1+trt8.0.3.4
+### Install Docker and NVIDIA Container Toolkit
+
+https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html
+
+### Build Container
+
+> From root of Torch-TensorRT repo
 
 ```
 # Build:
-docker build -f docker/Dockerfile -t torch_tensorrt1.0:latest .
+docker build --build-arg BASE={PyTorch Base Container Version} -f docker/Dockerfile -t torch_tensorrt1.0:latest .
 
 # Run:
 docker run --gpus all -it \
