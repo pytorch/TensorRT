@@ -214,7 +214,7 @@ class Input(object):
             if format == torch.contiguous_format:
                 return _enums.TensorFormat.contiguous
             elif format == torch.channels_last:
-                return _enums.TensorFormat.channel_last
+                return _enums.TensorFormat.channels_last
             else:
                 raise ValueError(
                     "Provided an unsupported tensor format (support: NHCW/contiguous_format, NHWC/channel_last)")

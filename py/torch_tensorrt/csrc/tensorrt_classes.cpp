@@ -49,7 +49,7 @@ Device::Device(const core::runtime::CudaDevice& internal_dev) {
 
 nvinfer1::TensorFormat toTRTTensorFormat(TensorFormat value) {
   switch (value) {
-    case TensorFormat::kChannelLast:
+    case TensorFormat::kChannelsLast:
       return nvinfer1::TensorFormat::kHWC;
     case TensorFormat::kContiguous:
     default:
@@ -61,7 +61,7 @@ std::string to_str(TensorFormat value) {
   switch (value) {
     case TensorFormat::kContiguous:
       return "Contiguous/Linear/NCHW";
-    case TensorFormat::kChannelLast:
+    case TensorFormat::kChannelsLast:
       return "Channel Last/NHWC";
     default:
       return "UNKNOWN";
