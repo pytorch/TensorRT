@@ -1,8 +1,8 @@
-FROM pytorch/manylinux-cuda111
+FROM pytorch/manylinux-cuda113
 
 RUN yum install -y ninja-build
 
-RUN wget https://copr.fedorainfracloud.org/coprs/vbatts/bazel/repo/epel-7/vbatts-bazel-epel-7.repo \
+RUN wget --no-check-certificate https://copr.fedorainfracloud.org/coprs/vbatts/bazel/repo/epel-7/vbatts-bazel-epel-7.repo \
     && mv vbatts-bazel-epel-7.repo /etc/yum.repos.d/
 
 RUN yum install -y bazel4 --nogpgcheck

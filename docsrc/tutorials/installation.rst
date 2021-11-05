@@ -52,7 +52,7 @@ Torch-TensorRT is built with Bazel, so begin by installing it.
 
     .. code-block:: shell
 
-        export BAZEL_VERSION=$(cat <PATH_TO_TRTORCH_ROOT>/.bazelversion)
+        export BAZEL_VERSION=$(cat <PATH_TO_TORCHTRT_ROOT>/.bazelversion)
         mkdir bazel
         cd bazel
         curl -fSsL -O https://github.com/bazelbuild/bazel/releases/download/$BAZEL_VERSION/bazel-$BAZEL_VERSION-dist.zip
@@ -237,7 +237,7 @@ Install or compile a build of PyTorch/LibTorch for aarch64
 
 NVIDIA hosts builds the latest release branch for Jetson here:
 
-    https://forums.developer.nvidia.com/t/pytorch-for-jetson-version-1-9-0-now-available/72048
+    https://forums.developer.nvidia.com/t/pytorch-for-jetson-version-1-10-now-available/72048
 
 
 Enviorment Setup
