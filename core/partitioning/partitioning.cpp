@@ -404,7 +404,7 @@ PartitionedGraph Partition(
   registerSegmentsOutputs(segmented_blocks, block);
 
   // run shape analysis on each segmented block
-  runShapeAnalysis(segmented_blocks, example_tensor_map);
+  runShapeAnalysis(segmented_blocks, example_tensor_map, partition_info);
 
   LOG_INFO(segmented_blocks);
 

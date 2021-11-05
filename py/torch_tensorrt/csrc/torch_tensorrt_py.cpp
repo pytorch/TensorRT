@@ -204,7 +204,7 @@ PYBIND11_MODULE(_C, m) {
 
   py::enum_<TensorFormat>(m, "TensorFormat", "Enum to specifiy the memory layout of tensors")
       .value("contiguous", TensorFormat::kContiguous, "Contiguous memory layout (NCHW / Linear)")
-      .value("channel_last", TensorFormat::kChannelLast, "Channel last memory layout (NHWC)")
+      .value("channels_last", TensorFormat::kChannelsLast, "Channels last memory layout (NHWC)")
       .export_values();
 
   py::enum_<nvinfer1::CalibrationAlgoType>(m, "CalibrationAlgo", py::module_local(), "Type of calibration algorithm")

@@ -8,7 +8,9 @@
 #include "core/util/prelude.h"
 
 #include "c10/util/intrusive_ptr.h"
+#include "core/conversion/converters/converter_util.h"
 #include "core/conversion/tensorcontainer/TensorContainer.h"
+#include "core/util/trt_util.h"
 
 namespace torch_tensorrt {
 namespace core {
@@ -212,6 +214,21 @@ void MarkOutputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> outp
           LOG_INFO(
               ctx->logger, "Marking Output " << out->debugName() << " named " << name << " in engine (ctx.MarkOutput)");
           ctx->num_outputs += 1;
+        } else if (out_ivalue.isTuple()) {
+          TORCHTRT_THROW_ERROR("Tuple type. Only a single tensor or a TensorList type is supported.");
+        } else if (out_ivalue.isList()) {
+          TORCHTRT_THROW_ERROR("List type. Only a single tensor or a TensorList type is supported.");
+        } else if (out_ivalue.isScalar()) {
+          TORCHTRT_THROW_ERROR("Scalar type. Only a single tensor or a TensorList type is supported.");
+        } else if (out_ivalue.isTensor()) {
+          // prim::NumToTensor will go to here
+          std::string name = std::string("output_") + std::to_string(ctx->num_outputs);
+          auto out_tensor = converters::tensor_to_const(ctx, out_ivalue.toTensor(), "");
+          out_tensor->setName(name.c_str());
+          ctx->net->markOutput(*out_tensor);
+          LOG_INFO(
+              ctx->logger, "Marking Output " << out->debugName() << " named " << name << " in engine (ctx.MarkOutput)");
+          ctx->num_outputs += 1;
         } else {
           TORCHTRT_THROW_ERROR("Unknown output type. Only a single tensor or a TensorList type is supported.");
         }
@@ -364,6 +381,7 @@ void ConvertBlockToNetDef(
     ConversionInfo& build_info,
     ir::StaticParams& static_params) {
   LOG_INFO(ctx->logger, "Converting Block");
+  LOG_DEBUG(ctx->logger, *b->owningGraph());
 
   auto inputs = b->inputs();
   AddParamsToCtxValueMap(ctx, static_params);
@@ -508,24 +526,37 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b, bool suppress_er
     unsupported_msg << "https://www.github.com/nvidia/Torch-TensorRT/issues" << std::endl;
     unsupported_msg << std::endl << "In Module:" << std::endl;
 
-    if (suppress_errors) {
+    if (!suppress_errors) {
       LOG_ERROR(unsupported_msg.str());
     }
 
+    std::unordered_map<std::string, std::unordered_set<std::string>> unsupported_node_locations;
     for (const auto n : b->nodes()) {
       auto schema = n->maybeSchema();
       if (schema) {
         for (const auto& x : unsupported_ops) {
           if (x.first == schema->operator_name()) {
-            if (suppress_errors) {
-              LOG_ERROR(
-                  "Unsupported operator: " << *schema << std::endl
-                                           << torch_tensorrt::core::util::GetPyTorchSourceCode(n) << std::endl);
+            auto loc = unsupported_node_locations.find(x.second);
+            if (loc == unsupported_node_locations.end()) {
+              unsupported_node_locations.insert({x.second, {torch_tensorrt::core::util::GetPyTorchSourceCode(n)}});
+            } else  {
+              loc->second.insert(torch_tensorrt::core::util::GetPyTorchSourceCode(n));
             }
           }
         }
       }
     }
+
+    for (const auto& type : unsupported_node_locations) {
+      std::stringstream traceback;
+      traceback << "Unsupported operator: " << type.first << std::endl;
+      for (const auto& str : type.second) {
+        traceback << str;
+      }
+      auto tb_str = traceback.str();
+      LOG_ERROR(tb_str);
+    }
+
     return false;
   }
 
@@ -537,7 +568,7 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b, bool suppress_er
     unsupported_msg
         << "This may be because there are no operators that can be added to the TensorRT graph or all operators have a resolved compile time value."
         << std::endl;
-    if (suppress_errors) {
+    if (!suppress_errors) {
       LOG_ERROR(unsupported_msg.str());
     }
     return false;
