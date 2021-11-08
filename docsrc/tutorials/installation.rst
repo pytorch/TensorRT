@@ -52,7 +52,7 @@ Torch-TensorRT is built with Bazel, so begin by installing it.
 
     .. code-block:: shell
 
-        export BAZEL_VERSION=$(cat <PATH_TO_TRTORCH_ROOT>/.bazelversion)
+        export BAZEL_VERSION=$(cat <PATH_TO_TORCHTRT_ROOT>/.bazelversion)
         mkdir bazel
         cd bazel
         curl -fSsL -O https://github.com/bazelbuild/bazel/releases/download/$BAZEL_VERSION/bazel-$BAZEL_VERSION-dist.zip
@@ -66,7 +66,7 @@ the CUDA driver installed and the container must have CUDA)
 
 The correct LibTorch version will be pulled down for you by bazel.
 
-    NOTE: For best compatability with official PyTorch, use torch==1.9.1+cuda111, TensorRT 8.0 and cuDNN 8.2 for CUDA 11.1 however Torch-TensorRT itself supports
+    NOTE: For best compatability with official PyTorch, use torch==1.10.0+cuda113, TensorRT 8.0 and cuDNN 8.2 for CUDA 11.3 however Torch-TensorRT itself supports
     TensorRT and cuDNN for CUDA versions other than 11.1 for usecases such as using NVIDIA compiled distributions of PyTorch that use other versions of CUDA
     e.g. aarch64 or custom compiled version of PyTorch.
 
@@ -237,7 +237,7 @@ Install or compile a build of PyTorch/LibTorch for aarch64
 
 NVIDIA hosts builds the latest release branch for Jetson here:
 
-    https://forums.developer.nvidia.com/t/pytorch-for-jetson-version-1-9-0-now-available/72048
+    https://forums.developer.nvidia.com/t/pytorch-for-jetson-version-1-10-now-available/72048
 
 
 Enviorment Setup

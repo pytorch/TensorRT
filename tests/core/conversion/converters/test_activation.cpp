@@ -200,13 +200,10 @@ TEST(Converters, ATenEluConvertsCorrectly) {
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
-#ifndef DISABLE_TEST_IN_CI
-
 TEST(Converters, ATenGELUConvertsCorrectly) {
   const auto graph = R"IR(
       graph(%0 : Tensor):
-        %1 : bool = prim::Constant[value=0]()
-        %3 : Tensor = aten::gelu(%0, %1)
+        %3 : Tensor = aten::gelu(%0)
         return (%3))IR";
 
   auto g = std::make_shared<torch::jit::Graph>();
@@ -226,6 +223,5 @@ TEST(Converters, ATenGELUConvertsCorrectly) {
   // c10::cuda::compat::normcdf to compute Phi(x). So there's a difference here and therefore the threshold is slightly
   // higher than other ops. One in ten runs will give you an out of normal threshold result
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 5e-3));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 5e-2));
 }
-#endif

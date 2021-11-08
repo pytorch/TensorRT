@@ -41,7 +41,7 @@ local_repository(
 new_local_repository(
     name = "cuda",
     build_file = "@//third_party/cuda:BUILD",
-    path = "/usr/local/cuda-11.1/",
+    path = "/usr/local/cuda-11.3/",
 )
 
 new_local_repository(
@@ -56,17 +56,17 @@ new_local_repository(
 http_archive(
     name = "libtorch",
     build_file = "@//third_party/libtorch:BUILD",
-    sha256 = "db57b1023fb33768286a98ba22c44cfe03d6ed158bc2dc0ca1d4928ee5f19f60",
+    sha256 = "190e963e739d5f7c2dcf94b3994de8fcd335706a4ebb333812ea7d8c841beb06",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/cu111/libtorch-cxx11-abi-shared-with-deps-1.9.1%2Bcu111.zip"],
+    urls = ["https://download.pytorch.org/libtorch/cu113/libtorch-cxx11-abi-shared-with-deps-1.10.0%2Bcu113.zip"],
 )
 
 http_archive(
     name = "libtorch_pre_cxx11_abi",
     build_file = "@//third_party/libtorch:BUILD",
-    sha256 = "5563ca53b2b5342f1ab7eef9baf308f197673663ad5b1458a031c46dd802f413",
+    sha256 = "0996a6a4ea8bbc1137b4fb0476eeca25b5efd8ed38955218dec1b73929090053",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/cu111/libtorch-shared-with-deps-1.9.1%2Bcu111.zip"],
+    urls = ["https://download.pytorch.org/libtorch/cu113/libtorch-shared-with-deps-1.10.0%2Bcu113.zip"],
 )
 
 # Download these tarballs manually from the NVIDIA website
