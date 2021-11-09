@@ -21,7 +21,7 @@ from tqdm import tqdm
 
 from vgg16 import vgg16
 
-PARSER = argparse.ArgumentParser(description="VGG16 example to use with TRTorch PTQ")
+PARSER = argparse.ArgumentParser(description="VGG16 example to use with Torch-TensorRT PTQ")
 PARSER.add_argument('--epochs', default=100, type=int, help="Number of total epochs to train")
 PARSER.add_argument('--enable_qat', action="store_true", help="Enable quantization aware training. This is recommended to perform on a pre-trained model.")
 PARSER.add_argument('--batch-size', default=128, type=int, help="Batch size to use when training")

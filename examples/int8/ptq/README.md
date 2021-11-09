@@ -4,9 +4,9 @@
 
 Post Training Quantization (PTQ) is a technique to reduce the required computational resources for inference while still preserving the accuracy of your model by mapping the traditional FP32 activation space to a reduced INT8 space. TensorRT uses a calibration step which executes your model with sample data from the target domain and track the activations in FP32 to calibrate a mapping to INT8 that minimizes the information loss between FP32 inference and INT8 inference.
 
-Users writing TensorRT applications are required to setup a calibrator class which will provide sample data to the TensorRT calibrator. With TRTorch we look to leverage existing infrastructure in PyTorch to make implementing calibrators easier.
+Users writing TensorRT applications are required to setup a calibrator class which will provide sample data to the TensorRT calibrator. With Torch-TensorRT we look to leverage existing infrastructure in PyTorch to make implementing calibrators easier.
 
-LibTorch provides a `Dataloader` and `Dataset` API which steamlines preprocessing and batching input data. TRTorch uses Dataloaders as the base of a generic calibrator implementation. So you will be able to reuse or quickly implement a `torch::Dataset` for your target domain, place it in a Dataloader and create a INT8 Calibrator from it which you can provide to TRTorch to run INT8 Calibration during compliation of your module.
+LibTorch provides a `Dataloader` and `Dataset` API which steamlines preprocessing and batching input data. Torch-TensorRT uses Dataloaders as the base of a generic calibrator implementation. So you will be able to reuse or quickly implement a `torch::Dataset` for your target domain, place it in a Dataloader and create a INT8 Calibrator from it which you can provide to Torch-TensorRT to run INT8 Calibration during compliation of your module.
 
 ### Code
 
@@ -115,7 +115,7 @@ From here not much changes in terms of how to execution works. You are still abl
 
 ## Running the Example Application
 
-This is a short example application that shows how to use TRTorch to perform post-training quantization for a module.
+This is a short example application that shows how to use Torch-TensorRT to perform post-training quantization for a module.
 
 ## Prerequisites
 
@@ -139,11 +139,11 @@ This will build a binary named `ptq` in `bazel-out/k8-<opt|dbg>/bin/cpp/int8/ptq
 
 ## Compilation using Makefile
 
-1) Download releases of <a href="https://pytorch.org">LibTorch</a>, <a href="https://github.com/NVIDIA/TRTorch/releases">TRTorch </a>and <a href="https://developer.nvidia.com/nvidia-tensorrt-download">TensorRT</a> and unpack them in the deps directory.
+1) Download releases of <a href="https://pytorch.org">LibTorch</a>, <a href="https://github.com/NVIDIA/Torch-TensorRT/releases">Torch-TensorRT </a>and <a href="https://developer.nvidia.com/nvidia-tensorrt-download">TensorRT</a> and unpack them in the deps directory.
 
 ```sh
 cd examples/torch_tensorrtrt_example/deps
-# Download latest TRTorch release tar file (libtorch_tensorrt.tar.gz) from https://github.com/NVIDIA/TRTorch/releases
+# Download latest Torch-TensorRT release tar file (libtorch_tensorrt.tar.gz) from https://github.com/NVIDIA/Torch-TensorRT/releases
 tar -xvzf libtorch_tensorrt.tar.gz
 # unzip libtorch downloaded from pytorch.org
 unzip libtorch.zip
@@ -161,9 +161,9 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/deps/torch_tensorrt/lib:$(pwd)/de
 
 2) Build and run `ptq`
 
-We import header files `cifar10.h` and `benchmark.h` from `ROOT_DIR`. `ROOT_DIR` should point to the path where TRTorch is located `<path_to_TRTORCH>`.
+We import header files `cifar10.h` and `benchmark.h` from `ROOT_DIR`. `ROOT_DIR` should point to the path where Torch-TensorRT is located `<path_to_TRTORCH>`.
 
-By default it is set to `../../../`. If your TRTorch directory structure is different, please set `ROOT_DIR` accordingly.
+By default it is set to `../../../`. If your Torch-TensorRT directory structure is different, please set `ROOT_DIR` accordingly.
 
 ```sh
 cd examples/int8/ptq

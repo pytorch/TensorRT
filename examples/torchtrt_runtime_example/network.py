@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-import trtorch
+import torch_tensorrt as torchtrt
 
 # create a simple norm layer.
 # This norm layer uses NormalizePlugin from TRTorch
@@ -30,16 +30,16 @@ def main():
     scripted_model = torch.jit.script(model)
 
     compile_settings = {
-        "inputs": [trtorch.Input([1, 3, 5, 5])],
+        "inputs": [torchtrt.Input([1, 3, 5, 5])],
         "enabled_precisions": {torch.float32}
     }
 
-    trt_ts_module = trtorch.compile(scripted_model, compile_settings)
+    trt_ts_module = torchtrt.compile(scripted_model, compile_settings)
     torch.jit.save(trt_ts_module, 'conv_gelu.jit')
 
     norm_model = Norm().eval().cuda()
     norm_ts_module = torch.jit.script(norm_model)
-    norm_trt_ts = trtorch.compile(norm_ts_module, compile_settings)
+    norm_trt_ts = torchtrt.compile(norm_ts_module, compile_settings)
     torch.jit.save(norm_trt_ts, 'norm.jit')
     print("Generated Torchscript-TRT models.")
 

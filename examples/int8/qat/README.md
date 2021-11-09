@@ -55,7 +55,7 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/deps/torch_tensorrt/lib:$(pwd)/de
 
 2) Build and run `qat`
 
-We import header files `cifar10.h` and `benchmark.h` from `ROOT_DIR`. `ROOT_DIR` should point to the path where Torch-TensorRT is located `<path_to_TRTORCH>`.
+We import header files `cifar10.h` and `benchmark.h` from `ROOT_DIR`. `ROOT_DIR` should point to the path where Torch-TensorRT is located `<path_to_torch_tensorrt>`.
 
 By default it is set to `../../../`. If your Torch-TensorRT directory structure is different, please set `ROOT_DIR` accordingly.
 

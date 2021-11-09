@@ -66,7 +66,7 @@ c10::IValue preprocess(
   for (auto it = method_compile_spec.begin(), end = method_compile_spec.end(); it != end; ++it) {
     TORCHTRT_CHECK(
         core::CheckMethodOperatorSupport(mod, it->key().toStringRef()),
-        "Method " << it->key().toStringRef() << "cannot be compiled by TRTorch");
+        "Method " << it->key().toStringRef() << "cannot be compiled by Torch-TensorRT");
   }
   return mod._ivalue();
 };

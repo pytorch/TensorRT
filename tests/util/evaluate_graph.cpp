@@ -13,7 +13,7 @@ namespace tests {
 namespace util {
 
 std::vector<torch::jit::IValue> EvaluateGraph(const torch::jit::Block* b, std::vector<torch::jit::IValue> inputs) {
-  LOG_DEBUG("Running TRTorch Version");
+  LOG_DEBUG("Running Torch-TensorRT Version");
 
   core::conversion::ConversionCtx* ctx = new core::conversion::ConversionCtx({});
 

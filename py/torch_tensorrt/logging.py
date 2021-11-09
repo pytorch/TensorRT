@@ -53,7 +53,7 @@ def get_reportable_log_level() -> Level:
     """Get the level required for a message to be printed in the log
 
     Returns:
-        trtorch.logging.Level: The enum representing the level required to print
+        torch_tensorrt.logging.Level: The enum representing the level required to print
     """
     return Level(_get_reportable_log_level())
 
@@ -62,7 +62,7 @@ def set_reportable_log_level(level: Level):
     """Set the level required for a message to be printed to the log
 
     Args:
-        level (trtorch.logging.Level): The enum representing the level required to print
+        level (torch_tensorrt.logging.Level): The enum representing the level required to print
     """
     _set_reportable_log_level(Level._to_internal_level(level))
 
@@ -92,7 +92,7 @@ def log(level: Level, msg: str):
     will only get printed out if Level > reportable_log_level
 
     Args:
-        level (trtorch.logging.Level): Severity of the message
+        level (torch_tensorrt.logging.Level): Severity of the message
         msg (str): Actual message text
     """
     _log(Level._to_internal_level(level), msg)

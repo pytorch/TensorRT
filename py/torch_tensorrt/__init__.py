@@ -2,7 +2,7 @@ import os
 import sys
 
 if sys.version_info < (3,):
-    raise Exception("Python 2 has reached end-of-life and is not supported by TRTorch")
+    raise Exception("Python 2 has reached end-of-life and is not supported by Torch-TensorRT")
 
 import ctypes
 import torch

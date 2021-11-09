@@ -1,8 +1,8 @@
 # Create a new op in C++, compile it to .so library and load it in Python
 
-There are some operators in PyTorch library which are not supported in TRTorch.
+There are some operators in PyTorch library which are not supported in Torch-TensorRT.
 To support these ops, users can register converters for missing ops. For example,
-if we try to compile a graph with a build of TRTorch that doesn't support the
+if we try to compile a graph with a build of Torch-TensorRT that doesn't support the
 [ELU](https://pytorch.org/docs/stable/generated/torch.nn.ELU.html) operation,
 we will get following error:
 
@@ -10,7 +10,7 @@ we will get following error:
 Schema: aten::elu(Tensor self, Scalar alpha=1, Scalar scale=1, Scalar input_scale=1) -> (Tensor)
 Converter for aten::elu requested, but no such converter was found.
 If you need a converter for this operator, you can try implementing one yourself
-or request a converter: https://www.github.com/NVIDIA/TRTorch/issues
+or request a converter: https://www.github.com/NVIDIA/Torch-TensorRT/issues
 
 Note that ELU converter is now supported in our library. If you want to get above
 error and run the example in this document, you can either:
