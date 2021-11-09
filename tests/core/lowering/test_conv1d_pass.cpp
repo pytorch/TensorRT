@@ -35,7 +35,8 @@ TEST(LoweringPasses, Conv1dCorrectly) {
         %12 : Tensor = aten::_convolution(%0, %1, %2, %stride, %padding, %dilation, %3, %output_padding, %6, %3, %3, %3, %3)
         return (%12))IR";
 
-  torch_tensorrt::core::util::logging::get_logger().set_reportable_log_level(torch_tensorrt::core::util::logging::LogLevel::kGRAPH);
+  torch_tensorrt::core::util::logging::get_logger().set_reportable_log_level(
+      torch_tensorrt::core::util::logging::LogLevel::kGRAPH);
   auto sg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(source_graph, &*sg);
   torch_tensorrt::core::lowering::passes::Conv1DToConvolution(sg);
@@ -92,7 +93,8 @@ TEST(LoweringPasses, ConvTransposed1dCorrectly) {
         %12 : Tensor = aten::_convolution(%0, %1, %2, %stride, %padding, %dilation, %8, %output_padding, %5, %7, %7, %7, %7)
         return (%12))IR";
 
-  torch_tensorrt::core::util::logging::get_logger().set_reportable_log_level(torch_tensorrt::core::util::logging::LogLevel::kGRAPH);
+  torch_tensorrt::core::util::logging::get_logger().set_reportable_log_level(
+      torch_tensorrt::core::util::logging::LogLevel::kGRAPH);
   auto sg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(source_graph, &*sg);
   torch_tensorrt::core::lowering::passes::ConvTransposed1DToConvolution(sg);

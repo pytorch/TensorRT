@@ -262,7 +262,6 @@ enum class EngineCapability : int8_t {
   kDLA_STANDALONE,
 };
 
-
 /**
  * @brief TensorFormat is an enum class which defines the memeory layout used to store Tensor Data
  * */

@@ -182,12 +182,19 @@ class BdistCommand(bdist_wheel):
 class CleanCommand(Command):
     """Custom clean command to tidy up the project root."""
     PY_CLEAN_DIRS = [
-        './build', './dist', './torch_tensorrt/__pycache__', './torch_tensorrt/lib', './torch_tensorrt/include',
-        './torch_tensorrt/bin', './*.pyc', './*.tgz', './*.egg-info',
+        './build',
+        './dist',
+        './torch_tensorrt/__pycache__',
+        './torch_tensorrt/lib',
+        './torch_tensorrt/include',
+        './torch_tensorrt/bin',
+        './*.pyc',
+        './*.tgz',
+        './*.egg-info',
     ]
     PY_CLEAN_FILES = [
-        './torch_tensorrt/*.so', './torch_tensorrt/_version.py',
-        './torch_tensorrt/BUILD', './torch_tensorrt/WORKSPACE', './torch_tensorrt/LICENSE'
+        './torch_tensorrt/*.so', './torch_tensorrt/_version.py', './torch_tensorrt/BUILD', './torch_tensorrt/WORKSPACE',
+        './torch_tensorrt/LICENSE'
     ]
     description = "Command to tidy up the project root"
     user_options = []
@@ -220,7 +227,6 @@ class CleanCommand(Command):
                 os.remove(path)
 
 
-
 ext_modules = [
     cpp_extension.CUDAExtension(
         'torch_tensorrt._C', [
@@ -235,8 +241,7 @@ ext_modules = [
             dir_path + "torch_tensorrt/csrc", dir_path + "torch_tensorrt/include",
             dir_path + "/../bazel-TRTorch/external/tensorrt/include",
             dir_path + "/../bazel-Torch-TensorRT-Preview/external/tensorrt/include",
-            dir_path + "/../bazel-Torch-TensorRT/external/tensorrt/include",
-            dir_path + "/../"
+            dir_path + "/../bazel-Torch-TensorRT/external/tensorrt/include", dir_path + "/../"
         ],
         extra_compile_args=[
             "-Wno-deprecated",

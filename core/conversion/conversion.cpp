@@ -539,7 +539,7 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b, bool suppress_er
             auto loc = unsupported_node_locations.find(x.second);
             if (loc == unsupported_node_locations.end()) {
               unsupported_node_locations.insert({x.second, {torch_tensorrt::core::util::GetPyTorchSourceCode(n)}});
-            } else  {
+            } else {
               loc->second.insert(torch_tensorrt::core::util::GetPyTorchSourceCode(n));
             }
           }
