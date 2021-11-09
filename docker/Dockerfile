@@ -1,4 +1,4 @@
-ARG BASE=21.09
+ARG BASE=21.10
 ARG BASE_IMG=nvcr.io/nvidia/pytorch:${BASE}-py3
 FROM ${BASE_IMG} as base
 
