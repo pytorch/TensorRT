@@ -2,8 +2,7 @@
 
 Creating a TorchScript Module
 ------------------------------
-
-Once you have a trained model you want to compile with Torch-TensorRT, you need to start by converting that model from Python code to TorchScript code.
+TorchScript is a way to create serializable and optimizable models from PyTorch code.
 PyTorch has detailed documentation on how to do this https://pytorch.org/tutorials/beginner/Intro_to_TorchScript_tutorial.html but briefly here is the
 here is key background information and the process:
 
