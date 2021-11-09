@@ -25,7 +25,7 @@ You can install the python package using
 
 .. code-block:: sh
 
-    pip3 install torch_tensorrt -f https://github.com/NVIDIA/Torch-TensorRT/releases
+    pip3 install torch-tensorrt -f https://github.com/NVIDIA/Torch-TensorRT/releases
 
 .. _bin-dist:
 
@@ -46,7 +46,7 @@ Dependencies for Compilation
 
 Torch-TensorRT is built with Bazel, so begin by installing it.
 
-    * The easiest way is to install bazelisk using the method of you choosing https://github.com/bazelbuild/bazelisk
+    * The easiest way is to install bazelisk using the method of your choosing https://github.com/bazelbuild/bazelisk
     * Otherwise you can use the following instructions to install binaries https://docs.bazel.build/versions/master/install.html
     * Finally if you need to compile from source (e.g. aarch64 until bazel distributes binaries for the architecture) you can use these instructions
 
@@ -67,8 +67,39 @@ the CUDA driver installed and the container must have CUDA)
 The correct LibTorch version will be pulled down for you by bazel.
 
     NOTE: For best compatability with official PyTorch, use torch==1.10.0+cuda113, TensorRT 8.0 and cuDNN 8.2 for CUDA 11.3 however Torch-TensorRT itself supports
-    TensorRT and cuDNN for CUDA versions other than 11.1 for usecases such as using NVIDIA compiled distributions of PyTorch that use other versions of CUDA
+    TensorRT and cuDNN for other CUDA versions for usecases such as using NVIDIA compiled distributions of PyTorch that use other versions of CUDA
     e.g. aarch64 or custom compiled version of PyTorch.
+
+.. _abis:
+
+Choosing the Right ABI
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+Likely the most complicated thing about compiling Torch-TensorRT is selecting the correct ABI. There are two options
+which are incompatible with each other, pre-cxx11-abi and the cxx11-abi. The complexity comes from the fact that while
+the most popular distribution of PyTorch (wheels downloaded from pytorch.org/pypi directly) use the pre-cxx11-abi, most
+other distributions you might encounter (e.g. ones from NVIDIA - NGC containers, and builds for Jetson as well as certain
+libtorch builds and likely if you build PyTorch from source) use the cxx11-abi. It is important you compile Torch-TensorRT
+using the correct ABI to function properly. Below is a table with general pairings of PyTorch distribution sources and the
+recommended commands:
+
++-------------------------------------------------------------+----------------------------------------------------------+--------------------------------------------------------------------+
+| PyTorch Source                                              | Recommended C++ Compilation Command                      | Recommended Python Compilation Command                             |
++=============================================================+==========================================================+====================================================================+
+| PyTorch whl file from PyTorch.org                           | bazel build //:libtorchtrt -c opt --config pre_cxx11_abi | python3 setup.py bdist_wheel                                       |
++-------------------------------------------------------------+----------------------------------------------------------+--------------------------------------------------------------------+
+| libtorch-shared-with-deps-*.zip from PyTorch.org            | bazel build //:libtorchtrt -c opt --config pre_cxx11_abi | python3 setup.py bdist_wheel                                       |
++-------------------------------------------------------------+----------------------------------------------------------+--------------------------------------------------------------------+
+| libtorch-cxx11-abi-shared-with-deps-*.zip from PyTorch.org  | bazel build //:libtorchtrt -c opt                        | python3 setup.py bdist_wheel --use-cxx11-abi                       |
++-------------------------------------------------------------+----------------------------------------------------------+--------------------------------------------------------------------+
+| PyTorch preinstalled in an NGC container                    | bazel build //:libtorchtrt -c opt                        | python3 setup.py bdist_wheel --use-cxx11-abi                       |
++-------------------------------------------------------------+----------------------------------------------------------+--------------------------------------------------------------------+
+| PyTorch from the NVIDIA Forums for Jetson                   | bazel build //:libtorchtrt -c opt                        | python3 setup.py bdist_wheel --jetpack-version 4.6 --use-cxx11-abi |
++-------------------------------------------------------------+----------------------------------------------------------+--------------------------------------------------------------------+
+| PyTorch built from Source                                   | bazel build //:libtorchtrt -c opt                        | python3 setup.py bdist_wheel --use-cxx11-abi                       |
++-------------------------------------------------------------+----------------------------------------------------------+--------------------------------------------------------------------+
+
+    NOTE: For all of the above cases you must correctly declare the source of PyTorch you intend to use in your WORKSPACE file for both Python and C++ builds. See below for more information
 
 You then have two compilation options:
 

@@ -141,8 +141,8 @@ class TORCHTRT_API DataType {
   Value value;
 };
 
-/*
- * Setting data structure for Target device
+/**
+ * @brief Setting data structure for Target device
  */
 struct Device {
   /**
@@ -262,6 +262,10 @@ enum class EngineCapability : int8_t {
   kDLA_STANDALONE,
 };
 
+
+/**
+ * @brief TensorFormat is an enum class which defines the memeory layout used to store Tensor Data
+ * */
 class TORCHTRT_API TensorFormat {
  public:
   /**
@@ -382,8 +386,6 @@ struct TORCHTRT_API Input {
    * / traditional TRT convection (FP32 for FP32 only, FP16 for FP32 and FP16, FP32 for Int8)
    *
    * @param shape Input tensor shape
-   * @param dtype Expected data type for the input (Defaults to the type of the weights in the first tensor
-   * calculation if detectable else Float32)
    * @param format Expected tensor format for the input (Defaults to contiguous)
    */
   Input(std::vector<int64_t> shape, TensorFormat format = TensorFormat::kContiguous);

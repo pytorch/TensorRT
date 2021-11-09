@@ -1,3 +1,5 @@
+.. _torch_tensorrt_logging_py:
+
 torch_tensorrt.logging
 ----------------------
 

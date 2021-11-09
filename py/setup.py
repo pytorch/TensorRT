@@ -22,7 +22,7 @@ CXX11_ABI = False
 
 JETPACK_VERSION = None
 
-__version__ = '1.0.0a0'
+__version__ = '1.0.0'
 
 
 def get_git_revision_short_hash() -> str:
@@ -181,9 +181,13 @@ class BdistCommand(bdist_wheel):
 
 class CleanCommand(Command):
     """Custom clean command to tidy up the project root."""
-    PY_CLEAN_FILES = [
+    PY_CLEAN_DIRS = [
         './build', './dist', './torch_tensorrt/__pycache__', './torch_tensorrt/lib', './torch_tensorrt/include',
-        './torch_tensorrt/bin', './*.pyc', './*.tgz', './*.egg-info'
+        './torch_tensorrt/bin', './*.pyc', './*.tgz', './*.egg-info',
+    ]
+    PY_CLEAN_FILES = [
+        './torch_tensorrt/*.so', './torch_tensorrt/_version.py',
+        './torch_tensorrt/BUILD', './torch_tensorrt/WORKSPACE', './torch_tensorrt/LICENSE'
     ]
     description = "Command to tidy up the project root"
     user_options = []
@@ -195,7 +199,7 @@ class CleanCommand(Command):
         pass
 
     def run(self):
-        for path_spec in self.PY_CLEAN_FILES:
+        for path_spec in self.PY_CLEAN_DIRS:
             # Make paths absolute and relative to this path
             abs_paths = glob.glob(os.path.normpath(os.path.join(dir_path, path_spec)))
             for path in [str(p) for p in abs_paths]:
@@ -204,6 +208,17 @@ class CleanCommand(Command):
                     raise ValueError("%s is not a path inside %s" % (path, dir_path))
                 print('Removing %s' % os.path.relpath(path))
                 rmtree(path)
+
+        for path_spec in self.PY_CLEAN_FILES:
+            # Make paths absolute and relative to this path
+            abs_paths = glob.glob(os.path.normpath(os.path.join(dir_path, path_spec)))
+            for path in [str(p) for p in abs_paths]:
+                if not path.startswith(dir_path):
+                    # Die if path in CLEAN_FILES is absolute + outside this directory
+                    raise ValueError("%s is not a path inside %s" % (path, dir_path))
+                print('Removing %s' % os.path.relpath(path))
+                os.remove(path)
+
 
 
 ext_modules = [
@@ -249,7 +264,7 @@ setup(
     long_description=long_description,
     ext_modules=ext_modules,
     install_requires=[
-        'torch>=1.10.0<1.11.0',
+        'torch>=1.10.0+cu113<1.11.0',
     ],
     setup_requires=[],
     cmdclass={

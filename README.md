@@ -12,14 +12,25 @@ More Information / System Architecture:
 
 
 
-## Building a docker container for Torch-TensorRT Preview
+## Building a docker container for Torch-TensorRT
 
-We provide a `Dockerfile` in `docker/` directory. We build `Torch-TensorRT` on top of a `Pytorch NGC container` which provide basic dependencies (like CUDA, CUDNN, CUBLAS, TensorRT, Pytorch and others) The dependency libraries in the container can be found in the <a href="https://docs.nvidia.com/deeplearning/frameworks/pytorch-release-notes/index.html">release notes</a>.
+We provide a `Dockerfile` in `docker/` directory. It expects a PyTorch NGC container as a base but can easily be modified to build on top of any container that provides, PyTorch, CUDA, cuDNN and TensorRT. The dependency libraries in the container can be found in the <a href="https://docs.nvidia.com/deeplearning/frameworks/pytorch-release-notes/index.html">release notes</a>.
 
 Please follow this instruction to build a Docker container.
 
 ```bash
-docker build -f docker/Dockerfile -t torch_tensorrt_preview:latest .
+docker build --build-arg BASE=<CONTAINER VERSION e.g. 21.11> -f docker/Dockerfile -t torch_tensorrt:latest .
+```
+
+In the case of building on top of a custom base container, you first must determine the
+version of the PyTorch C++ ABI. If your source of PyTorch is pytorch.org, likely this is the pre-cxx11-abi in which case you must modify `//docker/dist-build.sh` to not build the
+C++11 ABI version of Torch-TensorRT.
+
+You can then build the container using:
+
+
+```bash
+docker build --build-arg BASE_IMG=<IMAGE> -f docker/Dockerfile -t torch_tensorrt:latest .
 ```
 
 If you would like to build outside a docker container, please follow the section [Compiling Torch-TensorRT](#compiling-torch-tensorrt)
@@ -86,8 +97,9 @@ torch.jit.save(trt_ts_module, "trt_torchscript_module.ts") # save the TRT embedd
 | Linux aarch64 / DLA | **Native Compilation Supported on JetPack-4.4+** |
 | Windows / GPU       | **Unofficial Support**                           |
 | Linux ppc64le / GPU | -                                                |
+| NGC Containers      | **Including in PyTorch NGC Containers 21.11+**   |
 
-Torch-TensorRT will be included in NVIDIA NGC containers (https://ngc.nvidia.com/catalog/containers/nvidia:pytorch) starting in 21.11.
+> Torch-TensorRT will be included in NVIDIA NGC containers (https://ngc.nvidia.com/catalog/containers/nvidia:pytorch) starting in 21.11.
 
 > Note: Refer NVIDIA NGC container(https://ngc.nvidia.com/catalog/containers/nvidia:l4t-pytorch) for PyTorch libraries on JetPack.
 
@@ -95,9 +107,9 @@ Torch-TensorRT will be included in NVIDIA NGC containers (https://ngc.nvidia.com
 
 These are the following dependencies used to verify the testcases. Torch-TensorRT can work with other versions, but the tests are not guaranteed to pass.
 
-- Bazel 4.0.0
+- Bazel 4.2.1
 - Libtorch 1.10.0 (built with CUDA 11.3)
-- CUDA 11.1 (10.2 on Jetson)
+- CUDA 11.3 (10.2 on Jetson)
 - cuDNN 8.2
 - TensorRT 8.0.3.4 (TensorRT 8.0.1.6 on Jetson)
 
@@ -147,7 +159,7 @@ bazel build //:libtorchtrt --compilation_mode opt --distdir third_party/dist_dir
 
 #### 2. Building using locally installed cuDNN & TensorRT
 
-> If you find bugs and you compiled using this method please disclose it in the issue
+> If you find bugs and you compiled using this method please disclose you used this method in the issue
 > (an `ldd` dump would be nice too)
 
 1. Install TensorRT, CUDA and cuDNN on the system before starting to compile.
