@@ -576,4 +576,220 @@ Signed-off-by: Naren Dasan <narens@nvidia.com>
 * Move some lowering passes to graph level logging ([0266f41](https://github.com/NVIDIA/TRTorch/commit/0266f41))
 * **//py:** Fix trtorch.Device alternate contructor options ([ac26841](https://github.com/NVIDIA/TRTorch/commit/ac26841))
 
+# 1.0.0 (2021-11-09)
+
+
+### Bug Fixes
+
+* aten::gelu call was wrong in test ([40bc4e3](https://github.com/NVIDIA/TRTorch/commit/40bc4e3))
+* Fix a core partitioning algo bug where non-tensor input segments are not updated correctly ([cc10876](https://github.com/NVIDIA/TRTorch/commit/cc10876))
+* Fix modules_as_engines test case to use trt_mod instead of pyt_mod ([282e98a](https://github.com/NVIDIA/TRTorch/commit/282e98a))
+* Fix plugin registration macro ([8afab22](https://github.com/NVIDIA/TRTorch/commit/8afab22))
+* Fix python API tests for mobilenet v2 ([e5a38ff](https://github.com/NVIDIA/TRTorch/commit/e5a38ff))
+* Partial compilation translation to internal settings was incorrect ([648bad3](https://github.com/NVIDIA/TRTorch/commit/648bad3))
+* **//py:** Don't crash harshly on import when CUDA is not available ([07e16fd](https://github.com/NVIDIA/TRTorch/commit/07e16fd))
+* Renable backtrace and make it less repetitive ([1435845](https://github.com/NVIDIA/TRTorch/commit/1435845))
+* **//core/lowering:** Fixes module level fallback recursion ([f94ae8f](https://github.com/NVIDIA/TRTorch/commit/f94ae8f))
+* **//core/partitioing:** Fixing support for paritally compiling ([748ecf3](https://github.com/NVIDIA/TRTorch/commit/748ecf3))
+* **//docker:** Update docker container build script to use release path ([9982855](https://github.com/NVIDIA/TRTorch/commit/9982855))
+* **//py:** Add new dirs to remove during clean ([d2cc1e9](https://github.com/NVIDIA/TRTorch/commit/d2cc1e9))
+* **//py:** Fix some api import issues ([840ca89](https://github.com/NVIDIA/TRTorch/commit/840ca89))
+* **//py:** Fix trtorch.Device alternate contructor options ([fa08311](https://github.com/NVIDIA/TRTorch/commit/fa08311))
+* **//py:** Fix trtorch.Device alternate contructor options ([ac26841](https://github.com/NVIDIA/TRTorch/commit/ac26841))
+* Update notebooks with new library name Torch-TensorRT ([8274fd9](https://github.com/NVIDIA/TRTorch/commit/8274fd9))
+* **aten::conv1d:** Update namespace, fix typo in dest IR for conv1d ([d53f136](https://github.com/NVIDIA/TRTorch/commit/d53f136))
+* **eval:** Rollback 1.11a0 change + namespace issues ([ba743f5](https://github.com/NVIDIA/TRTorch/commit/ba743f5))
+* Use scripting instead of tracing for module fallback tests ([32e8b53](https://github.com/NVIDIA/TRTorch/commit/32e8b53))
+* Workspace defaults for other apis and centralize cuda api use ([930321e](https://github.com/NVIDIA/TRTorch/commit/930321e))
+
+
+### Features
+
+* Add functionality for tests to use precompiled libraries ([b5c324a](https://github.com/NVIDIA/TRTorch/commit/b5c324a))
+* Add QAT patch which modifies scale factor dtype to INT32 ([4a10673](https://github.com/NVIDIA/TRTorch/commit/4a10673))
+* Add TF32 override flag in bazelrc for CI-Testing ([7a0c9a5](https://github.com/NVIDIA/TRTorch/commit/7a0c9a5))
+* Add VGG QAT sample notebook which demonstrates end-end workflow for QAT models ([8bf6dd6](https://github.com/NVIDIA/TRTorch/commit/8bf6dd6))
+* Augment python package to include bin, lib, include directories ([ddc0685](https://github.com/NVIDIA/TRTorch/commit/ddc0685))
+* handle scalar type of size [] in shape_analysis ([fca53ce](https://github.com/NVIDIA/TRTorch/commit/fca53ce))
+* support aten::__and__.bool evaluator ([6d73e43](https://github.com/NVIDIA/TRTorch/commit/6d73e43))
+* support aten::conv1d and aten::conv_transpose1d ([c8dc6e9](https://github.com/NVIDIA/TRTorch/commit/c8dc6e9))
+* support aten::eq.str evaluator ([5643972](https://github.com/NVIDIA/TRTorch/commit/5643972))
+* support setting input types of subgraph in fallback, handle Tensor type in evaluated_value_map branch in MarkOutputs ([4778b2b](https://github.com/NVIDIA/TRTorch/commit/4778b2b))
+* support truncate_long_and_double in fallback subgraph input type ([0bc3c05](https://github.com/NVIDIA/TRTorch/commit/0bc3c05))
+* Update documentation with new library name Torch-TensorRT ([e5f96d9](https://github.com/NVIDIA/TRTorch/commit/e5f96d9))
+* Updating the pre_built to prebuilt ([51412c7](https://github.com/NVIDIA/TRTorch/commit/51412c7))
+* **//:libtrtorch:** Ship a WORKSPACE file and BUILD file with the ([7ac6f1c](https://github.com/NVIDIA/TRTorch/commit/7ac6f1c))
+* **//core/partitioning:** Improved logging and code org for the ([8927e77](https://github.com/NVIDIA/TRTorch/commit/8927e77))
+* **//cpp:** Adding example tensors as a way to set input spec ([70a7bb3](https://github.com/NVIDIA/TRTorch/commit/70a7bb3))
+* **//py:** Add the git revision to non release builds ([4a0a918](https://github.com/NVIDIA/TRTorch/commit/4a0a918))
+* **//py:** Allow example tensors from torch to set shape ([01d525d](https://github.com/NVIDIA/TRTorch/commit/01d525d))
+
+
+* feat!: Changing the default behavior for selecting the input type ([a234335](https://github.com/NVIDIA/TRTorch/commit/a234335))
+* refactor!: Removing deprecated InputRange, op_precision and input_shapes ([621bc67](https://github.com/NVIDIA/TRTorch/commit/621bc67))
+* feat(//py)!: Porting forward the API to use kwargs ([17e0e8a](https://github.com/NVIDIA/TRTorch/commit/17e0e8a))
+* refactor(//py)!: Kwargs updates and support for shifting internal apis ([2a0d1c8](https://github.com/NVIDIA/TRTorch/commit/2a0d1c8))
+* refactor!(//cpp): Inlining partial compilation settings since the ([19ecc64](https://github.com/NVIDIA/TRTorch/commit/19ecc64))
+* refactor! : Update default workspace size based on platforms. ([391a4c0](https://github.com/NVIDIA/TRTorch/commit/391a4c0))
+* feat!: Turning on partial compilation by default ([52e2f05](https://github.com/NVIDIA/TRTorch/commit/52e2f05))
+* refactor!: API level rename ([483ef59](https://github.com/NVIDIA/TRTorch/commit/483ef59))
+* refactor!: Changing the C++ api to be snake case ([f34e230](https://github.com/NVIDIA/TRTorch/commit/f34e230))
+* refactor! : Update Pytorch version to 1.10 ([cc7d0b7](https://github.com/NVIDIA/TRTorch/commit/cc7d0b7))
+* refactor!: Updating bazel version for py build container ([06533fe](https://github.com/NVIDIA/TRTorch/commit/06533fe))
+
+
+### BREAKING CHANGES
+
+* This removes the InputRange Class and op_precision and
+input shape fields which were deprecated in TRTorch v0.4.0
+
+Signed-off-by: Naren Dasan <naren@narendasan.com>
+Signed-off-by: Naren Dasan <narens@nvidia.com>
+* This change updates the bazel version
+to build Torch-TensorRT to 4.2.1.
+
+This was done since the only version of bazel available
+in our build container for python apis is 4.2.1
+
+Signed-off-by: Naren Dasan <naren@narendasan.com>
+Signed-off-by: Naren Dasan <narens@nvidia.com>
+* This changes the API for compile settings
+from a dictionary of settings to a set of kwargs for the various
+compilation functions. This will break existing code. However
+there is simple guidance to port forward your code:
+
+Given a dict of valid TRTorch CompileSpec settings
+
+```py
+spec = {
+	"inputs": ...
+	...
+}
+```
+
+You can use this same dict with the new APIs by changing your code from:
+
+```py
+trtorch.compile(mod, spec)
+```
+
+to:
+
+```py
+trtorch.compile(mod, **spec)
+```
+which will unpack the dictionary as arguments to the function
+
+Signed-off-by: Naren Dasan <naren@narendasan.com>
+Signed-off-by: Naren Dasan <narens@nvidia.com>
+* This commit changes the APIs from a dictionary of
+arguements to a set of kwargs. You can port forward using
+
+```py
+trtorch.compile(mod, **spec)
+```
+
+Also in preparation for partial compilation to be enabled by default
+settings related to torch fallback have been moved to the top level
+
+instead of
+
+```py
+"torch_fallback": {
+  "enabled": True,
+  "min_block_size" " 3,
+  "forced_fallback_ops" : ["aten::add"],
+  "forced_fallback_mods" : ["MySubModule"]
+}
+```
+
+now there are new settings
+
+```py
+require_full_compilation=False,
+min_block_size=3,
+torch_executed_ops=["aten::add"],
+torch_executed_modules=["MySubModule"]
+```
+
+Signed-off-by: Naren Dasan <naren@narendasan.com>
+Signed-off-by: Naren Dasan <narens@nvidia.com>
+* This commit changes the API for automatic fallback
+to inline settings regarding partial compilation in preparation
+for it to be turned on by default
+
+Now in the compile spec instead of a `torch_fallback` field with its
+associated struct, there are four new fields in the compile spec
+
+```c++
+bool require_full_compilation = true;
+uint64_t min_block_size = 3;
+std::vector<std::string> torch_executed_ops = {};
+std::vector<std::string> torch_executed_modules = {};
+```
+
+Signed-off-by: Naren Dasan <naren@narendasan.com>
+Signed-off-by: Naren Dasan <narens@nvidia.com>
+* This commit sets the default workspace size to 1GB for GPU platforms and 256MB for Jetson Nano/TX1 platforms whose compute capability is < 6.
+
+Signed-off-by: Dheeraj Peri <peri.dheeraj@gmail.com>
+
+Signed-off-by: Dheeraj Peri <peri.dheeraj@gmail.com>
+
+Signed-off-by: Dheeraj Peri <peri.dheeraj@gmail.com>
+
+Signed-off-by: Dheeraj Peri <peri.dheeraj@gmail.com>
+
+Signed-off-by: Dheeraj Peri <peri.dheeraj@gmail.com>
+* This commit turns on partial compilation
+by default. Unsupported modules will attempt to be
+run partially in PyTorch and partially in TensorRT
+
+Signed-off-by: Naren Dasan <naren@narendasan.com>
+Signed-off-by: Naren Dasan <narens@nvidia.com>
+* This commit renames the namespaces of all
+TRTorch/Torch-TensorRT APIs. Now torchscript specific functions
+are segregated into their own torch_tensorrt::torchscript /
+torch_tensorrt.ts namespaces. Generic utils will remain in the
+torch_tensorrt namespace. Guidance on how to port forward will follow in
+the next commits
+* This changes the C++ API ::ts
+APIs to be snake case and for CompileModules to
+become just compile
+
+Signed-off-by: Naren Dasan <narens@nvidia.com>
+Signed-off-by: Naren Dasan <naren@narendasan.com>
+* This commit updates the pytorch version to 1.10. To use python API of torch_tensorrt, please upgrade your local pytorch to 1.10 to avoid ABI incompatibility errors. WORKSPACE and requirements files are updated accordingly
+
+Signed-off-by: Dheeraj Peri <peri.dheeraj@gmail.com>
+
+Signed-off-by: Dheeraj Peri <peri.dheeraj@gmail.com>
+* This commit changes the default behavior of
+the compiler where if the user does not specify an input data
+type explicity instead of using the enabled precision, now
+the compiler will inspect the model provided to infer the
+data type for the input that will not cause an error if
+the model was run in torch. In practice this means
+
+- If the weights are in FP32 for the first tensor calculation
+  then default input type is FP32
+- If the weights are in FP16 for the first tensor calculation
+  then default input type is FP16
+- etc.
+
+If the data type cannot be determined the compiler will
+default to FP32.
+
+This calculation is done per input tensor so if one input
+is inferred to use FP32 and another INT32 then the expected
+types will be the same (FP32, INT32)
+
+As was the same before if the user defines the data type
+explicitly or provides an example tensor the data type
+specified there will be respected
+
+Signed-off-by: Naren Dasan <naren@narendasan.com>
+Signed-off-by: Naren Dasan <narens@nvidia.com>
+
+
 

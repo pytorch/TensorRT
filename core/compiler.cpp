@@ -25,7 +25,7 @@
 #include "core/partitioning/partitioning.h"
 #include "core/runtime/runtime.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 
 void AddEngineToGraph(
@@ -297,46 +297,48 @@ void MapInputsAndDetermineDTypes(
   cfg.convert_info.inputs = std::move(ir::associate_specs_with_inputs(g, cfg.inputs, static_params));
 
   for (auto& in : g->inputs()) {
-    auto est_type_opt = first_use_type_map.find(in)->second;
-    ir::Input& spec = cfg.convert_info.inputs.find(in)->second;
-    if (est_type_opt && !spec.dtype_is_user_defined) {
-      // If we can calculate the type from the graph and the type was not defined by the user then use the calculated
-      // type
-      LOG_INFO(
-          "Since input type is not explicitly defined, infering using first tensor calculation\n  Found input "
-          << in->debugName() << " has type " << est_type_opt.value()
-          << ". If this is incorrect explicitly set dtype for input and file a bug");
-      spec.dtype = util::ScalarTypeToTRTDataType(est_type_opt.value());
-    } else if (!est_type_opt && !spec.dtype_is_user_defined) {
-      // If we cannot calculate the type and the user did not define the type, then default to FP32
-      LOG_WARNING(
-          "Cannot infer input type from calcuations in graph for input "
-          << in->debugName() << ". Assuming it is Float32. If not, specify input type explicity");
-      spec.dtype = nvinfer1::DataType::kFLOAT;
-    } else if (spec.dtype_is_user_defined && cfg.partition_info.enabled) {
-      if (!est_type_opt) {
-        LOG_INFO("Cannot infer input tensor dtype in graph, unable to verify user input dtype settings");
-      } else {
-        if (util::TRTDataTypeToScalarType(cfg.convert_info.inputs.find(in)->second.dtype) != est_type_opt.value()) {
-          std::stringstream ss;
-          ss << "For input " << in->debugName() << ", found user specified input dtype as ";
-          ss << cfg.convert_info.inputs.find(in)->second.dtype;
-          ss << ", however when inspecting the graph, the input type expected was inferred to be ";
-          ss << est_type_opt.value() << std::endl;
-          ss << "The compiler is going to use the user setting " << cfg.convert_info.inputs.find(in)->second.dtype;
-          ss << "\nThis conflict may cause an error at runtime due to partial compilation being enabled and therefore\n";
-          ss << "compatibility with PyTorch's data type convention is required.\n";
-          ss << "If you do indeed see errors at runtime either:\n";
-          ss << "- Remove the dtype spec for " << in->debugName() << std::endl;
-          ss << "- Disable partial compilation by setting require_full_compilation to True";
-          auto warn_str = ss.str();
-          LOG_WARNING(warn_str);
-          // Overwrite type map with user settings
-          first_use_type_map[in] = {util::TRTDataTypeToScalarType(cfg.convert_info.inputs.find(in)->second.dtype)};
+    if (static_params.find(in) == static_params.end()) {
+      ir::Input& spec = cfg.convert_info.inputs.find(in)->second;
+      auto est_type_opt = first_use_type_map.find(in)->second;
+      if (est_type_opt && !spec.dtype_is_user_defined) {
+        // If we can calculate the type from the graph and the type was not defined by the user then use the calculated
+        // type
+        LOG_INFO(
+            "Since input type is not explicitly defined, infering using first tensor calculation\n  Found input "
+            << in->debugName() << " has type " << est_type_opt.value()
+            << ". If this is incorrect explicitly set dtype for input and file a bug");
+        spec.dtype = util::ScalarTypeToTRTDataType(est_type_opt.value());
+      } else if (!est_type_opt && !spec.dtype_is_user_defined) {
+        // If we cannot calculate the type and the user did not define the type, then default to FP32
+        LOG_WARNING(
+            "Cannot infer input type from calcuations in graph for input "
+            << in->debugName() << ". Assuming it is Float32. If not, specify input type explicity");
+        spec.dtype = nvinfer1::DataType::kFLOAT;
+      } else if (spec.dtype_is_user_defined && cfg.partition_info.enabled) {
+        if (!est_type_opt) {
+          LOG_INFO("Cannot infer input tensor dtype in graph, unable to verify user input dtype settings");
+        } else {
+          if (util::TRTDataTypeToScalarType(cfg.convert_info.inputs.find(in)->second.dtype) != est_type_opt.value()) {
+            std::stringstream ss;
+            ss << "For input " << in->debugName() << ", found user specified input dtype as ";
+            ss << cfg.convert_info.inputs.find(in)->second.dtype;
+            ss << ", however when inspecting the graph, the input type expected was inferred to be ";
+            ss << est_type_opt.value() << std::endl;
+            ss << "The compiler is going to use the user setting " << cfg.convert_info.inputs.find(in)->second.dtype;
+            ss << "\nThis conflict may cause an error at runtime due to partial compilation being enabled and therefore\n";
+            ss << "compatibility with PyTorch's data type convention is required.\n";
+            ss << "If you do indeed see errors at runtime either:\n";
+            ss << "- Remove the dtype spec for " << in->debugName() << std::endl;
+            ss << "- Disable partial compilation by setting require_full_compilation to True";
+            auto warn_str = ss.str();
+            LOG_WARNING(warn_str);
+            // Overwrite type map with user settings
+            first_use_type_map[in] = {util::TRTDataTypeToScalarType(cfg.convert_info.inputs.find(in)->second.dtype)};
+          }
         }
+      } else {
+        // The user defined the type so no changes are necessary
       }
-    } else {
-      // The user defined the type so no changes are necessary
     }
   }
 }
@@ -354,7 +356,7 @@ std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::
   auto graph_and_parameters = lowering::Lower(mod, method_name, cfg.lower_info);
 
   auto g = graph_and_parameters.first;
-  TRTORCH_CHECK(
+  TORCHTRT_CHECK(
       conversion::VerifyConverterSupportForBlock(g->block()),
       "Not all operations in graph are supported by the compiler");
   auto params = graph_and_parameters.second;
@@ -375,7 +377,7 @@ std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::
 
   auto engine = conversion::ConvertBlockToEngine(g->block(), cfg.convert_info, static_params);
 
-  return std::move(engine);
+  return engine;
 }
 
 torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) {
@@ -427,7 +429,7 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
           return mod;
         }
       } else {
-        TRTORCH_CHECK(
+        TORCHTRT_CHECK(
             conversion::VerifyConverterSupportForBlock(g->block()),
             "Not all operations in graph are supported by the compiler");
         auto engine = conversion::ConvertBlockToEngine(g->block(), cfg.convert_info, static_params);
@@ -457,8 +459,8 @@ torch::jit::script::Module EmbedEngineInNewModule(const std::string& engine, run
 }
 
 void set_device(const int gpu_id) {
-  TRTORCH_ASSERT(cudaSetDevice(gpu_id) == cudaSuccess, "Unable to set CUDA device: " << gpu_id);
+  TORCHTRT_ASSERT(cudaSetDevice(gpu_id) == cudaSuccess, "Unable to set CUDA device: " << gpu_id);
 }
 
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

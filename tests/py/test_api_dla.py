@@ -1,5 +1,5 @@
 import unittest
-import trtorch
+import torch_tensorrt as torchtrt
 import torch
 import torchvision.models as models
 
@@ -30,9 +30,9 @@ class TestCompile(ModelTestCaseOnDLA):
 
     def test_compile_traced(self):
         compile_spec = {
-            "inputs": [trtorch.Input(self.input.shape)],
+            "inputs": [torchtrt.Input(self.input.shape)],
             "device": {
-                "device_type": trtorch.DeviceType.DLA,
+                "device_type": torchtrt.DeviceType.DLA,
                 "gpu_id": 0,
                 "dla_core": 0,
                 "allow_gpu_fallback": True
@@ -40,15 +40,15 @@ class TestCompile(ModelTestCaseOnDLA):
             "enabled_precisions": {torch.half}
         }
 
-        trt_mod = trtorch.compile(self.traced_model, **compile_spec)
+        trt_mod = torchtrt.ts.compile(self.traced_model, **compile_spec)
         same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
         self.assertTrue(same < 2e-2)
 
     def test_compile_script(self):
         compile_spec = {
-            "inputs": [trtorch.Input(self.input.shape)],
+            "inputs": [torchtrt.Input(self.input.shape)],
             "device": {
-                "device_type": trtorch.DeviceType.DLA,
+                "device_type": torchtrt.DeviceType.DLA,
                 "gpu_id": 0,
                 "dla_core": 0,
                 "allow_gpu_fallback": True
@@ -56,7 +56,7 @@ class TestCompile(ModelTestCaseOnDLA):
             "enabled_precisions": {torch.half}
         }
 
-        trt_mod = trtorch.compile(self.scripted_model, **compile_spec)
+        trt_mod = torchtrt.ts.compile(self.scripted_model, **compile_spec)
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
         self.assertTrue(same < 2e-2)
 

@@ -1,7 +1,7 @@
 #include "cpp_api_test.h"
 
-std::vector<trtorch::CompileSpec::Input> toInputRangesDynamic(std::vector<std::vector<int64_t>> opts) {
-  std::vector<trtorch::CompileSpec::Input> a;
+std::vector<torch_tensorrt::Input> toInputRangesDynamic(std::vector<std::vector<int64_t>> opts) {
+  std::vector<torch_tensorrt::Input> a;
 
   for (auto opt : opts) {
     std::vector<int64_t> min_range(opt);
@@ -12,7 +12,7 @@ std::vector<trtorch::CompileSpec::Input> toInputRangesDynamic(std::vector<std::v
     min_range[2] = ceil(opt[2] / 2.0);
     max_range[2] = 2 * opt[2];
 
-    a.push_back(trtorch::CompileSpec::Input(min_range, opt, max_range));
+    a.push_back(torch_tensorrt::Input(min_range, opt, max_range));
   }
 
   return std::move(a);
@@ -27,9 +27,9 @@ TEST_P(CppAPITests, SerializedModuleIsStillCorrect) {
     pre_serialized_inputs_ivalues.push_back(in.clone());
   }
 
-  auto pre_serialized_mod = trtorch::CompileGraph(mod, input_shapes);
+  auto pre_serialized_mod = torch_tensorrt::ts::compile(mod, input_shapes);
   torch::jit::IValue pre_serialized_results_ivalues =
-      trtorch::tests::util::RunModuleForward(pre_serialized_mod, pre_serialized_inputs_ivalues);
+      torch_tensorrt::tests::util::RunModuleForward(pre_serialized_mod, pre_serialized_inputs_ivalues);
   std::vector<at::Tensor> pre_serialized_results;
   pre_serialized_results.push_back(pre_serialized_results_ivalues.toTensor());
 
@@ -37,12 +37,12 @@ TEST_P(CppAPITests, SerializedModuleIsStillCorrect) {
   auto post_serialized_mod = torch::jit::load("test_serialization_mod.ts");
 
   torch::jit::IValue post_serialized_results_ivalues =
-      trtorch::tests::util::RunModuleForward(post_serialized_mod, post_serialized_inputs_ivalues);
+      torch_tensorrt::tests::util::RunModuleForward(post_serialized_mod, post_serialized_inputs_ivalues);
   std::vector<at::Tensor> post_serialized_results;
   post_serialized_results.push_back(post_serialized_results_ivalues.toTensor());
 
   for (size_t i = 0; i < pre_serialized_results.size(); i++) {
-    ASSERT_TRUE(trtorch::tests::util::almostEqual(
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(
         post_serialized_results[i], pre_serialized_results[i].reshape_as(post_serialized_results[i]), threshold));
   }
 }
@@ -56,9 +56,10 @@ TEST_P(CppAPITests, SerializedDynamicModuleIsStillCorrect) {
     pre_serialized_inputs_ivalues.push_back(in.clone());
   }
 
-  auto pre_serialized_mod = trtorch::CompileGraph(mod, trtorch::CompileSpec(toInputRangesDynamic(input_shapes)));
+  auto pre_serialized_mod =
+      torch_tensorrt::ts::compile(mod, torch_tensorrt::ts::CompileSpec(toInputRangesDynamic(input_shapes)));
   torch::jit::IValue pre_serialized_results_ivalues =
-      trtorch::tests::util::RunModuleForward(pre_serialized_mod, pre_serialized_inputs_ivalues);
+      torch_tensorrt::tests::util::RunModuleForward(pre_serialized_mod, pre_serialized_inputs_ivalues);
   std::vector<at::Tensor> pre_serialized_results;
   pre_serialized_results.push_back(pre_serialized_results_ivalues.toTensor());
 
@@ -66,12 +67,12 @@ TEST_P(CppAPITests, SerializedDynamicModuleIsStillCorrect) {
   auto post_serialized_mod = torch::jit::load("test_serialization_mod.ts");
 
   torch::jit::IValue post_serialized_results_ivalues =
-      trtorch::tests::util::RunModuleForward(post_serialized_mod, post_serialized_inputs_ivalues);
+      torch_tensorrt::tests::util::RunModuleForward(post_serialized_mod, post_serialized_inputs_ivalues);
   std::vector<at::Tensor> post_serialized_results;
   post_serialized_results.push_back(post_serialized_results_ivalues.toTensor());
 
   for (size_t i = 0; i < pre_serialized_results.size(); i++) {
-    ASSERT_TRUE(trtorch::tests::util::almostEqual(
+    ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(
         post_serialized_results[i], pre_serialized_results[i].reshape_as(post_serialized_results[i]), threshold));
   }
 }

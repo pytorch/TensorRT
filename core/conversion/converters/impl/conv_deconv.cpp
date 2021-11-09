@@ -3,7 +3,7 @@
 #include "core/util/prelude.h"
 #include "torch/torch.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace converters {
@@ -59,7 +59,7 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
     // Make a new Dims with only the spatial dimensions.
     nvinfer1::Dims filter_dim;
     int64_t nbSpatialDims = in->getDimensions().nbDims - 2;
-    TRTORCH_CHECK(
+    TORCHTRT_CHECK(
         nbSpatialDims = kernel_dims.nbDims - 2,
         "Number of input spatial dimensions should match the kernel spatial dimensions");
     filter_dim.nbDims = nbSpatialDims;
@@ -79,7 +79,7 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
       deconvLayer->setPaddingNd(padding);
       // Set deconv kernel weights
       deconvLayer->setInput(1, *kernel);
-      TRTORCH_CHECK(deconvLayer, "Unable to create deconv layer with non-const weights from node: " << *n);
+      TORCHTRT_CHECK(deconvLayer, "Unable to create deconv layer with non-const weights from node: " << *n);
       layer = deconvLayer;
     } else {
       nvinfer1::IConvolutionLayer* convLayer =
@@ -112,7 +112,7 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
   LOG_DEBUG("out_padding: " << out_padding);
   LOG_DEBUG("groups: " << groups);
 
-  TRTORCH_CHECK(orig_dims.nbDims > 2, "Unable to create convolution layer from node: " << *n);
+  TORCHTRT_CHECK(orig_dims.nbDims > 2, "Unable to create convolution layer from node: " << *n);
 
   bool expandDims = (orig_dims.nbDims < 4);
   if (expandDims) {
@@ -134,7 +134,7 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
   if (transposed) {
     // shape of deconvolution's weight: [in, out/groups, ...]
     auto deconv = ctx->net->addDeconvolutionNd(*in, w.shape.d[1] * groups, w.kernel_shape, w.data, bias.data);
-    TRTORCH_CHECK(deconv, "Unable to create deconvolution layer from node: " << *n);
+    TORCHTRT_CHECK(deconv, "Unable to create deconvolution layer from node: " << *n);
 
     deconv->setStrideNd(stride);
     deconv->setPaddingNd(padding);
@@ -142,16 +142,16 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
     deconv->setDilationNd(dilation);
     deconv->setNbGroups(groups);
 #else
-    TRTORCH_CHECK(groups == 1, "for deconv with groups > 1, require TensorRT version >= 7.1");
+    TORCHTRT_CHECK(groups == 1, "for deconv with groups > 1, require TensorRT version >= 7.1");
     for (int idx = 0; idx < dilation.nbDims; idx++) {
-      TRTORCH_CHECK(dilation.d[idx] == 1, "for deconv with dilation > 1, require TensorRT version >= 7.1");
+      TORCHTRT_CHECK(dilation.d[idx] == 1, "for deconv with dilation > 1, require TensorRT version >= 7.1");
     }
 #endif
     new_layer = deconv;
   } else {
     // shape of convolution's weight: [out, in/groups, ...]
     auto conv = ctx->net->addConvolutionNd(*in, w.shape.d[0], w.kernel_shape, w.data, bias.data);
-    TRTORCH_CHECK(conv, "Unable to create convolution layer from node: " << *n);
+    TORCHTRT_CHECK(conv, "Unable to create convolution layer from node: " << *n);
 
     conv->setStrideNd(stride);
     conv->setPaddingMode(nvinfer1::PaddingMode::kCAFFE_ROUND_DOWN);
@@ -174,31 +174,32 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
   return true;
 }
 
-auto conv_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
-                                             .pattern({
-                                                 R"SIG(aten::_convolution(Tensor input, Tensor weight,
+auto conv_registrations TORCHTRT_UNUSED =
+    RegisterNodeConversionPatterns()
+        .pattern({
+            R"SIG(aten::_convolution(Tensor input, Tensor weight,
                                  Tensor? bias, int[] stride, int[] padding,
                                  int[] dilation, bool transposed,
                                  int[] output_padding, int groups, bool benchmark,
                                  bool deterministic, bool cudnn_enabled, bool allow_tf32) -> (Tensor))SIG",
-                                                 [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                                                   return add_conv_deconv(ctx, n, args);
-                                                 }})
-                                             .pattern({
-                                                 R"SIG(aten::_convolution.deprecated(Tensor input, Tensor weight,
+            [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+              return add_conv_deconv(ctx, n, args);
+            }})
+        .pattern({
+            R"SIG(aten::_convolution.deprecated(Tensor input, Tensor weight,
                                      Tensor? bias, int[] stride, int[] padding,
                                      int[] dilation, bool transposed,
                                      int[] output_padding, int groups, bool benchmark,
                                      bool deterministic, bool cudnn_enabled) -> (Tensor))SIG",
-                                                 [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                                                   // This pattern is only matched for traced JIT models which do not
-                                                   // have allow_tf32 bool in the function signature. The TRT conversion
-                                                   // code is exactly same as the above call.
-                                                   return add_conv_deconv(ctx, n, args);
-                                                 }});
+            [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+              // This pattern is only matched for traced JIT models which do not
+              // have allow_tf32 bool in the function signature. The TRT conversion
+              // code is exactly same as the above call.
+              return add_conv_deconv(ctx, n, args);
+            }});
 } // namespace
 } // namespace impl
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

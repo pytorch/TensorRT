@@ -2,14 +2,14 @@
 
 #include "torch/torch.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace converters {
 namespace impl {
 namespace {
 
-static auto shuffle_registrations TRTORCH_UNUSED =
+static auto shuffle_registrations TORCHTRT_UNUSED =
     RegisterNodeConversionPatterns()
         .pattern(
             {"aten::flatten.using_ints(Tensor self, int start_dim=0, int end_dim=-1) -> (Tensor)",
@@ -30,7 +30,7 @@ static auto shuffle_registrations TRTORCH_UNUSED =
                }
 
                auto shuffle = ctx->net->addShuffle(*in);
-               TRTORCH_CHECK(shuffle, "Unable to create shuffle layer from node: " << *n);
+               TORCHTRT_CHECK(shuffle, "Unable to create shuffle layer from node: " << *n);
                shuffle->setReshapeDimensions(util::toDims(out_shape));
                shuffle->setName(util::node_info(n).c_str());
 
@@ -44,13 +44,13 @@ static auto shuffle_registrations TRTORCH_UNUSED =
                     auto in_shape = util::toVec(in->getDimensions());
                     std::vector<int64_t> new_shape;
                     if (ctx->input_is_dynamic) {
-                      TRTORCH_THROW_ERROR("Resize is currently not support in dynamic input shape compilation");
+                      TORCHTRT_THROW_ERROR("Resize is currently not support in dynamic input shape compilation");
                     } else {
                       new_shape = torch::reshape(torch::rand(in_shape), args[1].unwrapToIntList().vec()).sizes().vec();
                     }
 
                     auto shuffle = ctx->net->addShuffle(*in);
-                    TRTORCH_CHECK(shuffle, "Unable to create shuffle layer from node: " << *n);
+                    TORCHTRT_CHECK(shuffle, "Unable to create shuffle layer from node: " << *n);
                     shuffle->setReshapeDimensions(util::toDims(new_shape));
                     shuffle->setName(util::node_info(n).c_str());
 
@@ -65,7 +65,7 @@ static auto shuffle_registrations TRTORCH_UNUSED =
                     auto in_shape = util::toVec(in->getDimensions());
 
                     auto shuffle = ctx->net->addShuffle(*in);
-                    TRTORCH_CHECK(shuffle, "Unable to create shuffle layer from node: " << *n);
+                    TORCHTRT_CHECK(shuffle, "Unable to create shuffle layer from node: " << *n);
                     shuffle->setReshapeDimensions(util::toDims(args[1].unwrapToIntList().vec()));
                     shuffle->setName(util::node_info(n).c_str());
 
@@ -83,7 +83,7 @@ static auto shuffle_registrations TRTORCH_UNUSED =
                     LOG_DEBUG("Shuffle to: " << util::toDims(new_order));
 
                     auto shuffle = ctx->net->addShuffle(*in);
-                    TRTORCH_CHECK(shuffle, "Unable to create shuffle layer from node: " << *n);
+                    TORCHTRT_CHECK(shuffle, "Unable to create shuffle layer from node: " << *n);
                     nvinfer1::Permutation permute;
                     std::copy(new_order.begin(), new_order.end(), permute.order);
                     shuffle->setSecondTranspose(permute);
@@ -115,7 +115,7 @@ static auto shuffle_registrations TRTORCH_UNUSED =
                     LOG_DEBUG("Shuffle to: " << util::toDims(new_order));
 
                     auto shuffle = ctx->net->addShuffle(*in);
-                    TRTORCH_CHECK(shuffle, "Unable to create shuffle layer from node: " << *n);
+                    TORCHTRT_CHECK(shuffle, "Unable to create shuffle layer from node: " << *n);
                     nvinfer1::Permutation permute;
                     std::copy(new_order.begin(), new_order.end(), permute.order);
 
@@ -140,7 +140,7 @@ static auto shuffle_registrations TRTORCH_UNUSED =
                     }
 
                     auto shuffle_layer = ctx->net->addShuffle(*in);
-                    TRTORCH_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
+                    TORCHTRT_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
                     nvinfer1::Permutation firstPerm;
                     firstPerm.order[0] = 1;
                     firstPerm.order[1] = 0;
@@ -159,12 +159,12 @@ static auto shuffle_registrations TRTORCH_UNUSED =
                     auto self = args[0].ITensorOrFreeze(ctx);
                     auto in_shape = util::toVec(self->getDimensions());
                     int64_t irank = in_shape.size();
-                    TRTORCH_CHECK(
+                    TORCHTRT_CHECK(
                         irank >= 3,
                         "pixel_shuffle expects input to have at least 3 dimensions, but got input with "
                             << irank << " dimension(s)");
                     int64_t upscale_factor = args[1].unwrapToInt();
-                    TRTORCH_CHECK(
+                    TORCHTRT_CHECK(
                         upscale_factor > 0,
                         "pixel_shuffle expects a positive upscale_factor, but got " << upscale_factor);
                     int64_t upscale_factor_squared = upscale_factor * upscale_factor;
@@ -176,7 +176,7 @@ static auto shuffle_registrations TRTORCH_UNUSED =
                     int64_t ih = in_shape[irank - 2];
                     int64_t iw = in_shape[irank - 1];
 
-                    TRTORCH_CHECK(
+                    TORCHTRT_CHECK(
                         ic % upscale_factor_squared == 0,
                         "pixel_shuffle expects its input's 'channel' dimension to be divisible by the square of "
                             << "upscale_factor, but input.size(-3)=" << ic << " is not divisible by "
@@ -192,13 +192,13 @@ static auto shuffle_registrations TRTORCH_UNUSED =
                     std::vector<int64_t> added_dims_shape(in_shape.begin(), self_sizes_batch_end);
                     added_dims_shape.insert(added_dims_shape.end(), {oc, upscale_factor, upscale_factor, ih, iw});
                     auto view_layer = ctx->net->addShuffle(*self);
-                    TRTORCH_CHECK(view_layer, "Unable to create shuffle layer from node: " << *n);
+                    TORCHTRT_CHECK(view_layer, "Unable to create shuffle layer from node: " << *n);
                     view_layer->setReshapeDimensions(util::toDims(added_dims_shape));
                     int64_t view_rank = added_dims_shape.size();
 
                     // Next, shuffle by permuting the new upscale_factor dims alongside the height and width dims.
                     auto permutation_layer = ctx->net->addShuffle(*view_layer->getOutput(0));
-                    TRTORCH_CHECK(permutation_layer, "Unable to create shuffle layer from node: " << *n);
+                    TORCHTRT_CHECK(permutation_layer, "Unable to create shuffle layer from node: " << *n);
                     // std::iota is used to maintain the batch dims within the permutation.
                     // Eg: if added_dims_shape is {n1, n2, c, r, r, h, w}, then the new_order is {view_rank-7,
                     // view_rank-6, view_rank-5, view_rank-2, view_rank-4, view_rank-1, view_rank-3}
@@ -220,7 +220,7 @@ static auto shuffle_registrations TRTORCH_UNUSED =
                     std::vector<int64_t> final_shape(in_shape.begin(), self_sizes_batch_end);
                     final_shape.insert(final_shape.end(), {oc, oh, ow});
                     auto last_view_layer = ctx->net->addShuffle(*permutation_layer->getOutput(0));
-                    TRTORCH_CHECK(last_view_layer, "Unable to create shuffle layer from node: " << *n);
+                    TORCHTRT_CHECK(last_view_layer, "Unable to create shuffle layer from node: " << *n);
                     last_view_layer->setReshapeDimensions(util::toDims(final_shape));
                     last_view_layer->setName(util::node_info(n).c_str());
 
@@ -235,4 +235,4 @@ static auto shuffle_registrations TRTORCH_UNUSED =
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

@@ -8,9 +8,11 @@
 #include "core/util/prelude.h"
 
 #include "c10/util/intrusive_ptr.h"
+#include "core/conversion/converters/converter_util.h"
 #include "core/conversion/tensorcontainer/TensorContainer.h"
+#include "core/util/trt_util.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 
@@ -24,7 +26,7 @@ bool OpSupported(const torch::jit::Node* n) {
 c10::optional<torch::jit::IValue> EvaluateNode(ConversionCtx* ctx, const torch::jit::Node* n, int level, int limit) {
   // Check to see if you can just go through and eval all of these AOT (saves
   // the recursion) Also probably a better way to deal with the two error cases;
-  TRTORCH_CHECK(
+  TORCHTRT_CHECK(
       level < limit,
       "Failed to evaluate node: " << *n << "Reason: Exceeded evaluation stack limit (limit=" << limit << ")");
 
@@ -56,9 +58,9 @@ c10::optional<torch::jit::IValue> EvaluateNode(ConversionCtx* ctx, const torch::
         }
       }
     } else {
-      TRTORCH_THROW_ERROR(
+      TORCHTRT_THROW_ERROR(
           "Failed to evaluate node: " << *n << "Reason: Node inputs cannot be evaluated at conversion time\n"
-                                      << "File a bug: https://www.github.com/NVIDIA/TRTorch/issues");
+                                      << "File a bug: https://www.github.com/NVIDIA/Torch-TensorRT/issues");
       return {};
     }
   }
@@ -101,31 +103,31 @@ void AddLayer(ConversionCtx* ctx, const torch::jit::Node* n) {
       }
     } else {
       // Node input has not been converted yet or is a prim op
-      TRTORCH_THROW_ERROR(
+      TORCHTRT_THROW_ERROR(
           "Unable to retrieve all node inputs for node: "
           << util::node_info(n) << " (ctx.AddLayer)\nSpecifically failed to retrieve value for input: " << *input_node);
     }
   }
 
   if (n->inputs().size() != node_args.size()) {
-    TRTORCH_THROW_ERROR("Unable to retrieve all node inputs for node: " << *n);
+    TORCHTRT_THROW_ERROR("Unable to retrieve all node inputs for node: " << *n);
   }
 
   auto schema = n->maybeSchema();
-  TRTORCH_CHECK(schema, "Unable to get schema for Node " << util::node_info(n) << " (conversion.AddLayer)");
+  TORCHTRT_CHECK(schema, "Unable to get schema for Node " << util::node_info(n) << " (conversion.AddLayer)");
 
   auto converter = converters::get_node_converter_for(schema);
-  TRTORCH_CHECK(
+  TORCHTRT_CHECK(
       converter,
       "Unable to convert node: "
           << util::node_info(n) << " (conversion.AddLayer)\nSchema: " << *schema << "\nConverter for " << schema->name()
           << " requested, but no such converter was found.\nIf you need a converter for this operator, you can try implementing one yourself\n"
-          << "or request a converter: https://www.github.com/NVIDIA/TRTorch/issues");
+          << "or request a converter: https://www.github.com/NVIDIA/Torch-TensorRT/issues");
 
-  TRTORCH_CHECK(
+  TORCHTRT_CHECK(
       converter(ctx, n, node_args),
       "Converter for " << *schema << " failed to convert node: " << util::node_info(n)
-                       << "please report this error to https://www.github.com/NVIDIA/TRTorch/issues");
+                       << "please report this error to https://www.github.com/NVIDIA/Torch-TensorRT/issues");
 }
 
 void AddInputs(
@@ -158,7 +160,7 @@ void AddInputs(
 
   for (auto input : input_tensors) {
     const torch::jit::Value* in = input;
-    TRTORCH_CHECK(
+    TORCHTRT_CHECK(
         input_specs.find(in) != input_specs.end(),
         "Cannot find an input spec associated with input: " << in->debugName());
     ir::Input& spec = input_specs.find(in)->second;
@@ -170,7 +172,7 @@ void AddInputs(
                         << " in engine (conversion.AddInputs)");
 
     auto trt_in = ctx->net->addInput(name.c_str(), spec.dtype, spec.input_shape);
-    TRTORCH_CHECK(trt_in, "Failed to add input node: " << in->debugName() << " (conversion.AddInputs)");
+    TORCHTRT_CHECK(trt_in, "Failed to add input node: " << in->debugName() << " (conversion.AddInputs)");
     trt_in->setAllowedFormats(1U << static_cast<int>(spec.format));
 
     profile->setDimensions(trt_in->getName(), nvinfer1::OptProfileSelector::kMIN, spec.min);
@@ -185,7 +187,7 @@ void AddInputs(
     ctx->num_inputs += 1;
   }
 
-  TRTORCH_CHECK(
+  TORCHTRT_CHECK(
       profile->isValid(),
       "Optimization profile is invalid, please check the input range provided (conversion.AddInputs)");
 
@@ -212,8 +214,23 @@ void MarkOutputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> outp
           LOG_INFO(
               ctx->logger, "Marking Output " << out->debugName() << " named " << name << " in engine (ctx.MarkOutput)");
           ctx->num_outputs += 1;
+        } else if (out_ivalue.isTuple()) {
+          TORCHTRT_THROW_ERROR("Tuple type. Only a single tensor or a TensorList type is supported.");
+        } else if (out_ivalue.isList()) {
+          TORCHTRT_THROW_ERROR("List type. Only a single tensor or a TensorList type is supported.");
+        } else if (out_ivalue.isScalar()) {
+          TORCHTRT_THROW_ERROR("Scalar type. Only a single tensor or a TensorList type is supported.");
+        } else if (out_ivalue.isTensor()) {
+          // prim::NumToTensor will go to here
+          std::string name = std::string("output_") + std::to_string(ctx->num_outputs);
+          auto out_tensor = converters::tensor_to_const(ctx, out_ivalue.toTensor(), "");
+          out_tensor->setName(name.c_str());
+          ctx->net->markOutput(*out_tensor);
+          LOG_INFO(
+              ctx->logger, "Marking Output " << out->debugName() << " named " << name << " in engine (ctx.MarkOutput)");
+          ctx->num_outputs += 1;
         } else {
-          TRTORCH_THROW_ERROR("Unknown output type. Only a single tensor or a TensorList type is supported.");
+          TORCHTRT_THROW_ERROR("Unknown output type. Only a single tensor or a TensorList type is supported.");
         }
       }
     } else {
@@ -258,7 +275,7 @@ void MapIValues(
       auto input = ctx->value_tensor_map[p.first];
       ctx->value_tensor_map[p.second] = input;
     } else {
-      TRTORCH_THROW_ERROR(
+      TORCHTRT_THROW_ERROR(
           "Cannot find Value " << p.first->debugName() << " either evaluated values or tensor maps (MapIValues)");
     }
   }
@@ -271,9 +288,9 @@ void EvaluateConditionalBlock(ConversionCtx* ctx, const torch::jit::Node* n, boo
       output_type_includes_tensor = true;
     }
   }
-  TRTORCH_CHECK(
+  TORCHTRT_CHECK(
       !(contained_in_loop && output_type_includes_tensor),
-      "TRTorch currently cannot compile conditionals within loops");
+      "Torch-TensorRT.TorchScript currently cannot compile conditionals within loops");
 
   auto condition = ctx->evaluated_value_map[n->input(0)].toBool();
   LOG_DEBUG(ctx->logger, "(Conditional Evaluation) Evaluating block " << (int)condition);
@@ -301,8 +318,9 @@ void EvaluateConditionalBlock(ConversionCtx* ctx, const torch::jit::Node* n, boo
     } else if (converters::node_is_convertable(bn)) {
       AddLayer(ctx, bn);
     } else {
-      TRTORCH_THROW_ERROR(
-          "TRTorch is unable to compile this conditional, a converter or evaluator is not available for node " << *bn);
+      TORCHTRT_THROW_ERROR(
+          "Torch-TensorRT.TorchScript is unable to compile this conditional, a converter or evaluator is not available for node "
+          << *bn);
     }
   }
 
@@ -332,9 +350,9 @@ void EvaluateLoopBlock(ConversionCtx* ctx, const torch::jit::Node* n) {
       } else if (bn->kind() == torch::jit::prim::If) {
         EvaluateConditionalBlock(ctx, bn, true);
       } else {
-        TRTORCH_CHECK(
+        TORCHTRT_CHECK(
             evaluators::shouldEvalAtConversionTime(bn),
-            "TRTorch currently can only compile loops that are evaluatable at conversion time but node "
+            "Torch-TensorRT.TorchScript currently can only compile loops that are evaluatable at conversion time but node "
                 << *bn << " cannot be evaluated.");
         auto eval = EvaluateNode(ctx, bn);
         if (!eval.value().isTensor()) {
@@ -363,6 +381,7 @@ void ConvertBlockToNetDef(
     ConversionInfo& build_info,
     ir::StaticParams& static_params) {
   LOG_INFO(ctx->logger, "Converting Block");
+  LOG_DEBUG(ctx->logger, *b->owningGraph());
 
   auto inputs = b->inputs();
   AddParamsToCtxValueMap(ctx, static_params);
@@ -383,7 +402,7 @@ void ConvertBlockToNetDef(
         if (n->outputs().size() > 1) { // For ListUnpack scenario
           if (eval.value().isTuple()) {
             auto eval_list = eval.value().toTuple();
-            TRTORCH_CHECK(
+            TORCHTRT_CHECK(
                 eval_list->elements().size() == n->outputs().size(),
                 "Size of evaluated results: " << eval_list->elements().size()
                                               << " and node outputs size: " << n->outputs().size() << " must match.");
@@ -395,7 +414,7 @@ void ConvertBlockToNetDef(
               ctx->AssociateValueAndIValue(n->output(i), eval_output);
             }
           } else {
-            TRTORCH_THROW_ERROR("Unsupported return type for evaluated node");
+            TORCHTRT_THROW_ERROR("Unsupported return type for evaluated node");
           }
         } else if (eval.value().isCustomClass()) {
           auto container = eval.value().toCustomClass<TensorContainer>();
@@ -452,7 +471,7 @@ std::unordered_map<c10::OperatorName, std::string> GetUnsupportedOpsInBlock(cons
   for (const auto n : b->nodes()) {
     if (n->kind() != torch::jit::prim::Loop && n->kind() != torch::jit::prim::If && !OpSupported(n)) {
       auto schema = n->maybeSchema();
-      TRTORCH_CHECK(
+      TORCHTRT_CHECK(
           schema,
           "Unable to get schema for Node " << util::node_info(n) << " (conversion.VerifyCoverterSupportForBlock)");
       std::stringstream ss;
@@ -480,7 +499,7 @@ std::set<std::string> ConvertableOpsInBlock(const torch::jit::Block* b) {
       }
       if (converters::node_is_convertable(n)) {
         auto schema = n->maybeSchema();
-        TRTORCH_CHECK(
+        TORCHTRT_CHECK(
             schema, "Unable to get schema for Node " << util::node_info(n) << " (conversion.CheckForConvertableOps)");
         std::stringstream ss;
         ss << *schema;
@@ -496,46 +515,60 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b, bool suppress_er
 
   if (unsupported_ops.size() != 0) {
     std::stringstream unsupported_msg;
-    unsupported_msg << "Method requested cannot be compiled by TRTorch.\nUnsupported operators listed below:"
-                    << std::endl;
+    unsupported_msg
+        << "Method requested cannot be compiled by Torch-TensorRT.TorchScript.\nUnsupported operators listed below:"
+        << std::endl;
     for (auto s : unsupported_ops) {
       unsupported_msg << "  - " << s.second << std::endl;
     }
     unsupported_msg << "You can either implement converters for these ops in your application or request implementation"
                     << std::endl;
-    unsupported_msg << "https://www.github.com/nvidia/TRTorch/issues" << std::endl;
+    unsupported_msg << "https://www.github.com/nvidia/Torch-TensorRT/issues" << std::endl;
     unsupported_msg << std::endl << "In Module:" << std::endl;
 
-    if (suppress_errors) {
+    if (!suppress_errors) {
       LOG_ERROR(unsupported_msg.str());
     }
 
+    std::unordered_map<std::string, std::unordered_set<std::string>> unsupported_node_locations;
     for (const auto n : b->nodes()) {
       auto schema = n->maybeSchema();
       if (schema) {
         for (const auto& x : unsupported_ops) {
           if (x.first == schema->operator_name()) {
-            if (suppress_errors) {
-              LOG_ERROR(
-                  "Unsupported operator: " << *schema << std::endl
-                                           << trtorch::core::util::GetPyTorchSourceCode(n) << std::endl);
+            auto loc = unsupported_node_locations.find(x.second);
+            if (loc == unsupported_node_locations.end()) {
+              unsupported_node_locations.insert({x.second, {torch_tensorrt::core::util::GetPyTorchSourceCode(n)}});
+            } else {
+              loc->second.insert(torch_tensorrt::core::util::GetPyTorchSourceCode(n));
             }
           }
         }
       }
     }
+
+    for (const auto& type : unsupported_node_locations) {
+      std::stringstream traceback;
+      traceback << "Unsupported operator: " << type.first << std::endl;
+      for (const auto& str : type.second) {
+        traceback << str;
+      }
+      auto tb_str = traceback.str();
+      LOG_ERROR(tb_str);
+    }
+
     return false;
   }
 
   if (ConvertableOpsInBlock(b).size() == 0) {
     std::stringstream unsupported_msg;
     unsupported_msg
-        << "Method requested cannot be compiled by TRTorch.\nThere is no work to be done since the resulting compiled program will contain an engine that is empty."
+        << "Method requested cannot be compiled by Torch-TensorRT.TorchScript.\nThere is no work to be done since the resulting compiled program will contain an engine that is empty."
         << std::endl;
     unsupported_msg
         << "This may be because there are no operators that can be added to the TensorRT graph or all operators have a resolved compile time value."
         << std::endl;
-    if (suppress_errors) {
+    if (!suppress_errors) {
       LOG_ERROR(unsupported_msg.str());
     }
     return false;
@@ -548,4 +581,4 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b, bool suppress_er
 
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

@@ -5,17 +5,17 @@
 #include "core/plugins/plugins.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace plugins {
 namespace impl {
 
-// Main registry for all flavours of plugins (eg: TRT plugins, TRTorch opensourced plugins)
-class TRTorchPluginRegistry {
+// Main registry for all flavours of plugins (eg: TRT plugins, Torch-TensorRT opensourced plugins)
+class TorchTRTPluginRegistry {
  public:
-  TRTorchPluginRegistry() {
-    // register libNvInferPlugins and TRTorch plugins
-    // trtorch_logger logging level is set to kERROR and reset back to kDEBUG.
+  TorchTRTPluginRegistry() {
+    // register libNvInferPlugins and Torch-TensorRT plugins
+    // torch_tensorrt_logger logging level is set to kERROR and reset back to kDEBUG.
     // This is because initLibNvInferPlugins initializes only a subset of plugins and logs them.
     // Plugins outside this subset in TensorRT are not being logged in this. So temporarily we disable this to prevent
     // multiple logging of same plugins. To provide a clear list of all plugins, we iterate through getPluginRegistry()
@@ -41,17 +41,17 @@ class TRTorchPluginRegistry {
   }
 
  public:
-  util::logging::TRTorchLogger plugin_logger = util::logging::TRTorchLogger(
-      "[TRTorch Plugins Context] - ",
+  util::logging::TorchTRTLogger plugin_logger = util::logging::TorchTRTLogger(
+      "[Torch-TensorRT Plugins Context] - ",
       util::logging::get_logger().get_reportable_log_level(),
       util::logging::get_logger().get_is_colored_output_on());
 };
 
 namespace {
-static TRTorchPluginRegistry plugin_registry;
+static TorchTRTPluginRegistry plugin_registry;
 }
 
 } // namespace impl
 } // namespace plugins
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

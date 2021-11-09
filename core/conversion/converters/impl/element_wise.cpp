@@ -3,7 +3,7 @@
 #include "core/conversion/converters/converters.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace converters {
@@ -20,7 +20,7 @@ nvinfer1::ITensor* clamp_util(
   nvinfer1::ITensor* clamp_layer_out = self;
   auto limitTensor = tensor_to_const(ctx, torch::tensor({limit}));
   auto limit_layer = add_elementwise(ctx, op_type, clamp_layer_out, limitTensor, util::node_info(n) + str);
-  TRTORCH_CHECK(limit_layer, "Unable to create elementwise " << str << " layer for node: " << *n);
+  TORCHTRT_CHECK(limit_layer, "Unable to create elementwise " << str << " layer for node: " << *n);
   clamp_layer_out = limit_layer->getOutput(0);
   return clamp_layer_out;
 }
@@ -41,12 +41,12 @@ nvinfer1::ITensor* scalar_to_tensor(ConversionCtx* ctx, at::Scalar s) {
     out = tensor_to_const(ctx, s_t);
   } else {
     out = nullptr;
-    TRTORCH_THROW_ERROR("Unsupported data type for scalar. Found: (" << s.type() << ")");
+    TORCHTRT_THROW_ERROR("Unsupported data type for scalar. Found: (" << s.type() << ")");
   }
   return out;
 }
 
-auto element_wise_registrations TRTORCH_UNUSED =
+auto element_wise_registrations TORCHTRT_UNUSED =
     RegisterNodeConversionPatterns()
         .pattern({"aten::add.Tensor(Tensor self, Tensor other, Scalar alpha=1) -> "
                   "Tensor",
@@ -64,13 +64,13 @@ auto element_wise_registrations TRTORCH_UNUSED =
                           other,
                           alphaTensor,
                           util::node_info(n) + std::string("_AlphaMultiplier"));
-                      TRTORCH_CHECK(scaleLayer, "Unable to create alpha*input layer from node: " << *n);
+                      TORCHTRT_CHECK(scaleLayer, "Unable to create alpha*input layer from node: " << *n);
                       other = scaleLayer->getOutput(0);
                     }
 
                     auto add =
                         add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUM, self, other, util::node_info(n));
-                    TRTORCH_CHECK(add, "Unable to create add layer from node: " << *n);
+                    TORCHTRT_CHECK(add, "Unable to create add layer from node: " << *n);
 
                     add->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], add->getOutput(0));
@@ -93,13 +93,13 @@ auto element_wise_registrations TRTORCH_UNUSED =
                           other,
                           alphaTensor,
                           util::node_info(n) + std::string("_AlphaMultiplier"));
-                      TRTORCH_CHECK(scaleLayer, "Unable to create alpha*input layer from node: " << *n);
+                      TORCHTRT_CHECK(scaleLayer, "Unable to create alpha*input layer from node: " << *n);
                       other = scaleLayer->getOutput(0);
                     }
 
                     auto add =
                         add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUM, self, other, util::node_info(n));
-                    TRTORCH_CHECK(add, "Unable to create add layer from node: " << *n);
+                    TORCHTRT_CHECK(add, "Unable to create add layer from node: " << *n);
 
                     add->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], add->getOutput(0));
@@ -115,7 +115,7 @@ auto element_wise_registrations TRTORCH_UNUSED =
 
                     auto add =
                         add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUM, self, other, util::node_info(n));
-                    TRTORCH_CHECK(add, "Unable to create add layer from node: " << *n);
+                    TORCHTRT_CHECK(add, "Unable to create add layer from node: " << *n);
 
                     add->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], add->getOutput(0));
@@ -133,7 +133,7 @@ auto element_wise_registrations TRTORCH_UNUSED =
                       auto alpha = args[1].unwrapToScalar().to<float>();
                       auto beta = args[2].unwrapToScalar().to<float>();
                       auto clip_layer = ctx->net->addActivation(*self, nvinfer1::ActivationType::kCLIP);
-                      TRTORCH_CHECK(clip_layer, "Unable to create clip layer for node: " << *n);
+                      TORCHTRT_CHECK(clip_layer, "Unable to create clip layer for node: " << *n);
                       clip_layer->setAlpha(alpha);
                       clip_layer->setBeta(beta);
                       clamp_layer_out = clip_layer->getOutput(0);
@@ -193,13 +193,13 @@ auto element_wise_registrations TRTORCH_UNUSED =
                           other,
                           alphaTensor,
                           util::node_info(n) + std::string("_AlphaMultiplier"));
-                      TRTORCH_CHECK(scaleLayer, "Unable to create alpha*input layer from node: " << *n);
+                      TORCHTRT_CHECK(scaleLayer, "Unable to create alpha*input layer from node: " << *n);
                       other = scaleLayer->getOutput(0);
                     }
 
                     auto sub =
                         add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUB, self, other, util::node_info(n));
-                    TRTORCH_CHECK(sub, "Unable to create sub layer from node: " << *n);
+                    TORCHTRT_CHECK(sub, "Unable to create sub layer from node: " << *n);
 
                     sub->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], sub->getOutput(0));
@@ -217,7 +217,7 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     auto scaled_other_tensor = tensor_to_const(ctx, torch::tensor({scaled_val}));
                     auto sub = add_elementwise(
                         ctx, nvinfer1::ElementWiseOperation::kSUB, self, scaled_other_tensor, util::node_info(n));
-                    TRTORCH_CHECK(sub, "Unable to create sub layer from node: " << *n);
+                    TORCHTRT_CHECK(sub, "Unable to create sub layer from node: " << *n);
                     sub->setName(util::node_info(n).c_str());
                     LOG_DEBUG("Output tensor shape: " << sub->getOutput(0)->getDimensions());
                     ctx->AssociateValueAndTensor(n->outputs()[0], sub->getOutput(0));
@@ -240,13 +240,13 @@ auto element_wise_registrations TRTORCH_UNUSED =
                           other,
                           alphaTensor,
                           util::node_info(n) + std::string("_AlphaMultiplier"));
-                      TRTORCH_CHECK(scaleLayer, "Unable to create alpha*input layer from node: " << *n);
+                      TORCHTRT_CHECK(scaleLayer, "Unable to create alpha*input layer from node: " << *n);
                       other = scaleLayer->getOutput(0);
                     }
 
                     auto sub =
                         add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUB, self, other, util::node_info(n));
-                    TRTORCH_CHECK(sub, "Unable to create sub layer from node: " << *n);
+                    TORCHTRT_CHECK(sub, "Unable to create sub layer from node: " << *n);
 
                     sub->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], sub->getOutput(0));
@@ -269,13 +269,13 @@ auto element_wise_registrations TRTORCH_UNUSED =
                           self,
                           alphaTensor,
                           util::node_info(n) + std::string("_AlphaMultiplier"));
-                      TRTORCH_CHECK(scaleLayer, "Unable to create alpha*input layer from node: " << *n);
+                      TORCHTRT_CHECK(scaleLayer, "Unable to create alpha*input layer from node: " << *n);
                       self = scaleLayer->getOutput(0);
                     }
 
                     auto rsub =
                         add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUB, other, self, util::node_info(n));
-                    TRTORCH_CHECK(rsub, "Unable to create rsub layer from node: " << *n);
+                    TORCHTRT_CHECK(rsub, "Unable to create rsub layer from node: " << *n);
 
                     rsub->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], rsub->getOutput(0));
@@ -297,13 +297,13 @@ auto element_wise_registrations TRTORCH_UNUSED =
                           self,
                           alphaTensor,
                           util::node_info(n) + std::string("_AlphaMultiplier"));
-                      TRTORCH_CHECK(scaleLayer, "Unable to create alpha*input layer from node: " << *n);
+                      TORCHTRT_CHECK(scaleLayer, "Unable to create alpha*input layer from node: " << *n);
                       self = scaleLayer->getOutput(0);
                     }
 
                     auto rsub =
                         add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUB, other, self, util::node_info(n));
-                    TRTORCH_CHECK(rsub, "Unable to create rsub layer from node: " << *n);
+                    TORCHTRT_CHECK(rsub, "Unable to create rsub layer from node: " << *n);
 
                     rsub->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], rsub->getOutput(0));
@@ -318,7 +318,7 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     auto div =
                         add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, util::node_info(n));
 
-                    TRTORCH_CHECK(div, "Unable to create div layer from node: " << *n);
+                    TORCHTRT_CHECK(div, "Unable to create div layer from node: " << *n);
 
                     div->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], div->getOutput(0));
@@ -333,7 +333,7 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     auto other = tensor_to_const(ctx, torch::tensor({otherScalar}));
                     auto div =
                         add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, util::node_info(n));
-                    TRTORCH_CHECK(div, "Unable to create div layer from node: " << *n);
+                    TORCHTRT_CHECK(div, "Unable to create div layer from node: " << *n);
 
                     div->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], div->getOutput(0));
@@ -348,7 +348,7 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     auto div =
                         add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, util::node_info(n));
 
-                    TRTORCH_CHECK(div, "Unable to create div layer from node: " << *n);
+                    TORCHTRT_CHECK(div, "Unable to create div layer from node: " << *n);
 
                     div->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], div->getOutput(0));
@@ -363,7 +363,7 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     auto other = tensor_to_const(ctx, torch::tensor({otherScalar}));
                     auto div =
                         add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, util::node_info(n));
-                    TRTORCH_CHECK(div, "Unable to create div layer from node: " << *n);
+                    TORCHTRT_CHECK(div, "Unable to create div layer from node: " << *n);
 
                     div->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], div->getOutput(0));
@@ -377,7 +377,7 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     auto other = args[1].ITensorOrFreeze(ctx);
                     auto mul =
                         add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPROD, self, other, util::node_info(n));
-                    TRTORCH_CHECK(mul, "Unable to create mul layer from node: " << *n);
+                    TORCHTRT_CHECK(mul, "Unable to create mul layer from node: " << *n);
 
                     mul->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], mul->getOutput(0));
@@ -392,7 +392,7 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     auto other = tensor_to_const(ctx, torch::tensor({otherScalar}));
                     auto mul =
                         add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPROD, self, other, util::node_info(n));
-                    TRTORCH_CHECK(mul, "Unable to create mul layer from node: " << *n);
+                    TORCHTRT_CHECK(mul, "Unable to create mul layer from node: " << *n);
 
                     mul->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], mul->getOutput(0));
@@ -406,7 +406,7 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     auto other = args[1].ITensorOrFreeze(ctx);
                     auto mul =
                         add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPROD, self, other, util::node_info(n));
-                    TRTORCH_CHECK(mul, "Unable to create mul layer from node: " << *n);
+                    TORCHTRT_CHECK(mul, "Unable to create mul layer from node: " << *n);
 
                     mul->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], mul->getOutput(0));
@@ -423,7 +423,7 @@ auto element_wise_registrations TRTORCH_UNUSED =
                         self,
                         other,
                         util::node_info(n) + std::string("is_equal"));
-                    TRTORCH_CHECK(equal, "Unable to create elementwise equal layer from node: " << *n);
+                    TORCHTRT_CHECK(equal, "Unable to create elementwise equal layer from node: " << *n);
                     // XOR with ones negates and produces not_equal result
                     auto options = torch::TensorOptions().dtype(torch::kFloat32);
                     auto ones = at::full({1}, 1, {options});
@@ -437,7 +437,7 @@ auto element_wise_registrations TRTORCH_UNUSED =
                         cast_layer->getOutput(0),
                         equal->getOutput(0),
                         util::node_info(n));
-                    TRTORCH_CHECK(sub, "Unable to create ne (not equal) layer from node: " << *n);
+                    TORCHTRT_CHECK(sub, "Unable to create ne (not equal) layer from node: " << *n);
 
                     sub->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], sub->getOutput(0));
@@ -455,7 +455,7 @@ auto element_wise_registrations TRTORCH_UNUSED =
                         self,
                         scalar_tensor,
                         util::node_info(n) + std::string("is_equal"));
-                    TRTORCH_CHECK(equal, "Unable to create elementwise equal layer from node: " << *n);
+                    TORCHTRT_CHECK(equal, "Unable to create elementwise equal layer from node: " << *n);
                     // XOR with ones negates and produces not_equal result
                     auto options = torch::TensorOptions().dtype(torch::kFloat32);
                     auto ones = at::full({1}, 1, {options});
@@ -469,7 +469,7 @@ auto element_wise_registrations TRTORCH_UNUSED =
                         cast_layer->getOutput(0),
                         equal->getOutput(0),
                         util::node_info(n));
-                    TRTORCH_CHECK(sub, "Unable to create ne (not equal) layer from node: " << *n);
+                    TORCHTRT_CHECK(sub, "Unable to create ne (not equal) layer from node: " << *n);
 
                     sub->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], sub->getOutput(0));
@@ -482,7 +482,7 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     auto exponent = args[1].ITensorOrFreeze(ctx);
                     auto pow =
                         add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPOW, self, exponent, util::node_info(n));
-                    TRTORCH_CHECK(pow, "Unable to create Power layer from node: " << *n);
+                    TORCHTRT_CHECK(pow, "Unable to create Power layer from node: " << *n);
 
                     pow->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], pow->getOutput(0));
@@ -497,7 +497,7 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     auto exponent = tensor_to_const(ctx, torch::tensor({exponentScalar}));
                     auto pow =
                         add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPOW, self, exponent, util::node_info(n));
-                    TRTORCH_CHECK(pow, "Unable to create Power layer from node: " << *n);
+                    TORCHTRT_CHECK(pow, "Unable to create Power layer from node: " << *n);
 
                     pow->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], pow->getOutput(0));
@@ -512,7 +512,7 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     auto other = args[1].ITensorOrFreeze(ctx);
                     auto floor_divide = add_elementwise(
                         ctx, nvinfer1::ElementWiseOperation::kFLOOR_DIV, self, other, util::node_info(n));
-                    TRTORCH_CHECK(floor_divide, "Unable to create floor_divide layer from node: " << *n);
+                    TORCHTRT_CHECK(floor_divide, "Unable to create floor_divide layer from node: " << *n);
 
                     floor_divide->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], floor_divide->getOutput(0));
@@ -527,7 +527,7 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     auto other = tensor_to_const(ctx, torch::tensor({otherScalar}));
                     auto floor_divide = add_elementwise(
                         ctx, nvinfer1::ElementWiseOperation::kFLOOR_DIV, self, other, util::node_info(n));
-                    TRTORCH_CHECK(floor_divide, "Unable to create floor_divide layer from node: " << *n);
+                    TORCHTRT_CHECK(floor_divide, "Unable to create floor_divide layer from node: " << *n);
 
                     floor_divide->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], floor_divide->getOutput(0));
@@ -541,7 +541,7 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     auto other = args[1].ITensorOrFreeze(ctx);
                     auto max =
                         add_elementwise(ctx, nvinfer1::ElementWiseOperation::kMAX, self, other, util::node_info(n));
-                    TRTORCH_CHECK(max, "Unable to create max layer from node: " << *n);
+                    TORCHTRT_CHECK(max, "Unable to create max layer from node: " << *n);
 
                     max->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], max->getOutput(0));
@@ -555,7 +555,7 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     auto other = args[1].ITensorOrFreeze(ctx);
                     auto min =
                         add_elementwise(ctx, nvinfer1::ElementWiseOperation::kMIN, self, other, util::node_info(n));
-                    TRTORCH_CHECK(min, "Unable to create min layer from node: " << *n);
+                    TORCHTRT_CHECK(min, "Unable to create min layer from node: " << *n);
 
                     min->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], min->getOutput(0));
@@ -568,7 +568,7 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     auto other = args[1].ITensorOrFreeze(ctx);
                     auto gt =
                         add_elementwise(ctx, nvinfer1::ElementWiseOperation::kGREATER, self, other, util::node_info(n));
-                    TRTORCH_CHECK(gt, "Unable to create greater layer from node: " << *n);
+                    TORCHTRT_CHECK(gt, "Unable to create greater layer from node: " << *n);
 
                     gt->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], gt->getOutput(0));
@@ -584,7 +584,7 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     }
                     auto gt =
                         add_elementwise(ctx, nvinfer1::ElementWiseOperation::kGREATER, self, other, util::node_info(n));
-                    TRTORCH_CHECK(gt, "Unable to create greater layer from node: " << *n);
+                    TORCHTRT_CHECK(gt, "Unable to create greater layer from node: " << *n);
 
                     gt->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], gt->getOutput(0));
@@ -597,7 +597,7 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     auto other = args[1].ITensorOrFreeze(ctx);
                     auto lt =
                         add_elementwise(ctx, nvinfer1::ElementWiseOperation::kLESS, self, other, util::node_info(n));
-                    TRTORCH_CHECK(lt, "Unable to create less layer from node: " << *n);
+                    TORCHTRT_CHECK(lt, "Unable to create less layer from node: " << *n);
 
                     lt->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], lt->getOutput(0));
@@ -613,7 +613,7 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     }
                     auto lt =
                         add_elementwise(ctx, nvinfer1::ElementWiseOperation::kLESS, self, other, util::node_info(n));
-                    TRTORCH_CHECK(lt, "Unable to create less layer from node: " << *n);
+                    TORCHTRT_CHECK(lt, "Unable to create less layer from node: " << *n);
 
                     lt->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], lt->getOutput(0));
@@ -626,7 +626,7 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     auto other = args[1].ITensorOrFreeze(ctx);
                     auto eq =
                         add_elementwise(ctx, nvinfer1::ElementWiseOperation::kEQUAL, self, other, util::node_info(n));
-                    TRTORCH_CHECK(eq, "Unable to create equal layer from node: " << *n);
+                    TORCHTRT_CHECK(eq, "Unable to create equal layer from node: " << *n);
 
                     eq->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], eq->getOutput(0));
@@ -652,7 +652,7 @@ auto element_wise_registrations TRTORCH_UNUSED =
                     }
                     auto eq =
                         add_elementwise(ctx, nvinfer1::ElementWiseOperation::kEQUAL, self, other, util::node_info(n));
-                    TRTORCH_CHECK(eq, "Unable to create equal layer from node: " << *n);
+                    TORCHTRT_CHECK(eq, "Unable to create equal layer from node: " << *n);
 
                     eq->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], eq->getOutput(0));
@@ -666,16 +666,16 @@ auto element_wise_registrations TRTORCH_UNUSED =
 
                     auto greater = add_elementwise(
                         ctx, nvinfer1::ElementWiseOperation::kGREATER, self, other, util::node_info(n) + "_greater");
-                    TRTORCH_CHECK(greater, "Unable to create Greater layer from node: " << *n);
+                    TORCHTRT_CHECK(greater, "Unable to create Greater layer from node: " << *n);
 
                     auto equal = add_elementwise(
                         ctx, nvinfer1::ElementWiseOperation::kEQUAL, self, other, util::node_info(n) + "_equal");
-                    TRTORCH_CHECK(equal, "Unable to create Equal layer from node: " << *n);
+                    TORCHTRT_CHECK(equal, "Unable to create Equal layer from node: " << *n);
 
                     auto or_op = ctx->net->addElementWise(
                         *greater->getOutput(0), *equal->getOutput(0), nvinfer1::ElementWiseOperation::kOR);
 
-                    TRTORCH_CHECK(or_op, "Unable to create Or layer from node: " << *n);
+                    TORCHTRT_CHECK(or_op, "Unable to create Or layer from node: " << *n);
                     or_op->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], or_op->getOutput(0));
 
@@ -692,16 +692,16 @@ auto element_wise_registrations TRTORCH_UNUSED =
 
                     auto greater = add_elementwise(
                         ctx, nvinfer1::ElementWiseOperation::kGREATER, self, other, util::node_info(n) + "_greater");
-                    TRTORCH_CHECK(greater, "Unable to create Greater layer from node: " << *n);
+                    TORCHTRT_CHECK(greater, "Unable to create Greater layer from node: " << *n);
 
                     auto equal = add_elementwise(
                         ctx, nvinfer1::ElementWiseOperation::kEQUAL, self, other, util::node_info(n) + "_equal");
-                    TRTORCH_CHECK(equal, "Unable to create Equal layer from node: " << *n);
+                    TORCHTRT_CHECK(equal, "Unable to create Equal layer from node: " << *n);
 
                     auto or_op = ctx->net->addElementWise(
                         *greater->getOutput(0), *equal->getOutput(0), nvinfer1::ElementWiseOperation::kOR);
 
-                    TRTORCH_CHECK(or_op, "Unable to create Or layer from node: " << *n);
+                    TORCHTRT_CHECK(or_op, "Unable to create Or layer from node: " << *n);
                     or_op->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], or_op->getOutput(0));
 
@@ -715,16 +715,16 @@ auto element_wise_registrations TRTORCH_UNUSED =
 
                     auto less = add_elementwise(
                         ctx, nvinfer1::ElementWiseOperation::kLESS, self, other, util::node_info(n) + "_less");
-                    TRTORCH_CHECK(less, "Unable to create Less layer from node: " << *n);
+                    TORCHTRT_CHECK(less, "Unable to create Less layer from node: " << *n);
 
                     auto equal = add_elementwise(
                         ctx, nvinfer1::ElementWiseOperation::kEQUAL, self, other, util::node_info(n) + "_equal");
-                    TRTORCH_CHECK(equal, "Unable to create Equal layer from node: " << *n);
+                    TORCHTRT_CHECK(equal, "Unable to create Equal layer from node: " << *n);
 
                     auto or_op = ctx->net->addElementWise(
                         *less->getOutput(0), *equal->getOutput(0), nvinfer1::ElementWiseOperation::kOR);
 
-                    TRTORCH_CHECK(or_op, "Unable to create Or layer from node: " << *n);
+                    TORCHTRT_CHECK(or_op, "Unable to create Or layer from node: " << *n);
                     or_op->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], or_op->getOutput(0));
 
@@ -741,16 +741,16 @@ auto element_wise_registrations TRTORCH_UNUSED =
 
                     auto less = add_elementwise(
                         ctx, nvinfer1::ElementWiseOperation::kLESS, self, other, util::node_info(n) + "_less");
-                    TRTORCH_CHECK(less, "Unable to create Less layer from node: " << *n);
+                    TORCHTRT_CHECK(less, "Unable to create Less layer from node: " << *n);
 
                     auto equal = add_elementwise(
                         ctx, nvinfer1::ElementWiseOperation::kEQUAL, self, other, util::node_info(n) + "_equal");
-                    TRTORCH_CHECK(equal, "Unable to create Equal layer from node: " << *n);
+                    TORCHTRT_CHECK(equal, "Unable to create Equal layer from node: " << *n);
 
                     auto or_op = ctx->net->addElementWise(
                         *less->getOutput(0), *equal->getOutput(0), nvinfer1::ElementWiseOperation::kOR);
 
-                    TRTORCH_CHECK(or_op, "Unable to create Or layer from node: " << *n);
+                    TORCHTRT_CHECK(or_op, "Unable to create Or layer from node: " << *n);
                     or_op->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], or_op->getOutput(0));
 
@@ -763,4 +763,4 @@ auto element_wise_registrations TRTORCH_UNUSED =
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

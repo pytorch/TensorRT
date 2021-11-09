@@ -1,18 +1,19 @@
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
-    name = "trtorch",
+    name = "torch_tensorrt",
     srcs = [
         "src/compile_spec.cpp",
         "src/logging.cpp",
         "src/ptq.cpp",
-        "src/trtorch.cpp",
+        "src/torch_tensorrt.cpp",
+        "src/types.cpp"
     ],
     hdrs = [
-        "include/trtorch/logging.h",
-        "include/trtorch/macros.h",
-        "include/trtorch/ptq.h",
-        "include/trtorch/trtorch.h",
+        "include/torch_tensorrt/logging.h",
+        "include/torch_tensorrt/macros.h",
+        "include/torch_tensorrt/ptq.h",
+        "include/torch_tensorrt/torch_tensorrt.h",
     ],
     linkstatic = True,
     strip_include_prefix = "include/",

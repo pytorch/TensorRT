@@ -1,1 +1,1 @@
-workspace(name = "trtorch")
+workspace(name = "torch_tensorrt")

@@ -1,8 +1,8 @@
 #include "core/util/trt_util.h"
-#include "core/util/logging/TRTorchLogger.h"
+#include "core/util/logging/TorchTRTLogger.h"
 #include "core/util/macros.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace util {
 
@@ -70,7 +70,7 @@ nvinfer1::Dims toDimsPad(c10::IntArrayRef l, uint64_t pad_to) {
     return toDims(l);
   }
 
-  TRTORCH_CHECK(
+  TORCHTRT_CHECK(
       pad_to <= nvinfer1::Dims::MAX_DIMS,
       "The list requested to be converted to nvinfer1::Dims exceeds the max number of dimensions for TensorRT");
 
@@ -87,7 +87,7 @@ nvinfer1::Dims toDimsPad(c10::IntArrayRef l, uint64_t pad_to) {
 }
 
 nvinfer1::Dims toDims(c10::IntArrayRef l) {
-  TRTORCH_CHECK(
+  TORCHTRT_CHECK(
       l.size() <= nvinfer1::Dims::MAX_DIMS,
       "The list requested to be converted to nvinfer1::Dims exceeds the max number of dimensions for TensorRT");
 
@@ -100,7 +100,7 @@ nvinfer1::Dims toDims(c10::IntArrayRef l) {
 }
 
 nvinfer1::Dims toDims(c10::List<int64_t> l) {
-  TRTORCH_CHECK(
+  TORCHTRT_CHECK(
       l.size() <= nvinfer1::Dims::MAX_DIMS,
       "The list requested to be converted to nvinfer1::Dims exceeds the max number of dimensions for TensorRT");
 
@@ -120,7 +120,7 @@ nvinfer1::Dims toDimsPad(c10::List<int64_t> l, uint64_t pad_to) {
     return toDims(l);
   }
 
-  TRTORCH_CHECK(
+  TORCHTRT_CHECK(
       pad_to <= nvinfer1::Dims::MAX_DIMS,
       "The list requested to be converted to nvinfer1::Dims exceeds the max number of dimensions for TensorRT");
 
@@ -162,7 +162,7 @@ nvinfer1::Dims unpadDims(const nvinfer1::Dims& d) {
 
 nvinfer1::Dims unsqueezeDims(const nvinfer1::Dims& d, int pos, int val, bool use_zeros) {
   // acceptable range for pos is [0, d.nbDims]
-  TRTORCH_ASSERT(pos >= 0 && pos <= d.nbDims, "ERROR: Index to unsqueeze is out of bounds.");
+  TORCHTRT_ASSERT(pos >= 0 && pos <= d.nbDims, "ERROR: Index to unsqueeze is out of bounds.");
 
   nvinfer1::Dims dims;
   for (int i = 0, j = 0; j <= d.nbDims; j++) {
@@ -182,7 +182,7 @@ nvinfer1::Dims unsqueezeDims(const nvinfer1::Dims& d, int pos, int val, bool use
 
 nvinfer1::Dims squeezeDims(const nvinfer1::Dims& d, int pos, bool use_zeros) {
   // acceptable range for pos is [0, d.nbDims]
-  TRTORCH_ASSERT(pos >= 0 && pos <= d.nbDims, "ERROR: Index to squeeze is out of bounds.");
+  TORCHTRT_ASSERT(pos >= 0 && pos <= d.nbDims, "ERROR: Index to squeeze is out of bounds.");
 
   nvinfer1::Dims dims;
   int j = 0;
@@ -211,7 +211,7 @@ std::string toStr(nvinfer1::Dims d) {
 }
 
 nvinfer1::DimsHW toDimsHW(c10::List<int64_t> l) {
-  TRTORCH_CHECK(l.size() == 2, "The list requested to be converted to nvinfer1::DimsHW is not 2");
+  TORCHTRT_CHECK(l.size() == 2, "The list requested to be converted to nvinfer1::DimsHW is not 2");
 
   nvinfer1::DimsHW dims;
   dims.nbDims = l.size();
@@ -222,7 +222,7 @@ nvinfer1::DimsHW toDimsHW(c10::List<int64_t> l) {
 }
 
 nvinfer1::DimsHW toDimsHW(c10::IntArrayRef l) {
-  TRTORCH_CHECK(l.size() == 2, "The list requested to be converted to nvinfer1::DimsHW is not 2");
+  TORCHTRT_CHECK(l.size() == 2, "The list requested to be converted to nvinfer1::DimsHW is not 2");
 
   nvinfer1::DimsHW dims;
   dims.nbDims = l.size();
@@ -239,8 +239,7 @@ const std::unordered_map<at::ScalarType, nvinfer1::DataType>& get_at_trt_type_ma
       {at::kHalf, nvinfer1::DataType::kHALF},
       {at::kInt, nvinfer1::DataType::kINT32},
       {at::kChar, nvinfer1::DataType::kINT8},
-      {at::kBool, nvinfer1::DataType::kBOOL},
-  };
+      {at::kBool, nvinfer1::DataType::kBOOL}};
   return at_trt_type_map;
 }
 
@@ -262,7 +261,7 @@ const std::unordered_map<nvinfer1::DataType, at::ScalarType>& get_trt_aten_type_
 
 at::ScalarType TRTDataTypeToScalarType(nvinfer1::DataType t) {
   auto type = optTRTDataTypeToScalarType(t);
-  TRTORCH_CHECK(type, "Unsupported TensorRT data type " << t);
+  TORCHTRT_CHECK(type, "Unsupported TensorRT data type " << t);
   return type.value();
 }
 
@@ -281,7 +280,7 @@ const std::unordered_map<at::ScalarType, nvinfer1::DataType>& get_aten_trt_type_
 
 nvinfer1::DataType ScalarTypeToTRTDataType(at::ScalarType t) {
   auto type = optScalarTypeToTRTDataType(t);
-  TRTORCH_CHECK(type, "Unsupported ATen data type " << t);
+  TORCHTRT_CHECK(type, "Unsupported ATen data type " << t);
   return type.value();
 }
 
@@ -342,4 +341,4 @@ torch::jit::Node* cloneNode(
 
 } // namespace util
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

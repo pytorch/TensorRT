@@ -1,7 +1,7 @@
 #include "core/conversion/converters/converters.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace converters {
@@ -9,7 +9,7 @@ namespace impl {
 namespace {
 
 // clang-format off
-auto constant_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
+auto constant_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns()
   .pattern({"trt::const(Tensor self) -> Tensor",
             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
               // This converter may be abusing what the registry is supposed to be
@@ -25,7 +25,7 @@ auto constant_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
                 output = ctx->AssociateValueAndTensor(n->outputs()[0], const_out);
               }
               LOG_DEBUG("Output tensor shape: " << output->getDimensions());
-              
+
               return true;
             }});
 // clang-format on
@@ -34,4 +34,4 @@ auto constant_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

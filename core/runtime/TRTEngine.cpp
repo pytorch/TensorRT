@@ -7,7 +7,7 @@
 #include "core/runtime/runtime.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace runtime {
 
@@ -24,12 +24,14 @@ TRTEngine::TRTEngine(std::string serialized_engine, CudaDevice cuda_device) {
 }
 
 TRTEngine::TRTEngine(std::vector<std::string> serialized_info) {
-  TRTORCH_CHECK(
-      serialized_info.size() == ENGINE_IDX + 1, "Program to be deserialized targets an incompatible TRTorch ABI");
-  TRTORCH_CHECK(
+  TORCHTRT_CHECK(
+      serialized_info.size() == ENGINE_IDX + 1,
+      "Program to be deserialized targets an incompatible Torch-TensorRT ABI");
+  TORCHTRT_CHECK(
       serialized_info[ABI_TARGET_IDX] == ABI_VERSION,
-      "Program to be deserialized targets a different TRTorch ABI Version ("
-          << serialized_info[ABI_TARGET_IDX] << ") than the TRTorch Runtime ABI Version (" << ABI_VERSION << ")");
+      "Program to be deserialized targets a different Torch-TensorRT ABI Version ("
+          << serialized_info[ABI_TARGET_IDX] << ") than the Torch-TensorRT Runtime ABI Version (" << ABI_VERSION
+          << ")");
   std::string _name = serialized_info[NAME_IDX];
   std::string engine_info = serialized_info[ENGINE_IDX];
 
@@ -39,7 +41,7 @@ TRTEngine::TRTEngine(std::vector<std::string> serialized_info) {
 
 TRTEngine::TRTEngine(std::string mod_name, std::string serialized_engine, CudaDevice cuda_device) {
   auto most_compatible_device = get_most_compatible_device(cuda_device);
-  TRTORCH_CHECK(most_compatible_device, "No compatible device was found for instantiating TensorRT engine");
+  TORCHTRT_CHECK(most_compatible_device, "No compatible device was found for instantiating TensorRT engine");
   device_info = most_compatible_device.value();
   set_cuda_device(device_info);
 
@@ -48,7 +50,7 @@ TRTEngine::TRTEngine(std::string mod_name, std::string serialized_engine, CudaDe
   name = slugify(mod_name);
 
   cuda_engine = make_trt(rt->deserializeCudaEngine(serialized_engine.c_str(), serialized_engine.size()));
-  TRTORCH_CHECK((cuda_engine.get() != nullptr), "Unable to deserialize the TensorRT engine");
+  TORCHTRT_CHECK((cuda_engine.get() != nullptr), "Unable to deserialize the TensorRT engine");
 
   exec_ctx = make_trt(cuda_engine->createExecutionContext());
 
@@ -89,7 +91,7 @@ TRTEngine& TRTEngine::operator=(const TRTEngine& other) {
 // }
 
 namespace {
-static auto TRTORCH_UNUSED TRTEngineTSRegistrtion =
+static auto TORCHTRT_UNUSED TRTEngineTSRegistrtion =
     torch::class_<TRTEngine>("tensorrt", "Engine")
         .def(torch::init<std::vector<std::string>>())
         // TODO: .def("__call__", &TRTEngine::Run)
@@ -118,4 +120,4 @@ static auto TRTORCH_UNUSED TRTEngineTSRegistrtion =
 
 } // namespace runtime
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

@@ -6,7 +6,7 @@ cc_binary(
         "main.cpp",
     ],
     deps = [
-        "//cpp/api:trtorch",
+        "//cpp:torch_tensorrt",
         "@libtorch",
         "@libtorch//:caffe2",
     ],

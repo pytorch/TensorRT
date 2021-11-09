@@ -3,7 +3,6 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -37,7 +36,7 @@
   <script src="../_static/javascripts/modernizr.js">
   </script>
   <title>
-   Using TRTorch Directly From PyTorch — TRTorch master documentation
+   Using Torch-TensorRT Directly From PyTorch — Torch-TensorRT master documentation
   </title>
   <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/pygments.css" rel="stylesheet" type="text/css"/>
@@ -65,8 +64,8 @@
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
-  <link href="runtime.html" rel="next" title="Deploying TRTorch Programs"/>
-  <link href="trtorchc.html" rel="prev" title="trtorchc"/>
+  <link href="runtime.html" rel="next" title="Deploying Torch-TensorRT Programs"/>
+  <link href="torchtrtc.html" rel="prev" title="torchtrtc"/>
  </head>
  <body data-md-color-accent="light-green" data-md-color-primary="light-green" dir="ltr">
   <svg class="md-svg">
@@ -88,7 +87,7 @@
    <nav class="md-header-nav md-grid">
     <div class="md-flex navheader">
      <div class="md-flex__cell md-flex__cell--shrink">
-      <a class="md-header-nav__button md-logo" href="../index.html" title="TRTorch master documentation">
+      <a class="md-header-nav__button md-logo" href="../index.html" title="Torch-TensorRT master documentation">
        <i class="md-icon">
         
        </i>
@@ -101,10 +100,10 @@
      <div class="md-flex__cell md-flex__cell--stretch">
       <div class="md-flex__ellipsis md-header-nav__title" data-md-component="title">
        <span class="md-header-nav__topic">
-        TRTorch
+        Torch-TensorRT
        </span>
        <span class="md-header-nav__topic">
-        Using TRTorch Directly From PyTorch
+        Using Torch-TensorRT Directly From PyTorch
        </span>
       </div>
      </div>
@@ -139,7 +138,7 @@
      </div>
      <div class="md-flex__cell md-flex__cell--shrink">
       <div class="md-header-nav__source">
-       <a class="md-source" data-md-source="github" href="https://github.com/nvidia/TRTorch/" title="Go to repository">
+       <a class="md-source" data-md-source="github" href="https://github.com/nvidia/Torch-TensorRT/" title="Go to repository">
         <div class="md-source__icon">
          <svg height="28" viewbox="0 0 24 24" width="28" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
           <use height="24" width="24" xlink:href="#__github">
@@ -147,7 +146,7 @@
          </svg>
         </div>
         <div class="md-source__repository">
-         TRTorch
+         Torch-TensorRT
         </div>
        </a>
       </div>
@@ -157,31 +156,34 @@
        Versions
       </button>
       <div class="dropdown-content md-hero">
-       <a href="https://nvidia.github.io/TRTorch/" title="master">
+       <a href="https://nvidia.github.io/Torch-TensorRT/" title="master">
         master
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.4.1/" title="v0.4.1">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v1.0.0/" title="v1.0.0">
+        v1.0.0
+       </a>
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.4.1/" title="v0.4.1">
         v0.4.1
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.4.0/" title="v0.4.0">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.4.0/" title="v0.4.0">
         v0.4.0
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.3.0/" title="v0.3.0">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.3.0/" title="v0.3.0">
         v0.3.0
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.2.0/" title="v0.2.0">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.2.0/" title="v0.2.0">
         v0.2.0
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.1.0/" title="v0.1.0">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.1.0/" title="v0.1.0">
         v0.1.0
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.0.3/" title="v0.0.3">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.0.3/" title="v0.0.3">
         v0.0.3
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.0.2/" title="v0.0.2">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.0.2/" title="v0.0.2">
         v0.0.2
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.0.1/" title="v0.0.1">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.0.1/" title="v0.0.1">
         v0.0.1
        </a>
       </div>
@@ -195,7 +197,7 @@
      <ul class="md-tabs__list">
       <li class="md-tabs__item">
        <a class="md-tabs__link" href="../index.html">
-        TRTorch master documentation
+        Torch-TensorRT master documentation
        </a>
       </li>
      </ul>
@@ -208,17 +210,17 @@
        <div class="md-sidebar__inner">
         <nav class="md-nav md-nav--primary" data-md-level="0">
          <label class="md-nav__title md-nav__title--site" for="__drawer">
-          <a class="md-nav__button md-logo" href="../index.html" title="TRTorch master documentation">
+          <a class="md-nav__button md-logo" href="../index.html" title="Torch-TensorRT master documentation">
            <i class="md-icon">
             
            </i>
           </a>
-          <a href="../index.html" title="TRTorch master documentation">
-           TRTorch
+          <a href="../index.html" title="Torch-TensorRT master documentation">
+           Torch-TensorRT
           </a>
          </label>
          <div class="md-nav__source">
-          <a class="md-source" data-md-source="github" href="https://github.com/nvidia/TRTorch/" title="Go to repository">
+          <a class="md-source" data-md-source="github" href="https://github.com/nvidia/Torch-TensorRT/" title="Go to repository">
            <div class="md-source__icon">
             <svg height="28" viewbox="0 0 24 24" width="28" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
              <use height="24" width="24" xlink:href="#__github">
@@ -226,7 +228,7 @@
             </svg>
            </div>
            <div class="md-source__repository">
-            TRTorch
+            Torch-TensorRT
            </div>
           </a>
          </div>
@@ -244,8 +246,28 @@
            </a>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="getting_started.html">
-            Getting Started
+           <a class="md-nav__link" href="getting_started_with_cpp_api.html">
+            Getting Started with C++
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="getting_started_with_python_api.html">
+            Using Torch-TensorRT in Python
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="creating_torchscript_module_in_python.html">
+            Creating a TorchScript Module
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="creating_torchscript_module_in_python.html#working-with-torchscript-in-python">
+            Working with TorchScript in Python
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">
+            Saving TorchScript Module to Disk
            </a>
           </li>
           <li class="md-nav__item">
@@ -254,17 +276,17 @@
            </a>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="trtorchc.html">
-            trtorchc
+           <a class="md-nav__link" href="torchtrtc.html">
+            torchtrtc
            </a>
           </li>
           <li class="md-nav__item">
            <input class="md-toggle md-nav__toggle" data-md-toggle="toc" id="__toc" type="checkbox"/>
            <label class="md-nav__link md-nav__link--active" for="__toc">
-            Using TRTorch Directly From PyTorch
+            Using Torch-TensorRT Directly From PyTorch
            </label>
            <a class="md-nav__link md-nav__link--active" href="#">
-            Using TRTorch Directly From PyTorch
+            Using Torch-TensorRT Directly From PyTorch
            </a>
            <nav class="md-nav md-nav--secondary">
             <ul class="md-nav__list" data-md-scrollfix="">
@@ -278,7 +300,7 @@
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="runtime.html">
-            Deploying TRTorch Programs
+            Deploying Torch-TensorRT Programs
            </a>
           </li>
           <li class="md-nav__item">
@@ -295,17 +317,22 @@
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../_notebooks/lenet-getting-started.html">
-            TRTorch Getting Started - LeNet
+            Torch-TensorRT Getting Started - LeNet
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/Resnet50-example.html">
+            Torch-TensorRT Getting Started - ResNet 50
            </a>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../_notebooks/ssd-object-detection-demo.html">
-            Object Detection with TRTorch (SSD)
+            Object Detection with Torch-TensorRT (SSD)
            </a>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../_notebooks/vgg-qat.html">
-            Deploying Quantization Aware Trained models in INT8 using TRTorch
+            Deploying Quantization Aware Trained models in INT8 using Torch-TensorRT
            </a>
           </li>
           <li class="md-nav__item">
@@ -316,13 +343,33 @@
            </span>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/trtorch.html">
-            trtorch
+           <a class="md-nav__link" href="../py_api/torch_tensorrt.html">
+            torch_tensorrt
            </a>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../py_api/logging.html">
-            trtorch.logging
+            torch_tensorrt.logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/ptq.html">
+            torch_tensorrt.ptq
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/ptq.html#classes">
+            Classes
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/ptq.html#enums">
+            Enums
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/ts.html">
+            torch_tensorrt.ts
            </a>
           </li>
           <li class="md-nav__item">
@@ -333,8 +380,28 @@
            </span>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html">
-            TRTorch C++ API
+           <a class="md-nav__link" href="../_cpp_api/torch_tensort_cpp.html">
+            Torch-TensorRT C++ API
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt.html">
+            Namespace torch_tensorrt
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt__logging.html">
+            Namespace torch_tensorrt::logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt__torchscript.html">
+            Namespace torch_tensorrt::torchscript
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt__ptq.html">
+            Namespace torch_tensorrt::ptq
            </a>
           </li>
           <li class="md-nav__item">
@@ -356,7 +423,7 @@
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../contributors/useful_links.html">
-            Useful Links for TRTorch Development
+            Useful Links for Torch-TensorRT Development
            </a>
           </li>
           <li class="md-nav__item">
@@ -395,151 +462,149 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <section id="using-trtorch-directly-from-pytorch">
-        <span id="use-from-pytorch">
-        </span>
-        <h1 id="tutorials-use-from-pytorch--page-root">
-         Using TRTorch Directly From PyTorch
-         <a class="headerlink" href="#tutorials-use-from-pytorch--page-root" title="Permalink to this headline">
-          ¶
-         </a>
-        </h1>
-        <p>
-         Starting in TRTorch 0.1.0, you will now be able to directly access TensorRT from PyTorch APIs. The process to use this feature
+       <span id="use-from-pytorch">
+       </span>
+       <h1 id="tutorials-use-from-pytorch--page-root">
+        Using Torch-TensorRT Directly From PyTorch
+        <a class="headerlink" href="#tutorials-use-from-pytorch--page-root" title="Permalink to this headline">
+         ¶
+        </a>
+       </h1>
+       <p>
+        You will now be able to directly access TensorRT from PyTorch APIs. The process to use this feature
 is very similar to the compilation workflow described in
-         <a class="reference internal" href="getting_started.html#getting-started">
-          <span class="std std-ref">
-           Getting Started
-          </span>
-         </a>
-        </p>
-        <p>
-         Start by loading
-         <code class="docutils literal notranslate">
-          <span class="pre">
-           trtorch
-          </span>
-         </code>
-         into your application.
-        </p>
-        <div class="highlight-python notranslate">
-         <div class="highlight">
-          <pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">import</span> <span class="nn">trtorch</span>
+        <a class="reference internal" href="getting_started_with_python_api.html#getting-started-with-python-api">
+         <span class="std std-ref">
+          Using Torch-TensorRT in Python
+         </span>
+        </a>
+       </p>
+       <p>
+        Start by loading
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          torch_tensorrt
+         </span>
+        </code>
+        into your application.
+       </p>
+       <div class="highlight-python notranslate">
+        <div class="highlight">
+         <pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">torch_tensorrt</span>
 </pre>
-         </div>
         </div>
-        <p>
-         Then given a TorchScript module, you can compile it with TensorRT using the
-         <code class="docutils literal notranslate">
-          <span class="pre">
-           torch._C._jit_to_backend("tensorrt",
-          </span>
-          <span class="pre">
-           ...)
-          </span>
-         </code>
-         API.
-        </p>
-        <div class="highlight-python notranslate">
-         <div class="highlight">
-          <pre><span></span><span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
+       </div>
+       <p>
+        Then given a TorchScript module, you can compile it with TensorRT using the
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          torch._C._jit_to_backend("tensorrt",
+         </span>
+         <span class="pre">
+          ...)
+         </span>
+        </code>
+        API.
+       </p>
+       <div class="highlight-python notranslate">
+        <div class="highlight">
+         <pre><span></span><span class="kn">import</span> <span class="nn">torchvision.models</span> <span class="k">as</span> <span class="nn">models</span>
 
 <span class="n">model</span> <span class="o">=</span> <span class="n">models</span><span class="o">.</span><span class="n">mobilenet_v2</span><span class="p">(</span><span class="n">pretrained</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">script_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">script</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
 </pre>
-         </div>
         </div>
-        <p>
-         Unlike the
-         <code class="docutils literal notranslate">
-          <span class="pre">
-           compile
-          </span>
-         </code>
-         API in TRTorch which assumes you are trying to compile the
-         <code class="docutils literal notranslate">
-          <span class="pre">
-           forward
-          </span>
-         </code>
-         function of a module
+       </div>
+       <p>
+        Unlike the
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          compile
+         </span>
+        </code>
+        API in Torch-TensorRT which assumes you are trying to compile the
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          forward
+         </span>
+        </code>
+        function of a module
 or the
-         <code class="docutils literal notranslate">
-          <span class="pre">
-           convert_method_to_trt_engine
-          </span>
-         </code>
-         which converts a specified function to a TensorRT engine, the backend API
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          convert_method_to_trt_engine
+         </span>
+        </code>
+        which converts a specified function to a TensorRT engine, the backend API
 will take a dictionary which maps names of functions to compile to Compilation Spec objects which wrap the same
 sort of dictionary you would provide to
-         <code class="docutils literal notranslate">
-          <span class="pre">
-           compile
-          </span>
-         </code>
-         . For more information on the compile spec dictionary take a look
-at the documentation for the TRTorch
-         <code class="docutils literal notranslate">
-          <span class="pre">
-           TensorRTCompileSpec
-          </span>
-         </code>
-         API.
-        </p>
-        <div class="highlight-python notranslate">
-         <div class="highlight">
-          <pre><span></span><span class="n">spec</span> <span class="o">=</span> <span class="p">{</span>
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          compile
+         </span>
+        </code>
+        . For more information on the compile spec dictionary take a look
+at the documentation for the Torch-TensorRT
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          TensorRTCompileSpec
+         </span>
+        </code>
+        API.
+       </p>
+       <div class="highlight-python notranslate">
+        <div class="highlight">
+         <pre><span></span><span class="n">spec</span> <span class="o">=</span> <span class="p">{</span>
     <span class="s2">"forward"</span><span class="p">:</span>
-        <span class="n">trtorch</span><span class="o">.</span><span class="n">TensorRTCompileSpec</span><span class="p">({</span>
-            <span class="s2">"inputs"</span><span class="p">:</span> <span class="p">[</span><span class="n">trtorch</span><span class="o">.</span><span class="n">Input</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">300</span><span class="p">])],</span>
+        <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">ts</span><span class="o">.</span><span class="n">TensorRTCompileSpec</span><span class="p">({</span>
+            <span class="s2">"inputs"</span><span class="p">:</span> <span class="p">[</span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">300</span><span class="p">])],</span>
             <span class="s2">"enabled_precisions"</span><span class="p">:</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">},</span>
             <span class="s2">"refit"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
             <span class="s2">"debug"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
             <span class="s2">"strict_types"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
             <span class="s2">"device"</span><span class="p">:</span> <span class="p">{</span>
-                <span class="s2">"device_type"</span><span class="p">:</span> <span class="n">trtorch</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span><span class="p">,</span>
+                <span class="s2">"device_type"</span><span class="p">:</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">DeviceType</span><span class="o">.</span><span class="n">GPU</span><span class="p">,</span>
                 <span class="s2">"gpu_id"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
                 <span class="s2">"dla_core"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
                 <span class="s2">"allow_gpu_fallback"</span><span class="p">:</span> <span class="kc">True</span>
             <span class="p">},</span>
-            <span class="s2">"capability"</span><span class="p">:</span> <span class="n">trtorch</span><span class="o">.</span><span class="n">EngineCapability</span><span class="o">.</span><span class="n">default</span><span class="p">,</span>
+            <span class="s2">"capability"</span><span class="p">:</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">EngineCapability</span><span class="o">.</span><span class="n">default</span><span class="p">,</span>
             <span class="s2">"num_min_timing_iters"</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
             <span class="s2">"num_avg_timing_iters"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
             <span class="s2">"max_batch_size"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
         <span class="p">})</span>
     <span class="p">}</span>
 </pre>
-         </div>
         </div>
-        <p>
-         Now to compile with TRTorch, provide the target module objects and the spec dictionary to
-         <code class="docutils literal notranslate">
-          <span class="pre">
-           torch._C._jit_to_backend("tensorrt",
-          </span>
-          <span class="pre">
-           ...)
-          </span>
-         </code>
-        </p>
-        <div class="highlight-python notranslate">
-         <div class="highlight">
-          <pre><span></span><span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">_C</span><span class="o">.</span><span class="n">_jit_to_backend</span><span class="p">(</span><span class="s2">"tensorrt"</span><span class="p">,</span> <span class="n">script_model</span><span class="p">,</span> <span class="n">spec</span><span class="p">)</span>
+       </div>
+       <p>
+        Now to compile with Torch-TensorRT, provide the target module objects and the spec dictionary to
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          torch._C._jit_to_backend("tensorrt",
+         </span>
+         <span class="pre">
+          ...)
+         </span>
+        </code>
+       </p>
+       <div class="highlight-python notranslate">
+        <div class="highlight">
+         <pre><span></span><span class="n">trt_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">_C</span><span class="o">.</span><span class="n">_jit_to_backend</span><span class="p">(</span><span class="s2">"tensorrt"</span><span class="p">,</span> <span class="n">script_model</span><span class="p">,</span> <span class="n">spec</span><span class="p">)</span>
 </pre>
-         </div>
         </div>
-        <p>
-         To run explicitly call the function of the method you want to run (vs. how you can just call on the module itself in standard PyTorch)
-        </p>
-        <div class="highlight-python notranslate">
-         <div class="highlight">
-          <pre><span></span><span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">300</span><span class="p">))</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">)</span>
+       </div>
+       <p>
+        To run explicitly call the function of the method you want to run (vs. how you can just call on the module itself in standard PyTorch)
+       </p>
+       <div class="highlight-python notranslate">
+        <div class="highlight">
+         <pre><span></span><span class="nb">input</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">300</span><span class="p">,</span> <span class="mi">300</span><span class="p">))</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">)</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">trt_model</span><span class="o">.</span><span class="n">forward</span><span class="p">(</span><span class="nb">input</span><span class="p">))</span>
 </pre>
-         </div>
         </div>
-       </section>
+       </div>
       </article>
      </div>
     </div>
@@ -548,7 +613,7 @@ at the documentation for the TRTorch
   <footer class="md-footer">
    <div class="md-footer-nav">
     <nav class="md-footer-nav__inner md-grid">
-     <a class="md-flex md-footer-nav__link md-footer-nav__link--prev" href="trtorchc.html" rel="prev" title="trtorchc">
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--prev" href="torchtrtc.html" rel="prev" title="torchtrtc">
       <div class="md-flex__cell md-flex__cell--shrink">
        <i class="md-icon md-icon--arrow-back md-footer-nav__button">
        </i>
@@ -558,17 +623,17 @@ at the documentation for the TRTorch
         <span class="md-footer-nav__direction">
          Previous
         </span>
-        trtorchc
+        torchtrtc
        </span>
       </div>
      </a>
-     <a class="md-flex md-footer-nav__link md-footer-nav__link--next" href="runtime.html" rel="next" title="Deploying TRTorch Programs">
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--next" href="runtime.html" rel="next" title="Deploying Torch-TensorRT Programs">
       <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
        <span class="md-flex__ellipsis">
         <span class="md-footer-nav__direction">
          Next
         </span>
-        Deploying TRTorch Programs
+        Deploying Torch-TensorRT Programs
        </span>
       </div>
       <div class="md-flex__cell md-flex__cell--shrink">

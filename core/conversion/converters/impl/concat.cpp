@@ -2,7 +2,7 @@
 #include "core/conversion/tensorcontainer/TensorContainer.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace converters {
@@ -10,7 +10,7 @@ namespace impl {
 namespace {
 
 // clang-format off
-auto cat_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
+auto cat_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns()
   .pattern({"aten::cat(Tensor[] tensors, int dim=0) -> Tensor",
             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
               auto ts = args[0].IValue()->toListRef();
@@ -45,4 +45,4 @@ auto cat_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns()
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

@@ -8,7 +8,7 @@
 #include "core/util/prelude.h"
 #include "torch/torch.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace converters {
@@ -67,7 +67,7 @@ bool add_split(ConversionCtx* ctx, const torch::jit::Node* n, args& args, bool s
   return true;
 }
 
-auto select_registrations TRTORCH_UNUSED =
+auto select_registrations TORCHTRT_UNUSED =
     RegisterNodeConversionPatterns()
         .pattern({"aten::select.int(Tensor(a) self, int dim, int index) -> (Tensor(a))",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
@@ -90,7 +90,7 @@ auto select_registrations TRTORCH_UNUSED =
                     // IGatherLayer takes in input tensor, the indices, and the axis
                     // of input tensor to take indices from
                     auto gather_layer = ctx->net->addGather(*in, *const_out, dim);
-                    TRTORCH_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
+                    TORCHTRT_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
                     auto out = gather_layer->getOutput(0);
 
                     LOG_DEBUG("Gather tensor shape: " << out->getDimensions());
@@ -98,7 +98,7 @@ auto select_registrations TRTORCH_UNUSED =
                     if (out->getDimensions().nbDims != 1) {
                       // IShuffleLayer removes redundant dimensions
                       auto shuffle_layer = ctx->net->addShuffle(*out);
-                      TRTORCH_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
+                      TORCHTRT_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
                       shuffle_layer->setReshapeDimensions(util::squeezeDims(out->getDimensions(), dim));
                       shuffle_layer->setName(util::node_info(n).c_str());
                       out = shuffle_layer->getOutput(0);
@@ -123,18 +123,18 @@ auto select_registrations TRTORCH_UNUSED =
 
                     // IConstantLayer to convert indices from Weights to ITensor
                     auto const_layer = ctx->net->addConstant(weights.shape, weights.data);
-                    TRTORCH_CHECK(const_layer, "Unable to create constant layer from node: " << *n);
+                    TORCHTRT_CHECK(const_layer, "Unable to create constant layer from node: " << *n);
                     auto const_out = const_layer->getOutput(0);
 
                     // IGatherLayer takes in input tensor, the indices, and the axis
                     // of input tensor to take indices from
                     auto gather_layer = ctx->net->addGather(*in, *const_out, axis);
-                    TRTORCH_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
+                    TORCHTRT_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
                     auto gather_out = gather_layer->getOutput(0);
 
                     // IShuffleLayer removes redundant dimensions
                     auto shuffle_layer = ctx->net->addShuffle(*gather_out);
-                    TRTORCH_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
+                    TORCHTRT_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
                     shuffle_layer->setReshapeDimensions(util::unpadDims(gather_out->getDimensions()));
                     shuffle_layer->setName(util::node_info(n).c_str());
                     auto shuffle_out = shuffle_layer->getOutput(0);
@@ -159,18 +159,18 @@ auto select_registrations TRTORCH_UNUSED =
 
                     // IConstantLayer to convert indices from Weights to ITensor
                     auto const_layer = ctx->net->addConstant(weights.shape, weights.data);
-                    TRTORCH_CHECK(const_layer, "Unable to create constant layer from node: " << *n);
+                    TORCHTRT_CHECK(const_layer, "Unable to create constant layer from node: " << *n);
                     auto const_out = const_layer->getOutput(0);
 
                     // IGatherLayer takes in input tensor, the indices, and the axis
                     // of input tensor to take indices from
                     auto gather_layer = ctx->net->addGather(*in, *const_out, axis);
-                    TRTORCH_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
+                    TORCHTRT_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
                     auto gather_out = gather_layer->getOutput(0);
 
                     // IShuffleLayer removes redundant dimensions
                     auto shuffle_layer = ctx->net->addShuffle(*gather_out);
-                    TRTORCH_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
+                    TORCHTRT_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
                     shuffle_layer->setReshapeDimensions(util::unpadDims(gather_out->getDimensions()));
                     shuffle_layer->setName(util::node_info(n).c_str());
                     auto shuffle_out = shuffle_layer->getOutput(0);
@@ -193,7 +193,7 @@ auto select_registrations TRTORCH_UNUSED =
 
                // IGatherLayer takes in input tensor, the indices, and the axis of input tensor to take indices from
                auto gather_layer = ctx->net->addGather(*embeddingTensor, *indicesTensor, 0);
-               TRTORCH_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
+               TORCHTRT_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
                auto gather_out = gather_layer->getOutput(0);
 
                auto out = ctx->AssociateValueAndTensor(n->outputs()[0], gather_out);
@@ -233,12 +233,12 @@ auto select_registrations TRTORCH_UNUSED =
 
                // IConstantLayer to convert indices from Weights to ITensor
                auto const_layer = ctx->net->addConstant(weights.shape, weights.data);
-               TRTORCH_CHECK(const_layer, "Unable to create constant layer from node: " << *n);
+               TORCHTRT_CHECK(const_layer, "Unable to create constant layer from node: " << *n);
                auto const_out = const_layer->getOutput(0);
 
                // IGatherLayer takes in input tensor, the indices, and the axis of input tensor to take indices from
                auto gather_layer = ctx->net->addGather(*in, *const_out, axis);
-               TRTORCH_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
+               TORCHTRT_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
                auto gather_out = gather_layer->getOutput(0);
 
                auto out = ctx->AssociateValueAndTensor(n->outputs()[0], gather_out);
@@ -273,12 +273,12 @@ auto select_registrations TRTORCH_UNUSED =
                     auto val = args[2].unwrapToScalar().to<float>();
                     auto val_t = tensor_to_const(ctx, torch::full(util::toVec(self->getDimensions()), val));
 
-                    TRTORCH_CHECK(
+                    TORCHTRT_CHECK(
                         util::broadcastable(self->getDimensions(), mask->getDimensions(), /*multidirectional=*/false),
                         "Self and mask tensors are not broadcastable");
 
                     auto new_layer = ctx->net->addSelect(*mask, *val_t, *self);
-                    TRTORCH_CHECK(new_layer, "Unable to create layer for aten::masked_fill");
+                    TORCHTRT_CHECK(new_layer, "Unable to create layer for aten::masked_fill");
 
                     new_layer->setName(util::node_info(n).c_str());
 
@@ -292,4 +292,4 @@ auto select_registrations TRTORCH_UNUSED =
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

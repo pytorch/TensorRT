@@ -2,7 +2,7 @@
 
 # Example usage: docker run -it -v$(pwd)/..:/workspace/TRTorch build_trtorch_wheel /bin/bash /workspace/TRTorch/py/build_whl.sh
 
-cd /workspace/TRTorch/py
+cd /workspace/Torch-TensorRT/py
 
 export CXX=g++
 

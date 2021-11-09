@@ -4,14 +4,14 @@
 #include "core/util/prelude.h"
 #include "core/util/trt_util.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace converters {
 namespace impl {
 namespace {
 
-auto cast_registrations TRTORCH_UNUSED =
+auto cast_registrations TORCHTRT_UNUSED =
     RegisterNodeConversionPatterns()
         .pattern(
             {"aten::to.dtype(Tensor self, int dtype, bool non_blocking=False, bool copy=False, int? memory_format=None) -> (Tensor)",
@@ -60,4 +60,4 @@ auto cast_registrations TRTORCH_UNUSED =
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

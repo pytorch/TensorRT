@@ -3,7 +3,7 @@
 #include "torch/csrc/jit/api/module.h"
 #include "torch/csrc/jit/passes/constant_pooling.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace partitioning {
 
@@ -34,7 +34,8 @@ std::unordered_map<const torch::jit::Value*, torch::jit::IValue> generateRandomI
 
 void getSegmentsOutputByRunning(
     SegmentedBlock& seg_block,
-    std::unordered_map<const torch::jit::Value*, torch::jit::IValue>& ivalues_maps) {
+    std::unordered_map<const torch::jit::Value*, torch::jit::IValue>& ivalues_maps,
+    const PartitionInfo& partition_info) {
   // create a module to run the graph
   auto g = seg_block.g();
   auto copy_g = g->copy();
@@ -63,7 +64,7 @@ void getSegmentsOutputByRunning(
 
   // set inputs ivalues, now supports Tensor/Int to pass argumentes between different segments
   for (auto& input : seg_block.raw_inputs()) {
-    TRTORCH_CHECK(
+    TORCHTRT_CHECK(
         ivalues_maps.count(input),
         "Could not find torch::jit::Value* " << input->debugName() << " produced from "
                                              << util::node_info(input->node())
@@ -81,7 +82,7 @@ void getSegmentsOutputByRunning(
     } else if (input->type()->kind() == torch::jit::TypeKind::TupleType) {
       jit_inputs_ivalues.push_back(ivalues_maps[input].toTuple());
     } else {
-      TRTORCH_THROW_ERROR("Unable to find type for value: " << input->debugName() << " to get the ivalues.\n");
+      TORCHTRT_THROW_ERROR("Unable to find type for value: " << input->debugName() << " to get the ivalues.\n");
     }
   }
 
@@ -108,7 +109,28 @@ void getSegmentsOutputByRunning(
   std::vector<at::ScalarType> input_types;
   for (auto& i : seg_block.raw_inputs()) {
     if (ivalues_maps[i].isTensor()) {
-      input_shapes.push_back(util::toVec(util::toDims(ivalues_maps[i].toTensor().sizes())));
+      // set the input_shape and data_type
+      at::ScalarType t = ivalues_maps[i].toTensor().scalar_type();
+      if (!partition_info.truncate_long_and_double && (t == at::kLong || t == at::kDouble)) {
+        TORCHTRT_THROW_ERROR(
+            "Unable to process subgraph input type of at::kLong/at::kDouble, try to compile model with truncate_long_and_double enabled");
+      } else if (partition_info.truncate_long_and_double && t == at::kLong) {
+        ivalues_maps[i] = ivalues_maps[i].toTensor().to(at::kInt);
+        LOG_WARNING("Truncating graph input type from at::kLong to at::kInt");
+      } else if (partition_info.truncate_long_and_double && t == at::kDouble) {
+        ivalues_maps[i] = ivalues_maps[i].toTensor().to(at::kFloat);
+        LOG_WARNING("Truncating graph input type from at::kDouble to at::kFloat");
+      }
+      c10::optional<nvinfer1::DataType> dtype = util::optTypeMetaToTRTDataType(ivalues_maps[i].toTensor().dtype());
+      if (dtype == c10::nullopt) {
+        TORCHTRT_THROW_ERROR("Unsupported input data type " << ivalues_maps[i].toTensor().dtype());
+      }
+      if (ivalues_maps[i].toTensor().sizes().size() == 0) {
+        // handle Scalar types, which has sizes of []
+        input_shapes.push_back(util::toVec(util::toDims(c10::List<long int>({1}))));
+      } else {
+        input_shapes.push_back(util::toVec(util::toDims(ivalues_maps[i].toTensor().sizes())));
+      }
       input_types.push_back(ivalues_maps[i].toTensor().scalar_type());
     }
   }
@@ -119,15 +141,16 @@ void getSegmentsOutputByRunning(
 
 void runShapeAnalysis(
     std::vector<SegmentedBlock>& segmented_blocks,
-    std::unordered_map<const torch::jit::Value*, torch::jit::IValue>& example_tensor_map) {
+    std::unordered_map<const torch::jit::Value*, torch::jit::IValue>& example_tensor_map,
+    const PartitionInfo& partition_info) {
   // register every segment's input shape, and it's running output IValues
   for (auto& seg_block : segmented_blocks) {
     torch::jit::ConstantPooling(seg_block.g());
-    getSegmentsOutputByRunning(seg_block, example_tensor_map);
+    getSegmentsOutputByRunning(seg_block, example_tensor_map, partition_info);
   }
   return;
 }
 
 } // namespace partitioning
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

@@ -12,7 +12,7 @@
 #include <math.h>
 #include <vector>
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace tests {
 namespace util {
 
@@ -55,8 +55,8 @@ std::vector<core::ir::Input> toInputsDynamic(std::vector<at::Tensor> ten, bool d
 std::vector<at::Tensor> RunEngine(std::string& eng, std::vector<at::Tensor> inputs) {
   LOG_DEBUG("Running TRT version");
   auto cuda_device = core::runtime::CudaDevice(0, nvinfer1::DeviceType::kGPU);
-  auto engine_ptr = c10::make_intrusive<trtorch::core::runtime::TRTEngine>("test_engine", eng, cuda_device);
-  auto outputs = trtorch::core::runtime::execute_engine(inputs, engine_ptr);
+  auto engine_ptr = c10::make_intrusive<torch_tensorrt::core::runtime::TRTEngine>("test_engine", eng, cuda_device);
+  auto outputs = torch_tensorrt::core::runtime::execute_engine(inputs, engine_ptr);
   return outputs;
 }
 
@@ -82,7 +82,7 @@ std::vector<at::Tensor> RunGraphEngine(
   auto in = core::ir::pair_input_vals_with_specs(var_ins, toInputs(inputs));
   auto info = core::conversion::ConversionInfo();
   info.inputs = std::move(in);
-  info.engine_settings.workspace_size = 1 << 20;
+  info.engine_settings.workspace_size = (1 << 30);
   info.engine_settings.enabled_precisions.insert(op_precision);
   std::string eng = core::conversion::ConvertBlockToEngine(g->block(), info, named_params);
   return RunEngine(eng, inputs);
@@ -98,11 +98,11 @@ std::vector<at::Tensor> RunGraphEngineDynamic(
   auto in = core::ir::pair_input_vals_with_specs(var_ins, toInputs(inputs));
   auto info = core::conversion::ConversionInfo();
   info.inputs = std::move(in);
-  info.engine_settings.workspace_size = 1 << 20;
+  info.engine_settings.workspace_size = (1 << 30);
   std::string eng = core::conversion::ConvertBlockToEngine(g->block(), info, named_params);
   return RunEngine(eng, inputs);
 }
 
 } // namespace util
 } // namespace tests
-} // namespace trtorch
+} // namespace torch_tensorrt

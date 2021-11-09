@@ -7,7 +7,7 @@
 #include "core/ir/ir.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace tests {
 namespace util {
 
@@ -54,4 +54,4 @@ std::vector<torch::jit::IValue> EvaluateGraphJIT(
     std::vector<torch::jit::IValue> inputs);
 } // namespace util
 } // namespace tests
-} // namespace trtorch
+} // namespace torch_tensorrt

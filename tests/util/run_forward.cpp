@@ -1,8 +1,8 @@
 #include "tests/util/util.h"
 #include "torch/script.h"
-#include "trtorch/trtorch.h"
+#include "torch_tensorrt/torch_tensorrt.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace tests {
 namespace util {
 
@@ -18,10 +18,10 @@ std::vector<at::Tensor> RunModuleForwardAsEngine(torch::jit::Module& mod, std::v
     input_ranges.push_back(in.sizes());
   }
 
-  auto engine = trtorch::ConvertGraphToTRTEngine(mod, "forward", input_ranges);
+  auto engine = torch_tensorrt::ts::convert_method_to_trt_engine(mod, "forward", input_ranges);
   return RunEngine(engine, inputs);
 }
 
 } // namespace util
 } // namespace tests
-} // namespace trtorch
+} // namespace torch_tensorrt

@@ -9,7 +9,7 @@
 #include "core/runtime/runtime.h"
 #include "torch/csrc/jit/api/module.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 
 struct CompileSpec {
@@ -31,4 +31,4 @@ torch::jit::script::Module EmbedEngineInNewModule(const std::string& engine, run
 void set_device(const int gpu_id);
 
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

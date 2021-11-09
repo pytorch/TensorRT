@@ -7,7 +7,7 @@
 #include "torch/csrc/jit/passes/constant_pooling.h"
 #include "torch/csrc/jit/passes/dead_code_elimination.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace partitioning {
 
@@ -133,7 +133,7 @@ std::vector<SegmentedBlock> segmentBlocksWithNonTensorInputs(SegmentedBlock& seg
     }
   }
 
-  return std::move(new_seg_blocks);
+  return new_seg_blocks;
 }
 
 void resolveNonTensorInputs(PartitionedGraph& segmented_blocks) { // , std::shared_ptr<torch::jit::Graph> g
@@ -179,7 +179,7 @@ void resolveNonTensorInputs(PartitionedGraph& segmented_blocks) { // , std::shar
       auto first_torch_id = use_info.torch_use_id.front();
       if (!updated_segments.count(first_torch_id)) {
         // Segmented Blocks with non-tensor inputs will have to be re-segmented as
-        // TRTorch doesn't support non-tensor inputs for a module.
+        // Torch-TensorRT doesn't support non-tensor inputs for a module.
         auto to_inject_blocks = segmentBlocksWithNonTensorInputs(segmented_blocks[first_torch_id]);
         auto next_iter = segmented_blocks_list.erase(idx_to_iter[first_torch_id]);
         segmented_blocks_list.insert(next_iter, to_inject_blocks.begin(), to_inject_blocks.end());
@@ -190,7 +190,7 @@ void resolveNonTensorInputs(PartitionedGraph& segmented_blocks) { // , std::shar
     for (auto i : use_info.tensorrt_use_id) {
       if (!updated_segments.count(i)) {
         // Segmented Blocks with non-tensor inputs will have to be re-segmented as
-        // TRTorch doesn't support non-tensor inputs for a module.
+        // Torch-TensorRT doesn't support non-tensor inputs for a module.
         auto to_inject_blocks = segmentBlocksWithNonTensorInputs(segmented_blocks[i]);
         auto next_iter = segmented_blocks_list.erase(idx_to_iter[i]);
         segmented_blocks_list.insert(next_iter, to_inject_blocks.begin(), to_inject_blocks.end());
@@ -385,7 +385,7 @@ PartitionedGraph segment_graph(torch::jit::Block* block, const PartitionInfo& pa
     finalize_block(segmented_blocks, SegmentedBlock::kTorch, in_prog_pyt_blk_nodes);
   }
 
-  return std::move(segmented_blocks);
+  return segmented_blocks;
 }
 
 PartitionedGraph Partition(
@@ -404,7 +404,7 @@ PartitionedGraph Partition(
   registerSegmentsOutputs(segmented_blocks, block);
 
   // run shape analysis on each segmented block
-  runShapeAnalysis(segmented_blocks, example_tensor_map);
+  runShapeAnalysis(segmented_blocks, example_tensor_map, partition_info);
 
   LOG_INFO(segmented_blocks);
 
@@ -422,4 +422,4 @@ std::ostream& operator<<(std::ostream& os, const PartitionedGraph& g) {
 
 } // namespace partitioning
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

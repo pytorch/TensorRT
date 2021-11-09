@@ -12,7 +12,7 @@ jobs:
   build-docs:
     runs-on: ubuntu-18.04
     container:
-      image: docker.pkg.github.com/nvidia/trtorch/docgen:latest
+      image: docker.pkg.github.com/nvidia/torch-tensorrt/docgen:latest
       credentials:
         username: $GITHUB_ACTOR
         password: ${{secrets.GITHUB_TOKEN}}
@@ -36,7 +36,7 @@ jobs:
       - name: Generate New Docs
         run: |
           cd docsrc
-          python3 -c "import trtorch; print(trtorch.__version__)"
+          python3 -c "import torch_tensorrt; print(torch_tensorrt.__version__)"
           make html
       - uses: stefanzweifel/git-auto-commit-action@v4
         with:
@@ -44,6 +44,6 @@ jobs:
           commit_message: "docs: [Automated] Regenerating documenation for ${{ steps.vars.outputs.sha }}"
           commit_options: "--no-verify --signoff"
           file_pattern: docs/
-          commit_user_name: TRTorch Github Bot
-          commit_user_email: trtorch.github.bot@nvidia.com
-          commit_author: TRTorch Github Bot <trtorch.github.bot@nvidia.com>
+          commit_user_name: Torch-TensorRT Github Bot
+          commit_user_email: torch-tensorrt.github.bot@nvidia.com
+          commit_author: Torch-TensorRT Github Bot <torch-tensorrt.github.bot@nvidia.com>

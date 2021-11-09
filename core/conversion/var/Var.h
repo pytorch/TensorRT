@@ -8,7 +8,7 @@
 #include "core/util/prelude.h"
 #include "torch/csrc/jit/ir/ir.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 
@@ -36,6 +36,8 @@ class Var : torch::CustomClassHolder {
   double unwrapToDouble();
   bool unwrapToBool(bool default_val);
   bool unwrapToBool();
+  std::string unwrapToString(std::string default_val);
+  std::string unwrapToString();
   c10::Scalar unwrapToScalar(c10::Scalar default_val);
   c10::Scalar unwrapToScalar();
   c10::List<int64_t> unwrapToIntList(c10::List<int64_t> default_val);
@@ -72,6 +74,6 @@ class Var : torch::CustomClassHolder {
 
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt
 
 #include "core/conversion/var/Var_inl.h"

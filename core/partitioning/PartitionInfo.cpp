@@ -4,7 +4,7 @@
 
 #include "core/partitioning/PartitionInfo.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace partitioning {
 // clang-format off
@@ -27,4 +27,4 @@ std::ostream& operator<<(std::ostream& os, const PartitionInfo& s) {
 // clang-format on
 } // namespace partitioning
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

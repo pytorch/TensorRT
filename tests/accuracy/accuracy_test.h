@@ -3,7 +3,7 @@
 #include "gtest/gtest.h"
 #include "tests/util/util.h"
 #include "torch/script.h"
-#include "trtorch/trtorch.h"
+#include "torch_tensorrt/torch_tensorrt.h"
 
 // TODO: Extend this to support other datasets
 class AccuracyTests : public testing::TestWithParam<std::string> {

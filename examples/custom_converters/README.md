@@ -31,11 +31,11 @@ Once we are clear about these rules and writing patterns, we can create a sepera
 
 namespace my_custom_converters {
 
-auto actelu = trtorch::core::conversion::converters::RegisterNodeConversionPatterns().pattern(
+auto actelu = torch_tensorrt::core::conversion::converters::RegisterNodeConversionPatterns().pattern(
     {"aten::elu(Tensor self, Scalar alpha=1, Scalar scale=1, Scalar input_scale=1) -> (Tensor)",
-     [](trtorch::core::conversion::ConversionCtx* ctx,
+     [](torch_tensorrt::core::conversion::ConversionCtx* ctx,
         const torch::jit::Node* n,
-        trtorch::core::conversion::converters::args& args) -> bool {
+        torch_tensorrt::core::conversion::converters::args& args) -> bool {
        auto in = args[0].ITensorOrFreeze(ctx);
        auto alpha = args[1].unwrapToDouble();
 
@@ -45,7 +45,7 @@ auto actelu = trtorch::core::conversion::converters::RegisterNodeConversionPatte
        }
 
        new_layer->setAlpha(alpha);
-       new_layer->setName(trtorch::core::util::node_info(n).c_str());
+       new_layer->setName(torch_tensorrt::core::util::node_info(n).c_str());
        ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
 
        return true;
@@ -65,18 +65,18 @@ from setuptools import setup, Extension
 from torch.utils import cpp_extension
 
 
-# library_dirs should point to the libtrtorch.so, include_dirs should point to the dir that include the headers
+# library_dirs should point to the libtorch_tensorrt.so, include_dirs should point to the dir that include the headers
 # 1) download the latest package from https://github.com/NVIDIA/TRTorch/releases/
-# 2) Extract the file from downloaded package, we will get the "trtorch" directory
-# 3) Set trtorch_path to that directory
-trtorch_path = <PATH TO TRTORCH>
+# 2) Extract the file from downloaded package, we will get the "torch_tensorrt" directory
+# 3) Set torch_tensorrt_path to that directory
+torch_tensorrt_path = <PATH TO TRTORCH>
 
 
 ext_modules = [
     cpp_extension.CUDAExtension('elu_converter', ['./csrc/elu_converter.cpp'],
-                                library_dirs=[(trtorch_path + "/lib/")],
-                                libraries=["trtorch"],
-                                include_dirs=[trtorch_path + "/include/trtorch/"])
+                                library_dirs=[(torch_tensorrt_path + "/lib/")],
+                                libraries=["torch_tensorrt"],
+                                include_dirs=[torch_tensorrt_path + "/include/torch_tensorrt/"])
 ]
 
 setup(
@@ -88,7 +88,7 @@ setup(
 Make sure to include the path for header files in `include_dirs` and the path
 for dependent libraries in `library_dirs`. Generally speaking, you should download
 the latest package from [here](https://github.com/NVIDIA/TRTorch/releases), extract
-the files, and the set the `trtorch_path` to it. You could also add other compilation
+the files, and the set the `torch_tensorrt_path` to it. You could also add other compilation
 flags in cpp_extension if you need. Then, run above python scripts as:
 ```shell
 python3 setup.py install --user
@@ -104,7 +104,7 @@ We use `torch.ops.load_library` to load `.so`. For example, we could load the EL
 converter and use it in our application:
 ```python
 import torch
-import trtorch
+import torch_tensorrt
 
 # After "python3 setup install", you should find this .so file under generated "build" directory
 torch.ops.load_library('./elu_converter/build/lib.linux-x86_64-3.6/elu_converter.cpython-36m-x86_64-linux-gnu.so')
@@ -120,8 +120,8 @@ class Elu(torch.nn.Module):
         return self.elu(x)
 
 
-def cal_max_diff(pytorch_out, trtorch_out):
-    diff = torch.sub(pytorch_out, trtorch_out)
+def cal_max_diff(pytorch_out, torch_tensorrt_out):
+    diff = torch.sub(pytorch_out, torch_tensorrt_out)
     abs_diff = torch.abs(diff)
     max_diff = torch.max(abs_diff)
     print("Maximum differnce between TRTorch and PyTorch: \n", max_diff)
@@ -132,22 +132,22 @@ def main():
 
     scripted_model = torch.jit.script(model)
     compile_settings = {
-        "inputs": [trtorch.Input(
+        "inputs": [torch_tensorrt.Input(
             min_shape=[1024, 1, 32, 32],
             opt_shape=[1024, 1, 33, 33],
             max_shape=[1024, 1, 34, 34],
         }],
         "enabled_precisions": {torch.float, torch.half}  # Run with FP16
     }
-    trt_ts_module = trtorch.compile(scripted_model, compile_settings)
+    trt_ts_module = torch_tensorrt.compile(scripted_model, compile_settings)
     input_data = torch.randn((1024, 1, 32, 32))
     input_data = input_data.half().to("cuda")
     pytorch_out = model.forward(input_data)
 
-    trtorch_out = trt_ts_module(input_data)
+    torch_tensorrt_out = trt_ts_module(input_data)
     print('PyTorch output: \n', pytorch_out[0, :, :, 0])
-    print('TRTorch output: \n', trtorch_out[0, :, :, 0])
-    cal_max_diff(pytorch_out, trtorch_out)
+    print('TRTorch output: \n', torch_tensorrt_out[0, :, :, 0])
+    cal_max_diff(pytorch_out, torch_tensorrt_out)
 
 
 if __name__ == "__main__":

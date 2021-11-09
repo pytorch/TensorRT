@@ -7,6 +7,13 @@ config_setting(
     },
 )
 
+config_setting(
+    name = "ci_build_testing",
+    values  = {
+        "define": "torchtrt_src=prebuilt"
+    }
+)
+
 cc_library(
     name = "util",
     srcs = [
@@ -31,12 +38,12 @@ cc_library(
             "@libtorch//:caffe2",
         ],
     }) + select({
-        "//tests:ci_build_testing": [
-            "@trtorch//:trtorch",
-            "@trtorch//:trtorch_core_hdrs"
+        ":ci_build_testing": [
+            "@torch_tensorrt//:torch_tensorrt",
+            "@torch_tensorrt//:torch_tensorrt_core_hdrs"
         ],
         "//conditions:default": [
-            "//cpp:trtorch",
+            "//cpp:torch_tensorrt",
             "//core/conversion",
             "//core/util:prelude"
         ]

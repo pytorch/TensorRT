@@ -3,7 +3,7 @@
 #include "cuda_runtime_api.h"
 #include "torch/script.h"
 #include "torch/torch.h"
-#include "trtorch/trtorch.h"
+#include "torch_tensorrt/torch_tensorrt.h"
 
 #include "timer.h"
 

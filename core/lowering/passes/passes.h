@@ -2,7 +2,7 @@
 
 #include "torch/csrc/jit/ir/ir.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace lowering {
 namespace passes {
@@ -12,6 +12,8 @@ void NotateModuleForFallback(
     std::string mod_name,
     std::string method_name,
     std::unordered_set<std::string> forced_fallback_modules);
+void Conv1DToConvolution(std::shared_ptr<torch::jit::Graph>& graph);
+void ConvTransposed1DToConvolution(std::shared_ptr<torch::jit::Graph>& graph);
 void Conv2DToConvolution(std::shared_ptr<torch::jit::Graph>& graph);
 void Conv3DToConvolution(std::shared_ptr<torch::jit::Graph>& graph);
 void FuseAddMMBranches(std::shared_ptr<torch::jit::Graph> graph);
@@ -35,4 +37,4 @@ void UnpackHardSwish(std::shared_ptr<torch::jit::Graph>& graph);
 } // namespace passes
 } // namespace lowering
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt
