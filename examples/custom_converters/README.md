@@ -16,13 +16,13 @@ Note that ELU converter is now supported in our library. If you want to get abov
 error and run the example in this document, you can either:
 1. get the source code, go to root directory, then run: <br />
   `git apply ./examples/custom_converters/elu_converter/disable_core_elu.patch`
-2. If you are using a pre-downloaded release of TRTorch, you need to make sure that
-it doesn't support elu operator in default. (TRTorch <= v0.1.0)
+2. If you are using a pre-downloaded release of Torch-TensorRT, you need to make sure that
+it doesn't support elu operator in default. (Torch-TensorRT <= v0.1.0)
 
 ## Writing Converter in C++
 We can register a converter for this operator in our application. You can find more
 information on all the details of writing converters in the contributors documentation
-([Writing Converters](https://nvidia.github.io/TRTorch/contributors/writing_converters.html)).
+([Writing Converters](https://nvidia.github.io/Torch-TensorRT/contributors/writing_converters.html)).
 Once we are clear about these rules and writing patterns, we can create a seperate new C++ source file as:
 
 ```c++
@@ -66,7 +66,7 @@ from torch.utils import cpp_extension
 
 
 # library_dirs should point to the libtorch_tensorrt.so, include_dirs should point to the dir that include the headers
-# 1) download the latest package from https://github.com/NVIDIA/TRTorch/releases/
+# 1) download the latest package from https://github.com/NVIDIA/Torch-TensorRT/releases/
 # 2) Extract the file from downloaded package, we will get the "torch_tensorrt" directory
 # 3) Set torch_tensorrt_path to that directory
 torch_tensorrt_path = <PATH TO TRTORCH>
@@ -87,7 +87,7 @@ setup(
 ```
 Make sure to include the path for header files in `include_dirs` and the path
 for dependent libraries in `library_dirs`. Generally speaking, you should download
-the latest package from [here](https://github.com/NVIDIA/TRTorch/releases), extract
+the latest package from [here](https://github.com/NVIDIA/Torch-TensorRT/releases), extract
 the files, and the set the `torch_tensorrt_path` to it. You could also add other compilation
 flags in cpp_extension if you need. Then, run above python scripts as:
 ```shell
@@ -99,7 +99,7 @@ by the command above. In build folder, you can find the generated `.so` library,
 which could be loaded in our Python application.
 
 ## Load `.so` in Python Application
-With the new generated library, TRTorch now support the new developed converter.
+With the new generated library, Torch-TensorRT now support the new developed converter.
 We use `torch.ops.load_library` to load `.so`. For example, we could load the ELU
 converter and use it in our application:
 ```python
@@ -124,7 +124,7 @@ def cal_max_diff(pytorch_out, torch_tensorrt_out):
     diff = torch.sub(pytorch_out, torch_tensorrt_out)
     abs_diff = torch.abs(diff)
     max_diff = torch.max(abs_diff)
-    print("Maximum differnce between TRTorch and PyTorch: \n", max_diff)
+    print("Maximum differnce between Torch-TensorRT and PyTorch: \n", max_diff)
 
 
 def main():
@@ -146,7 +146,7 @@ def main():
 
     torch_tensorrt_out = trt_ts_module(input_data)
     print('PyTorch output: \n', pytorch_out[0, :, :, 0])
-    print('TRTorch output: \n', torch_tensorrt_out[0, :, :, 0])
+    print('Torch-TensorRT output: \n', torch_tensorrt_out[0, :, :, 0])
     cal_max_diff(pytorch_out, torch_tensorrt_out)
 
 
@@ -154,4 +154,4 @@ if __name__ == "__main__":
     main()
 
 ```
-Run this script, we can get the different outputs from PyTorch and TRTorch.
+Run this script, we can get the different outputs from PyTorch and Torch-TensorRT.

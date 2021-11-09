@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch_tensorrt as torchtrt
 
 # create a simple norm layer.
-# This norm layer uses NormalizePlugin from TRTorch
+# This norm layer uses NormalizePlugin from Torch-TensorRT
 class Norm(torch.nn.Module):
     def __init__(self):
         super(Norm, self).__init__()
@@ -12,7 +12,7 @@ class Norm(torch.nn.Module):
         return torch.norm(x, 2, None, False)
 
 # Create a sample network with a conv and gelu node.
-# Gelu layer in TRTorch is converted to CustomGeluPluginDynamic from TensorRT plugin registry.
+# Gelu layer in Torch-TensorRT is converted to CustomGeluPluginDynamic from TensorRT plugin registry.
 class ConvGelu(torch.nn.Module):
     def __init__(self):
         super(ConvGelu, self).__init__()
