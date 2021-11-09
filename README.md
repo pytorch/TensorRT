@@ -97,7 +97,7 @@ torch.jit.save(trt_ts_module, "trt_torchscript_module.ts") # save the TRT embedd
 | Linux aarch64 / DLA | **Native Compilation Supported on JetPack-4.4+** |
 | Windows / GPU       | **Unofficial Support**                           |
 | Linux ppc64le / GPU | -                                                |
-| NGC Containers      | **Including in PyTorch NGC Containers 21.11+**   |
+| NGC Containers      | **Included in PyTorch NGC Containers 21.11+**   |
 
 > Torch-TensorRT will be included in NVIDIA NGC containers (https://ngc.nvidia.com/catalog/containers/nvidia:pytorch) starting in 21.11.
 
@@ -216,7 +216,7 @@ bazel build //:libtorchtrt --compilation_mode=dbg
 ```
 
 ### Native compilation on NVIDIA Jetson AGX
-We performed end to end testing on Jetson platform using Jetpack SDK 4.6. 
+We performed end to end testing on Jetson platform using Jetpack SDK 4.6.
 
 ``` shell
 bazel build //:libtorchtrt --platforms //toolchains:jetpack_4.6

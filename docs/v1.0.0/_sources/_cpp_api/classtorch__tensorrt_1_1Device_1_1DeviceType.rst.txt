@@ -1,0 +1,22 @@
+.. _exhale_class_classtorch__tensorrt_1_1Device_1_1DeviceType:
+
+Class Device::DeviceType
+========================
+
+- Defined in :ref:`file_cpp_include_torch_tensorrt_torch_tensorrt.h`
+
+
+Nested Relationships
+--------------------
+
+This class is a nested type of :ref:`exhale_struct_structtorch__tensorrt_1_1Device`.
+
+
+Class Documentation
+-------------------
+
+
+.. doxygenclass:: torch_tensorrt::Device::DeviceType
+   :members:
+   :protected-members:
+   :undoc-members:

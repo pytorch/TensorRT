@@ -10,7 +10,7 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-import os   
+import os
 import sys
 
 sys.path.append(os.path.join(os.path.dirname(__name__), '../py'))
@@ -119,6 +119,7 @@ html_theme_options = {
     'master_doc': True,
     "version_info": {
         "master": "https://nvidia.github.io/Torch-TensorRT/",
+        "v1.0.0": "https://nvidia.github.io/Torch-TensorRT/v1.0.0/",
         "v0.4.1": "https://nvidia.github.io/Torch-TensorRT/v0.4.1/",
         "v0.4.0": "https://nvidia.github.io/Torch-TensorRT/v0.4.0/",
         "v0.3.0": "https://nvidia.github.io/Torch-TensorRT/v0.3.0/",
