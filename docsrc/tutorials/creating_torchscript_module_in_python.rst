@@ -64,7 +64,7 @@ To trace an instance of our LeNet module, we can call ``torch.jit.trace`` with a
 
 .. code-block:: python
 
-    import torch.jit
+    import torch
 
     model = LeNet()
     input_data = torch.empty([1,1,32,32])
@@ -76,7 +76,7 @@ include these components. We can run the script compiler on our LeNet module by 
 
 .. code-block:: python
 
-    import torch.jit
+    import torch
 
     model = LeNet()
     script_model = torch.jit.script(model)
@@ -130,7 +130,7 @@ For either traced or scripted modules, you can save the module to disk with the 
 
 .. code-block:: python
 
-    import torch.jit
+    import torch
 
     model = LeNet()
     script_model = torch.jit.script(model)
