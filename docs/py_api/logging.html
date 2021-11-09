@@ -3,7 +3,6 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -311,6 +310,11 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/Resnet50-example.html">
+            Torch-TensorRT Getting Started - ResNet 50
+           </a>
+          </li>
+          <li class="md-nav__item">
            <a class="md-nav__link" href="../_notebooks/ssd-object-detection-demo.html">
             Object Detection with Torch-TensorRT (SSD)
            </a>
@@ -333,11 +337,6 @@
            </a>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="ts.html">
-            torch_tensorrt.ts
-           </a>
-          </li>
-          <li class="md-nav__item">
            <input class="md-toggle md-nav__toggle" data-md-toggle="toc" id="__toc" type="checkbox"/>
            <label class="md-nav__link md-nav__link--active" for="__toc">
             torch_tensorrt.logging
@@ -354,6 +353,43 @@
              </li>
             </ul>
            </nav>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="ts.html">
+            torch_tensorrt.ts
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             C++ API Documenation
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/torch_tensort_cpp.html">
+            Torch-TensorRT C++ API
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt.html">
+            Namespace torch_tensorrt
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt__logging.html">
+            Namespace torch_tensorrt::logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt__torchscript.html">
+            Namespace torch_tensorrt::torchscript
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt__ptq.html">
+            Namespace torch_tensorrt::ptq
+           </a>
           </li>
           <li class="md-nav__item">
            <span class="md-nav__link caption">
@@ -413,522 +449,522 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <section id="torch-tensorrt-logging">
-        <h1 id="py-api-logging--page-root">
-         torch_tensorrt.logging
-         <a class="headerlink" href="#py-api-logging--page-root" title="Permalink to this headline">
+       <span id="torch-tensorrt-logging-py">
+       </span>
+       <h1 id="py-api-logging--page-root">
+        torch_tensorrt.logging
+        <a class="headerlink" href="#py-api-logging--page-root" title="Permalink to this headline">
+         ¶
+        </a>
+       </h1>
+       <span class="target" id="module-torch_tensorrt.logging">
+       </span>
+       <dl class="py class">
+        <dt id="torch_tensorrt.logging.Level">
+         <em class="property">
+          class
+         </em>
+         <code class="sig-prename descclassname">
+          torch_tensorrt.logging.
+         </code>
+         <code class="sig-name descname">
+          Level
+         </code>
+         <span class="sig-paren">
+          (
+         </span>
+         <em class="sig-param">
+          <span class="n">
+           value
+          </span>
+         </em>
+         <span class="sig-paren">
+          )
+         </span>
+         <a class="headerlink" href="#torch_tensorrt.logging.Level" title="Permalink to this definition">
           ¶
          </a>
-        </h1>
-        <span class="target" id="module-torch_tensorrt.logging">
-        </span>
-        <dl class="py class">
-         <dt id="torch_tensorrt.logging.Level">
-          <em class="property">
-           class
-          </em>
-          <code class="sig-prename descclassname">
-           torch_tensorrt.logging.
-          </code>
-          <code class="sig-name descname">
-           Level
-          </code>
-          <span class="sig-paren">
-           (
-          </span>
-          <em class="sig-param">
-           <span class="n">
-            value
+        </dt>
+        <dd>
+         <p>
+          Bases:
+          <code class="xref cpp cpp-class docutils literal notranslate">
+           <span class="pre">
+            enum.Enum
            </span>
-          </em>
-          <span class="sig-paren">
-           )
-          </span>
-          <a class="headerlink" href="#torch_tensorrt.logging.Level" title="Permalink to this definition">
-           ¶
-          </a>
-         </dt>
-         <dd>
-          <p>
-           Bases:
-           <code class="xref cpp cpp-class docutils literal notranslate">
-            <span class="pre">
-             enum.Enum
-            </span>
+          </code>
+         </p>
+         <p>
+          Enum to set the minimum required logging level to print a message to stdout
+         </p>
+         <dl class="py attribute">
+          <dt id="torch_tensorrt.logging.Level.Debug">
+           <code class="sig-name descname">
+            Debug
            </code>
-          </p>
-          <p>
-           Enum to set the minimum required logging level to print a message to stdout
-          </p>
-          <dl class="py attribute">
-           <dt id="torch_tensorrt.logging.Level.Debug">
-            <code class="sig-name descname">
-             Debug
-            </code>
-            <em class="property">
-             = &lt;LogLevel.DEBUG: 4&gt;
-            </em>
-            <a class="headerlink" href="#torch_tensorrt.logging.Level.Debug" title="Permalink to this definition">
-             ¶
-            </a>
-           </dt>
-           <dd>
-           </dd>
-          </dl>
-          <dl class="py attribute">
-           <dt id="torch_tensorrt.logging.Level.Error">
-            <code class="sig-name descname">
-             Error
-            </code>
-            <em class="property">
-             = &lt;LogLevel.ERROR: 1&gt;
-            </em>
-            <a class="headerlink" href="#torch_tensorrt.logging.Level.Error" title="Permalink to this definition">
-             ¶
-            </a>
-           </dt>
-           <dd>
-           </dd>
-          </dl>
-          <dl class="py attribute">
-           <dt id="torch_tensorrt.logging.Level.Graph">
-            <code class="sig-name descname">
-             Graph
-            </code>
-            <em class="property">
-             = &lt;LogLevel.GRAPH: 5&gt;
-            </em>
-            <a class="headerlink" href="#torch_tensorrt.logging.Level.Graph" title="Permalink to this definition">
-             ¶
-            </a>
-           </dt>
-           <dd>
-           </dd>
-          </dl>
-          <dl class="py attribute">
-           <dt id="torch_tensorrt.logging.Level.Info">
-            <code class="sig-name descname">
-             Info
-            </code>
-            <em class="property">
-             = &lt;LogLevel.INFO: 3&gt;
-            </em>
-            <a class="headerlink" href="#torch_tensorrt.logging.Level.Info" title="Permalink to this definition">
-             ¶
-            </a>
-           </dt>
-           <dd>
-           </dd>
-          </dl>
-          <dl class="py attribute">
-           <dt id="torch_tensorrt.logging.Level.InternalError">
-            <code class="sig-name descname">
-             InternalError
-            </code>
-            <em class="property">
-             = &lt;LogLevel.INTERNAL_ERROR: 0&gt;
-            </em>
-            <a class="headerlink" href="#torch_tensorrt.logging.Level.InternalError" title="Permalink to this definition">
-             ¶
-            </a>
-           </dt>
-           <dd>
-           </dd>
-          </dl>
-          <dl class="py attribute">
-           <dt id="torch_tensorrt.logging.Level.Warning">
-            <code class="sig-name descname">
-             Warning
-            </code>
-            <em class="property">
-             = &lt;LogLevel.WARNING: 2&gt;
-            </em>
-            <a class="headerlink" href="#torch_tensorrt.logging.Level.Warning" title="Permalink to this definition">
-             ¶
-            </a>
-           </dt>
-           <dd>
-           </dd>
-          </dl>
-         </dd>
-        </dl>
-        <dl class="py function">
-         <dt id="torch_tensorrt.logging.get_is_colored_output_on">
-          <code class="sig-prename descclassname">
-           torch_tensorrt.logging.
-          </code>
-          <code class="sig-name descname">
-           get_is_colored_output_on
-          </code>
-          <span class="sig-paren">
-           (
-          </span>
-          <span class="sig-paren">
-           )
-          </span>
-          → bool
-          <a class="headerlink" href="#torch_tensorrt.logging.get_is_colored_output_on" title="Permalink to this definition">
-           ¶
-          </a>
-         </dt>
-         <dd>
-          <p>
-           Get if colored output is enabled for logging
-          </p>
-          <dl class="field-list simple">
-           <dt class="field-odd">
-            Returns
-           </dt>
-           <dd class="field-odd">
-            <p>
-             If colored output is one
-            </p>
-           </dd>
-           <dt class="field-even">
-            Return type
-           </dt>
-           <dd class="field-even">
-            <p>
-             bool
-            </p>
-           </dd>
-          </dl>
-         </dd>
-        </dl>
-        <dl class="py function">
-         <dt id="torch_tensorrt.logging.get_logging_prefix">
-          <code class="sig-prename descclassname">
-           torch_tensorrt.logging.
-          </code>
-          <code class="sig-name descname">
-           get_logging_prefix
-          </code>
-          <span class="sig-paren">
-           (
-          </span>
-          <span class="sig-paren">
-           )
-          </span>
-          → str
-          <a class="headerlink" href="#torch_tensorrt.logging.get_logging_prefix" title="Permalink to this definition">
-           ¶
-          </a>
-         </dt>
-         <dd>
-          <p>
-           Get the prefix set for logging messages
-          </p>
-          <dl class="field-list simple">
-           <dt class="field-odd">
-            Returns
-           </dt>
-           <dd class="field-odd">
-            <p>
-             Prefix used for logger
-            </p>
-           </dd>
-           <dt class="field-even">
-            Return type
-           </dt>
-           <dd class="field-even">
-            <p>
-             str
-            </p>
-           </dd>
-          </dl>
-         </dd>
-        </dl>
-        <dl class="py function">
-         <dt id="torch_tensorrt.logging.get_reportable_log_level">
-          <code class="sig-prename descclassname">
-           torch_tensorrt.logging.
-          </code>
-          <code class="sig-name descname">
-           get_reportable_log_level
-          </code>
-          <span class="sig-paren">
-           (
-          </span>
-          <span class="sig-paren">
-           )
-          </span>
-          →
-          <a class="reference internal" href="#torch_tensorrt.logging.Level" title="torch_tensorrt.logging.Level">
-           torch_tensorrt.logging.Level
-          </a>
-          <a class="headerlink" href="#torch_tensorrt.logging.get_reportable_log_level" title="Permalink to this definition">
-           ¶
-          </a>
-         </dt>
-         <dd>
-          <p>
-           Get the level required for a message to be printed in the log
-          </p>
-          <dl class="field-list simple">
-           <dt class="field-odd">
-            Returns
-           </dt>
-           <dd class="field-odd">
-            <p>
-             The enum representing the level required to print
-            </p>
-           </dd>
-           <dt class="field-even">
-            Return type
-           </dt>
-           <dd class="field-even">
-            <p>
-             trtorch.logging.Level
-            </p>
-           </dd>
-          </dl>
-         </dd>
-        </dl>
-        <dl class="py function">
-         <dt id="torch_tensorrt.logging.log">
-          <code class="sig-prename descclassname">
-           torch_tensorrt.logging.
-          </code>
-          <code class="sig-name descname">
-           log
-          </code>
-          <span class="sig-paren">
-           (
-          </span>
-          <em class="sig-param">
-           <span class="n">
-            level
-           </span>
-           <span class="p">
-            :
-           </span>
-           <span class="n">
-            <a class="reference internal" href="#torch_tensorrt.logging.Level" title="torch_tensorrt.logging.Level">
-             torch_tensorrt.logging.Level
-            </a>
-           </span>
-          </em>
-          ,
-          <em class="sig-param">
-           <span class="n">
-            msg
-           </span>
-           <span class="p">
-            :
-           </span>
-           <span class="n">
-            str
-           </span>
-          </em>
-          <span class="sig-paren">
-           )
-          </span>
-          <a class="headerlink" href="#torch_tensorrt.logging.log" title="Permalink to this definition">
-           ¶
-          </a>
-         </dt>
-         <dd>
-          <p>
-           Add a new message to the log
-          </p>
-          <p>
-           Adds a new message to the log at a specified level. The message
-will only get printed out if Level &gt; reportable_log_level
-          </p>
-          <dl class="field-list simple">
-           <dt class="field-odd">
-            Parameters
-           </dt>
-           <dd class="field-odd">
-            <ul class="simple">
-             <li>
-              <p>
-               <strong>
-                level
-               </strong>
-               (
-               <em>
-                trtorch.logging.Level
-               </em>
-               ) – Severity of the message
-              </p>
-             </li>
-             <li>
-              <p>
-               <strong>
-                msg
-               </strong>
-               (
-               <em>
-                str
-               </em>
-               ) – Actual message text
-              </p>
-             </li>
-            </ul>
-           </dd>
-          </dl>
-         </dd>
-        </dl>
-        <dl class="py function">
-         <dt id="torch_tensorrt.logging.set_is_colored_output_on">
-          <code class="sig-prename descclassname">
-           torch_tensorrt.logging.
-          </code>
-          <code class="sig-name descname">
-           set_is_colored_output_on
-          </code>
-          <span class="sig-paren">
-           (
-          </span>
-          <em class="sig-param">
-           <span class="n">
-            colored_output_on
-           </span>
-           <span class="p">
-            :
-           </span>
-           <span class="n">
+           <em class="property">
+            = &lt;LogLevel.DEBUG: 4&gt;
+           </em>
+           <a class="headerlink" href="#torch_tensorrt.logging.Level.Debug" title="Permalink to this definition">
+            ¶
+           </a>
+          </dt>
+          <dd>
+          </dd>
+         </dl>
+         <dl class="py attribute">
+          <dt id="torch_tensorrt.logging.Level.Error">
+           <code class="sig-name descname">
+            Error
+           </code>
+           <em class="property">
+            = &lt;LogLevel.ERROR: 1&gt;
+           </em>
+           <a class="headerlink" href="#torch_tensorrt.logging.Level.Error" title="Permalink to this definition">
+            ¶
+           </a>
+          </dt>
+          <dd>
+          </dd>
+         </dl>
+         <dl class="py attribute">
+          <dt id="torch_tensorrt.logging.Level.Graph">
+           <code class="sig-name descname">
+            Graph
+           </code>
+           <em class="property">
+            = &lt;LogLevel.GRAPH: 5&gt;
+           </em>
+           <a class="headerlink" href="#torch_tensorrt.logging.Level.Graph" title="Permalink to this definition">
+            ¶
+           </a>
+          </dt>
+          <dd>
+          </dd>
+         </dl>
+         <dl class="py attribute">
+          <dt id="torch_tensorrt.logging.Level.Info">
+           <code class="sig-name descname">
+            Info
+           </code>
+           <em class="property">
+            = &lt;LogLevel.INFO: 3&gt;
+           </em>
+           <a class="headerlink" href="#torch_tensorrt.logging.Level.Info" title="Permalink to this definition">
+            ¶
+           </a>
+          </dt>
+          <dd>
+          </dd>
+         </dl>
+         <dl class="py attribute">
+          <dt id="torch_tensorrt.logging.Level.InternalError">
+           <code class="sig-name descname">
+            InternalError
+           </code>
+           <em class="property">
+            = &lt;LogLevel.INTERNAL_ERROR: 0&gt;
+           </em>
+           <a class="headerlink" href="#torch_tensorrt.logging.Level.InternalError" title="Permalink to this definition">
+            ¶
+           </a>
+          </dt>
+          <dd>
+          </dd>
+         </dl>
+         <dl class="py attribute">
+          <dt id="torch_tensorrt.logging.Level.Warning">
+           <code class="sig-name descname">
+            Warning
+           </code>
+           <em class="property">
+            = &lt;LogLevel.WARNING: 2&gt;
+           </em>
+           <a class="headerlink" href="#torch_tensorrt.logging.Level.Warning" title="Permalink to this definition">
+            ¶
+           </a>
+          </dt>
+          <dd>
+          </dd>
+         </dl>
+        </dd>
+       </dl>
+       <dl class="py function">
+        <dt id="torch_tensorrt.logging.get_is_colored_output_on">
+         <code class="sig-prename descclassname">
+          torch_tensorrt.logging.
+         </code>
+         <code class="sig-name descname">
+          get_is_colored_output_on
+         </code>
+         <span class="sig-paren">
+          (
+         </span>
+         <span class="sig-paren">
+          )
+         </span>
+         → bool
+         <a class="headerlink" href="#torch_tensorrt.logging.get_is_colored_output_on" title="Permalink to this definition">
+          ¶
+         </a>
+        </dt>
+        <dd>
+         <p>
+          Get if colored output is enabled for logging
+         </p>
+         <dl class="field-list simple">
+          <dt class="field-odd">
+           Returns
+          </dt>
+          <dd class="field-odd">
+           <p>
+            If colored output is one
+           </p>
+          </dd>
+          <dt class="field-even">
+           Return type
+          </dt>
+          <dd class="field-even">
+           <p>
             bool
-           </span>
-          </em>
-          <span class="sig-paren">
-           )
-          </span>
-          <a class="headerlink" href="#torch_tensorrt.logging.set_is_colored_output_on" title="Permalink to this definition">
-           ¶
-          </a>
-         </dt>
-         <dd>
-          <p>
-           Enable or disable color in the log output
-          </p>
-          <dl class="field-list simple">
-           <dt class="field-odd">
-            Parameters
-           </dt>
-           <dd class="field-odd">
-            <p>
-             <strong>
-              colored_output_on
-             </strong>
-             (
-             <em>
-              bool
-             </em>
-             ) – If colored output should be enabled or not
-            </p>
-           </dd>
-          </dl>
-         </dd>
-        </dl>
-        <dl class="py function">
-         <dt id="torch_tensorrt.logging.set_logging_prefix">
-          <code class="sig-prename descclassname">
-           torch_tensorrt.logging.
-          </code>
-          <code class="sig-name descname">
-           set_logging_prefix
-          </code>
-          <span class="sig-paren">
-           (
-          </span>
-          <em class="sig-param">
-           <span class="n">
-            prefix
-           </span>
-           <span class="p">
-            :
-           </span>
-           <span class="n">
+           </p>
+          </dd>
+         </dl>
+        </dd>
+       </dl>
+       <dl class="py function">
+        <dt id="torch_tensorrt.logging.get_logging_prefix">
+         <code class="sig-prename descclassname">
+          torch_tensorrt.logging.
+         </code>
+         <code class="sig-name descname">
+          get_logging_prefix
+         </code>
+         <span class="sig-paren">
+          (
+         </span>
+         <span class="sig-paren">
+          )
+         </span>
+         → str
+         <a class="headerlink" href="#torch_tensorrt.logging.get_logging_prefix" title="Permalink to this definition">
+          ¶
+         </a>
+        </dt>
+        <dd>
+         <p>
+          Get the prefix set for logging messages
+         </p>
+         <dl class="field-list simple">
+          <dt class="field-odd">
+           Returns
+          </dt>
+          <dd class="field-odd">
+           <p>
+            Prefix used for logger
+           </p>
+          </dd>
+          <dt class="field-even">
+           Return type
+          </dt>
+          <dd class="field-even">
+           <p>
             str
-           </span>
-          </em>
-          <span class="sig-paren">
-           )
+           </p>
+          </dd>
+         </dl>
+        </dd>
+       </dl>
+       <dl class="py function">
+        <dt id="torch_tensorrt.logging.get_reportable_log_level">
+         <code class="sig-prename descclassname">
+          torch_tensorrt.logging.
+         </code>
+         <code class="sig-name descname">
+          get_reportable_log_level
+         </code>
+         <span class="sig-paren">
+          (
+         </span>
+         <span class="sig-paren">
+          )
+         </span>
+         →
+         <a class="reference internal" href="#torch_tensorrt.logging.Level" title="torch_tensorrt.logging.Level">
+          torch_tensorrt.logging.Level
+         </a>
+         <a class="headerlink" href="#torch_tensorrt.logging.get_reportable_log_level" title="Permalink to this definition">
+          ¶
+         </a>
+        </dt>
+        <dd>
+         <p>
+          Get the level required for a message to be printed in the log
+         </p>
+         <dl class="field-list simple">
+          <dt class="field-odd">
+           Returns
+          </dt>
+          <dd class="field-odd">
+           <p>
+            The enum representing the level required to print
+           </p>
+          </dd>
+          <dt class="field-even">
+           Return type
+          </dt>
+          <dd class="field-even">
+           <p>
+            trtorch.logging.Level
+           </p>
+          </dd>
+         </dl>
+        </dd>
+       </dl>
+       <dl class="py function">
+        <dt id="torch_tensorrt.logging.log">
+         <code class="sig-prename descclassname">
+          torch_tensorrt.logging.
+         </code>
+         <code class="sig-name descname">
+          log
+         </code>
+         <span class="sig-paren">
+          (
+         </span>
+         <em class="sig-param">
+          <span class="n">
+           level
           </span>
-          <a class="headerlink" href="#torch_tensorrt.logging.set_logging_prefix" title="Permalink to this definition">
-           ¶
-          </a>
-         </dt>
-         <dd>
-          <p>
-           Set the prefix used when logging messages
-          </p>
-          <dl class="field-list simple">
-           <dt class="field-odd">
-            Parameters
-           </dt>
-           <dd class="field-odd">
-            <p>
-             <strong>
-              prefix
-             </strong>
-             (
-             <em>
-              str
-             </em>
-             ) – Prefix to use for logging messages
-            </p>
-           </dd>
-          </dl>
-         </dd>
-        </dl>
-        <dl class="py function">
-         <dt id="torch_tensorrt.logging.set_reportable_log_level">
-          <code class="sig-prename descclassname">
-           torch_tensorrt.logging.
-          </code>
-          <code class="sig-name descname">
-           set_reportable_log_level
-          </code>
-          <span class="sig-paren">
-           (
+          <span class="p">
+           :
           </span>
-          <em class="sig-param">
-           <span class="n">
-            level
-           </span>
-           <span class="p">
-            :
-           </span>
-           <span class="n">
-            <a class="reference internal" href="#torch_tensorrt.logging.Level" title="torch_tensorrt.logging.Level">
-             torch_tensorrt.logging.Level
-            </a>
-           </span>
-          </em>
-          <span class="sig-paren">
-           )
+          <span class="n">
+           <a class="reference internal" href="#torch_tensorrt.logging.Level" title="torch_tensorrt.logging.Level">
+            torch_tensorrt.logging.Level
+           </a>
           </span>
-          <a class="headerlink" href="#torch_tensorrt.logging.set_reportable_log_level" title="Permalink to this definition">
-           ¶
-          </a>
-         </dt>
-         <dd>
-          <p>
-           Set the level required for a message to be printed to the log
-          </p>
-          <dl class="field-list simple">
-           <dt class="field-odd">
-            Parameters
-           </dt>
-           <dd class="field-odd">
-            <p>
-             <strong>
-              level
-             </strong>
-             (
-             <em>
-              trtorch.logging.Level
-             </em>
-             ) – The enum representing the level required to print
-            </p>
-           </dd>
-          </dl>
-         </dd>
-        </dl>
-       </section>
+         </em>
+         ,
+         <em class="sig-param">
+          <span class="n">
+           msg
+          </span>
+          <span class="p">
+           :
+          </span>
+          <span class="n">
+           str
+          </span>
+         </em>
+         <span class="sig-paren">
+          )
+         </span>
+         <a class="headerlink" href="#torch_tensorrt.logging.log" title="Permalink to this definition">
+          ¶
+         </a>
+        </dt>
+        <dd>
+         <p>
+          Add a new message to the log
+         </p>
+         <p>
+          Adds a new message to the log at a specified level. The message
+will only get printed out if Level &gt; reportable_log_level
+         </p>
+         <dl class="field-list simple">
+          <dt class="field-odd">
+           Parameters
+          </dt>
+          <dd class="field-odd">
+           <ul class="simple">
+            <li>
+             <p>
+              <strong>
+               level
+              </strong>
+              (
+              <em>
+               trtorch.logging.Level
+              </em>
+              ) – Severity of the message
+             </p>
+            </li>
+            <li>
+             <p>
+              <strong>
+               msg
+              </strong>
+              (
+              <em>
+               str
+              </em>
+              ) – Actual message text
+             </p>
+            </li>
+           </ul>
+          </dd>
+         </dl>
+        </dd>
+       </dl>
+       <dl class="py function">
+        <dt id="torch_tensorrt.logging.set_is_colored_output_on">
+         <code class="sig-prename descclassname">
+          torch_tensorrt.logging.
+         </code>
+         <code class="sig-name descname">
+          set_is_colored_output_on
+         </code>
+         <span class="sig-paren">
+          (
+         </span>
+         <em class="sig-param">
+          <span class="n">
+           colored_output_on
+          </span>
+          <span class="p">
+           :
+          </span>
+          <span class="n">
+           bool
+          </span>
+         </em>
+         <span class="sig-paren">
+          )
+         </span>
+         <a class="headerlink" href="#torch_tensorrt.logging.set_is_colored_output_on" title="Permalink to this definition">
+          ¶
+         </a>
+        </dt>
+        <dd>
+         <p>
+          Enable or disable color in the log output
+         </p>
+         <dl class="field-list simple">
+          <dt class="field-odd">
+           Parameters
+          </dt>
+          <dd class="field-odd">
+           <p>
+            <strong>
+             colored_output_on
+            </strong>
+            (
+            <em>
+             bool
+            </em>
+            ) – If colored output should be enabled or not
+           </p>
+          </dd>
+         </dl>
+        </dd>
+       </dl>
+       <dl class="py function">
+        <dt id="torch_tensorrt.logging.set_logging_prefix">
+         <code class="sig-prename descclassname">
+          torch_tensorrt.logging.
+         </code>
+         <code class="sig-name descname">
+          set_logging_prefix
+         </code>
+         <span class="sig-paren">
+          (
+         </span>
+         <em class="sig-param">
+          <span class="n">
+           prefix
+          </span>
+          <span class="p">
+           :
+          </span>
+          <span class="n">
+           str
+          </span>
+         </em>
+         <span class="sig-paren">
+          )
+         </span>
+         <a class="headerlink" href="#torch_tensorrt.logging.set_logging_prefix" title="Permalink to this definition">
+          ¶
+         </a>
+        </dt>
+        <dd>
+         <p>
+          Set the prefix used when logging messages
+         </p>
+         <dl class="field-list simple">
+          <dt class="field-odd">
+           Parameters
+          </dt>
+          <dd class="field-odd">
+           <p>
+            <strong>
+             prefix
+            </strong>
+            (
+            <em>
+             str
+            </em>
+            ) – Prefix to use for logging messages
+           </p>
+          </dd>
+         </dl>
+        </dd>
+       </dl>
+       <dl class="py function">
+        <dt id="torch_tensorrt.logging.set_reportable_log_level">
+         <code class="sig-prename descclassname">
+          torch_tensorrt.logging.
+         </code>
+         <code class="sig-name descname">
+          set_reportable_log_level
+         </code>
+         <span class="sig-paren">
+          (
+         </span>
+         <em class="sig-param">
+          <span class="n">
+           level
+          </span>
+          <span class="p">
+           :
+          </span>
+          <span class="n">
+           <a class="reference internal" href="#torch_tensorrt.logging.Level" title="torch_tensorrt.logging.Level">
+            torch_tensorrt.logging.Level
+           </a>
+          </span>
+         </em>
+         <span class="sig-paren">
+          )
+         </span>
+         <a class="headerlink" href="#torch_tensorrt.logging.set_reportable_log_level" title="Permalink to this definition">
+          ¶
+         </a>
+        </dt>
+        <dd>
+         <p>
+          Set the level required for a message to be printed to the log
+         </p>
+         <dl class="field-list simple">
+          <dt class="field-odd">
+           Parameters
+          </dt>
+          <dd class="field-odd">
+           <p>
+            <strong>
+             level
+            </strong>
+            (
+            <em>
+             trtorch.logging.Level
+            </em>
+            ) – The enum representing the level required to print
+           </p>
+          </dd>
+         </dl>
+        </dd>
+       </dl>
       </article>
      </div>
     </div>

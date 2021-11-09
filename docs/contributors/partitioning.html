@@ -3,7 +3,6 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -400,21 +399,19 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <section id="partitioning-phase">
-        <span id="partitioning">
-        </span>
-        <h1 id="contributors-partitioning--page-root">
-         Partitioning Phase
-         <a class="headerlink" href="#contributors-partitioning--page-root" title="Permalink to this headline">
-          ¶
-         </a>
-        </h1>
-        <p>
-         The phase is optional and enabled by the user. It instructs the compiler to seperate nodes into ones that should run in PyTorch and ones that should run in TensorRT.
+       <span id="partitioning">
+       </span>
+       <h1 id="contributors-partitioning--page-root">
+        Partitioning Phase
+        <a class="headerlink" href="#contributors-partitioning--page-root" title="Permalink to this headline">
+         ¶
+        </a>
+       </h1>
+       <p>
+        The phase is optional and enabled by the user. It instructs the compiler to seperate nodes into ones that should run in PyTorch and ones that should run in TensorRT.
 Criteria for seperation include: Lack of a converter, operator is explicitly set to run in PyTorch by the user or the node has a flag which tells partitioning to
 run in PyTorch by the module fallback passes.
-        </p>
-       </section>
+       </p>
       </article>
      </div>
     </div>

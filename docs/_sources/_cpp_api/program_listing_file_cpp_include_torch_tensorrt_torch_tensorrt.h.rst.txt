@@ -86,9 +86,6 @@ Program Listing for File torch_tensorrt.h
      Value value;
    };
    
-   /*
-    * Setting data structure for Target device
-    */
    struct Device {
      class DeviceType {
       public:
@@ -137,6 +134,7 @@ Program Listing for File torch_tensorrt.h
      kSAFETY,
      kDLA_STANDALONE,
    };
+   
    
    class TORCHTRT_API TensorFormat {
     public:

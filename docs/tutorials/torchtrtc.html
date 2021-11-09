@@ -3,7 +3,6 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -408,47 +407,46 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <section id="torchtrtc">
-        <span id="id1">
-        </span>
-        <h1 id="tutorials-torchtrtc--page-root">
-         torchtrtc
-         <a class="headerlink" href="#tutorials-torchtrtc--page-root" title="Permalink to this headline">
-          ¶
-         </a>
-        </h1>
-        <p>
-         <code class="docutils literal notranslate">
-          <span class="pre">
-           torchtrtc
-          </span>
-         </code>
-         is a CLI application for using the Torch-TensorRT compiler. It serves as an easy way to compile a
+       <span id="id1">
+       </span>
+       <h1 id="tutorials-torchtrtc--page-root">
+        torchtrtc
+        <a class="headerlink" href="#tutorials-torchtrtc--page-root" title="Permalink to this headline">
+         ¶
+        </a>
+       </h1>
+       <p>
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          torchtrtc
+         </span>
+        </code>
+        is a CLI application for using the Torch-TensorRT compiler. It serves as an easy way to compile a
 TorchScript Module with Torch-TensorRT from the command-line to quickly check support or as part of
 a deployment pipeline. All basic features of the compiler are supported including post training
 quantization (though you must already have a calibration cache file to use the PTQ feature). The compiler can
 output two formats, either a TorchScript program with the TensorRT engine embedded or
 the TensorRT engine itself as a PLAN file.
-        </p>
-        <p>
-         All that is required to run the program after compilation is for C++ linking against
-         <code class="docutils literal notranslate">
-          <span class="pre">
-           libtorchtrt.so
-          </span>
-         </code>
-         or in Python importing the torch_tensorrt package. All other aspects of using compiled modules are identical
+       </p>
+       <p>
+        All that is required to run the program after compilation is for C++ linking against
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          libtorchtrt.so
+         </span>
+        </code>
+        or in Python importing the torch_tensorrt package. All other aspects of using compiled modules are identical
 to standard TorchScript. Load with
-         <code class="docutils literal notranslate">
-          <span class="pre">
-           torch.jit.load()
-          </span>
-         </code>
-         and run like you would run any other module.
-        </p>
-        <div class="highlight-txt notranslate">
-         <div class="highlight">
-          <pre><span></span>torchtrtc [input_file_path] [output_file_path]
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          torch.jit.load()
+         </span>
+        </code>
+        and run like you would run any other module.
+       </p>
+       <div class="highlight-txt notranslate">
+        <div class="highlight">
+         <pre><span></span>torchtrtc [input_file_path] [output_file_path]
   [input_specs...] {OPTIONS}
 
   Torch-TensorRT is a compiler for TorchScript, it will compile and optimize
@@ -556,18 +554,17 @@ OPTIONS:
     "--" can be used to terminate flag options and force all following
     arguments to be treated as positional options
 </pre>
-         </div>
         </div>
-        <p>
-         e.g.
-        </p>
-        <div class="highlight-shell notranslate">
-         <div class="highlight">
-          <pre><span></span>torchtrtc tests/modules/ssd_traced.jit.pt ssd_trt.ts <span class="s2">"[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@f16%contiguous"</span> -p f16
+       </div>
+       <p>
+        e.g.
+       </p>
+       <div class="highlight-shell notranslate">
+        <div class="highlight">
+         <pre><span></span>torchtrtc tests/modules/ssd_traced.jit.pt ssd_trt.ts <span class="s2">"[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@f16%contiguous"</span> -p f16
 </pre>
-         </div>
         </div>
-       </section>
+       </div>
       </article>
      </div>
     </div>

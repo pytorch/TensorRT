@@ -3,7 +3,6 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -304,6 +303,11 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/Resnet50-example.html">
+            Torch-TensorRT Getting Started - ResNet 50
+           </a>
+          </li>
+          <li class="md-nav__item">
            <a class="md-nav__link" href="../_notebooks/ssd-object-detection-demo.html">
             Object Detection with Torch-TensorRT (SSD)
            </a>
@@ -326,13 +330,60 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/logging.html">
+            torch_tensorrt.logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/ptq.html">
+            torch_tensorrt.ptq
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/ptq.html#classes">
+            Classes
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/ptq.html#enums">
+            Enums
+           </a>
+          </li>
+          <li class="md-nav__item">
            <a class="md-nav__link" href="../py_api/ts.html">
             torch_tensorrt.ts
            </a>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/logging.html">
-            torch_tensorrt.logging
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             C++ API Documenation
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="torch_tensort_cpp.html">
+            Torch-TensorRT C++ API
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="namespace_torch_tensorrt.html">
+            Namespace torch_tensorrt
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="namespace_torch_tensorrt__logging.html">
+            Namespace torch_tensorrt::logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="namespace_torch_tensorrt__torchscript.html">
+            Namespace torch_tensorrt::torchscript
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="namespace_torch_tensorrt__ptq.html">
+            Namespace torch_tensorrt::ptq
            </a>
           </li>
           <li class="md-nav__item">
@@ -431,233 +482,223 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <section id="file-macros-h">
-        <span id="file-cpp-include-torch-tensorrt-macros-h">
-        </span>
-        <h1 id="cpp-api-file-cpp-include-torch-tensorrt-macros-h--page-root">
-         File macros.h
-         <a class="headerlink" href="#cpp-api-file-cpp-include-torch-tensorrt-macros-h--page-root" title="Permalink to this headline">
-          ¶
-         </a>
-        </h1>
-        <p>
-         ↰
-         <a class="reference internal" href="dir_cpp_include_torch_tensorrt.html#dir-cpp-include-torch-tensorrt">
-          <span class="std std-ref">
-           Parent directory
-          </span>
-         </a>
-         (
-         <code class="docutils literal notranslate">
-          <span class="pre">
-           cpp/include/torch_tensorrt
-          </span>
-         </code>
-         )
+       <span id="file-cpp-include-torch-tensorrt-macros-h">
+       </span>
+       <h1 id="cpp-api-file-cpp-include-torch-tensorrt-macros-h--page-root">
+        File macros.h
+        <a class="headerlink" href="#cpp-api-file-cpp-include-torch-tensorrt-macros-h--page-root" title="Permalink to this headline">
+         ¶
+        </a>
+       </h1>
+       <p>
+        ↰
+        <a class="reference internal" href="dir_cpp_include_torch_tensorrt.html#dir-cpp-include-torch-tensorrt">
+         <span class="std std-ref">
+          Parent directory
+         </span>
+        </a>
+        (
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          cpp/include/torch_tensorrt
+         </span>
+        </code>
+        )
+       </p>
+       <div class="contents local topic" id="contents">
+        <p class="topic-title first">
+         Contents
         </p>
-        <div class="contents local topic" id="contents">
-         <p class="topic-title">
-          Contents
-         </p>
-         <ul class="simple">
-          <li>
-           <p>
-            <a class="reference internal" href="#definition-cpp-include-torch-tensorrt-macros-h" id="id1">
-             Definition (
-             <code class="docutils literal notranslate">
-              <span class="pre">
-               cpp/include/torch_tensorrt/macros.h
-              </span>
-             </code>
-             )
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference internal" href="#included-by" id="id2">
-             Included By
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference internal" href="#namespaces" id="id3">
-             Namespaces
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference internal" href="#defines" id="id4">
-             Defines
-            </a>
-           </p>
-          </li>
-         </ul>
-        </div>
-        <section id="definition-cpp-include-torch-tensorrt-macros-h">
-         <h2 id="definition-cpp-include-torch-tensorrt-macros-h">
-          Definition (
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            cpp/include/torch_tensorrt/macros.h
+        <ul class="simple">
+         <li>
+          <p>
+           <a class="reference internal" href="#definition-cpp-include-torch-tensorrt-macros-h" id="id1">
+            Definition (
+            <code class="docutils literal notranslate">
+             <span class="pre">
+              cpp/include/torch_tensorrt/macros.h
+             </span>
+            </code>
+            )
+           </a>
+          </p>
+         </li>
+         <li>
+          <p>
+           <a class="reference internal" href="#included-by" id="id2">
+            Included By
+           </a>
+          </p>
+         </li>
+         <li>
+          <p>
+           <a class="reference internal" href="#namespaces" id="id3">
+            Namespaces
+           </a>
+          </p>
+         </li>
+         <li>
+          <p>
+           <a class="reference internal" href="#defines" id="id4">
+            Defines
+           </a>
+          </p>
+         </li>
+        </ul>
+       </div>
+       <h2 id="definition-cpp-include-torch-tensorrt-macros-h">
+        Definition (
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          cpp/include/torch_tensorrt/macros.h
+         </span>
+        </code>
+        )
+        <a class="headerlink" href="#definition-cpp-include-torch-tensorrt-macros-h" title="Permalink to this headline">
+         ¶
+        </a>
+       </h2>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="program_listing_file_cpp_include_torch_tensorrt_macros.h.html">
+           Program Listing for File macros.h
+          </a>
+         </li>
+        </ul>
+       </div>
+       <h2 id="included-by">
+        Included By
+        <a class="headerlink" href="#included-by" title="Permalink to this headline">
+         ¶
+        </a>
+       </h2>
+       <ul class="simple">
+        <li>
+         <p>
+          <a class="reference internal" href="file_cpp_include_torch_tensorrt_logging.h.html#file-cpp-include-torch-tensorrt-logging-h">
+           <span class="std std-ref">
+            File logging.h
            </span>
-          </code>
-          )
-          <a class="headerlink" href="#definition-cpp-include-torch-tensorrt-macros-h" title="Permalink to this headline">
-           ¶
           </a>
-         </h2>
-         <div class="toctree-wrapper compound">
-          <ul>
-           <li class="toctree-l1">
-            <a class="reference internal" href="program_listing_file_cpp_include_torch_tensorrt_macros.h.html">
-             Program Listing for File macros.h
-            </a>
-           </li>
-          </ul>
-         </div>
-        </section>
-        <section id="included-by">
-         <h2 id="included-by">
-          Included By
-          <a class="headerlink" href="#included-by" title="Permalink to this headline">
-           ¶
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference internal" href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html#file-cpp-include-torch-tensorrt-torch-tensorrt-h">
+           <span class="std std-ref">
+            File torch_tensorrt.h
+           </span>
           </a>
-         </h2>
-         <ul class="simple">
-          <li>
-           <p>
-            <a class="reference internal" href="file_cpp_include_torch_tensorrt_logging.h.html#file-cpp-include-torch-tensorrt-logging-h">
-             <span class="std std-ref">
-              File logging.h
-             </span>
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference internal" href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html#file-cpp-include-torch-tensorrt-torch-tensorrt-h">
-             <span class="std std-ref">
-              File torch_tensorrt.h
-             </span>
-            </a>
-           </p>
-          </li>
-         </ul>
-        </section>
-        <section id="namespaces">
-         <h2 id="namespaces">
-          Namespaces
-          <a class="headerlink" href="#namespaces" title="Permalink to this headline">
-           ¶
+         </p>
+        </li>
+       </ul>
+       <h2 id="namespaces">
+        Namespaces
+        <a class="headerlink" href="#namespaces" title="Permalink to this headline">
+         ¶
+        </a>
+       </h2>
+       <ul class="simple">
+        <li>
+         <p>
+          <a class="reference internal" href="namespace_torch_tensorrt.html#namespace-torch-tensorrt">
+           <span class="std std-ref">
+            Namespace torch_tensorrt
+           </span>
           </a>
-         </h2>
-         <ul class="simple">
-          <li>
-           <p>
-            <a class="reference internal" href="namespace_torch_tensorrt.html#namespace-torch-tensorrt">
-             <span class="std std-ref">
-              Namespace torch_tensorrt
-             </span>
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference internal" href="namespace_torch_tensorrt__torchscript.html#namespace-torch-tensorrt-torchscript">
-             <span class="std std-ref">
-              Namespace torch_tensorrt::torchscript
-             </span>
-            </a>
-           </p>
-          </li>
-         </ul>
-        </section>
-        <section id="defines">
-         <h2 id="defines">
-          Defines
-          <a class="headerlink" href="#defines" title="Permalink to this headline">
-           ¶
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference internal" href="namespace_torch_tensorrt__torchscript.html#namespace-torch-tensorrt-torchscript">
+           <span class="std std-ref">
+            Namespace torch_tensorrt::torchscript
+           </span>
           </a>
-         </h2>
-         <ul class="simple">
-          <li>
-           <p>
-            <a class="reference internal" href="define_macros_8h_1a18d295a837ac71add5578860b55e5502.html#exhale-define-macros-8h-1a18d295a837ac71add5578860b55e5502">
-             <span class="std std-ref">
-              Define STR
-             </span>
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference internal" href="define_macros_8h_1a31398a6d4d27e28817afb0f0139e909e.html#exhale-define-macros-8h-1a31398a6d4d27e28817afb0f0139e909e">
-             <span class="std std-ref">
-              Define TORCH_TENSORRT_MAJOR_VERSION
-             </span>
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference internal" href="define_macros_8h_1a35703561b26b1a9d2738ad7d58b27827.html#exhale-define-macros-8h-1a35703561b26b1a9d2738ad7d58b27827">
-             <span class="std std-ref">
-              Define TORCH_TENSORRT_MINOR_VERSION
-             </span>
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference internal" href="define_macros_8h_1a282fd3c0b1c3a215148ae372070e1268.html#exhale-define-macros-8h-1a282fd3c0b1c3a215148ae372070e1268">
-             <span class="std std-ref">
-              Define TORCH_TENSORRT_PATCH_VERSION
-             </span>
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference internal" href="define_macros_8h_1adad592a7b1b7eed529cdf6acd584c883.html#exhale-define-macros-8h-1adad592a7b1b7eed529cdf6acd584c883">
-             <span class="std std-ref">
-              Define TORCH_TENSORRT_VERSION
-             </span>
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference internal" href="define_macros_8h_1abd1465eb38256d3f22cc1426b23d516b.html#exhale-define-macros-8h-1abd1465eb38256d3f22cc1426b23d516b">
-             <span class="std std-ref">
-              Define TORCHTRT_API
-             </span>
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference internal" href="define_macros_8h_1ad19939408f7be171a74a89928b36eb59.html#exhale-define-macros-8h-1ad19939408f7be171a74a89928b36eb59">
-             <span class="std std-ref">
-              Define TORCHTRT_HIDDEN
-             </span>
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference internal" href="define_macros_8h_1abe87b341f562fd1cf40b7672e4d759da.html#exhale-define-macros-8h-1abe87b341f562fd1cf40b7672e4d759da">
-             <span class="std std-ref">
-              Define XSTR
-             </span>
-            </a>
-           </p>
-          </li>
-         </ul>
-        </section>
-       </section>
+         </p>
+        </li>
+       </ul>
+       <h2 id="defines">
+        Defines
+        <a class="headerlink" href="#defines" title="Permalink to this headline">
+         ¶
+        </a>
+       </h2>
+       <ul class="simple">
+        <li>
+         <p>
+          <a class="reference internal" href="define_macros_8h_1a18d295a837ac71add5578860b55e5502.html#exhale-define-macros-8h-1a18d295a837ac71add5578860b55e5502">
+           <span class="std std-ref">
+            Define STR
+           </span>
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference internal" href="define_macros_8h_1a31398a6d4d27e28817afb0f0139e909e.html#exhale-define-macros-8h-1a31398a6d4d27e28817afb0f0139e909e">
+           <span class="std std-ref">
+            Define TORCH_TENSORRT_MAJOR_VERSION
+           </span>
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference internal" href="define_macros_8h_1a35703561b26b1a9d2738ad7d58b27827.html#exhale-define-macros-8h-1a35703561b26b1a9d2738ad7d58b27827">
+           <span class="std std-ref">
+            Define TORCH_TENSORRT_MINOR_VERSION
+           </span>
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference internal" href="define_macros_8h_1a282fd3c0b1c3a215148ae372070e1268.html#exhale-define-macros-8h-1a282fd3c0b1c3a215148ae372070e1268">
+           <span class="std std-ref">
+            Define TORCH_TENSORRT_PATCH_VERSION
+           </span>
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference internal" href="define_macros_8h_1adad592a7b1b7eed529cdf6acd584c883.html#exhale-define-macros-8h-1adad592a7b1b7eed529cdf6acd584c883">
+           <span class="std std-ref">
+            Define TORCH_TENSORRT_VERSION
+           </span>
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference internal" href="define_macros_8h_1abd1465eb38256d3f22cc1426b23d516b.html#exhale-define-macros-8h-1abd1465eb38256d3f22cc1426b23d516b">
+           <span class="std std-ref">
+            Define TORCHTRT_API
+           </span>
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference internal" href="define_macros_8h_1ad19939408f7be171a74a89928b36eb59.html#exhale-define-macros-8h-1ad19939408f7be171a74a89928b36eb59">
+           <span class="std std-ref">
+            Define TORCHTRT_HIDDEN
+           </span>
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference internal" href="define_macros_8h_1abe87b341f562fd1cf40b7672e4d759da.html#exhale-define-macros-8h-1abe87b341f562fd1cf40b7672e4d759da">
+           <span class="std std-ref">
+            Define XSTR
+           </span>
+          </a>
+         </p>
+        </li>
+       </ul>
       </article>
      </div>
     </div>

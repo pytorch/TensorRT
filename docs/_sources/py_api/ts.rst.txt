@@ -1,3 +1,5 @@
+.. _torch_tensorrt_ts_py:
+
 torch_tensorrt.ts
 ===================
 

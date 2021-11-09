@@ -3,7 +3,6 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -65,6 +64,8 @@
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
+  <link href="define_macros_8h_1adad592a7b1b7eed529cdf6acd584c883.html" rel="next" title="Define TORCH_TENSORRT_VERSION"/>
+  <link href="define_macros_8h_1a35703561b26b1a9d2738ad7d58b27827.html" rel="prev" title="Define TORCH_TENSORRT_MINOR_VERSION"/>
  </head>
  <body data-md-color-accent="light-green" data-md-color-primary="light-green" dir="ltr">
   <svg class="md-svg">
@@ -196,6 +197,11 @@
         Torch-TensorRT master documentation
        </a>
       </li>
+      <li class="md-tabs__item">
+       <a class="md-tabs__link" href="torch_tensort_cpp.html">
+        Torch-TensorRT C++ API
+       </a>
+      </li>
      </ul>
     </div>
    </nav>
@@ -304,6 +310,11 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/Resnet50-example.html">
+            Torch-TensorRT Getting Started - ResNet 50
+           </a>
+          </li>
+          <li class="md-nav__item">
            <a class="md-nav__link" href="../_notebooks/ssd-object-detection-demo.html">
             Object Detection with Torch-TensorRT (SSD)
            </a>
@@ -326,13 +337,60 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/logging.html">
+            torch_tensorrt.logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/ptq.html">
+            torch_tensorrt.ptq
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/ptq.html#classes">
+            Classes
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/ptq.html#enums">
+            Enums
+           </a>
+          </li>
+          <li class="md-nav__item">
            <a class="md-nav__link" href="../py_api/ts.html">
             torch_tensorrt.ts
            </a>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/logging.html">
-            torch_tensorrt.logging
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             C++ API Documenation
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="torch_tensort_cpp.html">
+            Torch-TensorRT C++ API
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="namespace_torch_tensorrt.html">
+            Namespace torch_tensorrt
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="namespace_torch_tensorrt__logging.html">
+            Namespace torch_tensorrt::logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="namespace_torch_tensorrt__torchscript.html">
+            Namespace torch_tensorrt::torchscript
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="namespace_torch_tensorrt__ptq.html">
+            Namespace torch_tensorrt::ptq
            </a>
           </li>
           <li class="md-nav__item">
@@ -410,51 +468,47 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <section id="define-torch-tensorrt-patch-version">
-        <span id="exhale-define-macros-8h-1a282fd3c0b1c3a215148ae372070e1268">
-        </span>
-        <h1 id="cpp-api-define-macros-8h-1a282fd3c0b1c3a215148ae372070e1268--page-root">
-         Define TORCH_TENSORRT_PATCH_VERSION
-         <a class="headerlink" href="#cpp-api-define-macros-8h-1a282fd3c0b1c3a215148ae372070e1268--page-root" title="Permalink to this headline">
+       <span id="exhale-define-macros-8h-1a282fd3c0b1c3a215148ae372070e1268">
+       </span>
+       <h1 id="cpp-api-define-macros-8h-1a282fd3c0b1c3a215148ae372070e1268--page-root">
+        Define TORCH_TENSORRT_PATCH_VERSION
+        <a class="headerlink" href="#cpp-api-define-macros-8h-1a282fd3c0b1c3a215148ae372070e1268--page-root" title="Permalink to this headline">
+         ¶
+        </a>
+       </h1>
+       <ul class="simple">
+        <li>
+         <p>
+          Defined in
+          <a class="reference internal" href="file_cpp_include_torch_tensorrt_macros.h.html#file-cpp-include-torch-tensorrt-macros-h">
+           <span class="std std-ref">
+            File macros.h
+           </span>
+          </a>
+         </p>
+        </li>
+       </ul>
+       <h2 id="define-documentation">
+        Define Documentation
+        <a class="headerlink" href="#define-documentation" title="Permalink to this headline">
+         ¶
+        </a>
+       </h2>
+       <dl class="cpp macro">
+        <dt id="c.TORCH_TENSORRT_PATCH_VERSION">
+         <span class="target" id="macros_8h_1a282fd3c0b1c3a215148ae372070e1268">
+         </span>
+         <code class="sig-name descname">
+          TORCH_TENSORRT_PATCH_VERSION
+         </code>
+         <a class="headerlink" href="#c.TORCH_TENSORRT_PATCH_VERSION" title="Permalink to this definition">
           ¶
          </a>
-        </h1>
-        <ul class="simple">
-         <li>
-          <p>
-           Defined in
-           <a class="reference internal" href="file_cpp_include_torch_tensorrt_macros.h.html#file-cpp-include-torch-tensorrt-macros-h">
-            <span class="std std-ref">
-             File macros.h
-            </span>
-           </a>
-          </p>
-         </li>
-        </ul>
-        <section id="define-documentation">
-         <h2 id="define-documentation">
-          Define Documentation
-          <a class="headerlink" href="#define-documentation" title="Permalink to this headline">
-           ¶
-          </a>
-         </h2>
-         <dl class="cpp macro">
-          <dt id="c.TORCH_TENSORRT_PATCH_VERSION">
-           <span class="target" id="macros_8h_1a282fd3c0b1c3a215148ae372070e1268">
-           </span>
-           <code class="sig-name descname">
-            TORCH_TENSORRT_PATCH_VERSION
-           </code>
-           <a class="headerlink" href="#c.TORCH_TENSORRT_PATCH_VERSION" title="Permalink to this definition">
-            ¶
-           </a>
-           <br/>
-          </dt>
-          <dd>
-          </dd>
-         </dl>
-        </section>
-       </section>
+         <br/>
+        </dt>
+        <dd>
+        </dd>
+       </dl>
       </article>
      </div>
     </div>
@@ -463,6 +517,34 @@
   <footer class="md-footer">
    <div class="md-footer-nav">
     <nav class="md-footer-nav__inner md-grid">
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--prev" href="define_macros_8h_1a35703561b26b1a9d2738ad7d58b27827.html" rel="prev" title="Define TORCH_TENSORRT_MINOR_VERSION">
+      <div class="md-flex__cell md-flex__cell--shrink">
+       <i class="md-icon md-icon--arrow-back md-footer-nav__button">
+       </i>
+      </div>
+      <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
+       <span class="md-flex__ellipsis">
+        <span class="md-footer-nav__direction">
+         Previous
+        </span>
+        Define TORCH_TENSORRT_MINOR_VERSION
+       </span>
+      </div>
+     </a>
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--next" href="define_macros_8h_1adad592a7b1b7eed529cdf6acd584c883.html" rel="next" title="Define TORCH_TENSORRT_VERSION">
+      <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
+       <span class="md-flex__ellipsis">
+        <span class="md-footer-nav__direction">
+         Next
+        </span>
+        Define TORCH_TENSORRT_VERSION
+       </span>
+      </div>
+      <div class="md-flex__cell md-flex__cell--shrink">
+       <i class="md-icon md-icon--arrow-forward md-footer-nav__button">
+       </i>
+      </div>
+     </a>
     </nav>
    </div>
    <div class="md-footer-meta md-typeset">

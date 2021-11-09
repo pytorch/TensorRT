@@ -1,10 +1,12 @@
 .. _torch_tensorrt_py:
 
+torch_tensorrt
+===============
+
 .. automodule torch_tensorrt
    :undoc-members:
 
-torch_tensorrt
-===============
+
 
 .. automodule:: torch_tensorrt
    :members:
@@ -53,4 +55,6 @@ Submodules
    :maxdepth: 1
 
    logging
+   ptq
    ts
+

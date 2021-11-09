@@ -3,7 +3,6 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -65,6 +64,8 @@
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
+  <link href="function_torch__tensorrt_8h_1ad6a4ee8ca6c8f6e5519eb1128ec7f4a1.html" rel="next" title="Function torch_tensorrt::dump_build_info"/>
+  <link href="enum_torch__tensorrt_8h_1a3fbe5d72e4fc624dbd038853079620eb.html" rel="prev" title="Enum EngineCapability"/>
  </head>
  <body data-md-color-accent="light-green" data-md-color-primary="light-green" dir="ltr">
   <svg class="md-svg">
@@ -196,6 +197,11 @@
         Torch-TensorRT master documentation
        </a>
       </li>
+      <li class="md-tabs__item">
+       <a class="md-tabs__link" href="torch_tensort_cpp.html">
+        Torch-TensorRT C++ API
+       </a>
+      </li>
      </ul>
     </div>
    </nav>
@@ -304,6 +310,11 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/Resnet50-example.html">
+            Torch-TensorRT Getting Started - ResNet 50
+           </a>
+          </li>
+          <li class="md-nav__item">
            <a class="md-nav__link" href="../_notebooks/ssd-object-detection-demo.html">
             Object Detection with Torch-TensorRT (SSD)
            </a>
@@ -326,13 +337,60 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/logging.html">
+            torch_tensorrt.logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/ptq.html">
+            torch_tensorrt.ptq
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/ptq.html#classes">
+            Classes
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/ptq.html#enums">
+            Enums
+           </a>
+          </li>
+          <li class="md-nav__item">
            <a class="md-nav__link" href="../py_api/ts.html">
             torch_tensorrt.ts
            </a>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/logging.html">
-            torch_tensorrt.logging
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             C++ API Documenation
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="torch_tensort_cpp.html">
+            Torch-TensorRT C++ API
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="namespace_torch_tensorrt.html">
+            Namespace torch_tensorrt
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="namespace_torch_tensorrt__logging.html">
+            Namespace torch_tensorrt::logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="namespace_torch_tensorrt__torchscript.html">
+            Namespace torch_tensorrt::torchscript
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="namespace_torch_tensorrt__ptq.html">
+            Namespace torch_tensorrt::ptq
            </a>
           </li>
           <li class="md-nav__item">
@@ -410,194 +468,190 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <section id="enum-level">
-        <span id="exhale-enum-logging-8h-1a130f65408ad8cbaee060f05e8db69558">
-        </span>
-        <h1 id="cpp-api-enum-logging-8h-1a130f65408ad8cbaee060f05e8db69558--page-root">
-         Enum Level
-         <a class="headerlink" href="#cpp-api-enum-logging-8h-1a130f65408ad8cbaee060f05e8db69558--page-root" title="Permalink to this headline">
+       <span id="exhale-enum-logging-8h-1a130f65408ad8cbaee060f05e8db69558">
+       </span>
+       <h1 id="cpp-api-enum-logging-8h-1a130f65408ad8cbaee060f05e8db69558--page-root">
+        Enum Level
+        <a class="headerlink" href="#cpp-api-enum-logging-8h-1a130f65408ad8cbaee060f05e8db69558--page-root" title="Permalink to this headline">
+         ¶
+        </a>
+       </h1>
+       <ul class="simple">
+        <li>
+         <p>
+          Defined in
+          <a class="reference internal" href="file_cpp_include_torch_tensorrt_logging.h.html#file-cpp-include-torch-tensorrt-logging-h">
+           <span class="std std-ref">
+            File logging.h
+           </span>
+          </a>
+         </p>
+        </li>
+       </ul>
+       <h2 id="enum-documentation">
+        Enum Documentation
+        <a class="headerlink" href="#enum-documentation" title="Permalink to this headline">
+         ¶
+        </a>
+       </h2>
+       <dl class="cpp enum">
+        <dt id="_CPPv4N14torch_tensorrt7logging5LevelE">
+         <span class="target" id="logging_8h_1a130f65408ad8cbaee060f05e8db69558">
+         </span>
+         <em class="property">
+          enum
+         </em>
+         <code class="sig-prename descclassname">
+          torch_tensorrt::logging
+          <code class="sig-prename descclassname">
+           ::
+          </code>
+         </code>
+         <code class="sig-name descname">
+          Level
+         </code>
+         <a class="headerlink" href="#_CPPv4N14torch_tensorrt7logging5LevelE" title="Permalink to this definition">
           ¶
          </a>
-        </h1>
-        <ul class="simple">
-         <li>
-          <p>
-           Defined in
-           <a class="reference internal" href="file_cpp_include_torch_tensorrt_logging.h.html#file-cpp-include-torch-tensorrt-logging-h">
-            <span class="std std-ref">
-             File logging.h
-            </span>
-           </a>
-          </p>
-         </li>
-        </ul>
-        <section id="enum-documentation">
-         <h2 id="enum-documentation">
-          Enum Documentation
-          <a class="headerlink" href="#enum-documentation" title="Permalink to this headline">
-           ¶
-          </a>
-         </h2>
-         <dl class="cpp enum">
-          <dt id="_CPPv4N14torch_tensorrt7logging5LevelE">
-           <span class="target" id="logging_8h_1a130f65408ad8cbaee060f05e8db69558">
+         <br/>
+        </dt>
+        <dd>
+         <p>
+          Emum for setting message severity
+         </p>
+         <p>
+          <em>
+           Values:
+          </em>
+         </p>
+         <dl class="cpp enumerator">
+          <dt id="_CPPv4N14torch_tensorrt7logging5Level15kINTERNAL_ERRORE">
+           <span class="target" id="logging_8h_1a130f65408ad8cbaee060f05e8db69558a9cb66846a4b6da3a54a00dc1471f49db">
            </span>
            <em class="property">
-            enum
+            enumerator
            </em>
-           <code class="sig-prename descclassname">
-            torch_tensorrt::logging
-            <code class="sig-prename descclassname">
-             ::
-            </code>
-           </code>
            <code class="sig-name descname">
-            Level
+            kINTERNAL_ERROR
            </code>
-           <a class="headerlink" href="#_CPPv4N14torch_tensorrt7logging5LevelE" title="Permalink to this definition">
+           <a class="headerlink" href="#_CPPv4N14torch_tensorrt7logging5Level15kINTERNAL_ERRORE" title="Permalink to this definition">
             ¶
            </a>
            <br/>
           </dt>
           <dd>
            <p>
-            Emum for setting message severity
+            Only print messages for internal errors.
            </p>
-           <p>
-            <em>
-             Values:
-            </em>
-           </p>
-           <dl class="cpp enumerator">
-            <dt id="_CPPv4N14torch_tensorrt7logging5Level15kINTERNAL_ERRORE">
-             <span class="target" id="logging_8h_1a130f65408ad8cbaee060f05e8db69558a9cb66846a4b6da3a54a00dc1471f49db">
-             </span>
-             <em class="property">
-              enumerator
-             </em>
-             <code class="sig-name descname">
-              kINTERNAL_ERROR
-             </code>
-             <a class="headerlink" href="#_CPPv4N14torch_tensorrt7logging5Level15kINTERNAL_ERRORE" title="Permalink to this definition">
-              ¶
-             </a>
-             <br/>
-            </dt>
-            <dd>
-             <p>
-              Only print messages for internal errors.
-             </p>
-            </dd>
-           </dl>
-           <dl class="cpp enumerator">
-            <dt id="_CPPv4N14torch_tensorrt7logging5Level6kERRORE">
-             <span class="target" id="logging_8h_1a130f65408ad8cbaee060f05e8db69558a4e69ac7a513b3ec45e04be00b614bb1c">
-             </span>
-             <em class="property">
-              enumerator
-             </em>
-             <code class="sig-name descname">
-              kERROR
-             </code>
-             <a class="headerlink" href="#_CPPv4N14torch_tensorrt7logging5Level6kERRORE" title="Permalink to this definition">
-              ¶
-             </a>
-             <br/>
-            </dt>
-            <dd>
-             <p>
-              Print all internal errors and errors (default)
-             </p>
-            </dd>
-           </dl>
-           <dl class="cpp enumerator">
-            <dt id="_CPPv4N14torch_tensorrt7logging5Level8kWARNINGE">
-             <span class="target" id="logging_8h_1a130f65408ad8cbaee060f05e8db69558a6cfdce2a1b702d1c93b210dfa2e510c8">
-             </span>
-             <em class="property">
-              enumerator
-             </em>
-             <code class="sig-name descname">
-              kWARNING
-             </code>
-             <a class="headerlink" href="#_CPPv4N14torch_tensorrt7logging5Level8kWARNINGE" title="Permalink to this definition">
-              ¶
-             </a>
-             <br/>
-            </dt>
-            <dd>
-             <p>
-              Print warnings and errors.
-             </p>
-            </dd>
-           </dl>
-           <dl class="cpp enumerator">
-            <dt id="_CPPv4N14torch_tensorrt7logging5Level5kINFOE">
-             <span class="target" id="logging_8h_1a130f65408ad8cbaee060f05e8db69558a762a21c4c39c9214fdc85008587096bc">
-             </span>
-             <em class="property">
-              enumerator
-             </em>
-             <code class="sig-name descname">
-              kINFO
-             </code>
-             <a class="headerlink" href="#_CPPv4N14torch_tensorrt7logging5Level5kINFOE" title="Permalink to this definition">
-              ¶
-             </a>
-             <br/>
-            </dt>
-            <dd>
-             <p>
-              Print all info, warnings and errors.
-             </p>
-            </dd>
-           </dl>
-           <dl class="cpp enumerator">
-            <dt id="_CPPv4N14torch_tensorrt7logging5Level6kDEBUGE">
-             <span class="target" id="logging_8h_1a130f65408ad8cbaee060f05e8db69558a9c330d1bdbebdb7506897806426959d1">
-             </span>
-             <em class="property">
-              enumerator
-             </em>
-             <code class="sig-name descname">
-              kDEBUG
-             </code>
-             <a class="headerlink" href="#_CPPv4N14torch_tensorrt7logging5Level6kDEBUGE" title="Permalink to this definition">
-              ¶
-             </a>
-             <br/>
-            </dt>
-            <dd>
-             <p>
-              Print all debug info, info, warnings and errors.
-             </p>
-            </dd>
-           </dl>
-           <dl class="cpp enumerator">
-            <dt id="_CPPv4N14torch_tensorrt7logging5Level6kGRAPHE">
-             <span class="target" id="logging_8h_1a130f65408ad8cbaee060f05e8db69558a97098a2a97f4840a7d50b285703ff929">
-             </span>
-             <em class="property">
-              enumerator
-             </em>
-             <code class="sig-name descname">
-              kGRAPH
-             </code>
-             <a class="headerlink" href="#_CPPv4N14torch_tensorrt7logging5Level6kGRAPHE" title="Permalink to this definition">
-              ¶
-             </a>
-             <br/>
-            </dt>
-            <dd>
-             <p>
-              Print everything including the intermediate graphs of the lowering phase.
-             </p>
-            </dd>
-           </dl>
           </dd>
          </dl>
-        </section>
-       </section>
+         <dl class="cpp enumerator">
+          <dt id="_CPPv4N14torch_tensorrt7logging5Level6kERRORE">
+           <span class="target" id="logging_8h_1a130f65408ad8cbaee060f05e8db69558a4e69ac7a513b3ec45e04be00b614bb1c">
+           </span>
+           <em class="property">
+            enumerator
+           </em>
+           <code class="sig-name descname">
+            kERROR
+           </code>
+           <a class="headerlink" href="#_CPPv4N14torch_tensorrt7logging5Level6kERRORE" title="Permalink to this definition">
+            ¶
+           </a>
+           <br/>
+          </dt>
+          <dd>
+           <p>
+            Print all internal errors and errors (default)
+           </p>
+          </dd>
+         </dl>
+         <dl class="cpp enumerator">
+          <dt id="_CPPv4N14torch_tensorrt7logging5Level8kWARNINGE">
+           <span class="target" id="logging_8h_1a130f65408ad8cbaee060f05e8db69558a6cfdce2a1b702d1c93b210dfa2e510c8">
+           </span>
+           <em class="property">
+            enumerator
+           </em>
+           <code class="sig-name descname">
+            kWARNING
+           </code>
+           <a class="headerlink" href="#_CPPv4N14torch_tensorrt7logging5Level8kWARNINGE" title="Permalink to this definition">
+            ¶
+           </a>
+           <br/>
+          </dt>
+          <dd>
+           <p>
+            Print warnings and errors.
+           </p>
+          </dd>
+         </dl>
+         <dl class="cpp enumerator">
+          <dt id="_CPPv4N14torch_tensorrt7logging5Level5kINFOE">
+           <span class="target" id="logging_8h_1a130f65408ad8cbaee060f05e8db69558a762a21c4c39c9214fdc85008587096bc">
+           </span>
+           <em class="property">
+            enumerator
+           </em>
+           <code class="sig-name descname">
+            kINFO
+           </code>
+           <a class="headerlink" href="#_CPPv4N14torch_tensorrt7logging5Level5kINFOE" title="Permalink to this definition">
+            ¶
+           </a>
+           <br/>
+          </dt>
+          <dd>
+           <p>
+            Print all info, warnings and errors.
+           </p>
+          </dd>
+         </dl>
+         <dl class="cpp enumerator">
+          <dt id="_CPPv4N14torch_tensorrt7logging5Level6kDEBUGE">
+           <span class="target" id="logging_8h_1a130f65408ad8cbaee060f05e8db69558a9c330d1bdbebdb7506897806426959d1">
+           </span>
+           <em class="property">
+            enumerator
+           </em>
+           <code class="sig-name descname">
+            kDEBUG
+           </code>
+           <a class="headerlink" href="#_CPPv4N14torch_tensorrt7logging5Level6kDEBUGE" title="Permalink to this definition">
+            ¶
+           </a>
+           <br/>
+          </dt>
+          <dd>
+           <p>
+            Print all debug info, info, warnings and errors.
+           </p>
+          </dd>
+         </dl>
+         <dl class="cpp enumerator">
+          <dt id="_CPPv4N14torch_tensorrt7logging5Level6kGRAPHE">
+           <span class="target" id="logging_8h_1a130f65408ad8cbaee060f05e8db69558a97098a2a97f4840a7d50b285703ff929">
+           </span>
+           <em class="property">
+            enumerator
+           </em>
+           <code class="sig-name descname">
+            kGRAPH
+           </code>
+           <a class="headerlink" href="#_CPPv4N14torch_tensorrt7logging5Level6kGRAPHE" title="Permalink to this definition">
+            ¶
+           </a>
+           <br/>
+          </dt>
+          <dd>
+           <p>
+            Print everything including the intermediate graphs of the lowering phase.
+           </p>
+          </dd>
+         </dl>
+        </dd>
+       </dl>
       </article>
      </div>
     </div>
@@ -606,6 +660,34 @@
   <footer class="md-footer">
    <div class="md-footer-nav">
     <nav class="md-footer-nav__inner md-grid">
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--prev" href="enum_torch__tensorrt_8h_1a3fbe5d72e4fc624dbd038853079620eb.html" rel="prev" title="Enum EngineCapability">
+      <div class="md-flex__cell md-flex__cell--shrink">
+       <i class="md-icon md-icon--arrow-back md-footer-nav__button">
+       </i>
+      </div>
+      <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
+       <span class="md-flex__ellipsis">
+        <span class="md-footer-nav__direction">
+         Previous
+        </span>
+        Enum EngineCapability
+       </span>
+      </div>
+     </a>
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--next" href="function_torch__tensorrt_8h_1ad6a4ee8ca6c8f6e5519eb1128ec7f4a1.html" rel="next" title="Function torch_tensorrt::dump_build_info">
+      <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
+       <span class="md-flex__ellipsis">
+        <span class="md-footer-nav__direction">
+         Next
+        </span>
+        Function torch_tensorrt::dump_build_info
+       </span>
+      </div>
+      <div class="md-flex__cell md-flex__cell--shrink">
+       <i class="md-icon md-icon--arrow-forward md-footer-nav__button">
+       </i>
+      </div>
+     </a>
     </nav>
    </div>
    <div class="md-footer-meta md-typeset">

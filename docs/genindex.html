@@ -303,6 +303,11 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="_notebooks/Resnet50-example.html">
+            Torch-TensorRT Getting Started - ResNet 50
+           </a>
+          </li>
+          <li class="md-nav__item">
            <a class="md-nav__link" href="_notebooks/ssd-object-detection-demo.html">
             Object Detection with Torch-TensorRT (SSD)
            </a>
@@ -325,13 +330,60 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="py_api/logging.html">
+            torch_tensorrt.logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="py_api/ptq.html">
+            torch_tensorrt.ptq
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="py_api/ptq.html#classes">
+            Classes
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="py_api/ptq.html#enums">
+            Enums
+           </a>
+          </li>
+          <li class="md-nav__item">
            <a class="md-nav__link" href="py_api/ts.html">
             torch_tensorrt.ts
            </a>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="py_api/logging.html">
-            torch_tensorrt.logging
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             C++ API Documenation
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="_cpp_api/torch_tensort_cpp.html">
+            Torch-TensorRT C++ API
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="_cpp_api/namespace_torch_tensorrt.html">
+            Namespace torch_tensorrt
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="_cpp_api/namespace_torch_tensorrt__logging.html">
+            Namespace torch_tensorrt::logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="_cpp_api/namespace_torch_tensorrt__torchscript.html">
+            Namespace torch_tensorrt::torchscript
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="_cpp_api/namespace_torch_tensorrt__ptq.html">
+            Namespace torch_tensorrt::ptq
            </a>
           </li>
           <li class="md-nav__item">
@@ -451,6 +503,12 @@
          </strong>
         </a>
         |
+        <a href="#R">
+         <strong>
+          R
+         </strong>
+        </a>
+        |
         <a href="#S">
          <strong>
           S
@@ -492,6 +550,16 @@
                (torch_tensorrt.Input method)
               </a>
              </li>
+             <li>
+              <a href="py_api/ptq.html#torch_tensorrt.ptq.CacheCalibrator.__init__">
+               (torch_tensorrt.ptq.CacheCalibrator method)
+              </a>
+             </li>
+             <li>
+              <a href="py_api/ptq.html#torch_tensorrt.ptq.DataLoaderCalibrator.__init__">
+               (torch_tensorrt.ptq.DataLoaderCalibrator method)
+              </a>
+             </li>
             </ul>
            </li>
           </ul>
@@ -522,10 +590,32 @@
          <td style="width: 33%; vertical-align: top;">
           <ul>
            <li>
+            <a href="py_api/ptq.html#id1">
+             CacheCalibrator (class in torch_tensorrt.ptq)
+            </a>
+            ,
+            <a href="py_api/ptq.html#torch_tensorrt.ptq.CacheCalibrator">
+             [1]
+            </a>
+           </li>
+           <li>
+            <a href="py_api/ptq.html#id2">
+             CalibrationAlgo (class in torch_tensorrt.ptq)
+            </a>
+            ,
+            <a href="py_api/ptq.html#torch_tensorrt.ptq.CalibrationAlgo">
+             [1]
+            </a>
+           </li>
+           <li>
             <a href="py_api/ts.html#torch_tensorrt.ts.check_method_op_support">
              check_method_op_support() (in module torch_tensorrt.ts)
             </a>
            </li>
+          </ul>
+         </td>
+         <td style="width: 33%; vertical-align: top;">
+          <ul>
            <li>
             <a href="py_api/torch_tensorrt.html#torch_tensorrt.compile">
              compile() (in module torch_tensorrt)
@@ -538,10 +628,6 @@
              </li>
             </ul>
            </li>
-          </ul>
-         </td>
-         <td style="width: 33%; vertical-align: top;">
-          <ul>
            <li>
             <a href="py_api/torch_tensorrt.html#torch_tensorrt.convert_method_to_trt_engine">
              convert_method_to_trt_engine() (in module torch_tensorrt)
@@ -566,6 +652,15 @@
          <td style="width: 33%; vertical-align: top;">
           <ul>
            <li>
+            <a href="py_api/ptq.html#id0">
+             DataLoaderCalibrator (class in torch_tensorrt.ptq)
+            </a>
+            ,
+            <a href="py_api/ptq.html#torch_tensorrt.ptq.DataLoaderCalibrator">
+             [1]
+            </a>
+           </li>
+           <li>
             <a href="py_api/logging.html#torch_tensorrt.logging.Level.Debug">
              Debug (torch_tensorrt.logging.Level attribute)
             </a>
@@ -580,15 +675,15 @@
              device_type (torch_tensorrt.Device attribute)
             </a>
            </li>
+          </ul>
+         </td>
+         <td style="width: 33%; vertical-align: top;">
+          <ul>
            <li>
             <a href="py_api/torch_tensorrt.html#torch_tensorrt.DeviceType">
              DeviceType (class in torch_tensorrt)
             </a>
            </li>
-          </ul>
-         </td>
-         <td style="width: 33%; vertical-align: top;">
-          <ul>
            <li>
             <a href="py_api/torch_tensorrt.html#torch_tensorrt.Device.dla_core">
              dla_core (torch_tensorrt.Device attribute)
@@ -627,13 +722,23 @@
              embed_engine_in_new_module() (in module torch_tensorrt.ts)
             </a>
            </li>
+           <li>
+            <a href="py_api/torch_tensorrt.html#torch_tensorrt.EngineCapability">
+             EngineCapability (class in torch_tensorrt)
+            </a>
+           </li>
           </ul>
          </td>
          <td style="width: 33%; vertical-align: top;">
           <ul>
            <li>
-            <a href="py_api/torch_tensorrt.html#torch_tensorrt.EngineCapability">
-             EngineCapability (class in torch_tensorrt)
+            <a href="py_api/ptq.html#torch_tensorrt.ptq.CalibrationAlgo.ENTROPY_CALIBRATION">
+             ENTROPY_CALIBRATION (torch_tensorrt.ptq.CalibrationAlgo attribute)
+            </a>
+           </li>
+           <li>
+            <a href="py_api/ptq.html#torch_tensorrt.ptq.CalibrationAlgo.ENTROPY_CALIBRATION_2">
+             ENTROPY_CALIBRATION_2 (torch_tensorrt.ptq.CalibrationAlgo attribute)
             </a>
            </li>
            <li>
@@ -669,10 +774,29 @@
          <td style="width: 33%; vertical-align: top;">
           <ul>
            <li>
+            <a href="py_api/ptq.html#torch_tensorrt.ptq.get_batch">
+             get_batch() (in module torch_tensorrt.ptq)
+            </a>
+           </li>
+           <li>
+            <a href="py_api/ptq.html#torch_tensorrt.ptq.get_batch_size">
+             get_batch_size() (in module torch_tensorrt.ptq)
+            </a>
+           </li>
+           <li>
             <a href="py_api/torch_tensorrt.html#torch_tensorrt.get_build_info">
              get_build_info() (in module torch_tensorrt)
             </a>
            </li>
+           <li>
+            <a href="py_api/ptq.html#torch_tensorrt.ptq.get_cache_mode_batch">
+             get_cache_mode_batch() (in module torch_tensorrt.ptq)
+            </a>
+           </li>
+          </ul>
+         </td>
+         <td style="width: 33%; vertical-align: top;">
+          <ul>
            <li>
             <a href="py_api/logging.html#torch_tensorrt.logging.get_is_colored_output_on">
              get_is_colored_output_on() (in module torch_tensorrt.logging)
@@ -683,10 +807,6 @@
              get_logging_prefix() (in module torch_tensorrt.logging)
             </a>
            </li>
-          </ul>
-         </td>
-         <td style="width: 33%; vertical-align: top;">
-          <ul>
            <li>
             <a href="py_api/logging.html#torch_tensorrt.logging.get_reportable_log_level">
              get_reportable_log_level() (in module torch_tensorrt.logging)
@@ -744,14 +864,19 @@
          <td style="width: 33%; vertical-align: top;">
           <ul>
            <li>
-            <a href="py_api/logging.html#torch_tensorrt.logging.Level">
-             Level (class in torch_tensorrt.logging)
+            <a href="py_api/ptq.html#torch_tensorrt.ptq.CalibrationAlgo.LEGACY_CALIBRATION">
+             LEGACY_CALIBRATION (torch_tensorrt.ptq.CalibrationAlgo attribute)
             </a>
            </li>
           </ul>
          </td>
          <td style="width: 33%; vertical-align: top;">
           <ul>
+           <li>
+            <a href="py_api/logging.html#torch_tensorrt.logging.Level">
+             Level (class in torch_tensorrt.logging)
+            </a>
+           </li>
            <li>
             <a href="py_api/logging.html#torch_tensorrt.logging.log">
              log() (in module torch_tensorrt.logging)
@@ -769,6 +894,11 @@
          <td style="width: 33%; vertical-align: top;">
           <ul>
            <li>
+            <a href="py_api/ptq.html#torch_tensorrt.ptq.CalibrationAlgo.MINMAX_CALIBRATION">
+             MINMAX_CALIBRATION (torch_tensorrt.ptq.CalibrationAlgo attribute)
+            </a>
+           </li>
+           <li>
             module
             <ul>
              <li>
@@ -782,11 +912,32 @@
               </a>
              </li>
              <li>
+              <a href="py_api/ptq.html#module-torch_tensorrt.ptq">
+               torch_tensorrt.ptq
+              </a>
+             </li>
+             <li>
               <a href="py_api/ts.html#module-torch_tensorrt.ts">
                torch_tensorrt.ts
               </a>
              </li>
             </ul>
+           </li>
+          </ul>
+         </td>
+        </tr>
+       </table>
+       <h2 id="R">
+        R
+       </h2>
+       <table class="indextable genindextable" style="width: 100%">
+        <tr>
+         <td style="width: 33%; vertical-align: top;">
+          <ul>
+           <li>
+            <a href="py_api/ptq.html#torch_tensorrt.ptq.read_calibration_cache">
+             read_calibration_cache() (in module torch_tensorrt.ptq)
+            </a>
            </li>
           </ul>
          </td>
@@ -874,6 +1025,16 @@
             <ul>
              <li>
               <a href="py_api/logging.html#module-torch_tensorrt.logging">
+               module
+              </a>
+             </li>
+            </ul>
+           </li>
+           <li>
+            torch_tensorrt.ptq
+            <ul>
+             <li>
+              <a href="py_api/ptq.html#module-torch_tensorrt.ptq">
                module
               </a>
              </li>
@@ -1249,15 +1410,15 @@
              torch_tensorrt::logging::Level::kWARNING (C++ enumerator)
             </a>
            </li>
+          </ul>
+         </td>
+         <td style="width: 33%; vertical-align: top;">
+          <ul>
            <li>
             <a href="_cpp_api/function_logging_8h_1ac46ac0901cb97e3ae6e93b45f24e90b8.html#_CPPv4N14torch_tensorrt7logging3logE5LevelNSt6stringE">
              torch_tensorrt::logging::log (C++ function)
             </a>
            </li>
-          </ul>
-         </td>
-         <td style="width: 33%; vertical-align: top;">
-          <ul>
            <li>
             <a href="_cpp_api/function_logging_8h_1ad2efd47b6c3689e58ccc595680579ae5.html#_CPPv4N14torch_tensorrt7logging24set_is_colored_output_onEb">
              torch_tensorrt::logging::set_is_colored_output_on (C++ function)
@@ -1601,6 +1762,15 @@
            <li>
             <a href="py_api/logging.html#torch_tensorrt.logging.Level.Warning">
              Warning (torch_tensorrt.logging.Level attribute)
+            </a>
+           </li>
+          </ul>
+         </td>
+         <td style="width: 33%; vertical-align: top;">
+          <ul>
+           <li>
+            <a href="py_api/ptq.html#torch_tensorrt.ptq.write_calibration_cache">
+             write_calibration_cache() (in module torch_tensorrt.ptq)
             </a>
            </li>
           </ul>

@@ -3,7 +3,6 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -470,356 +469,352 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <section id="post-training-quantization-ptq">
-        <span id="ptq">
-        </span>
-        <h1 id="tutorials-ptq--page-root">
-         Post Training Quantization (PTQ)
-         <a class="headerlink" href="#tutorials-ptq--page-root" title="Permalink to this headline">
-          ¶
-         </a>
-        </h1>
-        <p>
-         Post Training Quantization (PTQ) is a technique to reduce the required computational resources for inference
+       <span id="ptq">
+       </span>
+       <h1 id="tutorials-ptq--page-root">
+        Post Training Quantization (PTQ)
+        <a class="headerlink" href="#tutorials-ptq--page-root" title="Permalink to this headline">
+         ¶
+        </a>
+       </h1>
+       <p>
+        Post Training Quantization (PTQ) is a technique to reduce the required computational resources for inference
 while still preserving the accuracy of your model by mapping the traditional FP32 activation space to a reduced
 INT8 space. TensorRT uses a calibration step which executes your model with sample data from the target domain
 and track the activations in FP32 to calibrate a mapping to INT8 that minimizes the information loss between
 FP32 inference and INT8 inference.
-        </p>
-        <p>
-         Users writing TensorRT applications are required to setup a calibrator class which will provide sample data to
+       </p>
+       <p>
+        Users writing TensorRT applications are required to setup a calibrator class which will provide sample data to
 the TensorRT calibrator. With Torch-TensorRT we look to leverage existing infrastructure in PyTorch to make implementing
 calibrators easier.
-        </p>
-        <p>
-         LibTorch provides a
-         <code class="docutils literal notranslate">
-          <span class="pre">
-           DataLoader
-          </span>
-         </code>
-         and
-         <code class="docutils literal notranslate">
-          <span class="pre">
-           Dataset
-          </span>
-         </code>
-         API which steamlines preprocessing and batching input data.
+       </p>
+       <p>
+        LibTorch provides a
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          DataLoader
+         </span>
+        </code>
+        and
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          Dataset
+         </span>
+        </code>
+        API which steamlines preprocessing and batching input data.
 These APIs are exposed via both C++ and Python interface which makes it easier for the end user.
 For C++ interface, we use
-         <code class="docutils literal notranslate">
-          <span class="pre">
-           torch::Dataset
-          </span>
-         </code>
-         and
-         <code class="docutils literal notranslate">
-          <span class="pre">
-           torch::data::make_data_loader
-          </span>
-         </code>
-         objects to construct and perform pre-processing on datasets.
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          torch::Dataset
+         </span>
+        </code>
+        and
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          torch::data::make_data_loader
+         </span>
+        </code>
+        objects to construct and perform pre-processing on datasets.
 The equivalent functionality in python interface uses
-         <code class="docutils literal notranslate">
-          <span class="pre">
-           torch.utils.data.Dataset
-          </span>
-         </code>
-         and
-         <code class="docutils literal notranslate">
-          <span class="pre">
-           torch.utils.data.DataLoader
-          </span>
-         </code>
-         .
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          torch.utils.data.Dataset
+         </span>
+        </code>
+        and
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          torch.utils.data.DataLoader
+         </span>
+        </code>
+        .
 This section of the PyTorch documentation has more information
-         <a class="reference external" href="https://pytorch.org/tutorials/advanced/cpp_frontend.html#loading-data">
-          https://pytorch.org/tutorials/advanced/cpp_frontend.html#loading-data
-         </a>
-         and
-         <a class="reference external" href="https://pytorch.org/tutorials/recipes/recipes/loading_data_recipe.html">
-          https://pytorch.org/tutorials/recipes/recipes/loading_data_recipe.html
-         </a>
-         .
+        <a class="reference external" href="https://pytorch.org/tutorials/advanced/cpp_frontend.html#loading-data">
+         https://pytorch.org/tutorials/advanced/cpp_frontend.html#loading-data
+        </a>
+        and
+        <a class="reference external" href="https://pytorch.org/tutorials/recipes/recipes/loading_data_recipe.html">
+         https://pytorch.org/tutorials/recipes/recipes/loading_data_recipe.html
+        </a>
+        .
 Torch-TensorRT uses Dataloaders as the base of a generic calibrator implementation. So you will be able to reuse or quickly
 implement a
-         <code class="docutils literal notranslate">
-          <span class="pre">
-           torch::Dataset
-          </span>
-         </code>
-         for your target domain, place it in a DataLoader and create a INT8 Calibrator
-which you can provide to Torch-TensorRT to run INT8 Calibration during compliation of your module.
-        </p>
-        <section id="how-to-create-your-own-ptq-application-in-c">
-         <span id="writing-ptq-cpp">
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          torch::Dataset
          </span>
-         <h2 id="how-to-create-your-own-ptq-application-in-c">
-          How to create your own PTQ application in C++
-          <a class="headerlink" href="#how-to-create-your-own-ptq-application-in-c" title="Permalink to this headline">
-           ¶
-          </a>
-         </h2>
-         <p>
-          Here is an example interface of a
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            torch::Dataset
-           </span>
-          </code>
-          class for CIFAR10:
-         </p>
-         <div class="highlight-c++ notranslate">
-          <table class="highlighttable">
-           <tr>
-            <td class="linenos">
-             <div class="linenodiv">
-              <pre><span class="normal"> 1</span>
-<span class="normal"> 2</span>
-<span class="normal"> 3</span>
-<span class="normal"> 4</span>
-<span class="normal"> 5</span>
-<span class="normal"> 6</span>
-<span class="normal"> 7</span>
-<span class="normal"> 8</span>
-<span class="normal"> 9</span>
-<span class="normal">10</span>
-<span class="normal">11</span>
-<span class="normal">12</span>
-<span class="normal">13</span>
-<span class="normal">14</span>
-<span class="normal">15</span>
-<span class="normal">16</span>
-<span class="normal">17</span>
-<span class="normal">18</span>
-<span class="normal">19</span>
-<span class="normal">20</span>
-<span class="normal">21</span>
-<span class="normal">22</span>
-<span class="normal">23</span>
-<span class="normal">24</span>
-<span class="normal">25</span>
-<span class="normal">26</span>
-<span class="normal">27</span>
-<span class="normal">28</span>
-<span class="normal">29</span>
-<span class="normal">30</span>
-<span class="normal">31</span>
-<span class="normal">32</span>
-<span class="normal">33</span>
-<span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span>
-<span class="normal">37</span>
-<span class="normal">38</span>
-<span class="normal">39</span>
-<span class="normal">40</span>
-<span class="normal">41</span>
-<span class="normal">42</span>
-<span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span></pre>
-             </div>
-            </td>
-            <td class="code">
-             <div class="highlight">
-              <pre><span></span><span class="c1">//cpp/ptq/datasets/cifar10.h</span>
+        </code>
+        for your target domain, place it in a DataLoader and create a INT8 Calibrator
+which you can provide to Torch-TensorRT to run INT8 Calibration during compliation of your module.
+       </p>
+       <span id="writing-ptq-cpp">
+       </span>
+       <h2 id="how-to-create-your-own-ptq-application-in-c">
+        How to create your own PTQ application in C++
+        <a class="headerlink" href="#how-to-create-your-own-ptq-application-in-c" title="Permalink to this headline">
+         ¶
+        </a>
+       </h2>
+       <p>
+        Here is an example interface of a
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          torch::Dataset
+         </span>
+        </code>
+        class for CIFAR10:
+       </p>
+       <div class="highlight-c++ notranslate">
+        <table class="highlighttable">
+         <tr>
+          <td class="linenos">
+           <div class="linenodiv">
+            <pre> 1
+ 2
+ 3
+ 4
+ 5
+ 6
+ 7
+ 8
+ 9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46</pre>
+           </div>
+          </td>
+          <td class="code">
+           <div class="highlight">
+            <pre><span></span><span class="c1">//cpp/ptq/datasets/cifar10.h</span>
 <span class="cp">#pragma once</span>
 
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch/data/datasets/base.h"</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch/data/example.h"</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch/types.h"</span><span class="cp"></span>
+<span class="cp">#include</span> <span class="cpf">"torch/data/datasets/base.h"</span><span class="cp"></span>
+<span class="cp">#include</span> <span class="cpf">"torch/data/example.h"</span><span class="cp"></span>
+<span class="cp">#include</span> <span class="cpf">"torch/types.h"</span><span class="cp"></span>
 
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;cstddef&gt;</span><span class="cp"></span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;string&gt;</span><span class="cp"></span>
+<span class="cp">#include</span> <span class="cpf">&lt;cstddef&gt;</span><span class="cp"></span>
+<span class="cp">#include</span> <span class="cpf">&lt;string&gt;</span><span class="cp"></span>
 
-<span class="k">namespace</span><span class="w"> </span><span class="nn">datasets</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="k">namespace</span> <span class="n">datasets</span> <span class="p">{</span>
 <span class="c1">// The CIFAR10 Dataset</span>
-<span class="k">class</span> <span class="nc">CIFAR10</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">datasets</span><span class="o">::</span><span class="n">Dataset</span><span class="o">&lt;</span><span class="n">CIFAR10</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="k">public</span><span class="o">:</span><span class="w"></span>
-<span class="w">    </span><span class="c1">// The mode in which the dataset is loaded</span>
-<span class="w">    </span><span class="k">enum</span> <span class="k">class</span><span class="w"> </span><span class="nc">Mode</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">kTrain</span><span class="p">,</span><span class="w"> </span><span class="n">kTest</span><span class="w"> </span><span class="p">};</span><span class="w"></span>
+<span class="k">class</span> <span class="nc">CIFAR10</span> <span class="o">:</span> <span class="k">public</span> <span class="n">torch</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">datasets</span><span class="o">::</span><span class="n">Dataset</span><span class="o">&lt;</span><span class="n">CIFAR10</span><span class="o">&gt;</span> <span class="p">{</span>
+<span class="k">public</span><span class="o">:</span>
+    <span class="c1">// The mode in which the dataset is loaded</span>
+    <span class="k">enum</span> <span class="k">class</span> <span class="nc">Mode</span> <span class="p">{</span> <span class="n">kTrain</span><span class="p">,</span> <span class="n">kTest</span> <span class="p">};</span>
 
-<span class="w">    </span><span class="c1">// Loads CIFAR10 from un-tarred file</span>
-<span class="w">    </span><span class="c1">// Dataset can be found https://www.cs.toronto.edu/~kriz/cifar-10-binary.tar.gz</span>
-<span class="w">    </span><span class="c1">// Root path should be the directory that contains the content of tarball</span>
-<span class="w">    </span><span class="k">explicit</span><span class="w"> </span><span class="n">CIFAR10</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span><span class="w"> </span><span class="n">root</span><span class="p">,</span><span class="w"> </span><span class="n">Mode</span><span class="w"> </span><span class="n">mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Mode</span><span class="o">::</span><span class="n">kTrain</span><span class="p">);</span><span class="w"></span>
+    <span class="c1">// Loads CIFAR10 from un-tarred file</span>
+    <span class="c1">// Dataset can be found https://www.cs.toronto.edu/~kriz/cifar-10-binary.tar.gz</span>
+    <span class="c1">// Root path should be the directory that contains the content of tarball</span>
+    <span class="k">explicit</span> <span class="nf">CIFAR10</span><span class="p">(</span><span class="k">const</span> <span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span> <span class="n">root</span><span class="p">,</span> <span class="n">Mode</span> <span class="n">mode</span> <span class="o">=</span> <span class="n">Mode</span><span class="o">::</span><span class="n">kTrain</span><span class="p">);</span>
 
-<span class="w">    </span><span class="c1">// Returns the pair at index in the dataset</span>
-<span class="w">    </span><span class="n">torch</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">Example</span><span class="o">&lt;&gt;</span><span class="w"> </span><span class="n">get</span><span class="p">(</span><span class="kt">size_t</span><span class="w"> </span><span class="n">index</span><span class="p">)</span><span class="w"> </span><span class="k">override</span><span class="p">;</span><span class="w"></span>
+    <span class="c1">// Returns the pair at index in the dataset</span>
+    <span class="n">torch</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">Example</span><span class="o">&lt;&gt;</span> <span class="n">get</span><span class="p">(</span><span class="kt">size_t</span> <span class="n">index</span><span class="p">)</span> <span class="k">override</span><span class="p">;</span>
 
-<span class="w">    </span><span class="c1">// The size of the dataset</span>
-<span class="w">    </span><span class="n">c10</span><span class="o">::</span><span class="n">optional</span><span class="o">&lt;</span><span class="kt">size_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">size</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">override</span><span class="p">;</span><span class="w"></span>
+    <span class="c1">// The size of the dataset</span>
+    <span class="n">c10</span><span class="o">::</span><span class="n">optional</span><span class="o">&lt;</span><span class="kt">size_t</span><span class="o">&gt;</span> <span class="n">size</span><span class="p">()</span> <span class="k">const</span> <span class="k">override</span><span class="p">;</span>
 
-<span class="w">    </span><span class="c1">// The mode the dataset is in</span>
-<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="nf">is_train</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">noexcept</span><span class="p">;</span><span class="w"></span>
+    <span class="c1">// The mode the dataset is in</span>
+    <span class="kt">bool</span> <span class="nf">is_train</span><span class="p">()</span> <span class="k">const</span> <span class="k">noexcept</span><span class="p">;</span>
 
-<span class="w">    </span><span class="c1">// Returns all images stacked into a single tensor</span>
-<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span><span class="o">&amp;</span><span class="w"> </span><span class="nf">images</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="p">;</span><span class="w"></span>
+    <span class="c1">// Returns all images stacked into a single tensor</span>
+    <span class="k">const</span> <span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span><span class="o">&amp;</span> <span class="n">images</span><span class="p">()</span> <span class="k">const</span><span class="p">;</span>
 
-<span class="w">    </span><span class="c1">// Returns all targets stacked into a single tensor</span>
-<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span><span class="o">&amp;</span><span class="w"> </span><span class="nf">targets</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="p">;</span><span class="w"></span>
+    <span class="c1">// Returns all targets stacked into a single tensor</span>
+    <span class="k">const</span> <span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span><span class="o">&amp;</span> <span class="n">targets</span><span class="p">()</span> <span class="k">const</span><span class="p">;</span>
 
-<span class="w">    </span><span class="c1">// Trims the dataset to the first n pairs</span>
-<span class="w">    </span><span class="n">CIFAR10</span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nf">use_subset</span><span class="p">(</span><span class="kt">int64_t</span><span class="w"> </span><span class="n">new_size</span><span class="p">);</span><span class="w"></span>
+    <span class="c1">// Trims the dataset to the first n pairs</span>
+    <span class="n">CIFAR10</span><span class="o">&amp;&amp;</span> <span class="n">use_subset</span><span class="p">(</span><span class="kt">int64_t</span> <span class="n">new_size</span><span class="p">);</span>
 
 
-<span class="k">private</span><span class="o">:</span><span class="w"></span>
-<span class="w">    </span><span class="n">Mode</span><span class="w"> </span><span class="n">mode_</span><span class="p">;</span><span class="w"></span>
-<span class="w">    </span><span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span><span class="w"> </span><span class="n">images_</span><span class="p">,</span><span class="w"> </span><span class="n">targets_</span><span class="p">;</span><span class="w"></span>
-<span class="p">};</span><span class="w"></span>
-<span class="p">}</span><span class="w"> </span><span class="c1">// namespace datasets</span>
+<span class="k">private</span><span class="o">:</span>
+    <span class="n">Mode</span> <span class="n">mode_</span><span class="p">;</span>
+    <span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span> <span class="n">images_</span><span class="p">,</span> <span class="n">targets_</span><span class="p">;</span>
+<span class="p">};</span>
+<span class="p">}</span> <span class="c1">// namespace datasets</span>
 </pre>
-             </div>
-            </td>
-           </tr>
-          </table>
-         </div>
-         <p>
-          This class’s implementation reads from the binary distribution of the CIFAR10 dataset and builds two tensors which hold the images and labels.
-         </p>
-         <p>
-          We use a subset of the dataset to use for calibration, since we don’t need the the full dataset for effective calibration and calibration does
+           </div>
+          </td>
+         </tr>
+        </table>
+       </div>
+       <p>
+        This class’s implementation reads from the binary distribution of the CIFAR10 dataset and builds two tensors which hold the images and labels.
+       </p>
+       <p>
+        We use a subset of the dataset to use for calibration, since we don’t need the the full dataset for effective calibration and calibration does
 some take time, then define the preprocessing to apply to the images in the dataset and create a DataLoader from the dataset which will batch the data:
-         </p>
-         <div class="highlight-c++ notranslate">
-          <div class="highlight">
-           <pre><span></span><span class="k">auto</span><span class="w"> </span><span class="n">calibration_dataset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">datasets</span><span class="o">::</span><span class="n">CIFAR10</span><span class="p">(</span><span class="n">data_dir</span><span class="p">,</span><span class="w"> </span><span class="n">datasets</span><span class="o">::</span><span class="n">CIFAR10</span><span class="o">::</span><span class="n">Mode</span><span class="o">::</span><span class="n">kTest</span><span class="p">)</span><span class="w"></span>
-<span class="w">                                    </span><span class="p">.</span><span class="n">use_subset</span><span class="p">(</span><span class="mi">320</span><span class="p">)</span><span class="w"></span>
-<span class="w">                                    </span><span class="p">.</span><span class="n">map</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">transforms</span><span class="o">::</span><span class="n">Normalize</span><span class="o">&lt;&gt;</span><span class="p">({</span><span class="mf">0.4914</span><span class="p">,</span><span class="w"> </span><span class="mf">0.4822</span><span class="p">,</span><span class="w"> </span><span class="mf">0.4465</span><span class="p">},</span><span class="w"></span>
-<span class="w">                                                                            </span><span class="p">{</span><span class="mf">0.2023</span><span class="p">,</span><span class="w"> </span><span class="mf">0.1994</span><span class="p">,</span><span class="w"> </span><span class="mf">0.2010</span><span class="p">}))</span><span class="w"></span>
-<span class="w">                                    </span><span class="p">.</span><span class="n">map</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">transforms</span><span class="o">::</span><span class="n">Stack</span><span class="o">&lt;&gt;</span><span class="p">());</span><span class="w"></span>
-<span class="k">auto</span><span class="w"> </span><span class="n">calibration_dataloader</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">make_data_loader</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">calibration_dataset</span><span class="p">),</span><span class="w"></span>
-<span class="w">                                                            </span><span class="n">torch</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">DataLoaderOptions</span><span class="p">().</span><span class="n">batch_size</span><span class="p">(</span><span class="mi">32</span><span class="p">)</span><span class="w"></span>
-<span class="w">                                                                                            </span><span class="p">.</span><span class="n">workers</span><span class="p">(</span><span class="mi">2</span><span class="p">));</span><span class="w"></span>
+       </p>
+       <div class="highlight-c++ notranslate">
+        <div class="highlight">
+         <pre><span></span><span class="k">auto</span> <span class="n">calibration_dataset</span> <span class="o">=</span> <span class="n">datasets</span><span class="o">::</span><span class="n">CIFAR10</span><span class="p">(</span><span class="n">data_dir</span><span class="p">,</span> <span class="n">datasets</span><span class="o">::</span><span class="n">CIFAR10</span><span class="o">::</span><span class="n">Mode</span><span class="o">::</span><span class="n">kTest</span><span class="p">)</span>
+                                    <span class="p">.</span><span class="n">use_subset</span><span class="p">(</span><span class="mi">320</span><span class="p">)</span>
+                                    <span class="p">.</span><span class="n">map</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">transforms</span><span class="o">::</span><span class="n">Normalize</span><span class="o">&lt;&gt;</span><span class="p">({</span><span class="mf">0.4914</span><span class="p">,</span> <span class="mf">0.4822</span><span class="p">,</span> <span class="mf">0.4465</span><span class="p">},</span>
+                                                                            <span class="p">{</span><span class="mf">0.2023</span><span class="p">,</span> <span class="mf">0.1994</span><span class="p">,</span> <span class="mf">0.2010</span><span class="p">}))</span>
+                                    <span class="p">.</span><span class="n">map</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">transforms</span><span class="o">::</span><span class="n">Stack</span><span class="o">&lt;&gt;</span><span class="p">());</span>
+<span class="k">auto</span> <span class="n">calibration_dataloader</span> <span class="o">=</span> <span class="n">torch</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">make_data_loader</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">calibration_dataset</span><span class="p">),</span>
+                                                            <span class="n">torch</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">DataLoaderOptions</span><span class="p">().</span><span class="n">batch_size</span><span class="p">(</span><span class="mi">32</span><span class="p">)</span>
+                                                                                            <span class="p">.</span><span class="n">workers</span><span class="p">(</span><span class="mi">2</span><span class="p">));</span>
 </pre>
-          </div>
-         </div>
-         <p>
-          Next we create a calibrator from the
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            calibration_dataloader
-           </span>
-          </code>
-          using the calibrator factory (found in
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            torch_tensorrt/ptq.h
-           </span>
-          </code>
-          ):
-         </p>
-         <div class="highlight-c++ notranslate">
-          <div class="highlight">
-           <pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch_tensorrt/ptq.h"</span><span class="cp"></span>
-<span class="p">...</span><span class="w"></span>
+        </div>
+       </div>
+       <p>
+        Next we create a calibrator from the
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          calibration_dataloader
+         </span>
+        </code>
+        using the calibrator factory (found in
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          torch_tensorrt/ptq.h
+         </span>
+        </code>
+        ):
+       </p>
+       <div class="highlight-c++ notranslate">
+        <div class="highlight">
+         <pre><span></span><span class="cp">#include</span> <span class="cpf">"torch_tensorrt/ptq.h"</span><span class="cp"></span>
+<span class="p">...</span>
 
-<span class="k">auto</span><span class="w"> </span><span class="n">calibrator</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">ptq</span><span class="o">::</span><span class="n">make_int8_calibrator</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">calibration_dataloader</span><span class="p">),</span><span class="w"> </span><span class="n">calibration_cache_file</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">);</span><span class="w"></span>
+<span class="k">auto</span> <span class="n">calibrator</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">ptq</span><span class="o">::</span><span class="n">make_int8_calibrator</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">calibration_dataloader</span><span class="p">),</span> <span class="n">calibration_cache_file</span><span class="p">,</span> <span class="nb">true</span><span class="p">);</span>
 </pre>
-          </div>
-         </div>
-         <p>
-          Here we also define a location to write a calibration cache file to which we can use to reuse the calibration data without needing the dataset and whether or not
+        </div>
+       </div>
+       <p>
+        Here we also define a location to write a calibration cache file to which we can use to reuse the calibration data without needing the dataset and whether or not
 we should use the cache file if it exists. There also exists a
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            torch_tensorrt::ptq::make_int8_cache_calibrator
-           </span>
-          </code>
-          factory which creates a calibrator that uses the cache
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          torch_tensorrt::ptq::make_int8_cache_calibrator
+         </span>
+        </code>
+        factory which creates a calibrator that uses the cache
 only for cases where you may do engine building on a machine that has limited storage (i.e. no space for a full dataset) or to have a simpiler deployment application.
-         </p>
-         <p>
-          The calibrator factories create a calibrator that inherits from a
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            nvinfer1::IInt8Calibrator
-           </span>
-          </code>
-          virtual class (
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            nvinfer1::IInt8EntropyCalibrator2
-           </span>
-          </code>
-          by default) which
+       </p>
+       <p>
+        The calibrator factories create a calibrator that inherits from a
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          nvinfer1::IInt8Calibrator
+         </span>
+        </code>
+        virtual class (
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          nvinfer1::IInt8EntropyCalibrator2
+         </span>
+        </code>
+        by default) which
 defines the calibration algorithm used when calibrating. You can explicitly make the selection of calibration algorithm like this:
-         </p>
-         <div class="highlight-c++ notranslate">
-          <div class="highlight">
-           <pre><span></span><span class="c1">// MinMax Calibrator is geared more towards NLP tasks</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">calibrator</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">ptq</span><span class="o">::</span><span class="n">make_int8_calibrator</span><span class="o">&lt;</span><span class="n">nvinfer1</span><span class="o">::</span><span class="n">IInt8MinMaxCalibrator</span><span class="o">&gt;</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">calibration_dataloader</span><span class="p">),</span><span class="w"> </span><span class="n">calibration_cache_file</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">);</span><span class="w"></span>
+       </p>
+       <div class="highlight-c++ notranslate">
+        <div class="highlight">
+         <pre><span></span><span class="c1">// MinMax Calibrator is geared more towards NLP tasks</span>
+<span class="k">auto</span> <span class="n">calibrator</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">ptq</span><span class="o">::</span><span class="n">make_int8_calibrator</span><span class="o">&lt;</span><span class="n">nvinfer1</span><span class="o">::</span><span class="n">IInt8MinMaxCalibrator</span><span class="o">&gt;</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">calibration_dataloader</span><span class="p">),</span> <span class="n">calibration_cache_file</span><span class="p">,</span> <span class="nb">true</span><span class="p">);</span>
 </pre>
-          </div>
-         </div>
-         <p>
-          Then all thats required to setup the module for INT8 calibration is to set the following compile settings in the
-          <cite>
-           torch_tensorrt::CompileSpec
-          </cite>
-          struct and compiling the module:
-         </p>
-         <div class="highlight-c++ notranslate">
-          <div class="highlight">
-           <pre><span></span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">input_shape</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{{</span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">}};</span><span class="w"></span>
+        </div>
+       </div>
+       <p>
+        Then all thats required to setup the module for INT8 calibration is to set the following compile settings in the
+        <cite>
+         torch_tensorrt::CompileSpec
+        </cite>
+        struct and compiling the module:
+       </p>
+       <div class="highlight-c++ notranslate">
+        <div class="highlight">
+         <pre><span></span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;&gt;</span> <span class="n">input_shape</span> <span class="o">=</span> <span class="p">{{</span><span class="mi">32</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">}};</span>
 <span class="c1">/// Configure settings for compilation</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">compile_spec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">CompileSpec</span><span class="p">({</span><span class="n">input_shape</span><span class="p">});</span><span class="w"></span>
+<span class="k">auto</span> <span class="n">compile_spec</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">CompileSpec</span><span class="p">({</span><span class="n">input_shape</span><span class="p">});</span>
 <span class="c1">/// Set operating precision to INT8</span>
-<span class="n">compile_spec</span><span class="p">.</span><span class="n">enabled_precisions</span><span class="p">.</span><span class="n">insert</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">kF16</span><span class="p">);</span><span class="w"></span>
-<span class="n">compile_spec</span><span class="p">.</span><span class="n">enabled_precisions</span><span class="p">.</span><span class="n">insert</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">kI8</span><span class="p">);</span><span class="w"></span>
+<span class="n">compile_spec</span><span class="p">.</span><span class="n">enabled_precisions</span><span class="p">.</span><span class="n">insert</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">kF16</span><span class="p">);</span>
+<span class="n">compile_spec</span><span class="p">.</span><span class="n">enabled_precisions</span><span class="p">.</span><span class="n">insert</span><span class="p">(</span><span class="n">torch</span><span class="o">::</span><span class="n">kI8</span><span class="p">);</span>
 <span class="c1">/// Use the TensorRT Entropy Calibrator</span>
-<span class="n">compile_spec</span><span class="p">.</span><span class="n">ptq_calibrator</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">calibrator</span><span class="p">;</span><span class="w"></span>
+<span class="n">compile_spec</span><span class="p">.</span><span class="n">ptq_calibrator</span> <span class="o">=</span> <span class="n">calibrator</span><span class="p">;</span>
 <span class="c1">/// Set a larger workspace (you may get better performace from doing so)</span>
-<span class="n">compile_spec</span><span class="p">.</span><span class="n">workspace_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="mi">28</span><span class="p">;</span><span class="w"></span>
+<span class="n">compile_spec</span><span class="p">.</span><span class="n">workspace_size</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="mi">28</span><span class="p">;</span>
 
-<span class="k">auto</span><span class="w"> </span><span class="n">trt_mod</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">CompileGraph</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span><span class="w"> </span><span class="n">compile_spec</span><span class="p">);</span><span class="w"></span>
+<span class="k">auto</span> <span class="n">trt_mod</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">::</span><span class="n">CompileGraph</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="n">compile_spec</span><span class="p">);</span>
 </pre>
-          </div>
-         </div>
-         <p>
-          If you have an existing Calibrator implementation for TensorRT you may directly set the
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            ptq_calibrator
-           </span>
-          </code>
-          field with a pointer to your calibrator and it will work as well.
+        </div>
+       </div>
+       <p>
+        If you have an existing Calibrator implementation for TensorRT you may directly set the
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          ptq_calibrator
+         </span>
+        </code>
+        field with a pointer to your calibrator and it will work as well.
 From here not much changes in terms of how to execution works. You are still able to fully use LibTorch as the sole interface for inference. Data should remain
 in FP32 precision when it’s passed into
-          <cite>
-           trt_mod.forward
-          </cite>
-          . There exists an example application in the Torch-TensorRT demo that takes you from training a VGG16 network on
+        <cite>
+         trt_mod.forward
+        </cite>
+        . There exists an example application in the Torch-TensorRT demo that takes you from training a VGG16 network on
 CIFAR10 to deploying in INT8 with Torch-TensorRT here:
-          <a class="reference external" href="https://github.com/NVIDIA/Torch-TensorRT/tree/master/cpp/ptq">
-           https://github.com/NVIDIA/Torch-TensorRT/tree/master/cpp/ptq
-          </a>
-         </p>
-        </section>
-        <section id="how-to-create-your-own-ptq-application-in-python">
-         <span id="writing-ptq-python">
+        <a class="reference external" href="https://github.com/NVIDIA/Torch-TensorRT/tree/master/cpp/ptq">
+         https://github.com/NVIDIA/Torch-TensorRT/tree/master/cpp/ptq
+        </a>
+       </p>
+       <span id="writing-ptq-python">
+       </span>
+       <h2 id="how-to-create-your-own-ptq-application-in-python">
+        How to create your own PTQ application in Python
+        <a class="headerlink" href="#how-to-create-your-own-ptq-application-in-python" title="Permalink to this headline">
+         ¶
+        </a>
+       </h2>
+       <p>
+        Torch-TensorRT Python API provides an easy and convenient way to use pytorch dataloaders with TensorRT calibrators.
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          DataLoaderCalibrator
          </span>
-         <h2 id="how-to-create-your-own-ptq-application-in-python">
-          How to create your own PTQ application in Python
-          <a class="headerlink" href="#how-to-create-your-own-ptq-application-in-python" title="Permalink to this headline">
-           ¶
-          </a>
-         </h2>
-         <p>
-          Torch-TensorRT Python API provides an easy and convenient way to use pytorch dataloaders with TensorRT calibrators.
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            DataLoaderCalibrator
-           </span>
-          </code>
-          class can be used to create
+        </code>
+        class can be used to create
 a TensorRT calibrator by providing desired configuration. The following code demonstrates an example on how to use it
-         </p>
-         <div class="highlight-python notranslate">
-          <div class="highlight">
-           <pre><span></span><span class="n">testing_dataset</span> <span class="o">=</span> <span class="n">torchvision</span><span class="o">.</span><span class="n">datasets</span><span class="o">.</span><span class="n">CIFAR10</span><span class="p">(</span><span class="n">root</span><span class="o">=</span><span class="s1">'./data'</span><span class="p">,</span>
+       </p>
+       <div class="highlight-python notranslate">
+        <div class="highlight">
+         <pre><span></span><span class="n">testing_dataset</span> <span class="o">=</span> <span class="n">torchvision</span><span class="o">.</span><span class="n">datasets</span><span class="o">.</span><span class="n">CIFAR10</span><span class="p">(</span><span class="n">root</span><span class="o">=</span><span class="s1">'./data'</span><span class="p">,</span>
                                                         <span class="n">train</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
                                                         <span class="n">download</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
                                                         <span class="n">transform</span><span class="o">=</span><span class="n">transforms</span><span class="o">.</span><span class="n">Compose</span><span class="p">([</span>
@@ -852,27 +847,27 @@ a TensorRT calibrator by providing desired configuration. The following code dem
      <span class="p">}</span>
 <span class="n">trt_mod</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">compile_spec</span><span class="p">)</span>
 </pre>
-          </div>
-         </div>
-         <p>
-          In the cases where there is a pre-existing calibration cache file that users want to use,
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            CacheCalibrator
-           </span>
-          </code>
-          can be used without any dataloaders. The following example demonstrates how
+        </div>
+       </div>
+       <p>
+        In the cases where there is a pre-existing calibration cache file that users want to use,
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          CacheCalibrator
+         </span>
+        </code>
+        can be used without any dataloaders. The following example demonstrates how
 to use
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            CacheCalibrator
-           </span>
-          </code>
-          to use in INT8 mode.
-         </p>
-         <div class="highlight-python notranslate">
-          <div class="highlight">
-           <pre><span></span><span class="n">calibrator</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">ptq</span><span class="o">.</span><span class="n">CacheCalibrator</span><span class="p">(</span><span class="s2">"./calibration.cache"</span><span class="p">)</span>
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          CacheCalibrator
+         </span>
+        </code>
+        to use in INT8 mode.
+       </p>
+       <div class="highlight-python notranslate">
+        <div class="highlight">
+         <pre><span></span><span class="n">calibrator</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">ptq</span><span class="o">.</span><span class="n">CacheCalibrator</span><span class="p">(</span><span class="s2">"./calibration.cache"</span><span class="p">)</span>
 
 <span class="n">compile_settings</span> <span class="o">=</span> <span class="p">{</span>
       <span class="s2">"inputs"</span><span class="p">:</span> <span class="p">[</span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">])],</span>
@@ -883,35 +878,31 @@ to use
 
 <span class="n">trt_mod</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">compile_settings</span><span class="p">)</span>
 </pre>
-          </div>
-         </div>
-         <p>
-          If you already have an existing calibrator class (implemented directly using TensorRT API), you can directly set the calibrator field to your class which can be very convenient.
+        </div>
+       </div>
+       <p>
+        If you already have an existing calibrator class (implemented directly using TensorRT API), you can directly set the calibrator field to your class which can be very convenient.
 For a demo on how PTQ can be performed on a VGG network using Torch-TensorRT API, you can refer to
-          <a class="reference external" href="https://github.com/NVIDIA/Torch-TensorRT/blob/master/tests/py/test_ptq_dataloader_calibrator.py">
-           https://github.com/NVIDIA/Torch-TensorRT/blob/master/tests/py/test_ptq_dataloader_calibrator.py
-          </a>
-          and
-          <a class="reference external" href="https://github.com/NVIDIA/Torch-TensorRT/blob/master/tests/py/test_ptq_trt_calibrator.py">
-           https://github.com/NVIDIA/Torch-TensorRT/blob/master/tests/py/test_ptq_trt_calibrator.py
-          </a>
-         </p>
-         <section id="citations">
-          <h3 id="citations">
-           Citations
-           <a class="headerlink" href="#citations" title="Permalink to this headline">
-            ¶
-           </a>
-          </h3>
-          <p>
-           Krizhevsky, A., &amp; Hinton, G. (2009). Learning multiple layers of features from tiny images.
-          </p>
-          <p>
-           Simonyan, K., &amp; Zisserman, A. (2014). Very deep convolutional networks for large-scale image recognition. arXiv preprint arXiv:1409.1556.
-          </p>
-         </section>
-        </section>
-       </section>
+        <a class="reference external" href="https://github.com/NVIDIA/Torch-TensorRT/blob/master/tests/py/test_ptq_dataloader_calibrator.py">
+         https://github.com/NVIDIA/Torch-TensorRT/blob/master/tests/py/test_ptq_dataloader_calibrator.py
+        </a>
+        and
+        <a class="reference external" href="https://github.com/NVIDIA/Torch-TensorRT/blob/master/tests/py/test_ptq_trt_calibrator.py">
+         https://github.com/NVIDIA/Torch-TensorRT/blob/master/tests/py/test_ptq_trt_calibrator.py
+        </a>
+       </p>
+       <h3 id="citations">
+        Citations
+        <a class="headerlink" href="#citations" title="Permalink to this headline">
+         ¶
+        </a>
+       </h3>
+       <p>
+        Krizhevsky, A., &amp; Hinton, G. (2009). Learning multiple layers of features from tiny images.
+       </p>
+       <p>
+        Simonyan, K., &amp; Zisserman, A. (2014). Very deep convolutional networks for large-scale image recognition. arXiv preprint arXiv:1409.1556.
+       </p>
       </article>
      </div>
     </div>

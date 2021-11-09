@@ -43,7 +43,6 @@ Getting Started
    tutorials/use_from_pytorch
    tutorials/runtime
    tutorials/using_dla
-   _notebooks/lenet
 
 .. toctree::
    :caption: Notebooks
@@ -51,6 +50,7 @@ Getting Started
    :hidden:
 
    _notebooks/lenet-getting-started
+   _notebooks/Resnet50-example
    _notebooks/ssd-object-detection-demo
    _notebooks/vgg-qat
 
@@ -58,6 +58,10 @@ Getting Started
 Python API Documenation
 ------------------------
 * :ref:`torch_tensorrt_py`
+* :ref:`torch_tensorrt_logging_py`
+* :ref:`torch_tensorrt_ptq_py`
+* :ref:`torch_tensorrt_ts_py`
+
 
 .. toctree::
    :caption: Python API Documenation
@@ -65,19 +69,28 @@ Python API Documenation
    :hidden:
 
    py_api/torch_tensorrt
-   py_api/ts
    py_api/logging
+   py_api/ptq
+   py_api/ts
 
 C++ API Documenation
 ----------------------
 * :ref:`namespace_torch_tensorrt`
+* :ref:`namespace_torch_tensorrt__logging`
+* :ref:`namespace_torch_tensorrt__ptq`
+* :ref:`namespace_torch_tensorrt__torchscript`
+
 
 .. toctree::
    :caption: C++ API Documenation
    :maxdepth: 1
    :hidden:
 
-   _cpp_api/torch_tensorrt_cpp
+   _cpp_api/torch_tensort_cpp
+   _cpp_api/namespace_torch_tensorrt
+   _cpp_api/namespace_torch_tensorrt__logging
+   _cpp_api/namespace_torch_tensorrt__torchscript
+   _cpp_api/namespace_torch_tensorrt__ptq
 
 Contributor Documentation
 --------------------------------

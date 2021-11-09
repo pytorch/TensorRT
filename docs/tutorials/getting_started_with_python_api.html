@@ -3,7 +3,6 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -408,56 +407,55 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <section id="using-torch-tensorrt-in-python">
-        <span id="getting-started-with-python-api">
-        </span>
-        <h1 id="tutorials-getting-started-with-python-api--page-root">
-         Using Torch-TensorRT in Python
-         <a class="headerlink" href="#tutorials-getting-started-with-python-api--page-root" title="Permalink to this headline">
-          ¶
-         </a>
-        </h1>
-        <p>
-         Torch-TensorRT Python API accepts a
-         <code class="docutils literal notranslate">
-          <span class="pre">
-           `torch.nn.Module
-          </span>
-         </code>
-         as an input. Under the hood, it uses
-         <code class="docutils literal notranslate">
-          <span class="pre">
-           torch.jit.script
-          </span>
-         </code>
-         to convert the input module into a
+       <span id="getting-started-with-python-api">
+       </span>
+       <h1 id="tutorials-getting-started-with-python-api--page-root">
+        Using Torch-TensorRT in Python
+        <a class="headerlink" href="#tutorials-getting-started-with-python-api--page-root" title="Permalink to this headline">
+         ¶
+        </a>
+       </h1>
+       <p>
+        Torch-TensorRT Python API accepts a
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          `torch.nn.Module
+         </span>
+        </code>
+        as an input. Under the hood, it uses
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          torch.jit.script
+         </span>
+        </code>
+        to convert the input module into a
 TorchScript module. To compile your input
-         <code class="docutils literal notranslate">
-          <span class="pre">
-           `torch.nn.Module
-          </span>
-         </code>
-         with Torch-TensorRT, all you need to do is provide the module and inputs
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          `torch.nn.Module
+         </span>
+        </code>
+        with Torch-TensorRT, all you need to do is provide the module and inputs
 to Torch-TensorRT and you will be returned an optimized TorchScript module to run or add into another PyTorch module. Inputs
 is a list of
-         <code class="docutils literal notranslate">
-          <span class="pre">
-           torch_tensorrt.Input
-          </span>
-         </code>
-         classes which define input’s shape, datatype and memory format. You can also specify settings such as
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          torch_tensorrt.Input
+         </span>
+        </code>
+        classes which define input’s shape, datatype and memory format. You can also specify settings such as
 operating precision for the engine or target device. After compilation you can save the module just like any other module
 to load in a deployment application. In order to load a TensorRT/TorchScript module, make sure you first import
-         <code class="docutils literal notranslate">
-          <span class="pre">
-           torch_tensorrt
-          </span>
-         </code>
-         .
-        </p>
-        <div class="highlight-python notranslate">
-         <div class="highlight">
-          <pre><span></span><span class="kn">import</span> <span class="nn">torch_tensorrt</span>
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          torch_tensorrt
+         </span>
+        </code>
+        .
+       </p>
+       <div class="highlight-python notranslate">
+        <div class="highlight">
+         <pre><span></span><span class="kn">import</span> <span class="nn">torch_tensorrt</span>
 
 <span class="o">...</span>
 
@@ -477,11 +475,11 @@ to load in a deployment application. In order to load a TensorRT/TorchScript mod
 <span class="n">result</span> <span class="o">=</span> <span class="n">trt_ts_module</span><span class="p">(</span><span class="n">input_data</span><span class="p">)</span>
 <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_ts_module</span><span class="p">,</span> <span class="s2">"trt_ts_module.ts"</span><span class="p">)</span>
 </pre>
-         </div>
         </div>
-        <div class="highlight-python notranslate">
-         <div class="highlight">
-          <pre><span></span><span class="c1"># Deployment application</span>
+       </div>
+       <div class="highlight-python notranslate">
+        <div class="highlight">
+         <pre><span></span><span class="c1"># Deployment application</span>
 <span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">torch_tensorrt</span>
 
@@ -489,36 +487,35 @@ to load in a deployment application. In order to load a TensorRT/TorchScript mod
 <span class="n">input_data</span> <span class="o">=</span> <span class="n">input_data</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s1">'cuda'</span><span class="p">)</span><span class="o">.</span><span class="n">half</span><span class="p">()</span>
 <span class="n">result</span> <span class="o">=</span> <span class="n">trt_ts_module</span><span class="p">(</span><span class="n">input_data</span><span class="p">)</span>
 </pre>
-         </div>
         </div>
-        <p>
-         Torch-TensorRT python API also provides
-         <code class="docutils literal notranslate">
-          <span class="pre">
-           torch_tensorrt.ts.compile
-          </span>
-         </code>
-         which accepts a TorchScript module as input.
-The torchscript module can be obtained via scripting or tracing (refer to
-         <span class="xref std std-ref">
-          creating_torchscript_module_in_python
+       </div>
+       <p>
+        Torch-TensorRT python API also provides
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          torch_tensorrt.ts.compile
          </span>
-         ).
-         <code class="docutils literal notranslate">
-          <span class="pre">
-           torch_tensorrt.ts.compile
-          </span>
-         </code>
-         accepts a Torchscript module
+        </code>
+        which accepts a TorchScript module as input.
+The torchscript module can be obtained via scripting or tracing (refer to
+        <span class="xref std std-ref">
+         creating_torchscript_module_in_python
+        </span>
+        ).
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          torch_tensorrt.ts.compile
+         </span>
+        </code>
+        accepts a Torchscript module
 and a list of
-         <code class="docutils literal notranslate">
-          <span class="pre">
-           torch_tensorrt.Input
-          </span>
-         </code>
-         classes.
-        </p>
-       </section>
+        <code class="docutils literal notranslate">
+         <span class="pre">
+          torch_tensorrt.Input
+         </span>
+        </code>
+        classes.
+       </p>
       </article>
      </div>
     </div>

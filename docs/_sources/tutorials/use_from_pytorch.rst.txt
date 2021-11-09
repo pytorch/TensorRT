@@ -1,7 +1,7 @@
 .. _use_from_pytorch:
 
 Using Torch-TensorRT Directly From PyTorch
-====================================
+============================================
 
 You will now be able to directly access TensorRT from PyTorch APIs. The process to use this feature
 is very similar to the compilation workflow described in :ref:`getting_started_with_python_api`
@@ -33,7 +33,7 @@ at the documentation for the Torch-TensorRT ``TensorRTCompileSpec`` API.
 
     spec = {
         "forward":
-            torch_tensorrt.TensorRTCompileSpec({
+            torch_tensorrt.ts.TensorRTCompileSpec({
                 "inputs": [torch_tensorrt.Input([1, 3, 300, 300])],
                 "enabled_precisions": {torch.float, torch.half},
                 "refit": False,

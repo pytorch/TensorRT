@@ -3,7 +3,6 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -305,6 +304,11 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="_notebooks/Resnet50-example.html">
+            Torch-TensorRT Getting Started - ResNet 50
+           </a>
+          </li>
+          <li class="md-nav__item">
            <a class="md-nav__link" href="_notebooks/ssd-object-detection-demo.html">
             Object Detection with Torch-TensorRT (SSD)
            </a>
@@ -327,13 +331,60 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="py_api/logging.html">
+            torch_tensorrt.logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="py_api/ptq.html">
+            torch_tensorrt.ptq
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="py_api/ptq.html#classes">
+            Classes
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="py_api/ptq.html#enums">
+            Enums
+           </a>
+          </li>
+          <li class="md-nav__item">
            <a class="md-nav__link" href="py_api/ts.html">
             torch_tensorrt.ts
            </a>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="py_api/logging.html">
-            torch_tensorrt.logging
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             C++ API Documenation
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="_cpp_api/torch_tensort_cpp.html">
+            Torch-TensorRT C++ API
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="_cpp_api/namespace_torch_tensorrt.html">
+            Namespace torch_tensorrt
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="_cpp_api/namespace_torch_tensorrt__logging.html">
+            Namespace torch_tensorrt::logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="_cpp_api/namespace_torch_tensorrt__torchscript.html">
+            Namespace torch_tensorrt::torchscript
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="_cpp_api/namespace_torch_tensorrt__ptq.html">
+            Namespace torch_tensorrt::ptq
            </a>
           </li>
           <li class="md-nav__item">
@@ -436,238 +487,280 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <section id="torch-tensorrt">
-        <h1 id="index--page-root">
-         Torch-TensorRT
-         <a class="headerlink" href="#index--page-root" title="Permalink to this headline">
-          ¶
-         </a>
-        </h1>
-        <section id="ahead-of-time-compilation-of-torchscript-pytorch-jit-for-nvidia-gpus">
-         <h2 id="ahead-of-time-compilation-of-torchscript-pytorch-jit-for-nvidia-gpus">
-          Ahead-of-time compilation of TorchScript / PyTorch JIT for NVIDIA GPUs
-          <a class="headerlink" href="#ahead-of-time-compilation-of-torchscript-pytorch-jit-for-nvidia-gpus" title="Permalink to this headline">
-           ¶
-          </a>
-         </h2>
-         <p>
-          Torch-TensorRT is a compiler for PyTorch/TorchScript, targeting NVIDIA GPUs via NVIDIA’s TensorRT Deep Learning Optimizer and Runtime.
+       <h1 id="index--page-root">
+        Torch-TensorRT
+        <a class="headerlink" href="#index--page-root" title="Permalink to this headline">
+         ¶
+        </a>
+       </h1>
+       <h2 id="ahead-of-time-compilation-of-torchscript-pytorch-jit-for-nvidia-gpus">
+        Ahead-of-time compilation of TorchScript / PyTorch JIT for NVIDIA GPUs
+        <a class="headerlink" href="#ahead-of-time-compilation-of-torchscript-pytorch-jit-for-nvidia-gpus" title="Permalink to this headline">
+         ¶
+        </a>
+       </h2>
+       <p>
+        Torch-TensorRT is a compiler for PyTorch/TorchScript, targeting NVIDIA GPUs via NVIDIA’s TensorRT Deep Learning Optimizer and Runtime.
 Unlike PyTorch’s Just-In-Time (JIT) compiler, Torch-TensorRT is an Ahead-of-Time (AOT) compiler, meaning that before you deploy your
 TorchScript code, you go through an explicit compile step to convert a standard TorchScript program into an module targeting
 a TensorRT engine. Torch-TensorRT operates as a PyTorch extention and compiles modules that integrate into the JIT runtime seamlessly.
 After compilation using the optimized graph should feel no different than running a TorchScript module.
 You also have access to TensorRT’s suite of configurations at compile time, so you are able to specify
 operating precision (FP32/FP16/INT8) and other settings for your module.
-         </p>
+       </p>
+       <p>
+        More Information / System Architecture:
+       </p>
+       <ul class="simple">
+        <li>
          <p>
-          More Information / System Architecture:
+          <a class="reference external" href="https://developer.nvidia.com/gtc/2020/video/s21671">
+           GTC 2020 Talk
+          </a>
          </p>
-         <ul class="simple">
-          <li>
-           <p>
-            <a class="reference external" href="https://developer.nvidia.com/gtc/2020/video/s21671">
-             GTC 2020 Talk
-            </a>
-           </p>
-          </li>
-         </ul>
-        </section>
-        <section id="getting-started">
-         <h2 id="getting-started">
-          Getting Started
-          <a class="headerlink" href="#getting-started" title="Permalink to this headline">
-           ¶
+        </li>
+       </ul>
+       <h2 id="getting-started">
+        Getting Started
+        <a class="headerlink" href="#getting-started" title="Permalink to this headline">
+         ¶
+        </a>
+       </h2>
+       <ul class="simple">
+        <li>
+         <p>
+          <a class="reference internal" href="tutorials/installation.html#installation">
+           <span class="std std-ref">
+            Installation
+           </span>
           </a>
-         </h2>
-         <ul class="simple">
-          <li>
-           <p>
-            <a class="reference internal" href="tutorials/installation.html#installation">
-             <span class="std std-ref">
-              Installation
-             </span>
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference internal" href="tutorials/getting_started_with_cpp_api.html#getting-started">
-             <span class="std std-ref">
-              Getting Started with C++
-             </span>
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference internal" href="tutorials/ptq.html#ptq">
-             <span class="std std-ref">
-              Post Training Quantization (PTQ)
-             </span>
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference internal" href="tutorials/torchtrtc.html#torchtrtc">
-             <span class="std std-ref">
-              torchtrtc
-             </span>
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference internal" href="tutorials/use_from_pytorch.html#use-from-pytorch">
-             <span class="std std-ref">
-              Using Torch-TensorRT Directly From PyTorch
-             </span>
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference internal" href="tutorials/runtime.html#runtime">
-             <span class="std std-ref">
-              Deploying Torch-TensorRT Programs
-             </span>
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference internal" href="tutorials/using_dla.html#using-dla">
-             <span class="std std-ref">
-              DLA
-             </span>
-            </a>
-           </p>
-          </li>
-         </ul>
-         <div class="toctree-wrapper compound">
-         </div>
-         <div class="toctree-wrapper compound">
-         </div>
-        </section>
-        <section id="python-api-documenation">
-         <h2 id="python-api-documenation">
-          Python API Documenation
-          <a class="headerlink" href="#python-api-documenation" title="Permalink to this headline">
-           ¶
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference internal" href="tutorials/getting_started_with_cpp_api.html#getting-started">
+           <span class="std std-ref">
+            Getting Started with C++
+           </span>
           </a>
-         </h2>
-         <ul class="simple">
-          <li>
-           <p>
-            <span class="xref std std-ref">
-             torch_tensorrt_py
-            </span>
-           </p>
-          </li>
-         </ul>
-         <div class="toctree-wrapper compound">
-         </div>
-        </section>
-        <section id="c-api-documenation">
-         <h2 id="c-api-documenation">
-          C++ API Documenation
-          <a class="headerlink" href="#c-api-documenation" title="Permalink to this headline">
-           ¶
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference internal" href="tutorials/ptq.html#ptq">
+           <span class="std std-ref">
+            Post Training Quantization (PTQ)
+           </span>
           </a>
-         </h2>
-         <ul class="simple">
-          <li>
-           <p>
-            <a class="reference internal" href="_cpp_api/namespace_torch_tensorrt.html#namespace-torch-tensorrt">
-             <span class="std std-ref">
-              Namespace torch_tensorrt
-             </span>
-            </a>
-           </p>
-          </li>
-         </ul>
-         <div class="toctree-wrapper compound">
-         </div>
-        </section>
-        <section id="contributor-documentation">
-         <h2 id="contributor-documentation">
-          Contributor Documentation
-          <a class="headerlink" href="#contributor-documentation" title="Permalink to this headline">
-           ¶
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference internal" href="tutorials/torchtrtc.html#torchtrtc">
+           <span class="std std-ref">
+            torchtrtc
+           </span>
           </a>
-         </h2>
-         <ul class="simple">
-          <li>
-           <p>
-            <a class="reference internal" href="contributors/system_overview.html#system-overview">
-             <span class="std std-ref">
-              System Overview
-             </span>
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference internal" href="contributors/writing_converters.html#writing-converters">
-             <span class="std std-ref">
-              Writing Converters
-             </span>
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference internal" href="contributors/useful_links.html#useful-links">
-             <span class="std std-ref">
-              Useful Links for Torch-TensorRT Development
-             </span>
-            </a>
-           </p>
-          </li>
-         </ul>
-         <div class="toctree-wrapper compound">
-         </div>
-        </section>
-        <section id="indices">
-         <h2 id="indices">
-          Indices
-          <a class="headerlink" href="#indices" title="Permalink to this headline">
-           ¶
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference internal" href="tutorials/use_from_pytorch.html#use-from-pytorch">
+           <span class="std std-ref">
+            Using Torch-TensorRT Directly From PyTorch
+           </span>
           </a>
-         </h2>
-         <ul class="simple">
-          <li>
-           <p>
-            <a class="reference internal" href="indices/supported_ops.html#supported-ops">
-             <span class="std std-ref">
-              Operators Supported
-             </span>
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference internal" href="genindex.html">
-             <span class="std std-ref">
-              Index
-             </span>
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference internal" href="search.html">
-             <span class="std std-ref">
-              Search Page
-             </span>
-            </a>
-           </p>
-          </li>
-         </ul>
-         <div class="toctree-wrapper compound">
-         </div>
-        </section>
-       </section>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference internal" href="tutorials/runtime.html#runtime">
+           <span class="std std-ref">
+            Deploying Torch-TensorRT Programs
+           </span>
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference internal" href="tutorials/using_dla.html#using-dla">
+           <span class="std std-ref">
+            DLA
+           </span>
+          </a>
+         </p>
+        </li>
+       </ul>
+       <div class="toctree-wrapper compound">
+       </div>
+       <div class="toctree-wrapper compound">
+       </div>
+       <h2 id="python-api-documenation">
+        Python API Documenation
+        <a class="headerlink" href="#python-api-documenation" title="Permalink to this headline">
+         ¶
+        </a>
+       </h2>
+       <ul class="simple">
+        <li>
+         <p>
+          <a class="reference internal" href="py_api/torch_tensorrt.html#torch-tensorrt-py">
+           <span class="std std-ref">
+            torch_tensorrt
+           </span>
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference internal" href="py_api/logging.html#torch-tensorrt-logging-py">
+           <span class="std std-ref">
+            torch_tensorrt.logging
+           </span>
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference internal" href="py_api/ptq.html#torch-tensorrt-ptq-py">
+           <span class="std std-ref">
+            torch_tensorrt.ptq
+           </span>
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference internal" href="py_api/ts.html#torch-tensorrt-ts-py">
+           <span class="std std-ref">
+            torch_tensorrt.ts
+           </span>
+          </a>
+         </p>
+        </li>
+       </ul>
+       <div class="toctree-wrapper compound">
+       </div>
+       <h2 id="c-api-documenation">
+        C++ API Documenation
+        <a class="headerlink" href="#c-api-documenation" title="Permalink to this headline">
+         ¶
+        </a>
+       </h2>
+       <ul class="simple">
+        <li>
+         <p>
+          <a class="reference internal" href="_cpp_api/namespace_torch_tensorrt.html#namespace-torch-tensorrt">
+           <span class="std std-ref">
+            Namespace torch_tensorrt
+           </span>
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference internal" href="_cpp_api/namespace_torch_tensorrt__logging.html#namespace-torch-tensorrt-logging">
+           <span class="std std-ref">
+            Namespace torch_tensorrt::logging
+           </span>
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference internal" href="_cpp_api/namespace_torch_tensorrt__ptq.html#namespace-torch-tensorrt-ptq">
+           <span class="std std-ref">
+            Namespace torch_tensorrt::ptq
+           </span>
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference internal" href="_cpp_api/namespace_torch_tensorrt__torchscript.html#namespace-torch-tensorrt-torchscript">
+           <span class="std std-ref">
+            Namespace torch_tensorrt::torchscript
+           </span>
+          </a>
+         </p>
+        </li>
+       </ul>
+       <div class="toctree-wrapper compound">
+       </div>
+       <h2 id="contributor-documentation">
+        Contributor Documentation
+        <a class="headerlink" href="#contributor-documentation" title="Permalink to this headline">
+         ¶
+        </a>
+       </h2>
+       <ul class="simple">
+        <li>
+         <p>
+          <a class="reference internal" href="contributors/system_overview.html#system-overview">
+           <span class="std std-ref">
+            System Overview
+           </span>
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference internal" href="contributors/writing_converters.html#writing-converters">
+           <span class="std std-ref">
+            Writing Converters
+           </span>
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference internal" href="contributors/useful_links.html#useful-links">
+           <span class="std std-ref">
+            Useful Links for Torch-TensorRT Development
+           </span>
+          </a>
+         </p>
+        </li>
+       </ul>
+       <div class="toctree-wrapper compound">
+       </div>
+       <h2 id="indices">
+        Indices
+        <a class="headerlink" href="#indices" title="Permalink to this headline">
+         ¶
+        </a>
+       </h2>
+       <ul class="simple">
+        <li>
+         <p>
+          <a class="reference internal" href="indices/supported_ops.html#supported-ops">
+           <span class="std std-ref">
+            Operators Supported
+           </span>
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference internal" href="genindex.html">
+           <span class="std std-ref">
+            Index
+           </span>
+          </a>
+         </p>
+        </li>
+        <li>
+         <p>
+          <a class="reference internal" href="search.html">
+           <span class="std std-ref">
+            Search Page
+           </span>
+          </a>
+         </p>
+        </li>
+       </ul>
+       <div class="toctree-wrapper compound">
+       </div>
       </article>
      </div>
     </div>

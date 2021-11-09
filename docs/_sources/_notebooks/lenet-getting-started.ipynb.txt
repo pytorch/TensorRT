@@ -215,43 +215,27 @@
   {
    "cell_type": "code",
    "execution_count": 5,
-   "metadata": {
-    "scrolled": false
-   },
+   "metadata": {},
    "outputs": [
     {
      "name": "stdout",
      "output_type": "stream",
      "text": [
-      "Warm up ...\n"
-     ]
-    },
-    {
-     "name": "stderr",
-     "output_type": "stream",
-     "text": [
-      "/opt/conda/lib/python3.8/site-packages/torch/nn/functional.py:718: UserWarning: Named tensors and all their associated APIs are an experimental feature and subject to change. Please do not use them for anything important until they are released as stable. (Triggered internally at  ../c10/core/TensorImpl.h:1153.)\n",
-      "  return torch.max_pool2d(input, kernel_size, stride, padding, dilation, ceil_mode)\n"
-     ]
-    },
-    {
-     "name": "stdout",
-     "output_type": "stream",
-     "text": [
+      "Warm up ...\n",
       "Start timing ...\n",
-      "Iteration 100/1000, ave batch time 5.14 ms\n",
-      "Iteration 200/1000, ave batch time 5.13 ms\n",
-      "Iteration 300/1000, ave batch time 5.13 ms\n",
-      "Iteration 400/1000, ave batch time 5.13 ms\n",
-      "Iteration 500/1000, ave batch time 5.13 ms\n",
-      "Iteration 600/1000, ave batch time 5.13 ms\n",
-      "Iteration 700/1000, ave batch time 5.13 ms\n",
-      "Iteration 800/1000, ave batch time 5.13 ms\n",
-      "Iteration 900/1000, ave batch time 5.13 ms\n",
-      "Iteration 1000/1000, ave batch time 5.13 ms\n",
+      "Iteration 100/1000, ave batch time 6.49 ms\n",
+      "Iteration 200/1000, ave batch time 6.49 ms\n",
+      "Iteration 300/1000, ave batch time 6.49 ms\n",
+      "Iteration 400/1000, ave batch time 6.49 ms\n",
+      "Iteration 500/1000, ave batch time 6.49 ms\n",
+      "Iteration 600/1000, ave batch time 6.49 ms\n",
+      "Iteration 700/1000, ave batch time 6.49 ms\n",
+      "Iteration 800/1000, ave batch time 6.49 ms\n",
+      "Iteration 900/1000, ave batch time 6.49 ms\n",
+      "Iteration 1000/1000, ave batch time 6.49 ms\n",
       "Input shape: torch.Size([1024, 1, 32, 32])\n",
       "Output features size: torch.Size([1024, 10])\n",
-      "Average batch time: 5.13 ms\n"
+      "Average batch time: 6.49 ms\n"
      ]
     }
    ],
@@ -315,19 +299,19 @@
      "text": [
       "Warm up ...\n",
       "Start timing ...\n",
-      "Iteration 100/1000, ave batch time 5.13 ms\n",
-      "Iteration 200/1000, ave batch time 5.13 ms\n",
-      "Iteration 300/1000, ave batch time 5.13 ms\n",
-      "Iteration 400/1000, ave batch time 5.13 ms\n",
-      "Iteration 500/1000, ave batch time 5.13 ms\n",
-      "Iteration 600/1000, ave batch time 5.13 ms\n",
-      "Iteration 700/1000, ave batch time 5.13 ms\n",
-      "Iteration 800/1000, ave batch time 5.13 ms\n",
-      "Iteration 900/1000, ave batch time 5.13 ms\n",
-      "Iteration 1000/1000, ave batch time 5.13 ms\n",
+      "Iteration 100/1000, ave batch time 6.49 ms\n",
+      "Iteration 200/1000, ave batch time 6.49 ms\n",
+      "Iteration 300/1000, ave batch time 6.49 ms\n",
+      "Iteration 400/1000, ave batch time 6.49 ms\n",
+      "Iteration 500/1000, ave batch time 6.49 ms\n",
+      "Iteration 600/1000, ave batch time 6.49 ms\n",
+      "Iteration 700/1000, ave batch time 6.49 ms\n",
+      "Iteration 800/1000, ave batch time 6.49 ms\n",
+      "Iteration 900/1000, ave batch time 6.49 ms\n",
+      "Iteration 1000/1000, ave batch time 6.49 ms\n",
       "Input shape: torch.Size([1024, 1, 32, 32])\n",
       "Output features size: torch.Size([1024, 10])\n",
-      "Average batch time: 5.13 ms\n"
+      "Average batch time: 6.49 ms\n"
      ]
     }
    ],
@@ -398,19 +382,19 @@
      "text": [
       "Warm up ...\n",
       "Start timing ...\n",
-      "Iteration 100/1000, ave batch time 5.16 ms\n",
-      "Iteration 200/1000, ave batch time 5.15 ms\n",
-      "Iteration 300/1000, ave batch time 5.14 ms\n",
-      "Iteration 400/1000, ave batch time 5.14 ms\n",
-      "Iteration 500/1000, ave batch time 5.14 ms\n",
-      "Iteration 600/1000, ave batch time 5.14 ms\n",
-      "Iteration 700/1000, ave batch time 5.14 ms\n",
-      "Iteration 800/1000, ave batch time 5.14 ms\n",
-      "Iteration 900/1000, ave batch time 5.14 ms\n",
-      "Iteration 1000/1000, ave batch time 5.14 ms\n",
+      "Iteration 100/1000, ave batch time 6.48 ms\n",
+      "Iteration 200/1000, ave batch time 6.48 ms\n",
+      "Iteration 300/1000, ave batch time 6.49 ms\n",
+      "Iteration 400/1000, ave batch time 6.49 ms\n",
+      "Iteration 500/1000, ave batch time 6.49 ms\n",
+      "Iteration 600/1000, ave batch time 6.48 ms\n",
+      "Iteration 700/1000, ave batch time 6.48 ms\n",
+      "Iteration 800/1000, ave batch time 6.48 ms\n",
+      "Iteration 900/1000, ave batch time 6.48 ms\n",
+      "Iteration 1000/1000, ave batch time 6.48 ms\n",
       "Input shape: torch.Size([1024, 1, 32, 32])\n",
       "Output features size: torch.Size([1024, 10])\n",
-      "Average batch time: 5.14 ms\n"
+      "Average batch time: 6.48 ms\n"
      ]
     }
    ],
@@ -439,7 +423,25 @@
    "cell_type": "code",
    "execution_count": 11,
    "metadata": {},
-   "outputs": [],
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "WARNING: [Torch-TensorRT] - For input x.1, found user specified input dtype as Float16, however when inspecting the graph, the input type expected was inferred to be Float\n",
+      "The compiler is going to use the user setting Float16\n",
+      "This conflict may cause an error at runtime due to partial compilation being enabled and therefore\n",
+      "compatibility with PyTorch's data type convention is required.\n",
+      "If you do indeed see errors at runtime either:\n",
+      "- Remove the dtype spec for x.1\n",
+      "- Disable partial compilation by setting require_full_compilation to True\n",
+      "WARNING: [Torch-TensorRT] - Dilation not used in Max pooling converter\n",
+      "WARNING: [Torch-TensorRT] - Dilation not used in Max pooling converter\n",
+      "WARNING: [Torch-TensorRT TorchScript Conversion Context] - Detected invalid timing cache, setup a local cache instead\n",
+      "WARNING: [Torch-TensorRT TorchScript Conversion Context] - Max value of this profile is not valid\n"
+     ]
+    }
+   ],
    "source": [
     "import torch_tensorrt\n",
     "\n",
@@ -451,10 +453,10 @@
     "            max_shape=[1024, 1, 34, 34],\n",
     "            dtype=torch.half\n",
     "        )],\n",
-    "    \"enabled_precisions\": {torch.float, torch.half} # Run with FP16\n",
+    "    \"enabled_precisions\": {torch.half} # Run with FP16\n",
     "}\n",
     "\n",
-    "trt_ts_module = torch_tensorrt.compile(traced_model, compile_settings)\n",
+    "trt_ts_module = torch_tensorrt.compile(traced_model, **compile_settings)\n",
     "\n",
     "input_data = torch.randn((1024, 1, 32, 32))\n",
     "input_data = input_data.half().to(\"cuda\")\n",
@@ -475,19 +477,19 @@
      "text": [
       "Warm up ...\n",
       "Start timing ...\n",
-      "Iteration 100/1000, ave batch time 2.00 ms\n",
-      "Iteration 200/1000, ave batch time 1.97 ms\n",
-      "Iteration 300/1000, ave batch time 1.98 ms\n",
-      "Iteration 400/1000, ave batch time 1.98 ms\n",
-      "Iteration 500/1000, ave batch time 1.99 ms\n",
-      "Iteration 600/1000, ave batch time 1.99 ms\n",
-      "Iteration 700/1000, ave batch time 1.99 ms\n",
-      "Iteration 800/1000, ave batch time 1.99 ms\n",
-      "Iteration 900/1000, ave batch time 1.98 ms\n",
-      "Iteration 1000/1000, ave batch time 1.98 ms\n",
+      "Iteration 100/1000, ave batch time 1.92 ms\n",
+      "Iteration 200/1000, ave batch time 1.98 ms\n",
+      "Iteration 300/1000, ave batch time 2.05 ms\n",
+      "Iteration 400/1000, ave batch time 2.07 ms\n",
+      "Iteration 500/1000, ave batch time 2.08 ms\n",
+      "Iteration 600/1000, ave batch time 2.09 ms\n",
+      "Iteration 700/1000, ave batch time 2.09 ms\n",
+      "Iteration 800/1000, ave batch time 2.09 ms\n",
+      "Iteration 900/1000, ave batch time 2.10 ms\n",
+      "Iteration 1000/1000, ave batch time 2.09 ms\n",
       "Input shape: torch.Size([1024, 1, 32, 32])\n",
       "Output features size: torch.Size([1024, 10])\n",
-      "Average batch time: 1.98 ms\n"
+      "Average batch time: 2.09 ms\n"
      ]
     }
    ],
@@ -508,7 +510,27 @@
    "cell_type": "code",
    "execution_count": 13,
    "metadata": {},
-   "outputs": [],
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "WARNING: [Torch-TensorRT] - For input x.1, found user specified input dtype as Float16, however when inspecting the graph, the input type expected was inferred to be Float\n",
+      "The compiler is going to use the user setting Float16\n",
+      "This conflict may cause an error at runtime due to partial compilation being enabled and therefore\n",
+      "compatibility with PyTorch's data type convention is required.\n",
+      "If you do indeed see errors at runtime either:\n",
+      "- Remove the dtype spec for x.1\n",
+      "- Disable partial compilation by setting require_full_compilation to True\n",
+      "WARNING: [Torch-TensorRT TorchScript Conversion Context] - The logger passed into createInferBuilder differs from one already provided for an existing builder, runtime, or refitter. TensorRT maintains only a single logger pointer at any given time, so the existing value, which can be retrieved with getLogger(), will be used instead. In order to use a new logger, first destroy all existing builder, runner or refitter objects.\n",
+      "\n",
+      "WARNING: [Torch-TensorRT] - Dilation not used in Max pooling converter\n",
+      "WARNING: [Torch-TensorRT] - Dilation not used in Max pooling converter\n",
+      "WARNING: [Torch-TensorRT] - Detected invalid timing cache, setup a local cache instead\n",
+      "WARNING: [Torch-TensorRT] - Max value of this profile is not valid\n"
+     ]
+    }
+   ],
    "source": [
     "import torch_tensorrt\n",
     "\n",
@@ -520,10 +542,10 @@
     "            max_shape=[1024, 1, 34, 34],\n",
     "            dtype=torch.half\n",
     "        )],\n",
-    "    \"enabled_precisions\": {torch.float, torch.half} # Run with FP16\n",
+    "    \"enabled_precisions\": {torch.half} # Run with FP16\n",
     "}\n",
     "\n",
-    "trt_script_module = torch_tensorrt.compile(script_model, compile_settings)\n",
+    "trt_script_module = torch_tensorrt.compile(script_model, **compile_settings)\n",
     "\n",
     "input_data = torch.randn((1024, 1, 32, 32))\n",
     "input_data = input_data.half().to(\"cuda\")\n",
@@ -544,19 +566,19 @@
      "text": [
       "Warm up ...\n",
       "Start timing ...\n",
-      "Iteration 100/1000, ave batch time 2.02 ms\n",
-      "Iteration 200/1000, ave batch time 1.98 ms\n",
-      "Iteration 300/1000, ave batch time 1.97 ms\n",
-      "Iteration 400/1000, ave batch time 1.96 ms\n",
-      "Iteration 500/1000, ave batch time 1.96 ms\n",
-      "Iteration 600/1000, ave batch time 1.96 ms\n",
-      "Iteration 700/1000, ave batch time 1.96 ms\n",
-      "Iteration 800/1000, ave batch time 1.96 ms\n",
-      "Iteration 900/1000, ave batch time 1.96 ms\n",
-      "Iteration 1000/1000, ave batch time 1.96 ms\n",
+      "Iteration 100/1000, ave batch time 1.82 ms\n",
+      "Iteration 200/1000, ave batch time 1.90 ms\n",
+      "Iteration 300/1000, ave batch time 2.00 ms\n",
+      "Iteration 400/1000, ave batch time 2.05 ms\n",
+      "Iteration 500/1000, ave batch time 2.06 ms\n",
+      "Iteration 600/1000, ave batch time 2.08 ms\n",
+      "Iteration 700/1000, ave batch time 2.13 ms\n",
+      "Iteration 800/1000, ave batch time 2.15 ms\n",
+      "Iteration 900/1000, ave batch time 2.15 ms\n",
+      "Iteration 1000/1000, ave batch time 2.17 ms\n",
       "Input shape: torch.Size([1024, 1, 32, 32])\n",
       "Output features size: torch.Size([1024, 10])\n",
-      "Average batch time: 1.96 ms\n"
+      "Average batch time: 2.17 ms\n"
      ]
     }
    ],
@@ -579,7 +601,7 @@
  ],
  "metadata": {
   "kernelspec": {
-   "display_name": "Python 3",
+   "display_name": "Python 3 (ipykernel)",
    "language": "python",
    "name": "python3"
   },
@@ -593,7 +615,7 @@
    "name": "python",
    "nbconvert_exporter": "python",
    "pygments_lexer": "ipython3",
-   "version": "3.6.13"
+   "version": "3.8.10"
   }
  },
  "nbformat": 4,

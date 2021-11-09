@@ -3,7 +3,6 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -65,6 +64,8 @@
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
+  <link href="namespace_torch_tensorrt.html" rel="next" title="Namespace torch_tensorrt"/>
+  <link href="../py_api/ts.html" rel="prev" title="torch_tensorrt.ts"/>
  </head>
  <body data-md-color-accent="light-green" data-md-color-primary="light-green" dir="ltr">
   <svg class="md-svg">
@@ -304,6 +305,11 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/Resnet50-example.html">
+            Torch-TensorRT Getting Started - ResNet 50
+           </a>
+          </li>
+          <li class="md-nav__item">
            <a class="md-nav__link" href="../_notebooks/ssd-object-detection-demo.html">
             Object Detection with Torch-TensorRT (SSD)
            </a>
@@ -326,13 +332,129 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/logging.html">
+            torch_tensorrt.logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/ptq.html">
+            torch_tensorrt.ptq
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/ptq.html#classes">
+            Classes
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/ptq.html#enums">
+            Enums
+           </a>
+          </li>
+          <li class="md-nav__item">
            <a class="md-nav__link" href="../py_api/ts.html">
             torch_tensorrt.ts
            </a>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/logging.html">
-            torch_tensorrt.logging
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             C++ API Documenation
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <input class="md-toggle md-nav__toggle" data-md-toggle="toc" id="__toc" type="checkbox"/>
+           <label class="md-nav__link md-nav__link--active" for="__toc">
+            Torch-TensorRT C++ API
+           </label>
+           <a class="md-nav__link md-nav__link--active" href="#">
+            Torch-TensorRT C++ API
+           </a>
+           <nav class="md-nav md-nav--secondary">
+            <label class="md-nav__title" for="__toc">
+             Contents
+            </label>
+            <ul class="md-nav__list" data-md-scrollfix="">
+             <li class="md-nav__item">
+              <a class="md-nav__link" href="#cpp-api-torch-tensort-cpp--page-root">
+               Torch-TensorRT C++ API
+              </a>
+              <nav class="md-nav">
+               <ul class="md-nav__list">
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#class-hierarchy">
+                  Class Hierarchy
+                 </a>
+                </li>
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#file-hierarchy">
+                  File Hierarchy
+                 </a>
+                </li>
+                <li class="md-nav__item">
+                 <a class="md-nav__link" href="#full-api">
+                  Full API
+                 </a>
+                 <nav class="md-nav">
+                  <ul class="md-nav__list">
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#namespaces">
+                     Namespaces
+                    </a>
+                   </li>
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#classes-and-structs">
+                     Classes and Structs
+                    </a>
+                   </li>
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#enums">
+                     Enums
+                    </a>
+                   </li>
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#functions">
+                     Functions
+                    </a>
+                   </li>
+                   <li class="md-nav__item">
+                    <a class="md-nav__link" href="#defines">
+                     Defines
+                    </a>
+                   </li>
+                  </ul>
+                 </nav>
+                </li>
+               </ul>
+              </nav>
+             </li>
+             <li class="md-nav__item">
+              <a class="md-nav__extra_link" href="../_sources/_cpp_api/torch_tensort_cpp.rst.txt">
+               Show Source
+              </a>
+             </li>
+            </ul>
+           </nav>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="namespace_torch_tensorrt.html">
+            Namespace torch_tensorrt
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="namespace_torch_tensorrt__logging.html">
+            Namespace torch_tensorrt::logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="namespace_torch_tensorrt__torchscript.html">
+            Namespace torch_tensorrt::torchscript
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="namespace_torch_tensorrt__ptq.html">
+            Namespace torch_tensorrt::ptq
            </a>
           </li>
           <li class="md-nav__item">
@@ -449,176 +571,170 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <section id="torch-tensorrt-c-api">
-        <h1 id="cpp-api-torch-tensort-cpp--page-root">
-         Torch-TensorRT C++ API
-         <a class="headerlink" href="#cpp-api-torch-tensort-cpp--page-root" title="Permalink to this headline">
-          ¶
-         </a>
-        </h1>
-        <section id="class-hierarchy">
-         <h2 id="class-hierarchy">
-          Class Hierarchy
-          <a class="headerlink" href="#class-hierarchy" title="Permalink to this headline">
-           ¶
-          </a>
-         </h2>
-         <ul class="treeView" id="class-treeView">
-          <li>
-           <ul class="collapsibleList">
-            <li class="lastChild">
+       <h1 id="cpp-api-torch-tensort-cpp--page-root">
+        Torch-TensorRT C++ API
+        <a class="headerlink" href="#cpp-api-torch-tensort-cpp--page-root" title="Permalink to this headline">
+         ¶
+        </a>
+       </h1>
+       <h2 id="class-hierarchy">
+        Class Hierarchy
+        <a class="headerlink" href="#class-hierarchy" title="Permalink to this headline">
+         ¶
+        </a>
+       </h2>
+       <ul class="treeView" id="class-treeView">
+        <li>
+         <ul class="collapsibleList">
+          <li class="lastChild">
+           Namespace
+           <a href="namespace_torch_tensorrt.html#namespace-torch-tensorrt">
+            torch_tensorrt
+           </a>
+           <ul>
+            <li>
              Namespace
-             <a href="namespace_torch_tensorrt.html#namespace-torch-tensorrt">
-              torch_tensorrt
+             <a href="namespace_torch_tensorrt__logging.html#namespace-torch-tensorrt-logging">
+              torch_tensorrt::logging
              </a>
              <ul>
-              <li>
-               Namespace
-               <a href="namespace_torch_tensorrt__logging.html#namespace-torch-tensorrt-logging">
-                torch_tensorrt::logging
-               </a>
-               <ul>
-                <li class="lastChild">
-                 Enum
-                 <a href="enum_logging_8h_1a130f65408ad8cbaee060f05e8db69558.html#exhale-enum-logging-8h-1a130f65408ad8cbaee060f05e8db69558">
-                  Level
-                 </a>
-                </li>
-               </ul>
-              </li>
-              <li>
-               Namespace
-               <a href="namespace_torch_tensorrt__ptq.html#namespace-torch-tensorrt-ptq">
-                torch_tensorrt::ptq
-               </a>
-               <ul>
-                <li>
-                 Template Class
-                 <a href="classtorch__tensorrt_1_1ptq_1_1Int8CacheCalibrator.html#exhale-class-classtorch-tensorrt-1-1ptq-1-1Int8CacheCalibrator">
-                  Int8CacheCalibrator
-                 </a>
-                </li>
-                <li class="lastChild">
-                 Template Class
-                 <a href="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator.html#exhale-class-classtorch-tensorrt-1-1ptq-1-1Int8Calibrator">
-                  Int8Calibrator
-                 </a>
-                </li>
-               </ul>
-              </li>
-              <li>
-               Namespace
-               <a href="namespace_torch_tensorrt__torchscript.html#namespace-torch-tensorrt-torchscript">
-                torch_tensorrt::torchscript
-               </a>
-               <ul>
-                <li class="lastChild">
-                 Struct
-                 <a href="structtorch__tensorrt_1_1torchscript_1_1CompileSpec.html#exhale-struct-structtorch-tensorrt-1-1torchscript-1-1CompileSpec">
-                  CompileSpec
-                 </a>
-                </li>
-               </ul>
-              </li>
-              <li>
-               Struct
-               <a href="structtorch__tensorrt_1_1Device.html#exhale-struct-structtorch-tensorrt-1-1Device">
-                Device
-               </a>
-               <ul>
-                <li class="lastChild">
-                 Class
-                 <a href="classtorch__tensorrt_1_1Device_1_1DeviceType.html#exhale-class-classtorch-tensorrt-1-1Device-1-1DeviceType">
-                  Device::DeviceType
-                 </a>
-                </li>
-               </ul>
-              </li>
-              <li>
-               Struct
-               <a href="structtorch__tensorrt_1_1Input.html#exhale-struct-structtorch-tensorrt-1-1Input">
-                Input
-               </a>
-              </li>
-              <li>
-               Class
-               <a href="classtorch__tensorrt_1_1DataType.html#exhale-class-classtorch-tensorrt-1-1DataType">
-                DataType
-               </a>
-              </li>
-              <li>
-               Class
-               <a href="classtorch__tensorrt_1_1TensorFormat.html#exhale-class-classtorch-tensorrt-1-1TensorFormat">
-                TensorFormat
-               </a>
-              </li>
               <li class="lastChild">
                Enum
-               <a href="enum_torch__tensorrt_8h_1a3fbe5d72e4fc624dbd038853079620eb.html#exhale-enum-torch-tensorrt-8h-1a3fbe5d72e4fc624dbd038853079620eb">
-                EngineCapability
+               <a href="enum_logging_8h_1a130f65408ad8cbaee060f05e8db69558.html#exhale-enum-logging-8h-1a130f65408ad8cbaee060f05e8db69558">
+                Level
                </a>
               </li>
              </ul>
             </li>
+            <li>
+             Namespace
+             <a href="namespace_torch_tensorrt__ptq.html#namespace-torch-tensorrt-ptq">
+              torch_tensorrt::ptq
+             </a>
+             <ul>
+              <li>
+               Template Class
+               <a href="classtorch__tensorrt_1_1ptq_1_1Int8CacheCalibrator.html#exhale-class-classtorch-tensorrt-1-1ptq-1-1Int8CacheCalibrator">
+                Int8CacheCalibrator
+               </a>
+              </li>
+              <li class="lastChild">
+               Template Class
+               <a href="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator.html#exhale-class-classtorch-tensorrt-1-1ptq-1-1Int8Calibrator">
+                Int8Calibrator
+               </a>
+              </li>
+             </ul>
+            </li>
+            <li>
+             Namespace
+             <a href="namespace_torch_tensorrt__torchscript.html#namespace-torch-tensorrt-torchscript">
+              torch_tensorrt::torchscript
+             </a>
+             <ul>
+              <li class="lastChild">
+               Struct
+               <a href="structtorch__tensorrt_1_1torchscript_1_1CompileSpec.html#exhale-struct-structtorch-tensorrt-1-1torchscript-1-1CompileSpec">
+                CompileSpec
+               </a>
+              </li>
+             </ul>
+            </li>
+            <li>
+             Struct
+             <a href="structtorch__tensorrt_1_1Device.html#exhale-struct-structtorch-tensorrt-1-1Device">
+              Device
+             </a>
+             <ul>
+              <li class="lastChild">
+               Class
+               <a href="classtorch__tensorrt_1_1Device_1_1DeviceType.html#exhale-class-classtorch-tensorrt-1-1Device-1-1DeviceType">
+                Device::DeviceType
+               </a>
+              </li>
+             </ul>
+            </li>
+            <li>
+             Struct
+             <a href="structtorch__tensorrt_1_1Input.html#exhale-struct-structtorch-tensorrt-1-1Input">
+              Input
+             </a>
+            </li>
+            <li>
+             Class
+             <a href="classtorch__tensorrt_1_1DataType.html#exhale-class-classtorch-tensorrt-1-1DataType">
+              DataType
+             </a>
+            </li>
+            <li>
+             Class
+             <a href="classtorch__tensorrt_1_1TensorFormat.html#exhale-class-classtorch-tensorrt-1-1TensorFormat">
+              TensorFormat
+             </a>
+            </li>
+            <li class="lastChild">
+             Enum
+             <a href="enum_torch__tensorrt_8h_1a3fbe5d72e4fc624dbd038853079620eb.html#exhale-enum-torch-tensorrt-8h-1a3fbe5d72e4fc624dbd038853079620eb">
+              EngineCapability
+             </a>
+            </li>
            </ul>
           </li>
-          <!-- only tree view element -->
          </ul>
-         <!-- /treeView class-treeView -->
-        </section>
-        <section id="file-hierarchy">
-         <h2 id="file-hierarchy">
-          File Hierarchy
-          <a class="headerlink" href="#file-hierarchy" title="Permalink to this headline">
-           ¶
-          </a>
-         </h2>
-         <ul class="treeView" id="file-treeView">
-          <li>
-           <ul class="collapsibleList">
+        </li>
+        <!-- only tree view element -->
+       </ul>
+       <!-- /treeView class-treeView -->
+       <h2 id="file-hierarchy">
+        File Hierarchy
+        <a class="headerlink" href="#file-hierarchy" title="Permalink to this headline">
+         ¶
+        </a>
+       </h2>
+       <ul class="treeView" id="file-treeView">
+        <li>
+         <ul class="collapsibleList">
+          <li class="lastChild">
+           Directory
+           <a href="dir_cpp.html#dir-cpp">
+            cpp
+           </a>
+           <ul>
             <li class="lastChild">
              Directory
-             <a href="dir_cpp.html#dir-cpp">
-              cpp
+             <a href="dir_cpp_include.html#dir-cpp-include">
+              include
              </a>
              <ul>
               <li class="lastChild">
                Directory
-               <a href="dir_cpp_include.html#dir-cpp-include">
-                include
+               <a href="dir_cpp_include_torch_tensorrt.html#dir-cpp-include-torch-tensorrt">
+                tensorrt
                </a>
                <ul>
-                <li class="lastChild">
-                 Directory
-                 <a href="dir_cpp_include_torch_tensorrt.html#dir-cpp-include-torch-tensorrt">
-                  tensorrt
+                <li>
+                 File
+                 <a href="file_cpp_include_torch_tensorrt_logging.h.html#file-cpp-include-torch-tensorrt-logging.h">
+                  logging.h
                  </a>
-                 <ul>
-                  <li>
-                   File
-                   <a href="file_cpp_include_torch_tensorrt_logging.h.html#file-cpp-include-torch-tensorrt-logging.h">
-                    logging.h
-                   </a>
-                  </li>
-                  <li>
-                   File
-                   <a href="file_cpp_include_torch_tensorrt_macros.h.html#file-cpp-include-torch-tensorrt-macros.h">
-                    macros.h
-                   </a>
-                  </li>
-                  <li>
-                   File
-                   <a href="file_cpp_include_torch_tensorrt_ptq.h.html#file-cpp-include-torch-tensorrt-ptq.h">
-                    ptq.h
-                   </a>
-                  </li>
-                  <li class="lastChild">
-                   File
-                   <a href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html#file-cpp-include-torch-tensorrt-torch-tensorrt.h">
-                    torch_tensorrt.h
-                   </a>
-                  </li>
-                 </ul>
+                </li>
+                <li>
+                 File
+                 <a href="file_cpp_include_torch_tensorrt_macros.h.html#file-cpp-include-torch-tensorrt-macros.h">
+                  macros.h
+                 </a>
+                </li>
+                <li>
+                 File
+                 <a href="file_cpp_include_torch_tensorrt_ptq.h.html#file-cpp-include-torch-tensorrt-ptq.h">
+                  ptq.h
+                 </a>
+                </li>
+                <li class="lastChild">
+                 File
+                 <a href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html#file-cpp-include-torch-tensorrt-torch-tensorrt.h">
+                  torch_tensorrt.h
+                 </a>
                 </li>
                </ul>
               </li>
@@ -626,738 +742,726 @@
             </li>
            </ul>
           </li>
-          <!-- only tree view element -->
          </ul>
-         <!-- /treeView file-treeView -->
-        </section>
-        <section id="full-api">
-         <h2 id="full-api">
-          Full API
-          <a class="headerlink" href="#full-api" title="Permalink to this headline">
-           ¶
+        </li>
+        <!-- only tree view element -->
+       </ul>
+       <!-- /treeView file-treeView -->
+       <h2 id="full-api">
+        Full API
+        <a class="headerlink" href="#full-api" title="Permalink to this headline">
+         ¶
+        </a>
+       </h2>
+       <h3 id="namespaces">
+        Namespaces
+        <a class="headerlink" href="#namespaces" title="Permalink to this headline">
+         ¶
+        </a>
+       </h3>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="namespace_torch_tensorrt.html">
+           Namespace torch_tensorrt
           </a>
-         </h2>
-         <section id="namespaces">
-          <h3 id="namespaces">
-           Namespaces
-           <a class="headerlink" href="#namespaces" title="Permalink to this headline">
-            ¶
-           </a>
-          </h3>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="namespace_torch_tensorrt.html">
-              Namespace torch_tensorrt
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="namespace_torch_tensorrt.html#namespaces">
-                Namespaces
-               </a>
-              </li>
-              <li class="toctree-l2">
-               <a class="reference internal" href="namespace_torch_tensorrt.html#classes">
-                Classes
-               </a>
-              </li>
-              <li class="toctree-l2">
-               <a class="reference internal" href="namespace_torch_tensorrt.html#enums">
-                Enums
-               </a>
-              </li>
-              <li class="toctree-l2">
-               <a class="reference internal" href="namespace_torch_tensorrt.html#functions">
-                Functions
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="namespace_torch_tensorrt__logging.html">
-              Namespace torch_tensorrt::logging
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="namespace_torch_tensorrt__logging.html#enums">
-                Enums
-               </a>
-              </li>
-              <li class="toctree-l2">
-               <a class="reference internal" href="namespace_torch_tensorrt__logging.html#functions">
-                Functions
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="namespace_torch_tensorrt__ptq.html">
-              Namespace torch_tensorrt::ptq
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="namespace_torch_tensorrt__ptq.html#classes">
-                Classes
-               </a>
-              </li>
-              <li class="toctree-l2">
-               <a class="reference internal" href="namespace_torch_tensorrt__ptq.html#functions">
-                Functions
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="namespace_torch_tensorrt__torchscript.html">
-              Namespace torch_tensorrt::torchscript
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="namespace_torch_tensorrt__torchscript.html#classes">
-                Classes
-               </a>
-              </li>
-              <li class="toctree-l2">
-               <a class="reference internal" href="namespace_torch_tensorrt__torchscript.html#functions">
-                Functions
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-         </section>
-         <section id="classes-and-structs">
-          <h3 id="classes-and-structs">
-           Classes and Structs
-           <a class="headerlink" href="#classes-and-structs" title="Permalink to this headline">
-            ¶
-           </a>
-          </h3>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="structtorch__tensorrt_1_1Device.html">
-              Struct Device
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#nested-relationships">
-                Nested Relationships
-               </a>
-               <ul>
-                <li class="toctree-l3">
-                 <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#nested-types">
-                  Nested Types
-                 </a>
-                </li>
-               </ul>
-              </li>
-              <li class="toctree-l2">
-               <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#struct-documentation">
-                Struct Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="structtorch__tensorrt_1_1Input.html">
-              Struct Input
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="structtorch__tensorrt_1_1Input.html#struct-documentation">
-                Struct Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="structtorch__tensorrt_1_1torchscript_1_1CompileSpec.html">
-              Struct CompileSpec
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="structtorch__tensorrt_1_1torchscript_1_1CompileSpec.html#struct-documentation">
-                Struct Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="classtorch__tensorrt_1_1DataType.html">
-              Class DataType
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="classtorch__tensorrt_1_1DataType.html#class-documentation">
-                Class Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="classtorch__tensorrt_1_1Device_1_1DeviceType.html">
-              Class Device::DeviceType
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="classtorch__tensorrt_1_1Device_1_1DeviceType.html#nested-relationships">
-                Nested Relationships
-               </a>
-              </li>
-              <li class="toctree-l2">
-               <a class="reference internal" href="classtorch__tensorrt_1_1Device_1_1DeviceType.html#class-documentation">
-                Class Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="classtorch__tensorrt_1_1ptq_1_1Int8CacheCalibrator.html">
-              Template Class Int8CacheCalibrator
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="classtorch__tensorrt_1_1ptq_1_1Int8CacheCalibrator.html#inheritance-relationships">
-                Inheritance Relationships
-               </a>
-               <ul>
-                <li class="toctree-l3">
-                 <a class="reference internal" href="classtorch__tensorrt_1_1ptq_1_1Int8CacheCalibrator.html#base-type">
-                  Base Type
-                 </a>
-                </li>
-               </ul>
-              </li>
-              <li class="toctree-l2">
-               <a class="reference internal" href="classtorch__tensorrt_1_1ptq_1_1Int8CacheCalibrator.html#class-documentation">
-                Class Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator.html">
-              Template Class Int8Calibrator
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator.html#inheritance-relationships">
-                Inheritance Relationships
-               </a>
-               <ul>
-                <li class="toctree-l3">
-                 <a class="reference internal" href="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator.html#base-type">
-                  Base Type
-                 </a>
-                </li>
-               </ul>
-              </li>
-              <li class="toctree-l2">
-               <a class="reference internal" href="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator.html#class-documentation">
-                Class Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html">
-              Class TensorFormat
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#class-documentation">
-                Class Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-         </section>
-         <section id="enums">
-          <h3 id="enums">
-           Enums
-           <a class="headerlink" href="#enums" title="Permalink to this headline">
-            ¶
-           </a>
-          </h3>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="enum_torch__tensorrt_8h_1a3fbe5d72e4fc624dbd038853079620eb.html">
-              Enum EngineCapability
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="enum_torch__tensorrt_8h_1a3fbe5d72e4fc624dbd038853079620eb.html#enum-documentation">
-                Enum Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="enum_logging_8h_1a130f65408ad8cbaee060f05e8db69558.html">
-              Enum Level
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="enum_logging_8h_1a130f65408ad8cbaee060f05e8db69558.html#enum-documentation">
-                Enum Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-         </section>
-         <section id="functions">
-          <h3 id="functions">
-           Functions
-           <a class="headerlink" href="#functions" title="Permalink to this headline">
-            ¶
-           </a>
-          </h3>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="function_torch__tensorrt_8h_1ad6a4ee8ca6c8f6e5519eb1128ec7f4a1.html">
-              Function torch_tensorrt::dump_build_info
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="function_torch__tensorrt_8h_1ad6a4ee8ca6c8f6e5519eb1128ec7f4a1.html#function-documentation">
-                Function Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="function_torch__tensorrt_8h_1ac4ab8313ae72c2c899ea31548b528528.html">
-              Function torch_tensorrt::get_build_info
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="function_torch__tensorrt_8h_1ac4ab8313ae72c2c899ea31548b528528.html#function-documentation">
-                Function Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="function_logging_8h_1a56e110feaaba2c3fd44bd201fd21a76a.html">
-              Function torch_tensorrt::logging::get_is_colored_output_on
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="function_logging_8h_1a56e110feaaba2c3fd44bd201fd21a76a.html#function-documentation">
-                Function Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="function_logging_8h_1a0593f776f469c20469e2f729fc7861a3.html">
-              Function torch_tensorrt::logging::get_logging_prefix
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="function_logging_8h_1a0593f776f469c20469e2f729fc7861a3.html#function-documentation">
-                Function Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="function_logging_8h_1a0c012cb374addd90eb1f42eaec570650.html">
-              Function torch_tensorrt::logging::get_reportable_log_level
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="function_logging_8h_1a0c012cb374addd90eb1f42eaec570650.html#function-documentation">
-                Function Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="function_logging_8h_1ac46ac0901cb97e3ae6e93b45f24e90b8.html">
-              Function torch_tensorrt::logging::log
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="function_logging_8h_1ac46ac0901cb97e3ae6e93b45f24e90b8.html#function-documentation">
-                Function Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="function_logging_8h_1ad2efd47b6c3689e58ccc595680579ae5.html">
-              Function torch_tensorrt::logging::set_is_colored_output_on
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="function_logging_8h_1ad2efd47b6c3689e58ccc595680579ae5.html#function-documentation">
-                Function Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="function_logging_8h_1af8f3443813315af7901903d25dd495cc.html">
-              Function torch_tensorrt::logging::set_logging_prefix
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="function_logging_8h_1af8f3443813315af7901903d25dd495cc.html#function-documentation">
-                Function Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="function_logging_8h_1a7cb50492421ea9de4e3db895819df6f2.html">
-              Function torch_tensorrt::logging::set_reportable_log_level
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="function_logging_8h_1a7cb50492421ea9de4e3db895819df6f2.html#function-documentation">
-                Function Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="function_ptq_8h_1a9835f6e605dce1abf442a55b64d6dffa.html">
-              Template Function torch_tensorrt::ptq::make_int8_cache_calibrator
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="function_ptq_8h_1a9835f6e605dce1abf442a55b64d6dffa.html#function-documentation">
-                Function Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="function_ptq_8h_1a83ff2be7e0b80bc7434de415861dc039.html">
-              Template Function torch_tensorrt::ptq::make_int8_calibrator
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="function_ptq_8h_1a83ff2be7e0b80bc7434de415861dc039.html#function-documentation">
-                Function Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="function_torch__tensorrt_8h_1ad1acd06eaeaffbbcf6e7ebf426891384.html">
-              Function torch_tensorrt::set_device
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="function_torch__tensorrt_8h_1ad1acd06eaeaffbbcf6e7ebf426891384.html#function-documentation">
-                Function Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="function_torch__tensorrt_8h_1a5b405fd3bf3c8fc2e2a54cbbab979797.html">
-              Function torch_tensorrt::torchscript::check_method_operator_support
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="function_torch__tensorrt_8h_1a5b405fd3bf3c8fc2e2a54cbbab979797.html#function-documentation">
-                Function Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="function_torch__tensorrt_8h_1a6e19490a08fb1553c9dd347a5ae79db9.html">
-              Function torch_tensorrt::torchscript::compile
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="function_torch__tensorrt_8h_1a6e19490a08fb1553c9dd347a5ae79db9.html#function-documentation">
-                Function Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="function_torch__tensorrt_8h_1ae8d56472106eeef37fbe51ff7f40c9b2.html">
-              Function torch_tensorrt::torchscript::convert_method_to_trt_engine
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="function_torch__tensorrt_8h_1ae8d56472106eeef37fbe51ff7f40c9b2.html#function-documentation">
-                Function Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="function_torch__tensorrt_8h_1a710df824a7718b440e4bc17bf9693cef.html">
-              Function torch_tensorrt::torchscript::embed_engine_in_new_module
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="function_torch__tensorrt_8h_1a710df824a7718b440e4bc17bf9693cef.html#function-documentation">
-                Function Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-         </section>
-         <section id="defines">
-          <h3 id="defines">
-           Defines
-           <a class="headerlink" href="#defines" title="Permalink to this headline">
-            ¶
-           </a>
-          </h3>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="define_macros_8h_1a18d295a837ac71add5578860b55e5502.html">
-              Define STR
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="define_macros_8h_1a18d295a837ac71add5578860b55e5502.html#define-documentation">
-                Define Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="define_macros_8h_1a31398a6d4d27e28817afb0f0139e909e.html">
-              Define TORCH_TENSORRT_MAJOR_VERSION
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="define_macros_8h_1a31398a6d4d27e28817afb0f0139e909e.html#define-documentation">
-                Define Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="define_macros_8h_1a35703561b26b1a9d2738ad7d58b27827.html">
-              Define TORCH_TENSORRT_MINOR_VERSION
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="define_macros_8h_1a35703561b26b1a9d2738ad7d58b27827.html#define-documentation">
-                Define Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="define_macros_8h_1a282fd3c0b1c3a215148ae372070e1268.html">
-              Define TORCH_TENSORRT_PATCH_VERSION
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="define_macros_8h_1a282fd3c0b1c3a215148ae372070e1268.html#define-documentation">
-                Define Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="define_macros_8h_1adad592a7b1b7eed529cdf6acd584c883.html">
-              Define TORCH_TENSORRT_VERSION
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="define_macros_8h_1adad592a7b1b7eed529cdf6acd584c883.html#define-documentation">
-                Define Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="define_macros_8h_1abd1465eb38256d3f22cc1426b23d516b.html">
-              Define TORCHTRT_API
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="define_macros_8h_1abd1465eb38256d3f22cc1426b23d516b.html#define-documentation">
-                Define Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="define_macros_8h_1ad19939408f7be171a74a89928b36eb59.html">
-              Define TORCHTRT_HIDDEN
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="define_macros_8h_1ad19939408f7be171a74a89928b36eb59.html#define-documentation">
-                Define Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-          <div class="toctree-wrapper compound">
-           <ul>
-            <li class="toctree-l1">
-             <a class="reference internal" href="define_macros_8h_1abe87b341f562fd1cf40b7672e4d759da.html">
-              Define XSTR
-             </a>
-             <ul>
-              <li class="toctree-l2">
-               <a class="reference internal" href="define_macros_8h_1abe87b341f562fd1cf40b7672e4d759da.html#define-documentation">
-                Define Documentation
-               </a>
-              </li>
-             </ul>
-            </li>
-           </ul>
-          </div>
-         </section>
-        </section>
-       </section>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="namespace_torch_tensorrt.html#namespaces">
+             Namespaces
+            </a>
+           </li>
+           <li class="toctree-l2">
+            <a class="reference internal" href="namespace_torch_tensorrt.html#classes">
+             Classes
+            </a>
+           </li>
+           <li class="toctree-l2">
+            <a class="reference internal" href="namespace_torch_tensorrt.html#enums">
+             Enums
+            </a>
+           </li>
+           <li class="toctree-l2">
+            <a class="reference internal" href="namespace_torch_tensorrt.html#functions">
+             Functions
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="namespace_torch_tensorrt__logging.html">
+           Namespace torch_tensorrt::logging
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="namespace_torch_tensorrt__logging.html#enums">
+             Enums
+            </a>
+           </li>
+           <li class="toctree-l2">
+            <a class="reference internal" href="namespace_torch_tensorrt__logging.html#functions">
+             Functions
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="namespace_torch_tensorrt__ptq.html">
+           Namespace torch_tensorrt::ptq
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="namespace_torch_tensorrt__ptq.html#classes">
+             Classes
+            </a>
+           </li>
+           <li class="toctree-l2">
+            <a class="reference internal" href="namespace_torch_tensorrt__ptq.html#functions">
+             Functions
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="namespace_torch_tensorrt__torchscript.html">
+           Namespace torch_tensorrt::torchscript
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="namespace_torch_tensorrt__torchscript.html#classes">
+             Classes
+            </a>
+           </li>
+           <li class="toctree-l2">
+            <a class="reference internal" href="namespace_torch_tensorrt__torchscript.html#functions">
+             Functions
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <h3 id="classes-and-structs">
+        Classes and Structs
+        <a class="headerlink" href="#classes-and-structs" title="Permalink to this headline">
+         ¶
+        </a>
+       </h3>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="structtorch__tensorrt_1_1Device.html">
+           Struct Device
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#nested-relationships">
+             Nested Relationships
+            </a>
+            <ul>
+             <li class="toctree-l3">
+              <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#nested-types">
+               Nested Types
+              </a>
+             </li>
+            </ul>
+           </li>
+           <li class="toctree-l2">
+            <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#struct-documentation">
+             Struct Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="structtorch__tensorrt_1_1Input.html">
+           Struct Input
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="structtorch__tensorrt_1_1Input.html#struct-documentation">
+             Struct Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="structtorch__tensorrt_1_1torchscript_1_1CompileSpec.html">
+           Struct CompileSpec
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="structtorch__tensorrt_1_1torchscript_1_1CompileSpec.html#struct-documentation">
+             Struct Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="classtorch__tensorrt_1_1DataType.html">
+           Class DataType
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="classtorch__tensorrt_1_1DataType.html#class-documentation">
+             Class Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="classtorch__tensorrt_1_1Device_1_1DeviceType.html">
+           Class Device::DeviceType
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="classtorch__tensorrt_1_1Device_1_1DeviceType.html#nested-relationships">
+             Nested Relationships
+            </a>
+           </li>
+           <li class="toctree-l2">
+            <a class="reference internal" href="classtorch__tensorrt_1_1Device_1_1DeviceType.html#class-documentation">
+             Class Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="classtorch__tensorrt_1_1ptq_1_1Int8CacheCalibrator.html">
+           Template Class Int8CacheCalibrator
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="classtorch__tensorrt_1_1ptq_1_1Int8CacheCalibrator.html#inheritance-relationships">
+             Inheritance Relationships
+            </a>
+            <ul>
+             <li class="toctree-l3">
+              <a class="reference internal" href="classtorch__tensorrt_1_1ptq_1_1Int8CacheCalibrator.html#base-type">
+               Base Type
+              </a>
+             </li>
+            </ul>
+           </li>
+           <li class="toctree-l2">
+            <a class="reference internal" href="classtorch__tensorrt_1_1ptq_1_1Int8CacheCalibrator.html#class-documentation">
+             Class Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator.html">
+           Template Class Int8Calibrator
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator.html#inheritance-relationships">
+             Inheritance Relationships
+            </a>
+            <ul>
+             <li class="toctree-l3">
+              <a class="reference internal" href="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator.html#base-type">
+               Base Type
+              </a>
+             </li>
+            </ul>
+           </li>
+           <li class="toctree-l2">
+            <a class="reference internal" href="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator.html#class-documentation">
+             Class Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html">
+           Class TensorFormat
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="classtorch__tensorrt_1_1TensorFormat.html#class-documentation">
+             Class Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <h3 id="enums">
+        Enums
+        <a class="headerlink" href="#enums" title="Permalink to this headline">
+         ¶
+        </a>
+       </h3>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="enum_torch__tensorrt_8h_1a3fbe5d72e4fc624dbd038853079620eb.html">
+           Enum EngineCapability
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="enum_torch__tensorrt_8h_1a3fbe5d72e4fc624dbd038853079620eb.html#enum-documentation">
+             Enum Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="enum_logging_8h_1a130f65408ad8cbaee060f05e8db69558.html">
+           Enum Level
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="enum_logging_8h_1a130f65408ad8cbaee060f05e8db69558.html#enum-documentation">
+             Enum Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <h3 id="functions">
+        Functions
+        <a class="headerlink" href="#functions" title="Permalink to this headline">
+         ¶
+        </a>
+       </h3>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="function_torch__tensorrt_8h_1ad6a4ee8ca6c8f6e5519eb1128ec7f4a1.html">
+           Function torch_tensorrt::dump_build_info
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="function_torch__tensorrt_8h_1ad6a4ee8ca6c8f6e5519eb1128ec7f4a1.html#function-documentation">
+             Function Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="function_torch__tensorrt_8h_1ac4ab8313ae72c2c899ea31548b528528.html">
+           Function torch_tensorrt::get_build_info
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="function_torch__tensorrt_8h_1ac4ab8313ae72c2c899ea31548b528528.html#function-documentation">
+             Function Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="function_logging_8h_1a56e110feaaba2c3fd44bd201fd21a76a.html">
+           Function torch_tensorrt::logging::get_is_colored_output_on
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="function_logging_8h_1a56e110feaaba2c3fd44bd201fd21a76a.html#function-documentation">
+             Function Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="function_logging_8h_1a0593f776f469c20469e2f729fc7861a3.html">
+           Function torch_tensorrt::logging::get_logging_prefix
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="function_logging_8h_1a0593f776f469c20469e2f729fc7861a3.html#function-documentation">
+             Function Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="function_logging_8h_1a0c012cb374addd90eb1f42eaec570650.html">
+           Function torch_tensorrt::logging::get_reportable_log_level
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="function_logging_8h_1a0c012cb374addd90eb1f42eaec570650.html#function-documentation">
+             Function Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="function_logging_8h_1ac46ac0901cb97e3ae6e93b45f24e90b8.html">
+           Function torch_tensorrt::logging::log
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="function_logging_8h_1ac46ac0901cb97e3ae6e93b45f24e90b8.html#function-documentation">
+             Function Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="function_logging_8h_1ad2efd47b6c3689e58ccc595680579ae5.html">
+           Function torch_tensorrt::logging::set_is_colored_output_on
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="function_logging_8h_1ad2efd47b6c3689e58ccc595680579ae5.html#function-documentation">
+             Function Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="function_logging_8h_1af8f3443813315af7901903d25dd495cc.html">
+           Function torch_tensorrt::logging::set_logging_prefix
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="function_logging_8h_1af8f3443813315af7901903d25dd495cc.html#function-documentation">
+             Function Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="function_logging_8h_1a7cb50492421ea9de4e3db895819df6f2.html">
+           Function torch_tensorrt::logging::set_reportable_log_level
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="function_logging_8h_1a7cb50492421ea9de4e3db895819df6f2.html#function-documentation">
+             Function Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="function_ptq_8h_1a9835f6e605dce1abf442a55b64d6dffa.html">
+           Template Function torch_tensorrt::ptq::make_int8_cache_calibrator
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="function_ptq_8h_1a9835f6e605dce1abf442a55b64d6dffa.html#function-documentation">
+             Function Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="function_ptq_8h_1a83ff2be7e0b80bc7434de415861dc039.html">
+           Template Function torch_tensorrt::ptq::make_int8_calibrator
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="function_ptq_8h_1a83ff2be7e0b80bc7434de415861dc039.html#function-documentation">
+             Function Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="function_torch__tensorrt_8h_1ad1acd06eaeaffbbcf6e7ebf426891384.html">
+           Function torch_tensorrt::set_device
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="function_torch__tensorrt_8h_1ad1acd06eaeaffbbcf6e7ebf426891384.html#function-documentation">
+             Function Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="function_torch__tensorrt_8h_1a5b405fd3bf3c8fc2e2a54cbbab979797.html">
+           Function torch_tensorrt::torchscript::check_method_operator_support
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="function_torch__tensorrt_8h_1a5b405fd3bf3c8fc2e2a54cbbab979797.html#function-documentation">
+             Function Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="function_torch__tensorrt_8h_1a6e19490a08fb1553c9dd347a5ae79db9.html">
+           Function torch_tensorrt::torchscript::compile
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="function_torch__tensorrt_8h_1a6e19490a08fb1553c9dd347a5ae79db9.html#function-documentation">
+             Function Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="function_torch__tensorrt_8h_1ae8d56472106eeef37fbe51ff7f40c9b2.html">
+           Function torch_tensorrt::torchscript::convert_method_to_trt_engine
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="function_torch__tensorrt_8h_1ae8d56472106eeef37fbe51ff7f40c9b2.html#function-documentation">
+             Function Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="function_torch__tensorrt_8h_1a710df824a7718b440e4bc17bf9693cef.html">
+           Function torch_tensorrt::torchscript::embed_engine_in_new_module
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="function_torch__tensorrt_8h_1a710df824a7718b440e4bc17bf9693cef.html#function-documentation">
+             Function Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <h3 id="defines">
+        Defines
+        <a class="headerlink" href="#defines" title="Permalink to this headline">
+         ¶
+        </a>
+       </h3>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="define_macros_8h_1a18d295a837ac71add5578860b55e5502.html">
+           Define STR
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="define_macros_8h_1a18d295a837ac71add5578860b55e5502.html#define-documentation">
+             Define Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="define_macros_8h_1a31398a6d4d27e28817afb0f0139e909e.html">
+           Define TORCH_TENSORRT_MAJOR_VERSION
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="define_macros_8h_1a31398a6d4d27e28817afb0f0139e909e.html#define-documentation">
+             Define Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="define_macros_8h_1a35703561b26b1a9d2738ad7d58b27827.html">
+           Define TORCH_TENSORRT_MINOR_VERSION
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="define_macros_8h_1a35703561b26b1a9d2738ad7d58b27827.html#define-documentation">
+             Define Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="define_macros_8h_1a282fd3c0b1c3a215148ae372070e1268.html">
+           Define TORCH_TENSORRT_PATCH_VERSION
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="define_macros_8h_1a282fd3c0b1c3a215148ae372070e1268.html#define-documentation">
+             Define Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="define_macros_8h_1adad592a7b1b7eed529cdf6acd584c883.html">
+           Define TORCH_TENSORRT_VERSION
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="define_macros_8h_1adad592a7b1b7eed529cdf6acd584c883.html#define-documentation">
+             Define Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="define_macros_8h_1abd1465eb38256d3f22cc1426b23d516b.html">
+           Define TORCHTRT_API
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="define_macros_8h_1abd1465eb38256d3f22cc1426b23d516b.html#define-documentation">
+             Define Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="define_macros_8h_1ad19939408f7be171a74a89928b36eb59.html">
+           Define TORCHTRT_HIDDEN
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="define_macros_8h_1ad19939408f7be171a74a89928b36eb59.html#define-documentation">
+             Define Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="define_macros_8h_1abe87b341f562fd1cf40b7672e4d759da.html">
+           Define XSTR
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="define_macros_8h_1abe87b341f562fd1cf40b7672e4d759da.html#define-documentation">
+             Define Documentation
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
       </article>
      </div>
     </div>
@@ -1366,6 +1470,34 @@
   <footer class="md-footer">
    <div class="md-footer-nav">
     <nav class="md-footer-nav__inner md-grid">
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--prev" href="../py_api/ts.html" rel="prev" title="torch_tensorrt.ts">
+      <div class="md-flex__cell md-flex__cell--shrink">
+       <i class="md-icon md-icon--arrow-back md-footer-nav__button">
+       </i>
+      </div>
+      <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
+       <span class="md-flex__ellipsis">
+        <span class="md-footer-nav__direction">
+         Previous
+        </span>
+        torch_tensorrt.ts
+       </span>
+      </div>
+     </a>
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--next" href="namespace_torch_tensorrt.html" rel="next" title="Namespace torch_tensorrt">
+      <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
+       <span class="md-flex__ellipsis">
+        <span class="md-footer-nav__direction">
+         Next
+        </span>
+        Namespace torch_tensorrt
+       </span>
+      </div>
+      <div class="md-flex__cell md-flex__cell--shrink">
+       <i class="md-icon md-icon--arrow-forward md-footer-nav__button">
+       </i>
+      </div>
+     </a>
     </nav>
    </div>
    <div class="md-footer-meta md-typeset">

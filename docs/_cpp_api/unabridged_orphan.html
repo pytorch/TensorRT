@@ -3,7 +3,6 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -304,6 +303,11 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/Resnet50-example.html">
+            Torch-TensorRT Getting Started - ResNet 50
+           </a>
+          </li>
+          <li class="md-nav__item">
            <a class="md-nav__link" href="../_notebooks/ssd-object-detection-demo.html">
             Object Detection with Torch-TensorRT (SSD)
            </a>
@@ -326,13 +330,60 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/logging.html">
+            torch_tensorrt.logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/ptq.html">
+            torch_tensorrt.ptq
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/ptq.html#classes">
+            Classes
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/ptq.html#enums">
+            Enums
+           </a>
+          </li>
+          <li class="md-nav__item">
            <a class="md-nav__link" href="../py_api/ts.html">
             torch_tensorrt.ts
            </a>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/logging.html">
-            torch_tensorrt.logging
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             C++ API Documenation
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="torch_tensort_cpp.html">
+            Torch-TensorRT C++ API
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="namespace_torch_tensorrt.html">
+            Namespace torch_tensorrt
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="namespace_torch_tensorrt__logging.html">
+            Namespace torch_tensorrt::logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="namespace_torch_tensorrt__torchscript.html">
+            Namespace torch_tensorrt::torchscript
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="namespace_torch_tensorrt__ptq.html">
+            Namespace torch_tensorrt::ptq
            </a>
           </li>
           <li class="md-nav__item">
@@ -415,279 +466,273 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <section id="full-api">
-        <h1 id="cpp-api-unabridged-orphan--page-root">
-         Full API
-         <a class="headerlink" href="#cpp-api-unabridged-orphan--page-root" title="Permalink to this headline">
-          ¶
-         </a>
-        </h1>
-        <section id="directories">
-         <h2 id="directories">
-          Directories
-          <a class="headerlink" href="#directories" title="Permalink to this headline">
-           ¶
+       <h1 id="cpp-api-unabridged-orphan--page-root">
+        Full API
+        <a class="headerlink" href="#cpp-api-unabridged-orphan--page-root" title="Permalink to this headline">
+         ¶
+        </a>
+       </h1>
+       <h2 id="directories">
+        Directories
+        <a class="headerlink" href="#directories" title="Permalink to this headline">
+         ¶
+        </a>
+       </h2>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="dir_cpp.html">
+           Directory cpp
           </a>
-         </h2>
-         <div class="toctree-wrapper compound">
           <ul>
-           <li class="toctree-l1">
-            <a class="reference internal" href="dir_cpp.html">
-             Directory cpp
+           <li class="toctree-l2">
+            <a class="reference internal" href="dir_cpp.html#subdirectories">
+             Subdirectories
             </a>
-            <ul>
-             <li class="toctree-l2">
-              <a class="reference internal" href="dir_cpp.html#subdirectories">
-               Subdirectories
-              </a>
-             </li>
-            </ul>
            </li>
           </ul>
-         </div>
-         <div class="toctree-wrapper compound">
-          <ul>
-           <li class="toctree-l1">
-            <a class="reference internal" href="dir_cpp_include.html">
-             Directory include
-            </a>
-            <ul>
-             <li class="toctree-l2">
-              <a class="reference internal" href="dir_cpp_include.html#subdirectories">
-               Subdirectories
-              </a>
-             </li>
-            </ul>
-           </li>
-          </ul>
-         </div>
-         <div class="toctree-wrapper compound">
-          <ul>
-           <li class="toctree-l1">
-            <a class="reference internal" href="dir_cpp_include_torch_tensorrt.html">
-             Directory tensorrt
-            </a>
-            <ul>
-             <li class="toctree-l2">
-              <a class="reference internal" href="dir_cpp_include_torch_tensorrt.html#files">
-               Files
-              </a>
-             </li>
-            </ul>
-           </li>
-          </ul>
-         </div>
-        </section>
-        <section id="files">
-         <h2 id="files">
-          Files
-          <a class="headerlink" href="#files" title="Permalink to this headline">
-           ¶
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="dir_cpp_include.html">
+           Directory include
           </a>
-         </h2>
-         <div class="toctree-wrapper compound">
           <ul>
-           <li class="toctree-l1">
-            <a class="reference internal" href="file_cpp_include_torch_tensorrt_logging.h.html">
-             File logging.h
+           <li class="toctree-l2">
+            <a class="reference internal" href="dir_cpp_include.html#subdirectories">
+             Subdirectories
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="dir_cpp_include_torch_tensorrt.html">
+           Directory tensorrt
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="dir_cpp_include_torch_tensorrt.html#files">
+             Files
+            </a>
+           </li>
+          </ul>
+         </li>
+        </ul>
+       </div>
+       <h2 id="files">
+        Files
+        <a class="headerlink" href="#files" title="Permalink to this headline">
+         ¶
+        </a>
+       </h2>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="file_cpp_include_torch_tensorrt_logging.h.html">
+           File logging.h
+          </a>
+          <ul>
+           <li class="toctree-l2">
+            <a class="reference internal" href="file_cpp_include_torch_tensorrt_logging.h.html#definition-cpp-include-torch-tensorrt-logging-h">
+             Definition (
+             <code class="docutils literal notranslate">
+              <span class="pre">
+               cpp/include/torch_tensorrt/logging.h
+              </span>
+             </code>
+             )
             </a>
             <ul>
-             <li class="toctree-l2">
-              <a class="reference internal" href="file_cpp_include_torch_tensorrt_logging.h.html#definition-cpp-include-torch-tensorrt-logging-h">
-               Definition (
-               <code class="docutils literal notranslate">
-                <span class="pre">
-                 cpp/include/torch_tensorrt/logging.h
-                </span>
-               </code>
-               )
-              </a>
-              <ul>
-               <li class="toctree-l3">
-                <a class="reference internal" href="program_listing_file_cpp_include_torch_tensorrt_logging.h.html">
-                 Program Listing for File logging.h
-                </a>
-               </li>
-              </ul>
-             </li>
-             <li class="toctree-l2">
-              <a class="reference internal" href="file_cpp_include_torch_tensorrt_logging.h.html#includes">
-               Includes
-              </a>
-             </li>
-             <li class="toctree-l2">
-              <a class="reference internal" href="file_cpp_include_torch_tensorrt_logging.h.html#included-by">
-               Included By
-              </a>
-             </li>
-             <li class="toctree-l2">
-              <a class="reference internal" href="file_cpp_include_torch_tensorrt_logging.h.html#namespaces">
-               Namespaces
-              </a>
-             </li>
-             <li class="toctree-l2">
-              <a class="reference internal" href="file_cpp_include_torch_tensorrt_logging.h.html#enums">
-               Enums
-              </a>
-             </li>
-             <li class="toctree-l2">
-              <a class="reference internal" href="file_cpp_include_torch_tensorrt_logging.h.html#functions">
-               Functions
+             <li class="toctree-l3">
+              <a class="reference internal" href="program_listing_file_cpp_include_torch_tensorrt_logging.h.html">
+               Program Listing for File logging.h
               </a>
              </li>
             </ul>
            </li>
+           <li class="toctree-l2">
+            <a class="reference internal" href="file_cpp_include_torch_tensorrt_logging.h.html#includes">
+             Includes
+            </a>
+           </li>
+           <li class="toctree-l2">
+            <a class="reference internal" href="file_cpp_include_torch_tensorrt_logging.h.html#included-by">
+             Included By
+            </a>
+           </li>
+           <li class="toctree-l2">
+            <a class="reference internal" href="file_cpp_include_torch_tensorrt_logging.h.html#namespaces">
+             Namespaces
+            </a>
+           </li>
+           <li class="toctree-l2">
+            <a class="reference internal" href="file_cpp_include_torch_tensorrt_logging.h.html#enums">
+             Enums
+            </a>
+           </li>
+           <li class="toctree-l2">
+            <a class="reference internal" href="file_cpp_include_torch_tensorrt_logging.h.html#functions">
+             Functions
+            </a>
+           </li>
           </ul>
-         </div>
-         <div class="toctree-wrapper compound">
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="file_cpp_include_torch_tensorrt_macros.h.html">
+           File macros.h
+          </a>
           <ul>
-           <li class="toctree-l1">
-            <a class="reference internal" href="file_cpp_include_torch_tensorrt_macros.h.html">
-             File macros.h
+           <li class="toctree-l2">
+            <a class="reference internal" href="file_cpp_include_torch_tensorrt_macros.h.html#definition-cpp-include-torch-tensorrt-macros-h">
+             Definition (
+             <code class="docutils literal notranslate">
+              <span class="pre">
+               cpp/include/torch_tensorrt/macros.h
+              </span>
+             </code>
+             )
             </a>
             <ul>
-             <li class="toctree-l2">
-              <a class="reference internal" href="file_cpp_include_torch_tensorrt_macros.h.html#definition-cpp-include-torch-tensorrt-macros-h">
-               Definition (
-               <code class="docutils literal notranslate">
-                <span class="pre">
-                 cpp/include/torch_tensorrt/macros.h
-                </span>
-               </code>
-               )
-              </a>
-              <ul>
-               <li class="toctree-l3">
-                <a class="reference internal" href="program_listing_file_cpp_include_torch_tensorrt_macros.h.html">
-                 Program Listing for File macros.h
-                </a>
-               </li>
-              </ul>
-             </li>
-             <li class="toctree-l2">
-              <a class="reference internal" href="file_cpp_include_torch_tensorrt_macros.h.html#included-by">
-               Included By
-              </a>
-             </li>
-             <li class="toctree-l2">
-              <a class="reference internal" href="file_cpp_include_torch_tensorrt_macros.h.html#namespaces">
-               Namespaces
-              </a>
-             </li>
-             <li class="toctree-l2">
-              <a class="reference internal" href="file_cpp_include_torch_tensorrt_macros.h.html#defines">
-               Defines
+             <li class="toctree-l3">
+              <a class="reference internal" href="program_listing_file_cpp_include_torch_tensorrt_macros.h.html">
+               Program Listing for File macros.h
               </a>
              </li>
             </ul>
            </li>
+           <li class="toctree-l2">
+            <a class="reference internal" href="file_cpp_include_torch_tensorrt_macros.h.html#included-by">
+             Included By
+            </a>
+           </li>
+           <li class="toctree-l2">
+            <a class="reference internal" href="file_cpp_include_torch_tensorrt_macros.h.html#namespaces">
+             Namespaces
+            </a>
+           </li>
+           <li class="toctree-l2">
+            <a class="reference internal" href="file_cpp_include_torch_tensorrt_macros.h.html#defines">
+             Defines
+            </a>
+           </li>
           </ul>
-         </div>
-         <div class="toctree-wrapper compound">
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="file_cpp_include_torch_tensorrt_ptq.h.html">
+           File ptq.h
+          </a>
           <ul>
-           <li class="toctree-l1">
-            <a class="reference internal" href="file_cpp_include_torch_tensorrt_ptq.h.html">
-             File ptq.h
+           <li class="toctree-l2">
+            <a class="reference internal" href="file_cpp_include_torch_tensorrt_ptq.h.html#definition-cpp-include-torch-tensorrt-ptq-h">
+             Definition (
+             <code class="docutils literal notranslate">
+              <span class="pre">
+               cpp/include/torch_tensorrt/ptq.h
+              </span>
+             </code>
+             )
             </a>
             <ul>
-             <li class="toctree-l2">
-              <a class="reference internal" href="file_cpp_include_torch_tensorrt_ptq.h.html#definition-cpp-include-torch-tensorrt-ptq-h">
-               Definition (
-               <code class="docutils literal notranslate">
-                <span class="pre">
-                 cpp/include/torch_tensorrt/ptq.h
-                </span>
-               </code>
-               )
-              </a>
-              <ul>
-               <li class="toctree-l3">
-                <a class="reference internal" href="program_listing_file_cpp_include_torch_tensorrt_ptq.h.html">
-                 Program Listing for File ptq.h
-                </a>
-               </li>
-              </ul>
-             </li>
-             <li class="toctree-l2">
-              <a class="reference internal" href="file_cpp_include_torch_tensorrt_ptq.h.html#includes">
-               Includes
-              </a>
-             </li>
-             <li class="toctree-l2">
-              <a class="reference internal" href="file_cpp_include_torch_tensorrt_ptq.h.html#namespaces">
-               Namespaces
-              </a>
-             </li>
-             <li class="toctree-l2">
-              <a class="reference internal" href="file_cpp_include_torch_tensorrt_ptq.h.html#classes">
-               Classes
-              </a>
-             </li>
-             <li class="toctree-l2">
-              <a class="reference internal" href="file_cpp_include_torch_tensorrt_ptq.h.html#functions">
-               Functions
+             <li class="toctree-l3">
+              <a class="reference internal" href="program_listing_file_cpp_include_torch_tensorrt_ptq.h.html">
+               Program Listing for File ptq.h
               </a>
              </li>
             </ul>
            </li>
+           <li class="toctree-l2">
+            <a class="reference internal" href="file_cpp_include_torch_tensorrt_ptq.h.html#includes">
+             Includes
+            </a>
+           </li>
+           <li class="toctree-l2">
+            <a class="reference internal" href="file_cpp_include_torch_tensorrt_ptq.h.html#namespaces">
+             Namespaces
+            </a>
+           </li>
+           <li class="toctree-l2">
+            <a class="reference internal" href="file_cpp_include_torch_tensorrt_ptq.h.html#classes">
+             Classes
+            </a>
+           </li>
+           <li class="toctree-l2">
+            <a class="reference internal" href="file_cpp_include_torch_tensorrt_ptq.h.html#functions">
+             Functions
+            </a>
+           </li>
           </ul>
-         </div>
-         <div class="toctree-wrapper compound">
+         </li>
+        </ul>
+       </div>
+       <div class="toctree-wrapper compound">
+        <ul>
+         <li class="toctree-l1">
+          <a class="reference internal" href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html">
+           File torch_tensorrt.h
+          </a>
           <ul>
-           <li class="toctree-l1">
-            <a class="reference internal" href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html">
-             File torch_tensorrt.h
+           <li class="toctree-l2">
+            <a class="reference internal" href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html#definition-cpp-include-torch-tensorrt-torch-tensorrt-h">
+             Definition (
+             <code class="docutils literal notranslate">
+              <span class="pre">
+               cpp/include/torch_tensorrt/torch_tensorrt.h
+              </span>
+             </code>
+             )
             </a>
             <ul>
-             <li class="toctree-l2">
-              <a class="reference internal" href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html#definition-cpp-include-torch-tensorrt-torch-tensorrt-h">
-               Definition (
-               <code class="docutils literal notranslate">
-                <span class="pre">
-                 cpp/include/torch_tensorrt/torch_tensorrt.h
-                </span>
-               </code>
-               )
-              </a>
-              <ul>
-               <li class="toctree-l3">
-                <a class="reference internal" href="program_listing_file_cpp_include_torch_tensorrt_torch_tensorrt.h.html">
-                 Program Listing for File torch_tensorrt.h
-                </a>
-               </li>
-              </ul>
-             </li>
-             <li class="toctree-l2">
-              <a class="reference internal" href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html#includes">
-               Includes
-              </a>
-             </li>
-             <li class="toctree-l2">
-              <a class="reference internal" href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html#namespaces">
-               Namespaces
-              </a>
-             </li>
-             <li class="toctree-l2">
-              <a class="reference internal" href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html#classes">
-               Classes
-              </a>
-             </li>
-             <li class="toctree-l2">
-              <a class="reference internal" href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html#enums">
-               Enums
-              </a>
-             </li>
-             <li class="toctree-l2">
-              <a class="reference internal" href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html#functions">
-               Functions
+             <li class="toctree-l3">
+              <a class="reference internal" href="program_listing_file_cpp_include_torch_tensorrt_torch_tensorrt.h.html">
+               Program Listing for File torch_tensorrt.h
               </a>
              </li>
             </ul>
            </li>
+           <li class="toctree-l2">
+            <a class="reference internal" href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html#includes">
+             Includes
+            </a>
+           </li>
+           <li class="toctree-l2">
+            <a class="reference internal" href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html#namespaces">
+             Namespaces
+            </a>
+           </li>
+           <li class="toctree-l2">
+            <a class="reference internal" href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html#classes">
+             Classes
+            </a>
+           </li>
+           <li class="toctree-l2">
+            <a class="reference internal" href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html#enums">
+             Enums
+            </a>
+           </li>
+           <li class="toctree-l2">
+            <a class="reference internal" href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html#functions">
+             Functions
+            </a>
+           </li>
           </ul>
-         </div>
-        </section>
-       </section>
+         </li>
+        </ul>
+       </div>
       </article>
      </div>
     </div>
