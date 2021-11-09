@@ -31,9 +31,16 @@ results = compiled_trt_model(data.half())
 
 ## Installation
 
-```
-python3 setup.py install
-```
+| ABI / Platform                          | Installation command                                         |
+| --------------------------------------- | ------------------------------------------------------------ |
+| Pre CXX11 ABI (Linux x86_64)            | python3 setup.py install --release                           |
+| CXX ABI  (Linux x86_64)                 | python3 setup.py install --use-cxx11-abi --release           |
+| Pre CXX11 ABI (Jetson platform aarch64) | python3 setup.py install --release --jetpack-version 4.6     |
+| CXX11 ABI (Jetson platform aarch64)     | python3 setup.py install --release --jetpack-version 4.6 --use-cxx11-abi |
+
+For Linux x86_64 platform, Pytorch libraries default to pre cxx11 abi. So, please use `python3 setup.py install --release`.
+
+On Jetson platforms, NVIDIA hosts <a href="https://forums.developer.nvidia.com/t/pytorch-for-jetson-version-1-10-now-available/72048">pre-built Pytorch wheel files</a>. These wheel files are built with CXX11 ABI. So on jetson platforms, please use `python3 setup.py install --release --jetpack-version 4.6`   
 
 ## Under the Hood
 

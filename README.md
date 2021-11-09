@@ -56,7 +56,7 @@ import torch_tensorrt
 
 ...
 
-trt_ts_module = torch_tensorrt.compile(torch_script_module, 
+trt_ts_module = torch_tensorrt.compile(torch_script_module,
     inputs = [example_tensor, # Provide example tensor for input shape or...
         torch_tensorrt.Input( # Specify input object with shape and dtype
             min_shape=[1, 3, 224, 224],
@@ -204,9 +204,10 @@ bazel build //:libtorchtrt --compilation_mode=dbg
 ```
 
 ### Native compilation on NVIDIA Jetson AGX
+We performed end to end testing on Jetson platform using Jetpack SDK 4.6. 
 
 ``` shell
-bazel build //:libtorchtrt --distdir third_party/dist_dir/aarch64-linux-gnu
+bazel build //:libtorchtrt --platforms //toolchains:jetpack_4.6
 ```
 
 > Note: Please refer [installation](docs/tutorials/installation.html) instructions for Pre-requisites
