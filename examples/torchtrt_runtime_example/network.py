@@ -34,12 +34,12 @@ def main():
         "enabled_precisions": {torch.float32}
     }
 
-    trt_ts_module = torchtrt.compile(scripted_model, compile_settings)
+    trt_ts_module = torchtrt.compile(scripted_model, **compile_settings)
     torch.jit.save(trt_ts_module, 'conv_gelu.jit')
 
     norm_model = Norm().eval().cuda()
     norm_ts_module = torch.jit.script(norm_model)
-    norm_trt_ts = torchtrt.compile(norm_ts_module, compile_settings)
+    norm_trt_ts = torchtrt.compile(norm_ts_module, **compile_settings)
     torch.jit.save(norm_trt_ts, 'norm.jit')
     print("Generated Torchscript-TRT models.")
 
