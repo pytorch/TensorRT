@@ -46,7 +46,13 @@ class TestCompile(ModelTestCase):
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
         self.assertTrue(same < 2e-2)
 
-
+    def test_compile_global_nn_mod(self):
+        trt_mod = torchtrt.compile(self.model,
+                                  inputs=[self.input],
+                                  device=torchtrt.Device(gpu_id=0),
+                                  enabled_precisions={torch.float})
+        same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
+        self.assertTrue(same < 2e-2)
 
     def test_from_torch_tensor(self):
         compile_spec = {
