@@ -14,8 +14,8 @@ jobs:
     container:
       image: ghcr.io/nvidia/torch-tensorrt/docgen:latest
       credentials:
-        username: $GITHUB_ACTOR
-        password: ${{secrets.GITHUB_TOKEN}}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Reclaim space
         run: |
