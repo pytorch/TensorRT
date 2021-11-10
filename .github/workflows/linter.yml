@@ -12,10 +12,12 @@ jobs:
       - uses: actions/checkout@v2
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - name: Docker Login
-        run: docker login docker.pkg.github.com -u $GITHUB_ACTOR -p $GITHUB_TOKEN
-        env:
-          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+      - name: Docker login
+        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Run image
         run: |
           docker run -it -d --name cpplinter -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GITHUB_WORKSPACE:/workspace -v $GITHUB_EVENT_PATH:/GITHUB_EVENT.json -w /workspace ghcr.io/nvidia/torch-tensorrt/docgen:latest
@@ -34,10 +36,12 @@ jobs:
       - uses: actions/checkout@v2
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - name: Docker Login
-        run: docker login docker.pkg.github.com -u $GITHUB_ACTOR -p $GITHUB_TOKEN
-        env:
-          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+      - name: Docker login
+        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Run image
         run: |
           docker run -it -d --name pylinter -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GITHUB_WORKSPACE:/workspace -v $GITHUB_EVENT_PATH:/GITHUB_EVENT.json -w /workspace ghcr.io/nvidia/torch-tensorrt/docgen:latest
