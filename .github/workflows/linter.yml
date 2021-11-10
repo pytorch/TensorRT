@@ -7,50 +7,48 @@ on:
 jobs:
   cpp-linting:
     name: C++ Linting
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
+    container:
+      image: ghcr.io/nvidia/torch-tensorrt/docgen:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v2
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - name: Docker login
-        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Run image
+        run: cp $GITHUB_WORKSPACE/docker/WORKSPACE.docs $GITHUB_WORKSPACE/WORKSPACE
+      - name: Install dependencies
+        run: pip3 install -r $GITHUB_WORKSPACE/.github/scripts/requirements.txt
+      - name: Lint C++
         run: |
-          docker run -it -d --name cpplinter -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GITHUB_WORKSPACE:/workspace -v $GITHUB_EVENT_PATH:/GITHUB_EVENT.json -w /workspace ghcr.io/nvidia/torch-tensorrt/docgen:latest
-          docker exec cpplinter bash -c "cp /workspace/docker/WORKSPACE.docs /workspace/WORKSPACE"
+          ln -s $GITHUB_EVENT_PATH /GITHUB_EVENT.json
+          python3 .github/scripts/run_cpp_linter.py
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
-      - name: Install dependencies
-        run: docker exec cpplinter bash -c "pip3 install -r /workspace/.github/scripts/requirements.txt"
-      - name: Lint C++
-        run: docker exec cpplinter bash -c "cd /workspace && python3 /workspace/.github/scripts/run_cpp_linter.py"
 
   py-linting:
     name: Python Linting
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
+    container:
+      image: ghcr.io/nvidia/torch-tensorrt/docgen:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v2
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - name: Docker login
-        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Run image
-        run: |
-          docker run -it -d --name pylinter -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GITHUB_WORKSPACE:/workspace -v $GITHUB_EVENT_PATH:/GITHUB_EVENT.json -w /workspace ghcr.io/nvidia/torch-tensorrt/docgen:latest
-          docker exec pylinter bash -c "cp /workspace/docker/WORKSPACE.docs /workspace/WORKSPACE"
-        env:
-          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+        run: cp $GITHUB_WORKSPACE/docker/WORKSPACE.docs $GITHUB_WORKSPACE/WORKSPACE
       - name: Install dependencies
         run: |
-          docker exec pylinter bash -c "pip3 install -r /workspace/.github/scripts/requirements.txt"
-          docker exec pylinter bash -c "pip3 install -r /workspace/tools/linter/requirements.txt"
-      - name: Lint Python
-        run: docker exec pylinter bash -c "cd /workspace && python3 /workspace/.github/scripts/run_py_linter.py"
+          pip3 install -r $GITHUB_WORKSPACE/.github/scripts/requirements.txt
+          pip3 install -r $GITHUB_WORKSPACE/tools/linter/requirements.txt
+      - name: Lint python
+        run: |
+          ln -s $GITHUB_EVENT_PATH /GITHUB_EVENT.json
+          python3 $GITHUB_WORKSPACE.github/scripts/run_py_linter.py
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
