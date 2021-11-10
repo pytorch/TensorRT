@@ -34,7 +34,7 @@ def main():
         )],
         "enabled_precisions": {torch.float, torch.half}  # Run with FP16
     }
-    trt_ts_module = torch_tensorrt.ts.ompile(scripted_model, **compile_settings)
+    trt_ts_module = torch_tensorrt.ts.compile(scripted_model, **compile_settings)
     input_data = torch.randn((1024, 1, 32, 32))
     input_data = input_data.half().to("cuda")
     pytorch_out = model.forward(input_data)
