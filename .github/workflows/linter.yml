@@ -18,7 +18,7 @@ jobs:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Run image
         run: |
-          docker run -it -d --name cpplinter -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GITHUB_WORKSPACE:/workspace -v $GITHUB_EVENT_PATH:/GITHUB_EVENT.json -w /workspace docker.pkg.github.com/nvidia/torch-tensorrt/docgen:latest
+          docker run -it -d --name cpplinter -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GITHUB_WORKSPACE:/workspace -v $GITHUB_EVENT_PATH:/GITHUB_EVENT.json -w /workspace ghcr.io/nvidia/torch-tensorrt/docgen:latest
           docker exec cpplinter bash -c "cp /workspace/docker/WORKSPACE.docs /workspace/WORKSPACE"
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
@@ -40,7 +40,7 @@ jobs:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Run image
         run: |
-          docker run -it -d --name pylinter -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GITHUB_WORKSPACE:/workspace -v $GITHUB_EVENT_PATH:/GITHUB_EVENT.json -w /workspace docker.pkg.github.com/nvidia/torch-tensorrt/docgen:latest
+          docker run -it -d --name pylinter -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GITHUB_WORKSPACE:/workspace -v $GITHUB_EVENT_PATH:/GITHUB_EVENT.json -w /workspace ghcr.io/nvidia/torch-tensorrt/docgen:latest
           docker exec pylinter bash -c "cp /workspace/docker/WORKSPACE.docs /workspace/WORKSPACE"
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
