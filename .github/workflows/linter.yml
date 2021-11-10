@@ -7,48 +7,76 @@ on:
 jobs:
   cpp-linting:
     name: C++ Linting
-    runs-on: ubuntu-18.04
-    container:
-      image: ghcr.io/nvidia/torch-tensorrt/docgen:latest
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      checks: write
+      contents: write
+      deployments: none
+      id_token: write
+      issues: write
+      discussions: write
+      packages: write
+      pull-requests: write
+      repository-projects: none
+      security-events: none
+      statuses: write
     steps:
       - uses: actions/checkout@v2
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+      - name: Docker login
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Run image
-        run: cp $GITHUB_WORKSPACE/docker/WORKSPACE.docs $GITHUB_WORKSPACE/WORKSPACE
-      - name: Install dependencies
-        run: pip3 install -r $GITHUB_WORKSPACE/.github/scripts/requirements.txt
-      - name: Lint C++
         run: |
-          ln -s $GITHUB_EVENT_PATH /GITHUB_EVENT.json
-          python3 .github/scripts/run_cpp_linter.py
+          docker run -it -d --name cpplinter -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GITHUB_WORKSPACE:/workspace -v $GITHUB_EVENT_PATH:/GITHUB_EVENT.json -w /workspace ghcr.io/nvidia/torch-tensorrt/docgen:latest
+          docker exec cpplinter bash -c "cp /workspace/docker/WORKSPACE.docs /workspace/WORKSPACE"
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+      - name: Install dependencies
+        run: docker exec cpplinter bash -c "pip3 install -r /workspace/.github/scripts/requirements.txt"
+      - name: Lint C++
+        run: docker exec cpplinter bash -c "cd /workspace && python3 /workspace/.github/scripts/run_cpp_linter.py"
 
   py-linting:
     name: Python Linting
-    runs-on: ubuntu-18.04
-    container:
-      image: ghcr.io/nvidia/torch-tensorrt/docgen:latest
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      checks: write
+      contents: write
+      deployments: none
+      id_token: write
+      issues: write
+      discussions: write
+      packages: write
+      pull-requests: write
+      repository-projects: none
+      security-events: none
+      statuses: write
     steps:
       - uses: actions/checkout@v2
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+      - name: Docker login
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Run image
-        run: cp $GITHUB_WORKSPACE/docker/WORKSPACE.docs $GITHUB_WORKSPACE/WORKSPACE
-      - name: Install dependencies
         run: |
-          pip3 install -r $GITHUB_WORKSPACE/.github/scripts/requirements.txt
-          pip3 install -r $GITHUB_WORKSPACE/tools/linter/requirements.txt
-      - name: Lint python
-        run: |
-          ln -s $GITHUB_EVENT_PATH /GITHUB_EVENT.json
-          python3 $GITHUB_WORKSPACE.github/scripts/run_py_linter.py
+          docker run -it -d --name pylinter -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GITHUB_WORKSPACE:/workspace -v $GITHUB_EVENT_PATH:/GITHUB_EVENT.json -w /workspace ghcr.io/nvidia/torch-tensorrt/docgen:latest
+          docker exec pylinter bash -c "cp /workspace/docker/WORKSPACE.docs /workspace/WORKSPACE"
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
+      - name: Install dependencies
+        run: |
+          docker exec pylinter bash -c "pip3 install -r /workspace/.github/scripts/requirements.txt"
+          docker exec pylinter bash -c "pip3 install -r /workspace/tools/linter/requirements.txt"
+      - name: Lint Python
+        run: docker exec pylinter bash -c "cd /workspace && python3 /workspace/.github/scripts/run_py_linter.py"
