@@ -8,14 +8,27 @@ jobs:
   cpp-linting:
     name: C++ Linting
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      checks: write
+      contents: write
+      deployments: none
+      id-token: write
+      issues: write
+      discussions: write
+      packages: write
+      pull-requests: write
+      repository-projects: none
+      security-events: none
+      statuses: write
     steps:
       - uses: actions/checkout@v2
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - name: Docker login
-        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+        uses: docker/login-action@v1
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Run image
@@ -32,14 +45,27 @@ jobs:
   py-linting:
     name: Python Linting
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      checks: write
+      contents: write
+      deployments: none
+      id-token: write
+      issues: write
+      discussions: write
+      packages: write
+      pull-requests: write
+      repository-projects: none
+      security-events: none
+      statuses: write
     steps:
       - uses: actions/checkout@v2
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - name: Docker login
-        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+        uses: docker/login-action@v1
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Run image
