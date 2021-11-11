@@ -302,6 +302,32 @@ TEST(Evaluators, FloorFloatIntEvaluatesCorrectly) {
   ASSERT_TRUE(jit_results[0] == trt_results[0]);
 }
 
+TEST(Evaluators, ATenExtendEvaluatesCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor, %1 : Tensor):
+        %2 : int = prim::Constant[value=0]()
+        %3 : Tensor[] = prim::ListConstruct(%0)
+        %4 : Tensor[] = prim::ListConstruct(%1)
+        aten::extend(%3, %4)
+        %5 : Tensor = aten::cat(%3, %2)
+        return (%5))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, &*g);
+
+  auto in0 = at::randint(1, 10, {3, 4}, {at::kCUDA});
+  auto in1 = at::randint(1, 10, {5, 4}, {at::kCUDA});
+
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in0, in1});
+
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in0, in1});
+
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+}
+
 TEST(Evaluators, ATenAppendWithITensorEvaluatesCorrectly) {
   const auto graph = R"IR(
       graph(%0 : Tensor, %1 : Tensor):

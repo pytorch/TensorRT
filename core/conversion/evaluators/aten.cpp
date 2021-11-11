@@ -285,6 +285,26 @@ auto aten_registrations TORCHTRT_UNUSED =
                     EvalOptions().validSchemas({
                         "aten::append.t(t[](a!) self, t(c -> *) el) -> (t[](a!))",
                     })})
+        .evaluator({c10::Symbol::fromQualString("aten::extend"),
+                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+                      if (args.at(n->input(0)).IValue()->isList() && args.at(n->input(1)).IValue()->isList()) {
+                        auto self = args.at(n->input(0)).IValue()->to<c10::List<c10::IValue>>();
+                        auto other = args.at(n->input(1)).IValue()->to<c10::List<c10::IValue>>();
+                        const int64_t other_size = other.size();
+
+                        for (int64_t i = 0; i < other_size; i++) {
+                          self.push_back(other.get(i));
+                        }
+                      } else {
+                        TORCHTRT_THROW_ERROR(
+                            "Unimplemented data type for aten::extend.t evaluator: "
+                            << args.at(n->input(0)).IValue()->type()->str() << ", "
+                            << args.at(n->input(1)).IValue()->type()->str());
+                      }
+                    },
+                    EvalOptions().validSchemas({
+                        "aten::extend.t(t[](a!) self, t[] other) -> ()",
+                    })})
         .evaluator({c10::Symbol::fromQualString("aten::neg"),
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                       auto el = args.at(n->input(0)).unwrapToInt();
