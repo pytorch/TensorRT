@@ -1,14 +1,14 @@
 .. _runtime:
 
 Deploying Torch-TensorRT Programs
-===========================
+====================================
 
 After compiling and saving Torch-TensorRT programs there is no longer a strict dependency on the full
 Torch-TensorRT library. All that is required to run a compiled program is the runtime. There are therfore a couple
 options to deploy your programs other than shipping the full Torch-TensorRT compiler with your applications.
 
 Torch-TensorRT package / libtorchtrt.so
----------------------------------
+--------------------------------------------
 
 Once a program is compiled, you run it using the standard PyTorch APIs. All that is required is that the package
 must be imported in python or linked in C++.
