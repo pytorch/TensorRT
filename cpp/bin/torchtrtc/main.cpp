@@ -288,9 +288,9 @@ int main(int argc, char** argv) {
       "(Repeatable) Module that should always be run in Pytorch for execution (partial compilation must be enabled)",
       {"tem", "torch-executed-mods"});
 
-  args::ValueFlagList<std::string> min_block_size(
+  args::ValueFlag<uint64_t> min_block_size(
       parser,
-      "torch-executed-mods",
+      "min-block-size",
       "Minimum number of contiguous TensorRT supported ops to compile a subgraph to TensorRT",
       {"mbs", "min-block-size"});
 
@@ -626,6 +626,7 @@ int main(int argc, char** argv) {
     std::ofstream out(real_output_path);
     out << engine;
     out.close();
+    return;
   } else {
     auto trt_mod = torchtrt::ts::compile(mod, compile_settings);
 
