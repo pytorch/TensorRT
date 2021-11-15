@@ -508,7 +508,8 @@ def test_suite():
     suite = unittest.TestSuite()
     suite.addTest(unittest.makeSuite(TestLoggingAPIs))
     suite.addTest(TestCompile.parametrize(TestCompile, model=models.resnet18(pretrained=True)))
-    suite.addTest(TestCompile.parametrize(TestCompile, model=models.mobilenet_v2(pretrained=True)))
+    # Disabling mobilenet_v2 test due to https://nvbugs/3433655
+    #suite.addTest(TestCompile.parametrize(TestCompile, model=models.mobilenet_v2(pretrained=True)))
     suite.addTest(TestCompileHalf.parametrize(TestCompileHalf, model=models.resnet18(pretrained=True)))
     suite.addTest(TestCompileHalfDefault.parametrize(TestCompileHalfDefault, model=models.resnet18(pretrained=True)))
     suite.addTest(TestPTtoTRTtoPT.parametrize(TestPTtoTRTtoPT, model=models.resnet18(pretrained=True)))
