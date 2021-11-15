@@ -580,3 +580,37 @@ TEST(Evaluators, AndBoolResultIsFalseEvaluatesCorrectly) {
 
   ASSERT_TRUE(jit_results[0] == trt_results[0]);
 }
+
+TEST(Evaluators, AtenFormatEvaluatesCorrectly) {
+  const auto graph = R"IR(
+      graph(%x_1 : Tensor, %x_2 : Tensor):
+        %0 : int = prim::Constant[value=1]()
+        %1 : str = prim::Constant[value="res{}_{}_"]()
+        %2 : int = prim::Constant[value=5]()
+        %2.1 : int = prim::Constant[value=2]()
+        %3 : str = prim::Constant[value="res5_2_"]()
+        %4 : str = aten::format(%1, %2, %2.1)
+        %5 : bool = aten::eq(%3, %4)
+        %y : Tensor = prim::If(%5)
+            block0():
+                %194 : Tensor = aten::add(%x_1, %x_2, %0)
+                -> (%194)
+            block1():
+                %195 : Tensor = aten::sub(%x_1, %x_2, %0)
+                -> (%195)
+        return (%y))IR";
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, &*g);
+
+  auto in0 = at::randint(1, 10, {3, 4}, {at::kCUDA});
+  auto in1 = in0.clone();
+
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in0, in1});
+
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in0, in1});
+
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+}
