@@ -48,6 +48,7 @@ Within the container, the notebooks themselves are located at `/Torch-TensorRT/n
 - [ssd-object-detection-demo.ipynb](ssd-object-detection-demo.ipynb): demo for compiling a pretrained SSD model using Torch-TensorRT.
 - [Resnet50-example.ipynb](Resnet50-example.ipynb): demo on the ResNet-50 network.
 - [vgg-qat.ipynb](vgg-qat.ipynb): Quantization Aware Trained models in INT8 using Torch-TensorRT
+- [EfficientNet-example.ipynb](EfficientNet-example.ipynb): Simple use of 3rd party PyTorch model library
 
 ```python
 
