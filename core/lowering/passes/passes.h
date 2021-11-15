@@ -20,6 +20,7 @@ void FuseAddMMBranches(std::shared_ptr<torch::jit::Graph> graph);
 void LinearToAddMM(std::shared_ptr<torch::jit::Graph>& graph);
 void EliminateExceptionOrPassPattern(std::shared_ptr<torch::jit::Graph> graph);
 void ReduceToOperation(std::shared_ptr<torch::jit::Graph>& graph);
+void ReduceGelu(std::shared_ptr<torch::jit::Graph>& graph);
 void MarkNodesForFallback(std::shared_ptr<torch::jit::Graph>& g, bool delete_delims);
 void RemoveBNDimCheck(std::shared_ptr<torch::jit::Graph> graph);
 void RemoveContiguous(std::shared_ptr<torch::jit::Graph>& graph);

@@ -17,6 +17,7 @@ cc_library(
         "module_fallback.cpp",
         "op_aliasing.cpp",
         "reduce_to.cpp",
+        "reduce_gelu.cpp",
         "remove_bn_dim_check.cpp",
         "remove_contiguous.cpp",
         "remove_dropout.cpp",
