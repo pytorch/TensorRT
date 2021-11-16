@@ -416,7 +416,7 @@ void ConvertBlockToNetDef(
       EvaluateConditionalBlock(ctx, n);
     } else if (to_eval) {
       auto eval = EvaluateNode(ctx, n);
-      if (eval) {
+      if (eval && n->outputs().size() > 0) {
         if (n->outputs().size() > 1) { // For ListUnpack scenario
           if (eval.value().isTuple()) {
             auto eval_list = eval.value().toTuple();

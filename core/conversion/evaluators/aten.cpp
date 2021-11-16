@@ -295,6 +295,7 @@ auto aten_registrations TORCHTRT_UNUSED =
                         for (int64_t i = 0; i < other_size; i++) {
                           self.push_back(other.get(i));
                         }
+                        return self;
                       } else {
                         TORCHTRT_THROW_ERROR(
                             "Unimplemented data type for aten::extend.t evaluator: "
