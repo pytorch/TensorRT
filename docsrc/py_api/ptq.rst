@@ -1,7 +1,7 @@
 .. _torch_tensorrt_ptq_py:
 
 torch_tensorrt.ptq
-----------------------
+===================
 
 .. currentmodule:: torch_tensorrt.ptq
 
