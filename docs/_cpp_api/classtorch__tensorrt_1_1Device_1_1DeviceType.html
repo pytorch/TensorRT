@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -38,8 +39,8 @@
   <title>
    Class Device::DeviceType — Torch-TensorRT master documentation
   </title>
-  <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/pygments.css" rel="stylesheet" type="text/css"/>
+  <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/collapsible-lists/css/tree_view.css" rel="stylesheet" type="text/css"/>
   <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js">
   </script>
@@ -49,18 +50,11 @@
   </script>
   <script src="../_static/doctools.js">
   </script>
-  <script src="../_static/language_data.js">
-  </script>
   <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js">
   </script>
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
-  </script>
-  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
-  </script>
-  <script type="text/x-mathjax-config">
-   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -328,6 +322,11 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/EfficientNet-example.html">
+            Torch-TensorRT Getting Started - EfficientNet-B0
+           </a>
+          </li>
+          <li class="md-nav__item">
            <span class="md-nav__link caption">
             <span class="caption-text">
              Python API Documenation
@@ -347,16 +346,6 @@
           <li class="md-nav__item">
            <a class="md-nav__link" href="../py_api/ptq.html">
             torch_tensorrt.ptq
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/ptq.html#classes">
-            Classes
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/ptq.html#enums">
-            Enums
            </a>
           </li>
           <li class="md-nav__item">
@@ -476,579 +465,783 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <span id="exhale-class-classtorch-tensorrt-1-1device-1-1devicetype">
-       </span>
-       <h1 id="cpp-api-classtorch-tensorrt-1-1device-1-1devicetype--page-root">
-        Class Device::DeviceType
-        <a class="headerlink" href="#cpp-api-classtorch-tensorrt-1-1device-1-1devicetype--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <ul class="simple">
-        <li>
-         <p>
-          Defined in
-          <a class="reference internal" href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html#file-cpp-include-torch-tensorrt-torch-tensorrt-h">
-           <span class="std std-ref">
-            File torch_tensorrt.h
-           </span>
-          </a>
-         </p>
-        </li>
-       </ul>
-       <h2 id="nested-relationships">
-        Nested Relationships
-        <a class="headerlink" href="#nested-relationships" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <p>
-        This class is a nested type of
-        <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#exhale-struct-structtorch-tensorrt-1-1device">
-         <span class="std std-ref">
-          Struct Device
-         </span>
-        </a>
-        .
-       </p>
-       <h2 id="class-documentation">
-        Class Documentation
-        <a class="headerlink" href="#class-documentation" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <dl class="cpp class">
-        <dt id="_CPPv4N14torch_tensorrt6Device10DeviceTypeE">
-         <span class="target" id="classtorch__tensorrt_1_1Device_1_1DeviceType">
-         </span>
-         <em class="property">
-          class
-         </em>
-         <code class="sig-prename descclassname">
-          torch_tensorrt::
-          <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#_CPPv4N14torch_tensorrt6DeviceE" title="torch_tensorrt::Device">
-           Device
-          </a>
-          <code class="sig-prename descclassname">
-           ::
-          </code>
-         </code>
-         <code class="sig-name descname">
-          DeviceType
-         </code>
-         <a class="headerlink" href="#_CPPv4N14torch_tensorrt6Device10DeviceTypeE" title="Permalink to this definition">
+       <section id="class-device-devicetype">
+        <span id="exhale-class-classtorch-tensorrt-1-1device-1-1devicetype">
+        </span>
+        <h1 id="cpp-api-classtorch-tensorrt-1-1device-1-1devicetype--page-root">
+         Class Device::DeviceType
+         <a class="headerlink" href="#cpp-api-classtorch-tensorrt-1-1device-1-1devicetype--page-root" title="Permalink to this headline">
           ¶
          </a>
-         <br/>
-        </dt>
-        <dd>
-         <p>
-          Supported
-          <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#structtorch__tensorrt_1_1Device">
-           <span class="std std-ref">
-            Device
-           </span>
-          </a>
-          Types that can be used with TensorRT engines
-         </p>
-         <p>
-          This class is compatable with c10::DeviceTypes (but will check for TRT support) but the only applicable value is at::kCUDA, which maps to
-          <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#classtorch__tensorrt_1_1Device_1_1DeviceType_1a23c188ccbece0f27609e8b1c7bf7e350a7096aeeb6744e578d5afd98e334f866c">
-           <span class="std std-ref">
-            DeviceType::kGPU
-           </span>
-          </a>
-         </p>
-         <p>
-          To use the
-          <a class="reference internal" href="classtorch__tensorrt_1_1DataType.html#classtorch__tensorrt_1_1DataType">
-           <span class="std std-ref">
-            DataType
-           </span>
-          </a>
-          class itself, interface using the enum vs. normal instatination
-         </p>
-         <p>
-          ex. torch_tensorrt::DeviceType type =
-          <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#classtorch__tensorrt_1_1Device_1_1DeviceType_1a23c188ccbece0f27609e8b1c7bf7e350a7096aeeb6744e578d5afd98e334f866c">
-           <span class="std std-ref">
-            DeviceType::kGPU
-           </span>
-          </a>
-          ;
-         </p>
-         <div class="breathe-sectiondef docutils container">
-          <p class="breathe-sectiondef-title rubric">
-           Public Types
-          </p>
-          <dl class="cpp enum">
-           <dt id="_CPPv4N14torch_tensorrt6Device10DeviceType5ValueE">
-            <span class="target" id="classtorch__tensorrt_1_1Device_1_1DeviceType_1a23c188ccbece0f27609e8b1c7bf7e350">
+        </h1>
+        <ul class="simple">
+         <li>
+          <p>
+           Defined in
+           <a class="reference internal" href="file_cpp_include_torch_tensorrt_torch_tensorrt.h.html#file-cpp-include-torch-tensorrt-torch-tensorrt-h">
+            <span class="std std-ref">
+             File torch_tensorrt.h
             </span>
-            <em class="property">
-             enum
-            </em>
-            <code class="sig-name descname">
-             Value
-            </code>
-            <a class="headerlink" href="#_CPPv4N14torch_tensorrt6Device10DeviceType5ValueE" title="Permalink to this definition">
-             ¶
+           </a>
+          </p>
+         </li>
+        </ul>
+        <section id="nested-relationships">
+         <h2 id="nested-relationships">
+          Nested Relationships
+          <a class="headerlink" href="#nested-relationships" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <p>
+          This class is a nested type of
+          <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#exhale-struct-structtorch-tensorrt-1-1device">
+           <span class="std std-ref">
+            Struct Device
+           </span>
+          </a>
+          .
+         </p>
+        </section>
+        <section id="class-documentation">
+         <h2 id="class-documentation">
+          Class Documentation
+          <a class="headerlink" href="#class-documentation" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <dl class="cpp class">
+          <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt6Device10DeviceTypeE">
+           <span class="target" id="classtorch__tensorrt_1_1Device_1_1DeviceType">
+           </span>
+           <span class="k">
+            <span class="pre">
+             class
+            </span>
+           </span>
+           <span class="w">
+           </span>
+           <span class="sig-prename descclassname">
+            <span class="n">
+             <span class="pre">
+              torch_tensorrt
+             </span>
+            </span>
+            <span class="p">
+             <span class="pre">
+              ::
+             </span>
+            </span>
+            <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#_CPPv4N14torch_tensorrt6DeviceE" title="torch_tensorrt::Device">
+             <span class="n">
+              <span class="pre">
+               Device
+              </span>
+             </span>
             </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Underlying enum class to support the
-             <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#classtorch__tensorrt_1_1Device_1_1DeviceType">
-              <span class="std std-ref">
-               DeviceType
-              </span>
-             </a>
-             Class
+            <span class="p">
+             <span class="pre">
+              ::
+             </span>
+            </span>
+           </span>
+           <span class="sig-name descname">
+            <span class="n">
+             <span class="pre">
+              DeviceType
+             </span>
+            </span>
+           </span>
+           <a class="headerlink" href="#_CPPv4N14torch_tensorrt6Device10DeviceTypeE" title="Permalink to this definition">
+            ¶
+           </a>
+           <br/>
+          </dt>
+          <dd>
+           <p>
+            Supported
+            <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#structtorch__tensorrt_1_1Device">
+             <span class="std std-ref">
+              Device
+             </span>
+            </a>
+            Types that can be used with TensorRT engines
+           </p>
+           <p>
+            This class is compatable with c10::DeviceTypes (but will check for TRT support) but the only applicable value is at::kCUDA, which maps to
+            <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#classtorch__tensorrt_1_1Device_1_1DeviceType_1a23c188ccbece0f27609e8b1c7bf7e350a7096aeeb6744e578d5afd98e334f866c">
+             <span class="std std-ref">
+              DeviceType::kGPU
+             </span>
+            </a>
+           </p>
+           <p>
+            To use the
+            <a class="reference internal" href="classtorch__tensorrt_1_1DataType.html#classtorch__tensorrt_1_1DataType">
+             <span class="std std-ref">
+              DataType
+             </span>
+            </a>
+            class itself, interface using the enum vs. normal instatination
+           </p>
+           <p>
+            ex. torch_tensorrt::DeviceType type =
+            <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#classtorch__tensorrt_1_1Device_1_1DeviceType_1a23c188ccbece0f27609e8b1c7bf7e350a7096aeeb6744e578d5afd98e334f866c">
+             <span class="std std-ref">
+              DeviceType::kGPU
+             </span>
+            </a>
+            ;
+           </p>
+           <div class="breathe-sectiondef docutils container">
+            <p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-types">
+             Public Types
             </p>
-            <p>
-             In the case that you need to use the
-             <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#classtorch__tensorrt_1_1Device_1_1DeviceType">
-              <span class="std std-ref">
-               DeviceType
+            <dl class="cpp enum">
+             <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt6Device10DeviceType5ValueE">
+              <span class="target" id="classtorch__tensorrt_1_1Device_1_1DeviceType_1a23c188ccbece0f27609e8b1c7bf7e350">
               </span>
-             </a>
-             class itself, interface using this enum vs. normal instatination
-            </p>
-            <p>
-             ex. torch_tensorrt::DeviceType type =
-             <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#classtorch__tensorrt_1_1Device_1_1DeviceType_1a23c188ccbece0f27609e8b1c7bf7e350a7096aeeb6744e578d5afd98e334f866c">
-              <span class="std std-ref">
-               DeviceType::kGPU
+              <span class="k">
+               <span class="pre">
+                enum
+               </span>
               </span>
-             </a>
-             ;
-            </p>
-            <p>
-             <em>
-              Values:
-             </em>
-            </p>
-            <dl class="cpp enumerator">
-             <dt id="_CPPv4N14torch_tensorrt6Device10DeviceType5Value4kGPUE">
-              <span class="target" id="classtorch__tensorrt_1_1Device_1_1DeviceType_1a23c188ccbece0f27609e8b1c7bf7e350a7096aeeb6744e578d5afd98e334f866c">
+              <span class="w">
               </span>
-              <em class="property">
-               enumerator
-              </em>
-              <code class="sig-name descname">
-               kGPU
-              </code>
-              <a class="headerlink" href="#_CPPv4N14torch_tensorrt6Device10DeviceType5Value4kGPUE" title="Permalink to this definition">
+              <span class="sig-name descname">
+               <span class="n">
+                <span class="pre">
+                 Value
+                </span>
+               </span>
+              </span>
+              <a class="headerlink" href="#_CPPv4N14torch_tensorrt6Device10DeviceType5ValueE" title="Permalink to this definition">
                ¶
               </a>
               <br/>
              </dt>
              <dd>
               <p>
-               Target GPU to run engine.
+               Underlying enum class to support the
+               <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#classtorch__tensorrt_1_1Device_1_1DeviceType">
+                <span class="std std-ref">
+                 DeviceType
+                </span>
+               </a>
+               Class
               </p>
+              <p>
+               In the case that you need to use the
+               <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#classtorch__tensorrt_1_1Device_1_1DeviceType">
+                <span class="std std-ref">
+                 DeviceType
+                </span>
+               </a>
+               class itself, interface using this enum vs. normal instatination
+              </p>
+              <p>
+               ex. torch_tensorrt::DeviceType type =
+               <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#classtorch__tensorrt_1_1Device_1_1DeviceType_1a23c188ccbece0f27609e8b1c7bf7e350a7096aeeb6744e578d5afd98e334f866c">
+                <span class="std std-ref">
+                 DeviceType::kGPU
+                </span>
+               </a>
+               ;
+              </p>
+              <p>
+               <em>
+                Values:
+               </em>
+              </p>
+              <dl class="cpp enumerator">
+               <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt6Device10DeviceType5Value4kGPUE">
+                <span class="target" id="classtorch__tensorrt_1_1Device_1_1DeviceType_1a23c188ccbece0f27609e8b1c7bf7e350a7096aeeb6744e578d5afd98e334f866c">
+                </span>
+                <span class="k">
+                 <span class="pre">
+                  enumerator
+                 </span>
+                </span>
+                <span class="w">
+                </span>
+                <span class="sig-name descname">
+                 <span class="n">
+                  <span class="pre">
+                   kGPU
+                  </span>
+                 </span>
+                </span>
+                <a class="headerlink" href="#_CPPv4N14torch_tensorrt6Device10DeviceType5Value4kGPUE" title="Permalink to this definition">
+                 ¶
+                </a>
+                <br/>
+               </dt>
+               <dd>
+                <p>
+                 Target GPU to run engine.
+                </p>
+               </dd>
+              </dl>
+              <dl class="cpp enumerator">
+               <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt6Device10DeviceType5Value4kDLAE">
+                <span class="target" id="classtorch__tensorrt_1_1Device_1_1DeviceType_1a23c188ccbece0f27609e8b1c7bf7e350aa13fb3ec20096f0d0c205b67ca05c98e">
+                </span>
+                <span class="k">
+                 <span class="pre">
+                  enumerator
+                 </span>
+                </span>
+                <span class="w">
+                </span>
+                <span class="sig-name descname">
+                 <span class="n">
+                  <span class="pre">
+                   kDLA
+                  </span>
+                 </span>
+                </span>
+                <a class="headerlink" href="#_CPPv4N14torch_tensorrt6Device10DeviceType5Value4kDLAE" title="Permalink to this definition">
+                 ¶
+                </a>
+                <br/>
+               </dt>
+               <dd>
+                <p>
+                 Target DLA to run engine.
+                </p>
+               </dd>
+              </dl>
              </dd>
             </dl>
-            <dl class="cpp enumerator">
-             <dt id="_CPPv4N14torch_tensorrt6Device10DeviceType5Value4kDLAE">
-              <span class="target" id="classtorch__tensorrt_1_1Device_1_1DeviceType_1a23c188ccbece0f27609e8b1c7bf7e350aa13fb3ec20096f0d0c205b67ca05c98e">
+           </div>
+           <div class="breathe-sectiondef docutils container">
+            <p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">
+             Public Functions
+            </p>
+            <dl class="cpp function">
+             <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt6Device10DeviceType10DeviceTypeEv">
+              <span class="target" id="classtorch__tensorrt_1_1Device_1_1DeviceType_1afe573ee91b95b81be8a0f1503a00ca45">
               </span>
-              <em class="property">
-               enumerator
-              </em>
-              <code class="sig-name descname">
-               kDLA
-              </code>
-              <a class="headerlink" href="#_CPPv4N14torch_tensorrt6Device10DeviceType5Value4kDLAE" title="Permalink to this definition">
+              <span class="sig-name descname">
+               <span class="n">
+                <span class="pre">
+                 DeviceType
+                </span>
+               </span>
+              </span>
+              <span class="sig-paren">
+               (
+              </span>
+              <span class="sig-paren">
+               )
+              </span>
+              <span class="w">
+              </span>
+              <span class="p">
+               <span class="pre">
+                =
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="k">
+               <span class="pre">
+                default
+               </span>
+              </span>
+              <a class="headerlink" href="#_CPPv4N14torch_tensorrt6Device10DeviceType10DeviceTypeEv" title="Permalink to this definition">
                ¶
               </a>
               <br/>
              </dt>
              <dd>
               <p>
-               Target DLA to run engine.
+               Construct a new
+               <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#structtorch__tensorrt_1_1Device">
+                <span class="std std-ref">
+                 Device
+                </span>
+               </a>
+               Type object.
               </p>
              </dd>
             </dl>
-           </dd>
-          </dl>
-         </div>
-         <div class="breathe-sectiondef docutils container">
-          <p class="breathe-sectiondef-title rubric">
-           Public Functions
-          </p>
-          <dl class="cpp function">
-           <dt id="_CPPv4N14torch_tensorrt6Device10DeviceType10DeviceTypeEv">
-            <span class="target" id="classtorch__tensorrt_1_1Device_1_1DeviceType_1afe573ee91b95b81be8a0f1503a00ca45">
-            </span>
-            <code class="sig-name descname">
-             DeviceType
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            <span class="sig-paren">
-             )
-            </span>
-            = default
-            <a class="headerlink" href="#_CPPv4N14torch_tensorrt6Device10DeviceType10DeviceTypeEv" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Construct a new
-             <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#structtorch__tensorrt_1_1Device">
-              <span class="std std-ref">
-               Device
+            <dl class="cpp function">
+             <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt6Device10DeviceType10DeviceTypeE5Value">
+              <span class="target" id="classtorch__tensorrt_1_1Device_1_1DeviceType_1a5a7e6c4eb98321bd53869a8ec08e2a2c">
               </span>
-             </a>
-             Type object.
-            </p>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4N14torch_tensorrt6Device10DeviceType10DeviceTypeE5Value">
-            <span class="target" id="classtorch__tensorrt_1_1Device_1_1DeviceType_1a5a7e6c4eb98321bd53869a8ec08e2a2c">
-            </span>
-            <em class="property">
-             constexpr
-            </em>
-            <code class="sig-name descname">
-             DeviceType
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            <a class="reference internal" href="#_CPPv4N14torch_tensorrt6Device10DeviceType5ValueE" title="torch_tensorrt::Device::DeviceType::Value">
-             Value
-            </a>
-            <em>
-             t
-            </em>
-            <span class="sig-paren">
-             )
-            </span>
-            <a class="headerlink" href="#_CPPv4N14torch_tensorrt6Device10DeviceType10DeviceTypeE5Value" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Construct a new
-             <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#structtorch__tensorrt_1_1Device">
-              <span class="std std-ref">
-               Device
+              <span class="k">
+               <span class="pre">
+                inline
+               </span>
               </span>
-             </a>
-             Type object from internal enum.
-            </p>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4N14torch_tensorrt6Device10DeviceType10DeviceTypeEN3c1010DeviceTypeE">
-            <span class="target" id="classtorch__tensorrt_1_1Device_1_1DeviceType_1a499573dd56df8fa1479dcec95dfda711">
-            </span>
-            <code class="sig-name descname">
-             DeviceType
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            c10::DeviceType
-            <em>
-             t
-            </em>
-            <span class="sig-paren">
-             )
-            </span>
-            <a class="headerlink" href="#_CPPv4N14torch_tensorrt6Device10DeviceType10DeviceTypeEN3c1010DeviceTypeE" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Construct a new
-             <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#structtorch__tensorrt_1_1Device">
-              <span class="std std-ref">
-               Device
+              <span class="w">
               </span>
-             </a>
-             Type object from torch device enums Note: The only valid value is torch::kCUDA (torch::kCPU is not supported)
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Parameters
-              </strong>
+              <span class="k">
+               <span class="pre">
+                constexpr
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="sig-name descname">
+               <span class="n">
+                <span class="pre">
+                 DeviceType
+                </span>
+               </span>
+              </span>
+              <span class="sig-paren">
+               (
+              </span>
+              <a class="reference internal" href="#_CPPv4N14torch_tensorrt6Device10DeviceType5ValueE" title="torch_tensorrt::Device::DeviceType::Value">
+               <span class="n">
+                <span class="pre">
+                 Value
+                </span>
+               </span>
+              </a>
+              <span class="w">
+              </span>
+              <span class="n sig-param">
+               <span class="pre">
+                t
+               </span>
+              </span>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N14torch_tensorrt6Device10DeviceType10DeviceTypeE5Value" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
              </dt>
              <dd>
-              <ul class="breatheparameterlist simple">
-               <li>
+              <p>
+               Construct a new
+               <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#structtorch__tensorrt_1_1Device">
+                <span class="std std-ref">
+                 Device
+                </span>
+               </a>
+               Type object from internal enum.
+              </p>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt6Device10DeviceType10DeviceTypeEN3c1010DeviceTypeE">
+              <span class="target" id="classtorch__tensorrt_1_1Device_1_1DeviceType_1a499573dd56df8fa1479dcec95dfda711">
+              </span>
+              <span class="sig-name descname">
+               <span class="n">
+                <span class="pre">
+                 DeviceType
+                </span>
+               </span>
+              </span>
+              <span class="sig-paren">
+               (
+              </span>
+              <span class="n">
+               <span class="pre">
+                c10
+               </span>
+              </span>
+              <span class="p">
+               <span class="pre">
+                ::
+               </span>
+              </span>
+              <span class="n">
+               <span class="pre">
+                DeviceType
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="n sig-param">
+               <span class="pre">
+                t
+               </span>
+              </span>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N14torch_tensorrt6Device10DeviceType10DeviceTypeEN3c1010DeviceTypeE" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Construct a new
+               <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#structtorch__tensorrt_1_1Device">
+                <span class="std std-ref">
+                 Device
+                </span>
+               </a>
+               Type object from torch device enums Note: The only valid value is torch::kCUDA (torch::kCPU is not supported)
+              </p>
+              <dl class="field-list simple">
+               <dt class="field-odd">
+                Parameters
+               </dt>
+               <dd class="field-odd">
                 <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   t
-                  </span>
-                 </code>
-                 :
+                 <strong>
+                  t
+                 </strong>
+                 –
                 </p>
-               </li>
-              </ul>
+               </dd>
+              </dl>
              </dd>
             </dl>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4NK14torch_tensorrt6Device10DeviceTypecv5ValueEv">
-            <span class="target" id="classtorch__tensorrt_1_1Device_1_1DeviceType_1a4afa0b396b7a076e37054754a367f2f4">
-            </span>
-            <code class="sig-name descname">
-             operator Value
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            <span class="sig-paren">
-             )
-            </span>
-            <em class="property">
-             const
-            </em>
-            <a class="headerlink" href="#_CPPv4NK14torch_tensorrt6Device10DeviceTypecv5ValueEv" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Get the internal value from the
-             <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#structtorch__tensorrt_1_1Device">
-              <span class="std std-ref">
-               Device
+            <dl class="cpp function">
+             <dt class="sig sig-object cpp" id="_CPPv4NK14torch_tensorrt6Device10DeviceTypecv5ValueEv">
+              <span class="target" id="classtorch__tensorrt_1_1Device_1_1DeviceType_1a4afa0b396b7a076e37054754a367f2f4">
               </span>
-             </a>
-             object.
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Return
-              </strong>
-             </dt>
-             <dd>
-              <p>
-               Value
-              </p>
-             </dd>
-            </dl>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4N14torch_tensorrt6Device10DeviceTypecvbEv">
-            <span class="target" id="classtorch__tensorrt_1_1Device_1_1DeviceType_1a1e78ae4780df8bd258ee8703a22d9a4d">
-            </span>
-            <code class="sig-name descname">
-             operator bool
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            <span class="sig-paren">
-             )
-            </span>
-            = delete
-            <a class="headerlink" href="#_CPPv4N14torch_tensorrt6Device10DeviceTypecvbEv" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4NK14torch_tensorrt6Device10DeviceTypeeqE10DeviceType">
-            <span class="target" id="classtorch__tensorrt_1_1Device_1_1DeviceType_1a0177ee9788edabb89a8cb64234d2a60c">
-            </span>
-            <em class="property">
-             constexpr
-            </em>
-            bool
-            <code class="sig-name descname">
-             operator==
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            <a class="reference internal" href="#_CPPv4N14torch_tensorrt6Device10DeviceTypeE" title="torch_tensorrt::Device::DeviceType">
-             DeviceType
-            </a>
-            <em>
-             other
-            </em>
-            <span class="sig-paren">
-             )
-            </span>
-            <em class="property">
-             const
-            </em>
-            <a class="headerlink" href="#_CPPv4NK14torch_tensorrt6Device10DeviceTypeeqE10DeviceType" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Comparison operator for
-             <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#classtorch__tensorrt_1_1Device_1_1DeviceType">
-              <span class="std std-ref">
-               DeviceType
+              <span class="k">
+               <span class="pre">
+                inline
+               </span>
               </span>
-             </a>
-             .
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Return
-              </strong>
+              <span class="w">
+              </span>
+              <span class="sig-name descname">
+               <span class="k">
+                <span class="pre">
+                 operator
+                </span>
+               </span>
+               <span class="w">
+               </span>
+               <a class="reference internal" href="#_CPPv4N14torch_tensorrt6Device10DeviceType5ValueE" title="torch_tensorrt::Device::DeviceType::Value">
+                <span class="n">
+                 <span class="pre">
+                  Value
+                 </span>
+                </span>
+               </a>
+              </span>
+              <span class="sig-paren">
+               (
+              </span>
+              <span class="sig-paren">
+               )
+              </span>
+              <span class="w">
+              </span>
+              <span class="k">
+               <span class="pre">
+                const
+               </span>
+              </span>
+              <a class="headerlink" href="#_CPPv4NK14torch_tensorrt6Device10DeviceTypecv5ValueEv" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
              </dt>
              <dd>
               <p>
-               true
+               Get the internal value from the
+               <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#structtorch__tensorrt_1_1Device">
+                <span class="std std-ref">
+                 Device
+                </span>
+               </a>
+               object.
               </p>
-             </dd>
-             <dt>
-              <strong>
-               Return
-              </strong>
-             </dt>
-             <dd>
-              <p>
-               false
-              </p>
-             </dd>
-             <dt>
-              <strong>
-               Parameters
-              </strong>
-             </dt>
-             <dd>
-              <ul class="breatheparameterlist simple">
-               <li>
+              <dl class="field-list simple">
+               <dt class="field-odd">
+                Returns
+               </dt>
+               <dd class="field-odd">
                 <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   other
-                  </span>
-                 </code>
-                 :
+                 Value
                 </p>
-               </li>
-              </ul>
+               </dd>
+              </dl>
              </dd>
             </dl>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4NK14torch_tensorrt6Device10DeviceTypeneE10DeviceType">
-            <span class="target" id="classtorch__tensorrt_1_1Device_1_1DeviceType_1a0d8973b436226f17597d94f4e8f63336">
-            </span>
-            <em class="property">
-             constexpr
-            </em>
-            bool
-            <code class="sig-name descname">
-             operator!=
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            <a class="reference internal" href="#_CPPv4N14torch_tensorrt6Device10DeviceTypeE" title="torch_tensorrt::Device::DeviceType">
-             DeviceType
-            </a>
-            <em>
-             other
-            </em>
-            <span class="sig-paren">
-             )
-            </span>
-            <em class="property">
-             const
-            </em>
-            <a class="headerlink" href="#_CPPv4NK14torch_tensorrt6Device10DeviceTypeneE10DeviceType" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Comparison operator for
-             <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#classtorch__tensorrt_1_1Device_1_1DeviceType">
-              <span class="std std-ref">
-               DeviceType
+            <dl class="cpp function">
+             <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt6Device10DeviceTypecvbEv">
+              <span class="target" id="classtorch__tensorrt_1_1Device_1_1DeviceType_1a1e78ae4780df8bd258ee8703a22d9a4d">
               </span>
-             </a>
-             .
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Return
-              </strong>
+              <span class="k">
+               <span class="pre">
+                explicit
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="sig-name descname">
+               <span class="k">
+                <span class="pre">
+                 operator
+                </span>
+               </span>
+               <span class="w">
+               </span>
+               <span class="kt">
+                <span class="pre">
+                 bool
+                </span>
+               </span>
+              </span>
+              <span class="sig-paren">
+               (
+              </span>
+              <span class="sig-paren">
+               )
+              </span>
+              <span class="w">
+              </span>
+              <span class="p">
+               <span class="pre">
+                =
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="k">
+               <span class="pre">
+                delete
+               </span>
+              </span>
+              <a class="headerlink" href="#_CPPv4N14torch_tensorrt6Device10DeviceTypecvbEv" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
              </dt>
              <dd>
-              <p>
-               true
-              </p>
-             </dd>
-             <dt>
-              <strong>
-               Return
-              </strong>
-             </dt>
-             <dd>
-              <p>
-               false
-              </p>
-             </dd>
-             <dt>
-              <strong>
-               Parameters
-              </strong>
-             </dt>
-             <dd>
-              <ul class="breatheparameterlist simple">
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   other
-                  </span>
-                 </code>
-                 :
-                </p>
-               </li>
-              </ul>
              </dd>
             </dl>
-           </dd>
-          </dl>
-         </div>
-        </dd>
-       </dl>
+            <dl class="cpp function">
+             <dt class="sig sig-object cpp" id="_CPPv4NK14torch_tensorrt6Device10DeviceTypeeqE10DeviceType">
+              <span class="target" id="classtorch__tensorrt_1_1Device_1_1DeviceType_1a0177ee9788edabb89a8cb64234d2a60c">
+              </span>
+              <span class="k">
+               <span class="pre">
+                inline
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="k">
+               <span class="pre">
+                constexpr
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="kt">
+               <span class="pre">
+                bool
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="sig-name descname">
+               <span class="k">
+                <span class="pre">
+                 operator
+                </span>
+               </span>
+               <span class="o">
+                <span class="pre">
+                 ==
+                </span>
+               </span>
+              </span>
+              <span class="sig-paren">
+               (
+              </span>
+              <a class="reference internal" href="#_CPPv4N14torch_tensorrt6Device10DeviceTypeE" title="torch_tensorrt::Device::DeviceType">
+               <span class="n">
+                <span class="pre">
+                 DeviceType
+                </span>
+               </span>
+              </a>
+              <span class="w">
+              </span>
+              <span class="n sig-param">
+               <span class="pre">
+                other
+               </span>
+              </span>
+              <span class="sig-paren">
+               )
+              </span>
+              <span class="w">
+              </span>
+              <span class="k">
+               <span class="pre">
+                const
+               </span>
+              </span>
+              <a class="headerlink" href="#_CPPv4NK14torch_tensorrt6Device10DeviceTypeeqE10DeviceType" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Comparison operator for
+               <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#classtorch__tensorrt_1_1Device_1_1DeviceType">
+                <span class="std std-ref">
+                 DeviceType
+                </span>
+               </a>
+               .
+              </p>
+              <dl class="field-list simple">
+               <dt class="field-odd">
+                Parameters
+               </dt>
+               <dd class="field-odd">
+                <p>
+                 <strong>
+                  other
+                 </strong>
+                 –
+                </p>
+               </dd>
+               <dt class="field-even">
+                Returns
+               </dt>
+               <dd class="field-even">
+                <p>
+                 true
+                </p>
+               </dd>
+               <dt class="field-odd">
+                Returns
+               </dt>
+               <dd class="field-odd">
+                <p>
+                 false
+                </p>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt class="sig sig-object cpp" id="_CPPv4NK14torch_tensorrt6Device10DeviceTypeneE10DeviceType">
+              <span class="target" id="classtorch__tensorrt_1_1Device_1_1DeviceType_1a0d8973b436226f17597d94f4e8f63336">
+              </span>
+              <span class="k">
+               <span class="pre">
+                inline
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="k">
+               <span class="pre">
+                constexpr
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="kt">
+               <span class="pre">
+                bool
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="sig-name descname">
+               <span class="k">
+                <span class="pre">
+                 operator
+                </span>
+               </span>
+               <span class="o">
+                <span class="pre">
+                 !=
+                </span>
+               </span>
+              </span>
+              <span class="sig-paren">
+               (
+              </span>
+              <a class="reference internal" href="#_CPPv4N14torch_tensorrt6Device10DeviceTypeE" title="torch_tensorrt::Device::DeviceType">
+               <span class="n">
+                <span class="pre">
+                 DeviceType
+                </span>
+               </span>
+              </a>
+              <span class="w">
+              </span>
+              <span class="n sig-param">
+               <span class="pre">
+                other
+               </span>
+              </span>
+              <span class="sig-paren">
+               )
+              </span>
+              <span class="w">
+              </span>
+              <span class="k">
+               <span class="pre">
+                const
+               </span>
+              </span>
+              <a class="headerlink" href="#_CPPv4NK14torch_tensorrt6Device10DeviceTypeneE10DeviceType" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Comparison operator for
+               <a class="reference internal" href="structtorch__tensorrt_1_1Device.html#classtorch__tensorrt_1_1Device_1_1DeviceType">
+                <span class="std std-ref">
+                 DeviceType
+                </span>
+               </a>
+               .
+              </p>
+              <dl class="field-list simple">
+               <dt class="field-odd">
+                Parameters
+               </dt>
+               <dd class="field-odd">
+                <p>
+                 <strong>
+                  other
+                 </strong>
+                 –
+                </p>
+               </dd>
+               <dt class="field-even">
+                Returns
+               </dt>
+               <dd class="field-even">
+                <p>
+                 true
+                </p>
+               </dd>
+               <dt class="field-odd">
+                Returns
+               </dt>
+               <dd class="field-odd">
+                <p>
+                 false
+                </p>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+           </div>
+          </dd>
+         </dl>
+        </section>
+       </section>
       </article>
      </div>
     </div>
@@ -1097,7 +1290,7 @@
       <a href="http://www.sphinx-doc.org/">
        Sphinx
       </a>
-      3.1.2.
+      4.3.0.
              and
       <a href="https://github.com/bashtage/sphinx-material/">
        Material for

@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -38,8 +39,8 @@
   <title>
    Template Class Int8Calibrator — Torch-TensorRT master documentation
   </title>
-  <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/pygments.css" rel="stylesheet" type="text/css"/>
+  <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/collapsible-lists/css/tree_view.css" rel="stylesheet" type="text/css"/>
   <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js">
   </script>
@@ -49,18 +50,11 @@
   </script>
   <script src="../_static/doctools.js">
   </script>
-  <script src="../_static/language_data.js">
-  </script>
   <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js">
   </script>
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
-  </script>
-  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
-  </script>
-  <script type="text/x-mathjax-config">
-   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -328,6 +322,11 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/EfficientNet-example.html">
+            Torch-TensorRT Getting Started - EfficientNet-B0
+           </a>
+          </li>
+          <li class="md-nav__item">
            <span class="md-nav__link caption">
             <span class="caption-text">
              Python API Documenation
@@ -347,16 +346,6 @@
           <li class="md-nav__item">
            <a class="md-nav__link" href="../py_api/ptq.html">
             torch_tensorrt.ptq
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/ptq.html#classes">
-            Classes
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/ptq.html#enums">
-            Enums
            </a>
           </li>
           <li class="md-nav__item">
@@ -485,591 +474,914 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <span id="exhale-class-classtorch-tensorrt-1-1ptq-1-1int8calibrator">
-       </span>
-       <h1 id="cpp-api-classtorch-tensorrt-1-1ptq-1-1int8calibrator--page-root">
-        Template Class Int8Calibrator
-        <a class="headerlink" href="#cpp-api-classtorch-tensorrt-1-1ptq-1-1int8calibrator--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <ul class="simple">
-        <li>
-         <p>
-          Defined in
-          <a class="reference internal" href="file_cpp_include_torch_tensorrt_ptq.h.html#file-cpp-include-torch-tensorrt-ptq-h">
-           <span class="std std-ref">
-            File ptq.h
-           </span>
-          </a>
-         </p>
-        </li>
-       </ul>
-       <h2 id="inheritance-relationships">
-        Inheritance Relationships
-        <a class="headerlink" href="#inheritance-relationships" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <h3 id="base-type">
-        Base Type
-        <a class="headerlink" href="#base-type" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <ul class="simple">
-        <li>
-         <p>
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            private
-           </span>
-           <span class="pre">
-            Algorithm
-           </span>
-          </code>
-         </p>
-        </li>
-       </ul>
-       <h2 id="class-documentation">
-        Class Documentation
-        <a class="headerlink" href="#class-documentation" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <dl class="cpp class">
-        <dt id="_CPPv4I00EN14torch_tensorrt3ptq14Int8CalibratorE">
-         template&lt;typename
-         <code class="sig-name descname">
-          Algorithm
-         </code>
-         , typename
-         <code class="sig-name descname">
-          DataLoaderUniquePtr
-         </code>
-         &gt;
-         <br/>
-         <span class="target" id="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator">
-         </span>
-         <em class="property">
-          class
-         </em>
-         <code class="sig-prename descclassname">
-          torch_tensorrt::ptq
-          <code class="sig-prename descclassname">
-           ::
-          </code>
-         </code>
-         <code class="sig-name descname">
-          Int8Calibrator
-         </code>
-         :
-         <em class="property">
-          private
-         </em>
-         <a class="reference internal" href="#_CPPv4I00EN14torch_tensorrt3ptq14Int8CalibratorE" title="torch_tensorrt::ptq::Int8Calibrator::Algorithm">
-          Algorithm
-         </a>
-         <a class="headerlink" href="#_CPPv4I00EN14torch_tensorrt3ptq14Int8CalibratorE" title="Permalink to this definition">
+       <section id="template-class-int8calibrator">
+        <span id="exhale-class-classtorch-tensorrt-1-1ptq-1-1int8calibrator">
+        </span>
+        <h1 id="cpp-api-classtorch-tensorrt-1-1ptq-1-1int8calibrator--page-root">
+         Template Class Int8Calibrator
+         <a class="headerlink" href="#cpp-api-classtorch-tensorrt-1-1ptq-1-1int8calibrator--page-root" title="Permalink to this headline">
           ¶
          </a>
-         <br/>
-        </dt>
-        <dd>
-         <p>
-          Generic
-          <a class="reference internal" href="#classtorch__tensorrt_1_1ptq_1_1Int8Calibrator">
-           <span class="std std-ref">
-            Int8Calibrator
-           </span>
+        </h1>
+        <ul class="simple">
+         <li>
+          <p>
+           Defined in
+           <a class="reference internal" href="file_cpp_include_torch_tensorrt_ptq.h.html#file-cpp-include-torch-tensorrt-ptq-h">
+            <span class="std std-ref">
+             File ptq.h
+            </span>
+           </a>
+          </p>
+         </li>
+        </ul>
+        <section id="inheritance-relationships">
+         <h2 id="inheritance-relationships">
+          Inheritance Relationships
+          <a class="headerlink" href="#inheritance-relationships" title="Permalink to this headline">
+           ¶
           </a>
-          implementation based on a specified TensorRT calibration algorithm and a LibTorch DataLoader.
-         </p>
-         <p>
-         </p>
-         <dl class="simple">
-          <dt>
-           <strong>
-            Template Parameters
-           </strong>
+         </h2>
+         <section id="base-type">
+          <h3 id="base-type">
+           Base Type
+           <a class="headerlink" href="#base-type" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <ul class="simple">
+           <li>
+            <p>
+             <code class="docutils literal notranslate">
+              <span class="pre">
+               private
+              </span>
+              <span class="pre">
+               Algorithm
+              </span>
+             </code>
+            </p>
+           </li>
+          </ul>
+         </section>
+        </section>
+        <section id="class-documentation">
+         <h2 id="class-documentation">
+          Class Documentation
+          <a class="headerlink" href="#class-documentation" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <dl class="cpp class">
+          <dt class="sig sig-object cpp" id="_CPPv4I00EN14torch_tensorrt3ptq14Int8CalibratorE">
+           <span class="k">
+            <span class="pre">
+             template
+            </span>
+           </span>
+           <span class="p">
+            <span class="pre">
+             &lt;
+            </span>
+           </span>
+           <span class="k">
+            <span class="pre">
+             typename
+            </span>
+           </span>
+           <span class="w">
+           </span>
+           <span class="sig-name descname">
+            <span class="n">
+             <span class="pre">
+              Algorithm
+             </span>
+            </span>
+           </span>
+           <span class="p">
+            <span class="pre">
+             ,
+            </span>
+           </span>
+           <span class="w">
+           </span>
+           <span class="k">
+            <span class="pre">
+             typename
+            </span>
+           </span>
+           <span class="w">
+           </span>
+           <span class="sig-name descname">
+            <span class="n">
+             <span class="pre">
+              DataLoaderUniquePtr
+             </span>
+            </span>
+           </span>
+           <span class="p">
+            <span class="pre">
+             &gt;
+            </span>
+           </span>
+           <br/>
+           <span class="target" id="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator">
+           </span>
+           <span class="k">
+            <span class="pre">
+             class
+            </span>
+           </span>
+           <span class="w">
+           </span>
+           <span class="sig-prename descclassname">
+            <span class="n">
+             <span class="pre">
+              torch_tensorrt
+             </span>
+            </span>
+            <span class="p">
+             <span class="pre">
+              ::
+             </span>
+            </span>
+            <span class="n">
+             <span class="pre">
+              ptq
+             </span>
+            </span>
+            <span class="p">
+             <span class="pre">
+              ::
+             </span>
+            </span>
+           </span>
+           <span class="sig-name descname">
+            <span class="n">
+             <span class="pre">
+              Int8Calibrator
+             </span>
+            </span>
+           </span>
+           <span class="w">
+           </span>
+           <span class="p">
+            <span class="pre">
+             :
+            </span>
+           </span>
+           <span class="w">
+           </span>
+           <span class="k">
+            <span class="pre">
+             private
+            </span>
+           </span>
+           <span class="w">
+           </span>
+           <a class="reference internal" href="#_CPPv4I00EN14torch_tensorrt3ptq14Int8CalibratorE" title="torch_tensorrt::ptq::Int8Calibrator::Algorithm">
+            <span class="n">
+             <span class="pre">
+              Algorithm
+             </span>
+            </span>
+           </a>
+           <a class="headerlink" href="#_CPPv4I00EN14torch_tensorrt3ptq14Int8CalibratorE" title="Permalink to this definition">
+            ¶
+           </a>
+           <br/>
           </dt>
           <dd>
-           <ul class="breatheparameterlist simple">
-            <li>
+           <p>
+            Generic
+            <a class="reference internal" href="#classtorch__tensorrt_1_1ptq_1_1Int8Calibrator">
+             <span class="std std-ref">
+              Int8Calibrator
+             </span>
+            </a>
+            implementation based on a specified TensorRT calibration algorithm and a LibTorch DataLoader.
+           </p>
+           <p>
+           </p>
+           <dl class="field-list simple">
+            <dt class="field-odd">
+             tparam Algorithm
+            </dt>
+            <dd class="field-odd">
              <p>
-              <code class="docutils literal notranslate">
-               <span class="pre">
-                Algorithm
-               </span>
-              </code>
-              : class nvinfer1::IInt8Calibrator (Default: nvinfer1::IInt8EntropyCalibrator2) - Algorithm to use
+              class nvinfer1::IInt8Calibrator (Default: nvinfer1::IInt8EntropyCalibrator2) - Algorithm to use
              </p>
-            </li>
-            <li>
+            </dd>
+            <dt class="field-even">
+             tparam DataLoaderUniquePtr
+            </dt>
+            <dd class="field-even">
              <p>
-              <code class="docutils literal notranslate">
-               <span class="pre">
-                DataLoaderUniquePtr
-               </span>
-              </code>
-              : std::unique_ptr&lt;torch::data::DataLoader&gt; - DataLoader type
+              std::unique_ptr&lt;torch::data::DataLoader&gt; - DataLoader type
              </p>
-            </li>
-           </ul>
+            </dd>
+           </dl>
+           <div class="breathe-sectiondef docutils container">
+            <p class="breathe-sectiondef-title rubric" id="breathe-section-title-public-functions">
+             Public Functions
+            </p>
+            <dl class="cpp function">
+             <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt3ptq14Int8Calibrator14Int8CalibratorE19DataLoaderUniquePtrRKNSt6stringEb">
+              <span class="target" id="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator_1a7cd5d19c509ef27870a6d52e4932884e">
+              </span>
+              <span class="k">
+               <span class="pre">
+                inline
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="sig-name descname">
+               <span class="n">
+                <span class="pre">
+                 Int8Calibrator
+                </span>
+               </span>
+              </span>
+              <span class="sig-paren">
+               (
+              </span>
+              <a class="reference internal" href="#_CPPv4I00EN14torch_tensorrt3ptq14Int8CalibratorE" title="torch_tensorrt::ptq::Int8Calibrator::DataLoaderUniquePtr">
+               <span class="n">
+                <span class="pre">
+                 DataLoaderUniquePtr
+                </span>
+               </span>
+              </a>
+              <span class="w">
+              </span>
+              <span class="n sig-param">
+               <span class="pre">
+                dataloader
+               </span>
+              </span>
+              ,
+              <span class="k">
+               <span class="pre">
+                const
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="n">
+               <span class="pre">
+                std
+               </span>
+              </span>
+              <span class="p">
+               <span class="pre">
+                ::
+               </span>
+              </span>
+              <span class="n">
+               <span class="pre">
+                string
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="p">
+               <span class="pre">
+                &amp;
+               </span>
+              </span>
+              <span class="n sig-param">
+               <span class="pre">
+                cache_file_path
+               </span>
+              </span>
+              ,
+              <span class="kt">
+               <span class="pre">
+                bool
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="n sig-param">
+               <span class="pre">
+                use_cache
+               </span>
+              </span>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N14torch_tensorrt3ptq14Int8Calibrator14Int8CalibratorE19DataLoaderUniquePtrRKNSt6stringEb" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Construct a new
+               <a class="reference internal" href="#classtorch__tensorrt_1_1ptq_1_1Int8Calibrator">
+                <span class="std std-ref">
+                 Int8Calibrator
+                </span>
+               </a>
+               object.
+              </p>
+              <p>
+               Using the provided DataLoader, construct a calibrator that can be used for PTQ with Torch-TensorRT
+              </p>
+              <dl class="field-list simple">
+               <dt class="field-odd">
+                Parameters
+               </dt>
+               <dd class="field-odd">
+                <ul class="simple">
+                 <li>
+                  <p>
+                   <strong>
+                    dataloader
+                   </strong>
+                   – std::unqiue_ptr&lt;torch::data::DataLoader&gt; - A unique pointer to the DataLoader, should be what is returned from the make_data_loader factory
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <strong>
+                    cache_file_path
+                   </strong>
+                   – const std::string&amp; - A path to store / find the calibration cache
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <strong>
+                    use_cache
+                   </strong>
+                   – : bool - Whether to use the cache (if it exists)
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt class="sig sig-object cpp" id="_CPPv4NK14torch_tensorrt3ptq14Int8Calibrator12getBatchSizeEv">
+              <span class="target" id="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator_1a2fb5b5bb33808075d54adfdbc5727573">
+              </span>
+              <span class="k">
+               <span class="pre">
+                inline
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="kt">
+               <span class="pre">
+                int
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="sig-name descname">
+               <span class="n">
+                <span class="pre">
+                 getBatchSize
+                </span>
+               </span>
+              </span>
+              <span class="sig-paren">
+               (
+              </span>
+              <span class="sig-paren">
+               )
+              </span>
+              <span class="w">
+              </span>
+              <span class="k">
+               <span class="pre">
+                const
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="k">
+               <span class="pre">
+                noexcept
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="k">
+               <span class="pre">
+                override
+               </span>
+              </span>
+              <a class="headerlink" href="#_CPPv4NK14torch_tensorrt3ptq14Int8Calibrator12getBatchSizeEv" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Get the Batch Size for the next batch (always 1 due to issues with TRT and explicit batch)
+              </p>
+              <dl class="field-list simple">
+               <dt class="field-odd">
+                Returns
+               </dt>
+               <dd class="field-odd">
+                <p>
+                 int
+                </p>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt3ptq14Int8Calibrator8getBatchEA_PvA_PKci">
+              <span class="target" id="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator_1a52b0ffc4230d610181c7c47fc0faaf23">
+              </span>
+              <span class="k">
+               <span class="pre">
+                inline
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="kt">
+               <span class="pre">
+                bool
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="sig-name descname">
+               <span class="n">
+                <span class="pre">
+                 getBatch
+                </span>
+               </span>
+              </span>
+              <span class="sig-paren">
+               (
+              </span>
+              <span class="kt">
+               <span class="pre">
+                void
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="p">
+               <span class="pre">
+                *
+               </span>
+              </span>
+              <span class="n sig-param">
+               <span class="pre">
+                bindings
+               </span>
+              </span>
+              <span class="p">
+               <span class="pre">
+                [
+               </span>
+              </span>
+              <span class="p">
+               <span class="pre">
+                ]
+               </span>
+              </span>
+              ,
+              <span class="k">
+               <span class="pre">
+                const
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="kt">
+               <span class="pre">
+                char
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="p">
+               <span class="pre">
+                *
+               </span>
+              </span>
+              <span class="n sig-param">
+               <span class="pre">
+                names
+               </span>
+              </span>
+              <span class="p">
+               <span class="pre">
+                [
+               </span>
+              </span>
+              <span class="p">
+               <span class="pre">
+                ]
+               </span>
+              </span>
+              ,
+              <span class="kt">
+               <span class="pre">
+                int
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="n sig-param">
+               <span class="pre">
+                nbBindings
+               </span>
+              </span>
+              <span class="sig-paren">
+               )
+              </span>
+              <span class="w">
+              </span>
+              <span class="k">
+               <span class="pre">
+                noexcept
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="k">
+               <span class="pre">
+                override
+               </span>
+              </span>
+              <a class="headerlink" href="#_CPPv4N14torch_tensorrt3ptq14Int8Calibrator8getBatchEA_PvA_PKci" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Get the next Batch.
+              </p>
+              <dl class="field-list simple">
+               <dt class="field-odd">
+                Parameters
+               </dt>
+               <dd class="field-odd">
+                <ul class="simple">
+                 <li>
+                  <p>
+                   <strong>
+                    bindings
+                   </strong>
+                   – void*[] - An array of binding pointers (fed in from TensorRT calibrator), these buffers should be filed with batch data for each input
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <strong>
+                    names
+                   </strong>
+                   – const char*[] - Names of bindings
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <strong>
+                    nbBindings
+                   </strong>
+                   – int - Number of bindings
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+               <dt class="field-even">
+                Returns
+               </dt>
+               <dd class="field-even">
+                <p>
+                 true - There is a new batch for the calibrator to consume
+                </p>
+               </dd>
+               <dt class="field-odd">
+                Returns
+               </dt>
+               <dd class="field-odd">
+                <p>
+                 false - There is not a new batch for the calibrator to consume
+                </p>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt3ptq14Int8Calibrator20readCalibrationCacheER6size_t">
+              <span class="target" id="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator_1adb666718fcc006b8e4057625469de6a8">
+              </span>
+              <span class="k">
+               <span class="pre">
+                inline
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="k">
+               <span class="pre">
+                const
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="kt">
+               <span class="pre">
+                void
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="p">
+               <span class="pre">
+                *
+               </span>
+              </span>
+              <span class="sig-name descname">
+               <span class="n">
+                <span class="pre">
+                 readCalibrationCache
+                </span>
+               </span>
+              </span>
+              <span class="sig-paren">
+               (
+              </span>
+              <span class="n">
+               <span class="pre">
+                size_t
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="p">
+               <span class="pre">
+                &amp;
+               </span>
+              </span>
+              <span class="n sig-param">
+               <span class="pre">
+                length
+               </span>
+              </span>
+              <span class="sig-paren">
+               )
+              </span>
+              <span class="w">
+              </span>
+              <span class="k">
+               <span class="pre">
+                noexcept
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="k">
+               <span class="pre">
+                override
+               </span>
+              </span>
+              <a class="headerlink" href="#_CPPv4N14torch_tensorrt3ptq14Int8Calibrator20readCalibrationCacheER6size_t" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Read calibration cache.
+              </p>
+              <p>
+               How to read from the calibration cache, only enabled if use_cache is set
+              </p>
+              <dl class="field-list simple">
+               <dt class="field-odd">
+                Parameters
+               </dt>
+               <dd class="field-odd">
+                <p>
+                 <strong>
+                  length
+                 </strong>
+                 –
+                </p>
+               </dd>
+               <dt class="field-even">
+                Returns
+               </dt>
+               <dd class="field-even">
+                <p>
+                 const void* - Pointer to cache data
+                </p>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt3ptq14Int8Calibrator21writeCalibrationCacheEPKv6size_t">
+              <span class="target" id="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator_1ae8756c27ffa527d05ba32da03561a417">
+              </span>
+              <span class="k">
+               <span class="pre">
+                inline
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="kt">
+               <span class="pre">
+                void
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="sig-name descname">
+               <span class="n">
+                <span class="pre">
+                 writeCalibrationCache
+                </span>
+               </span>
+              </span>
+              <span class="sig-paren">
+               (
+              </span>
+              <span class="k">
+               <span class="pre">
+                const
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="kt">
+               <span class="pre">
+                void
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="p">
+               <span class="pre">
+                *
+               </span>
+              </span>
+              <span class="n sig-param">
+               <span class="pre">
+                cache
+               </span>
+              </span>
+              ,
+              <span class="n">
+               <span class="pre">
+                size_t
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="n sig-param">
+               <span class="pre">
+                length
+               </span>
+              </span>
+              <span class="sig-paren">
+               )
+              </span>
+              <span class="w">
+              </span>
+              <span class="k">
+               <span class="pre">
+                noexcept
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="k">
+               <span class="pre">
+                override
+               </span>
+              </span>
+              <a class="headerlink" href="#_CPPv4N14torch_tensorrt3ptq14Int8Calibrator21writeCalibrationCacheEPKv6size_t" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               Write calibration cache.
+              </p>
+              <p>
+               Write a the calibration cache provided by TensorRT to a specified file
+              </p>
+              <dl class="field-list simple">
+               <dt class="field-odd">
+                Parameters
+               </dt>
+               <dd class="field-odd">
+                <ul class="simple">
+                 <li>
+                  <p>
+                   <strong>
+                    cache
+                   </strong>
+                   – const void* - cache data
+                  </p>
+                 </li>
+                 <li>
+                  <p>
+                   <strong>
+                    length
+                   </strong>
+                   – size_t - length of cache
+                  </p>
+                 </li>
+                </ul>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+            <dl class="cpp function">
+             <dt class="sig sig-object cpp" id="_CPPv4N14torch_tensorrt3ptq14Int8CalibratorcvPN8nvinfer115IInt8CalibratorEEv">
+              <span class="target" id="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator_1aaf70be340fa11c8cc95295d2692c913d">
+              </span>
+              <span class="k">
+               <span class="pre">
+                inline
+               </span>
+              </span>
+              <span class="w">
+              </span>
+              <span class="sig-name descname">
+               <span class="k">
+                <span class="pre">
+                 operator
+                </span>
+               </span>
+               <span class="w">
+               </span>
+               <span class="n">
+                <span class="pre">
+                 nvinfer1
+                </span>
+               </span>
+               <span class="p">
+                <span class="pre">
+                 ::
+                </span>
+               </span>
+               <span class="n">
+                <span class="pre">
+                 IInt8Calibrator
+                </span>
+               </span>
+               <span class="p">
+                <span class="pre">
+                 *
+                </span>
+               </span>
+              </span>
+              <span class="sig-paren">
+               (
+              </span>
+              <span class="sig-paren">
+               )
+              </span>
+              <a class="headerlink" href="#_CPPv4N14torch_tensorrt3ptq14Int8CalibratorcvPN8nvinfer115IInt8CalibratorEEv" title="Permalink to this definition">
+               ¶
+              </a>
+              <br/>
+             </dt>
+             <dd>
+              <p>
+               operator to cast to nvinfer1::IInt8Calibrator*
+              </p>
+              <p>
+               Convience function to convert to a IInt8Calibrator* to easily be assigned to the ptq_calibrator field in CompileSpec
+              </p>
+              <dl class="field-list simple">
+               <dt class="field-odd">
+                Returns
+               </dt>
+               <dd class="field-odd">
+                <p>
+                 nvinfer1::IInt8Calibrator*
+                </p>
+               </dd>
+              </dl>
+             </dd>
+            </dl>
+           </div>
           </dd>
          </dl>
-         <div class="breathe-sectiondef docutils container">
-          <p class="breathe-sectiondef-title rubric">
-           Public Functions
-          </p>
-          <dl class="cpp function">
-           <dt id="_CPPv4N14torch_tensorrt3ptq14Int8Calibrator14Int8CalibratorE19DataLoaderUniquePtrRKNSt6stringEb">
-            <span class="target" id="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator_1a7cd5d19c509ef27870a6d52e4932884e">
-            </span>
-            <code class="sig-name descname">
-             Int8Calibrator
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            <a class="reference internal" href="#_CPPv4I00EN14torch_tensorrt3ptq14Int8CalibratorE" title="torch_tensorrt::ptq::Int8Calibrator::DataLoaderUniquePtr">
-             DataLoaderUniquePtr
-            </a>
-            <em>
-             dataloader
-            </em>
-            ,
-            <em class="property">
-             const
-            </em>
-            std::string &amp;
-            <em>
-             cache_file_path
-            </em>
-            , bool
-            <em>
-             use_cache
-            </em>
-            <span class="sig-paren">
-             )
-            </span>
-            <a class="headerlink" href="#_CPPv4N14torch_tensorrt3ptq14Int8Calibrator14Int8CalibratorE19DataLoaderUniquePtrRKNSt6stringEb" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Construct a new
-             <a class="reference internal" href="#classtorch__tensorrt_1_1ptq_1_1Int8Calibrator">
-              <span class="std std-ref">
-               Int8Calibrator
-              </span>
-             </a>
-             object.
-            </p>
-            <p>
-             Using the provided DataLoader, construct a calibrator that can be used for PTQ with Torch-TensorRT
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Parameters
-              </strong>
-             </dt>
-             <dd>
-              <ul class="breatheparameterlist simple">
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   dataloader
-                  </span>
-                 </code>
-                 : std::unqiue_ptr&lt;torch::data::DataLoader&gt; - A unique pointer to the DataLoader, should be what is returned from the make_data_loader factory
-                </p>
-               </li>
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   cache_file_path
-                  </span>
-                 </code>
-                 : const std::string&amp; - A path to store / find the calibration cache
-                </p>
-               </li>
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   use_cache
-                  </span>
-                 </code>
-                 : : bool - Whether to use the cache (if it exists)
-                </p>
-               </li>
-              </ul>
-             </dd>
-            </dl>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4NK14torch_tensorrt3ptq14Int8Calibrator12getBatchSizeEv">
-            <span class="target" id="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator_1a2fb5b5bb33808075d54adfdbc5727573">
-            </span>
-            int
-            <code class="sig-name descname">
-             getBatchSize
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            <span class="sig-paren">
-             )
-            </span>
-            <em class="property">
-             const
-            </em>
-            <em class="property">
-             noexcept
-            </em>
-            <em class="property">
-             override
-            </em>
-            <a class="headerlink" href="#_CPPv4NK14torch_tensorrt3ptq14Int8Calibrator12getBatchSizeEv" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Get the Batch Size for the next batch (always 1 due to issues with TRT and explicit batch)
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Return
-              </strong>
-             </dt>
-             <dd>
-              <p>
-               int
-              </p>
-             </dd>
-            </dl>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4N14torch_tensorrt3ptq14Int8Calibrator8getBatchEA_PvA_PKci">
-            <span class="target" id="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator_1a52b0ffc4230d610181c7c47fc0faaf23">
-            </span>
-            bool
-            <code class="sig-name descname">
-             getBatch
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            void *
-            <em>
-             bindings
-            </em>
-            [],
-            <em class="property">
-             const
-            </em>
-            char *
-            <em>
-             names
-            </em>
-            [], int
-            <em>
-             nbBindings
-            </em>
-            <span class="sig-paren">
-             )
-            </span>
-            <em class="property">
-             noexcept
-            </em>
-            <em class="property">
-             override
-            </em>
-            <a class="headerlink" href="#_CPPv4N14torch_tensorrt3ptq14Int8Calibrator8getBatchEA_PvA_PKci" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Get the next Batch.
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Return
-              </strong>
-             </dt>
-             <dd>
-              <p>
-               true - There is a new batch for the calibrator to consume
-              </p>
-             </dd>
-             <dt>
-              <strong>
-               Return
-              </strong>
-             </dt>
-             <dd>
-              <p>
-               false - There is not a new batch for the calibrator to consume
-              </p>
-             </dd>
-             <dt>
-              <strong>
-               Parameters
-              </strong>
-             </dt>
-             <dd>
-              <ul class="breatheparameterlist simple">
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   bindings
-                  </span>
-                 </code>
-                 : void*[] - An array of binding pointers (fed in from TensorRT calibrator), these buffers should be filed with batch data for each input
-                </p>
-               </li>
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   names
-                  </span>
-                 </code>
-                 : const char*[] - Names of bindings
-                </p>
-               </li>
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   nbBindings
-                  </span>
-                 </code>
-                 : int - Number of bindings
-                </p>
-               </li>
-              </ul>
-             </dd>
-            </dl>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4N14torch_tensorrt3ptq14Int8Calibrator20readCalibrationCacheER6size_t">
-            <span class="target" id="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator_1adb666718fcc006b8e4057625469de6a8">
-            </span>
-            <em class="property">
-             const
-            </em>
-            void *
-            <code class="sig-name descname">
-             readCalibrationCache
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            size_t &amp;
-            <em>
-             length
-            </em>
-            <span class="sig-paren">
-             )
-            </span>
-            <em class="property">
-             noexcept
-            </em>
-            <em class="property">
-             override
-            </em>
-            <a class="headerlink" href="#_CPPv4N14torch_tensorrt3ptq14Int8Calibrator20readCalibrationCacheER6size_t" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Read calibration cache.
-            </p>
-            <p>
-             How to read from the calibration cache, only enabled if use_cache is set
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Return
-              </strong>
-             </dt>
-             <dd>
-              <p>
-               const void* - Pointer to cache data
-              </p>
-             </dd>
-             <dt>
-              <strong>
-               Parameters
-              </strong>
-             </dt>
-             <dd>
-              <ul class="breatheparameterlist simple">
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   length
-                  </span>
-                 </code>
-                 :
-                </p>
-               </li>
-              </ul>
-             </dd>
-            </dl>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4N14torch_tensorrt3ptq14Int8Calibrator21writeCalibrationCacheEPKv6size_t">
-            <span class="target" id="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator_1ae8756c27ffa527d05ba32da03561a417">
-            </span>
-            void
-            <code class="sig-name descname">
-             writeCalibrationCache
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            <em class="property">
-             const
-            </em>
-            void *
-            <em>
-             cache
-            </em>
-            , size_t
-            <em>
-             length
-            </em>
-            <span class="sig-paren">
-             )
-            </span>
-            <em class="property">
-             noexcept
-            </em>
-            <em class="property">
-             override
-            </em>
-            <a class="headerlink" href="#_CPPv4N14torch_tensorrt3ptq14Int8Calibrator21writeCalibrationCacheEPKv6size_t" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             Write calibration cache.
-            </p>
-            <p>
-             Write a the calibration cache provided by TensorRT to a specified file
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Parameters
-              </strong>
-             </dt>
-             <dd>
-              <ul class="breatheparameterlist simple">
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   cache
-                  </span>
-                 </code>
-                 : const void* - cache data
-                </p>
-               </li>
-               <li>
-                <p>
-                 <code class="docutils literal notranslate">
-                  <span class="pre">
-                   length
-                  </span>
-                 </code>
-                 : size_t - length of cache
-                </p>
-               </li>
-              </ul>
-             </dd>
-            </dl>
-           </dd>
-          </dl>
-          <dl class="cpp function">
-           <dt id="_CPPv4N14torch_tensorrt3ptq14Int8CalibratorcvPN8nvinfer115IInt8CalibratorEEv">
-            <span class="target" id="classtorch__tensorrt_1_1ptq_1_1Int8Calibrator_1aaf70be340fa11c8cc95295d2692c913d">
-            </span>
-            <code class="sig-name descname">
-             operator nvinfer1::IInt8Calibrator*
-            </code>
-            <span class="sig-paren">
-             (
-            </span>
-            <span class="sig-paren">
-             )
-            </span>
-            <a class="headerlink" href="#_CPPv4N14torch_tensorrt3ptq14Int8CalibratorcvPN8nvinfer115IInt8CalibratorEEv" title="Permalink to this definition">
-             ¶
-            </a>
-            <br/>
-           </dt>
-           <dd>
-            <p>
-             operator to cast to nvinfer1::IInt8Calibrator*
-            </p>
-            <p>
-             Convience function to convert to a IInt8Calibrator* to easily be assigned to the ptq_calibrator field in CompileSpec
-            </p>
-            <p>
-            </p>
-            <dl class="simple">
-             <dt>
-              <strong>
-               Return
-              </strong>
-             </dt>
-             <dd>
-              <p>
-               nvinfer1::IInt8Calibrator*
-              </p>
-             </dd>
-            </dl>
-           </dd>
-          </dl>
-         </div>
-        </dd>
-       </dl>
+        </section>
+       </section>
       </article>
      </div>
     </div>
@@ -1118,7 +1430,7 @@
       <a href="http://www.sphinx-doc.org/">
        Sphinx
       </a>
-      3.1.2.
+      4.3.0.
              and
       <a href="https://github.com/bashtage/sphinx-material/">
        Material for

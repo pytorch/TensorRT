@@ -15,7 +15,7 @@ Please refer to `Creating TorchScript modules in Python <https://nvidia.github.i
 .. _torch_tensorrt_quickstart:
 
 [Torch-TensorRT Quickstart] Compiling TorchScript Modules with ``torchtrtc``
----------------------------------------------------------------------
+---------------------------------------------------------------------------------
 
 An easy way to get started with Torch-TensorRT and to check if your model can be supported without extra work is to run it through
 ``torchtrtc``, which supports almost all features of the compiler from the command line including post training quantization

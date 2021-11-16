@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -38,8 +39,8 @@
   <title>
    Program Listing for File macros.h — Torch-TensorRT master documentation
   </title>
-  <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/pygments.css" rel="stylesheet" type="text/css"/>
+  <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/collapsible-lists/css/tree_view.css" rel="stylesheet" type="text/css"/>
   <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js">
   </script>
@@ -49,18 +50,11 @@
   </script>
   <script src="../_static/doctools.js">
   </script>
-  <script src="../_static/language_data.js">
-  </script>
   <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js">
   </script>
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
-  </script>
-  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
-  </script>
-  <script type="text/x-mathjax-config">
-   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -321,6 +315,11 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/EfficientNet-example.html">
+            Torch-TensorRT Getting Started - EfficientNet-B0
+           </a>
+          </li>
+          <li class="md-nav__item">
            <span class="md-nav__link caption">
             <span class="caption-text">
              Python API Documenation
@@ -340,16 +339,6 @@
           <li class="md-nav__item">
            <a class="md-nav__link" href="../py_api/ptq.html">
             torch_tensorrt.ptq
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/ptq.html#classes">
-            Classes
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/ptq.html#enums">
-            Enums
            </a>
           </li>
           <li class="md-nav__item">
@@ -447,38 +436,39 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <span id="program-listing-file-cpp-include-torch-tensorrt-macros-h">
-       </span>
-       <h1 id="cpp-api-program-listing-file-cpp-include-torch-tensorrt-macros-h--page-root">
-        Program Listing for File macros.h
-        <a class="headerlink" href="#cpp-api-program-listing-file-cpp-include-torch-tensorrt-macros-h--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <p>
-        ↰
-        <a class="reference internal" href="file_cpp_include_torch_tensorrt_macros.h.html#file-cpp-include-torch-tensorrt-macros-h">
-         <span class="std std-ref">
-          Return to documentation for file
-         </span>
-        </a>
-        (
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          cpp/include/torch_tensorrt/macros.h
-         </span>
-        </code>
-        )
-       </p>
-       <div class="highlight-cpp notranslate">
-        <div class="highlight">
-         <pre><span></span><span class="cm">/*</span>
+       <section id="program-listing-for-file-macros-h">
+        <span id="program-listing-file-cpp-include-torch-tensorrt-macros-h">
+        </span>
+        <h1 id="cpp-api-program-listing-file-cpp-include-torch-tensorrt-macros-h--page-root">
+         Program Listing for File macros.h
+         <a class="headerlink" href="#cpp-api-program-listing-file-cpp-include-torch-tensorrt-macros-h--page-root" title="Permalink to this headline">
+          ¶
+         </a>
+        </h1>
+        <p>
+         ↰
+         <a class="reference internal" href="file_cpp_include_torch_tensorrt_macros.h.html#file-cpp-include-torch-tensorrt-macros-h">
+          <span class="std std-ref">
+           Return to documentation for file
+          </span>
+         </a>
+         (
+         <code class="docutils literal notranslate">
+          <span class="pre">
+           cpp/include/torch_tensorrt/macros.h
+          </span>
+         </code>
+         )
+        </p>
+        <div class="highlight-cpp notranslate">
+         <div class="highlight">
+          <pre><span></span><span class="cm">/*</span>
 <span class="cm"> * Copyright (c) NVIDIA Corporation.</span>
 <span class="cm"> * All rights reserved.</span>
 <span class="cm"> *</span>
 <span class="cm"> * This library is licensed under the BSD-style license found in the</span>
 <span class="cm"> * LICENSE file in the root directory of this source tree.</span>
-<span class="cm"> */</span>
+<span class="cm"> */</span><span class="w"></span>
 <span class="cp">#pragma once</span>
 
 <span class="cp">#if defined(__GNUC__)</span>
@@ -494,21 +484,22 @@
 <span class="cp">#define STR(x) XSTR(x)</span>
 
 <span class="cp">#define TORCH_TENSORRT_MAJOR_VERSION 1</span>
-<span class="cp">#define TORCH_TENSORRT_MINOR_VERSION 0</span>
+<span class="cp">#define TORCH_TENSORRT_MINOR_VERSION 1</span>
 <span class="cp">#define TORCH_TENSORRT_PATCH_VERSION 0</span>
 <span class="cp">#define TORCH_TENSORRT_VERSION      \</span>
 <span class="cp">  STR(TORCH_TENSORRT_MAJOR_VERSION) \</span>
 <span class="cp">  "." STR(TORCH_TENSORRT_MINOR_VERSION) "." STR(TORCH_TENSORRT_PATCH_VERSION)</span>
 
 <span class="c1">// Setup namespace aliases for ease of use</span>
-<span class="k">namespace</span> <span class="n">torch_tensorrt</span> <span class="p">{</span>
-<span class="k">namespace</span> <span class="n">torchscript</span> <span class="p">{}</span>
-<span class="k">namespace</span> <span class="n">ts</span> <span class="o">=</span> <span class="n">torchscript</span><span class="p">;</span>
-<span class="p">}</span> <span class="c1">// namespace torch_tensorrt</span>
-<span class="k">namespace</span> <span class="n">torchtrt</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="p">;</span>
+<span class="k">namespace</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="k">namespace</span><span class="w"> </span><span class="nn">torchscript</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
+<span class="k">namespace</span><span class="w"> </span><span class="nn">ts</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nn">torchscript</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"> </span><span class="c1">// namespace torch_tensorrt</span>
+<span class="k">namespace</span><span class="w"> </span><span class="nn">torchtrt</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="p">;</span><span class="w"></span>
 </pre>
+         </div>
         </div>
-       </div>
+       </section>
       </article>
      </div>
     </div>
@@ -529,7 +520,7 @@
       <a href="http://www.sphinx-doc.org/">
        Sphinx
       </a>
-      3.1.2.
+      4.3.0.
              and
       <a href="https://github.com/bashtage/sphinx-material/">
        Material for
