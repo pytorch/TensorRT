@@ -30,12 +30,13 @@ class TestCompile(ModelTestCase):
         self.assertTrue(same < 2e-2)
 
     def test_compile_script(self):
-        trt_mod = torchtrt.ts.compile(self.scripted_model,
+        with torch.no_grad():
+            trt_mod = torchtrt.ts.compile(self.scripted_model,
                                       inputs=[self.input],
                                       device=torchtrt.Device(gpu_id=0),
                                       enabled_precisions={torch.float})
-        same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
-        self.assertTrue(same < 2e-2)
+            same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
+            self.assertTrue(same < 2e-2)
 
     def test_compile_global(self):
         trt_mod = torchtrt.compile(self.scripted_model,
@@ -46,12 +47,13 @@ class TestCompile(ModelTestCase):
         self.assertTrue(same < 2e-2)
 
     def test_compile_global_nn_mod(self):
-        trt_mod = torchtrt.compile(self.model,
+        with torch.no_grad():
+            trt_mod = torchtrt.compile(self.model,
                                    inputs=[self.input],
                                    device=torchtrt.Device(gpu_id=0),
                                    enabled_precisions={torch.float})
-        same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
-        self.assertTrue(same < 2e-2)
+            same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
+            self.assertTrue(same < 2e-2)
 
     def test_from_torch_tensor(self):
         compile_spec = {
