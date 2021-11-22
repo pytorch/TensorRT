@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -38,8 +39,8 @@
   <title>
    Conversion Phase — Torch-TensorRT master documentation
   </title>
-  <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/pygments.css" rel="stylesheet" type="text/css"/>
+  <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/collapsible-lists/css/tree_view.css" rel="stylesheet" type="text/css"/>
   <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js">
   </script>
@@ -49,18 +50,11 @@
   </script>
   <script src="../_static/doctools.js">
   </script>
-  <script src="../_static/language_data.js">
-  </script>
   <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js">
   </script>
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
-  </script>
-  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
-  </script>
-  <script type="text/x-mathjax-config">
-   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -328,6 +322,11 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/EfficientNet-example.html">
+            Torch-TensorRT Getting Started - EfficientNet-B0
+           </a>
+          </li>
+          <li class="md-nav__item">
            <span class="md-nav__link caption">
             <span class="caption-text">
              Python API Documenation
@@ -347,16 +346,6 @@
           <li class="md-nav__item">
            <a class="md-nav__link" href="../py_api/ptq.html">
             torch_tensorrt.ptq
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/ptq.html#classes">
-            Classes
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/ptq.html#enums">
-            Enums
            </a>
           </li>
           <li class="md-nav__item">
@@ -476,153 +465,159 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <span id="conversion">
-       </span>
-       <h1 id="contributors-conversion--page-root">
-        Conversion Phase
-        <a class="headerlink" href="#contributors-conversion--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <p>
-        Once the graph has be simplified to a form thats easy to convert, we then set up a conversion context
+       <section id="conversion-phase">
+        <span id="conversion">
+        </span>
+        <h1 id="contributors-conversion--page-root">
+         Conversion Phase
+         <a class="headerlink" href="#contributors-conversion--page-root" title="Permalink to this headline">
+          ¶
+         </a>
+        </h1>
+        <p>
+         Once the graph has be simplified to a form thats easy to convert, we then set up a conversion context
 to manage the construction of a TensorRT
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          INetworkDefinition
-         </span>
-        </code>
-        from the blocks nodes. The conversion context
+         <code class="docutils literal notranslate">
+          <span class="pre">
+           INetworkDefinition
+          </span>
+         </code>
+         from the blocks nodes. The conversion context
 records the set of converted nodes, block inputs and outputs and other information about the conversion
 of the graph. This data is then used to help converters link together layers and also hold build time
 information like weights required to construct the engine. After the context is created, the block
 converter starts iterating through the list of nodes, for each node, the converter will look at its
 inputs and assemble an array of resources to pass to the converter. Inputs can be in a couple of states:
-       </p>
-       <ul class="simple">
-        <li>
-         <p>
-          The input is a block parameter
-         </p>
-         <ul>
-          <li>
-           <p>
-            In this case the input should have already been stored in as an IValue in the
+        </p>
+        <ul class="simple">
+         <li>
+          <p>
+           The input is a block parameter
+          </p>
+          <ul>
+           <li>
+            <p>
+             In this case the input should have already been stored in as an IValue in the
 conversion context
-            <code class="docutils literal notranslate">
-             <span class="pre">
-              evaluated_value_map
-             </span>
-            </code>
-            . The conversion stage will add the IValue to the list of args for the
+             <code class="docutils literal notranslate">
+              <span class="pre">
+               evaluated_value_map
+              </span>
+             </code>
+             . The conversion stage will add the IValue to the list of args for the
 converter
-           </p>
-          </li>
-         </ul>
-        </li>
-        <li>
-         <p>
-          The input is an output of a node that has already been converted
-         </p>
-         <ul>
-          <li>
-           <p>
-            In this case the ITensor of the output has added to the to the
-            <code class="docutils literal notranslate">
-             <span class="pre">
-              value_tensor_map
-             </span>
-            </code>
-            ,
+            </p>
+           </li>
+          </ul>
+         </li>
+         <li>
+          <p>
+           The input is an output of a node that has already been converted
+          </p>
+          <ul>
+           <li>
+            <p>
+             In this case the ITensor of the output has added to the to the
+             <code class="docutils literal notranslate">
+              <span class="pre">
+               value_tensor_map
+              </span>
+             </code>
+             ,
 The conversion stage will add the ITensor to the list of args for the converter
-           </p>
-          </li>
-         </ul>
-        </li>
-        <li>
-         <p>
-          The input is from a node that produces a static value
-         </p>
-         <ul>
-          <li>
-           <p>
-            There are nodes that produce static values, typically used to store parameters for operators, we need to
+            </p>
+           </li>
+          </ul>
+         </li>
+         <li>
+          <p>
+           The input is from a node that produces a static value
+          </p>
+          <ul>
+           <li>
+            <p>
+             There are nodes that produce static values, typically used to store parameters for operators, we need to
 evaluate these nodes at conversion time to be able to convert a op. The conversion system will look for a node
 evaluator in the evaluator registry and run it on the node. The IValue produced will be entered in the
 conversion context
-            <code class="docutils literal notranslate">
-             <span class="pre">
-              evaluated_value_map
-             </span>
-            </code>
-            and added to the list of args for the converter. If the node
+             <code class="docutils literal notranslate">
+              <span class="pre">
+               evaluated_value_map
+              </span>
+             </code>
+             and added to the list of args for the converter. If the node
 to be evaluated takes inputs, the conversion stage will recursively resolve dependencies until the final
 static value has been evaluated
-           </p>
-          </li>
-         </ul>
-        </li>
-        <li>
-         <p>
-          The input is from a node that has not been converted
+            </p>
+           </li>
+          </ul>
+         </li>
+         <li>
+          <p>
+           The input is from a node that has not been converted
 *  Torch-TensorRT will error out here
-         </p>
-        </li>
-       </ul>
-       <h2 id="node-evaluation">
-        Node Evaluation
-        <a class="headerlink" href="#node-evaluation" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <p>
-        There are some nodes that contain static data and are resources for operations. These can be evaluated at
+          </p>
+         </li>
+        </ul>
+        <section id="node-evaluation">
+         <h2 id="node-evaluation">
+          Node Evaluation
+          <a class="headerlink" href="#node-evaluation" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <p>
+          There are some nodes that contain static data and are resources for operations. These can be evaluated at
 conversion time so that you can use those values when doing node conversion. In theory any node kind can have
 a conversion time evaluator as long as it produces a static IValue, This IValue will be stored in the conversion
 context so it can be consumed by any node that takes the evaluated node as an input. Common node types are
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          prim::Constant
-         </span>
-        </code>
-        which emits a constant and
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          prim::ListConstruct
-         </span>
-        </code>
-        which makes lists.
-       </p>
-       <h2 id="node-converters">
-        Node Converters
-        <a class="headerlink" href="#node-converters" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <p>
-        Node converters map JIT nodes to layers or subgraphs of layers. They then associate outputs from the JIT graph
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            prim::Constant
+           </span>
+          </code>
+          which emits a constant and
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            prim::ListConstruct
+           </span>
+          </code>
+          which makes lists.
+         </p>
+        </section>
+        <section id="node-converters">
+         <h2 id="node-converters">
+          Node Converters
+          <a class="headerlink" href="#node-converters" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <p>
+          Node converters map JIT nodes to layers or subgraphs of layers. They then associate outputs from the JIT graph
 and the TRT graph together in the conversion context. This allows the conversion stage to assemble the inputs
 for the next node. There are some cases where a node produces an output that is not a Tensor but a static result
 from a calculation done on inputs which need to be converted first. In this case the converter may associate the outputs in
 the
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          evaluated_value_map
-         </span>
-        </code>
-        instead of the
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          value_tensor_map
-         </span>
-        </code>
-        . For more information take a look at:
-        <a class="reference internal" href="writing_converters.html#writing-converters">
-         <span class="std std-ref">
-          Writing Converters
-         </span>
-        </a>
-       </p>
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            evaluated_value_map
+           </span>
+          </code>
+          instead of the
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            value_tensor_map
+           </span>
+          </code>
+          . For more information take a look at:
+          <a class="reference internal" href="writing_converters.html#writing-converters">
+           <span class="std std-ref">
+            Writing Converters
+           </span>
+          </a>
+         </p>
+        </section>
+       </section>
       </article>
      </div>
     </div>
@@ -671,7 +666,7 @@ the
       <a href="http://www.sphinx-doc.org/">
        Sphinx
       </a>
-      3.1.2.
+      4.3.0.
              and
       <a href="https://github.com/bashtage/sphinx-material/">
        Material for

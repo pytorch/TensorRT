@@ -34,11 +34,9 @@ To enable automatic fallback feature, you can set following attributes in Python
   ts_model = torch.jit.script(model)
   trt_model = torchtrt.ts.compile(model, **{
     ...
-    "torch_fallback" : {
-      "enabled" : True,
-      "min_block_size" : 3,
-      "forced_fallback_ops": ["aten::add"],
-    }
+    "min_block_size" : 3,
+    "torch_executed_ops": ["aten::add"],
+    "torch_executed_modules": [],
   })
 ```
 - `enabled`: By default automatic fallback will be off. It is enabled by setting it to True.
@@ -59,9 +57,8 @@ auto in = torch::randn({1, 3, 224, 224}, {torch::kCUDA});
 auto mod = torch::jit::load("trt_ts_module.ts");
 auto input_sizes =  std::vector<torchtrt::InputRange>{{in.sizes()}};
 torchtrt::ts::CompileSpec cfg(input_sizes);
-cfg.torch_fallback = torchtrt::CompileSpec::TorchFallback(true);
-cfg.torch_fallback.min_block_size = 2;
-cfg.torch_fallback.forced_fallback_ops.push_back("aten::relu");
+cfg.min_block_size = 2;
+cfg.torch_executed_ops.push_back("aten::relu");
 auto trt_mod = torchtrt::ts::compile(mod, cfg);
 auto out = trt_mod.forward({in});
 ```

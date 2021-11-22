@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -38,8 +39,8 @@
   <title>
    Deploying Torch-TensorRT Programs — Torch-TensorRT master documentation
   </title>
-  <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/pygments.css" rel="stylesheet" type="text/css"/>
+  <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/collapsible-lists/css/tree_view.css" rel="stylesheet" type="text/css"/>
   <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js">
   </script>
@@ -49,18 +50,11 @@
   </script>
   <script src="../_static/doctools.js">
   </script>
-  <script src="../_static/language_data.js">
-  </script>
   <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js">
   </script>
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
-  </script>
-  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
-  </script>
-  <script type="text/x-mathjax-config">
-   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -363,6 +357,11 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/EfficientNet-example.html">
+            Torch-TensorRT Getting Started - EfficientNet-B0
+           </a>
+          </li>
+          <li class="md-nav__item">
            <span class="md-nav__link caption">
             <span class="caption-text">
              Python API Documenation
@@ -382,16 +381,6 @@
           <li class="md-nav__item">
            <a class="md-nav__link" href="../py_api/ptq.html">
             torch_tensorrt.ptq
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/ptq.html#classes">
-            Classes
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/ptq.html#enums">
-            Enums
            </a>
           </li>
           <li class="md-nav__item">
@@ -516,171 +505,179 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <span id="runtime">
-       </span>
-       <h1 id="tutorials-runtime--page-root">
-        Deploying Torch-TensorRT Programs
-        <a class="headerlink" href="#tutorials-runtime--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <p>
-        After compiling and saving Torch-TensorRT programs there is no longer a strict dependency on the full
+       <section id="deploying-torch-tensorrt-programs">
+        <span id="runtime">
+        </span>
+        <h1 id="tutorials-runtime--page-root">
+         Deploying Torch-TensorRT Programs
+         <a class="headerlink" href="#tutorials-runtime--page-root" title="Permalink to this headline">
+          ¶
+         </a>
+        </h1>
+        <p>
+         After compiling and saving Torch-TensorRT programs there is no longer a strict dependency on the full
 Torch-TensorRT library. All that is required to run a compiled program is the runtime. There are therfore a couple
 options to deploy your programs other than shipping the full Torch-TensorRT compiler with your applications.
-       </p>
-       <h2 id="torch-tensorrt-package-libtorchtrt-so">
-        Torch-TensorRT package / libtorchtrt.so
-        <a class="headerlink" href="#torch-tensorrt-package-libtorchtrt-so" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <p>
-        Once a program is compiled, you run it using the standard PyTorch APIs. All that is required is that the package
+        </p>
+        <section id="torch-tensorrt-package-libtorchtrt-so">
+         <h2 id="torch-tensorrt-package-libtorchtrt-so">
+          Torch-TensorRT package / libtorchtrt.so
+          <a class="headerlink" href="#torch-tensorrt-package-libtorchtrt-so" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <p>
+          Once a program is compiled, you run it using the standard PyTorch APIs. All that is required is that the package
 must be imported in python or linked in C++.
-       </p>
-       <h2 id="runtime-library">
-        Runtime Library
-        <a class="headerlink" href="#runtime-library" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <p>
-        Distributed with the C++ distribution is
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          libtorchtrt_runtime.so
-         </span>
-        </code>
-        . This library only contains the components
+         </p>
+        </section>
+        <section id="runtime-library">
+         <h2 id="runtime-library">
+          Runtime Library
+          <a class="headerlink" href="#runtime-library" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <p>
+          Distributed with the C++ distribution is
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            libtorchtrt_runtime.so
+           </span>
+          </code>
+          . This library only contains the components
 necessary to run Torch-TensorRT programs. Instead of linking
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          libtorchtrt.so
-         </span>
-        </code>
-        or importing
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          torch_tensorrt
-         </span>
-        </code>
-        you can
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            libtorchtrt.so
+           </span>
+          </code>
+          or importing
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            torch_tensorrt
+           </span>
+          </code>
+          you can
 link
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          libtorchtrt_runtime.so
-         </span>
-        </code>
-        in your deployment programs or use
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          DL_OPEN
-         </span>
-        </code>
-        or
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          LD_PRELOAD
-         </span>
-        </code>
-        . For python
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            libtorchtrt_runtime.so
+           </span>
+          </code>
+          in your deployment programs or use
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            DL_OPEN
+           </span>
+          </code>
+          or
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            LD_PRELOAD
+           </span>
+          </code>
+          . For python
 you can load the runtime with
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          torch.ops.load_library("libtorchtrt_runtime.so")
-         </span>
-        </code>
-        . You can then continue to use
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            torch.ops.load_library("libtorchtrt_runtime.so")
+           </span>
+          </code>
+          . You can then continue to use
 programs just as you would otherwise via PyTorch API.
-       </p>
-       <div class="admonition note">
-        <p class="admonition-title">
-         Note
-        </p>
-        <p>
-         If you are using the standard distribution of PyTorch in Python on x86, likely you will need the pre-cxx11-abi variant of
-         <code class="docutils literal notranslate">
-          <span class="pre">
-           libtorchtrt_runtime.so
-          </span>
-         </code>
-         , check
-         <a class="reference internal" href="installation.html#installation">
-          <span class="std std-ref">
-           Installation
-          </span>
-         </a>
-         documentation for more details.
-        </p>
-       </div>
-       <div class="admonition note">
-        <p class="admonition-title">
-         Note
-        </p>
-        <p>
-         If you are linking
-         <code class="docutils literal notranslate">
-          <span class="pre">
-           libtorchtrt_runtime.so
-          </span>
-         </code>
-         , likely using the following flags will help
-         <code class="docutils literal notranslate">
-          <span class="pre">
-           -Wl,--no-as-needed
-          </span>
-          <span class="pre">
-           -ltorchtrt
-          </span>
-          <span class="pre">
-           -Wl,--as-needed
-          </span>
-         </code>
-         as theres no direct symbol dependency to anything in the Torch-TensorRT runtime for most Torch-TensorRT runtime applications
-        </p>
-       </div>
-       <p>
-        An example of how to use
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          libtorchtrt_runtime.so
-         </span>
-        </code>
-        can be found here:
-        <a class="reference external" href="https://github.com/NVIDIA/Torch-TensorRT/tree/master/examples/torchtrt_example">
-         https://github.com/NVIDIA/Torch-TensorRT/tree/master/examples/torchtrt_example
-        </a>
-       </p>
-       <h2 id="plugin-library">
-        Plugin Library
-        <a class="headerlink" href="#plugin-library" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <p>
-        In the case you use Torch-TensorRT as a converter to a TensorRT engine and your engine uses plugins provided by Torch-TensorRT, Torch-TensorRT
+         </p>
+         <div class="admonition note">
+          <p class="admonition-title">
+           Note
+          </p>
+          <p>
+           If you are using the standard distribution of PyTorch in Python on x86, likely you will need the pre-cxx11-abi variant of
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             libtorchtrt_runtime.so
+            </span>
+           </code>
+           , check
+           <a class="reference internal" href="installation.html#installation">
+            <span class="std std-ref">
+             Installation
+            </span>
+           </a>
+           documentation for more details.
+          </p>
+         </div>
+         <div class="admonition note">
+          <p class="admonition-title">
+           Note
+          </p>
+          <p>
+           If you are linking
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             libtorchtrt_runtime.so
+            </span>
+           </code>
+           , likely using the following flags will help
+           <code class="docutils literal notranslate">
+            <span class="pre">
+             -Wl,--no-as-needed
+            </span>
+            <span class="pre">
+             -ltorchtrt
+            </span>
+            <span class="pre">
+             -Wl,--as-needed
+            </span>
+           </code>
+           as theres no direct symbol dependency to anything in the Torch-TensorRT runtime for most Torch-TensorRT runtime applications
+          </p>
+         </div>
+         <p>
+          An example of how to use
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            libtorchtrt_runtime.so
+           </span>
+          </code>
+          can be found here:
+          <a class="reference external" href="https://github.com/NVIDIA/Torch-TensorRT/tree/master/examples/torchtrt_example">
+           https://github.com/NVIDIA/Torch-TensorRT/tree/master/examples/torchtrt_example
+          </a>
+         </p>
+        </section>
+        <section id="plugin-library">
+         <h2 id="plugin-library">
+          Plugin Library
+          <a class="headerlink" href="#plugin-library" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <p>
+          In the case you use Torch-TensorRT as a converter to a TensorRT engine and your engine uses plugins provided by Torch-TensorRT, Torch-TensorRT
 ships the library
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          libtorchtrt_plugins.so
-         </span>
-        </code>
-        which contains the implementation of the TensorRT plugins used by Torch-TensorRT during
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            libtorchtrt_plugins.so
+           </span>
+          </code>
+          which contains the implementation of the TensorRT plugins used by Torch-TensorRT during
 compilation. This library can be
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          DL_OPEN
-         </span>
-        </code>
-        or
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          LD_PRELOAD
-         </span>
-        </code>
-        similar to other TensorRT plugin libraries.
-       </p>
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            DL_OPEN
+           </span>
+          </code>
+          or
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            LD_PRELOAD
+           </span>
+          </code>
+          similar to other TensorRT plugin libraries.
+         </p>
+        </section>
+       </section>
       </article>
      </div>
     </div>
@@ -729,7 +726,7 @@ compilation. This library can be
       <a href="http://www.sphinx-doc.org/">
        Sphinx
       </a>
-      3.1.2.
+      4.3.0.
              and
       <a href="https://github.com/bashtage/sphinx-material/">
        Material for

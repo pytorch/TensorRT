@@ -36,6 +36,7 @@ jobs:
       - name: Generate New Docs
         run: |
           cd docsrc
+          pip3 install -r requirements.txt
           python3 -c "import torch_tensorrt; print(torch_tensorrt.__version__)"
           make html
       - uses: stefanzweifel/git-auto-commit-action@v4

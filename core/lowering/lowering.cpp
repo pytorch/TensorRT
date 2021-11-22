@@ -43,6 +43,7 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, LowerInfo lower_info) {
   passes::UnpackHardSwish(g);
   passes::EliminateExceptionOrPassPattern(g);
   passes::ReduceToOperation(g);
+  passes::ReduceGelu(g);
   passes::RemoveContiguous(g);
   passes::RemoveDropout(g);
   passes::LinearToAddMM(g);
