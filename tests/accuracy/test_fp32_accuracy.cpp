@@ -52,4 +52,4 @@ TEST_P(AccuracyTests, FP32AccuracyIsClose) {
 INSTANTIATE_TEST_SUITE_P(
     FP32AccuracyIsCloseSuite,
     AccuracyTests,
-    testing::Values("tests/accuracy/vgg16_cifar10.jit.pt"));
+    testing::Values("tests/accuracy/trained_vgg16.jit.pt"));

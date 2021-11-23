@@ -84,4 +84,4 @@ TEST_P(AccuracyTests, DLAINT8AccuracyIsClose) {
 INSTANTIATE_TEST_SUITE_P(
     DLAINT8AccuracyIsCloseSuite,
     AccuracyTests,
-    testing::Values("tests/accuracy/vgg16_cifar10.jit.pt"));
+    testing::Values("tests/accuracy/trained_vgg16.jit.pt"));

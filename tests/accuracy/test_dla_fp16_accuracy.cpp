@@ -34,6 +34,8 @@ TEST_P(AccuracyTests, DLAFP16AccuracyIsClose) {
   compile_spec.device.allow_gpu_fallback = true;
   compile_spec.workspace_size = 1 << 28;
 
+  mod.to(torch::kHalf);
+
   auto trt_mod = torch_tensorrt::ts::compile(mod, compile_spec);
 
   torch::Tensor trt_correct = torch::zeros({1}, {torch::kCUDA}), trt_total = torch::zeros({1}, {torch::kCUDA});

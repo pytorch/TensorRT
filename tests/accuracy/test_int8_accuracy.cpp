@@ -81,4 +81,4 @@ TEST_P(AccuracyTests, INT8AccuracyIsClose) {
 INSTANTIATE_TEST_SUITE_P(
     INT8AccuracyIsCloseSuite,
     AccuracyTests,
-    testing::Values("tests/accuracy/vgg16_cifar10.jit.pt"));
+    testing::Values("tests/accuracy/trained_vgg16.jit.pt"));
