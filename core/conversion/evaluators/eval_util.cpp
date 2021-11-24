@@ -238,7 +238,7 @@ at::Tensor createTensorFromList(
   /// Gets shape of tensor to be created
   auto sizes = compute_sizes(data);
   checkListInputType(elem_type, sizes.size() == 1 && sizes[0] == 0);
-  at::ScalarType initial_scalar_type = c10::scalarTypeFromJitType(elem_type);
+  at::ScalarType initial_scalar_type = c10::scalarTypeFromJitType(*elem_type);
   if (initial_scalar_type == at::ScalarType::Double) {
     initial_scalar_type = at::typeMetaToScalarType(c10::get_default_dtype());
   }
