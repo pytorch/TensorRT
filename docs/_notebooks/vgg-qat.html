@@ -840,6 +840,21 @@ div.rendered_html tbody tr:hover {
          <p>
           ## 1. Requirements Please install the required dependencies and import these libraries accordingly
          </p>
+         <div class="nbinput nblast docutils container">
+          <div class="prompt highlight-none notranslate">
+           <div class="highlight">
+            <pre><span></span>[ ]:
+</pre>
+           </div>
+          </div>
+          <div class="input_area highlight-ipython3 notranslate">
+           <div class="highlight">
+            <pre>
+<span></span>!pip install ipywidgets --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host=files.pythonhosted.org
+</pre>
+           </div>
+          </div>
+         </div>
          <div class="nbinput docutils container">
           <div class="prompt highlight-none notranslate">
            <div class="highlight">
@@ -892,7 +907,7 @@ from vgg16 import vgg16
          </div>
          <p>
           ## 2. VGG16 Overview ### Very Deep Convolutional Networks for Large-Scale Image Recognition VGG is one of the earliest family of image classification networks that first used small (3x3) convolution filters and achieved significant improvements on ImageNet recognition challenge. The network architecture looks as follows
-          <img alt="47c4e0399e6043aa9214649c5d2fa999" src="https://neurohive.io/wp-content/uploads/2018/11/vgg16-1-e1542731207177.png"/>
+          <img alt="d52cf8532e934d3b81a57cb0cd58a6c7" src="https://neurohive.io/wp-content/uploads/2018/11/vgg16-1-e1542731207177.png"/>
          </p>
          <p>
           ## 3. Training a baseline VGG16 model We train VGG16 on CIFAR10 dataset. Define training and testing datasets and dataloaders. This will download the CIFAR 10 data in your
