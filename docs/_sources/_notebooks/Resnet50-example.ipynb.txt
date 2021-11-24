@@ -138,7 +138,8 @@
    ],
    "source": [
     "!pip install numpy==1.21.2 scipy==1.5.2 Pillow==6.2.0 scikit-image==0.17.2 matplotlib==3.3.0\n",
-    "!nvidia-smi"
+    "!nvidia-smi\n",
+    "!pip install ipywidgets --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host=files.pythonhosted.org"
    ]
   },
   {
@@ -975,7 +976,7 @@
    "name": "python",
    "nbconvert_exporter": "python",
    "pygments_lexer": "ipython3",
-   "version": "3.8.10"
+   "version": "3.8.12"
   }
  },
  "nbformat": 4,
