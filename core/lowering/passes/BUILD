@@ -20,6 +20,7 @@ cc_library(
         "reduce_gelu.cpp",
         "remove_bn_dim_check.cpp",
         "remove_contiguous.cpp",
+        "view_to_reshape.cpp",
         "remove_dropout.cpp",
         "remove_nops.cpp",
         "silu_to_sigmoid_multiplication.cpp",
