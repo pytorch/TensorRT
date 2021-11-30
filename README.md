@@ -10,7 +10,8 @@ More Information / System Architecture:
 
 - [GTC 2020 Talk](https://developer.nvidia.com/gtc/2020/video/s21671)
 
-
+## NVIDIA NGC Container
+Torch-TensorRT is distributed in the ready-to-run NVIDIA [NGC PyTorch Container](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch) starting with 21.11. We recommend using this prebuilt container to experiment & develop with Torch-TensorRT; it has all dependencies with the proper versions as well as example notebooks included.
 
 ## Building a docker container for Torch-TensorRT
 
