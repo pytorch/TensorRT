@@ -28,6 +28,7 @@ Additionally, accuracy tests are supported for Python backend using Nox. Please 
 # To run complete Python accuracy + API tests
 nox
 
+# To list supported sessions
 nox -l
 ```
 
