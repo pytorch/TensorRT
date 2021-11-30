@@ -15,7 +15,7 @@ chmod a+x /usr/bin/bazel
 export NVIDIA_TF32_OVERRIDE=0
 
 cd /opt/pytorch/torch_tensorrt
-cp cp /opt/pytorch/torch_tensorrt/docker/WORKSPACE.docker  /opt/pytorch/torch_tensorrt/WORKSPACE
+cp /opt/pytorch/torch_tensorrt/docker/WORKSPACE.docker  /opt/pytorch/torch_tensorrt/WORKSPACE
 
 pip install --user --upgrade nox
-nox 
+TOP_DIR=/opt/pytorch/torch_tensorrt nox
