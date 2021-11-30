@@ -2,19 +2,21 @@ import nox
 import os
 
 # Use system installed Python packages
-PYT_PATH='/opt/conda/lib/python3.8/site-packages'
+PYT_PATH='/opt/conda/lib/python3.8/site-packages' if not 'PYT_PATH' in os.environ else os.environ["PYT_PATH"]
 
 # Root directory for torch_tensorrt. Set according to docker container by default
-TOP_DIR='/opt/pytorch/torch_tensorrt'
+TOP_DIR='/torchtrt' if not 'TOP_DIR' in os.environ else os.environ["TOP_DIR"]
 
 # Download the dataset
 @nox.session(python=["3"], reuse_venv=True)
 def download_datasets(session):
+    print("Downloading dataset to path", os.path.join(TOP_DIR, 'examples/int8/training/vgg16'))
     session.chdir(os.path.join(TOP_DIR, 'examples/int8/training/vgg16'))
-    session.run_always('wget', 'https://www.cs.toronto.edu/~kriz/cifar-10-binary.tar.gz')
-    session.run_always('tar', '-xvzf', 'cifar-10-binary.tar.gz')
+    session.run_always('wget', 'https://www.cs.toronto.edu/~kriz/cifar-10-binary.tar.gz', external=True)
+    session.run_always('tar', '-xvzf', 'cifar-10-binary.tar.gz', external=True)
     session.run_always('mkdir', '-p', 
-                        os.path.join(TOP_DIR, 'tests/accuracy/datasets/data'))
+                        os.path.join(TOP_DIR, 'tests/accuracy/datasets/data'),
+                        external=True)
     session.run_always('cp', '-rpf', 
                         os.path.join(TOP_DIR, 'examples/int8/training/vgg16/cifar-10-batches-bin'),
                         os.path.join(TOP_DIR, 'tests/accuracy/datasets/data/cidar-10-batches-bin'),
