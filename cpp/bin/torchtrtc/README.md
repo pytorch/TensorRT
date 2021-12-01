@@ -14,12 +14,12 @@ to standard TorchScript. Load with `torch.jit.load()` and run like you would run
 
 ```
 torchtrtc [input_file_path] [output_file_path]
-  [input_specs...] {OPTIONS}
+    [input_specs...] {OPTIONS}
 
-  Torch-TensorRT is a compiler for TorchScript, it will compile and optimize
-  TorchScript programs to run on NVIDIA GPUs using TensorRT
+    torchtrtc is a compiler for TorchScript, it will compile and optimize
+    TorchScript programs to run on NVIDIA GPUs using TensorRT
 
-OPTIONS:
+  OPTIONS:
 
     -h, --help                        Display this help menu
     Verbiosity of the compiler
