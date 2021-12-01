@@ -249,11 +249,11 @@ int main(int argc, char** argv) {
   args::Flag sparse_weights(
       parser, "sparse-weights", "Enable sparsity for weights of conv and FC layers", {"sparse-weights"});
 
-  args::ValueFlagList<std::string> enabled_precision(
+  args::ValueFlagList<std::string> enabled_precisions(
       parser,
       "precision",
       "(Repeatable) Enabling an operating precision for kernels to use when building the engine (Int8 requires a calibration-cache argument) [ float | float32 | f32 | fp32 | half | float16 | f16 | fp16 | int8 | i8 | char ] (default: float)",
-      {'p', "enabled-precision"});
+      {'p', "enable-precision"});
   args::ValueFlag<std::string> device_type(
       parser,
       "type",
@@ -501,8 +501,8 @@ int main(int argc, char** argv) {
     }
   }
 
-  if (enabled_precision) {
-    for (const auto precision : args::get(enabled_precision)) {
+  if (enabled_precisions) {
+    for (const auto precision : args::get(enabled_precisions)) {
       auto dtype = parseDataType(precision);
       if (dtype == torchtrt::DataType::kFloat) {
         compile_settings.enabled_precisions.insert(torch::kF32);
