@@ -49,7 +49,7 @@ struct AddMMBranchFusion {
     if ((*arm1_start)->kind().toQualString() == std::string("aten::addmm") &&
         (*(++arm1_start))->kind() == prim::Return &&
         (*arm2_start)->kind().toQualString() == std::string("aten::matmul") &&
-        (*(++arm2_start))->kind().toQualString() != std::string("aten::add") &&
+        (*(++arm2_start))->kind().toQualString() == std::string("aten::add") &&
         (*(++arm2_start))->kind() == prim::Return) {
       // Make sure that block0 is solely just the aten::addmm op and block1 is matmul + add
       return true;
