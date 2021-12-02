@@ -1,6 +1,6 @@
-#include <sstream>
-#include <torch/torch.h>
 #include "core/conversion/conversion.h"
+#include <torch/torch.h>
+#include <sstream>
 #include "core/conversion/conversionctx/ConversionCtx.h"
 #include "core/conversion/converters/converters.h"
 #include "core/conversion/evaluators/evaluators.h"
@@ -200,7 +200,6 @@ void AddInputs(
 }
 
 void MarkOutputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> outputs) {
-
   for (auto out : outputs) {
     auto it = ctx->value_tensor_map.find(out);
     if (it == ctx->value_tensor_map.end()) {
@@ -241,18 +240,19 @@ void MarkOutputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> outp
       std::string name = std::string("output_") + std::to_string(ctx->num_outputs);
 
       // Check if the output tensor is one of the inputs to the network. If so, apply an identity layer to it.
-      for (int64_t i=0; i < num_inputs; i++){
-        if (out_tensor == ctx->net->getInput(i)){
-          LOG_DEBUG("One of the inputs named " << ctx->net->getInput(i)->getName() << " to the network is marked as an output tensor. Applying an identity layer and marking this tensor as output");
-          setOutput = true;
-          auto id_layer = ctx->net->addIdentity(*out_tensor);
-          auto id_out_tensor = id_layer->getOutput(0);
-          id_out_tensor->setName(name.c_str());
+      for (int64_t i = 0; i < num_inputs; i++) {
+        if (out_tensor == ctx->net->getInput(i)) {
+          LOG_DEBUG(
+              "One of the inputs named "
+              << ctx->net->getInput(i)->getName()
+              << " to the network is marked as an output tensor. Applying an identity layer and marking this tensor as output");
+          auto id_out_tensor = converters::applyIdentityOp(ctx, out_tensor, name);
           ctx->net->markOutput(*id_out_tensor);
+          setOutput = true;
         }
       }
 
-      if (!setOutput){
+      if (!setOutput) {
         out_tensor->setName(name.c_str());
         ctx->net->markOutput(*out_tensor);
       }
