@@ -1,11 +1,6 @@
-<<<<<<< HEAD
-#include <sstream>
-
-=======
->>>>>>> 367dd7bb... chore: refactor applyIdentityOp
-#include "core/conversion/conversion.h"
 #include <torch/torch.h>
 #include <sstream>
+#include "core/conversion/conversion.h"
 #include "core/conversion/conversionctx/ConversionCtx.h"
 #include "core/conversion/converters/converters.h"
 #include "core/conversion/evaluators/evaluators.h"
