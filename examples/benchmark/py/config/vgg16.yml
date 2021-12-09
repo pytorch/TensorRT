@@ -1,0 +1,18 @@
+--- 
+backend: 
+  - all
+input: 
+  input0: 
+    - 1
+    - 3
+    - 224
+    - 224
+  num_of_input: 1
+model: 
+  filename: vgg16_traced.jit.pt
+  name: vgg16
+runtime: 
+  device: 0
+  precision: 
+    - fp32
+    - fp16

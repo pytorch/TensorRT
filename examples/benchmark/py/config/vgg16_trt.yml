@@ -1,0 +1,17 @@
+--- 
+backend: 
+  - tensorrt
+input: 
+  input0: 
+    - 3
+    - 224
+    - 224
+  num_of_input: 1
+model: 
+  filename: model.plan
+  name: vgg16
+runtime: 
+  device: 0
+  precision: 
+    - fp32
+    - fp16
