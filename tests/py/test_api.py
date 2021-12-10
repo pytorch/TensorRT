@@ -32,9 +32,9 @@ class TestCompile(ModelTestCase):
     def test_compile_script(self):
         with torch.no_grad():
             trt_mod = torchtrt.ts.compile(self.scripted_model,
-                                      inputs=[self.input],
-                                      device=torchtrt.Device(gpu_id=0),
-                                      enabled_precisions={torch.float})
+                                          inputs=[self.input],
+                                          device=torchtrt.Device(gpu_id=0),
+                                          enabled_precisions={torch.float})
             same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
             self.assertTrue(same < 2e-2)
 
@@ -49,9 +49,9 @@ class TestCompile(ModelTestCase):
     def test_compile_global_nn_mod(self):
         with torch.no_grad():
             trt_mod = torchtrt.compile(self.model,
-                                   inputs=[self.input],
-                                   device=torchtrt.Device(gpu_id=0),
-                                   enabled_precisions={torch.float})
+                                       inputs=[self.input],
+                                       device=torchtrt.Device(gpu_id=0),
+                                       enabled_precisions={torch.float})
             same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
             self.assertTrue(same < 2e-2)
 
