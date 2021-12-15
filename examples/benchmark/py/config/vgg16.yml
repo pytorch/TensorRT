@@ -7,7 +7,7 @@ input:
     - 3
     - 224
     - 224
-  num_of_input: 1
+  num_inputs: 1
 model: 
   filename: vgg16_traced.jit.pt
   name: vgg16

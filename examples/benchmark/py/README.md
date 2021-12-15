@@ -8,6 +8,14 @@ This is a comprehensive Python benchmark suite to run perf runs using different 
 
 Note: Please note that for ONNX models, user can convert the ONNX model to TensorRT serialized engine and then use this package.
 
+## Prerequisite
+
+Benchmark scripts depends on following Python packages in addition to requirements.txt packages
+
+1. Torch-TensorRT
+2. Torch
+3. TensorRT
+
 ## Structure
 
 ```
@@ -42,14 +50,20 @@ There are two sample configuration files added.
 
 | Name | Supported Values | Description |
 | --- | --- | --- |
-| backend | all, torch, torch_tensorrt, tensorrt | Supported backends for inference |
+| backend | all, torch, torch_tensorrt, tensorrt | Supported backends for inference. |
 | input | - | Input binding names. Expected to list shapes of each input bindings |
 | model | - | Configure the model filename and name |
-| filename | - | Model file name to load from disk |
+| filename | - | Model file name to load from disk. |
 | name | - | Model name | 
 | runtime | - | Runtime configurations | 
 | device | 0 | Target device ID to run inference. Range depends on available GPUs |
-| precision | fp32, fp16 or half, int8 | Target precision to run inference |
+| precision | fp32, fp16 or half, int8 | Target precision to run inference. int8 cannot be used with 'all' backend |
+| calibration_cache | - | Calibration cache file expected for torch_tensorrt runtime in int8 precision |
+
+Note: 
+1. Please note that torch runtime perf is not supported for int8 yet.
+2. Torchscript module filename should end with .jit.pt otherwise it will be treated as a TensorRT engine.
+
 
 
 Additional sample use case:
@@ -64,7 +78,7 @@ input:
     - 3
     - 224
     - 224
-  num_of_input: 1
+  num_inputs: 1
 model: 
   filename: model.plan
   name: vgg16
