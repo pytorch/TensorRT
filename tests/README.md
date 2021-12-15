@@ -23,7 +23,7 @@ bazel test //tests --compilation_mode=dbg --test_output=errors --jobs=4 --runs_p
 
 `--jobs=4` is useful and is sometimes required to prevent too many processes to use GPU memory and cause CUDA out of memory issues.
 
-Additionally, accuracy tests are supported for Python backend using Nox. Please refer [dist-accuracy-test.sh](../docker/dist-accuracy-test.sh) for reference.
+Additionally, accuracy tests are supported for Python backend using Nox. Please refer [setup_nox.sh](../docker/setup_nox.sh) for reference.
 ```
 # To run complete Python accuracy + API tests
 nox
