@@ -78,6 +78,10 @@ def run_torch_tensorrt(model, input_tensors, params, precision):
        "inputs": input_tensors,
        "enabled_precisions": {precision_to_dtype(precision)} 
     }
+
+    if precision == 'int8':
+        compile_settings.update({"calib": params.get('calibration_cache')})
+
     
     model = torchtrt.compile(model, **compile_settings)
  
@@ -166,26 +170,35 @@ def run_tensorrt(model, input_tensors, params, precision, is_trt_engine=False):
             k += 1
     
     timings = []
-    with torch.no_grad():
-        with engine.create_execution_context() as context:
-            for i in range(WARMUP_ITER):
-                context.execute_async(batch_size, bindings, torch.cuda.current_stream().cuda_stream)
-                torch.cuda.synchronize()
-            
-            for i in range(iters):
-                start_time = timeit.default_timer()
-                context.execute_async(batch_size, bindings, torch.cuda.current_stream().cuda_stream)
-                torch.cuda.synchronize()
-                end_time = timeit.default_timer()
-                meas_time = end_time - start_time
-                timings.append(meas_time)
-                print("Iterations {}: {:.6f} s".format(i, end_time - start_time))
+    with engine.create_execution_context() as context:
+        for i in range(WARMUP_ITER):
+            context.execute_async(batch_size, bindings, torch.cuda.current_stream().cuda_stream)
+            torch.cuda.synchronize()
+
+        for i in range(iters):
+            start_time = timeit.default_timer()
+            context.execute_async(batch_size, bindings, torch.cuda.current_stream().cuda_stream)
+            torch.cuda.synchronize()
+            end_time = timeit.default_timer()
+            meas_time = end_time - start_time
+            timings.append(meas_time)
+            print("Iterations {}: {:.6f} s".format(i, end_time - start_time))
     
     printStats("TensorRT", timings, precision)
 
 # Deploys inference run for different backend configurations
 def run(model, input_tensors, params, precision, is_trt_engine = False):
     for backend in params.get('backend'):
+
+        if precision == 'int8':
+            if backend == 'all' or backend == 'torch':
+                print("int8 precision is not supported for torch runtime in this script yet")
+                return False
+
+            if backend == 'all' or backend == 'torch_tensorrt' or params.get('calibration_cache', None) == None:
+                print("int8 precision expects calibration cache file for inference")
+                return False
+
         if backend == 'all':
             run_torch(model, input_tensors, params, precision)
             run_torch_tensorrt(model, input_tensors, params, precision)
@@ -280,20 +293,25 @@ if __name__ == '__main__':
     # Create random input tensor of certain size
     torch.manual_seed(12345)
 
-    num_input = params.get('input').get('num_of_input')
+    num_input = params.get('input').get('num_inputs')
     for precision in params.get('runtime').get('precision', 'fp32'):
         input_tensors = []
-        num_input = params.get('input').get('num_of_input', 1)
+        num_input = params.get('input').get('num_inputs', 1)
         for i in range(num_input):
             inp_tensor = params.get('input').get('input' + str(i))
             input_tensors.append(torch.randint(0, 2, tuple(d for d in inp_tensor), dtype=precision_to_dtype(precision)).cuda())
+
+        if is_trt_engine:
+            print("Warning, TensorRT engine file is configured. Please make sure the precision matches with the TRT engine for reliable results")
 
         if not is_trt_engine and precision == "fp16" or precision == "half":
             # If model is TensorRT serialized engine then model.half will report failure
             model = model.half()
         
         # Run inference
-        run(model, input_tensors, params, precision, is_trt_engine)
+        status = run(model, input_tensors, params, precision, is_trt_engine)
+        if status == False:
+            continue
 
     # Generate report
     print('Model Summary:')
