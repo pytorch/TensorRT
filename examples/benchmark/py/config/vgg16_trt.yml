@@ -6,12 +6,15 @@ input:
     - 3
     - 224
     - 224
-  num_of_input: 1
+  num_inputs: 1
 model: 
-  filename: model.plan
+  filename: models/model.plan
   name: vgg16
+calibration_cache:
+  - vgg16.cache
 runtime: 
   device: 0
   precision: 
     - fp32
     - fp16
+    - int8
