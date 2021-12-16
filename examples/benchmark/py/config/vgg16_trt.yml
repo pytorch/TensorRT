@@ -8,7 +8,7 @@ input:
     - 224
   num_inputs: 1
 model: 
-  filename: model.plan
+  filename: models/model.plan
   name: vgg16
 calibration_cache:
   - vgg16.cache

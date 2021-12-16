@@ -258,7 +258,7 @@ def load_model(params):
     model = None
     is_trt_engine = False
     # Load torch model traced/scripted
-    model_file = os.path.join("models", params.get('model').get('filename'))
+    model_file = params.get('model').get('filename')
 
     if model_file.endswith('.jit.pt'):
         model = torch.jit.load(model_file).cuda()
@@ -278,7 +278,6 @@ if __name__ == '__main__':
     parser = ConfigParser(args.config)
     # Load YAML params
     params = parser.read_config()
-    
     print("Loading model: ", params.get('model').get('filename'))
 
     model = None
