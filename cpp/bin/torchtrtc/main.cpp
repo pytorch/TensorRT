@@ -53,11 +53,10 @@ int main(int argc, char** argv) {
       {"require-full-compilation"});
 
   args::ValueFlag<std::string> check_method_op_support(
-    parser,
-    "check-method-op-support",
-    "Check the support for end to end compilation of a specified method in the TorchScript module",
-    {"supported", "is-supported", "check-support", "check-method-op-support"}
-  );
+      parser,
+      "check-method-op-support",
+      "Check the support for end to end compilation of a specified method in the TorchScript module",
+      {"supported", "is-supported", "check-support", "check-method-op-support"});
 
   args::Flag disable_tf32(
       parser, "disable-tf32", "Prevent Float32 layers from using the TF32 data format", {"disable-tf32"});
@@ -196,7 +195,8 @@ int main(int argc, char** argv) {
   // Instead of compiling, just embed engine in a PyTorch module
   if (embed_engine) {
     auto device_str = args::get(device_type);
-    std::transform(device_str.begin(), device_str.end(), device_str.begin(), [](unsigned char c) { return std::tolower(c); });
+    std::transform(
+        device_str.begin(), device_str.end(), device_str.begin(), [](unsigned char c) { return std::tolower(c); });
 
     torchtrt::Device device;
 
@@ -224,7 +224,6 @@ int main(int argc, char** argv) {
     trt_mod.save(real_output_path);
     return 0;
   }
-
 
   std::vector<torchtrt::Input> ranges;
   for (const auto spec : args::get(input_shapes)) {
@@ -434,7 +433,8 @@ int main(int argc, char** argv) {
       }
 
       for (size_t i = 0; i < trt_results.size(); i++) {
-        if (!torchtrtc::accuracy::almost_equal(jit_results[i], trt_results[i].reshape_as(jit_results[i]), threshold_val)) {
+        if (!torchtrtc::accuracy::almost_equal(
+                jit_results[i], trt_results[i].reshape_as(jit_results[i]), threshold_val)) {
           std::ostringstream threshold_ss;
           threshold_ss << threshold_val;
           torchtrt::logging::log(
