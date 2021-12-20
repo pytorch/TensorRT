@@ -2,20 +2,6 @@
 #include <iostream>
 #include <sstream>
 
-#ifdef linux
-#include <linux/limits.h>
-#else
-#define PATH_MAX 260
-#endif
-
-#if defined(_WIN32)
-#include <direct.h>
-#define getcwd _getcwd
-#define realpath(N, R) _fullpath((R), (N), PATH_MAX)
-#else
-#include <unistd.h>
-#endif
-
 #include "NvInfer.h"
 #include "third_party/args/args.hpp"
 #include "torch/script.h"
@@ -25,187 +11,10 @@
 #include "torch_tensorrt/ptq.h"
 #include "torch_tensorrt/torch_tensorrt.h"
 
-at::ScalarType to_torch_dtype(torchtrt::DataType dtype) {
-  switch (dtype) {
-    case torchtrt::DataType::kHalf:
-      return at::kHalf;
-    case torchtrt::DataType::kChar:
-      return at::kChar;
-    case torchtrt::DataType::kInt:
-      return at::kInt;
-    case torchtrt::DataType::kBool:
-      return at::kBool;
-    case torchtrt::DataType::kFloat:
-    default:
-      return at::kFloat;
-  }
-}
-
-const std::unordered_map<nvinfer1::DataType, at::ScalarType>& get_trt_at_type_map() {
-  static const std::unordered_map<nvinfer1::DataType, at::ScalarType> trt_at_type_map = {
-      {nvinfer1::DataType::kFLOAT, at::kFloat},
-      {nvinfer1::DataType::kHALF, at::kHalf},
-      {nvinfer1::DataType::kINT32, at::kInt},
-      {nvinfer1::DataType::kINT8, at::kChar},
-      {nvinfer1::DataType::kBOOL, at::kBool},
-  };
-  return trt_at_type_map;
-}
-
-bool checkRtol(const at::Tensor& diff, const std::vector<at::Tensor> inputs, float threshold) {
-  double maxValue = 0.0;
-  for (auto& tensor : inputs) {
-    maxValue = fmax(tensor.abs().max().item<float>(), maxValue);
-  }
-  torchtrt::logging::log(
-      torchtrt::logging::Level::kDEBUG,
-      std::string("Max Difference: ") + std::to_string(diff.abs().max().item<float>()));
-  torchtrt::logging::log(
-      torchtrt::logging::Level::kDEBUG, std::string("Acceptable Threshold: ") + std::to_string(threshold));
-  return diff.abs().max().item<float>() <= threshold * maxValue;
-}
-
-bool almostEqual(const at::Tensor& a, const at::Tensor& b, float threshold) {
-  return checkRtol(a - b, {a, b}, threshold);
-}
-
-torchtrt::TensorFormat parseTensorFormat(std::string str) {
-  std::transform(str.begin(), str.end(), str.begin(), [](unsigned char c) { return std::tolower(c); });
-
-  if (str == "linear" || str == "nchw" || str == "chw" || str == "contiguous") {
-    return torchtrt::TensorFormat::kContiguous;
-  } else if (str == "nhwc" || str == "hwc" || str == "channels_last") {
-    return torchtrt::TensorFormat::kChannelsLast;
-  } else {
-    torchtrt::logging::log(
-        torchtrt::logging::Level::kERROR,
-        "Invalid tensor format, options are [ linear | nchw | chw | contiguous | nhwc | hwc | channels_last ], found: " +
-            str);
-    return torchtrt::TensorFormat::kUnknown;
-  }
-}
-
-torchtrt::DataType parseDataType(std::string dtype_str) {
-  std::transform(
-      dtype_str.begin(), dtype_str.end(), dtype_str.begin(), [](unsigned char c) { return std::tolower(c); });
-  if (dtype_str == "float" || dtype_str == "float32" || dtype_str == "f32" || dtype_str == "fp32") {
-    return torchtrt::DataType::kFloat;
-  } else if (dtype_str == "half" || dtype_str == "float16" || dtype_str == "f16" || dtype_str == "fp16") {
-    return torchtrt::DataType::kHalf;
-  } else if (dtype_str == "char" || dtype_str == "int8" || dtype_str == "i8") {
-    return torchtrt::DataType::kChar;
-  } else if (dtype_str == "int" || dtype_str == "int32" || dtype_str == "i32") {
-    return torchtrt::DataType::kInt;
-  } else if (dtype_str == "bool" || dtype_str == "b") {
-    return torchtrt::DataType::kBool;
-  } else {
-    torchtrt::logging::log(
-        torchtrt::logging::Level::kERROR,
-        "Invalid precision, options are [ float | float32 | fp32 | f32 | half | float16 | fp16 | f16 | char | int8 | i8 | int | int32 | i32 | bool | b], found: " +
-            dtype_str);
-    return torchtrt::DataType::kUnknown;
-  }
-}
-
-std::vector<int64_t> parseSingleDim(std::string shape_str) {
-  std::vector<int64_t> shape;
-  std::stringstream ss;
-  for (auto c : shape_str) {
-    if (c == '(' || c == ' ') {
-      continue;
-    } else if (c == ',') {
-      int64_t dim;
-      ss >> dim;
-      shape.push_back(dim);
-      ss.clear();
-    } else if (c == ')') {
-      int64_t dim;
-      ss >> dim;
-      shape.push_back(dim);
-      ss.clear();
-      return shape;
-    } else {
-      ss << c;
-    }
-  }
-
-  torchtrt::logging::log(
-      torchtrt::logging::Level::kERROR,
-      "Shapes need dimensions delimited by comma in parentheses, \"(N,..,C,H,W)\"\n e.g \"(3,3,200,200)\"");
-  exit(1);
-  return {};
-}
-
-std::vector<std::vector<int64_t>> parseDynamicDim(std::string shape_str) {
-  shape_str = shape_str.substr(1, shape_str.size() - 2);
-  std::vector<std::vector<int64_t>> shape;
-  std::stringstream ss;
-
-  std::string delimiter = ";";
-
-  size_t pos = 0;
-  while ((pos = shape_str.find(delimiter)) != std::string::npos) {
-    auto token = shape_str.substr(0, pos);
-    auto range = parseSingleDim(token);
-    shape_str.erase(0, pos + delimiter.length());
-    shape.push_back(range);
-  }
-
-  auto range = parseSingleDim(shape_str);
-  shape.push_back(range);
-
-  if (shape.size() != 3) {
-    torchtrt::logging::log(
-        torchtrt::logging::Level::kERROR,
-        "Dynamic shapes need three sets of dimensions delimited by semi-colons, \"[(MIN_N,..,MIN_C,MIN_H,MIN_W);(OPT_N,..,OPT_C,OPT_H,OPT_W);(MAX_N,..,MAX_C,MAX_H,MAX_W)]\"\n e.g \"[(3,3,100,100);(3,3,200,200);(3,3,300,300)]\"");
-    exit(1);
-  }
-
-  return shape;
-}
-
-std::string read_buf(std::string const& path) {
-  std::string buf;
-  std::ifstream stream(path.c_str(), std::ios::binary);
-
-  if (stream) {
-    stream >> std::noskipws;
-    std::copy(std::istream_iterator<char>(stream), std::istream_iterator<char>(), std::back_inserter(buf));
-  }
-
-  return buf;
-}
-
-std::string get_cwd() {
-  char buff[FILENAME_MAX]; // create string buffer to hold path
-  if (getcwd(buff, FILENAME_MAX)) {
-    std::string current_working_dir(buff);
-    return current_working_dir;
-  } else {
-    torchtrt::logging::log(torchtrt::logging::Level::kERROR, "Unable to get current directory");
-    exit(1);
-  }
-}
-
-std::string real_path(std::string path) {
-  auto abs_path = path;
-  char real_path_c[PATH_MAX];
-  char* res = realpath(abs_path.c_str(), real_path_c);
-  if (res) {
-    return std::string(real_path_c);
-  } else {
-    torchtrt::logging::log(torchtrt::logging::Level::kERROR, std::string("Unable to find file ") + abs_path);
-    exit(1);
-  }
-}
-
-std::string resolve_path(std::string path) {
-  auto rpath = path;
-  if (!(rpath.rfind("/", 0) == 0)) {
-    rpath = get_cwd() + '/' + rpath;
-  }
-  return rpath;
-}
+#include "accuracy.h"
+#include "fileio.h"
+#include "luts.h"
+#include "parser_util.h"
 
 int main(int argc, char** argv) {
   torchtrt::logging::set_is_colored_output_on(true);
@@ -242,6 +51,13 @@ int main(int argc, char** argv) {
       "require-full-compilation",
       "Require that the model should be fully compiled to TensorRT or throw an error",
       {"require-full-compilation"});
+
+  args::ValueFlag<std::string> check_method_op_support(
+    parser,
+    "check-method-op-support",
+    "Check the support for end to end compilation of a specified method in the TorchScript module",
+    {"supported", "is-supported", "check-support", "check-method-op-support"}
+  );
 
   args::Flag disable_tf32(
       parser, "disable-tf32", "Prevent Float32 layers from using the TF32 data format", {"disable-tf32"});
@@ -354,101 +170,67 @@ int main(int argc, char** argv) {
     torchtrt::logging::set_reportable_log_level(torchtrt::logging::Level::kERROR);
   }
 
-  std::vector<torchtrt::Input> ranges;
-  const std::string spec_err_str =
-      "Dimensions should be specified in one of these types \"(N,..,C,H,W)\" \"[(MIN_N,..,MIN_C,MIN_H,MIN_W);(OPT_N,..,OPT_C,OPT_H,OPT_W);(MAX_N,..,MAX_C,MAX_H,MAX_W)]\"\n e.g \"(3,3,300,300)\" \"[(3,3,100,100);(3,3,200,200);(3,3,300,300)]\"\nTo specify input type append an @ followed by the precision\n e.g. \"(3,3,300,300)@f32\"\nTo specify input format append an \% followed by the format [contiguous | channel_last]\n e.g. \"(3,3,300,300)@f32\%channel_last\"";
-  for (const auto spec : args::get(input_shapes)) {
-    std::string shapes;
-    std::string dtype;
-    std::string format;
-    // THERE IS A SPEC FOR DTYPE
-    if (spec.find('@') != std::string::npos) {
-      // THERE IS ALSO A SPEC FOR FORMAT
-      if (spec.find('%') != std::string::npos) {
-        auto dtype_delim = spec.find('@');
-        auto format_delim = spec.find('%');
-        std::string shapes = spec.substr(0, dtype_delim);
-        std::string dtype = spec.substr(dtype_delim + 1, format_delim - (dtype_delim + 1));
-        std::string format = spec.substr(format_delim + 1, spec.size());
+  auto real_input_path = torchtrtc::fileio::resolve_path(args::get(input_path));
 
-        auto parsed_dtype = parseDataType(dtype);
-        if (parsed_dtype == torchtrt::DataType::kUnknown) {
-          torchtrt::logging::log(torchtrt::logging::Level::kERROR, "Invalid datatype for input specification " + spec);
-          std::cerr << std::endl << parser;
-          exit(1);
-        }
-        auto parsed_format = parseTensorFormat(format);
-        if (parsed_format == torchtrt::TensorFormat::kUnknown) {
-          torchtrt::logging::log(torchtrt::logging::Level::kERROR, "Invalid format for input specification " + spec);
-          std::cerr << std::endl << parser;
-          exit(1);
-        }
-        if (shapes.rfind("(", 0) == 0) {
-          ranges.push_back(torchtrt::Input(parseSingleDim(shapes), parsed_dtype, parsed_format));
-        } else if (shapes.rfind("[", 0) == 0) {
-          auto dyn_shapes = parseDynamicDim(shapes);
-          ranges.push_back(torchtrt::Input(dyn_shapes[0], dyn_shapes[1], dyn_shapes[2], parsed_dtype, parsed_format));
-        } else {
-          torchtrt::logging::log(torchtrt::logging::Level::kERROR, spec_err_str);
-          std::cerr << std::endl << parser;
-          exit(1);
-        }
-        // THERE IS NO SPEC FOR FORMAT
-      } else {
-        std::string shapes = spec.substr(0, spec.find('@'));
-        std::string dtype = spec.substr(spec.find('@') + 1, spec.size());
-
-        auto parsed_dtype = parseDataType(dtype);
-        if (parsed_dtype == torchtrt::DataType::kUnknown) {
-          torchtrt::logging::log(torchtrt::logging::Level::kERROR, "Invalid datatype for input specification " + spec);
-          std::cerr << std::endl << parser;
-          exit(1);
-        }
-        if (shapes.rfind("(", 0) == 0) {
-          ranges.push_back(torchtrt::Input(parseSingleDim(shapes), parsed_dtype));
-        } else if (shapes.rfind("[", 0) == 0) {
-          auto dyn_shapes = parseDynamicDim(shapes);
-          ranges.push_back(torchtrt::Input(dyn_shapes[0], dyn_shapes[1], dyn_shapes[2], parsed_dtype));
-        } else {
-          torchtrt::logging::log(torchtrt::logging::Level::kERROR, spec_err_str);
-          std::cerr << std::endl << parser;
-          exit(1);
-        }
-      }
-      // THERE IS A SPEC FOR FORMAT BUT NOT DTYPE
-    } else if (spec.find('%') != std::string::npos) {
-      std::string shapes = spec.substr(0, spec.find('%'));
-      std::string format = spec.substr(spec.find('%') + 1, spec.size());
-
-      auto parsed_format = parseTensorFormat(format);
-      if (parsed_format == torchtrt::TensorFormat::kUnknown) {
-        torchtrt::logging::log(torchtrt::logging::Level::kERROR, "Invalid format for input specification " + spec);
-        std::cerr << std::endl << parser;
-        exit(1);
-      }
-      if (shapes.rfind("(", 0) == 0) {
-        ranges.push_back(torchtrt::Input(parseSingleDim(shapes), parsed_format));
-      } else if (shapes.rfind("[", 0) == 0) {
-        auto dyn_shapes = parseDynamicDim(shapes);
-        ranges.push_back(torchtrt::Input(dyn_shapes[0], dyn_shapes[1], dyn_shapes[2], parsed_format));
-      } else {
-        torchtrt::logging::log(torchtrt::logging::Level::kERROR, spec_err_str);
-        std::cerr << std::endl << parser;
-        exit(1);
-      }
-      // JUST SHAPE USE DEFAULT DTYPE
-    } else {
-      if (spec.rfind("(", 0) == 0) {
-        ranges.push_back(torchtrt::Input(parseSingleDim(spec)));
-      } else if (spec.rfind("[", 0) == 0) {
-        auto dyn_shapes = parseDynamicDim(spec);
-        ranges.push_back(torchtrt::Input(dyn_shapes[0], dyn_shapes[1], dyn_shapes[2]));
-      } else {
-        torchtrt::logging::log(torchtrt::logging::Level::kERROR, spec_err_str);
-        std::cerr << std::endl << parser;
-        exit(1);
-      }
+  if (check_method_op_support) {
+    torch::jit::Module mod;
+    try {
+      // Deserialize the ScriptModule from a file using torch::jit::load().
+      mod = torch::jit::load(real_input_path);
+    } catch (const c10::Error& e) {
+      torchtrt::logging::log(torchtrt::logging::Level::kERROR, "Error loading the model (path may be incorrect)");
+      return 1;
     }
+
+    auto method = args::get(check_method_op_support);
+    auto result = torchtrt::ts::check_method_operator_support(mod, method);
+    if (result) {
+      std::cout << "The method is supported end to end by Torch-TensorRT" << std::endl;
+      return 0;
+    } else {
+      torchtrt::logging::log(torchtrt::logging::Level::kERROR, "Method is not currently supported by Torch-TensorRT");
+      return 1;
+    }
+  }
+
+  auto real_output_path = torchtrtc::fileio::resolve_path(args::get(output_path));
+
+  // Instead of compiling, just embed engine in a PyTorch module
+  if (embed_engine) {
+    auto device_str = args::get(device_type);
+    std::transform(device_str.begin(), device_str.end(), device_str.begin(), [](unsigned char c) { return std::tolower(c); });
+
+    torchtrt::Device device;
+
+    if (gpu_id) {
+      device.gpu_id = args::get(gpu_id);
+      torchtrt::set_device(device.gpu_id);
+    }
+
+    if (device_str == "gpu") {
+      device.device_type = torchtrt::Device::DeviceType::kGPU;
+    } else if (device_str == "dla") {
+      device.device_type = torchtrt::Device::DeviceType::kDLA;
+      if (dla_core) {
+        device.dla_core = args::get(dla_core);
+      }
+    } else {
+      torchtrt::logging::log(
+          torchtrt::logging::Level::kERROR, "Invalid device type, options are [ gpu | dla ] found: " + device_type);
+      std::cerr << std::endl << parser;
+      return 1;
+    }
+
+    std::string serialized_engine = torchtrtc::fileio::read_buf(real_input_path);
+    auto trt_mod = torchtrt::ts::embed_engine_in_new_module(serialized_engine, device);
+    trt_mod.save(real_output_path);
+    return 0;
+  }
+
+
+  std::vector<torchtrt::Input> ranges;
+  for (const auto spec : args::get(input_shapes)) {
+    ranges.push_back(torchtrtc::parserutil::parse_input(spec));
     std::stringstream ss;
     ss << "Parsed Input: " << ranges.back();
     torchtrt::logging::log(torchtrt::logging::Level::kDEBUG, ss.str());
@@ -475,7 +257,7 @@ int main(int argc, char** argv) {
 
   std::string calibration_cache_file_path = "";
   if (calibration_cache_file) {
-    calibration_cache_file_path = resolve_path(args::get(calibration_cache_file));
+    calibration_cache_file_path = torchtrtc::fileio::resolve_path(args::get(calibration_cache_file));
   }
 
   auto calibrator = torchtrt::ptq::make_int8_cache_calibrator(calibration_cache_file_path);
@@ -503,7 +285,7 @@ int main(int argc, char** argv) {
 
   if (enabled_precisions) {
     for (const auto precision : args::get(enabled_precisions)) {
-      auto dtype = parseDataType(precision);
+      auto dtype = torchtrtc::parserutil::parse_dtype(precision);
       if (dtype == torchtrt::DataType::kFloat) {
         compile_settings.enabled_precisions.insert(torch::kF32);
       } else if (dtype == torchtrt::DataType::kHalf) {
@@ -588,17 +370,6 @@ int main(int argc, char** argv) {
     compile_settings.truncate_long_and_double = true;
   }
 
-  auto real_input_path = resolve_path(args::get(input_path));
-  auto real_output_path = resolve_path(args::get(output_path));
-
-  // Instead of compiling, just embed engine in a PyTorch module
-  if (embed_engine) {
-    std::string serialized_engine = read_buf(real_input_path);
-    auto trt_mod = torchtrt::ts::embed_engine_in_new_module(serialized_engine, compile_settings.device);
-    trt_mod.save(real_output_path);
-    return 0;
-  }
-
   torch::jit::Module mod;
   try {
     // Deserialize the ScriptModule from a file using torch::jit::load().
@@ -638,7 +409,7 @@ int main(int argc, char** argv) {
 
       for (auto i : ranges) {
         auto in = at::randn(i.opt_shape, {at::kCUDA});
-        in = in.to(to_torch_dtype(i.dtype));
+        in = in.to(torchtrtc::luts::to_torch_dtype(i.dtype));
         jit_inputs_ivalues.push_back(in.clone());
         trt_inputs_ivalues.push_back(in.clone());
       }
@@ -667,7 +438,7 @@ int main(int argc, char** argv) {
       }
 
       for (size_t i = 0; i < trt_results.size(); i++) {
-        if (!almostEqual(jit_results[i], trt_results[i].reshape_as(jit_results[i]), threshold_val)) {
+        if (!torchtrtc::accuracy::almost_equal(jit_results[i], trt_results[i].reshape_as(jit_results[i]), threshold_val)) {
           std::ostringstream threshold_ss;
           threshold_ss << threshold_val;
           torchtrt::logging::log(
