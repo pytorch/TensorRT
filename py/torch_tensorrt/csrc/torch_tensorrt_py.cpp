@@ -298,13 +298,11 @@ PYBIND11_MODULE(_C, m) {
       .def_readwrite("sparse_weights", &CompileSpec::sparse_weights)
       .def_readwrite("disable_tf32", &CompileSpec::disable_tf32)
       .def_readwrite("debug", &CompileSpec::debug)
-      .def_readwrite("strict_types", &CompileSpec::strict_types)
       .def_readwrite("device", &CompileSpec::device)
       .def_readwrite("capability", &CompileSpec::capability)
       .def_readwrite("num_min_timing_iters", &CompileSpec::num_min_timing_iters)
       .def_readwrite("num_avg_timing_iters", &CompileSpec::num_avg_timing_iters)
       .def_readwrite("workspace_size", &CompileSpec::workspace_size)
-      .def_readwrite("max_batch_size", &CompileSpec::max_batch_size)
       .def_readwrite("torch_fallback", &CompileSpec::torch_fallback)
       .def_readwrite("truncate_long_and_double", &CompileSpec::truncate_long_and_double);
 
