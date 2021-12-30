@@ -289,6 +289,8 @@ int InterpolatePlugin::enqueue(
       out = at::upsample_bilinear2d(input, {size_[0], size_[1]}, align_corners_);
     } else if (mode_ == "trilinear") {
       out = at::upsample_trilinear3d(input, {size_[0], size_[1], size_[2]}, align_corners_);
+    } else if(mode_ == "adaptive_avg_pool1d"){
+      out = at::adaptive_avg_pool1d(input, {size_[0]});
     } else if (mode_ == "adaptive_avg_pool2d") {
       out = at::adaptive_avg_pool2d(input, {size_[0], size_[1]});
     } else if (mode_ == "adaptive_max_pool2d") {
