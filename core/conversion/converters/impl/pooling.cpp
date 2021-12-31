@@ -16,7 +16,7 @@ bool GlobalPoolingConverter(
     nvinfer1::PoolingType pool_type) {
   auto in = args[0].ITensorOrFreeze(ctx);
   nvinfer1::Dims dims = in->getDimensions();
-  // Generate a bitmask of all 1s except the last 2 bits (N and C axes) when dims.nbDims >= 2
+  // Generate a bitmask of all 1s except the last 2 bits (N and C axes) when dims.nbDims > 2
   uint32_t reduceAxes = ((1 << dims.nbDims) - 1) & ~0b11;
   // Generate a bitmask of all 1s except the last 1 bits (N axes) when dims.nbDims == 2. `aten::adaptive_avg_pool1d`'s
   // input can be (N, C, L) or (C, L).
