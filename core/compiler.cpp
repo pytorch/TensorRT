@@ -416,7 +416,7 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
       if (cfg.partition_info.enabled &&
           !(cfg.lower_info.forced_fallback_modules.size() == 0 &&
             cfg.partition_info.forced_fallback_operators.size() == 0 &&
-            conversion::VerifyConverterSupportForBlock(g->block(), false))) {
+            conversion::VerifyConverterSupportForBlock(g->block(), true))) {
         auto input_ivalues_map = partitioning::generateRandomInputs(cfg.convert_info.inputs, first_use_types);
         auto graph_and_mapping = ConstructFallbackGraph(new_mod, g->block(), input_ivalues_map, cfg, static_params);
         new_g = graph_and_mapping.first;
