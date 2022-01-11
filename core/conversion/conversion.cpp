@@ -555,7 +555,7 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b, bool suppress_er
     unsupported_msg << std::endl << "In Module:" << std::endl;
 
     if (!suppress_errors) {
-      LOG_DEBUG(unsupported_msg.str());
+      LOG_ERROR(unsupported_msg.str());
     }
 
     std::unordered_map<std::string, std::unordered_set<std::string>> unsupported_node_locations;
@@ -582,7 +582,7 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b, bool suppress_er
         traceback << str;
       }
       auto tb_str = traceback.str();
-      LOG_DEBUG(tb_str);
+      LOG_ERROR(tb_str);
     }
 
     return false;
