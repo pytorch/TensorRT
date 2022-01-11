@@ -71,7 +71,7 @@ auto batch_norm_registrations TORCHTRT_UNUSED =
               LOG_DEBUG("momentum disregarded");
               LOG_DEBUG("training disregarded");
               LOG_DEBUG("cudnn disregarded");
-              TORCHTRT_CHECK(orig_shape.nbDims > 2, "Unable to create batch normalization layer from node: " << *n);
+              TORCHTRT_CHECK(orig_shape.nbDims >= 2, "Unable to create batch normalization layer from node: " << *n);
 
               // Expand spatial dims from 1D to 2D if needed
               bool expandDims = (orig_shape.nbDims < 4);
