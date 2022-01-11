@@ -34,3 +34,9 @@ build:python --define=target_lang=python
 build:pre_cxx11_abi --cxxopt="-D_GLIBCXX_USE_CXX11_ABI=0"
 build:pre_cxx11_abi --linkopt="-D_GLIBCXX_USE_CXX11_ABI=0"
 build:pre_cxx11_abi --define=abi=pre_cxx11_abi
+
+build:ci_testing --define=torchtrt_src=prebuilt --cxxopt="-DDISABLE_TEST_IN_CI" --action_env "NVIDIA_TF32_OVERRIDE=0"
+build:use_precompiled_torchtrt --define=torchtrt_src=prebuilt
+
+test:ci_testing --define=torchtrt_src=prebuilt --cxxopt="-DDISABLE_TEST_IN_CI" --action_env "NVIDIA_TF32_OVERRIDE=0"
+test:use_precompiled_torchtrt --define=torchtrt_src=prebuilt

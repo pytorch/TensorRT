@@ -11,7 +11,9 @@ filegroup(
     name = "jit_models",
     srcs = ["//tests/modules:resnet50_traced.jit.pt",
             "//tests/modules:mobilenet_v2_traced.jit.pt",
-            "//tests/modules:conditional_scripted.jit.pt"]
+            "//tests/modules:conditional_scripted.jit.pt",
+            "//tests/modules:loop_fallback_eval_scripted.jit.pt",
+            "//tests/modules:loop_fallback_no_eval_scripted.jit.pt"]
 )
 
 partitioning_test(
@@ -35,7 +37,21 @@ cc_test(
   srcs = ["test_fallback_graph_output.cpp"],
   deps = [
       "//tests/util",
-      "//core",
+      "@googletest//:gtest_main",
+  ] + select({
+      ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
+      "//conditions:default":  ["@libtorch//:libtorch"],
+  }),
+  data = [
+      ":jit_models"
+  ]
+)
+
+cc_test(
+  name = "test_loop_fallback",
+  srcs = ["test_loop_fallback.cpp"],
+  deps = [
+      "//tests/util",
       "@googletest//:gtest_main",
   ] + select({
       ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
@@ -51,7 +67,6 @@ cc_test(
   srcs = ["test_conditionals.cpp"],
   deps = [
       "//tests/util",
-      "//core",
       "@googletest//:gtest_main",
   ] + select({
       ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
@@ -63,13 +78,14 @@ cc_test(
 )
 
 test_suite(
-    name = "partitioning_test",
+    name = "partitioning_tests",
     tests = [
         ":test_segmentation",
         ":test_shape_analysis",
         ":test_tensorrt_conversion",
         ":test_stitched_graph",
         ":test_fallback_graph_output",
+        ":test_loop_fallback",
         ":test_conditionals"
     ]
 )

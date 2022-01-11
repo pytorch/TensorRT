@@ -1,13 +1,14 @@
 #pragma once
 #include <map>
 #include <memory>
+#include <mutex>
 #include <utility>
 #include "ATen/core/function_schema.h"
 #include "NvInfer.h"
 #include "core/util/prelude.h"
 #include "torch/custom_class.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace runtime {
 
@@ -47,6 +48,7 @@ struct TRTEngine : torch::CustomClassHolder {
   std::shared_ptr<nvinfer1::IExecutionContext> exec_ctx;
   std::pair<uint64_t, uint64_t> num_io;
   std::string name;
+  std::mutex mu;
   CudaDevice device_info;
 
   std::unordered_map<uint64_t, uint64_t> in_binding_map;
@@ -83,4 +85,4 @@ const std::unordered_map<std::string, std::string>& get_dla_supported_SMs();
 
 } // namespace runtime
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

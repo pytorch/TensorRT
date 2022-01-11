@@ -65,13 +65,13 @@ void test_body(const std::string& graph, at::Tensor& in) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
 
   in = at::clone(in);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 } // namespace
 
@@ -279,15 +279,15 @@ TEST(Converters, UnpackVarLowersCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
 
   in = at::clone(in);
-  trtorch::core::lowering::passes::UnpackVar(g);
+  torch_tensorrt::core::lowering::passes::UnpackVar(g);
   torch::jit::EliminateCommonSubexpression(g);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
 TEST(Converters, UnpackVarKeepDimsLowersCorrectly) {
@@ -305,15 +305,15 @@ TEST(Converters, UnpackVarKeepDimsLowersCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
 
   in = at::clone(in);
-  trtorch::core::lowering::passes::UnpackVar(g);
+  torch_tensorrt::core::lowering::passes::UnpackVar(g);
   torch::jit::EliminateCommonSubexpression(g);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
 TEST(Converters, UnpackVarUnbiasedLowersCorrectly) {
@@ -331,15 +331,15 @@ TEST(Converters, UnpackVarUnbiasedLowersCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
 
   in = at::clone(in);
-  trtorch::core::lowering::passes::UnpackVar(g);
+  torch_tensorrt::core::lowering::passes::UnpackVar(g);
   torch::jit::EliminateCommonSubexpression(g);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
 TEST(Converters, UnpackVarUnbiasedKeepDimsLowersCorrectly) {
@@ -357,15 +357,15 @@ TEST(Converters, UnpackVarUnbiasedKeepDimsLowersCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
 
   in = at::clone(in);
-  trtorch::core::lowering::passes::UnpackVar(g);
+  torch_tensorrt::core::lowering::passes::UnpackVar(g);
   torch::jit::EliminateCommonSubexpression(g);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
 TEST(Converters, UnpackStdLowersCorrectly) {
@@ -383,15 +383,15 @@ TEST(Converters, UnpackStdLowersCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
 
   in = at::clone(in);
-  trtorch::core::lowering::passes::UnpackStd(g);
-  trtorch::core::lowering::passes::UnpackVar(g);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  torch_tensorrt::core::lowering::passes::UnpackStd(g);
+  torch_tensorrt::core::lowering::passes::UnpackVar(g);
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
 TEST(Converters, UnpackStdKeepDimsLowersCorrectly) {
@@ -409,15 +409,15 @@ TEST(Converters, UnpackStdKeepDimsLowersCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
 
   in = at::clone(in);
-  trtorch::core::lowering::passes::UnpackStd(g);
-  trtorch::core::lowering::passes::UnpackVar(g);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  torch_tensorrt::core::lowering::passes::UnpackStd(g);
+  torch_tensorrt::core::lowering::passes::UnpackVar(g);
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
 TEST(Converters, UnpackStdUnbiasedLowersCorrectly) {
@@ -435,16 +435,16 @@ TEST(Converters, UnpackStdUnbiasedLowersCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
 
   in = at::clone(in);
-  trtorch::core::lowering::passes::UnpackStd(g);
-  trtorch::core::lowering::passes::UnpackVar(g);
+  torch_tensorrt::core::lowering::passes::UnpackStd(g);
+  torch_tensorrt::core::lowering::passes::UnpackVar(g);
   torch::jit::EliminateCommonSubexpression(g);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
 TEST(Converters, UnpackStdUnbiasedKeepDimsLowersCorrectly) {
@@ -462,16 +462,16 @@ TEST(Converters, UnpackStdUnbiasedKeepDimsLowersCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
 
   in = at::clone(in);
-  trtorch::core::lowering::passes::UnpackStd(g);
-  trtorch::core::lowering::passes::UnpackVar(g);
+  torch_tensorrt::core::lowering::passes::UnpackStd(g);
+  torch_tensorrt::core::lowering::passes::UnpackVar(g);
   torch::jit::EliminateCommonSubexpression(g);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
 TEST(Converters, UnpackVarUnbiasedNegAxisLowersCorrectly) {
@@ -488,14 +488,14 @@ TEST(Converters, UnpackVarUnbiasedNegAxisLowersCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
 
   in = at::clone(in);
-  trtorch::core::lowering::passes::UnpackVar(g);
+  torch_tensorrt::core::lowering::passes::UnpackVar(g);
   torch::jit::EliminateCommonSubexpression(g);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {jit_in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {jit_in});
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }

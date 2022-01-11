@@ -14,6 +14,7 @@ test_suite(
         ":test_default_input_types",
         ":test_compiled_modules",
         ":test_modules_as_engines",
+        ":test_runtime_thread_safety",
         ":test_multiple_registered_engines",
         ":test_serialization",
         ":test_module_fallback",
@@ -27,6 +28,7 @@ test_suite(
         ":test_default_input_types",
         ":test_compiled_modules",
         ":test_modules_as_engines",
+        ":test_runtime_thread_safety",
         ":test_multiple_registered_engines",
         ":test_serialization",
         ":test_module_fallback",
@@ -74,7 +76,6 @@ cc_test(
         "//tests/modules:jit_models",
     ],
     deps = [
-        "//cpp:trtorch",
         "//tests/util",
         "@googletest//:gtest_main",
     ] + select({
@@ -96,13 +97,23 @@ cc_test(
 )
 
 cc_test(
+    name = "test_runtime_thread_safety",
+    srcs = ["test_runtime_thread_safety.cpp"],
+    data = [
+        "//tests/modules:jit_models",
+    ],
+    deps = [
+        ":cpp_api_test",
+    ]
+)
+
+cc_test(
     name = "test_module_fallback",
     srcs = ["test_module_fallback.cpp"],
     data = [
         "//tests/modules:jit_models",
     ],
     deps = [
-        "//cpp:trtorch",
         "//tests/util",
         "@googletest//:gtest_main",
     ] + select({
@@ -123,8 +134,8 @@ cc_test(
 )
 
 cc_test(
-    name = "test_multi_gpu_serdes",
-    srcs = ["test_multi_gpu_serdes.cpp"],
+    name = "test_multi_gpu_serde",
+    srcs = ["test_multi_gpu_serde.cpp"],
     data = [
         "//tests/modules:jit_models",
     ],
@@ -137,7 +148,6 @@ cc_library(
     name = "cpp_api_test",
     hdrs = ["cpp_api_test.h"],
     deps = [
-        "//cpp:trtorch",
         "//tests/util",
         "@googletest//:gtest_main",
     ] + select({

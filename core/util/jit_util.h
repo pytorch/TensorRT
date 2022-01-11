@@ -5,7 +5,7 @@
 
 #include "torch/csrc/jit/ir/ir.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace util {
 
@@ -15,6 +15,14 @@ inline std::string node_info(const torch::jit::Node* n) {
   std::string node_info = ss.str();
   node_info.erase(std::remove(node_info.begin(), node_info.end(), '\n'), node_info.end());
   return node_info;
+}
+
+inline std::string value_info(const torch::jit::Value* v) {
+  std::stringstream ss;
+  ss << node_info(v->node());
+  std::string value_info = ss.str();
+  value_info.erase(std::remove(value_info.begin(), value_info.end(), '\n'), value_info.end());
+  return value_info;
 }
 
 inline std::string schema_info(const torch::jit::FunctionSchema* s) {
@@ -54,4 +62,4 @@ inline std::string GetPyTorchSourceCode(const torch::jit::Node* n) {
 
 } // namespace util
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

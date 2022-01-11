@@ -1,7 +1,7 @@
 #include "core/ir/ir.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace ir {
 
@@ -62,7 +62,11 @@ bool valid_input_dtype(nvinfer1::DataType dtype) {
   }
 }
 
-Input::Input(std::vector<int64_t> shape, nvinfer1::DataType dtype, nvinfer1::TensorFormat format) {
+Input::Input(
+    std::vector<int64_t> shape,
+    nvinfer1::DataType dtype,
+    nvinfer1::TensorFormat format,
+    bool dtype_is_user_defined) {
   if (shape.size() > 5) {
     LOG_WARNING("Verify that this dim size is accepted");
   }
@@ -73,14 +77,15 @@ Input::Input(std::vector<int64_t> shape, nvinfer1::DataType dtype, nvinfer1::Ten
   input_shape = util::toDims(shape);
   input_is_dynamic = false;
 
-  TRTORCH_CHECK(valid_input_dtype(dtype), "Unsupported input data type: " << dtype);
+  TORCHTRT_CHECK(valid_input_dtype(dtype), "Unsupported input data type: " << dtype);
   this->dtype = dtype;
-  TRTORCH_CHECK(
+  TORCHTRT_CHECK(
       valid_dtype_format_combo(dtype, format),
       "Unsupported combination of dtype and tensor format: ("
           << dtype << ", " << format
-          << "), TRTorch only supports contiguous format (NCHW) except with input type Float32 where channel last (NHWC) is also supported");
+          << "), Torch-TensorRT only supports contiguous format (NCHW) except with input type Float32 where channel last (NHWC) is also supported");
   this->format = format;
+  this->dtype_is_user_defined = dtype_is_user_defined;
 }
 
 Input::Input(
@@ -88,7 +93,8 @@ Input::Input(
     std::vector<int64_t> opt_shape,
     std::vector<int64_t> max_shape,
     nvinfer1::DataType dtype,
-    nvinfer1::TensorFormat format) {
+    nvinfer1::TensorFormat format,
+    bool dtype_is_user_defined) {
   if (min_shape.size() > 5 || opt_shape.size() > 5 || max_shape.size() > 5) {
     LOG_WARNING("Verify that this dim size is accepted");
   }
@@ -124,14 +130,15 @@ Input::Input(
 
   input_shape = util::toDims(dyn_shape);
 
-  TRTORCH_CHECK(valid_input_dtype(dtype), "Unsupported input data type: " << dtype);
+  TORCHTRT_CHECK(valid_input_dtype(dtype), "Unsupported input data type: " << dtype);
   this->dtype = dtype;
-  TRTORCH_CHECK(
+  TORCHTRT_CHECK(
       valid_dtype_format_combo(dtype, format),
       "Unsupported combination of dtype and tensor format: ("
           << dtype << ", " << format
-          << "), TRTorch only supports contiguous format (NCHW) except with input type Float32 where channel last (NHWC) is also supported");
+          << "), Torch-TensorRT only supports contiguous format (NCHW) except with input type Float32 where channel last (NHWC) is also supported");
   this->format = format;
+  this->dtype_is_user_defined = dtype_is_user_defined;
 }
 
 std::ostream& operator<<(std::ostream& os, const Input& input) {
@@ -146,4 +153,4 @@ std::ostream& operator<<(std::ostream& os, const Input& input) {
 
 } // namespace ir
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

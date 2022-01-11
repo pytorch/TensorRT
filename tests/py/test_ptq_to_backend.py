@@ -1,6 +1,6 @@
 import unittest
-import trtorch
-from trtorch.logging import *
+import torch_tensorrt as torchtrt
+from torch_tensorrt.logging import *
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
@@ -26,25 +26,27 @@ class TestAccuracy(ModelTestCase):
                                                               batch_size=1,
                                                               shuffle=False,
                                                               num_workers=1)
-        self.calibrator = trtorch.ptq.DataLoaderCalibrator(self.testing_dataloader,
-                                                           cache_file='./calibration.cache',
-                                                           use_cache=False,
-                                                           algo_type=trtorch.ptq.CalibrationAlgo.ENTROPY_CALIBRATION_2,
-                                                           device=torch.device('cuda:0'))
+        self.calibrator = torchtrt.ptq.DataLoaderCalibrator(
+            self.testing_dataloader,
+            cache_file='./calibration.cache',
+            use_cache=False,
+            algo_type=torchtrt.ptq.CalibrationAlgo.ENTROPY_CALIBRATION_2,
+            device=torch.device('cuda:0'))
 
         self.spec = {
             "forward":
-                trtorch.TensorRTCompileSpec({
-                    "inputs": [trtorch.Input([1, 3, 32, 32])],
-                    "enabled_precision": {torch.float, torch.int8},
-                    "calibrator": self.calibrator,
-                    "device": {
-                        "device_type": trtorch.DeviceType.GPU,
-                        "gpu_id": 0,
-                        "dla_core": 0,
-                        "allow_gpu_fallback": False,
-                    }
-                })
+                torchtrt.ts.TensorRTCompileSpec(
+                    **{
+                        "inputs": [torchtrt.Input([1, 3, 32, 32])],
+                        "enabled_precisions": {torch.float, torch.half, torch.int8},
+                        "calibrator": self.calibrator,
+                        "device": {
+                            "device_type": torchtrt.DeviceType.GPU,
+                            "gpu_id": 0,
+                            "dla_core": 0,
+                            "allow_gpu_fallback": False,
+                        }
+                    })
         }
 
     def compute_accuracy(self, testing_dataloader, model):
@@ -85,7 +87,7 @@ class TestAccuracy(ModelTestCase):
 def test_suite():
     suite = unittest.TestSuite()
     # You need a pre-trained VGG cifar10 model to run this test. Please follow instructions at
-    # https://github.com/NVIDIA/TRTorch/tree/master/cpp/ptq/training/vgg16 to export this model.
+    # https://github.com/NVIDIA/torchtrt/tree/master/cpp/ptq/training/vgg16 to export this model.
     suite.addTest(TestAccuracy.parametrize(TestAccuracy, model=torch.jit.load('./trained_vgg16.jit.pt')))
 
     return suite

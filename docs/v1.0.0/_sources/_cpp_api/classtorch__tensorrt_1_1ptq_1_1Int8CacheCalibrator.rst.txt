@@ -1,0 +1,25 @@
+.. _exhale_class_classtorch__tensorrt_1_1ptq_1_1Int8CacheCalibrator:
+
+Template Class Int8CacheCalibrator
+==================================
+
+- Defined in :ref:`file_cpp_include_torch_tensorrt_ptq.h`
+
+
+Inheritance Relationships
+-------------------------
+
+Base Type
+*********
+
+- ``private Algorithm``
+
+
+Class Documentation
+-------------------
+
+
+.. doxygenclass:: torch_tensorrt::ptq::Int8CacheCalibrator
+   :members:
+   :protected-members:
+   :undoc-members:

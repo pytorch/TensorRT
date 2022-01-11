@@ -1,8 +1,16 @@
 #include "SegmentedBlock.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace partitioning {
+
+SegmentedBlock::SegmentedBlock(BlockID id, SegmentedBlockTarget blk_target, const std::vector<torch::jit::Node*>& nodes)
+    : id_(id), target_(blk_target), g_(std::make_shared<torch::jit::Graph>()) {
+  for (auto& node : nodes) {
+    nodes_.push_back(node);
+    appendNode(node);
+  }
+}
 
 SegmentedBlock::SegmentedBlock(SegmentedBlockTarget blk_target, const std::vector<torch::jit::Node*>& nodes)
     : target_(blk_target), g_(std::make_shared<torch::jit::Graph>()) {
@@ -62,6 +70,18 @@ torch::jit::Node* SegmentedBlock::cloneNode(torch::jit::Node* node) {
   return new_node;
 }
 
+std::ostream& operator<<(std::ostream& os, const SegmentedBlock& b) {
+  os << "Segment Block @" << b.id_ << ":" << std::endl;
+  os << "    Target: " << b.target_ << std::endl;
+  os << "    Graph: " << *b.g_ << std::endl;
+  return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const SegmentedBlock::SegmentedBlockTarget& t) {
+  os << SegmentedBlock::target_to_str(t) << std::endl;
+  return os;
+}
+
 } // namespace partitioning
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

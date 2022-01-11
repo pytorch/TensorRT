@@ -20,23 +20,23 @@ void pointwise_test_helper(
   if (!singleInput) {
     torch_inputs.push_back(at::randint(1, 5, shape2, {at::kCUDA}));
   }
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, torch_inputs);
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, torch_inputs);
 
   std::vector<at::Tensor> trt_inputs;
   for (auto in : torch_inputs) {
     trt_inputs.push_back(at::clone(in));
   }
 
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   std::vector<at::Tensor> trt_results;
   if (dynamicInput) {
-    trt_results = trtorch::tests::util::RunGraphEngineDynamic(g, params, trt_inputs);
+    trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, trt_inputs);
   } else {
-    trt_results = trtorch::tests::util::RunGraphEngine(g, params, trt_inputs);
+    trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, trt_inputs);
   }
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
 TEST(Converters, ATenAddConvertsCorrectly) {

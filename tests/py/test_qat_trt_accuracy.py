@@ -1,12 +1,14 @@
 import unittest
-import trtorch
-from trtorch.logging import *
+import torch_tensorrt as torchtrt
+from torch_tensorrt.logging import *
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
 import torchvision
 import torchvision.transforms as transforms
 from model_test_case import ModelTestCase
+
+set_reportable_log_level(Level.Graph)
 
 
 class TestAccuracy(ModelTestCase):
@@ -54,12 +56,12 @@ class TestAccuracy(ModelTestCase):
         log(Level.Info, "[Pyt FP32] Test Acc: {:.2f}%".format(100 * fp32_test_acc))
 
         compile_spec = {
-            "inputs": [trtorch.Input([16, 3, 32, 32])],
-            "op_precision": torch.int8,
+            "inputs": [torchtrt.Input([16, 3, 32, 32])],
+            "enabled_precisions": {torch.int8},
             # "enabled_precision": {torch.float32, torch.int8},
         }
 
-        trt_mod = trtorch.compile(self.model, compile_spec)
+        trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
         int8_test_acc = self.compute_accuracy(self.testing_dataloader, trt_mod)
         log(Level.Info, "[TRT QAT INT8] Test Acc: {:.2f}%".format(100 * int8_test_acc))
         acc_diff = fp32_test_acc - int8_test_acc
@@ -69,7 +71,7 @@ class TestAccuracy(ModelTestCase):
 def test_suite():
     suite = unittest.TestSuite()
     # You need a VGG QAT model trained on CIFAR10 to run this test. Please follow instructions at
-    # https://github.com/NVIDIA/TRTorch/tree/master/examples/int8/training/vgg16 to export this model.
+    # https://github.com/NVIDIA/torchtrt/tree/master/examples/int8/training/vgg16 to export this model.
     suite.addTest(TestAccuracy.parametrize(TestAccuracy, model=torch.jit.load('./trained_vgg16_qat.jit.pt')))
 
     return suite

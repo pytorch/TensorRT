@@ -12,7 +12,7 @@
 #include <math.h>
 #include <vector>
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace tests {
 namespace util {
 
@@ -55,20 +55,34 @@ std::vector<core::ir::Input> toInputsDynamic(std::vector<at::Tensor> ten, bool d
 std::vector<at::Tensor> RunEngine(std::string& eng, std::vector<at::Tensor> inputs) {
   LOG_DEBUG("Running TRT version");
   auto cuda_device = core::runtime::CudaDevice(0, nvinfer1::DeviceType::kGPU);
-  auto engine_ptr = c10::make_intrusive<trtorch::core::runtime::TRTEngine>("test_engine", eng, cuda_device);
-  auto outputs = trtorch::core::runtime::execute_engine(inputs, engine_ptr);
+  auto engine_ptr = c10::make_intrusive<torch_tensorrt::core::runtime::TRTEngine>("test_engine", eng, cuda_device);
+  auto outputs = torch_tensorrt::core::runtime::execute_engine(inputs, engine_ptr);
   return outputs;
+}
+
+std::vector<const torch::jit::Value*> get_var_inputs(
+    c10::ArrayRef<torch::jit::Value*> ins,
+    core::ir::StaticParams& static_ins) {
+  std::vector<const torch::jit::Value*> var_ins;
+  for (auto in : ins) {
+    if (static_ins.find(in) == static_ins.end()) {
+      var_ins.push_back(in);
+    }
+  }
+  return var_ins;
 }
 
 std::vector<at::Tensor> RunGraphEngine(
     std::shared_ptr<torch::jit::Graph>& g,
-    core::conversion::GraphParams& named_params,
+    core::ir::StaticParams& named_params,
     std::vector<at::Tensor> inputs,
     nvinfer1::DataType op_precision = nvinfer1::DataType::kFLOAT) {
   LOG_DEBUG("Running TRT version");
-  auto in = toInputs(inputs);
-  auto info = core::conversion::ConversionInfo(in);
-  info.engine_settings.workspace_size = 1 << 20;
+  auto var_ins = get_var_inputs(g->inputs(), named_params);
+  auto in = core::ir::pair_input_vals_with_specs(var_ins, toInputs(inputs));
+  auto info = core::conversion::ConversionInfo();
+  info.inputs = std::move(in);
+  info.engine_settings.workspace_size = (1 << 30);
   info.engine_settings.enabled_precisions.insert(op_precision);
   std::string eng = core::conversion::ConvertBlockToEngine(g->block(), info, named_params);
   return RunEngine(eng, inputs);
@@ -76,17 +90,19 @@ std::vector<at::Tensor> RunGraphEngine(
 
 std::vector<at::Tensor> RunGraphEngineDynamic(
     std::shared_ptr<torch::jit::Graph>& g,
-    core::conversion::GraphParams& named_params,
+    core::ir::StaticParams& named_params,
     std::vector<at::Tensor> inputs,
     bool dynamic_batch) {
   LOG_DEBUG("Running TRT version");
-  auto in = toInputsDynamic(inputs, dynamic_batch);
-  auto info = core::conversion::ConversionInfo(in);
-  info.engine_settings.workspace_size = 1 << 20;
+  auto var_ins = get_var_inputs(g->inputs(), named_params);
+  auto in = core::ir::pair_input_vals_with_specs(var_ins, toInputs(inputs));
+  auto info = core::conversion::ConversionInfo();
+  info.inputs = std::move(in);
+  info.engine_settings.workspace_size = (1 << 30);
   std::string eng = core::conversion::ConvertBlockToEngine(g->block(), info, named_params);
   return RunEngine(eng, inputs);
 }
 
 } // namespace util
 } // namespace tests
-} // namespace trtorch
+} // namespace torch_tensorrt

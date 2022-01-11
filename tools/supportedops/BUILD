@@ -7,6 +7,6 @@ cc_binary(
     ],
     deps = [
         "//core/conversion/converters",
-        "//cpp:trtorch",
+        "//cpp:torch_tensorrt",
     ],
 )

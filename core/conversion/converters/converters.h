@@ -12,7 +12,7 @@
 #include "core/conversion/var/Var.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace converters {
@@ -45,4 +45,4 @@ std::vector<std::string> get_converter_list();
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

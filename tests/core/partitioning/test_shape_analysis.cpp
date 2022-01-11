@@ -6,16 +6,16 @@
 #include "torch/script.h"
 
 bool checkSegmentedBlockInputShape(
-    std::vector<trtorch::core::partitioning::SegmentedBlock>& segmented_blocks,
+    std::vector<torch_tensorrt::core::partitioning::SegmentedBlock>& segmented_blocks,
     std::vector<std::vector<std::vector<int>>> in_shape) {
   if (segmented_blocks.size() != in_shape.size())
     return false;
   for (size_t i = 0; i < segmented_blocks.size(); ++i) {
-    auto cur_block_in_shapes = segmented_blocks[i].in_shape();
+    auto cur_block_in_shapes = segmented_blocks[i].in_shapes();
     if (cur_block_in_shapes.size() != in_shape[i].size())
       return false;
     for (size_t j = 0; j < cur_block_in_shapes.size(); ++j) {
-      auto cur_input_shape = trtorch::core::util::toVec(cur_block_in_shapes[j].input_shape);
+      auto cur_input_shape = torch_tensorrt::core::util::toVec(cur_block_in_shapes[j].input_shape);
       for (size_t k = 0; k < cur_input_shape.size(); ++k) {
         if (cur_input_shape[k] != in_shape[i][j][k])
           return false;
@@ -48,24 +48,26 @@ TEST(Partitioning, InferSequentialModelSegmentedBlockShapeCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  trtorch::core::partitioning::PartitionInfo partition_info;
+  torch_tensorrt::core::partitioning::PartitionInfo partition_info;
   partition_info.enabled = true;
-  std::vector<trtorch::core::ir::Input> inputs;
-  inputs.push_back(trtorch::core::ir::Input({3, 3, 16, 16}));
-  inputs.push_back(trtorch::core::ir::Input({32, 3, 3, 3}));
-  inputs.push_back(trtorch::core::ir::Input({32}));
-  inputs.push_back(trtorch::core::ir::Input({16, 32, 3, 3}));
-  inputs.push_back(trtorch::core::ir::Input({16}));
-  inputs.push_back(trtorch::core::ir::Input({8, 16, 3, 3}));
-  inputs.push_back(trtorch::core::ir::Input({8}));
+  std::vector<torch_tensorrt::core::ir::Input> inputs;
+  inputs.push_back(torch_tensorrt::core::ir::Input({3, 3, 16, 16}));
+  inputs.push_back(torch_tensorrt::core::ir::Input({32, 3, 3, 3}));
+  inputs.push_back(torch_tensorrt::core::ir::Input({32}));
+  inputs.push_back(torch_tensorrt::core::ir::Input({16, 32, 3, 3}));
+  inputs.push_back(torch_tensorrt::core::ir::Input({16}));
+  inputs.push_back(torch_tensorrt::core::ir::Input({8, 16, 3, 3}));
+  inputs.push_back(torch_tensorrt::core::ir::Input({8}));
 
-  std::unordered_map<torch::jit::Value*, trtorch::core::ir::Input> inputs_map;
+  std::unordered_map<const torch::jit::Value*, torch_tensorrt::core::ir::Input> inputs_map;
+  std::unordered_map<const torch::jit::Value*, c10::optional<at::ScalarType>> input_types;
   for (size_t i = 0; i < g->inputs().size(); ++i) {
     inputs_map.insert({g->inputs()[i], inputs[i]});
+    input_types.insert({g->inputs()[i], {at::kFloat}});
   }
-  auto input_ivalues_map = trtorch::core::partitioning::generateRandomInputs(inputs_map);
-  std::vector<trtorch::core::partitioning::SegmentedBlock> segmented_blocks =
-      trtorch::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info);
+  auto input_ivalues_map = torch_tensorrt::core::partitioning::generateRandomInputs(inputs_map, input_types);
+  std::vector<torch_tensorrt::core::partitioning::SegmentedBlock> segmented_blocks =
+      torch_tensorrt::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info);
 
   ASSERT_TRUE(checkSegmentedBlockInputShape(
       segmented_blocks,
@@ -98,22 +100,24 @@ TEST(Partitioning, InferBranchModelSegmentedBlockShapeCorrectly) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph, g.get());
 
-  trtorch::core::partitioning::PartitionInfo partition_info;
+  torch_tensorrt::core::partitioning::PartitionInfo partition_info;
   partition_info.enabled = true;
-  std::vector<trtorch::core::ir::Input> inputs;
-  inputs.push_back(trtorch::core::ir::Input({3, 3, 16, 16}));
-  inputs.push_back(trtorch::core::ir::Input({32, 3, 3, 3}));
-  inputs.push_back(trtorch::core::ir::Input({32}));
-  inputs.push_back(trtorch::core::ir::Input({16, 32, 3, 3}));
-  inputs.push_back(trtorch::core::ir::Input({16}));
+  std::vector<torch_tensorrt::core::ir::Input> inputs;
+  inputs.push_back(torch_tensorrt::core::ir::Input({3, 3, 16, 16}));
+  inputs.push_back(torch_tensorrt::core::ir::Input({32, 3, 3, 3}));
+  inputs.push_back(torch_tensorrt::core::ir::Input({32}));
+  inputs.push_back(torch_tensorrt::core::ir::Input({16, 32, 3, 3}));
+  inputs.push_back(torch_tensorrt::core::ir::Input({16}));
 
-  std::unordered_map<torch::jit::Value*, trtorch::core::ir::Input> inputs_map;
+  std::unordered_map<const torch::jit::Value*, torch_tensorrt::core::ir::Input> inputs_map;
+  std::unordered_map<const torch::jit::Value*, c10::optional<at::ScalarType>> input_types;
   for (size_t i = 0; i < g->inputs().size(); ++i) {
     inputs_map.insert({g->inputs()[i], inputs[i]});
+    input_types.insert({g->inputs()[i], {at::kFloat}});
   }
-  auto input_ivalues_map = trtorch::core::partitioning::generateRandomInputs(inputs_map);
-  std::vector<trtorch::core::partitioning::SegmentedBlock> segmented_blocks =
-      trtorch::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info);
+  auto input_ivalues_map = torch_tensorrt::core::partitioning::generateRandomInputs(inputs_map, input_types);
+  std::vector<torch_tensorrt::core::partitioning::SegmentedBlock> segmented_blocks =
+      torch_tensorrt::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info);
 
   ASSERT_TRUE(checkSegmentedBlockInputShape(
       segmented_blocks,

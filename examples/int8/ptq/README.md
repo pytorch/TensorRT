@@ -4,9 +4,9 @@
 
 Post Training Quantization (PTQ) is a technique to reduce the required computational resources for inference while still preserving the accuracy of your model by mapping the traditional FP32 activation space to a reduced INT8 space. TensorRT uses a calibration step which executes your model with sample data from the target domain and track the activations in FP32 to calibrate a mapping to INT8 that minimizes the information loss between FP32 inference and INT8 inference.
 
-Users writing TensorRT applications are required to setup a calibrator class which will provide sample data to the TensorRT calibrator. With TRTorch we look to leverage existing infrastructure in PyTorch to make implementing calibrators easier.
+Users writing TensorRT applications are required to setup a calibrator class which will provide sample data to the TensorRT calibrator. With Torch-TensorRT we look to leverage existing infrastructure in PyTorch to make implementing calibrators easier.
 
-LibTorch provides a `Dataloader` and `Dataset` API which steamlines preprocessing and batching input data. TRTorch uses Dataloaders as the base of a generic calibrator implementation. So you will be able to reuse or quickly implement a `torch::Dataset` for your target domain, place it in a Dataloader and create a INT8 Calibrator from it which you can provide to TRTorch to run INT8 Calibration during compliation of your module.
+LibTorch provides a `Dataloader` and `Dataset` API which steamlines preprocessing and batching input data. Torch-TensorRT uses Dataloaders as the base of a generic calibrator implementation. So you will be able to reuse or quickly implement a `torch::Dataset` for your target domain, place it in a Dataloader and create a INT8 Calibrator from it which you can provide to Torch-TensorRT to run INT8 Calibration during compliation of your module.
 
 ### Code
 
@@ -79,25 +79,25 @@ auto calibration_dataloader = torch::data::make_data_loader(std::move(calibratio
 Next we create a calibrator from the `calibration_dataloader` using the calibrator factory:
 
 ```C++
-auto calibrator = trtorch::ptq::make_int8_calibrator(std::move(calibration_dataloader), calibration_cache_file, true);
+auto calibrator = torch_tensorrt::ptq::make_int8_calibrator(std::move(calibration_dataloader), calibration_cache_file, true);
 
 ```
 
-Here we also define a location to write a calibration cache file to which we can use to reuse the calibration data without needing the dataset and whether or not we should use the cache file if it exists. There also exists a `trtorch::ptq::make_int8_cache_calibrator` factory which creates a calibrator that uses the cache only for cases where you may do engine building on a machine that has limited storage (i.e. no space for a dataset) or to have a simpiler deployment application.
+Here we also define a location to write a calibration cache file to which we can use to reuse the calibration data without needing the dataset and whether or not we should use the cache file if it exists. There also exists a `torch_tensorrt::ptq::make_int8_cache_calibrator` factory which creates a calibrator that uses the cache only for cases where you may do engine building on a machine that has limited storage (i.e. no space for a dataset) or to have a simpiler deployment application.
 
 The calibrator factories create a calibrator that inherits from a `nvinfer1::IInt8Calibrator` virtual class (`nvinfer1::IInt8EntropyCalibrator2` by default) which defines the calibration algorithm used when calibrating. You can explicitly make the selection of calibration algorithm like this:
 
 ```C++
 // MinMax Calibrator is geared more towards NLP tasks
-auto calibrator = trtorch::ptq::make_int8_calibrator<nvinfer1::IInt8MinMaxCalibrator>(std::move(calibration_dataloader), calibration_cache_file, true);
+auto calibrator = torch_tensorrt::ptq::make_int8_calibrator<nvinfer1::IInt8MinMaxCalibrator>(std::move(calibration_dataloader), calibration_cache_file, true);
 ```
 
-Then all thats required to setup the module for INT8 calibration is to set the following compile settings in the `trtorch::CompileSpec` struct and compiling the module:
+Then all thats required to setup the module for INT8 calibration is to set the following compile settings in the `torch_tensorrt::CompileSpec` struct and compiling the module:
 
 ```C++
     std::vector<std::vector<int64_t>> input_shape = {{32, 3, 32, 32}};
     /// Configure settings for compilation
-    auto compile_spec = trtorch::CompileSpec({input_shape});
+    auto compile_spec = torch_tensorrt::CompileSpec({input_shape});
     /// Set enable INT8 precision
     compile_spec.enabled_precisions.insert(torch::kI8);
     /// Use the TensorRT Entropy Calibrator
@@ -105,7 +105,7 @@ Then all thats required to setup the module for INT8 calibration is to set the f
     /// Set a larger workspace (you may get better performace from doing so)
     compile_spec.workspace_size = 1 << 28;
 
-    auto trt_mod = trtorch::CompileGraph(mod, compile_spec);
+    auto trt_mod = torch_tensorrt::CompileGraph(mod, compile_spec);
 ```
 
 If you have an existing Calibrator implementation for TensorRT you may directly set the `ptq_calibrator` field with a pointer to your calibrator and it will work as well.
@@ -115,7 +115,7 @@ From here not much changes in terms of how to execution works. You are still abl
 
 ## Running the Example Application
 
-This is a short example application that shows how to use TRTorch to perform post-training quantization for a module.
+This is a short example application that shows how to use Torch-TensorRT to perform post-training quantization for a module.
 
 ## Prerequisites
 
@@ -139,12 +139,12 @@ This will build a binary named `ptq` in `bazel-out/k8-<opt|dbg>/bin/cpp/int8/ptq
 
 ## Compilation using Makefile
 
-1) Download releases of <a href="https://pytorch.org">LibTorch</a>, <a href="https://github.com/NVIDIA/TRTorch/releases">TRTorch </a>and <a href="https://developer.nvidia.com/nvidia-tensorrt-download">TensorRT</a> and unpack them in the deps directory.
+1) Download releases of <a href="https://pytorch.org">LibTorch</a>, <a href="https://github.com/NVIDIA/Torch-TensorRT/releases">Torch-TensorRT </a>and <a href="https://developer.nvidia.com/nvidia-tensorrt-download">TensorRT</a> and unpack them in the deps directory.
 
 ```sh
-cd examples/trtorchrt_example/deps
-# Download latest TRTorch release tar file (libtrtorch.tar.gz) from https://github.com/NVIDIA/TRTorch/releases
-tar -xvzf libtrtorch.tar.gz
+cd examples/torch_tensorrtrt_example/deps
+# Download latest Torch-TensorRT release tar file (libtorch_tensorrt.tar.gz) from https://github.com/NVIDIA/Torch-TensorRT/releases
+tar -xvzf libtorch_tensorrt.tar.gz
 # unzip libtorch downloaded from pytorch.org
 unzip libtorch.zip
 ```
@@ -156,14 +156,14 @@ cd deps
 mkdir cudnn && tar -xvzf <cuDNN TARBALL> --directory cudnn --strip-components=1
 mkdir tensorrt && tar -xvzf <TensorRT TARBALL> --directory tensorrt --strip-components=1
 cd ..
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/deps/trtorch/lib:$(pwd)/deps/libtorch/lib:$(pwd)/deps/tensorrt/lib:$(pwd)/deps/cudnn/lib64:/usr/local/cuda/lib
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/deps/torch_tensorrt/lib:$(pwd)/deps/libtorch/lib:$(pwd)/deps/tensorrt/lib:$(pwd)/deps/cudnn/lib64:/usr/local/cuda/lib
 ```
 
 2) Build and run `ptq`
 
-We import header files `cifar10.h` and `benchmark.h` from `ROOT_DIR`. `ROOT_DIR` should point to the path where TRTorch is located `<path_to_TRTORCH>`.
+We import header files `cifar10.h` and `benchmark.h` from `ROOT_DIR`. `ROOT_DIR` should point to the path where Torch-TensorRT is located `<path_to_torch_tensorrt>`.
 
-By default it is set to `../../../`. If your TRTorch directory structure is different, please set `ROOT_DIR` accordingly.
+By default it is set to `../../../`. If your Torch-TensorRT directory structure is different, please set `ROOT_DIR` accordingly.
 
 ```sh
 cd examples/int8/ptq

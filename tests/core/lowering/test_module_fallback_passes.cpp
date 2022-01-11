@@ -20,7 +20,7 @@ TEST(Lowering, NotateModuleForFallbackWorksCorrectly) {
   std::unordered_set<std::string> mods_to_mark;
   mods_to_mark.insert("ModuleFallbackSub");
 
-  trtorch::core::lowering::passes::NotateModuleForFallback(mod, "", "forward", mods_to_mark);
+  torch_tensorrt::core::lowering::passes::NotateModuleForFallback(mod, "", "forward", mods_to_mark);
 
   auto g = mod.get_method("forward").graph();
   auto nodes = g->block()->nodes();
@@ -60,10 +60,10 @@ TEST(Lowering, MarkNodesForFallbackWorksCorrectly) {
   std::unordered_set<std::string> mods_to_mark;
   mods_to_mark.insert("ModuleFallbackSub");
 
-  trtorch::core::lowering::passes::NotateModuleForFallback(mod, "", "forward", mods_to_mark);
+  torch_tensorrt::core::lowering::passes::NotateModuleForFallback(mod, "", "forward", mods_to_mark);
   auto mod_ = torch::jit::freeze_module(mod);
   auto g = mod_.get_method("forward").graph();
-  trtorch::core::lowering::passes::MarkNodesForFallback(g, true);
+  torch_tensorrt::core::lowering::passes::MarkNodesForFallback(g, true);
   auto nodes = g->block()->nodes();
 
   int64_t num_marked_nodes = 0;
@@ -96,16 +96,18 @@ TEST(Lowering, LowerAndPartitionSimpleModuleFallbackCorrectly) {
     trt_inputs_ivalues.push_back(in.clone());
   }
 
-  std::vector<trtorch::core::ir::Input> input_ranges{trtorch::core::ir::Input({1, 1, 16, 16})};
-  trtorch::core::CompileSpec cfg(input_ranges);
+  auto g = mod.get_method("forward").graph();
+
+  std::vector<torch_tensorrt::core::ir::Input> input_ranges{torch_tensorrt::core::ir::Input({1, 1, 16, 16})};
+  torch_tensorrt::core::CompileSpec cfg(input_ranges);
   cfg.partition_info.enabled = true;
   cfg.lower_info.forced_fallback_modules.push_back("ModuleFallbackSub");
 
   auto jit_results = mod.forward(jit_inputs_ivalues).toTensor();
-  auto trt_mod = trtorch::core::CompileGraph(mod, cfg);
+  auto trt_mod = torch_tensorrt::core::CompileGraph(mod, cfg);
 
-  auto g = trt_mod.get_method("forward").graph();
-  auto nodes = g->block()->nodes();
+  auto trt_g = trt_mod.get_method("forward").graph();
+  auto nodes = trt_g->block()->nodes();
   std::size_t curr_node = 0;
   for (const auto n : nodes) {
     if (curr_node == 5) {
@@ -122,5 +124,5 @@ TEST(Lowering, LowerAndPartitionSimpleModuleFallbackCorrectly) {
   }
 
   auto trt_results = trt_mod.forward(trt_inputs_ivalues).toTensor();
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results, trt_results, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results, trt_results, 2e-6));
 }

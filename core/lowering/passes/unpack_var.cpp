@@ -2,7 +2,7 @@
 
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace lowering {
 namespace passes {
@@ -42,10 +42,10 @@ void UnpackVar(std::shared_ptr<torch::jit::Graph>& graph) {
   torch::jit::SubgraphRewriter var_rewriter;
   var_rewriter.RegisterRewritePattern(var_pattern, unpacked_pattern);
   var_rewriter.runOnGraph(graph);
-  LOG_DEBUG("Post unpack var: " << *graph);
+  LOG_GRAPH("Post unpack var: " << *graph);
 }
 
 } // namespace passes
 } // namespace lowering
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

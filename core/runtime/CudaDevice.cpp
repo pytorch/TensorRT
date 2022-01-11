@@ -3,7 +3,7 @@
 #include "core/runtime/runtime.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace runtime {
 
@@ -55,7 +55,7 @@ CudaDevice::CudaDevice(std::string device_info) {
   }
   tokens.push_back(device_info.substr(start, end - start));
 
-  TRTORCH_CHECK(tokens.size() == DEVICE_NAME_IDX + 1, "Unable to deserializable program target device infomation");
+  TORCHTRT_CHECK(tokens.size() == DEVICE_NAME_IDX + 1, "Unable to deserializable program target device infomation");
 
   id = std::stoi(tokens[ID_IDX]);
   major = std::stoi(tokens[SM_MAJOR_IDX]);
@@ -112,4 +112,4 @@ std::ostream& operator<<(std::ostream& os, const CudaDevice& device) {
 
 } // namespace runtime
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

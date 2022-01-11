@@ -1,7 +1,7 @@
 #include "core/conversion/converters/Weights.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace converters {
@@ -46,7 +46,7 @@ Weights::Weights(ConversionCtx* ctx, int32_t val) {
 
 Weights::Weights(ConversionCtx* ctx, at::Tensor t) {
   if (t.sizes().size() > nvinfer1::Dims::MAX_DIMS) {
-    TRTORCH_THROW_ERROR(
+    TORCHTRT_THROW_ERROR(
         "The tensor requested to be converted to nvinfer1::Weights exceeds the max number of dimensions for TensorRT");
   }
   this->shape = util::toDims(t.sizes());
@@ -75,7 +75,7 @@ Weights::Weights(ConversionCtx* ctx, at::Tensor t) {
   t_cpu = t_cpu.contiguous();
   auto dtype_optional = util::optScalarTypeToTRTDataType(t_cpu.scalar_type());
   if (!dtype_optional) {
-    TRTORCH_THROW_ERROR(
+    TORCHTRT_THROW_ERROR(
         "The tensor requested to be converted to nvinfer1::Weights is of an unsupported type: "
         << dtype_optional.value());
   }
@@ -101,7 +101,7 @@ Weights::Weights(ConversionCtx* ctx, at::Tensor t) {
     buf = malloc(t_cpu.numel() * sizeof(bool));
     memcpy(buf, t_cpu.data_ptr(), t_cpu.numel() * sizeof(bool));
   } else {
-    TRTORCH_THROW_ERROR("Found unsupported data type for tensor to weight conversion");
+    TORCHTRT_THROW_ERROR("Found unsupported data type for tensor to weight conversion");
   }
 
   ctx->builder_resources.push_back(buf);
@@ -133,4 +133,4 @@ std::ostream& operator<<(std::ostream& os, const Weights& w) {
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

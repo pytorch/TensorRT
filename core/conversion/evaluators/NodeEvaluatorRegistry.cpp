@@ -10,7 +10,7 @@
 #include "core/conversion/evaluators/evaluators.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace evaluators {
@@ -32,7 +32,7 @@ class NodeEvaluatorRegistry {
     LOG_DEBUG("Registering evaluator for " << node_kind.toQualString());
     auto iter = evaluator_lut_.find(node_kind);
     if (iter != evaluator_lut_.end()) {
-      TRTORCH_THROW_ERROR(
+      TORCHTRT_THROW_ERROR(
           "Attempting to override already registered evaluator " << node_kind.toQualString()
                                                                  << ", merge implementations instead");
     }
@@ -59,7 +59,7 @@ class NodeEvaluatorRegistry {
 
       if (eval_reg.options.valid_schemas.size() != 0) {
         auto schema = n->maybeSchema();
-        TRTORCH_CHECK(
+        TORCHTRT_CHECK(
             schema,
             "Evaluator for " << node_kind.toQualString() << " only runs on certain schemas, but schema for target"
                              << " node is not a supported schema variant of " << node_kind.toQualString());
@@ -74,7 +74,7 @@ class NodeEvaluatorRegistry {
 
   NodeEvaluator GetEvaluator(const torch::jit::Node* n) {
     auto evaluator = FindEvaluator(n);
-    TRTORCH_CHECK(
+    TORCHTRT_CHECK(
         evaluator, "Requested evaluator for " << n->kind().toQualString() << ", but no such evaluator was found");
     return evaluator;
   }
@@ -138,4 +138,4 @@ RegisterNodeEvaluators& RegisterNodeEvaluators::RegisterNodeEvaluators::operator
 } // namespace evaluators
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

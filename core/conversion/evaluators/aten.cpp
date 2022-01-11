@@ -11,7 +11,7 @@
 #include "core/conversion/evaluators/eval_util.h"
 #include "core/conversion/evaluators/evaluators.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace evaluators {
@@ -33,6 +33,7 @@ DEFINE_GENERIC_TWO_INPUT_EVALUATOR(
         "aten::eq.bool(bool a, bool b) -> (bool)",
         "aten::eq.int(int a, int b) -> (bool)",
         "aten::eq.float(float a, float b) -> (bool)",
+        "aten::eq.str(str a, str b) -> (bool)",
         "aten::eq.int_float(int a, float b) -> (bool)",
         "aten::eq.float_int(float a, int b) -> (bool)",
     }));
@@ -97,7 +98,12 @@ DEFINE_GENERIC_TWO_INPUT_EVALUATOR(
         "aten::ge.float_int(float a, int b) -> (bool)",
     }));
 
-DEFINE_TWO_INPUT_SIMPLE_EVALUATOR(and, "aten::__and__", a&& b, bool, {"aten::__and__(int a, int b) -> (bool)"});
+DEFINE_TWO_INPUT_SIMPLE_EVALUATOR(
+    and,
+    "aten::__and__",
+    a&& b,
+    bool,
+    std::set<std::string>({"aten::__and__(int a, int b) -> (bool)", "aten::__and__.bool(bool a, bool b) -> (bool)"}));
 DEFINE_TWO_INPUT_SIMPLE_EVALUATOR(or, "aten::__or__", a || b, bool, {"aten::__or__(int a, int b) -> (bool)"});
 DEFINE_TWO_INPUT_SIMPLE_EVALUATOR(
     xor,
@@ -113,7 +119,7 @@ DEFINE_TWO_INPUT_SIMPLE_EVALUATOR(
     int64_t,
     {"aten::__round_to_zero_floordiv(int a, int b) -> (int)"});
 
-auto aten_registrations TRTORCH_UNUSED =
+auto aten_registrations TORCHTRT_UNUSED =
     RegisterNodeEvaluators()
       .evaluator({c10::Symbol::fromQualString("aten::bitwise_not"),
                   [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
@@ -237,7 +243,7 @@ auto aten_registrations TRTORCH_UNUSED =
                    auto tensor = tensor_var.IValue()->toCustomClass<TensorContainer>()->tensor();
                    return util::toVec(tensor->getDimensions());
                  } else {
-                   TRTORCH_THROW_ERROR("IValue is not some class of Tensor. Found: " << tensor_var.IValue()->type());
+                   TORCHTRT_THROW_ERROR("IValue is not some class of Tensor. Found: " << tensor_var.IValue()->type());
                  }
                } else {
                  auto dim = args.at(n->input(1)).unwrapToInt();
@@ -265,7 +271,7 @@ auto aten_registrations TRTORCH_UNUSED =
                    }
                    return dims[dim];
                  } else {
-                   TRTORCH_THROW_ERROR("IValue is not some class of Tensor. Found: " << tensor_var.IValue()->type());
+                   TORCHTRT_THROW_ERROR("IValue is not some class of Tensor. Found: " << tensor_var.IValue()->type());
                  }
                }
              },
@@ -278,7 +284,7 @@ auto aten_registrations TRTORCH_UNUSED =
 
                       const int64_t list_size = list.size();
                       const int64_t normalized_idx = normalizeIndex(idx, list_size);
-                      TRTORCH_CHECK(
+                      TORCHTRT_CHECK(
                           normalized_idx >= 0 || normalized_idx < list_size,
                           "List index out of range (aten::__getitem__)");
                       return list.get(normalized_idx);
@@ -325,7 +331,7 @@ auto aten_registrations TRTORCH_UNUSED =
                         auto b = args.at(n->input(1)).unwrapToDouble();
                         return a + b;
                       } else {
-                        TRTORCH_THROW_ERROR(
+                        TORCHTRT_THROW_ERROR(
                             "Unimplemented data type for aten::add evaluator: "
                             << args.at(n->input(0)).IValue()->type()->str());
                         return {};
@@ -355,7 +361,7 @@ auto aten_registrations TRTORCH_UNUSED =
 
                         return merged;
                       } else {
-                        TRTORCH_THROW_ERROR(
+                        TORCHTRT_THROW_ERROR(
                             "Unimplemented data type for aten::add_ evaluator: "
                             << args.at(n->input(0)).IValue()->type()->str());
                         return {};
@@ -373,7 +379,7 @@ auto aten_registrations TRTORCH_UNUSED =
                         auto b = args.at(n->input(1)).unwrapToDouble();
                         return a * b;
                       } else {
-                        TRTORCH_THROW_ERROR(
+                        TORCHTRT_THROW_ERROR(
                             "Unimplemented data type for aten::mul evaluator: "
                             << args.at(n->input(0)).IValue()->type()->str());
                         return {};
@@ -392,7 +398,7 @@ auto aten_registrations TRTORCH_UNUSED =
                         auto b = args.at(n->input(1)).unwrapToDouble();
                         return a - b;
                       } else {
-                        TRTORCH_THROW_ERROR(
+                        TORCHTRT_THROW_ERROR(
                             "Unimplemented data type for aten::sub evaluator: "
                             << args.at(n->input(0)).IValue()->type()->str());
                         return {};
@@ -412,7 +418,7 @@ auto aten_registrations TRTORCH_UNUSED =
                  auto a = args.at(n->input(0)).unwrapToDouble();
                  return (bool)a;
                } else {
-                 TRTORCH_THROW_ERROR(
+                 TORCHTRT_THROW_ERROR(
                      "Unimplemented data type for aten::Bool evaluator: "
                      << args.at(n->input(0)).IValue()->type()->str());
                  return {};
@@ -431,7 +437,7 @@ auto aten_registrations TRTORCH_UNUSED =
                         auto a = args.at(n->input(0)).unwrapToBool();
                         return (float)a;
                       } else {
-                        TRTORCH_THROW_ERROR(
+                        TORCHTRT_THROW_ERROR(
                             "Unimplemented data type for aten::Float evaluator: "
                             << args.at(n->input(0)).IValue()->type()->str());
                         return {};
@@ -454,7 +460,7 @@ auto aten_registrations TRTORCH_UNUSED =
                         auto a = args.at(n->input(0)).unwrapToBool();
                         return (int)a;
                       } else {
-                        TRTORCH_THROW_ERROR(
+                        TORCHTRT_THROW_ERROR(
                             "Unimplemented data type for aten::Int evaluator: "
                             << args.at(n->input(0)).IValue()->type()->str());
                         return {};
@@ -535,7 +541,7 @@ auto aten_registrations TRTORCH_UNUSED =
                         auto b = args.at(n->input(1)).unwrapToDouble();
                         return a / b;
                       } else {
-                        TRTORCH_THROW_ERROR(
+                        TORCHTRT_THROW_ERROR(
                             "Unimplemented data type for aten::div evaluator: "
                             << args.at(n->input(0)).IValue()->type()->str());
                         return {};
@@ -556,7 +562,7 @@ auto aten_registrations TRTORCH_UNUSED =
                         auto b = args.at(n->input(1)).unwrapToDouble();
                         return std::floor(a / b);
                       } else {
-                        TRTORCH_THROW_ERROR(
+                        TORCHTRT_THROW_ERROR(
                             "Unimplemented data type for aten::floordiv evaluator: "
                             << args.at(n->input(0)).IValue()->type()->str());
                         return {};
@@ -575,7 +581,7 @@ auto aten_registrations TRTORCH_UNUSED =
                         auto el = args.at(n->input(0)).unwrapToDouble();
                         return static_cast<int64_t>(std::floor(el));
                       } else {
-                        TRTORCH_THROW_ERROR(
+                        TORCHTRT_THROW_ERROR(
                             "Unimplemented data type for aten::floor evaluator: "
                             << args.at(n->input(0)).IValue()->type()->str());
                         return {};
@@ -594,7 +600,7 @@ auto aten_registrations TRTORCH_UNUSED =
                         auto a = args.at(n->input(0)).unwrapToDouble();
                         return std::sqrt(a);
                       } else {
-                        TRTORCH_THROW_ERROR(
+                        TORCHTRT_THROW_ERROR(
                             "Unimplemented data type for aten::sqrt evaluator: "
                             << args.at(n->input(0)).IValue()->type()->str());
                         return {};
@@ -679,7 +685,7 @@ auto aten_registrations TRTORCH_UNUSED =
                           return torch::arange(start_scalar, end_scalar, step_scalar);
                         }
                       } else {
-                        TRTORCH_THROW_ERROR(
+                        TORCHTRT_THROW_ERROR(
                             "Invalid input argument size for aten::arange, input argument size: " << input_size);
                       }
                       return {};
@@ -726,9 +732,25 @@ auto aten_registrations TRTORCH_UNUSED =
                     },
                     EvalOptions().validSchemas({
                         R"SIG(aten::copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> (Tensor(a!)))SIG",
-                    })});
+                    })})
+        .evaluator({c10::Symbol::fromQualString("aten::format"),
+                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+                      int64_t input_num = n->inputs().size();
+                      std::vector<torch::jit::IValue> stack;
+                      for (auto v : n->inputs()) {
+                        stack.push_back(*args.at(v).IValue());
+                      }
+                      stack.push_back(input_num);
+                      auto& ops = torch::jit::getAllOperatorsFor(c10::Symbol::fromQualString("aten::format"));
+                      auto& aten_format = ops.front();
+                      aten_format->getOperation()(stack);
+                      std::string output;
+                      torch::jit::pop(stack, output);
+                      return output;
+                    },
+                    EvalOptions().validSchemas({"aten::format(str self, ...) -> (str)"})});
 } // namespace
 } // namespace evaluators
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

@@ -16,7 +16,6 @@ cc_test(
   srcs = ["test_module_fallback_passes.cpp"],
   deps = [
       "//tests/util",
-      "//core",
       "@googletest//:gtest_main",
   ] + select({
       ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
@@ -25,6 +24,10 @@ cc_test(
   data = [
       "//tests/modules:jit_models"
   ]
+)
+
+lowering_test(
+    name = "test_conv1d_pass",
 )
 
 lowering_test(
@@ -37,6 +40,10 @@ lowering_test(
 
 lowering_test(
     name = "test_reduce_to_pass",
+)
+
+lowering_test(
+    name = "test_reduce_gelu",
 )
 
 lowering_test(
@@ -62,6 +69,7 @@ lowering_test(
 test_suite(
     name = "lowering_tests",
     tests = [
+        ":test_conv1d_pass",
         ":test_linear_to_addmm",
         ":test_module_fallback_passes",
         ":test_operator_aliasing_pass",
@@ -69,6 +77,7 @@ test_suite(
         ":test_remove_detach_pass",
         ":test_remove_dropout_pass",
         ":test_reduce_to_pass",
+        ":test_reduce_gelu",
         ":test_unpack_hardswish",
         ":test_unpack_reduce_ops"
     ],

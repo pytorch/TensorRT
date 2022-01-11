@@ -11,7 +11,7 @@
 #include <cuda_runtime.h>
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 
@@ -61,7 +61,7 @@ struct ConversionCtx {
   std::shared_ptr<nvinfer1::IBuilderConfig> cfg;
   std::set<nvinfer1::DataType> enabled_precisions;
   BuilderSettings settings;
-  util::logging::TRTorchLogger logger;
+  util::logging::TorchTRTLogger logger;
   // Pointers to data that needs to remain alive until conversion is done
   // All data will be freed when the destructor is called
   // The weights class is the main consumer of this, each time a weight object
@@ -75,4 +75,4 @@ struct ConversionCtx {
 
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

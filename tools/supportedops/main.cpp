@@ -7,8 +7,8 @@
 #include <vector>
 
 int main(int argc, const char* argv[]) {
-  std::vector<std::string> converters = trtorch::core::conversion::converters::get_converter_list();
-  std::vector<std::string> evaluators = trtorch::core::conversion::evaluators::getEvaluatorList();
+  std::vector<std::string> converters = torch_tensorrt::core::conversion::converters::get_converter_list();
+  std::vector<std::string> evaluators = torch_tensorrt::core::conversion::evaluators::getEvaluatorList();
 
   std::stringstream ss;
 

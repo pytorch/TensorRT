@@ -13,7 +13,9 @@ cc_library(
         "ir.h"
     ],
     srcs = [
-        "Input.cpp"
+        "ir.cpp",
+        "Input.cpp",
+        "StaticParams.cpp"
     ],
     deps = [
         "@tensorrt//:nvinfer",

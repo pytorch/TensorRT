@@ -9,7 +9,7 @@ config_setting(
 
 pkg_tar(
     name = "include_core",
-    package_dir = "include/trtorch",
+    package_dir = "include/torch_tensorrt",
     deps = [
         "//core:include",
         "//core/conversion:include",
@@ -35,17 +35,17 @@ pkg_tar(
     srcs = [
         "//cpp:api_headers",
     ],
-    package_dir = "include/trtorch/",
+    package_dir = "include/torch_tensorrt/",
 )
 
 pkg_tar(
     name = "lib",
     srcs = select({
-        ":windows": ["//cpp/lib:trtorch.dll"],
+        ":windows": ["//cpp/lib:torch_tensorrt.dll"],
         "//conditions:default": [
-            "//cpp/lib:libtrtorch.so",
-            "//cpp/lib:libtrtorchrt.so",
-            "//cpp/lib:libtrtorch_plugins.so",
+            "//cpp/lib:libtorchtrt.so",
+            "//cpp/lib:libtorchtrt_runtime.so",
+            "//cpp/lib:libtorchtrt_plugins.so",
         ],
     }),
     mode = "0755",
@@ -55,19 +55,21 @@ pkg_tar(
 pkg_tar(
     name = "bin",
     srcs = [
-        "//cpp/bin/trtorchc",
+        "//cpp/bin/torchtrtc",
     ],
     mode = "0755",
     package_dir = "bin/",
 )
 
 pkg_tar(
-    name = "libtrtorch",
+    name = "libtorchtrt",
     srcs = [
         "//:LICENSE",
+        "//bzl_def:BUILD",
+        "//bzl_def:WORKSPACE"
     ],
     extension = "tar.gz",
-    package_dir = "trtorch",
+    package_dir = "torch_tensorrt",
     deps = [
         ":lib",
         ":include",

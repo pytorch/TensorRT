@@ -109,7 +109,7 @@ cc_library(
     name = "accuracy_test",
     hdrs = ["accuracy_test.h"],
     deps = [
-        "//cpp:trtorch",
+        "//cpp:torch_tensorrt",
         "//tests/util",
         "@googletest//:gtest_main",
         "@libtorch",

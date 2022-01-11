@@ -78,14 +78,13 @@ with torch.no_grad():
 test_loss, test_acc = test(jit_model, testing_dataloader, crit)
 print("[JIT] Test Loss: {:.5f} Test Acc: {:.2f}%".format(test_loss, 100 * test_acc))
 
-import trtorch
-# trtorch.logging.set_reportable_log_level(trtorch.logging.Level.Debug)
+import torch_tensorrt as torchtrt
 compile_settings = {
-"input_shapes": [[1, 3, 32, 32]],
-"op_precision": torch.int8 # Run with FP16
+    "inputs": [torchtrt.Input([1, 3, 32, 32])],
+    "enabled_precisions": {torch.float, torch.half, torch.int8} # Run with FP16
 }
 new_mod = torch.jit.load('trained_vgg16_qat.jit.pt')
-trt_ts_module = trtorch.compile(new_mod, compile_settings)
+trt_ts_module = torchtrt.compile(new_mod, **compile_settings)
 testing_dataloader = torch.utils.data.DataLoader(testing_dataset, batch_size=1, shuffle=False, num_workers=2)
 test_loss, test_acc = test(trt_ts_module, testing_dataloader, crit)
 print("[TRTorch] Test Loss: {:.5f} Test Acc: {:.2f}%".format(test_loss, 100 * test_acc))

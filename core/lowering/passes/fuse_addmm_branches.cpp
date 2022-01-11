@@ -10,7 +10,7 @@
 
 #include <vector>
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace lowering {
 namespace passes {
@@ -49,7 +49,7 @@ struct AddMMBranchFusion {
     if ((*arm1_start)->kind().toQualString() == std::string("aten::addmm") &&
         (*(++arm1_start))->kind() == prim::Return &&
         (*arm2_start)->kind().toQualString() == std::string("aten::matmul") &&
-        (*(++arm2_start))->kind().toQualString() != std::string("aten::add") &&
+        (*(++arm2_start))->kind().toQualString() == std::string("aten::add") &&
         (*(++arm2_start))->kind() == prim::Return) {
       // Make sure that block0 is solely just the aten::addmm op and block1 is matmul + add
       return true;
@@ -93,4 +93,4 @@ void FuseAddMMBranches(std::shared_ptr<Graph> graph) {
 } // namespace passes
 } // namespace lowering
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

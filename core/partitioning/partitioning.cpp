@@ -2,11 +2,12 @@
 
 #include <queue>
 #include "core/conversion/conversion.h"
+#include "core/conversion/evaluators/evaluators.h"
 #include "core/partitioning/shape_analysis.h"
 #include "torch/csrc/jit/passes/constant_pooling.h"
 #include "torch/csrc/jit/passes/dead_code_elimination.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace partitioning {
 
@@ -114,7 +115,7 @@ std::vector<SegmentedBlock> segmentBlocksWithNonTensorInputs(SegmentedBlock& seg
         pytorch_nodes.push_back(n);
         prev_non_tensor_outputs = containNonTensorOutputs(n);
       } else {
-        // If pytorch_nodes is not empty, the previous nodes were all tensorrt_nodes. Construct a
+        // If pytorch_nodes is not empty, the previous nodes were all pytorch_nodes. Construct a
         // Pytorch segmented_block and clear the pytorch_nodes list to be later used for new Pytorch segments.
         if (!pytorch_nodes.empty()) {
           new_seg_blocks.emplace_back(SegmentedBlock::kTorch, pytorch_nodes);
@@ -131,7 +132,8 @@ std::vector<SegmentedBlock> segmentBlocksWithNonTensorInputs(SegmentedBlock& seg
       new_seg_blocks.emplace_back(SegmentedBlock::kTorch, pytorch_nodes);
     }
   }
-  return std::move(new_seg_blocks);
+
+  return new_seg_blocks;
 }
 
 void resolveNonTensorInputs(PartitionedGraph& segmented_blocks) { // , std::shared_ptr<torch::jit::Graph> g
@@ -158,6 +160,8 @@ void resolveNonTensorInputs(PartitionedGraph& segmented_blocks) { // , std::shar
       }
     }
 
+    // For each non-tensor value in the usage_counts map, keep updating the produce_id to the earliest segmented block
+    // that has/produces it.
     for (auto& use : usage_counts) {
       // Set the produce_id to the segmented block index that contains/produces this non-tensor torch::jit::Value
       if (segmented_blocks[i].contain_raw_value(use.first)) {
@@ -175,11 +179,10 @@ void resolveNonTensorInputs(PartitionedGraph& segmented_blocks) { // , std::shar
       auto first_torch_id = use_info.torch_use_id.front();
       if (!updated_segments.count(first_torch_id)) {
         // Segmented Blocks with non-tensor inputs will have to be re-segmented as
-        // TRTorch doesn't support non-tensor inputs for a module.
+        // Torch-TensorRT doesn't support non-tensor inputs for a module.
         auto to_inject_blocks = segmentBlocksWithNonTensorInputs(segmented_blocks[first_torch_id]);
-        segmented_blocks.erase(segmented_blocks.begin() + first_torch_id);
-        segmented_blocks.insert(
-            segmented_blocks.begin() + first_torch_id, to_inject_blocks.begin(), to_inject_blocks.end());
+        auto next_iter = segmented_blocks_list.erase(idx_to_iter[first_torch_id]);
+        segmented_blocks_list.insert(next_iter, to_inject_blocks.begin(), to_inject_blocks.end());
         updated_segments.insert(first_torch_id);
       }
     }
@@ -187,7 +190,7 @@ void resolveNonTensorInputs(PartitionedGraph& segmented_blocks) { // , std::shar
     for (auto i : use_info.tensorrt_use_id) {
       if (!updated_segments.count(i)) {
         // Segmented Blocks with non-tensor inputs will have to be re-segmented as
-        // TRTorch doesn't support non-tensor inputs for a module.
+        // Torch-TensorRT doesn't support non-tensor inputs for a module.
         auto to_inject_blocks = segmentBlocksWithNonTensorInputs(segmented_blocks[i]);
         auto next_iter = segmented_blocks_list.erase(idx_to_iter[i]);
         segmented_blocks_list.insert(next_iter, to_inject_blocks.begin(), to_inject_blocks.end());
@@ -258,70 +261,141 @@ void registerSegmentsOutputs(PartitionedGraph& segmented_blocks, torch::jit::Blo
   return;
 }
 
-std::vector<SegmentedBlock> segment_graph(torch::jit::Block* block, const PartitionInfo& partition_info) {
+bool checkLoopEvaluatable(torch::jit::Node* n) {
+  bool compile_to_trt = true;
+  for (auto bn : n->blocks()[0]->nodes()) {
+    if (bn->kind() == torch::jit::prim::Loop) {
+      compile_to_trt = compile_to_trt && checkLoopEvaluatable(bn);
+    } else if (bn->kind() == torch::jit::prim::If) {
+      compile_to_trt = compile_to_trt && containNonTensorOutputs(bn);
+    } else {
+      compile_to_trt = compile_to_trt && core::conversion::evaluators::shouldEvalAtConversionTime(bn);
+    }
+  }
+  return compile_to_trt;
+}
+
+bool should_run_in_trt(torch::jit::Node* n, const std::unordered_set<std::string>& torch_ops) {
+  // If the op is not supported by the conversion phase it should run in PyTorch
+  if (!conversion::OpSupported(n)) {
+    LOG_GRAPH("Node not supported by conversion: " << util::node_info(n));
+    return false;
+  }
+
+  // If the user specifies the op to run in Torch it should run in PyTorch
+  if (torch_ops.find(n->kind().toQualString()) != torch_ops.end()) {
+    LOG_GRAPH("Node explicitly set to run in torch: " << util::node_info(n));
+    return false;
+  }
+
+  // If the user specifies the module containing this op to run in torch it should run in PyTorch
+  const auto to_compile_sym = c10::Symbol::attr("to_compile");
+  if (n->hasAttribute(to_compile_sym) && n->i(to_compile_sym) == (int64_t) false) {
+    LOG_GRAPH("Node is within a module set to run in torch: " << util::node_info(n));
+    return false;
+  }
+
+  LOG_GRAPH("Node is going to run in TensorRT: " << util::node_info(n));
+  return true;
+}
+
+void finalize_block(
+    PartitionedGraph& g,
+    SegmentedBlock::SegmentedBlockTarget kind,
+    std::vector<torch::jit::Node*>& nodes) {
+  SegmentedBlock::BlockID b_id = g.size();
+  LOG_DEBUG("Finalizing in progress " << SegmentedBlock::target_to_str(kind) << " block");
+  g.emplace_back(b_id, kind, nodes);
+  nodes.clear();
+  LOG_DEBUG(g.back());
+}
+
+PartitionedGraph segment_graph(torch::jit::Block* block, const PartitionInfo& partition_info) {
   auto min_block_size = partition_info.min_block_size;
-  std::unordered_set<std::string> forced_fallback_operators(
+  std::unordered_set<std::string> forced_fallback_ops(
       partition_info.forced_fallback_operators.begin(), partition_info.forced_fallback_operators.end());
 
   auto nodes = block->nodes();
-  std::vector<SegmentedBlock> segmented_blocks;
+  PartitionedGraph segmented_blocks;
 
   // segment the nodes
-  std::vector<torch::jit::Node*> tensorrt_nodes, pytorch_nodes;
+  std::vector<torch::jit::Node*> in_prog_trt_blk_nodes, in_prog_pyt_blk_nodes;
   for (const auto n : nodes) {
+    // Skip constant nodes as they are resources for both kinds of modules
     if (n->kind() == torch::jit::prim::Constant) {
       continue;
     }
 
-    std::string node_string(n->kind().toQualString());
-    auto has_compile_attribute = n->hasAttribute(c10::Symbol::attr("to_compile"));
-    if (conversion::OpSupported(n) && !forced_fallback_operators.count(node_string) &&
-        (!has_compile_attribute || n->i(c10::Symbol::attr("to_compile")) == (int64_t) true)) {
-      tensorrt_nodes.push_back(n);
-      if (tensorrt_nodes.size() >= min_block_size && !pytorch_nodes.empty()) {
-        segmented_blocks.emplace_back(SegmentedBlock::kTorch, pytorch_nodes);
-        pytorch_nodes.clear();
+    if (should_run_in_trt(n, forced_fallback_ops)) {
+      in_prog_trt_blk_nodes.push_back(n);
+
+      // If there is an active PyTorch block and we have passed the threshold for a valid TRT
+      // block then segment and reset the active PyTorch block
+      if (in_prog_trt_blk_nodes.size() >= min_block_size && !in_prog_pyt_blk_nodes.empty()) {
+        finalize_block(segmented_blocks, SegmentedBlock::kTorch, in_prog_pyt_blk_nodes);
       }
     } else {
-      if (tensorrt_nodes.size() >= min_block_size) {
-        segmented_blocks.emplace_back(SegmentedBlock::kTensorRT, tensorrt_nodes);
+      // If there is an active TRT block that is valid segment and reset the active TRT block
+      // otherwise add it to the active PyTorch block and reset
+      if (in_prog_trt_blk_nodes.size() >= min_block_size) {
+        finalize_block(segmented_blocks, SegmentedBlock::kTensorRT, in_prog_trt_blk_nodes);
       } else {
-        pytorch_nodes.insert(pytorch_nodes.end(), tensorrt_nodes.begin(), tensorrt_nodes.end());
+        LOG_DEBUG(
+            "In progress TRT block does not meet minimum block size requirements, therefore folding into in progress PyTorch block");
+        in_prog_pyt_blk_nodes.insert(
+            in_prog_pyt_blk_nodes.end(), in_prog_trt_blk_nodes.begin(), in_prog_trt_blk_nodes.end());
       }
-      tensorrt_nodes.clear();
+      in_prog_trt_blk_nodes.clear();
       // if there is a prim::If then this if node will be encapsulated in a SegmentedBlock
       // we shouldn't inject node for this block in dependency analysis process
       if (n->kind() == torch::jit::prim::If) {
-        if (!pytorch_nodes.empty()) {
-          segmented_blocks.emplace_back(SegmentedBlock::kTorch, pytorch_nodes);
-          pytorch_nodes.clear();
+        LOG_DEBUG(
+            "Hit a conditional statement, finializing in progress PYT block and creating a new one for the conditional");
+        if (!in_prog_pyt_blk_nodes.empty()) {
+          finalize_block(segmented_blocks, SegmentedBlock::kTorch, in_prog_pyt_blk_nodes);
         }
-        segmented_blocks.emplace_back(SegmentedBlock::kTorch, std::vector<torch::jit::Node*>{n});
+        auto cond_node = std::vector<torch::jit::Node*>{n};
+        finalize_block(segmented_blocks, SegmentedBlock::kTorch, cond_node);
+        continue;
+      } else if (n->kind() == torch::jit::prim::Loop) {
+        if (!in_prog_pyt_blk_nodes.empty()) {
+          finalize_block(segmented_blocks, SegmentedBlock::kTorch, in_prog_pyt_blk_nodes);
+        }
+        if (checkLoopEvaluatable(n)) {
+          in_prog_trt_blk_nodes.push_back(n);
+        } else {
+          auto loop_node = std::vector<torch::jit::Node*>{n};
+          finalize_block(segmented_blocks, SegmentedBlock::kTorch, loop_node);
+        }
         continue;
       }
-      pytorch_nodes.push_back(n);
+      in_prog_pyt_blk_nodes.push_back(n);
     }
   }
 
   // if there is any kTorch nodes left, then either the last nodes are kTorch or last nodes are kTensorRT but num <
   // min_block_size
-  if (!pytorch_nodes.empty()) {
-    pytorch_nodes.insert(pytorch_nodes.end(), tensorrt_nodes.begin(), tensorrt_nodes.end());
-    segmented_blocks.emplace_back(SegmentedBlock::kTorch, pytorch_nodes);
-  } else {
-    segmented_blocks.emplace_back(SegmentedBlock::kTensorRT, tensorrt_nodes);
+  if (in_prog_trt_blk_nodes.size() >= min_block_size) {
+    finalize_block(segmented_blocks, SegmentedBlock::kTensorRT, in_prog_trt_blk_nodes);
   }
 
-  return std::move(segmented_blocks);
+  if (!in_prog_pyt_blk_nodes.empty()) {
+    in_prog_pyt_blk_nodes.insert(
+        in_prog_pyt_blk_nodes.end(), in_prog_trt_blk_nodes.begin(), in_prog_trt_blk_nodes.end());
+    finalize_block(segmented_blocks, SegmentedBlock::kTorch, in_prog_pyt_blk_nodes);
+  }
+
+  return segmented_blocks;
 }
 
-std::vector<SegmentedBlock> Partition(
+PartitionedGraph Partition(
     torch::jit::Block* block,
-    std::unordered_map<torch::jit::Value*, torch::jit::IValue>& input_ivalues_map,
+    std::unordered_map<const torch::jit::Value*, torch::jit::IValue>& example_tensor_map,
     const PartitionInfo& partition_info) {
   LOG_DEBUG(partition_info);
   // segment lowering global graph into blocks
-  std::vector<SegmentedBlock> segmented_blocks = segment_graph(block, partition_info);
+  LOG_DEBUG("Parititioning source module into PyTorch and TensorRT sub blocks");
+  PartitionedGraph segmented_blocks = segment_graph(block, partition_info);
 
   // resolve nonTensor inputs/outputs
   resolveNonTensorInputs(segmented_blocks);
@@ -330,11 +404,22 @@ std::vector<SegmentedBlock> Partition(
   registerSegmentsOutputs(segmented_blocks, block);
 
   // run shape analysis on each segmented block
-  runShapeAnalysis(segmented_blocks, input_ivalues_map);
+  runShapeAnalysis(segmented_blocks, example_tensor_map, partition_info);
+
+  LOG_INFO(segmented_blocks);
 
   return segmented_blocks;
 }
 
+std::ostream& operator<<(std::ostream& os, const PartitionedGraph& g) {
+  os << "Partitioned Graph: [";
+  for (auto b : g) {
+    os << b;
+  }
+  os << "]";
+  return os;
+}
+
 } // namespace partitioning
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

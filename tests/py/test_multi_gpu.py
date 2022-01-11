@@ -1,5 +1,5 @@
 import unittest
-import trtorch
+import torch_tensorrt as torchtrt
 import torch
 import torchvision.models as models
 
@@ -12,7 +12,7 @@ class TestMultiGpuSwitching(ModelTestCase):
         if torch.cuda.device_count() < 2:
             self.fail("Test is not relevant for this platform since number of available CUDA devices is less than 2")
 
-        trtorch.set_device(0)
+        torchtrt.set_device(0)
         self.target_gpu = 1
         self.input = torch.randn((1, 3, 224, 224)).to("cuda:1")
         self.model = self.model.to("cuda:1")
@@ -20,11 +20,11 @@ class TestMultiGpuSwitching(ModelTestCase):
         self.scripted_model = torch.jit.script(self.model)
 
     def test_compile_traced(self):
-        trtorch.set_device(0)
+        torchtrt.set_device(0)
         compile_spec = {
-            "inputs": [trtorch.Input(self.input.shape)],
+            "inputs": [torchtrt.Input(self.input.shape)],
             "device": {
-                "device_type": trtorch.DeviceType.GPU,
+                "device_type": torchtrt.DeviceType.GPU,
                 "gpu_id": self.target_gpu,
                 "dla_core": 0,
                 "allow_gpu_fallback": False,
@@ -32,18 +32,18 @@ class TestMultiGpuSwitching(ModelTestCase):
             }
         }
 
-        trt_mod = trtorch.compile(self.traced_model, compile_spec)
-        trtorch.set_device(self.target_gpu)
+        trt_mod = torchtrt.ts.compile(self.traced_model, **compile_spec)
+        torchtrt.set_device(self.target_gpu)
         same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
-        trtorch.set_device(0)
+        torchtrt.set_device(0)
         self.assertTrue(same < 2e-3)
 
     def test_compile_script(self):
-        trtorch.set_device(0)
+        torchtrt.set_device(0)
         compile_spec = {
-            "inputs": [trtorch.Input(self.input.shape)],
+            "inputs": [torchtrt.Input(self.input.shape)],
             "device": {
-                "device_type": trtorch.DeviceType.GPU,
+                "device_type": torchtrt.DeviceType.GPU,
                 "gpu_id": self.target_gpu,
                 "dla_core": 0,
                 "allow_gpu_fallback": False,
@@ -51,10 +51,10 @@ class TestMultiGpuSwitching(ModelTestCase):
             }
         }
 
-        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
-        trtorch.set_device(self.target_gpu)
+        trt_mod = torchtrt.ts.compile(self.scripted_model, **compile_spec)
+        torchtrt.set_device(self.target_gpu)
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
-        trtorch.set_device(0)
+        torchtrt.set_device(0)
         self.assertTrue(same < 2e-3)
 
 
@@ -65,18 +65,18 @@ class TestMultiGpuSerializeDeserializeSwitching(ModelTestCase):
             self.fail("Test is not relevant for this platform since number of available CUDA devices is less than 2")
 
         self.target_gpu = 0
-        trtorch.set_device(0)
+        torchtrt.set_device(0)
         self.input = torch.randn((1, 3, 224, 224)).to("cuda:0")
         self.model = self.model.to("cuda:0")
         self.traced_model = torch.jit.trace(self.model, [self.input])
         self.scripted_model = torch.jit.script(self.model)
 
     def test_compile_traced(self):
-        trtorch.set_device(0)
+        torchtrt.set_device(0)
         compile_spec = {
-            "inputs": [trtorch.Input(self.input.shape)],
+            "inputs": [torchtrt.Input(self.input.shape)],
             "device": {
-                "device_type": trtorch.DeviceType.GPU,
+                "device_type": torchtrt.DeviceType.GPU,
                 "gpu_id": self.target_gpu,
                 "dla_core": 0,
                 "allow_gpu_fallback": False,
@@ -84,18 +84,18 @@ class TestMultiGpuSerializeDeserializeSwitching(ModelTestCase):
             }
         }
 
-        trt_mod = trtorch.compile(self.traced_model, compile_spec)
+        trt_mod = torchtrt.ts.compile(self.traced_model, **compile_spec)
         # Changing the device ID deliberately. It should still run on correct device ID by context switching
-        trtorch.set_device(1)
+        torchtrt.set_device(1)
         same = (trt_mod(self.input) - self.traced_model(self.input)).abs().max()
         self.assertTrue(same < 2e-3)
 
     def test_compile_script(self):
-        trtorch.set_device(0)
+        torchtrt.set_device(0)
         compile_spec = {
-            "inputs": [trtorch.Input(self.input.shape)],
+            "inputs": [torchtrt.Input(self.input.shape)],
             "device": {
-                "device_type": trtorch.DeviceType.GPU,
+                "device_type": torchtrt.DeviceType.GPU,
                 "gpu_id": self.target_gpu,
                 "dla_core": 0,
                 "allow_gpu_fallback": False,
@@ -103,9 +103,9 @@ class TestMultiGpuSerializeDeserializeSwitching(ModelTestCase):
             }
         }
 
-        trt_mod = trtorch.compile(self.scripted_model, compile_spec)
+        trt_mod = torchtrt.ts.compile(self.scripted_model, **compile_spec)
         # Changing the device ID deliberately. It should still run on correct device ID by context switching
-        trtorch.set_device(1)
+        torchtrt.set_device(1)
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
         self.assertTrue(same < 2e-3)
 

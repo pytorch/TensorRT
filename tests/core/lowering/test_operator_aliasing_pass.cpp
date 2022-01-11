@@ -18,7 +18,7 @@ TEST(LoweringPasses, LoweringTrueDivideCorrectly) {
 
   auto sg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(source_graph, sg.get());
-  trtorch::core::lowering::passes::AliasOperators(sg);
+  torch_tensorrt::core::lowering::passes::AliasOperators(sg);
 
   auto tg = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(target_graph, tg.get());

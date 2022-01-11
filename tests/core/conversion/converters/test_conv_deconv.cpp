@@ -22,18 +22,18 @@ void conv_test_helper(std::string graph_ir) {
   auto jit_w = at::clone(w);
   auto jit_b = at::clone(b);
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w, jit_b});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {jit_w, jit_b});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
   auto trt_b = at::clone(b);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w, trt_b});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {trt_w, trt_b});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
 TEST(Converters, ATenConvolutionConvertsCorrectly) {
@@ -64,18 +64,18 @@ TEST(Converters, ATenConvolutionConvertsCorrectly) {
   auto jit_w = at::clone(w);
   auto jit_b = at::clone(b);
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w, jit_b});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {jit_w, jit_b});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
   auto trt_b = at::clone(b);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w, trt_b});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {trt_w, trt_b});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
 TEST(Converters, ATenConvolution1dConvertsCorrectly) {
@@ -103,17 +103,17 @@ TEST(Converters, ATenConvolution1dConvertsCorrectly) {
 
   auto jit_in = at::clone(in);
   auto jit_w = at::clone(w);
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {jit_w});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {trt_w});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
 TEST(Converters, ATenConvolutionNoBiasConvertsCorrectly) {
@@ -141,17 +141,17 @@ TEST(Converters, ATenConvolutionNoBiasConvertsCorrectly) {
 
   auto jit_in = at::clone(in);
   auto jit_w = at::clone(w);
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {jit_w});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {trt_w});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
 TEST(Converters, ATenConvolutionWithStrideConvertsCorrectly) {
@@ -183,18 +183,18 @@ TEST(Converters, ATenConvolutionWithStrideConvertsCorrectly) {
   auto jit_w = at::clone(w);
   auto jit_b = at::clone(b);
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w, jit_b});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {jit_w, jit_b});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
   auto trt_b = at::clone(b);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w, trt_b});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {trt_w, trt_b});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
 TEST(Converters, ATenConvolutionWithPaddingConvertsCorrectly) {
@@ -226,18 +226,18 @@ TEST(Converters, ATenConvolutionWithPaddingConvertsCorrectly) {
   auto jit_w = at::clone(w);
   auto jit_b = at::clone(b);
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w, jit_b});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {jit_w, jit_b});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
   auto trt_b = at::clone(b);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w, trt_b});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {trt_w, trt_b});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
 TEST(Converters, ATenConvolution3dConvertsCorrectly) {
@@ -268,18 +268,18 @@ TEST(Converters, ATenConvolution3dConvertsCorrectly) {
   auto jit_w = at::clone(w);
   auto jit_b = at::clone(b);
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w, jit_b});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {jit_w, jit_b});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
   auto trt_b = at::clone(b);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w, trt_b});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {trt_w, trt_b});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
 TEST(Converters, ATenConvolution3dNoBiasConvertsCorrectly) {
@@ -307,17 +307,17 @@ TEST(Converters, ATenConvolution3dNoBiasConvertsCorrectly) {
 
   auto jit_in = at::clone(in);
   auto jit_w = at::clone(w);
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {jit_w});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {trt_w});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
 TEST(Converters, ATenConvolution3dWithPaddingConvertsCorrectly) {
@@ -348,18 +348,18 @@ TEST(Converters, ATenConvolution3dWithPaddingConvertsCorrectly) {
   auto jit_w = at::clone(w);
   auto jit_b = at::clone(b);
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w, jit_b});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {jit_w, jit_b});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
   auto trt_b = at::clone(b);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w, trt_b});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {trt_w, trt_b});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
 TEST(Converters, ATenConvolution3dWithStrideDilationConvertsCorrectly) {
@@ -390,18 +390,18 @@ TEST(Converters, ATenConvolution3dWithStrideDilationConvertsCorrectly) {
   auto jit_w = at::clone(w);
   auto jit_b = at::clone(b);
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w, jit_b});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {jit_w, jit_b});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
   auto trt_b = at::clone(b);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w, trt_b});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {trt_w, trt_b});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
 TEST(Converters, ATenConvTransposeConvertsCorrectly) {
@@ -432,18 +432,18 @@ TEST(Converters, ATenConvTransposeConvertsCorrectly) {
   auto jit_w = at::clone(w);
   auto jit_b = at::clone(b);
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w, jit_b});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {jit_w, jit_b});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
   auto trt_b = at::clone(b);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w, trt_b});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {trt_w, trt_b});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
 TEST(Converters, ATenConvTransposeNoBiasConvertsCorrectly) {
@@ -471,17 +471,17 @@ TEST(Converters, ATenConvTransposeNoBiasConvertsCorrectly) {
 
   auto jit_in = at::clone(in);
   auto jit_w = at::clone(w);
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {jit_w});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {trt_w});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
 TEST(Converters, ATenConvTransposeWithStrideConvertsCorrectly) {
@@ -513,18 +513,18 @@ TEST(Converters, ATenConvTransposeWithStrideConvertsCorrectly) {
   auto jit_w = at::clone(w);
   auto jit_b = at::clone(b);
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w, jit_b});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {jit_w, jit_b});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
   auto trt_b = at::clone(b);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w, trt_b});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {trt_w, trt_b});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
 TEST(Converters, ATenConvTransposeWithPaddingConvertsCorrectly) {
@@ -556,18 +556,18 @@ TEST(Converters, ATenConvTransposeWithPaddingConvertsCorrectly) {
   auto jit_w = at::clone(w);
   auto jit_b = at::clone(b);
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w, jit_b});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {jit_w, jit_b});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
   auto trt_b = at::clone(b);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w, trt_b});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {trt_w, trt_b});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
 TEST(Converters, ATenConvolutionWithGroupConvertsCorrectly) {
@@ -599,18 +599,18 @@ TEST(Converters, ATenConvolutionWithGroupConvertsCorrectly) {
   auto jit_w = at::clone(w);
   auto jit_b = at::clone(b);
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w, jit_b});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {jit_w, jit_b});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
   auto trt_b = at::clone(b);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w, trt_b});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {trt_w, trt_b});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
 TEST(Converters, ATenConvTransposeWithGroupConvertsCorrectly) {
@@ -642,16 +642,16 @@ TEST(Converters, ATenConvTransposeWithGroupConvertsCorrectly) {
   auto jit_w = at::clone(w);
   auto jit_b = at::clone(b);
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {jit_w, jit_b});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {jit_in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {jit_w, jit_b});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
 
   auto trt_in = at::clone(in);
   auto trt_w = at::clone(w);
   auto trt_b = at::clone(b);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {trt_w, trt_b});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {trt_in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {trt_w, trt_b});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {trt_in});
 
   auto trt = trt_results[0].reshape(jit_results[0].sizes());
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }

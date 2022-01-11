@@ -168,6 +168,7 @@ Operators Currently Supported Through Evaluators
 - aten::Int.float(float a) -> int
 - aten::Int.int(int a) -> int
 - aten::__and__(int a, int b) -> (bool)
+- aten::__and__.bool(bool a, bool b) -> (bool)
 - aten::__getitem__.t(t[](a) list, int idx) -> (t(*))
 - aten::__is__(t1 self, t2 obj) -> bool
 - aten::__isnot__(t1 self, t2 obj) -> bool
@@ -195,6 +196,7 @@ Operators Currently Supported Through Evaluators
 - aten::eq.float_int(float a, int b) -> (bool)
 - aten::eq.int(int a, int b) -> (bool)
 - aten::eq.int_float(int a, float b) -> (bool)
+- aten::eq.str(str a, str b) -> (bool)
 - aten::floor.float(float a) -> (int)
 - aten::floor.int(int a) -> (int)
 - aten::floordiv.float(float a, float b) -> (int)

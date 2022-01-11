@@ -12,7 +12,7 @@ cc_binary(
         "-lpthread",
     ],
     deps = [
-        "//cpp:trtorch",
+        "//cpp:torch_tensorrt",
         "//examples/int8/benchmark",
         "//examples/int8/datasets:cifar10",
         "@libtorch",

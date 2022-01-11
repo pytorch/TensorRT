@@ -1,7 +1,7 @@
 #include "torch/script.h"
 #include "torch/torch.h"
-#include "trtorch/ptq.h"
-#include "trtorch/trtorch.h"
+#include "torch_tensorrt/ptq.h"
+#include "torch_tensorrt/torch_tensorrt.h"
 
 #include "examples/int8/benchmark/benchmark.h"
 #include "examples/int8/datasets/cifar10.h"
@@ -38,12 +38,12 @@ torch::jit::Module compile_int8_model(const std::string& data_dir, torch::jit::M
 
   std::string calibration_cache_file = "/tmp/vgg16_TRT_ptq_calibration.cache";
 
-  auto calibrator = trtorch::ptq::make_int8_calibrator(std::move(calibration_dataloader), calibration_cache_file, true);
+  auto calibrator = torch_tensorrt::ptq::make_int8_calibrator(std::move(calibration_dataloader), calibration_cache_file, true);
 
-  std::vector<trtorch::CompileSpec::Input> inputs = {
-      trtorch::CompileSpec::Input(std::vector<int64_t>({32, 3, 32, 32}), trtorch::CompileSpec::DataType::kFloat)};
+  std::vector<torch_tensorrt::Input> inputs = {
+      torch_tensorrt::Input(std::vector<int64_t>({32, 3, 32, 32}), torch_tensorrt::DataType::kFloat)};
   /// Configure settings for compilation
-  auto compile_spec = trtorch::CompileSpec(inputs);
+  auto compile_spec = torch_tensorrt::ts::CompileSpec(inputs);
   /// Set operating precision to INT8
   compile_spec.enabled_precisions.insert(torch::kF16);
   compile_spec.enabled_precisions.insert(torch::kI8);
@@ -56,14 +56,14 @@ torch::jit::Module compile_int8_model(const std::string& data_dir, torch::jit::M
 
 #ifdef SAVE_ENGINE
   std::cout << "Compiling graph to save as TRT engine (/tmp/engine_converted_from_jit.trt)" << std::endl;
-  auto engine = trtorch::ConvertGraphToTRTEngine(mod, "forward", compile_spec);
+  auto engine = torch_tensorrt::ts::convert_method_to_trt_engine(mod, "forward", compile_spec);
   std::ofstream out("/tmp/int8_engine_converted_from_jit.trt");
   out << engine;
   out.close();
 #endif
 
   std::cout << "Compiling and quantizing module" << std::endl;
-  auto trt_mod = trtorch::CompileGraph(mod, compile_spec);
+  auto trt_mod = torch_tensorrt::ts::compile(mod, compile_spec);
   return std::move(trt_mod);
 }
 

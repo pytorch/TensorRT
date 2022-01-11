@@ -3,14 +3,14 @@
 #include "core/util/prelude.h"
 #include "torch/torch.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace converters {
 namespace impl {
 namespace {
 
-auto layer_norm_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().pattern({
+auto layer_norm_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pattern({
     R"SIG(aten::layer_norm(Tensor input, int[] normalized_shape, Tensor? gamma, Tensor? beta,
                            float eps, bool cudnn_enabled) -> (Tensor))SIG",
     [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
@@ -37,14 +37,14 @@ auto layer_norm_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().
 
       // E[x]
       auto mean_expected = ctx->net->addReduce(*input, nvinfer1::ReduceOperation::kAVG, axis_mask, true);
-      TRTORCH_CHECK(mean_expected, "Unable to create mean_expected from node: " << *n);
+      TORCHTRT_CHECK(mean_expected, "Unable to create mean_expected from node: " << *n);
       mean_expected->setName((util::node_info(n) + "_mean_expected").c_str());
       auto mean_expected_out = mean_expected->getOutput(0);
 
       // X-E[x]
       auto sub = add_elementwise(
           ctx, nvinfer1::ElementWiseOperation::kSUB, input, mean_expected_out, (util::node_info(n) + "_sub").c_str());
-      TRTORCH_CHECK(sub, "Unable to create Sub layer from node: " << *n);
+      TORCHTRT_CHECK(sub, "Unable to create Sub layer from node: " << *n);
       sub->setName((util::node_info(n) + "_sub").c_str());
       auto xsubmean_out = sub->getOutput(0);
 
@@ -53,12 +53,12 @@ auto layer_norm_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().
       auto exponent = tensor_to_const(ctx, torch::tensor({pow_scalar}));
       auto pow = add_elementwise(
           ctx, nvinfer1::ElementWiseOperation::kPOW, xsubmean_out, exponent, (util::node_info(n) + "_pow").c_str());
-      TRTORCH_CHECK(pow, "Unable to create Pow layer from node: " << *n);
+      TORCHTRT_CHECK(pow, "Unable to create Pow layer from node: " << *n);
       pow->setName((util::node_info(n) + "_pow").c_str());
       auto pow_out = pow->getOutput(0);
 
       auto mean_var = ctx->net->addReduce(*pow_out, nvinfer1::ReduceOperation::kAVG, axis_mask, true);
-      TRTORCH_CHECK(mean_var, "Unable to create mean_var from node: " << *n);
+      TORCHTRT_CHECK(mean_var, "Unable to create mean_var from node: " << *n);
       mean_var->setName((util::node_info(n) + "_mean_var").c_str());
       auto mean_var_out = mean_var->getOutput(0);
 
@@ -66,20 +66,20 @@ auto layer_norm_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().
       auto eps_tensor = tensor_to_const(ctx, torch::tensor({eps}));
       auto add = add_elementwise(
           ctx, nvinfer1::ElementWiseOperation::kSUM, mean_var_out, eps_tensor, (util::node_info(n) + "_add").c_str());
-      TRTORCH_CHECK(add, "Unable to create Add layer from node: " << *n);
+      TORCHTRT_CHECK(add, "Unable to create Add layer from node: " << *n);
       add->setName((util::node_info(n) + "_add").c_str());
       auto add_out = add->getOutput(0);
 
       // SQRT((Var + eps))
       auto sqrt = ctx->net->addUnary(*add_out, nvinfer1::UnaryOperation::kSQRT);
-      TRTORCH_CHECK(sqrt, "Unable to create unary(sqrt) from node: " << *n);
+      TORCHTRT_CHECK(sqrt, "Unable to create unary(sqrt) from node: " << *n);
       sqrt->setName((util::node_info(n) + "_sqrt").c_str());
       auto sqrt_out = sqrt->getOutput(0);
 
       // (x - E[x]) / sqrt((var + eps))
       auto div = add_elementwise(
           ctx, nvinfer1::ElementWiseOperation::kDIV, xsubmean_out, sqrt_out, (util::node_info(n) + "_div").c_str());
-      TRTORCH_CHECK(div, "Unable to create div layer from node: " << *n);
+      TORCHTRT_CHECK(div, "Unable to create div layer from node: " << *n);
       div->setName((util::node_info(n) + "_div").c_str());
       auto div_out = div->getOutput(0);
 
@@ -150,4 +150,4 @@ auto layer_norm_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

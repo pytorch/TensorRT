@@ -3,29 +3,39 @@
 #include "torch/csrc/jit/api/module.h"
 #include "torch/csrc/jit/passes/constant_pooling.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace partitioning {
 
-std::unordered_map<torch::jit::Value*, torch::jit::IValue> generateRandomInputs(
-    std::unordered_map<torch::jit::Value*, ir::Input>& inputs) {
+std::unordered_map<const torch::jit::Value*, torch::jit::IValue> generateRandomInputs(
+    std::unordered_map<const torch::jit::Value*, ir::Input>& inputs,
+    std::unordered_map<const torch::jit::Value*, c10::optional<at::ScalarType>>& types) {
   // generate random inputs for running pytorch segments
-  std::unordered_map<torch::jit::Value*, torch::jit::IValue> ivalue_maps;
-  std::vector<torch::jit::IValue> random_inputs;
+  std::unordered_map<const torch::jit::Value*, torch::jit::IValue> ivalue_map;
 
+  uint64_t in_i = 0;
   for (auto& input : inputs) {
     auto cur_shape = input.second.input_shape;
     std::vector<int64_t> shape;
     shape.insert(shape.begin(), std::begin(cur_shape.d), std::begin(cur_shape.d) + cur_shape.nbDims);
-    auto in = at::randint(5, shape, {at::kCUDA});
-    ivalue_maps[input.first] = in.clone();
+    auto type_opt = types[input.first];
+    auto type = at::kFloat;
+    if (type_opt) {
+      type = type_opt.value();
+    } else {
+      LOG_WARNING("Input type for doing shape analysis could not be determined, defaulting to F32");
+    }
+    auto in = at::randint(5, shape, {at::kCUDA}).to(type);
+    ivalue_map[input.first] = in.clone();
+    in_i++;
   }
-  return ivalue_maps;
+  return ivalue_map;
 }
 
 void getSegmentsOutputByRunning(
     SegmentedBlock& seg_block,
-    std::unordered_map<torch::jit::Value*, torch::jit::IValue>& ivalues_maps) {
+    std::unordered_map<const torch::jit::Value*, torch::jit::IValue>& ivalues_maps,
+    const PartitionInfo& partition_info) {
   // create a module to run the graph
   auto g = seg_block.g();
   auto copy_g = g->copy();
@@ -54,9 +64,11 @@ void getSegmentsOutputByRunning(
 
   // set inputs ivalues, now supports Tensor/Int to pass argumentes between different segments
   for (auto& input : seg_block.raw_inputs()) {
-    TRTORCH_CHECK(
+    TORCHTRT_CHECK(
         ivalues_maps.count(input),
-        "Could not find torch::jit::Value* " << input->debugName() << " in lowering graph for mini graph input.\n");
+        "Could not find torch::jit::Value* " << input->debugName() << " produced from "
+                                             << util::node_info(input->node())
+                                             << " in lowering graph for mini graph input.\n");
     if (input->node()->kind() == torch::jit::prim::Param) {
       jit_inputs_ivalues.push_back(ivalues_maps[input]);
     } else if (input->type()->isSubtypeOf(torch::jit::TensorType::get())) {
@@ -70,7 +82,7 @@ void getSegmentsOutputByRunning(
     } else if (input->type()->kind() == torch::jit::TypeKind::TupleType) {
       jit_inputs_ivalues.push_back(ivalues_maps[input].toTuple());
     } else {
-      TRTORCH_THROW_ERROR("Unable to find type for value: " << input->debugName() << " to get the ivalues.\n");
+      TORCHTRT_THROW_ERROR("Unable to find type for value: " << input->debugName() << " to get the ivalues.\n");
     }
   }
 
@@ -93,27 +105,52 @@ void getSegmentsOutputByRunning(
   }
 
   // set input shape for each segmented block so we wil use it in conversion process
-  std::vector<ir::Input> input_shape;
+  std::vector<ir::Input> input_shapes;
+  std::vector<at::ScalarType> input_types;
   for (auto& i : seg_block.raw_inputs()) {
     if (ivalues_maps[i].isTensor()) {
-      input_shape.push_back(util::toVec(util::toDims(ivalues_maps[i].toTensor().sizes())));
+      // set the input_shape and data_type
+      at::ScalarType t = ivalues_maps[i].toTensor().scalar_type();
+      if (!partition_info.truncate_long_and_double && (t == at::kLong || t == at::kDouble)) {
+        TORCHTRT_THROW_ERROR(
+            "Unable to process subgraph input type of at::kLong/at::kDouble, try to compile model with truncate_long_and_double enabled");
+      } else if (partition_info.truncate_long_and_double && t == at::kLong) {
+        ivalues_maps[i] = ivalues_maps[i].toTensor().to(at::kInt);
+        LOG_WARNING("Truncating graph input type from at::kLong to at::kInt");
+      } else if (partition_info.truncate_long_and_double && t == at::kDouble) {
+        ivalues_maps[i] = ivalues_maps[i].toTensor().to(at::kFloat);
+        LOG_WARNING("Truncating graph input type from at::kDouble to at::kFloat");
+      }
+      c10::optional<nvinfer1::DataType> dtype = util::optTypeMetaToTRTDataType(ivalues_maps[i].toTensor().dtype());
+      if (dtype == c10::nullopt) {
+        TORCHTRT_THROW_ERROR("Unsupported input data type " << ivalues_maps[i].toTensor().dtype());
+      }
+      if (ivalues_maps[i].toTensor().sizes().size() == 0) {
+        // handle Scalar types, which has sizes of []
+        input_shapes.push_back(util::toVec(util::toDims(c10::List<long int>({1}))));
+      } else {
+        input_shapes.push_back(util::toVec(util::toDims(ivalues_maps[i].toTensor().sizes())));
+      }
+      input_types.push_back(ivalues_maps[i].toTensor().scalar_type());
     }
   }
 
-  seg_block.register_inshape(input_shape);
+  seg_block.register_inshapes(input_shapes);
+  seg_block.register_intypes(input_types);
 }
 
 void runShapeAnalysis(
     std::vector<SegmentedBlock>& segmented_blocks,
-    std::unordered_map<torch::jit::Value*, torch::jit::IValue>& ivalues_maps) {
+    std::unordered_map<const torch::jit::Value*, torch::jit::IValue>& example_tensor_map,
+    const PartitionInfo& partition_info) {
   // register every segment's input shape, and it's running output IValues
   for (auto& seg_block : segmented_blocks) {
     torch::jit::ConstantPooling(seg_block.g());
-    getSegmentsOutputByRunning(seg_block, ivalues_maps);
+    getSegmentsOutputByRunning(seg_block, example_tensor_map, partition_info);
   }
   return;
 }
 
 } // namespace partitioning
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

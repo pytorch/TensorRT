@@ -37,10 +37,10 @@
   <script src="../_static/javascripts/modernizr.js">
   </script>
   <title>
-   Deploying TRTorch Programs — TRTorch master documentation
+   Deploying Torch-TensorRT Programs — Torch-TensorRT master documentation
   </title>
-  <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/pygments.css" rel="stylesheet" type="text/css"/>
+  <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/collapsible-lists/css/tree_view.css" rel="stylesheet" type="text/css"/>
   <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js">
   </script>
@@ -50,23 +50,16 @@
   </script>
   <script src="../_static/doctools.js">
   </script>
-  <script src="../_static/language_data.js">
-  </script>
   <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js">
   </script>
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
   </script>
-  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
-  </script>
-  <script type="text/x-mathjax-config">
-   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
-  </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
   <link href="using_dla.html" rel="next" title="DLA"/>
-  <link href="use_from_pytorch.html" rel="prev" title="Using TRTorch Directly From PyTorch"/>
+  <link href="use_from_pytorch.html" rel="prev" title="Using Torch-TensorRT Directly From PyTorch"/>
  </head>
  <body data-md-color-accent="light-green" data-md-color-primary="light-green" dir="ltr">
   <svg class="md-svg">
@@ -88,7 +81,7 @@
    <nav class="md-header-nav md-grid">
     <div class="md-flex navheader">
      <div class="md-flex__cell md-flex__cell--shrink">
-      <a class="md-header-nav__button md-logo" href="../index.html" title="TRTorch master documentation">
+      <a class="md-header-nav__button md-logo" href="../index.html" title="Torch-TensorRT master documentation">
        <i class="md-icon">
         
        </i>
@@ -101,10 +94,10 @@
      <div class="md-flex__cell md-flex__cell--stretch">
       <div class="md-flex__ellipsis md-header-nav__title" data-md-component="title">
        <span class="md-header-nav__topic">
-        TRTorch
+        Torch-TensorRT
        </span>
        <span class="md-header-nav__topic">
-        Deploying TRTorch Programs
+        Deploying Torch-TensorRT Programs
        </span>
       </div>
      </div>
@@ -115,7 +108,7 @@
        <label class="md-search__overlay" for="__search">
        </label>
        <div class="md-search__inner" role="search">
-        <form action="../search.html" class="md-search__form" method="GET" name="search">
+        <form action="../search.html" class="md-search__form" method="get" name="search">
          <input autocapitalize="off" autocomplete="off" class="md-search__input" data-md-component="query" data-md-state="active" name="q" placeholder="Search" spellcheck="false" type="text"/>
          <label class="md-icon md-search__icon" for="__search">
          </label>
@@ -139,7 +132,7 @@
      </div>
      <div class="md-flex__cell md-flex__cell--shrink">
       <div class="md-header-nav__source">
-       <a class="md-source" data-md-source="github" href="https://github.com/nvidia/TRTorch/" title="Go to repository">
+       <a class="md-source" data-md-source="github" href="https://github.com/nvidia/Torch-TensorRT/" title="Go to repository">
         <div class="md-source__icon">
          <svg height="28" viewbox="0 0 24 24" width="28" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
           <use height="24" width="24" xlink:href="#__github">
@@ -147,7 +140,7 @@
          </svg>
         </div>
         <div class="md-source__repository">
-         TRTorch
+         Torch-TensorRT
         </div>
        </a>
       </div>
@@ -157,28 +150,34 @@
        Versions
       </button>
       <div class="dropdown-content md-hero">
-       <a href="https://nvidia.github.io/TRTorch/" title="master">
+       <a href="https://nvidia.github.io/Torch-TensorRT/" title="master">
         master
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.4.0/" title="v0.4.0">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v1.0.0/" title="v1.0.0">
+        v1.0.0
+       </a>
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.4.1/" title="v0.4.1">
+        v0.4.1
+       </a>
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.4.0/" title="v0.4.0">
         v0.4.0
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.3.0/" title="v0.3.0">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.3.0/" title="v0.3.0">
         v0.3.0
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.2.0/" title="v0.2.0">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.2.0/" title="v0.2.0">
         v0.2.0
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.1.0/" title="v0.1.0">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.1.0/" title="v0.1.0">
         v0.1.0
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.0.3/" title="v0.0.3">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.0.3/" title="v0.0.3">
         v0.0.3
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.0.2/" title="v0.0.2">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.0.2/" title="v0.0.2">
         v0.0.2
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.0.1/" title="v0.0.1">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.0.1/" title="v0.0.1">
         v0.0.1
        </a>
       </div>
@@ -192,7 +191,7 @@
      <ul class="md-tabs__list">
       <li class="md-tabs__item">
        <a class="md-tabs__link" href="../index.html">
-        TRTorch master documentation
+        Torch-TensorRT master documentation
        </a>
       </li>
      </ul>
@@ -205,17 +204,17 @@
        <div class="md-sidebar__inner">
         <nav class="md-nav md-nav--primary" data-md-level="0">
          <label class="md-nav__title md-nav__title--site" for="__drawer">
-          <a class="md-nav__button md-logo" href="../index.html" title="TRTorch master documentation">
+          <a class="md-nav__button md-logo" href="../index.html" title="Torch-TensorRT master documentation">
            <i class="md-icon">
             
            </i>
           </a>
-          <a href="../index.html" title="TRTorch master documentation">
-           TRTorch
+          <a href="../index.html" title="Torch-TensorRT master documentation">
+           Torch-TensorRT
           </a>
          </label>
          <div class="md-nav__source">
-          <a class="md-source" data-md-source="github" href="https://github.com/nvidia/TRTorch/" title="Go to repository">
+          <a class="md-source" data-md-source="github" href="https://github.com/nvidia/Torch-TensorRT/" title="Go to repository">
            <div class="md-source__icon">
             <svg height="28" viewbox="0 0 24 24" width="28" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
              <use height="24" width="24" xlink:href="#__github">
@@ -223,7 +222,7 @@
             </svg>
            </div>
            <div class="md-source__repository">
-            TRTorch
+            Torch-TensorRT
            </div>
           </a>
          </div>
@@ -241,8 +240,28 @@
            </a>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="getting_started.html">
-            Getting Started
+           <a class="md-nav__link" href="getting_started_with_cpp_api.html">
+            Getting Started with C++
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="getting_started_with_python_api.html">
+            Using Torch-TensorRT in Python
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="creating_torchscript_module_in_python.html">
+            Creating a TorchScript Module
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="creating_torchscript_module_in_python.html#working-with-torchscript-in-python">
+            Working with TorchScript in Python
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">
+            Saving TorchScript Module to Disk
            </a>
           </li>
           <li class="md-nav__item">
@@ -251,22 +270,22 @@
            </a>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="trtorchc.html">
-            trtorchc
+           <a class="md-nav__link" href="torchtrtc.html">
+            torchtrtc
            </a>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="use_from_pytorch.html">
-            Using TRTorch Directly From PyTorch
+            Using Torch-TensorRT Directly From PyTorch
            </a>
           </li>
           <li class="md-nav__item">
            <input class="md-toggle md-nav__toggle" data-md-toggle="toc" id="__toc" type="checkbox"/>
            <label class="md-nav__link md-nav__link--active" for="__toc">
-            Deploying TRTorch Programs
+            Deploying Torch-TensorRT Programs
            </label>
            <a class="md-nav__link md-nav__link--active" href="#">
-            Deploying TRTorch Programs
+            Deploying Torch-TensorRT Programs
            </a>
            <nav class="md-nav md-nav--secondary">
             <label class="md-nav__title" for="__toc">
@@ -275,13 +294,13 @@
             <ul class="md-nav__list" data-md-scrollfix="">
              <li class="md-nav__item">
               <a class="md-nav__link" href="#tutorials-runtime--page-root">
-               Deploying TRTorch Programs
+               Deploying Torch-TensorRT Programs
               </a>
               <nav class="md-nav">
                <ul class="md-nav__list">
                 <li class="md-nav__item">
-                 <a class="md-nav__link" href="#trtorch-package-libtrtorch-so">
-                  TRTorch package / libtrtorch.so
+                 <a class="md-nav__link" href="#torch-tensorrt-package-libtorchtrt-so">
+                  Torch-TensorRT package / libtorchtrt.so
                  </a>
                 </li>
                 <li class="md-nav__item">
@@ -319,17 +338,27 @@
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../_notebooks/lenet-getting-started.html">
-            TRTorch Getting Started - LeNet
+            Torch-TensorRT Getting Started - LeNet
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/Resnet50-example.html">
+            Torch-TensorRT Getting Started - ResNet 50
            </a>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../_notebooks/ssd-object-detection-demo.html">
-            Object Detection with TRTorch (SSD)
+            Object Detection with Torch-TensorRT (SSD)
            </a>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../_notebooks/vgg-qat.html">
-            Deploying Quantization Aware Trained models in INT8 using TRTorch
+            Deploying Quantization Aware Trained models in INT8 using Torch-TensorRT
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/EfficientNet-example.html">
+            Torch-TensorRT Getting Started - EfficientNet-B0
            </a>
           </li>
           <li class="md-nav__item">
@@ -340,13 +369,23 @@
            </span>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/trtorch.html">
-            trtorch
+           <a class="md-nav__link" href="../py_api/torch_tensorrt.html">
+            torch_tensorrt
            </a>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../py_api/logging.html">
-            trtorch.logging
+            torch_tensorrt.logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/ptq.html">
+            torch_tensorrt.ptq
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/ts.html">
+            torch_tensorrt.ts
            </a>
           </li>
           <li class="md-nav__item">
@@ -357,8 +396,28 @@
            </span>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html">
-            TRTorch C++ API
+           <a class="md-nav__link" href="../_cpp_api/torch_tensort_cpp.html">
+            Torch-TensorRT C++ API
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt.html">
+            Namespace torch_tensorrt
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt__logging.html">
+            Namespace torch_tensorrt::logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt__torchscript.html">
+            Namespace torch_tensorrt::torchscript
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt__ptq.html">
+            Namespace torch_tensorrt::ptq
            </a>
           </li>
           <li class="md-nav__item">
@@ -380,7 +439,7 @@
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../contributors/useful_links.html">
-            Useful Links for TRTorch Development
+            Useful Links for Torch-TensorRT Development
            </a>
           </li>
           <li class="md-nav__item">
@@ -410,13 +469,13 @@
          <ul class="md-nav__list" data-md-scrollfix="">
           <li class="md-nav__item">
            <a class="md-nav__link" href="#tutorials-runtime--page-root">
-            Deploying TRTorch Programs
+            Deploying Torch-TensorRT Programs
            </a>
            <nav class="md-nav">
             <ul class="md-nav__list">
              <li class="md-nav__item">
-              <a class="md-nav__link" href="#trtorch-package-libtrtorch-so">
-               TRTorch package / libtrtorch.so
+              <a class="md-nav__link" href="#torch-tensorrt-package-libtorchtrt-so">
+               Torch-TensorRT package / libtorchtrt.so
               </a>
              </li>
              <li class="md-nav__item">
@@ -446,24 +505,24 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <section id="deploying-trtorch-programs">
+       <section id="deploying-torch-tensorrt-programs">
         <span id="runtime">
         </span>
         <h1 id="tutorials-runtime--page-root">
-         Deploying TRTorch Programs
+         Deploying Torch-TensorRT Programs
          <a class="headerlink" href="#tutorials-runtime--page-root" title="Permalink to this headline">
           ¶
          </a>
         </h1>
         <p>
-         After compiling and saving TRTorch programs there is no longer a strict dependency on the full
-TRTorch library. All that is required to run a compiled program is the runtime. There are therfore a couple
-options to deploy your programs other than shipping the full trtorch compiler with your applications.
+         After compiling and saving Torch-TensorRT programs there is no longer a strict dependency on the full
+Torch-TensorRT library. All that is required to run a compiled program is the runtime. There are therfore a couple
+options to deploy your programs other than shipping the full Torch-TensorRT compiler with your applications.
         </p>
-        <section id="trtorch-package-libtrtorch-so">
-         <h2 id="trtorch-package-libtrtorch-so">
-          TRTorch package / libtrtorch.so
-          <a class="headerlink" href="#trtorch-package-libtrtorch-so" title="Permalink to this headline">
+        <section id="torch-tensorrt-package-libtorchtrt-so">
+         <h2 id="torch-tensorrt-package-libtorchtrt-so">
+          Torch-TensorRT package / libtorchtrt.so
+          <a class="headerlink" href="#torch-tensorrt-package-libtorchtrt-so" title="Permalink to this headline">
            ¶
           </a>
          </h2>
@@ -483,27 +542,27 @@ must be imported in python or linked in C++.
           Distributed with the C++ distribution is
           <code class="docutils literal notranslate">
            <span class="pre">
-            libtrtorchrt.so
+            libtorchtrt_runtime.so
            </span>
           </code>
           . This library only contains the components
-necessary to run TRTorch programs. Instead of linking
+necessary to run Torch-TensorRT programs. Instead of linking
           <code class="docutils literal notranslate">
            <span class="pre">
-            libtrtorch.so
+            libtorchtrt.so
            </span>
           </code>
           or importing
           <code class="docutils literal notranslate">
            <span class="pre">
-            trtorch
+            torch_tensorrt
            </span>
           </code>
           you can
 link
           <code class="docutils literal notranslate">
            <span class="pre">
-            libtrtorchrt.so
+            libtorchtrt_runtime.so
            </span>
           </code>
           in your deployment programs or use
@@ -522,7 +581,7 @@ link
 you can load the runtime with
           <code class="docutils literal notranslate">
            <span class="pre">
-            torch.ops.load_library("libtrtorchrt.so")
+            torch.ops.load_library("libtorchtrt_runtime.so")
            </span>
           </code>
           . You can then continue to use
@@ -536,7 +595,7 @@ programs just as you would otherwise via PyTorch API.
            If you are using the standard distribution of PyTorch in Python on x86, likely you will need the pre-cxx11-abi variant of
            <code class="docutils literal notranslate">
             <span class="pre">
-             libtrtorchrt.so
+             libtorchtrt_runtime.so
             </span>
            </code>
            , check
@@ -556,7 +615,7 @@ programs just as you would otherwise via PyTorch API.
            If you are linking
            <code class="docutils literal notranslate">
             <span class="pre">
-             libtrtorchrt.so
+             libtorchtrt_runtime.so
             </span>
            </code>
            , likely using the following flags will help
@@ -565,25 +624,25 @@ programs just as you would otherwise via PyTorch API.
              -Wl,--no-as-needed
             </span>
             <span class="pre">
-             -ltrtorchrt
+             -ltorchtrt
             </span>
             <span class="pre">
              -Wl,--as-needed
             </span>
            </code>
-           as theres no direct symbol dependency to anything in the TRTorch runtime for most TRTorch runtime applications
+           as theres no direct symbol dependency to anything in the Torch-TensorRT runtime for most Torch-TensorRT runtime applications
           </p>
          </div>
          <p>
           An example of how to use
           <code class="docutils literal notranslate">
            <span class="pre">
-            libtrtorchrt.so
+            libtorchtrt_runtime.so
            </span>
           </code>
           can be found here:
-          <a class="reference external" href="https://github.com/NVIDIA/TRTorch/tree/master/examples/trtorchrt_example">
-           https://github.com/NVIDIA/TRTorch/tree/master/examples/trtorchrt_example
+          <a class="reference external" href="https://github.com/NVIDIA/Torch-TensorRT/tree/master/examples/torchtrt_example">
+           https://github.com/NVIDIA/Torch-TensorRT/tree/master/examples/torchtrt_example
           </a>
          </p>
         </section>
@@ -595,14 +654,14 @@ programs just as you would otherwise via PyTorch API.
           </a>
          </h2>
          <p>
-          In the case you use TRTorch as a converter to a TensorRT engine and your engine uses plugins provided by TRTorch, TRTorch
+          In the case you use Torch-TensorRT as a converter to a TensorRT engine and your engine uses plugins provided by Torch-TensorRT, Torch-TensorRT
 ships the library
           <code class="docutils literal notranslate">
            <span class="pre">
-            libtrtorch_plugins.so
+            libtorchtrt_plugins.so
            </span>
           </code>
-          which contains the implementation of the TensorRT plugins used by TRTorch during
+          which contains the implementation of the TensorRT plugins used by Torch-TensorRT during
 compilation. This library can be
           <code class="docutils literal notranslate">
            <span class="pre">
@@ -627,7 +686,7 @@ compilation. This library can be
   <footer class="md-footer">
    <div class="md-footer-nav">
     <nav class="md-footer-nav__inner md-grid">
-     <a class="md-flex md-footer-nav__link md-footer-nav__link--prev" href="use_from_pytorch.html" rel="prev" title="Using TRTorch Directly From PyTorch">
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--prev" href="use_from_pytorch.html" rel="prev" title="Using Torch-TensorRT Directly From PyTorch">
       <div class="md-flex__cell md-flex__cell--shrink">
        <i class="md-icon md-icon--arrow-back md-footer-nav__button">
        </i>
@@ -637,7 +696,7 @@ compilation. This library can be
         <span class="md-footer-nav__direction">
          Previous
         </span>
-        Using TRTorch Directly From PyTorch
+        Using Torch-TensorRT Directly From PyTorch
        </span>
       </div>
      </a>
@@ -667,7 +726,7 @@ compilation. This library can be
       <a href="http://www.sphinx-doc.org/">
        Sphinx
       </a>
-      3.1.2.
+      4.3.0.
              and
       <a href="https://github.com/bashtage/sphinx-material/">
        Material for

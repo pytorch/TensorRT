@@ -8,20 +8,20 @@
 #include <ATen/ATen.h>
 #include <vector>
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace converters {
 namespace impl {
 namespace {
 
-auto cumsum_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().pattern(
+auto cumsum_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pattern(
     {"aten::cumsum(Tensor self, int dim, *, int? dtype=None) -> (Tensor)",
      [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
        auto in = args[0].ITensorOrFreeze(ctx);
        auto input_dims = in->getDimensions();
        int dim = args[1].unwrapToInt();
-       TRTORCH_CHECK(
+       TORCHTRT_CHECK(
            (dim >= 0 && dim < input_dims.nbDims) || (dim < 0 && (input_dims.nbDims + dim >= 0)),
            "Dimension out of range (expected to be in range of [" << -input_dims.nbDims << ", " << input_dims.nbDims - 1
                                                                   << "], but got " << dim << ")");
@@ -73,4 +73,4 @@ auto cumsum_registrations TRTORCH_UNUSED = RegisterNodeConversionPatterns().patt
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

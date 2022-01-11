@@ -9,11 +9,12 @@
 #include "core/runtime/runtime.h"
 #include "torch/csrc/jit/api/module.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 
 struct CompileSpec {
-  CompileSpec(std::vector<ir::Input> inputs) : convert_info(std::move(inputs)) {}
+  CompileSpec(std::vector<ir::Input> inputs) : inputs(inputs) {}
+  std::vector<ir::Input> inputs;
   conversion::ConversionInfo convert_info;
   lowering::LowerInfo lower_info;
   partitioning::PartitionInfo partition_info;
@@ -30,4 +31,4 @@ torch::jit::script::Module EmbedEngineInNewModule(const std::string& engine, run
 void set_device(const int gpu_id);
 
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

@@ -37,10 +37,10 @@
   <script src="../_static/javascripts/modernizr.js">
   </script>
   <title>
-   trtorch.logging — TRTorch master documentation
+   torch_tensorrt.logging — Torch-TensorRT master documentation
   </title>
-  <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/pygments.css" rel="stylesheet" type="text/css"/>
+  <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/collapsible-lists/css/tree_view.css" rel="stylesheet" type="text/css"/>
   <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js">
   </script>
@@ -50,23 +50,16 @@
   </script>
   <script src="../_static/doctools.js">
   </script>
-  <script src="../_static/language_data.js">
-  </script>
   <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js">
   </script>
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
   </script>
-  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
-  </script>
-  <script type="text/x-mathjax-config">
-   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
-  </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
-  <link href="../_cpp_api/trtorch_cpp.html" rel="next" title="TRTorch C++ API"/>
-  <link href="trtorch.html" rel="prev" title="trtorch"/>
+  <link href="ptq.html" rel="next" title="torch_tensorrt.ptq"/>
+  <link href="torch_tensorrt.html" rel="prev" title="torch_tensorrt"/>
  </head>
  <body data-md-color-accent="light-green" data-md-color-primary="light-green" dir="ltr">
   <svg class="md-svg">
@@ -88,7 +81,7 @@
    <nav class="md-header-nav md-grid">
     <div class="md-flex navheader">
      <div class="md-flex__cell md-flex__cell--shrink">
-      <a class="md-header-nav__button md-logo" href="../index.html" title="TRTorch master documentation">
+      <a class="md-header-nav__button md-logo" href="../index.html" title="Torch-TensorRT master documentation">
        <i class="md-icon">
         
        </i>
@@ -101,10 +94,10 @@
      <div class="md-flex__cell md-flex__cell--stretch">
       <div class="md-flex__ellipsis md-header-nav__title" data-md-component="title">
        <span class="md-header-nav__topic">
-        TRTorch
+        Torch-TensorRT
        </span>
        <span class="md-header-nav__topic">
-        trtorch.logging
+        torch_tensorrt.logging
        </span>
       </div>
      </div>
@@ -115,7 +108,7 @@
        <label class="md-search__overlay" for="__search">
        </label>
        <div class="md-search__inner" role="search">
-        <form action="../search.html" class="md-search__form" method="GET" name="search">
+        <form action="../search.html" class="md-search__form" method="get" name="search">
          <input autocapitalize="off" autocomplete="off" class="md-search__input" data-md-component="query" data-md-state="active" name="q" placeholder="Search" spellcheck="false" type="text"/>
          <label class="md-icon md-search__icon" for="__search">
          </label>
@@ -139,7 +132,7 @@
      </div>
      <div class="md-flex__cell md-flex__cell--shrink">
       <div class="md-header-nav__source">
-       <a class="md-source" data-md-source="github" href="https://github.com/nvidia/TRTorch/" title="Go to repository">
+       <a class="md-source" data-md-source="github" href="https://github.com/nvidia/Torch-TensorRT/" title="Go to repository">
         <div class="md-source__icon">
          <svg height="28" viewbox="0 0 24 24" width="28" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
           <use height="24" width="24" xlink:href="#__github">
@@ -147,7 +140,7 @@
          </svg>
         </div>
         <div class="md-source__repository">
-         TRTorch
+         Torch-TensorRT
         </div>
        </a>
       </div>
@@ -157,28 +150,34 @@
        Versions
       </button>
       <div class="dropdown-content md-hero">
-       <a href="https://nvidia.github.io/TRTorch/" title="master">
+       <a href="https://nvidia.github.io/Torch-TensorRT/" title="master">
         master
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.4.0/" title="v0.4.0">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v1.0.0/" title="v1.0.0">
+        v1.0.0
+       </a>
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.4.1/" title="v0.4.1">
+        v0.4.1
+       </a>
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.4.0/" title="v0.4.0">
         v0.4.0
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.3.0/" title="v0.3.0">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.3.0/" title="v0.3.0">
         v0.3.0
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.2.0/" title="v0.2.0">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.2.0/" title="v0.2.0">
         v0.2.0
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.1.0/" title="v0.1.0">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.1.0/" title="v0.1.0">
         v0.1.0
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.0.3/" title="v0.0.3">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.0.3/" title="v0.0.3">
         v0.0.3
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.0.2/" title="v0.0.2">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.0.2/" title="v0.0.2">
         v0.0.2
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.0.1/" title="v0.0.1">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.0.1/" title="v0.0.1">
         v0.0.1
        </a>
       </div>
@@ -192,12 +191,12 @@
      <ul class="md-tabs__list">
       <li class="md-tabs__item">
        <a class="md-tabs__link" href="../index.html">
-        TRTorch master documentation
+        Torch-TensorRT master documentation
        </a>
       </li>
       <li class="md-tabs__item">
-       <a class="md-tabs__link" href="trtorch.html">
-        trtorch
+       <a class="md-tabs__link" href="torch_tensorrt.html">
+        torch_tensorrt
        </a>
       </li>
      </ul>
@@ -210,17 +209,17 @@
        <div class="md-sidebar__inner">
         <nav class="md-nav md-nav--primary" data-md-level="0">
          <label class="md-nav__title md-nav__title--site" for="__drawer">
-          <a class="md-nav__button md-logo" href="../index.html" title="TRTorch master documentation">
+          <a class="md-nav__button md-logo" href="../index.html" title="Torch-TensorRT master documentation">
            <i class="md-icon">
             
            </i>
           </a>
-          <a href="../index.html" title="TRTorch master documentation">
-           TRTorch
+          <a href="../index.html" title="Torch-TensorRT master documentation">
+           Torch-TensorRT
           </a>
          </label>
          <div class="md-nav__source">
-          <a class="md-source" data-md-source="github" href="https://github.com/nvidia/TRTorch/" title="Go to repository">
+          <a class="md-source" data-md-source="github" href="https://github.com/nvidia/Torch-TensorRT/" title="Go to repository">
            <div class="md-source__icon">
             <svg height="28" viewbox="0 0 24 24" width="28" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
              <use height="24" width="24" xlink:href="#__github">
@@ -228,7 +227,7 @@
             </svg>
            </div>
            <div class="md-source__repository">
-            TRTorch
+            Torch-TensorRT
            </div>
           </a>
          </div>
@@ -246,8 +245,28 @@
            </a>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="../tutorials/getting_started.html">
-            Getting Started
+           <a class="md-nav__link" href="../tutorials/getting_started_with_cpp_api.html">
+            Getting Started with C++
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/getting_started_with_python_api.html">
+            Using Torch-TensorRT in Python
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/creating_torchscript_module_in_python.html">
+            Creating a TorchScript Module
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/creating_torchscript_module_in_python.html#working-with-torchscript-in-python">
+            Working with TorchScript in Python
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">
+            Saving TorchScript Module to Disk
            </a>
           </li>
           <li class="md-nav__item">
@@ -256,18 +275,18 @@
            </a>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="../tutorials/trtorchc.html">
-            trtorchc
+           <a class="md-nav__link" href="../tutorials/torchtrtc.html">
+            torchtrtc
            </a>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../tutorials/use_from_pytorch.html">
-            Using TRTorch Directly From PyTorch
+            Using Torch-TensorRT Directly From PyTorch
            </a>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../tutorials/runtime.html">
-            Deploying TRTorch Programs
+            Deploying Torch-TensorRT Programs
            </a>
           </li>
           <li class="md-nav__item">
@@ -284,17 +303,27 @@
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../_notebooks/lenet-getting-started.html">
-            TRTorch Getting Started - LeNet
+            Torch-TensorRT Getting Started - LeNet
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/Resnet50-example.html">
+            Torch-TensorRT Getting Started - ResNet 50
            </a>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../_notebooks/ssd-object-detection-demo.html">
-            Object Detection with TRTorch (SSD)
+            Object Detection with Torch-TensorRT (SSD)
            </a>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../_notebooks/vgg-qat.html">
-            Deploying Quantization Aware Trained models in INT8 using TRTorch
+            Deploying Quantization Aware Trained models in INT8 using Torch-TensorRT
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/EfficientNet-example.html">
+            Torch-TensorRT Getting Started - EfficientNet-B0
            </a>
           </li>
           <li class="md-nav__item">
@@ -305,17 +334,17 @@
            </span>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="trtorch.html">
-            trtorch
+           <a class="md-nav__link" href="torch_tensorrt.html">
+            torch_tensorrt
            </a>
           </li>
           <li class="md-nav__item">
            <input class="md-toggle md-nav__toggle" data-md-toggle="toc" id="__toc" type="checkbox"/>
            <label class="md-nav__link md-nav__link--active" for="__toc">
-            trtorch.logging
+            torch_tensorrt.logging
            </label>
            <a class="md-nav__link md-nav__link--active" href="#">
-            trtorch.logging
+            torch_tensorrt.logging
            </a>
            <nav class="md-nav md-nav--secondary">
             <ul class="md-nav__list" data-md-scrollfix="">
@@ -328,6 +357,16 @@
            </nav>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="ptq.html">
+            torch_tensorrt.ptq
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="ts.html">
+            torch_tensorrt.ts
+           </a>
+          </li>
+          <li class="md-nav__item">
            <span class="md-nav__link caption">
             <span class="caption-text">
              C++ API Documenation
@@ -335,8 +374,28 @@
            </span>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html">
-            TRTorch C++ API
+           <a class="md-nav__link" href="../_cpp_api/torch_tensort_cpp.html">
+            Torch-TensorRT C++ API
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt.html">
+            Namespace torch_tensorrt
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt__logging.html">
+            Namespace torch_tensorrt::logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt__torchscript.html">
+            Namespace torch_tensorrt::torchscript
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt__ptq.html">
+            Namespace torch_tensorrt::ptq
            </a>
           </li>
           <li class="md-nav__item">
@@ -358,7 +417,7 @@
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../contributors/useful_links.html">
-            Useful Links for TRTorch Development
+            Useful Links for Torch-TensorRT Development
            </a>
           </li>
           <li class="md-nav__item">
@@ -397,45 +456,57 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <section id="trtorch-logging">
+       <section id="torch-tensorrt-logging">
+        <span id="torch-tensorrt-logging-py">
+        </span>
         <h1 id="py-api-logging--page-root">
-         trtorch.logging
+         torch_tensorrt.logging
          <a class="headerlink" href="#py-api-logging--page-root" title="Permalink to this headline">
           ¶
          </a>
         </h1>
-        <span class="target" id="module-trtorch.logging">
+        <span class="target" id="module-torch_tensorrt.logging">
         </span>
         <dl class="py class">
-         <dt id="trtorch.logging.Level">
+         <dt class="sig sig-object py" id="torch_tensorrt.logging.Level">
           <em class="property">
-           class
+           <span class="pre">
+            class
+           </span>
+           <span class="w">
+           </span>
           </em>
-          <code class="sig-prename descclassname">
-           trtorch.logging.
-          </code>
-          <code class="sig-name descname">
-           Level
-          </code>
+          <span class="sig-prename descclassname">
+           <span class="pre">
+            torch_tensorrt.logging.
+           </span>
+          </span>
+          <span class="sig-name descname">
+           <span class="pre">
+            Level
+           </span>
+          </span>
           <span class="sig-paren">
            (
           </span>
           <em class="sig-param">
            <span class="n">
-            value
+            <span class="pre">
+             value
+            </span>
            </span>
           </em>
           <span class="sig-paren">
            )
           </span>
-          <a class="headerlink" href="#trtorch.logging.Level" title="Permalink to this definition">
+          <a class="headerlink" href="#torch_tensorrt.logging.Level" title="Permalink to this definition">
            ¶
           </a>
          </dt>
          <dd>
           <p>
            Bases:
-           <code class="xref cpp cpp-class docutils literal notranslate">
+           <code class="xref py py-class docutils literal notranslate">
             <span class="pre">
              enum.Enum
             </span>
@@ -445,14 +516,30 @@
            Enum to set the minimum required logging level to print a message to stdout
           </p>
           <dl class="py attribute">
-           <dt id="trtorch.logging.Level.Debug">
-            <code class="sig-name descname">
-             Debug
-            </code>
+           <dt class="sig sig-object py" id="torch_tensorrt.logging.Level.Debug">
+            <span class="sig-name descname">
+             <span class="pre">
+              Debug
+             </span>
+            </span>
             <em class="property">
-             = &lt;LogLevel.DEBUG: 4&gt;
+             <span class="w">
+             </span>
+             <span class="p">
+              <span class="pre">
+               =
+              </span>
+             </span>
+             <span class="w">
+             </span>
+             <span class="pre">
+              &lt;LogLevel.DEBUG:
+             </span>
+             <span class="pre">
+              4&gt;
+             </span>
             </em>
-            <a class="headerlink" href="#trtorch.logging.Level.Debug" title="Permalink to this definition">
+            <a class="headerlink" href="#torch_tensorrt.logging.Level.Debug" title="Permalink to this definition">
              ¶
             </a>
            </dt>
@@ -460,14 +547,30 @@
            </dd>
           </dl>
           <dl class="py attribute">
-           <dt id="trtorch.logging.Level.Error">
-            <code class="sig-name descname">
-             Error
-            </code>
+           <dt class="sig sig-object py" id="torch_tensorrt.logging.Level.Error">
+            <span class="sig-name descname">
+             <span class="pre">
+              Error
+             </span>
+            </span>
             <em class="property">
-             = &lt;LogLevel.ERROR: 1&gt;
+             <span class="w">
+             </span>
+             <span class="p">
+              <span class="pre">
+               =
+              </span>
+             </span>
+             <span class="w">
+             </span>
+             <span class="pre">
+              &lt;LogLevel.ERROR:
+             </span>
+             <span class="pre">
+              1&gt;
+             </span>
             </em>
-            <a class="headerlink" href="#trtorch.logging.Level.Error" title="Permalink to this definition">
+            <a class="headerlink" href="#torch_tensorrt.logging.Level.Error" title="Permalink to this definition">
              ¶
             </a>
            </dt>
@@ -475,14 +578,30 @@
            </dd>
           </dl>
           <dl class="py attribute">
-           <dt id="trtorch.logging.Level.Graph">
-            <code class="sig-name descname">
-             Graph
-            </code>
+           <dt class="sig sig-object py" id="torch_tensorrt.logging.Level.Graph">
+            <span class="sig-name descname">
+             <span class="pre">
+              Graph
+             </span>
+            </span>
             <em class="property">
-             = &lt;LogLevel.GRAPH: 5&gt;
+             <span class="w">
+             </span>
+             <span class="p">
+              <span class="pre">
+               =
+              </span>
+             </span>
+             <span class="w">
+             </span>
+             <span class="pre">
+              &lt;LogLevel.GRAPH:
+             </span>
+             <span class="pre">
+              5&gt;
+             </span>
             </em>
-            <a class="headerlink" href="#trtorch.logging.Level.Graph" title="Permalink to this definition">
+            <a class="headerlink" href="#torch_tensorrt.logging.Level.Graph" title="Permalink to this definition">
              ¶
             </a>
            </dt>
@@ -490,14 +609,30 @@
            </dd>
           </dl>
           <dl class="py attribute">
-           <dt id="trtorch.logging.Level.Info">
-            <code class="sig-name descname">
-             Info
-            </code>
+           <dt class="sig sig-object py" id="torch_tensorrt.logging.Level.Info">
+            <span class="sig-name descname">
+             <span class="pre">
+              Info
+             </span>
+            </span>
             <em class="property">
-             = &lt;LogLevel.INFO: 3&gt;
+             <span class="w">
+             </span>
+             <span class="p">
+              <span class="pre">
+               =
+              </span>
+             </span>
+             <span class="w">
+             </span>
+             <span class="pre">
+              &lt;LogLevel.INFO:
+             </span>
+             <span class="pre">
+              3&gt;
+             </span>
             </em>
-            <a class="headerlink" href="#trtorch.logging.Level.Info" title="Permalink to this definition">
+            <a class="headerlink" href="#torch_tensorrt.logging.Level.Info" title="Permalink to this definition">
              ¶
             </a>
            </dt>
@@ -505,14 +640,30 @@
            </dd>
           </dl>
           <dl class="py attribute">
-           <dt id="trtorch.logging.Level.InternalError">
-            <code class="sig-name descname">
-             InternalError
-            </code>
+           <dt class="sig sig-object py" id="torch_tensorrt.logging.Level.InternalError">
+            <span class="sig-name descname">
+             <span class="pre">
+              InternalError
+             </span>
+            </span>
             <em class="property">
-             = &lt;LogLevel.INTERNAL_ERROR: 0&gt;
+             <span class="w">
+             </span>
+             <span class="p">
+              <span class="pre">
+               =
+              </span>
+             </span>
+             <span class="w">
+             </span>
+             <span class="pre">
+              &lt;LogLevel.INTERNAL_ERROR:
+             </span>
+             <span class="pre">
+              0&gt;
+             </span>
             </em>
-            <a class="headerlink" href="#trtorch.logging.Level.InternalError" title="Permalink to this definition">
+            <a class="headerlink" href="#torch_tensorrt.logging.Level.InternalError" title="Permalink to this definition">
              ¶
             </a>
            </dt>
@@ -520,14 +671,30 @@
            </dd>
           </dl>
           <dl class="py attribute">
-           <dt id="trtorch.logging.Level.Warning">
-            <code class="sig-name descname">
-             Warning
-            </code>
+           <dt class="sig sig-object py" id="torch_tensorrt.logging.Level.Warning">
+            <span class="sig-name descname">
+             <span class="pre">
+              Warning
+             </span>
+            </span>
             <em class="property">
-             = &lt;LogLevel.WARNING: 2&gt;
+             <span class="w">
+             </span>
+             <span class="p">
+              <span class="pre">
+               =
+              </span>
+             </span>
+             <span class="w">
+             </span>
+             <span class="pre">
+              &lt;LogLevel.WARNING:
+             </span>
+             <span class="pre">
+              2&gt;
+             </span>
             </em>
-            <a class="headerlink" href="#trtorch.logging.Level.Warning" title="Permalink to this definition">
+            <a class="headerlink" href="#torch_tensorrt.logging.Level.Warning" title="Permalink to this definition">
              ¶
             </a>
            </dt>
@@ -537,21 +704,34 @@
          </dd>
         </dl>
         <dl class="py function">
-         <dt id="trtorch.logging.get_is_colored_output_on">
-          <code class="sig-prename descclassname">
-           trtorch.logging.
-          </code>
-          <code class="sig-name descname">
-           get_is_colored_output_on
-          </code>
+         <dt class="sig sig-object py" id="torch_tensorrt.logging.get_is_colored_output_on">
+          <span class="sig-prename descclassname">
+           <span class="pre">
+            torch_tensorrt.logging.
+           </span>
+          </span>
+          <span class="sig-name descname">
+           <span class="pre">
+            get_is_colored_output_on
+           </span>
+          </span>
           <span class="sig-paren">
            (
           </span>
           <span class="sig-paren">
            )
           </span>
-          → bool
-          <a class="headerlink" href="#trtorch.logging.get_is_colored_output_on" title="Permalink to this definition">
+          <span class="sig-return">
+           <span class="sig-return-icon">
+            →
+           </span>
+           <span class="sig-return-typehint">
+            <span class="pre">
+             bool
+            </span>
+           </span>
+          </span>
+          <a class="headerlink" href="#torch_tensorrt.logging.get_is_colored_output_on" title="Permalink to this definition">
            ¶
           </a>
          </dt>
@@ -580,21 +760,34 @@
          </dd>
         </dl>
         <dl class="py function">
-         <dt id="trtorch.logging.get_logging_prefix">
-          <code class="sig-prename descclassname">
-           trtorch.logging.
-          </code>
-          <code class="sig-name descname">
-           get_logging_prefix
-          </code>
+         <dt class="sig sig-object py" id="torch_tensorrt.logging.get_logging_prefix">
+          <span class="sig-prename descclassname">
+           <span class="pre">
+            torch_tensorrt.logging.
+           </span>
+          </span>
+          <span class="sig-name descname">
+           <span class="pre">
+            get_logging_prefix
+           </span>
+          </span>
           <span class="sig-paren">
            (
           </span>
           <span class="sig-paren">
            )
           </span>
-          → str
-          <a class="headerlink" href="#trtorch.logging.get_logging_prefix" title="Permalink to this definition">
+          <span class="sig-return">
+           <span class="sig-return-icon">
+            →
+           </span>
+           <span class="sig-return-typehint">
+            <span class="pre">
+             str
+            </span>
+           </span>
+          </span>
+          <a class="headerlink" href="#torch_tensorrt.logging.get_logging_prefix" title="Permalink to this definition">
            ¶
           </a>
          </dt>
@@ -623,24 +816,36 @@
          </dd>
         </dl>
         <dl class="py function">
-         <dt id="trtorch.logging.get_reportable_log_level">
-          <code class="sig-prename descclassname">
-           trtorch.logging.
-          </code>
-          <code class="sig-name descname">
-           get_reportable_log_level
-          </code>
+         <dt class="sig sig-object py" id="torch_tensorrt.logging.get_reportable_log_level">
+          <span class="sig-prename descclassname">
+           <span class="pre">
+            torch_tensorrt.logging.
+           </span>
+          </span>
+          <span class="sig-name descname">
+           <span class="pre">
+            get_reportable_log_level
+           </span>
+          </span>
           <span class="sig-paren">
            (
           </span>
           <span class="sig-paren">
            )
           </span>
-          →
-          <a class="reference internal" href="#trtorch.logging.Level" title="trtorch.logging.Level">
-           trtorch.logging.Level
-          </a>
-          <a class="headerlink" href="#trtorch.logging.get_reportable_log_level" title="Permalink to this definition">
+          <span class="sig-return">
+           <span class="sig-return-icon">
+            →
+           </span>
+           <span class="sig-return-typehint">
+            <a class="reference internal" href="#torch_tensorrt.logging.Level" title="torch_tensorrt.logging.Level">
+             <span class="pre">
+              torch_tensorrt.logging.Level
+             </span>
+            </a>
+           </span>
+          </span>
+          <a class="headerlink" href="#torch_tensorrt.logging.get_reportable_log_level" title="Permalink to this definition">
            ¶
           </a>
          </dt>
@@ -662,8 +867,8 @@
            </dt>
            <dd class="field-even">
             <p>
-             <a class="reference internal" href="#trtorch.logging.Level" title="trtorch.logging.Level">
-              trtorch.logging.Level
+             <a class="reference internal" href="#torch_tensorrt.logging.Level" title="torch_tensorrt.logging.Level">
+              torch_tensorrt.logging.Level
              </a>
             </p>
            </dd>
@@ -671,45 +876,65 @@
          </dd>
         </dl>
         <dl class="py function">
-         <dt id="trtorch.logging.log">
-          <code class="sig-prename descclassname">
-           trtorch.logging.
-          </code>
-          <code class="sig-name descname">
-           log
-          </code>
+         <dt class="sig sig-object py" id="torch_tensorrt.logging.log">
+          <span class="sig-prename descclassname">
+           <span class="pre">
+            torch_tensorrt.logging.
+           </span>
+          </span>
+          <span class="sig-name descname">
+           <span class="pre">
+            log
+           </span>
+          </span>
           <span class="sig-paren">
            (
           </span>
           <em class="sig-param">
            <span class="n">
-            level
+            <span class="pre">
+             level
+            </span>
            </span>
            <span class="p">
-            :
+            <span class="pre">
+             :
+            </span>
+           </span>
+           <span class="w">
            </span>
            <span class="n">
-            <a class="reference internal" href="#trtorch.logging.Level" title="trtorch.logging.Level">
-             trtorch.logging.Level
+            <a class="reference internal" href="#torch_tensorrt.logging.Level" title="torch_tensorrt.logging.Level">
+             <span class="pre">
+              torch_tensorrt.logging.Level
+             </span>
             </a>
            </span>
           </em>
           ,
           <em class="sig-param">
            <span class="n">
-            msg
+            <span class="pre">
+             msg
+            </span>
            </span>
            <span class="p">
-            :
+            <span class="pre">
+             :
+            </span>
+           </span>
+           <span class="w">
            </span>
            <span class="n">
-            str
+            <span class="pre">
+             str
+            </span>
            </span>
           </em>
           <span class="sig-paren">
            )
           </span>
-          <a class="headerlink" href="#trtorch.logging.log" title="Permalink to this definition">
+          <a class="headerlink" href="#torch_tensorrt.logging.log" title="Permalink to this definition">
            ¶
           </a>
          </dt>
@@ -733,9 +958,9 @@ will only get printed out if Level &gt; reportable_log_level
                 level
                </strong>
                (
-               <a class="reference internal" href="#trtorch.logging.Level" title="trtorch.logging.Level">
+               <a class="reference internal" href="#torch_tensorrt.logging.Level" title="torch_tensorrt.logging.Level">
                 <em>
-                 trtorch.logging.Level
+                 torch_tensorrt.logging.Level
                 </em>
                </a>
                ) – Severity of the message
@@ -759,31 +984,43 @@ will only get printed out if Level &gt; reportable_log_level
          </dd>
         </dl>
         <dl class="py function">
-         <dt id="trtorch.logging.set_is_colored_output_on">
-          <code class="sig-prename descclassname">
-           trtorch.logging.
-          </code>
-          <code class="sig-name descname">
-           set_is_colored_output_on
-          </code>
+         <dt class="sig sig-object py" id="torch_tensorrt.logging.set_is_colored_output_on">
+          <span class="sig-prename descclassname">
+           <span class="pre">
+            torch_tensorrt.logging.
+           </span>
+          </span>
+          <span class="sig-name descname">
+           <span class="pre">
+            set_is_colored_output_on
+           </span>
+          </span>
           <span class="sig-paren">
            (
           </span>
           <em class="sig-param">
            <span class="n">
-            colored_output_on
+            <span class="pre">
+             colored_output_on
+            </span>
            </span>
            <span class="p">
-            :
+            <span class="pre">
+             :
+            </span>
+           </span>
+           <span class="w">
            </span>
            <span class="n">
-            bool
+            <span class="pre">
+             bool
+            </span>
            </span>
           </em>
           <span class="sig-paren">
            )
           </span>
-          <a class="headerlink" href="#trtorch.logging.set_is_colored_output_on" title="Permalink to this definition">
+          <a class="headerlink" href="#torch_tensorrt.logging.set_is_colored_output_on" title="Permalink to this definition">
            ¶
           </a>
          </dt>
@@ -811,31 +1048,43 @@ will only get printed out if Level &gt; reportable_log_level
          </dd>
         </dl>
         <dl class="py function">
-         <dt id="trtorch.logging.set_logging_prefix">
-          <code class="sig-prename descclassname">
-           trtorch.logging.
-          </code>
-          <code class="sig-name descname">
-           set_logging_prefix
-          </code>
+         <dt class="sig sig-object py" id="torch_tensorrt.logging.set_logging_prefix">
+          <span class="sig-prename descclassname">
+           <span class="pre">
+            torch_tensorrt.logging.
+           </span>
+          </span>
+          <span class="sig-name descname">
+           <span class="pre">
+            set_logging_prefix
+           </span>
+          </span>
           <span class="sig-paren">
            (
           </span>
           <em class="sig-param">
            <span class="n">
-            prefix
+            <span class="pre">
+             prefix
+            </span>
            </span>
            <span class="p">
-            :
+            <span class="pre">
+             :
+            </span>
+           </span>
+           <span class="w">
            </span>
            <span class="n">
-            str
+            <span class="pre">
+             str
+            </span>
            </span>
           </em>
           <span class="sig-paren">
            )
           </span>
-          <a class="headerlink" href="#trtorch.logging.set_logging_prefix" title="Permalink to this definition">
+          <a class="headerlink" href="#torch_tensorrt.logging.set_logging_prefix" title="Permalink to this definition">
            ¶
           </a>
          </dt>
@@ -863,33 +1112,45 @@ will only get printed out if Level &gt; reportable_log_level
          </dd>
         </dl>
         <dl class="py function">
-         <dt id="trtorch.logging.set_reportable_log_level">
-          <code class="sig-prename descclassname">
-           trtorch.logging.
-          </code>
-          <code class="sig-name descname">
-           set_reportable_log_level
-          </code>
+         <dt class="sig sig-object py" id="torch_tensorrt.logging.set_reportable_log_level">
+          <span class="sig-prename descclassname">
+           <span class="pre">
+            torch_tensorrt.logging.
+           </span>
+          </span>
+          <span class="sig-name descname">
+           <span class="pre">
+            set_reportable_log_level
+           </span>
+          </span>
           <span class="sig-paren">
            (
           </span>
           <em class="sig-param">
            <span class="n">
-            level
+            <span class="pre">
+             level
+            </span>
            </span>
            <span class="p">
-            :
+            <span class="pre">
+             :
+            </span>
+           </span>
+           <span class="w">
            </span>
            <span class="n">
-            <a class="reference internal" href="#trtorch.logging.Level" title="trtorch.logging.Level">
-             trtorch.logging.Level
+            <a class="reference internal" href="#torch_tensorrt.logging.Level" title="torch_tensorrt.logging.Level">
+             <span class="pre">
+              torch_tensorrt.logging.Level
+             </span>
             </a>
            </span>
           </em>
           <span class="sig-paren">
            )
           </span>
-          <a class="headerlink" href="#trtorch.logging.set_reportable_log_level" title="Permalink to this definition">
+          <a class="headerlink" href="#torch_tensorrt.logging.set_reportable_log_level" title="Permalink to this definition">
            ¶
           </a>
          </dt>
@@ -907,9 +1168,9 @@ will only get printed out if Level &gt; reportable_log_level
               level
              </strong>
              (
-             <a class="reference internal" href="#trtorch.logging.Level" title="trtorch.logging.Level">
+             <a class="reference internal" href="#torch_tensorrt.logging.Level" title="torch_tensorrt.logging.Level">
               <em>
-               trtorch.logging.Level
+               torch_tensorrt.logging.Level
               </em>
              </a>
              ) – The enum representing the level required to print
@@ -927,7 +1188,7 @@ will only get printed out if Level &gt; reportable_log_level
   <footer class="md-footer">
    <div class="md-footer-nav">
     <nav class="md-footer-nav__inner md-grid">
-     <a class="md-flex md-footer-nav__link md-footer-nav__link--prev" href="trtorch.html" rel="prev" title="trtorch">
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--prev" href="torch_tensorrt.html" rel="prev" title="torch_tensorrt">
       <div class="md-flex__cell md-flex__cell--shrink">
        <i class="md-icon md-icon--arrow-back md-footer-nav__button">
        </i>
@@ -937,17 +1198,17 @@ will only get printed out if Level &gt; reportable_log_level
         <span class="md-footer-nav__direction">
          Previous
         </span>
-        trtorch
+        torch_tensorrt
        </span>
       </div>
      </a>
-     <a class="md-flex md-footer-nav__link md-footer-nav__link--next" href="../_cpp_api/trtorch_cpp.html" rel="next" title="TRTorch C++ API">
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--next" href="ptq.html" rel="next" title="torch_tensorrt.ptq">
       <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
        <span class="md-flex__ellipsis">
         <span class="md-footer-nav__direction">
          Next
         </span>
-        TRTorch C++ API
+        torch_tensorrt.ptq
        </span>
       </div>
       <div class="md-flex__cell md-flex__cell--shrink">
@@ -967,7 +1228,7 @@ will only get printed out if Level &gt; reportable_log_level
       <a href="http://www.sphinx-doc.org/">
        Sphinx
       </a>
-      3.1.2.
+      4.3.0.
              and
       <a href="https://github.com/bashtage/sphinx-material/">
        Material for

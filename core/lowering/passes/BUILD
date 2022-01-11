@@ -10,14 +10,14 @@ config_setting(
 cc_library(
     name = "passes",
     srcs = [
-        "conv2d_to_convolution.cpp",
-        "conv3d_to_convolution.cpp",
+        "convNd_to_convolution.cpp",
         "exception_elimination.cpp",
         "fuse_addmm_branches.cpp",
         "linear_to_addmm.cpp",
         "module_fallback.cpp",
         "op_aliasing.cpp",
         "reduce_to.cpp",
+        "reduce_gelu.cpp",
         "remove_bn_dim_check.cpp",
         "remove_contiguous.cpp",
         "remove_dropout.cpp",

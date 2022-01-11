@@ -8,7 +8,7 @@
 #include <ATen/ATen.h>
 #include <vector>
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace converters {
@@ -29,7 +29,7 @@ nvinfer1::ITensor* concat(int max_rank, int old_rank, ConversionCtx* ctx, nvinfe
 
 bool add_expand(ConversionCtx* ctx, const torch::jit::Node* n, nvinfer1::ITensor* in, nvinfer1::Dims expandedDims) {
   auto input_dims = in->getDimensions();
-  TRTORCH_CHECK(
+  TORCHTRT_CHECK(
       input_dims.nbDims <= expandedDims.nbDims,
       "Number of dimensions of the desired expansion must be greater than or equal to the number of input dimensions");
 
@@ -43,7 +43,7 @@ bool add_expand(ConversionCtx* ctx, const torch::jit::Node* n, nvinfer1::ITensor
     if (targetSize != -1) {
       if (size != targetSize) {
         if (size != 1) {
-          TRTORCH_THROW_ERROR(
+          TORCHTRT_THROW_ERROR(
               "The expanded size of tensor (" << targetSize << ")"
                                               << " must match the existing size (" << size << ")"
                                               << " at dimension " << i);
@@ -53,7 +53,7 @@ bool add_expand(ConversionCtx* ctx, const torch::jit::Node* n, nvinfer1::ITensor
       // For the new dimensions, the size cannot be set to -1. Eg: an input of [3, 1] can be expanded to [3, -1, 4] but
       // not [-1, 3, 4].
       if (dim < 0) {
-        TRTORCH_THROW_ERROR(
+        TORCHTRT_THROW_ERROR(
             "The expanded size of the tensor (" << targetSize << ") isn't allowed in a leading, non-existing dimension "
                                                 << i);
       } else {
@@ -112,7 +112,7 @@ bool add_expand_dynamic(
   auto input_dims = in->getDimensions();
   auto input_rank = in->getDimensions().nbDims;
   auto output_rank = expandedDims.nbDims;
-  TRTORCH_CHECK(
+  TORCHTRT_CHECK(
       input_rank <= output_rank,
       "Number of dimensions of the desired expansion must be greater than or equal to the number of input dimensions");
 
@@ -131,7 +131,7 @@ bool add_expand_dynamic(
       if (size != targetSize) {
         // if size == -1, we can't validate the expansion before setBindingDimensions.
         if (!(size == -1 || size == 1)) {
-          TRTORCH_THROW_ERROR(
+          TORCHTRT_THROW_ERROR(
               "The expanded size of tensor (" << targetSize << ")"
                                               << " must match the existing size (" << size << ")"
                                               << " at dimension " << i);
@@ -141,7 +141,7 @@ bool add_expand_dynamic(
       // In dynamic expand layer, for the new dimensions, the size cannot be set to -1. Eg: an input of [3, 1] can be
       // expanded to [3, -1, 4] but not [-1, 3, 4].
       if (is_expand_layer && dim < 0) {
-        TRTORCH_THROW_ERROR(
+        TORCHTRT_THROW_ERROR(
             "The expanded size of the tensor (" << targetSize << ") isn't allowed in a leading, non-existing dimension "
                                                 << i);
       }
@@ -194,7 +194,7 @@ bool add_expand_dynamic(
   return true;
 }
 
-auto expand_registrations TRTORCH_UNUSED =
+auto expand_registrations TORCHTRT_UNUSED =
     RegisterNodeConversionPatterns()
         .pattern({"aten::expand(Tensor(a) self, int[] size, *, bool implicit=False) -> (Tensor(a))",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
@@ -231,7 +231,7 @@ auto expand_registrations TRTORCH_UNUSED =
                     auto input_dims = in->getDimensions();
                     auto repeats = args[1].unwrapToIntList().vec();
                     int repeats_rank = repeats.size();
-                    TRTORCH_CHECK(
+                    TORCHTRT_CHECK(
                         repeats_rank >= input_dims.nbDims,
                         "Number of repeat dimensions cannot be smaller than number of input dimensions");
                     auto num_expand_dims = repeats_rank - input_dims.nbDims;
@@ -287,4 +287,4 @@ auto expand_registrations TRTORCH_UNUSED =
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

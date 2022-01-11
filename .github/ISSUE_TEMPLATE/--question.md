@@ -1,6 +1,6 @@
 ---
 name: "❓ Question"
-about: Ask a question about using TRTorch
+about: Ask a question about using Torch-TensorRT
 title: "❓ [Question] How do you ....? "
 labels: question
 assignees: ''
@@ -17,7 +17,7 @@ assignees: ''
 
 ## Environment
 
-> Build information about the TRTorch compiler can be found by turning on debug messages
+> Build information about Torch-TensorRT can be found by turning on debug messages
 
  - PyTorch Version (e.g., 1.0):
  - CPU Architecture:

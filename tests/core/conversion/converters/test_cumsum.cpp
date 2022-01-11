@@ -16,14 +16,14 @@ TEST(Converters, ATenCumsumConvertsCorrectly) {
   torch::jit::parseIR(graph, &*g);
 
   auto in = at::randint(-5, 5, {2, 3, 4}, {at::kCUDA});
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
 
   in = at::clone(in);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
 TEST(Converters, ATenCumsumConvertsCorrectlyWithDynamicInput) {
@@ -38,14 +38,14 @@ TEST(Converters, ATenCumsumConvertsCorrectlyWithDynamicInput) {
   torch::jit::parseIR(graph, &*g);
 
   auto in = at::randint(-5, 5, {2, 3, 4}, {at::kCUDA});
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
 
   in = at::clone(in);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngineDynamic(g, params, {in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {in});
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
 TEST(Converters, ATenCumsumNegativeDimConvertsCorrectly) {
@@ -60,14 +60,14 @@ TEST(Converters, ATenCumsumNegativeDimConvertsCorrectly) {
   torch::jit::parseIR(graph, &*g);
 
   auto in = at::randint(-5, 5, {2, 3, 4}, {at::kCUDA});
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
 
   in = at::clone(in);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
 TEST(Converters, ATenCumsumNegativeDimConvertsCorrectlyWithDynamicInput) {
@@ -82,12 +82,12 @@ TEST(Converters, ATenCumsumNegativeDimConvertsCorrectlyWithDynamicInput) {
   torch::jit::parseIR(graph, &*g);
 
   auto in = at::randint(-5, 5, {2, 3, 4}, {at::kCUDA});
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
 
   in = at::clone(in);
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngineDynamic(g, params, {in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {in});
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }

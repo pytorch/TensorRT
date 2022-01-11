@@ -4,7 +4,7 @@
 #include "core/plugins/plugins.h"
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace plugins {
 namespace impl {
@@ -54,7 +54,7 @@ const char* NormalizePlugin::getPluginVersion() const noexcept {
 }
 
 const char* NormalizePlugin::getPluginNamespace() const noexcept {
-  return "trtorch";
+  return "torch_tensorrt";
 }
 
 nvinfer1::IPluginV2DynamicExt* NormalizePlugin::clone() const noexcept {
@@ -70,7 +70,7 @@ nvinfer1::DimsExprs NormalizePlugin::getOutputDimensions(
   output.nbDims = keep_dims_ ? inputs[0].nbDims : inputs[0].nbDims - axes_.size();
 
   // For order-0 norm, when the norm dimension is None, it should normalize across all dimensions.
-  // TODO: For dim=None, the axes_ passed would have [0, 0, 0] which is obtained through loop counter in TRTorch.
+  // TODO: For dim=None, the axes_ passed would have [0, 0, 0] which is obtained through loop counter in Torch-TensorRT.
   // Resolve this. For dim=None case, change the axes_ inplace to range(0, axes_.size())
   bool isAxisNone = std::all_of(axes_.begin(), axes_.end(), [](int32_t i) { return i == 0; }) &&
       ((int32_t)axes_.size() == inputs[0].nbDims);
@@ -219,7 +219,7 @@ NormalizePluginCreator::NormalizePluginCreator() {
 }
 
 const char* NormalizePluginCreator::getPluginNamespace() const noexcept {
-  return "trtorch";
+  return "torch_tensorrt";
 }
 
 const char* NormalizePluginCreator::getPluginName() const noexcept {
@@ -264,9 +264,9 @@ const nvinfer1::PluginFieldCollection* NormalizePluginCreator::getFieldNames() n
   return nullptr;
 }
 
-REGISTER_TRTORCH_PLUGIN(NormalizePluginCreator);
+REGISTER_TORCHTRT_PLUGIN(NormalizePluginCreator);
 
 } // namespace impl
 } // namespace plugins
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

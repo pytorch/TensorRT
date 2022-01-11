@@ -23,13 +23,14 @@ TEST(Converters, ATenLayerNormConvertsCorrectlyLast3DimsNoGammaBeta) {
 
   auto in = at::randint(1, 10, {4, 3, 100, 100}, {at::kCUDA});
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
 
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
 }
 
 TEST(Converters, ATenLayerNormConvertsCorrectlyLast3Dims) {
@@ -53,13 +54,14 @@ TEST(Converters, ATenLayerNormConvertsCorrectlyLast3Dims) {
   auto gamma = at::randint(1, 10, {3, 100, 100}, {at::kCUDA});
   auto beta = at::randint(1, 10, {3, 100, 100}, {at::kCUDA});
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {gamma, beta});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {gamma, beta});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
 
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {gamma, beta});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {gamma, beta});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
 }
 
 TEST(Converters, ATenLayerNormConvertsCorrectlyLast2Dims) {
@@ -82,13 +84,14 @@ TEST(Converters, ATenLayerNormConvertsCorrectlyLast2Dims) {
   auto gamma = at::randint(1, 10, {100, 100}, {at::kCUDA});
   auto beta = at::randint(1, 10, {100, 100}, {at::kCUDA});
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {gamma, beta});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {gamma, beta});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
 
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {gamma, beta});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {gamma, beta});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
 }
 
 TEST(Converters, ATenLayerNormConvertsCorrectlyLast1Dims) {
@@ -110,13 +113,14 @@ TEST(Converters, ATenLayerNormConvertsCorrectlyLast1Dims) {
   auto gamma = at::randint(1, 10, {100}, {at::kCUDA});
   auto beta = at::randint(1, 10, {100}, {at::kCUDA});
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {gamma, beta});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {gamma, beta});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
 
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {gamma, beta});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {gamma, beta});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
 }
 
 TEST(Converters, ATenLayerNormConvertsCorrectly3dInput1dNormalizedShape) {
@@ -138,11 +142,12 @@ TEST(Converters, ATenLayerNormConvertsCorrectly3dInput1dNormalizedShape) {
   auto gamma = at::randint(1, 10, {768}, {at::kCUDA});
   auto beta = at::randint(1, 10, {768}, {at::kCUDA});
 
-  auto params = trtorch::core::conversion::get_named_params(g->inputs(), {gamma, beta});
-  auto jit_results = trtorch::tests::util::RunGraph(g, params, {in});
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {gamma, beta});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
 
-  params = trtorch::core::conversion::get_named_params(g->inputs(), {gamma, beta});
-  auto trt_results = trtorch::tests::util::RunGraphEngine(g, params, {in});
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {gamma, beta});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
 
-  ASSERT_TRUE(trtorch::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
 }

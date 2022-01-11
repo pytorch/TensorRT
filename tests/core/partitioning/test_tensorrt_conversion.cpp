@@ -50,24 +50,24 @@ TEST(Partitioning, ConvertSequentialModelSegmentedBlockCorrectly) {
   for (auto node : parsed_g->nodes()) {
     if (node->kind() == torch::jit::prim::Constant)
       continue;
-    trtorch::core::util::cloneNode(node, g, tensor_to_constant);
+    torch_tensorrt::core::util::cloneNode(node, g, tensor_to_constant);
   }
   g->registerOutput(tensor_to_constant[parsed_g->outputs()[0]]);
 
-  std::vector<trtorch::core::ir::Input> inputs;
-  inputs.push_back(trtorch::core::ir::Input({3, 3, 16, 16}));
-  trtorch::core::CompileSpec cfg(inputs);
+  std::vector<torch_tensorrt::core::ir::Input> inputs;
+  inputs.push_back(torch_tensorrt::core::ir::Input({3, 3, 16, 16}));
+  torch_tensorrt::core::CompileSpec cfg(inputs);
   cfg.partition_info.enabled = true;
   torch::jit::script::Module mod(c10::QualifiedName("module"));
 
   auto self = g->insertInput(0, "self_1");
   self->setType(mod.type());
   auto cur_method = mod._ivalue()->compilation_unit()->create_function(c10::QualifiedName("forward"), g);
-  auto schema = trtorch::core::util::GenerateGraphSchema(cur_method->name(), g);
+  auto schema = torch_tensorrt::core::util::GenerateGraphSchema(cur_method->name(), g);
   mod.type()->addMethod(cur_method);
   cur_method->setSchema(schema);
 
-  torch::jit::script::Module new_mod = trtorch::core::CompileGraph(mod, cfg);
+  torch::jit::script::Module new_mod = torch_tensorrt::core::CompileGraph(mod, cfg);
   auto fallback_g = new_mod.get_method("forward").graph();
   int count = count_trt_engines(fallback_g);
   ASSERT_TRUE(count == 2);
@@ -109,24 +109,24 @@ TEST(Partitioning, ConvertBranchModelSegmentedBlockCorrectly) {
   for (auto node : parsed_g->nodes()) {
     if (node->kind() == torch::jit::prim::Constant)
       continue;
-    trtorch::core::util::cloneNode(node, g, tensor_to_constant);
+    torch_tensorrt::core::util::cloneNode(node, g, tensor_to_constant);
   }
   g->registerOutput(tensor_to_constant[parsed_g->outputs()[0]]);
 
-  std::vector<trtorch::core::ir::Input> inputs;
-  inputs.push_back(trtorch::core::ir::Input({3, 3, 16, 16}));
-  trtorch::core::CompileSpec cfg(inputs);
+  std::vector<torch_tensorrt::core::ir::Input> inputs;
+  inputs.push_back(torch_tensorrt::core::ir::Input({3, 3, 16, 16}));
+  torch_tensorrt::core::CompileSpec cfg(inputs);
   cfg.partition_info.enabled = true;
   torch::jit::script::Module mod(c10::QualifiedName("module"));
 
   auto self = g->insertInput(0, "self_1");
   self->setType(mod.type());
   auto cur_method = mod._ivalue()->compilation_unit()->create_function(c10::QualifiedName("forward"), g);
-  auto schema = trtorch::core::util::GenerateGraphSchema(cur_method->name(), g);
+  auto schema = torch_tensorrt::core::util::GenerateGraphSchema(cur_method->name(), g);
   mod.type()->addMethod(cur_method);
   cur_method->setSchema(schema);
 
-  torch::jit::script::Module new_mod = trtorch::core::CompileGraph(mod, cfg);
+  torch::jit::script::Module new_mod = torch_tensorrt::core::CompileGraph(mod, cfg);
   auto fallback_g = new_mod.get_method("forward").graph();
   int count = count_trt_engines(fallback_g);
   ASSERT_TRUE(count == 2);

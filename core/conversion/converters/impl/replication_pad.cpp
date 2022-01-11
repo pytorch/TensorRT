@@ -5,7 +5,7 @@
 #include "core/util/prelude.h"
 #include "torch/torch.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 namespace converters {
@@ -22,13 +22,13 @@ bool replication_padXd(ConversionCtx* ctx, const torch::jit::Node* n, args& args
       padding.push_back(padding[0]);
   }
   if (inRank == 3) {
-    TRTORCH_CHECK(padding.size() == 2, "3D tensors expect 2 values for padding");
+    TORCHTRT_CHECK(padding.size() == 2, "3D tensors expect 2 values for padding");
   } else if (inRank == 4) {
-    TRTORCH_CHECK(padding.size() == 4, "4D tensors expect 4 values for padding");
+    TORCHTRT_CHECK(padding.size() == 4, "4D tensors expect 4 values for padding");
   } else if (inRank == 5) {
-    TRTORCH_CHECK(padding.size() == 6, "5D tensors expect 6 values for padding");
+    TORCHTRT_CHECK(padding.size() == 6, "5D tensors expect 6 values for padding");
   } else {
-    TRTORCH_THROW_ERROR("Only 3D, 4D, 5D padding with non-constant padding are supported for now");
+    TORCHTRT_THROW_ERROR("Only 3D, 4D, 5D padding with non-constant padding are supported for now");
   }
 
   std::vector<nvinfer1::ITensor*> tensors_vec;
@@ -94,7 +94,7 @@ bool replication_padXd(ConversionCtx* ctx, const torch::jit::Node* n, args& args
   return true;
 }
 
-auto replication_pad_registrations TRTORCH_UNUSED =
+auto replication_pad_registrations TORCHTRT_UNUSED =
     RegisterNodeConversionPatterns()
         .pattern({"aten::replication_pad1d(Tensor self, int[2] padding) -> (Tensor)",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
@@ -117,4 +117,4 @@ auto replication_pad_registrations TRTORCH_UNUSED =
 } // namespace converters
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt
