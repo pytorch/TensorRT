@@ -21,7 +21,7 @@ docker build -t torch_tensorrt -f ./docker/Dockerfile .
 Then launch the container with:
 
 ```
-docker run --gpus=all --rm -it -v $PWD:/Torch-TensorRT --net=host torch_tensorrt bash
+docker run --gpus=all --rm -it -v $PWD:/Torch-TensorRT --net=host --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 torch_tensorrt bash
 ```
 
 Within the docker interactive bash session, start Jupyter with
