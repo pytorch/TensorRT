@@ -32,7 +32,9 @@ std::vector<const torch::jit::Value*> get_tensor_inputs(
     StaticParams& static_params) {
   std::vector<const torch::jit::Value*> input_tensors;
   auto inputs = g->inputs();
+  LOG_DEBUG("Inputs size " << inputs.size());
   for (auto in : inputs) {
+    LOG_DEBUG("input debug name: " << in->debugName());
     // Disregarding inputs that are not tensors or are static
     //
     // Ex.
@@ -40,6 +42,27 @@ std::vector<const torch::jit::Value*> get_tensor_inputs(
     // input.1:Tensor -> used
     if (in->type()->isSubtypeOf(c10::TensorType::get()) && static_params.find(in) == static_params.end()) {
       input_tensors.push_back(in);
+    } else if (in->type()->cast<c10::TupleType>() && static_params.find(in) == static_params.end()) {
+    // } else if (in->type()->isSubtypeOf(c10::TupleType::create()) && static_params.find(in) == static_params.end()) {
+      at::ArrayRef<torch::jit::Value*> unpack_tuple = torch::jit::createTupleUnpack(in);
+      LOG_DEBUG("Tuple size " << unpack_tuple.size());
+      for (auto item: unpack_tuple) {
+        input_tensors.push_back(in);
+      }
+    } else if (in->type()->isSubtypeOf(c10::ListType::ofTensors()) && static_params.find(in) == static_params.end()) {
+      
+      LOG_DEBUG("List use size " << in->uses().size());
+      // for (auto use : in->uses()) {
+      //   LOG_DEBUG(use.user->outputs()[0]->debugName());
+      // }
+      // TODO: set the correct list number according to the Input IValue
+      int n = 2;
+      auto unpack_node = g->createListUnpack(in, n);
+      g->block()->appendNode(unpack_node);
+      for (auto item: unpack_node->outputs()) {
+        input_tensors.push_back(item);
+      }
+      LOG_DEBUG("Unpack List of size " << n);
     }
   }
   return input_tensors;
@@ -52,14 +75,17 @@ c10::optional<at::ScalarType> get_value_first_calc_dtype_opt(torch::jit::Block* 
   auto b_ins = b->inputs();
   std::unordered_set<torch::jit::Value*> b_in_set(b_ins.begin(), b_ins.end());
 
-  TORCHTRT_ASSERT(
-      in->type() == c10::TensorType::get(), "Input is not a tensor, cannot check for dtype based on calculation");
+  // TORCHTRT_ASSERT(
+  //     in->type() == c10::TensorType::get(), "Input is not a tensor, cannot check for dtype based on calculation");
 
   auto consumers = in->uses();
   auto search_list = std::vector<torch::jit::Use>(consumers.begin(), consumers.end());
-
-  for (auto iter = search_list.begin(); iter != search_list.end(); ++iter) {
-    auto n = iter->user;
+  LOG_DEBUG("Users number for " << in->debugName() << ": " << consumers.size());
+  while(search_list.size() > 0) {
+    // after insertion, original iterator will be invalid
+    auto& u = search_list.front();
+    search_list.erase(search_list.begin());
+    auto n = u.user;
     LOG_GRAPH("Node we are looking at: " << util::node_info(n));
     auto ins = n->inputs();
     auto outs = n->outputs();
@@ -142,15 +168,27 @@ exit_first_calc_dtype:
 
 TypeMap get_block_first_calc_dtypes_opt(torch::jit::Block* b) {
   TypeMap types;
-
   for (auto i : b->inputs()) {
     if (i->type() == c10::TensorType::get()) {
       torch::jit::Value* in = i;
       types.insert({in, get_value_first_calc_dtype_opt(b, i)});
+    } else if(i->type()->cast<c10::TupleType>()) {
+      // make sure very time get the same ptr
+      at::ArrayRef<torch::jit::Value*> unpack_tuple = torch::jit::createTupleUnpack(i);
+      LOG_DEBUG("Tuple size " << unpack_tuple.size());
+      for (auto item: unpack_tuple) {
+        torch::jit::Value* in = item;
+        types.insert({in, get_value_first_calc_dtype_opt(b, i)});
+      }
+    } else if(i->type()->isSubtypeOf(c10::ListType::ofTensors())) {
+      LOG_INFO("Unsupported type of c10::ListType::ofTensors()");
     }
   }
   return types;
 }
+
+static auto core_input_container =
+    torch::class_<Input>("_torch_tensorrt_core_ir", "Input").def(torch::init<>());
 
 } // namespace ir
 } // namespace core

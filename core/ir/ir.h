@@ -11,9 +11,10 @@ namespace torch_tensorrt {
 namespace core {
 namespace ir {
 
-struct Input {
+struct Input : torch::CustomClassHolder {
   // Input(std::vector<int64_t> shape);
   // Input(std::vector<int64_t> min_shape, std::vector<int64_t> opt_shape, std::vector<int64_t> max_shape);
+  Input() {};
   Input(
       std::vector<int64_t> shape,
       nvinfer1::DataType dtype = nvinfer1::DataType::kFLOAT,
@@ -36,13 +37,34 @@ struct Input {
   nvinfer1::Dims opt;
   nvinfer1::DataType dtype;
   nvinfer1::TensorFormat format;
+  int id;
 };
+
+// Add to spec
+struct GraphInputs {
+  GraphInputs() {}
+  GraphInputs(torch::jit::IValue inputs) {
+    input_signature = inputs;
+    // TODO flatten IValue
+  }
+  GraphInputs(std::vector<Input> inputs) {
+    flattened_inputs = inputs;
+    // TODO construct the IValue
+  }
+  torch::jit::IValue input_signature;  // nested Input, full input spec
+  std::vector<Input> flattened_inputs;  // flattend Input
+};
+
+typedef std::pair<GraphInputs, torch::jit::IValue> GraphIO; // Graph input output mapping
 
 using StaticParams = std::map<torch::jit::Value*, torch::jit::IValue>;
 StaticParams get_static_params(c10::ArrayRef<torch::jit::Value*> inputs, std::vector<torch::jit::IValue> params);
 
 using InputSpecMap = std::unordered_map<const torch::jit::Value*, Input>;
 
+std::vector<const torch::jit::Value*> get_tensor_inputs(
+    std::shared_ptr<torch::jit::Graph>& g,
+    StaticParams& static_params);
 InputSpecMap associate_specs_with_inputs(
     std::shared_ptr<torch::jit::Graph>& g,
     std::vector<Input> specs,

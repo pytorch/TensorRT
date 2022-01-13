@@ -8,12 +8,20 @@
 #include "core/partitioning/partitioning.h"
 #include "core/runtime/runtime.h"
 #include "torch/csrc/jit/api/module.h"
+#include "torch/csrc/jit/ir/ir.h"
 
 namespace torch_tensorrt {
 namespace core {
 
 struct CompileSpec {
-  CompileSpec(std::vector<ir::Input> inputs) : inputs(inputs) {}
+  CompileSpec(std::vector<ir::Input> inputs) : inputs(inputs) {
+    graph_inputs = ir::GraphInputs(inputs);
+  }
+  CompileSpec(torch::jit::IValue& input_signature) {
+    graph_inputs = ir::GraphInputs(input_signature);
+    inputs = graph_inputs.flattened_inputs;
+  }
+  ir::GraphInputs graph_inputs;
   std::vector<ir::Input> inputs;
   conversion::ConversionInfo convert_info;
   lowering::LowerInfo lower_info;
