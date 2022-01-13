@@ -183,6 +183,7 @@ void AddInputs(
       ctx->input_is_dynamic = true;
     }
 
+    // mapping torch Value to tensorrt iTensor
     ctx->value_tensor_map[in] = trt_in;
     ctx->num_inputs += 1;
   }

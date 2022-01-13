@@ -254,6 +254,7 @@ GraphAndMapping ConstructFallbackGraph(
       // update the input ranges for each segments
       convert_cfg.inputs = ir::associate_specs_with_inputs(seg_block.g(), inputs, static_params);
 
+      // TODO mapping Inputs Ivalue to flatten one here
       auto engine = conversion::ConvertBlockToEngine(seg_block.block(), convert_cfg, static_params);
       auto temp_g = std::make_shared<torch::jit::Graph>();
       auto device_spec = convert_cfg.engine_settings.device;
@@ -295,11 +296,17 @@ void MapInputsAndDetermineDTypes(
     ir::TypeMap& first_use_type_map) {
   // Associate input specs with inputs
   cfg.convert_info.inputs = std::move(ir::associate_specs_with_inputs(g, cfg.inputs, static_params));
-
-  for (auto& in : g->inputs()) {
-    if (static_params.find(in) == static_params.end()) {
+  auto tensor_inputs = ir::get_tensor_inputs(g, static_params);
+  LOG_DEBUG("In MapInputsAndDetermineDTypes " << "g->inputs() size " << g->inputs().size() << ", tensor_inputs size " << tensor_inputs.size());
+  // for (auto& in : g->inputs()) {
+  //   if (static_params.find(in) == static_params.end()) {
+    for (auto in : tensor_inputs) {
       ir::Input& spec = cfg.convert_info.inputs.find(in)->second;
-      auto est_type_opt = first_use_type_map.find(in)->second;
+      c10::optional<at::ScalarType> est_type_opt = {};
+      auto est_it = first_use_type_map.find(in);
+      if (est_it != first_use_type_map.end()) {
+        est_type_opt = first_use_type_map.find(in)->second;
+      }
       if (est_type_opt && !spec.dtype_is_user_defined) {
         // If we can calculate the type from the graph and the type was not defined by the user then use the calculated
         // type
@@ -340,7 +347,7 @@ void MapInputsAndDetermineDTypes(
         // The user defined the type so no changes are necessary
       }
     }
-  }
+  // }
 }
 
 uint64_t GetRecommendedWorkspaceSize(const runtime::CudaDevice& device) {
