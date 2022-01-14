@@ -11,17 +11,16 @@ First, clone the repository:
 git clone https://github.com/NVIDIA/Torch-TensorRT
 ```
 
-Next, build the NVIDIA Torch-TensorRT container (from repo root):
+Next, navigate to the repo's root directory:
 
 ```
 cd Torch-TensorRT
-docker build -t torch_tensorrt -f ./docker/Dockerfile .
 ```
 
 Then launch the container with:
 
 ```
-docker run --gpus=all --rm -it -v $PWD:/Torch-TensorRT --net=host --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 torch_tensorrt bash
+docker run --gpus=all --rm -it -v $PWD:/Torch-TensorRT --net=host --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 nvcr.io/nvidia/pytorch:21.12-py3 bash
 ```
 
 Within the docker interactive bash session, start Jupyter with
