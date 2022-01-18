@@ -1,9 +1,10 @@
 #include "torch/script.h"
 #include "torch/torch.h"
+#include "torch_tensorrt/ptq.h"
 #include "torch_tensorrt/torch_tensorrt.h"
 
-#include "examples/int8/benchmark/benchmark.h"
-#include "examples/int8/datasets/cifar10.h"
+#include "tools/cpp_benchmark/int8/benchmark/benchmark.h"
+#include "tools/cpp_benchmark//int8/datasets/cifar10.h"
 
 #include <sys/stat.h>
 #include <iostream>
@@ -12,6 +13,7 @@
 
 namespace F = torch::nn::functional;
 
+// Actual PTQ application code
 struct Resize : public torch::data::transforms::TensorTransform<torch::Tensor> {
   Resize(std::vector<int64_t> new_size) : new_size_(new_size) {}
 
@@ -25,14 +27,28 @@ struct Resize : public torch::data::transforms::TensorTransform<torch::Tensor> {
   std::vector<int64_t> new_size_;
 };
 
-torch::jit::Module compile_int8_qat_model(const std::string& data_dir, torch::jit::Module& mod) {
+torch::jit::Module compile_int8_model(const std::string& data_dir, torch::jit::Module& mod) {
+  auto calibration_dataset =
+      datasets::CIFAR10(data_dir, datasets::CIFAR10::Mode::kTest)
+          .use_subset(320)
+          .map(torch::data::transforms::Normalize<>({0.4914, 0.4822, 0.4465}, {0.2023, 0.1994, 0.2010}))
+          .map(torch::data::transforms::Stack<>());
+  auto calibration_dataloader = torch::data::make_data_loader(
+      std::move(calibration_dataset), torch::data::DataLoaderOptions().batch_size(32).workers(2));
+
+  std::string calibration_cache_file = "/tmp/vgg16_TRT_ptq_calibration.cache";
+
+  auto calibrator = torch_tensorrt::ptq::make_int8_calibrator(std::move(calibration_dataloader), calibration_cache_file, true);
 
   std::vector<torch_tensorrt::Input> inputs = {
       torch_tensorrt::Input(std::vector<int64_t>({32, 3, 32, 32}), torch_tensorrt::DataType::kFloat)};
   /// Configure settings for compilation
   auto compile_spec = torch_tensorrt::ts::CompileSpec(inputs);
   /// Set operating precision to INT8
+  compile_spec.enabled_precisions.insert(torch::kF16);
   compile_spec.enabled_precisions.insert(torch::kI8);
+  /// Use the TensorRT Entropy Calibrator
+  compile_spec.ptq_calibrator = calibrator;
   /// Set max batch size for the engine
   compile_spec.max_batch_size = 32;
   /// Set a larger workspace
@@ -55,7 +71,7 @@ int main(int argc, const char* argv[]) {
   at::globalContext().setBenchmarkCuDNN(true);
 
   if (argc < 3) {
-    std::cerr << "usage: qat <path-to-module> <path-to-cifar10>\n";
+    std::cerr << "usage: ptq <path-to-module> <path-to-cifar10>\n";
     return -1;
   }
 
@@ -96,7 +112,7 @@ int main(int argc, const char* argv[]) {
   torch::Tensor jit_accuracy = (jit_correct / jit_total) * 100;
 
   /// Compile Graph
-  auto trt_mod = compile_int8_qat_model(data_dir, mod);
+  auto trt_mod = compile_int8_model(data_dir, mod);
 
   /// Check the INT8 accuracy in TRT
   torch::Tensor trt_correct = torch::zeros({1}, {torch::kCUDA}), trt_total = torch::zeros({1}, {torch::kCUDA});
@@ -124,6 +140,5 @@ int main(int argc, const char* argv[]) {
 
   auto trt_runtimes = benchmark_module(trt_mod, dims[0]);
   print_avg_std_dev("TRT quantized model", trt_runtimes, dims[0][0]);
-  trt_mod.save("/tmp/qat_vgg16.trt.ts");
+  trt_mod.save("/tmp/ptq_vgg16.trt.ts");
 }
-

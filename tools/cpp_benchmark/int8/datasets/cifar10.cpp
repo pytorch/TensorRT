@@ -1,4 +1,4 @@
-#include "examples/int8/datasets/cifar10.h"
+#include "tools/cpp_benchmark/int8/datasets/cifar10.h"
 #include "torch/data/example.h"
 #include "torch/torch.h"
 #include "torch/types.h"

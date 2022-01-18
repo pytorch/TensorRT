@@ -1,7 +1,7 @@
 package(default_visibility = ["//visibility:public"])
 
 cc_binary(
-    name = "qat",
+    name = "ptq",
     srcs = [
         "main.cpp",
     ],
@@ -13,8 +13,8 @@ cc_binary(
     ],
     deps = [
         "//cpp:torch_tensorrt",
-        "//examples/int8/benchmark",
-        "//examples/int8/datasets:cifar10",
+        "//tools/cpp_benchmark/int8/benchmark",
+        "//tools/cpp_benchmark/int8/datasets:cifar10",
         "@libtorch",
         "@libtorch//:caffe2",
         "@tensorrt//:nvinfer",

@@ -13,7 +13,7 @@ LibTorch provides a `Dataloader` and `Dataset` API which steamlines preprocessin
 Here is an example interface of a `torch::Dataset` class for CIFAR10:
 
 ```C++
-//examples/int8/ptq/datasets/cifar10.h
+//tools/cpp_benchmark/int8/ptq/datasets/cifar10.h
 #pragma once
 
 #include "torch/data/datasets/base.h"
@@ -120,19 +120,19 @@ This is a short example application that shows how to use Torch-TensorRT to perf
 ## Prerequisites
 
 1. Download CIFAR10 Dataset Binary version ([https://www.cs.toronto.edu/~kriz/cifar-10-binary.tar.gz](https://www.cs.toronto.edu/~kriz/cifar-10-binary.tar.gz))
-2. Train a network on CIFAR10 (see `examples/int8/training/vgg16/README.md` for a VGG16 recipe)
+2. Train a network on CIFAR10 (see `examples/training/vgg16/README.md` for a VGG16 recipe)
 3. Export model to torchscript
 
 ## Compilation using bazel
 
 ``` shell
-bazel run //examples/int8/ptq --compilation_mode=opt <path-to-module> <path-to-cifar10>
+bazel run //tools/cpp_benchmark/int8/ptq --compilation_mode=opt <path-to-module> <path-to-cifar10>
 ```
 
 If you want insight into what is going under the hood or need debug symbols
 
 ``` shell
-bazel run //examples/int8/ptq --compilation_mode=dbg <path-to-module> <path-to-cifar10>
+bazel run //tools/cpp_benchmark/int8/ptq --compilation_mode=dbg <path-to-module> <path-to-cifar10>
 ```
 
 This will build a binary named `ptq` in `bazel-out/k8-<opt|dbg>/bin/cpp/int8/ptq/` directory. Optionally you can add this to `$PATH` environment variable to run `ptq` from anywhere on your system.
@@ -166,7 +166,7 @@ We import header files `cifar10.h` and `benchmark.h` from `ROOT_DIR`. `ROOT_DIR`
 By default it is set to `../../../`. If your Torch-TensorRT directory structure is different, please set `ROOT_DIR` accordingly.
 
 ```sh
-cd examples/int8/ptq
+cd tools/cpp_benchmark/int8/ptq
 # This will generate a ptq binary
 make ROOT_DIR=<PATH> CUDA_VERSION=11.1
 ./ptq <path-to-module> <path-to-cifar10>
