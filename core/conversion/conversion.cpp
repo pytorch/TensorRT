@@ -200,6 +200,10 @@ void AddInputs(
 }
 
 void MarkOutputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> outputs) {
+  std::set<const char*> input_name;
+  for(int idx = 0; idx < ctx->net->getNbInputs(); ++idx){
+    input_name.insert(ctx->net->getInput(idx)->getName());
+  }
   for (auto out : outputs) {
     auto it = ctx->value_tensor_map.find(out);
     if (it == ctx->value_tensor_map.end()) {
@@ -209,6 +213,10 @@ void MarkOutputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> outp
           std::string name = std::string("output_") + std::to_string(ctx->num_outputs);
           auto output_container = out_ivalue.toCustomClass<TensorContainer>();
           nvinfer1::ITensor* out_tensor = output_container.get()->tensor();
+          if (input_name.find(out_tensor->getName()) != input_name.end()){
+              auto identity = ctx->net->addShuffle(*out_tensor);
+              out_tensor = identity->getOutput(0);
+          }
           out_tensor->setName(name.c_str());
           ctx->net->markOutput(*out_tensor);
           LOG_INFO(
@@ -224,6 +232,10 @@ void MarkOutputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> outp
           // prim::NumToTensor will go to here
           std::string name = std::string("output_") + std::to_string(ctx->num_outputs);
           auto out_tensor = converters::tensor_to_const(ctx, out_ivalue.toTensor(), "");
+          if (input_name.find(out_tensor->getName()) != input_name.end()){
+              auto identity = ctx->net->addShuffle(*out_tensor);
+              out_tensor = identity->getOutput(0);
+          }
           out_tensor->setName(name.c_str());
           ctx->net->markOutput(*out_tensor);
           LOG_INFO(
