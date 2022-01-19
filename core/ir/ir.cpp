@@ -102,11 +102,16 @@ c10::optional<at::ScalarType> get_value_first_calc_dtype_opt(torch::jit::Block* 
   auto consumers = in->uses();
   auto search_list = std::vector<torch::jit::Use>(consumers.begin(), consumers.end());
 
+//<<<<<<< HEAD
   while(search_list.size() > 0) {
-    // after insertion, original iterator will be invalid
-    auto& u = search_list.front();
-    search_list.erase(search_list.begin());
-    auto n = u.user;
+//    // after insertion, original iterator will be invalid
+//    auto& u = search_list.front();
+//    search_list.erase(search_list.begin());
+//    auto n = u.user;
+//=======
+  for (auto iter = search_list.begin(); iter != search_list.end(); ++iter) {
+    auto n = iter->user;
+//>>>>>>> fix the bug caused by vector.insert in torch_tensorrt::core::ir::get_value_first_calc_dtype_opt
     LOG_GRAPH("Node we are looking at: " << util::node_info(n));
     auto ins = n->inputs();
     auto outs = n->outputs();
@@ -141,7 +146,9 @@ c10::optional<at::ScalarType> get_value_first_calc_dtype_opt(torch::jit::Block* 
       for (auto o : outs) {
         if (o->type() == c10::TensorType::get()) {
           auto o_uses = o->uses();
+          int offset = iter - search_list.begin();
           search_list.insert(search_list.end(), o_uses.begin(), o_uses.end());
+          iter = search_list.begin() + offset;
         }
       }
       continue;
@@ -170,7 +177,9 @@ c10::optional<at::ScalarType> get_value_first_calc_dtype_opt(torch::jit::Block* 
     for (auto o : outs) {
       if (o->type() == c10::TensorType::get()) {
         auto o_uses = o->uses();
+        int offset = iter - search_list.begin();
         search_list.insert(search_list.end(), o_uses.begin(), o_uses.end());
+        iter = search_list.begin() + offset;
       }
     }
   }
