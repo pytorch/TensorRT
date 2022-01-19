@@ -17,16 +17,61 @@ Next, navigate to the repo's root directory:
 cd Torch-TensorRT
 ```
 
-Then launch the container with:
+At this point, we recommend pulling the [PyTorch container](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch) 
+from [NVIDIA GPU Cloud](https://catalog.ngc.nvidia.com/) as follows: 
+
+```
+docker pull nvcr.io/nvidia/pytorch:21.12-py3
+```
+
+Replace ```21.12``` with a different string in the form ```yy.mm```, 
+where ```yy``` indicates the last two numbers of a calendar year, and 
+```mm``` indicates the month in two-digit numerical form, if you wish 
+to pull a different version of the container. 
+
+Alternatively, to build the container from source, run 
+
+```
+docker build -t torch_tensorrt -f ./docker/Dockerfile .
+```
+
+The NGC PyTorch container ships with the Torch-TensorRT tutorial notebooks. 
+Therefore, you can run the container and the notebooks therein without 
+mounting the repo to the container. To do so, run 
+
+```
+docker run --gpus=all --rm -it --net=host --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 nvcr.io/nvidia/pytorch:21.12-py3 bash
+```
+
+If, however, you wish for your work in the notebooks to persist, use the 
+```-v``` flag to mount the repo to the container as follows: 
 
 ```
 docker run --gpus=all --rm -it -v $PWD:/Torch-TensorRT --net=host --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 nvcr.io/nvidia/pytorch:21.12-py3 bash
 ```
 
-Within the docker interactive bash session, start Jupyter with
+If you're using a container built from source, run this instead:  
+
+```
+docker run --gpus=all --rm -it -v $PWD:/Torch-TensorRT --net=host --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 torch_tensorrt:latest bash
+```
+
+Within the docker interactive bash session, proceed to the notebooks. 
+To use the notebooks which ship with the container, run 
+
+```
+cd /workspace/examples/torch_tensorrt/notebooks
+```
+
+If, however, you mounted the repo to the container, run 
 
 ```
 cd /Torch-TensorRT/notebooks
+```
+
+Once you have entered the appropriate ```notebooks``` directory, start Jupyter with
+
+```
 jupyter notebook --allow-root --ip 0.0.0.0 --port 8888
 ```
 
