@@ -281,9 +281,21 @@ GraphAndMapping ConstructFallbackGraph(
     }
   }
 
-  for (auto& output : block->outputs()) {
-    if (old_to_new_g.count(output)) {
-      new_g->registerOutput(old_to_new_g[output]);
+  if (block->outputs().size() > 1){
+    std::vector<torch::jit::Value*> fallback_graph_vector;
+    for (auto& output : block->outputs()){
+      if (old_to_new_g.count(output)) {
+        fallback_graph_vector.push_back(old_to_new_g[output]);
+      }
+    }
+    torch::jit::ArrayRef<torch::jit::Value*> fallback_graph_outputs(fallback_graph_vector);
+    auto return_tuple_node = new_g->createTuple(fallback_graph_outputs);
+    new_g->block()->appendNode(return_tuple_node);
+    // Set the output as the produced tuple
+    new_g->registerOutput(return_tuple_node->outputs()[0]);
+  } else {
+    if (old_to_new_g.count(block->outputs()[0])) {
+      new_g->registerOutput(old_to_new_g[block->outputs()[0]]);
     }
   }
   return {new_g, old_to_new_g};
