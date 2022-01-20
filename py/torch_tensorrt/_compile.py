@@ -1,4 +1,4 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Tuple, Any
 from torch_tensorrt import _enums
 import torch_tensorrt.ts
 from torch_tensorrt import logging
@@ -14,19 +14,37 @@ class _IRType(Enum):
     fx = 1
 
 
-def _module_ir(module: Any, ir: str) -> _IRType.ts:
-    # Possible module types
-    module_is_tsable = any(
-        isinstance(module, t) for t in [torch.nn.Module, torch.jit.ScriptModule, torch.jit.ScriptFunction])
-    module_is_fxable = any(isinstance(module, t) for t in [torch.nn.Module, torch.fx.GraphModule])
+class _ModuleType(Enum):
+    """Enum to set the minimum required logging level to print a message to stdout
+    """
+    nn = 0
+    ts = 1
+    fx = 2
+
+
+def _parse_module_type(module: Any) -> _ModuleType:
+    if any(isinstance(module, t) for t in [torch.jit.ScriptModule, torch.jit.ScriptFunction]):
+        return _ModuleType.ts
+    elif isinstance(module, torch.fx.GraphModule):
+        return _ModuleType.fx
+    elif isinstance(module, torch.nn.Module):
+        return _ModuleType.nn
+    else:
+        raise RuntimeError("Module is an unknown format")
+
+
+def _module_ir(module: Any, ir: str) -> Tuple[_ModuleType, _IRType]:
+    module_type = _parse_module_type(module)
+    module_is_tsable = any([module_type == t for t in [_ModuleType.nn, _ModuleType.ts]])
+    module_is_fxable = any([module_type == t for t in [_ModuleType.nn, _ModuleType.fx]])
 
     ir_targets_torchscript = any([ir == opt for opt in ["torchscript", "ts"]])
     ir_targets_fx = ir == "fx"
 
     if module_is_tsable and ir_targets_torchscript:
-        return _IRType.ts
+        return module_type, _IRType.ts
     elif module_is_fxable and ir_targets_fx:
-        if isinstance(module, torch.fx.GraphModule):
+        if module_type == _ModuleType.fx:
             raise ValueError("Was given a torch.fx.GraphModule, fx is not currently supported by Torch-TensorRT")
         elif ir_targets_fx:
             raise ValueError("Preferred ir was set to \"fx\" which is currently not supported by Torch-TensorRT")
@@ -38,7 +56,7 @@ def _module_ir(module: Any, ir: str) -> _IRType.ts:
             # Options are listed in order of preference
             if module_is_tsable:
                 logging.log(logging.Level.Info, "ir was set to default, using TorchScript as ir")
-                return _IRType.ts
+                return module_type, _IRType.ts
             elif module_is_fxable:
                 raise ValueError("Was given a torch.fx.GraphModule, fx is not currently supported by Torch-TensorRT")
                 #logging.log(logging.Level.Info, "ir was set to default, using TorchScript as fx")
@@ -85,10 +103,10 @@ def compile(module: Any, ir="default", inputs=[], enabled_precisions=set([_enums
     Returns:
         torch.nn.Module: Compiled Module, when run it will execute via TensorRT
     """
-    target_ir = _module_ir(module, ir)
+    module_type, target_ir = _module_ir(module, ir)
     if target_ir == _IRType.ts:
         ts_mod = module
-        if isinstance(module, torch.nn.Module):
+        if module_type == _ModuleType.nn:
             logging.log(
                 logging.Level.Info,
                 "Module was provided as a torch.nn.Module, trying to script the module with torch.jit.script. In the event of a failure please preconvert your module to TorchScript"
@@ -141,7 +159,7 @@ def convert_method_to_trt_engine(module: Any,
     target_ir = _module_ir(module, ir)
     if target_ir == _IRType.ts:
         ts_mod = module
-        if isinstance(module, torch.nn.Module):
+        if module_type == _ModuleType.nn:
             logging.log(
                 logging.Level.Info,
                 "Module was provided as a torch.nn.Module, trying to script the module with torch.jit.script. In the event of a failure please preconvert your module to TorchScript"
@@ -156,3 +174,4 @@ def convert_method_to_trt_engine(module: Any,
         raise RuntimeError("fx is currently not supported")
     else:
         raise RuntimeError("Module is an unknown format or the ir requested is unknown")
+
