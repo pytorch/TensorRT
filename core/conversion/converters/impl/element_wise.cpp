@@ -334,7 +334,7 @@ auto element_wise_registrations TORCHTRT_UNUSED =
                     auto div =
                         add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, util::node_info(n));
 
-                    TRTORCH_CHECK(div, "Unable to create div layer from node: " << *n);
+                    TORCHTRT_CHECK(div, "Unable to create div layer from node: " << *n);
 
                     div->setName(util::node_info(n).c_str());
                     auto out = ctx->AssociateValueAndTensor(n->outputs()[0], div->getOutput(0));
