@@ -17,6 +17,8 @@ Next, navigate to the repo's root directory:
 cd Torch-TensorRT
 ```
 
+### a. Using the NGC PyTorch container
+
 At this point, we recommend pulling the [PyTorch container](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch) 
 from [NVIDIA GPU Cloud](https://catalog.ngc.nvidia.com/) as follows: 
 
@@ -28,12 +30,6 @@ Replace ```21.12``` with a different string in the form ```yy.mm```,
 where ```yy``` indicates the last two numbers of a calendar year, and 
 ```mm``` indicates the month in two-digit numerical form, if you wish 
 to pull a different version of the container. 
-
-Alternatively, to build the container from source, run 
-
-```
-docker build -t torch_tensorrt -f ./docker/Dockerfile .
-```
 
 The NGC PyTorch container ships with the Torch-TensorRT tutorial notebooks. 
 Therefore, you can run the container and the notebooks therein without 
@@ -50,11 +46,21 @@ If, however, you wish for your work in the notebooks to persist, use the
 docker run --gpus=all --rm -it -v $PWD:/Torch-TensorRT --net=host --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 nvcr.io/nvidia/pytorch:21.12-py3 bash
 ```
 
-If you're using a container built from source, run this instead:  
+### b. Building a Torch-TensorRT container from source
+
+Alternatively, to build the container from source, run 
+
+```
+docker build -t torch_tensorrt -f ./docker/Dockerfile .
+```
+
+To run this container, enter the following command:  
 
 ```
 docker run --gpus=all --rm -it -v $PWD:/Torch-TensorRT --net=host --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 torch_tensorrt:latest bash
 ```
+
+### c. Running the notebooks inside the container
 
 Within the docker interactive bash session, proceed to the notebooks. 
 To use the notebooks which ship with the container, run 
