@@ -1,4 +1,4 @@
-from typing import List, Dict, Tuple, Any
+from typing import List, Dict, Any
 from torch_tensorrt import _enums
 import torch_tensorrt.ts
 from torch_tensorrt import logging
@@ -33,8 +33,7 @@ def _parse_module_type(module: Any) -> _ModuleType:
         raise RuntimeError("Module is an unknown format")
 
 
-def _module_ir(module: Any, ir: str) -> Tuple[_ModuleType, _IRType]:
-    module_type = _parse_module_type(module)
+def _get_target_ir(module_type: _ModuleType, ir: str) -> _IRType:
     module_is_tsable = any([module_type == t for t in [_ModuleType.nn, _ModuleType.ts]])
     module_is_fxable = any([module_type == t for t in [_ModuleType.nn, _ModuleType.fx]])
 
@@ -42,7 +41,7 @@ def _module_ir(module: Any, ir: str) -> Tuple[_ModuleType, _IRType]:
     ir_targets_fx = ir == "fx"
 
     if module_is_tsable and ir_targets_torchscript:
-        return module_type, _IRType.ts
+        return _IRType.ts
     elif module_is_fxable and ir_targets_fx:
         if module_type == _ModuleType.fx:
             raise ValueError("Was given a torch.fx.GraphModule, fx is not currently supported by Torch-TensorRT")
@@ -56,7 +55,7 @@ def _module_ir(module: Any, ir: str) -> Tuple[_ModuleType, _IRType]:
             # Options are listed in order of preference
             if module_is_tsable:
                 logging.log(logging.Level.Info, "ir was set to default, using TorchScript as ir")
-                return module_type, _IRType.ts
+                return _IRType.ts
             elif module_is_fxable:
                 raise ValueError("Was given a torch.fx.GraphModule, fx is not currently supported by Torch-TensorRT")
                 #logging.log(logging.Level.Info, "ir was set to default, using TorchScript as fx")
@@ -103,7 +102,8 @@ def compile(module: Any, ir="default", inputs=[], enabled_precisions=set([_enums
     Returns:
         torch.nn.Module: Compiled Module, when run it will execute via TensorRT
     """
-    module_type, target_ir = _module_ir(module, ir)
+    module_type = _parse_module_type(module)
+    target_ir = _get_target_ir(module_type, ir)
     if target_ir == _IRType.ts:
         ts_mod = module
         if module_type == _ModuleType.nn:
@@ -152,11 +152,11 @@ def convert_method_to_trt_engine(module: Any,
         enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
         ir (str): The requested strategy to compile. (Options: default - Let Torch-TensorRT decide, ts - TorchScript with scripting path)
         **kwargs: Additional settings for the specific requested strategy (See submodules for more info)
-
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
     """
-    target_ir = _module_ir(module, ir)
+    module_type = _parse_module_type(module)
+    target_ir = _get_target_ir(module_type, ir)
     if target_ir == _IRType.ts:
         ts_mod = module
         if module_type == _ModuleType.nn:
@@ -173,4 +173,3 @@ def convert_method_to_trt_engine(module: Any,
         raise RuntimeError("fx is currently not supported")
     else:
         raise RuntimeError("Module is an unknown format or the ir requested is unknown")
-
