@@ -17,13 +17,13 @@ void ReduceToOperation(std::shared_ptr<torch::jit::Graph>& graph) {
             %out : Tensor = aten::to(%x, %dtype, %nb, %copy, %format)
             return (%out))IR";
   std::string to_dtype_layout_pattern = R"IR(
-        graph(%x, %device, %dtype, %layout, %nb, %copy, %format, %other):
-            %out : Tensor = aten::to.dtype_layout(%x, %device, %dtype, %layout, %nb, %copy, %format, %other)
+        graph(%x, %device, %dtype, %layout, %pm, %nb, %copy, %format):
+            %out : Tensor = aten::to(%x, %device, %dtype, %layout, %pm, %nb, %copy, %format)
             return (%out))IR";
 
   std::string to_dtype_multi_input_pattern = R"IR(
-        graph(%x, %device, %dtype, %layout, %nb, %copy, %format, %other):
-            %out : Tensor = aten::to(%x, %device, %dtype, %nb, %copy, %format)
+        graph(%x, %device, %dtype, %layout, %pm, %nb, %copy, %format):
+            %out : Tensor = aten::to(%x, %dtype, %nb, %copy, %format)
             return (%out))IR";
 
   std::string to_type_as_pattern = R"IR(
