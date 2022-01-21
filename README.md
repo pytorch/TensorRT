@@ -8,7 +8,7 @@ Torch-TensorRT is a compiler for PyTorch/TorchScript, targeting NVIDIA GPUs via 
 
 Resources:
 - [Documentation](https://nvidia.github.io/Torch-TensorRT/)
-- [Torch TensorRT Explained in 2 minutes!](https://www.youtube.com/watch?v=TU5BMU6iYZ0&ab_channel=NVIDIADeveloper)
+- [Torch-TensorRT Explained in 2 minutes!](https://www.youtube.com/watch?v=TU5BMU6iYZ0&ab_channel=NVIDIADeveloper)
 - [Comprehensive Discusion (GTC Event)](https://www.nvidia.com/en-us/on-demand/session/gtcfall21-a31107/)
 - [Pre-built Docker Container](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch). To use this container, make an NGC account and sign in to NVIDIA's registry with an API key. Refer to [this guide](https://docs.nvidia.com/ngc/ngc-catalog-user-guide/index.html#registering-activating-ngc-account) for the same.
 
