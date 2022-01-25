@@ -176,7 +176,7 @@ void resolveNonTensorInputs(PartitionedGraph& segmented_blocks) { // , std::shar
     // if the segment that produce this nonTensor value is kTensorRT but consumed in kTorch, inject nodes in the first
     // kTorch segment.
     if (segmented_blocks[use_info.produce_id].target() == SegmentedBlock::kTensorRT && !use_info.torch_use_id.empty()) {
-      auto first_torch_id = use_info.torch_use_id.front();
+      auto first_torch_id = use_info.torch_use_id.back();
       if (!updated_segments.count(first_torch_id)) {
         // Segmented Blocks with non-tensor inputs will have to be re-segmented as
         // Torch-TensorRT doesn't support non-tensor inputs for a module.

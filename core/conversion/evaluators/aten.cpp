@@ -706,7 +706,23 @@ auto aten_registrations TORCHTRT_UNUSED =
                     },
                     EvalOptions().validSchemas({
                         R"SIG(aten::copy_(Tensor(a!) self, Tensor src, bool non_blocking=False) -> (Tensor(a!)))SIG",
-                    })});
+                    })})
+        .evaluator({c10::Symbol::fromQualString("aten::format"),
+                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+                      int64_t input_num = n->inputs().size();
+                      std::vector<torch::jit::IValue> stack;
+                      for (auto v : n->inputs()) {
+                        stack.push_back(*args.at(v).IValue());
+                      }
+                      stack.push_back(input_num);
+                      auto& ops = torch::jit::getAllOperatorsFor(c10::Symbol::fromQualString("aten::format"));
+                      auto& aten_format = ops.front();
+                      aten_format->getOperation()(stack);
+                      std::string output;
+                      torch::jit::pop(stack, output);
+                      return output;
+                    },
+                    EvalOptions().validSchemas({"aten::format(str self, ...) -> (str)"})});
 } // namespace
 } // namespace evaluators
 } // namespace conversion

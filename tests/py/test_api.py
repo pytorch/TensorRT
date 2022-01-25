@@ -30,12 +30,13 @@ class TestCompile(ModelTestCase):
         self.assertTrue(same < 2e-2)
 
     def test_compile_script(self):
-        trt_mod = torchtrt.ts.compile(self.scripted_model,
-                                      inputs=[self.input],
-                                      device=torchtrt.Device(gpu_id=0),
-                                      enabled_precisions={torch.float})
-        same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
-        self.assertTrue(same < 2e-2)
+        with torch.no_grad():
+            trt_mod = torchtrt.ts.compile(self.scripted_model,
+                                          inputs=[self.input],
+                                          device=torchtrt.Device(gpu_id=0),
+                                          enabled_precisions={torch.float})
+            same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
+            self.assertTrue(same < 2e-2)
 
     def test_compile_global(self):
         trt_mod = torchtrt.compile(self.scripted_model,
@@ -46,12 +47,13 @@ class TestCompile(ModelTestCase):
         self.assertTrue(same < 2e-2)
 
     def test_compile_global_nn_mod(self):
-        trt_mod = torchtrt.compile(self.model,
-                                   inputs=[self.input],
-                                   device=torchtrt.Device(gpu_id=0),
-                                   enabled_precisions={torch.float})
-        same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
-        self.assertTrue(same < 2e-2)
+        with torch.no_grad():
+            trt_mod = torchtrt.compile(self.model,
+                                       inputs=[self.input],
+                                       device=torchtrt.Device(gpu_id=0),
+                                       enabled_precisions={torch.float})
+            same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
+            self.assertTrue(same < 2e-2)
 
     def test_from_torch_tensor(self):
         compile_spec = {
@@ -508,7 +510,8 @@ def test_suite():
     suite = unittest.TestSuite()
     suite.addTest(unittest.makeSuite(TestLoggingAPIs))
     suite.addTest(TestCompile.parametrize(TestCompile, model=models.resnet18(pretrained=True)))
-    suite.addTest(TestCompile.parametrize(TestCompile, model=models.mobilenet_v2(pretrained=True)))
+    # Disabling mobilenet_v2 test due to https://nvbugs/3433655
+    # suite.addTest(TestCompile.parametrize(TestCompile, model=models.mobilenet_v2(pretrained=True)))
     suite.addTest(TestCompileHalf.parametrize(TestCompileHalf, model=models.resnet18(pretrained=True)))
     suite.addTest(TestCompileHalfDefault.parametrize(TestCompileHalfDefault, model=models.resnet18(pretrained=True)))
     suite.addTest(TestPTtoTRTtoPT.parametrize(TestPTtoTRTtoPT, model=models.resnet18(pretrained=True)))
