@@ -281,9 +281,9 @@ GraphAndMapping ConstructFallbackGraph(
     }
   }
 
-  if (block->outputs().size() > 1){
+  if (block->outputs().size() > 1) {
     std::vector<torch::jit::Value*> fallback_graph_vector;
-    for (auto& output : block->outputs()){
+    for (auto& output : block->outputs()) {
       if (old_to_new_g.count(output)) {
         fallback_graph_vector.push_back(old_to_new_g[output]);
       }
