@@ -2,6 +2,7 @@
 #include "core/util/prelude.h"
 #include "torch/csrc/jit/api/module.h"
 #include "torch/csrc/jit/passes/constant_pooling.h"
+#include <ATen/ATen.h>
 
 namespace torch_tensorrt {
 namespace core {

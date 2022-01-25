@@ -269,7 +269,7 @@ setup(
     long_description=long_description,
     ext_modules=ext_modules,
     install_requires=[
-        'torch>=1.10.0+cu113<1.11.0',
+        'torch',
     ],
     setup_requires=[],
     cmdclass={

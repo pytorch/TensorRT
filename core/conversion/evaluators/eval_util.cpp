@@ -6,6 +6,11 @@
 #include "c10/util/irange.h"
 #include "core/util/prelude.h"
 
+#include <ATen/ATen.h>
+// #include <ATen/AccumulateType.h>
+// #include <ATen/Dispatch.h>
+// #include <ATen/TensorUtils.h>
+
 namespace torch_tensorrt {
 namespace core {
 namespace conversion {
