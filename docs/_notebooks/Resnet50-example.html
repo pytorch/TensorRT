@@ -870,7 +870,7 @@ div.rendered_html tbody tr:hover {
         </div>
        </div>
        <p>
-        <img alt="f6e9185b688e410ab5233e8ef7fdee84" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
+        <img alt="558cd152251f417c97fe5a4f001f0ddf" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
        </p>
        <section id="Torch-TensorRT-Getting-Started---ResNet-50">
         <h1 id="notebooks-resnet50-example--page-root">
@@ -964,8 +964,7 @@ perform best on the target GPU. TensorRT also has strong support for reduced ope
           <div class="input_area highlight-ipython3 notranslate">
            <div class="highlight">
             <pre>
-<span></span>!pip install numpy==1.21.2 scipy==1.5.2 Pillow==6.2.0 scikit-image==0.17.2 matplotlib==3.3.0
-!nvidia-smi
+<span></span>!nvidia-smi
 !pip install ipywidgets --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host=files.pythonhosted.org
 </pre>
            </div>
@@ -977,61 +976,17 @@ perform best on the target GPU. TensorRT also has strong support for reduced ope
           <div class="output_area docutils container">
            <div class="highlight">
             <pre>
-Requirement already satisfied: numpy==1.21.2 in /opt/conda/lib/python3.8/site-packages (1.21.2)
-Requirement already satisfied: scipy==1.5.2 in /opt/conda/lib/python3.8/site-packages (1.5.2)
-Requirement already satisfied: Pillow==6.2.0 in /opt/conda/lib/python3.8/site-packages (6.2.0)
-Requirement already satisfied: scikit-image==0.17.2 in /opt/conda/lib/python3.8/site-packages (0.17.2)
-Requirement already satisfied: matplotlib==3.3.0 in /opt/conda/lib/python3.8/site-packages (3.3.0)
-Requirement already satisfied: PyWavelets&gt;=1.1.1 in /opt/conda/lib/python3.8/site-packages (from scikit-image==0.17.2) (1.1.1)
-Requirement already satisfied: tifffile&gt;=2019.7.26 in /opt/conda/lib/python3.8/site-packages (from scikit-image==0.17.2) (2021.10.12)
-Requirement already satisfied: networkx&gt;=2.0 in /opt/conda/lib/python3.8/site-packages (from scikit-image==0.17.2) (2.0)
-Requirement already satisfied: imageio&gt;=2.3.0 in /opt/conda/lib/python3.8/site-packages (from scikit-image==0.17.2) (2.9.0)
-Requirement already satisfied: pyparsing!=2.0.4,!=2.1.2,!=2.1.6,&gt;=2.0.3 in /opt/conda/lib/python3.8/site-packages (from matplotlib==3.3.0) (2.4.7)
-Requirement already satisfied: python-dateutil&gt;=2.1 in /opt/conda/lib/python3.8/site-packages (from matplotlib==3.3.0) (2.8.2)
-Requirement already satisfied: kiwisolver&gt;=1.0.1 in /opt/conda/lib/python3.8/site-packages (from matplotlib==3.3.0) (1.3.2)
-Requirement already satisfied: cycler&gt;=0.10 in /opt/conda/lib/python3.8/site-packages (from matplotlib==3.3.0) (0.10.0)
-Requirement already satisfied: six in /opt/conda/lib/python3.8/site-packages (from cycler&gt;=0.10-&gt;matplotlib==3.3.0) (1.16.0)
-Requirement already satisfied: decorator&gt;=4.1.0 in /opt/conda/lib/python3.8/site-packages (from networkx&gt;=2.0-&gt;scikit-image==0.17.2) (5.0.9)
-<span class="ansi-yellow-fg">WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv</span>
-Tue Oct 26 00:13:31 2021
+Fri Jan 14 07:30:41 2022
 +-----------------------------------------------------------------------------+
-| NVIDIA-SMI 450.51.06    Driver Version: 450.51.06    CUDA Version: 11.4     |
+| NVIDIA-SMI 470.57.02    Driver Version: 470.57.02    CUDA Version: 11.5     |
 |-------------------------------+----------------------+----------------------+
 | GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |
 | Fan  Temp  Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |
 |                               |                      |               MIG M. |
 |===============================+======================+======================|
-|   0  Tesla V100-PCIE...  On   | 00000000:1A:00.0 Off |                    0 |
-| N/A   37C    P0    24W / 250W |      0MiB / 32510MiB |      0%      Default |
-|                               |                      |                  N/A |
-+-------------------------------+----------------------+----------------------+
-|   1  Tesla V100-PCIE...  On   | 00000000:1B:00.0 Off |                    0 |
-| N/A   33C    P0    22W / 250W |      0MiB / 32510MiB |      0%      Default |
-|                               |                      |                  N/A |
-+-------------------------------+----------------------+----------------------+
-|   2  Tesla V100-PCIE...  On   | 00000000:3D:00.0 Off |                    0 |
-| N/A   32C    P0    24W / 250W |      0MiB / 32510MiB |      0%      Default |
-|                               |                      |                  N/A |
-+-------------------------------+----------------------+----------------------+
-|   3  Tesla V100-PCIE...  On   | 00000000:3E:00.0 Off |                    0 |
-| N/A   33C    P0    24W / 250W |      0MiB / 32510MiB |      0%      Default |
-|                               |                      |                  N/A |
-+-------------------------------+----------------------+----------------------+
-|   4  Tesla V100-PCIE...  On   | 00000000:88:00.0 Off |                    0 |
-| N/A   32C    P0    25W / 250W |      0MiB / 32510MiB |      0%      Default |
-|                               |                      |                  N/A |
-+-------------------------------+----------------------+----------------------+
-|   5  Tesla V100-PCIE...  On   | 00000000:89:00.0 Off |                    0 |
-| N/A   31C    P0    22W / 250W |      0MiB / 32510MiB |      0%      Default |
-|                               |                      |                  N/A |
-+-------------------------------+----------------------+----------------------+
-|   6  Tesla V100-PCIE...  On   | 00000000:B1:00.0 Off |                    0 |
-| N/A   32C    P0    24W / 250W |      0MiB / 32510MiB |      0%      Default |
-|                               |                      |                  N/A |
-+-------------------------------+----------------------+----------------------+
-|   7  Tesla V100-PCIE...  On   | 00000000:B2:00.0 Off |                    0 |
-| N/A   32C    P0    25W / 250W |      0MiB / 32510MiB |      0%      Default |
-|                               |                      |                  N/A |
+|   0  NVIDIA A30          On   | 00000000:41:00.0 Off |                    0 |
+| N/A   43C    P0    34W / 165W |      0MiB / 24258MiB |      0%      Default |
+|                               |                      |             Disabled |
 +-------------------------------+----------------------+----------------------+
 
 +-----------------------------------------------------------------------------+
@@ -1041,6 +996,70 @@ Tue Oct 26 00:13:31 2021
 |=============================================================================|
 |  No running processes found                                                 |
 +-----------------------------------------------------------------------------+
+Looking in indexes: https://pypi.org/simple, https://pypi.ngc.nvidia.com
+Collecting ipywidgets
+  Downloading ipywidgets-7.6.5-py2.py3-none-any.whl (121 kB)
+     |████████████████████████████████| 121 kB 12.7 MB/s eta 0:00:01
+Collecting widgetsnbextension~=3.5.0
+  Downloading widgetsnbextension-3.5.2-py2.py3-none-any.whl (1.6 MB)
+     |████████████████████████████████| 1.6 MB 50.0 MB/s eta 0:00:01
+Collecting jupyterlab-widgets&gt;=1.0.0
+  Downloading jupyterlab_widgets-1.0.2-py3-none-any.whl (243 kB)
+     |████████████████████████████████| 243 kB 115.1 MB/s eta 0:00:01
+Requirement already satisfied: ipython&gt;=4.0.0 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (7.30.0)
+Requirement already satisfied: traitlets&gt;=4.3.1 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (5.1.1)
+Requirement already satisfied: ipython-genutils~=0.2.0 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (0.2.0)
+Requirement already satisfied: nbformat&gt;=4.2.0 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (5.1.3)
+Requirement already satisfied: ipykernel&gt;=4.5.1 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (6.6.0)
+Requirement already satisfied: matplotlib-inline&lt;0.2.0,&gt;=0.1.0 in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets) (0.1.3)
+Requirement already satisfied: tornado&lt;7.0,&gt;=4.2 in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets) (6.1)
+Requirement already satisfied: debugpy&lt;2.0,&gt;=1.0.0 in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets) (1.5.1)
+Requirement already satisfied: jupyter-client&lt;8.0 in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets) (7.1.0)
+Requirement already satisfied: setuptools&gt;=18.5 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (59.4.0)
+Requirement already satisfied: pexpect&gt;4.3 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (4.8.0)
+Requirement already satisfied: prompt-toolkit!=3.0.0,!=3.0.1,&lt;3.1.0,&gt;=2.0.0 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (3.0.22)
+Requirement already satisfied: decorator in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (5.1.0)
+Requirement already satisfied: pickleshare in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (0.7.5)
+Requirement already satisfied: backcall in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (0.2.0)
+Requirement already satisfied: pygments in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (2.10.0)
+Requirement already satisfied: jedi&gt;=0.16 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (0.18.1)
+Requirement already satisfied: parso&lt;0.9.0,&gt;=0.8.0 in /opt/conda/lib/python3.8/site-packages (from jedi&gt;=0.16-&gt;ipython&gt;=4.0.0-&gt;ipywidgets) (0.8.3)
+Requirement already satisfied: python-dateutil&gt;=2.1 in /opt/conda/lib/python3.8/site-packages (from jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (2.8.2)
+Requirement already satisfied: jupyter-core&gt;=4.6.0 in /opt/conda/lib/python3.8/site-packages (from jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (4.9.1)
+Requirement already satisfied: pyzmq&gt;=13 in /opt/conda/lib/python3.8/site-packages (from jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (22.3.0)
+Requirement already satisfied: entrypoints in /opt/conda/lib/python3.8/site-packages (from jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (0.3)
+Requirement already satisfied: nest-asyncio&gt;=1.5 in /opt/conda/lib/python3.8/site-packages (from jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (1.5.4)
+Requirement already satisfied: jsonschema!=2.5.0,&gt;=2.4 in /opt/conda/lib/python3.8/site-packages (from nbformat&gt;=4.2.0-&gt;ipywidgets) (4.2.1)
+Requirement already satisfied: pyrsistent!=0.17.0,!=0.17.1,!=0.17.2,&gt;=0.14.0 in /opt/conda/lib/python3.8/site-packages (from jsonschema!=2.5.0,&gt;=2.4-&gt;nbformat&gt;=4.2.0-&gt;ipywidgets) (0.18.0)
+Requirement already satisfied: attrs&gt;=17.4.0 in /opt/conda/lib/python3.8/site-packages (from jsonschema!=2.5.0,&gt;=2.4-&gt;nbformat&gt;=4.2.0-&gt;ipywidgets) (21.2.0)
+Requirement already satisfied: importlib-resources&gt;=1.4.0 in /opt/conda/lib/python3.8/site-packages (from jsonschema!=2.5.0,&gt;=2.4-&gt;nbformat&gt;=4.2.0-&gt;ipywidgets) (5.4.0)
+Requirement already satisfied: zipp&gt;=3.1.0 in /opt/conda/lib/python3.8/site-packages (from importlib-resources&gt;=1.4.0-&gt;jsonschema!=2.5.0,&gt;=2.4-&gt;nbformat&gt;=4.2.0-&gt;ipywidgets) (3.6.0)
+Requirement already satisfied: ptyprocess&gt;=0.5 in /opt/conda/lib/python3.8/site-packages (from pexpect&gt;4.3-&gt;ipython&gt;=4.0.0-&gt;ipywidgets) (0.7.0)
+Requirement already satisfied: wcwidth in /opt/conda/lib/python3.8/site-packages (from prompt-toolkit!=3.0.0,!=3.0.1,&lt;3.1.0,&gt;=2.0.0-&gt;ipython&gt;=4.0.0-&gt;ipywidgets) (0.2.5)
+Requirement already satisfied: six&gt;=1.5 in /opt/conda/lib/python3.8/site-packages (from python-dateutil&gt;=2.1-&gt;jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (1.16.0)
+Requirement already satisfied: notebook&gt;=4.4.1 in /opt/conda/lib/python3.8/site-packages (from widgetsnbextension~=3.5.0-&gt;ipywidgets) (6.4.1)
+Requirement already satisfied: argon2-cffi in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (21.1.0)
+Requirement already satisfied: jinja2 in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (3.0.3)
+Requirement already satisfied: Send2Trash&gt;=1.5.0 in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (1.8.0)
+Requirement already satisfied: nbconvert in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (6.3.0)
+Requirement already satisfied: prometheus-client in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.12.0)
+Requirement already satisfied: terminado&gt;=0.8.3 in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.12.1)
+Requirement already satisfied: cffi&gt;=1.0.0 in /opt/conda/lib/python3.8/site-packages (from argon2-cffi-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (1.15.0)
+Requirement already satisfied: pycparser in /opt/conda/lib/python3.8/site-packages (from cffi&gt;=1.0.0-&gt;argon2-cffi-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (2.21)
+Requirement already satisfied: MarkupSafe&gt;=2.0 in /opt/conda/lib/python3.8/site-packages (from jinja2-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (2.0.1)
+Requirement already satisfied: pandocfilters&gt;=1.4.1 in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (1.5.0)
+Requirement already satisfied: defusedxml in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.7.1)
+Requirement already satisfied: nbclient&lt;0.6.0,&gt;=0.5.0 in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.5.9)
+Requirement already satisfied: testpath in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.5.0)
+Requirement already satisfied: mistune&lt;2,&gt;=0.8.1 in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.8.4)
+Requirement already satisfied: jupyterlab-pygments in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.1.2)
+Requirement already satisfied: bleach in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (4.1.0)
+Requirement already satisfied: packaging in /opt/conda/lib/python3.8/site-packages (from bleach-&gt;nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (21.3)
+Requirement already satisfied: webencodings in /opt/conda/lib/python3.8/site-packages (from bleach-&gt;nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.5.1)
+Requirement already satisfied: pyparsing!=3.0.5,&gt;=2.0.2 in /opt/conda/lib/python3.8/site-packages (from packaging-&gt;bleach-&gt;nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (3.0.6)
+Installing collected packages: widgetsnbextension, jupyterlab-widgets, ipywidgets
+Successfully installed ipywidgets-7.6.5 jupyterlab-widgets-1.0.2 widgetsnbextension-3.5.2
+<span class="ansi-yellow-fg">WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv</span>
 </pre>
            </div>
           </div>
@@ -1108,8 +1127,18 @@ resnet50_model.eval()
             <div class="highlight">
              <pre>
 Using cache found in /root/.cache/torch/hub/pytorch_vision_v0.10.0
+Downloading: "https://download.pytorch.org/models/resnet50-0676ba61.pth" to /root/.cache/torch/hub/checkpoints/resnet50-0676ba61.pth
 </pre>
             </div>
+           </div>
+          </div>
+          <div class="nboutput docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <script type="application/vnd.jupyter.widget-view+json">
+             {"model_id": "50517a42db3747579052cb4f3535efcc", "version_major": 2, "version_minor": 0}
+            </script>
            </div>
           </div>
           <div class="nboutput nblast docutils container">
@@ -1399,7 +1428,7 @@ ResNet(
            <div class="input_area highlight-ipython3 notranslate">
             <div class="highlight">
              <pre>
-<span></span>!mkdir ./data
+<span></span>!mkdir -p ./data
 !wget  -O ./data/img0.JPG "https://d17fnq9dkz9hgj.cloudfront.net/breed-uploads/2018/08/siberian-husky-detail.jpg?bust=1535566590&amp;width=630"
 !wget  -O ./data/img1.JPG "https://www.hakaimagazine.com/wp-content/uploads/header-gulf-birds.jpg"
 !wget  -O ./data/img2.JPG "https://www.artis.nl/media/filer_public_thumbnails/filer_public/00/f1/00f1b6db-fbed-4fef-9ab0-84e944ff11f8/chimpansee_amber_r_1920x1080.jpg__1920x1080_q85_subject_location-923%2C365_subsampling-2.jpg"
@@ -1416,61 +1445,60 @@ ResNet(
            <div class="output_area docutils container">
             <div class="highlight">
              <pre>
-mkdir: cannot create directory ‘./data’: File exists
---2021-10-26 00:13:33--  https://d17fnq9dkz9hgj.cloudfront.net/breed-uploads/2018/08/siberian-husky-detail.jpg?bust=1535566590&amp;width=630
-Resolving d17fnq9dkz9hgj.cloudfront.net (d17fnq9dkz9hgj.cloudfront.net)... 13.226.251.36, 13.226.251.27, 13.226.251.107, ...
-Connecting to d17fnq9dkz9hgj.cloudfront.net (d17fnq9dkz9hgj.cloudfront.net)|13.226.251.36|:443... connected.
+--2022-01-14 07:30:47--  https://d17fnq9dkz9hgj.cloudfront.net/breed-uploads/2018/08/siberian-husky-detail.jpg?bust=1535566590&amp;width=630
+Resolving d17fnq9dkz9hgj.cloudfront.net (d17fnq9dkz9hgj.cloudfront.net)... 18.65.227.99, 18.65.227.37, 18.65.227.127, ...
+Connecting to d17fnq9dkz9hgj.cloudfront.net (d17fnq9dkz9hgj.cloudfront.net)|18.65.227.99|:443... connected.
 HTTP request sent, awaiting response... 200 OK
 Length: 24112 (24K) [image/jpeg]
 Saving to: ‘./data/img0.JPG’
 
-./data/img0.JPG     100%[===================&gt;]  23.55K  --.-KB/s    in 0.002s
+./data/img0.JPG     100%[===================&gt;]  23.55K  --.-KB/s    in 0.004s
 
-2021-10-26 00:13:34 (13.1 MB/s) - ‘./data/img0.JPG’ saved [24112/24112]
+2022-01-14 07:30:47 (6.21 MB/s) - ‘./data/img0.JPG’ saved [24112/24112]
 
---2021-10-26 00:13:34--  https://www.hakaimagazine.com/wp-content/uploads/header-gulf-birds.jpg
-Resolving www.hakaimagazine.com (www.hakaimagazine.com)... 23.185.0.4, 2620:12a:8001::4, 2620:12a:8000::4
-Connecting to www.hakaimagazine.com (www.hakaimagazine.com)|23.185.0.4|:443... connected.
+--2022-01-14 07:30:47--  https://www.hakaimagazine.com/wp-content/uploads/header-gulf-birds.jpg
+Resolving www.hakaimagazine.com (www.hakaimagazine.com)... 164.92.73.117
+Connecting to www.hakaimagazine.com (www.hakaimagazine.com)|164.92.73.117|:443... connected.
 HTTP request sent, awaiting response... 200 OK
 Length: 452718 (442K) [image/jpeg]
 Saving to: ‘./data/img1.JPG’
 
-./data/img1.JPG     100%[===================&gt;] 442.11K  --.-KB/s    in 0.02s
+./data/img1.JPG     100%[===================&gt;] 442.11K  --.-KB/s    in 0.04s
 
-2021-10-26 00:13:35 (28.3 MB/s) - ‘./data/img1.JPG’ saved [452718/452718]
+2022-01-14 07:30:48 (11.3 MB/s) - ‘./data/img1.JPG’ saved [452718/452718]
 
---2021-10-26 00:13:36--  https://www.artis.nl/media/filer_public_thumbnails/filer_public/00/f1/00f1b6db-fbed-4fef-9ab0-84e944ff11f8/chimpansee_amber_r_1920x1080.jpg__1920x1080_q85_subject_location-923%2C365_subsampling-2.jpg
+--2022-01-14 07:30:48--  https://www.artis.nl/media/filer_public_thumbnails/filer_public/00/f1/00f1b6db-fbed-4fef-9ab0-84e944ff11f8/chimpansee_amber_r_1920x1080.jpg__1920x1080_q85_subject_location-923%2C365_subsampling-2.jpg
 Resolving www.artis.nl (www.artis.nl)... 94.75.225.20
 Connecting to www.artis.nl (www.artis.nl)|94.75.225.20|:443... connected.
 HTTP request sent, awaiting response... 200 OK
 Length: 361413 (353K) [image/jpeg]
 Saving to: ‘./data/img2.JPG’
 
-./data/img2.JPG     100%[===================&gt;] 352.94K   790KB/s    in 0.4s
+./data/img2.JPG     100%[===================&gt;] 352.94K   609KB/s    in 0.6s
 
-2021-10-26 00:13:38 (790 KB/s) - ‘./data/img2.JPG’ saved [361413/361413]
+2022-01-14 07:30:50 (609 KB/s) - ‘./data/img2.JPG’ saved [361413/361413]
 
---2021-10-26 00:13:38--  https://www.familyhandyman.com/wp-content/uploads/2018/09/How-to-Avoid-Snakes-Slithering-Up-Your-Toilet-shutterstock_780480850.jpg
+--2022-01-14 07:30:50--  https://www.familyhandyman.com/wp-content/uploads/2018/09/How-to-Avoid-Snakes-Slithering-Up-Your-Toilet-shutterstock_780480850.jpg
 Resolving www.familyhandyman.com (www.familyhandyman.com)... 104.18.201.107, 104.18.202.107, 2606:4700::6812:ca6b, ...
 Connecting to www.familyhandyman.com (www.familyhandyman.com)|104.18.201.107|:443... connected.
 HTTP request sent, awaiting response... 200 OK
 Length: 90994 (89K) [image/jpeg]
 Saving to: ‘./data/img3.JPG’
 
-./data/img3.JPG     100%[===================&gt;]  88.86K  --.-KB/s    in 0.009s
+./data/img3.JPG     100%[===================&gt;]  88.86K  --.-KB/s    in 0.006s
 
-2021-10-26 00:13:38 (9.64 MB/s) - ‘./data/img3.JPG’ saved [90994/90994]
+2022-01-14 07:30:50 (14.8 MB/s) - ‘./data/img3.JPG’ saved [90994/90994]
 
---2021-10-26 00:13:39--  https://s3.amazonaws.com/deep-learning-models/image-models/imagenet_class_index.json
-Resolving s3.amazonaws.com (s3.amazonaws.com)... 52.217.225.168
-Connecting to s3.amazonaws.com (s3.amazonaws.com)|52.217.225.168|:443... connected.
+--2022-01-14 07:30:50--  https://s3.amazonaws.com/deep-learning-models/image-models/imagenet_class_index.json
+Resolving s3.amazonaws.com (s3.amazonaws.com)... 52.217.165.72
+Connecting to s3.amazonaws.com (s3.amazonaws.com)|52.217.165.72|:443... connected.
 HTTP request sent, awaiting response... 200 OK
 Length: 35363 (35K) [application/octet-stream]
 Saving to: ‘./data/imagenet_class_index.json’
 
 ./data/imagenet_cla 100%[===================&gt;]  34.53K  --.-KB/s    in 0.07s
 
-2021-10-26 00:13:39 (486 KB/s) - ‘./data/imagenet_class_index.json’ saved [35363/35363]
+2022-01-14 07:30:51 (480 KB/s) - ‘./data/imagenet_class_index.json’ saved [35363/35363]
 
 </pre>
             </div>
@@ -1487,6 +1515,9 @@ Saving to: ‘./data/imagenet_class_index.json’
             <div class="highlight">
              <pre>
 <span></span>from PIL import Image
+# # The two lines below are an attempt to circumvent an `OSError: broken data stream when reading image file` issue
+# from PIL import Image, ImageFile
+# ImageFile.LOAD_TRUNCATED_IMAGES = True
 from torchvision import transforms
 import matplotlib.pyplot as plt
 
@@ -1622,10 +1653,10 @@ def predict(img_path, model):
            <div class="output_area docutils container">
             <div class="highlight">
              <pre>
-./data/img0.JPG - Predicted: ['n02110185', 'Siberian_husky'], Probablility: 0.49787256121635437
-./data/img1.JPG - Predicted: ['n01820546', 'lorikeet'], Probablility: 0.6447006464004517
-./data/img2.JPG - Predicted: ['n02481823', 'chimpanzee'], Probablility: 0.9899842739105225
-./data/img3.JPG - Predicted: ['n01749939', 'green_mamba'], Probablility: 0.4564124643802643
+./data/img0.JPG - Predicted: ['n02110185', 'Siberian_husky'], Probablility: 0.49741318821907043
+./data/img1.JPG - Predicted: ['n01820546', 'lorikeet'], Probablility: 0.6437691450119019
+./data/img2.JPG - Predicted: ['n02481823', 'chimpanzee'], Probablility: 0.9899656772613525
+./data/img3.JPG - Predicted: ['n01749939', 'green_mamba'], Probablility: 0.45652177929878235
 </pre>
             </div>
            </div>
@@ -1719,19 +1750,19 @@ benchmark(model, input_shape=(128, 3, 224, 224), nruns=100)
              <pre>
 Warm up ...
 Start timing ...
-Iteration 10/100, ave batch time 109.12 ms
-Iteration 20/100, ave batch time 109.08 ms
-Iteration 30/100, ave batch time 109.10 ms
-Iteration 40/100, ave batch time 109.12 ms
-Iteration 50/100, ave batch time 109.11 ms
-Iteration 60/100, ave batch time 109.10 ms
-Iteration 70/100, ave batch time 109.10 ms
-Iteration 80/100, ave batch time 109.11 ms
-Iteration 90/100, ave batch time 109.13 ms
-Iteration 100/100, ave batch time 109.13 ms
+Iteration 10/100, ave batch time 77.89 ms
+Iteration 20/100, ave batch time 77.96 ms
+Iteration 30/100, ave batch time 77.97 ms
+Iteration 40/100, ave batch time 77.99 ms
+Iteration 50/100, ave batch time 78.00 ms
+Iteration 60/100, ave batch time 78.02 ms
+Iteration 70/100, ave batch time 78.03 ms
+Iteration 80/100, ave batch time 78.04 ms
+Iteration 90/100, ave batch time 78.06 ms
+Iteration 100/100, ave batch time 78.08 ms
 Input shape: torch.Size([128, 3, 224, 224])
 Output features size: torch.Size([128, 1000])
-Average batch time: 109.13 ms
+Average batch time: 78.08 ms
 </pre>
             </div>
            </div>
@@ -1843,19 +1874,19 @@ benchmark(traced_model, input_shape=(128, 3, 224, 224), nruns=100)
             <pre>
 Warm up ...
 Start timing ...
-Iteration 10/100, ave batch time 109.04 ms
-Iteration 20/100, ave batch time 109.04 ms
-Iteration 30/100, ave batch time 109.03 ms
-Iteration 40/100, ave batch time 109.05 ms
-Iteration 50/100, ave batch time 109.04 ms
-Iteration 60/100, ave batch time 109.04 ms
-Iteration 70/100, ave batch time 109.04 ms
-Iteration 80/100, ave batch time 109.04 ms
-Iteration 90/100, ave batch time 109.05 ms
-Iteration 100/100, ave batch time 109.06 ms
+Iteration 10/100, ave batch time 78.75 ms
+Iteration 20/100, ave batch time 78.78 ms
+Iteration 30/100, ave batch time 78.77 ms
+Iteration 40/100, ave batch time 78.79 ms
+Iteration 50/100, ave batch time 78.80 ms
+Iteration 60/100, ave batch time 78.81 ms
+Iteration 70/100, ave batch time 78.82 ms
+Iteration 80/100, ave batch time 78.82 ms
+Iteration 90/100, ave batch time 78.83 ms
+Iteration 100/100, ave batch time 78.84 ms
 Input shape: torch.Size([128, 3, 224, 224])
 Output features size: torch.Size([128, 1000])
-Average batch time: 109.06 ms
+Average batch time: 78.84 ms
 </pre>
            </div>
           </div>
@@ -1882,7 +1913,7 @@ Average batch time: 109.06 ms
           <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[18]:
+             <pre><span></span>[14]:
 </pre>
             </div>
            </div>
@@ -1910,10 +1941,7 @@ trt_model_fp32 = torch_tensorrt.compile(traced_model, **{
            <div class="output_area stderr docutils container">
             <div class="highlight">
              <pre>
-WARNING: [Torch-TensorRT TorchScript Conversion Context] - The logger passed into createInferBuilder differs from one already provided for an existing builder, runtime, or refitter. TensorRT maintains only a single logger pointer at any given time, so the existing value, which can be retrieved with getLogger(), will be used instead. In order to use a new logger, first destroy all existing builder, runner or refitter objects.
-
 WARNING: [Torch-TensorRT] - Dilation not used in Max pooling converter
-WARNING: [Torch-TensorRT] - Detected invalid timing cache, setup a local cache instead
 </pre>
             </div>
            </div>
@@ -1921,7 +1949,7 @@ WARNING: [Torch-TensorRT] - Detected invalid timing cache, setup a local cache i
           <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[19]:
+             <pre><span></span>[15]:
 </pre>
             </div>
            </div>
@@ -1942,19 +1970,19 @@ benchmark(trt_model_fp32, input_shape=(128, 3, 224, 224), nruns=100)
              <pre>
 Warm up ...
 Start timing ...
-Iteration 10/100, ave batch time 93.58 ms
-Iteration 20/100, ave batch time 85.57 ms
-Iteration 30/100, ave batch time 92.02 ms
-Iteration 40/100, ave batch time 89.07 ms
-Iteration 50/100, ave batch time 86.80 ms
-Iteration 60/100, ave batch time 89.88 ms
-Iteration 70/100, ave batch time 88.58 ms
-Iteration 80/100, ave batch time 87.30 ms
-Iteration 90/100, ave batch time 86.28 ms
-Iteration 100/100, ave batch time 88.27 ms
+Iteration 10/100, ave batch time 35.62 ms
+Iteration 20/100, ave batch time 35.34 ms
+Iteration 30/100, ave batch time 35.25 ms
+Iteration 40/100, ave batch time 35.30 ms
+Iteration 50/100, ave batch time 35.25 ms
+Iteration 60/100, ave batch time 35.23 ms
+Iteration 70/100, ave batch time 35.25 ms
+Iteration 80/100, ave batch time 35.24 ms
+Iteration 90/100, ave batch time 35.23 ms
+Iteration 100/100, ave batch time 35.24 ms
 Input shape: torch.Size([128, 3, 224, 224])
 Output features size: torch.Size([128, 1000])
-Average batch time: 88.27 ms
+Average batch time: 35.24 ms
 </pre>
             </div>
            </div>
@@ -1970,7 +1998,7 @@ Average batch time: 88.27 ms
           <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[21]:
+             <pre><span></span>[16]:
 </pre>
             </div>
            </div>
@@ -2004,10 +2032,7 @@ compatibility with PyTorch's data type convention is required.
 If you do indeed see errors at runtime either:
 - Remove the dtype spec for x.1
 - Disable partial compilation by setting require_full_compilation to True
-WARNING: [Torch-TensorRT TorchScript Conversion Context] - The logger passed into createInferBuilder differs from one already provided for an existing builder, runtime, or refitter. TensorRT maintains only a single logger pointer at any given time, so the existing value, which can be retrieved with getLogger(), will be used instead. In order to use a new logger, first destroy all existing builder, runner or refitter objects.
-
 WARNING: [Torch-TensorRT] - Dilation not used in Max pooling converter
-WARNING: [Torch-TensorRT] - Detected invalid timing cache, setup a local cache instead
 </pre>
             </div>
            </div>
@@ -2015,7 +2040,7 @@ WARNING: [Torch-TensorRT] - Detected invalid timing cache, setup a local cache i
           <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[23]:
+             <pre><span></span>[17]:
 </pre>
             </div>
            </div>
@@ -2036,19 +2061,19 @@ benchmark(trt_model, input_shape=(128, 3, 224, 224), dtype='fp16', nruns=100)
              <pre>
 Warm up ...
 Start timing ...
-Iteration 10/100, ave batch time 18.76 ms
-Iteration 20/100, ave batch time 18.85 ms
-Iteration 30/100, ave batch time 18.93 ms
-Iteration 40/100, ave batch time 18.96 ms
-Iteration 50/100, ave batch time 18.92 ms
-Iteration 60/100, ave batch time 18.94 ms
-Iteration 70/100, ave batch time 18.98 ms
-Iteration 80/100, ave batch time 18.97 ms
-Iteration 90/100, ave batch time 19.08 ms
-Iteration 100/100, ave batch time 22.90 ms
+Iteration 10/100, ave batch time 18.56 ms
+Iteration 20/100, ave batch time 18.43 ms
+Iteration 30/100, ave batch time 18.40 ms
+Iteration 40/100, ave batch time 18.40 ms
+Iteration 50/100, ave batch time 18.38 ms
+Iteration 60/100, ave batch time 18.41 ms
+Iteration 70/100, ave batch time 18.42 ms
+Iteration 80/100, ave batch time 18.42 ms
+Iteration 90/100, ave batch time 18.41 ms
+Iteration 100/100, ave batch time 18.41 ms
 Input shape: torch.Size([128, 3, 224, 224])
 Output features size: torch.Size([128, 1000])
-Average batch time: 22.90 ms
+Average batch time: 18.41 ms
 </pre>
             </div>
            </div>
