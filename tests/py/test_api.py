@@ -485,6 +485,19 @@ class TestInput(unittest.TestCase):
         i = torchtrt.Input(min_shape=tensor_shape(min_shape), opt_shape=tensor_shape(opt_shape), max_shape=tensor_shape(max_shape))
         self.assertTrue(self._verify_correctness(i, target))
 
+
+class TestModule(unittest.TestCase):
+
+    def test_module_type(self):
+        nn_module = models.alexnet(pretrained=True).eval().to("cuda")
+        ts_module = torch.jit.trace(nn_module, torch.ones([1, 3, 224, 224]).to("cuda"))
+        fx_module = torch.fx.symbolic_trace(nn_module)
+
+        self.assertEqual(torchtrt._compile._parse_module_type(nn_module), torchtrt._compile._ModuleType.nn)
+        self.assertEqual(torchtrt._compile._parse_module_type(ts_module), torchtrt._compile._ModuleType.ts)
+        self.assertEqual(torchtrt._compile._parse_module_type(fx_module), torchtrt._compile._ModuleType.fx)
+
+
 def test_suite():
     suite = unittest.TestSuite()
     suite.addTest(unittest.makeSuite(TestLoggingAPIs))
@@ -505,6 +518,7 @@ def test_suite():
     suite.addTest(unittest.makeSuite(TestCheckMethodOpSupport))
     suite.addTest(unittest.makeSuite(TestDevice))
     suite.addTest(unittest.makeSuite(TestInput))
+    suite.addTest(unittest.makeSuite(TestModule))
 
     return suite
 
