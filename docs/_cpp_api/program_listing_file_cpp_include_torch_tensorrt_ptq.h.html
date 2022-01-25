@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -38,8 +39,8 @@
   <title>
    Program Listing for File ptq.h — Torch-TensorRT master documentation
   </title>
-  <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/pygments.css" rel="stylesheet" type="text/css"/>
+  <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/collapsible-lists/css/tree_view.css" rel="stylesheet" type="text/css"/>
   <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js">
   </script>
@@ -49,18 +50,11 @@
   </script>
   <script src="../_static/doctools.js">
   </script>
-  <script src="../_static/language_data.js">
-  </script>
   <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js">
   </script>
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
-  </script>
-  <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.7/latest.js?config=TeX-AMS-MML_HTMLorMML">
-  </script>
-  <script type="text/x-mathjax-config">
-   MathJax.Hub.Config({"tex2jax": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true, "ignoreClass": "document", "processClass": "math|output_area"}})
   </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
@@ -321,6 +315,11 @@
            </a>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="../_notebooks/EfficientNet-example.html">
+            Torch-TensorRT Getting Started - EfficientNet-B0
+           </a>
+          </li>
+          <li class="md-nav__item">
            <span class="md-nav__link caption">
             <span class="caption-text">
              Python API Documenation
@@ -340,16 +339,6 @@
           <li class="md-nav__item">
            <a class="md-nav__link" href="../py_api/ptq.html">
             torch_tensorrt.ptq
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/ptq.html#classes">
-            Classes
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/ptq.html#enums">
-            Enums
            </a>
           </li>
           <li class="md-nav__item">
@@ -447,211 +436,213 @@
      </div>
      <div class="md-content">
       <article class="md-content__inner md-typeset" role="main">
-       <span id="program-listing-file-cpp-include-torch-tensorrt-ptq-h">
-       </span>
-       <h1 id="cpp-api-program-listing-file-cpp-include-torch-tensorrt-ptq-h--page-root">
-        Program Listing for File ptq.h
-        <a class="headerlink" href="#cpp-api-program-listing-file-cpp-include-torch-tensorrt-ptq-h--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <p>
-        ↰
-        <a class="reference internal" href="file_cpp_include_torch_tensorrt_ptq.h.html#file-cpp-include-torch-tensorrt-ptq-h">
-         <span class="std std-ref">
-          Return to documentation for file
-         </span>
-        </a>
-        (
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          cpp/include/torch_tensorrt/ptq.h
-         </span>
-        </code>
-        )
-       </p>
-       <div class="highlight-cpp notranslate">
-        <div class="highlight">
-         <pre><span></span><span class="cm">/*</span>
+       <section id="program-listing-for-file-ptq-h">
+        <span id="program-listing-file-cpp-include-torch-tensorrt-ptq-h">
+        </span>
+        <h1 id="cpp-api-program-listing-file-cpp-include-torch-tensorrt-ptq-h--page-root">
+         Program Listing for File ptq.h
+         <a class="headerlink" href="#cpp-api-program-listing-file-cpp-include-torch-tensorrt-ptq-h--page-root" title="Permalink to this headline">
+          ¶
+         </a>
+        </h1>
+        <p>
+         ↰
+         <a class="reference internal" href="file_cpp_include_torch_tensorrt_ptq.h.html#file-cpp-include-torch-tensorrt-ptq-h">
+          <span class="std std-ref">
+           Return to documentation for file
+          </span>
+         </a>
+         (
+         <code class="docutils literal notranslate">
+          <span class="pre">
+           cpp/include/torch_tensorrt/ptq.h
+          </span>
+         </code>
+         )
+        </p>
+        <div class="highlight-cpp notranslate">
+         <div class="highlight">
+          <pre><span></span><span class="cm">/*</span>
 <span class="cm"> * Copyright (c) NVIDIA Corporation.</span>
 <span class="cm"> * All rights reserved.</span>
 <span class="cm"> *</span>
 <span class="cm"> * This library is licensed under the BSD-style license found in the</span>
 <span class="cm"> * LICENSE file in the root directory of this source tree.</span>
-<span class="cm"> */</span>
+<span class="cm"> */</span><span class="w"></span>
 <span class="cp">#pragma once</span>
 
-<span class="cp">#include</span> <span class="cpf">&lt;fstream&gt;</span><span class="cp"></span>
-<span class="cp">#include</span> <span class="cpf">&lt;iostream&gt;</span><span class="cp"></span>
-<span class="cp">#include</span> <span class="cpf">&lt;iterator&gt;</span><span class="cp"></span>
-<span class="cp">#include</span> <span class="cpf">&lt;memory&gt;</span><span class="cp"></span>
-<span class="cp">#include</span> <span class="cpf">&lt;sstream&gt;</span><span class="cp"></span>
-<span class="cp">#include</span> <span class="cpf">&lt;string&gt;</span><span class="cp"></span>
-<span class="cp">#include</span> <span class="cpf">&lt;vector&gt;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;fstream&gt;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iostream&gt;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;iterator&gt;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;memory&gt;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;sstream&gt;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;string&gt;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;vector&gt;</span><span class="cp"></span>
 
-<span class="cp">#include</span> <span class="cpf">"NvInfer.h"</span><span class="cp"></span>
-<span class="cp">#include</span> <span class="cpf">"torch/torch.h"</span><span class="cp"></span>
-<span class="cp">#include</span> <span class="cpf">"torch_tensorrt/logging.h"</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"NvInfer.h"</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch/torch.h"</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch_tensorrt/logging.h"</span><span class="cp"></span>
 
 <span class="cp">#ifndef DOXYGEN_SHOULD_SKIP_THIS</span>
-<span class="k">namespace</span> <span class="n">nvinfer1</span> <span class="p">{</span>
-<span class="k">class</span> <span class="nc">IInt8Calibrator</span><span class="p">;</span>
-<span class="k">class</span> <span class="nc">IInt8EntropyCalibrator2</span><span class="p">;</span>
-<span class="p">}</span> <span class="c1">// namespace nvinfer1</span>
+<span class="k">namespace</span><span class="w"> </span><span class="nn">nvinfer1</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="k">class</span> <span class="nc">IInt8Calibrator</span><span class="p">;</span><span class="w"></span>
+<span class="k">class</span> <span class="nc">IInt8EntropyCalibrator2</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"> </span><span class="c1">// namespace nvinfer1</span>
 
-<span class="k">namespace</span> <span class="n">torch_tensorrt</span> <span class="p">{</span>
-<span class="k">namespace</span> <span class="n">ptq</span> <span class="p">{</span>
-<span class="kt">bool</span> <span class="n">get_batch_impl</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span> <span class="n">bindings</span><span class="p">[],</span> <span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <span class="n">names</span><span class="p">[],</span> <span class="kt">int</span> <span class="n">nbBindings</span><span class="p">,</span> <span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span><span class="o">&amp;</span> <span class="n">data</span><span class="p">);</span>
-<span class="p">}</span>
-<span class="p">}</span> <span class="c1">// namespace torch_tensorrt</span>
+<span class="k">namespace</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="k">namespace</span><span class="w"> </span><span class="nn">ptq</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="kt">bool</span><span class="w"> </span><span class="nf">get_batch_impl</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">bindings</span><span class="p">[],</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">names</span><span class="p">[],</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">nbBindings</span><span class="p">,</span><span class="w"> </span><span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span><span class="o">&amp;</span><span class="w"> </span><span class="n">data</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"> </span><span class="c1">// namespace torch_tensorrt</span>
 <span class="cp">#endif </span><span class="c1">// DOXYGEN_SHOULD_SKIP_THIS</span>
 
-<span class="k">namespace</span> <span class="n">torch_tensorrt</span> <span class="p">{</span>
-<span class="k">namespace</span> <span class="n">ptq</span> <span class="p">{</span>
+<span class="k">namespace</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="k">namespace</span><span class="w"> </span><span class="nn">ptq</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
 
-<span class="k">template</span> <span class="o">&lt;</span><span class="k">typename</span> <span class="n">Algorithm</span><span class="p">,</span> <span class="k">typename</span> <span class="n">DataLoaderUniquePtr</span><span class="o">&gt;</span>
-<span class="k">class</span> <span class="nc">Int8Calibrator</span> <span class="o">:</span> <span class="n">Algorithm</span> <span class="p">{</span>
-  <span class="k">using</span> <span class="n">DataLoader</span> <span class="o">=</span> <span class="k">typename</span> <span class="n">DataLoaderUniquePtr</span><span class="o">::</span><span class="n">element_type</span><span class="p">;</span>
-  <span class="k">using</span> <span class="n">Batch</span> <span class="o">=</span> <span class="k">typename</span> <span class="n">DataLoader</span><span class="o">::</span><span class="n">super</span><span class="o">::</span><span class="n">BatchType</span><span class="p">;</span>
+<span class="k">template</span><span class="w"> </span><span class="o">&lt;</span><span class="k">typename</span> <span class="nc">Algorithm</span><span class="p">,</span><span class="w"> </span><span class="k">typename</span> <span class="nc">DataLoaderUniquePtr</span><span class="o">&gt;</span><span class="w"></span>
+<span class="k">class</span> <span class="nc">Int8Calibrator</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Algorithm</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="k">using</span><span class="w"> </span><span class="n">DataLoader</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">typename</span> <span class="nc">DataLoaderUniquePtr</span><span class="o">::</span><span class="n">element_type</span><span class="p">;</span><span class="w"></span>
+<span class="w">  </span><span class="k">using</span><span class="w"> </span><span class="n">Batch</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">typename</span> <span class="nc">DataLoader</span><span class="o">::</span><span class="n">super</span><span class="o">::</span><span class="n">BatchType</span><span class="p">;</span><span class="w"></span>
 
- <span class="k">public</span><span class="o">:</span>
-  <span class="n">Int8Calibrator</span><span class="p">(</span><span class="n">DataLoaderUniquePtr</span> <span class="n">dataloader</span><span class="p">,</span> <span class="k">const</span> <span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span> <span class="n">cache_file_path</span><span class="p">,</span> <span class="kt">bool</span> <span class="n">use_cache</span><span class="p">)</span>
-      <span class="o">:</span> <span class="n">dataloader_</span><span class="p">(</span><span class="n">dataloader</span><span class="p">.</span><span class="n">get</span><span class="p">()),</span> <span class="n">cache_file_path_</span><span class="p">(</span><span class="n">cache_file_path</span><span class="p">),</span> <span class="n">use_cache_</span><span class="p">(</span><span class="n">use_cache</span><span class="p">)</span> <span class="p">{</span>
-    <span class="k">for</span> <span class="p">(</span><span class="k">auto</span> <span class="nl">batch</span> <span class="p">:</span> <span class="o">*</span><span class="n">dataloader_</span><span class="p">)</span> <span class="p">{</span>
-      <span class="n">batched_data_</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">batch</span><span class="p">.</span><span class="n">data</span><span class="p">);</span>
-    <span class="p">}</span>
-    <span class="n">it_</span> <span class="o">=</span> <span class="n">batched_data_</span><span class="p">.</span><span class="n">begin</span><span class="p">();</span>
-  <span class="p">}</span>
+<span class="w"> </span><span class="k">public</span><span class="o">:</span><span class="w"></span>
+<span class="w">  </span><span class="n">Int8Calibrator</span><span class="p">(</span><span class="n">DataLoaderUniquePtr</span><span class="w"> </span><span class="n">dataloader</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span><span class="w"> </span><span class="n">cache_file_path</span><span class="p">,</span><span class="w"> </span><span class="kt">bool</span><span class="w"> </span><span class="n">use_cache</span><span class="p">)</span><span class="w"></span>
+<span class="w">      </span><span class="o">:</span><span class="w"> </span><span class="n">dataloader_</span><span class="p">(</span><span class="n">dataloader</span><span class="p">.</span><span class="n">get</span><span class="p">()),</span><span class="w"> </span><span class="n">cache_file_path_</span><span class="p">(</span><span class="n">cache_file_path</span><span class="p">),</span><span class="w"> </span><span class="n">use_cache_</span><span class="p">(</span><span class="n">use_cache</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">auto</span><span class="w"> </span><span class="nl">batch</span> <span class="p">:</span><span class="w"> </span><span class="o">*</span><span class="n">dataloader_</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="n">batched_data_</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">batch</span><span class="p">.</span><span class="n">data</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="n">it_</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">batched_data_</span><span class="p">.</span><span class="n">begin</span><span class="p">();</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
 
-  <span class="kt">int</span> <span class="n">getBatchSize</span><span class="p">()</span> <span class="k">const</span> <span class="k">noexcept</span> <span class="k">override</span> <span class="p">{</span>
-    <span class="c1">// HACK: Torch-TensorRT only uses explict batch sizing, INT8 Calibrator does not</span>
-    <span class="c1">// work when reporting the batch size here and having explicity batching.</span>
-    <span class="c1">// So we just report batch size 1 (warnings will still be printed out).</span>
-    <span class="k">return</span> <span class="mi">1</span><span class="p">;</span>
-    <span class="c1">// return static_cast&lt;int&gt;(dataloader_-&gt;options().batch_size);</span>
-  <span class="p">}</span>
+<span class="w">  </span><span class="kt">int</span><span class="w"> </span><span class="n">getBatchSize</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">noexcept</span><span class="w"> </span><span class="k">override</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="c1">// HACK: Torch-TensorRT only uses explict batch sizing, INT8 Calibrator does not</span>
+<span class="w">    </span><span class="c1">// work when reporting the batch size here and having explicity batching.</span>
+<span class="w">    </span><span class="c1">// So we just report batch size 1 (warnings will still be printed out).</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="c1">// return static_cast&lt;int&gt;(dataloader_-&gt;options().batch_size);</span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
 
-  <span class="kt">bool</span> <span class="n">getBatch</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span> <span class="n">bindings</span><span class="p">[],</span> <span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <span class="n">names</span><span class="p">[],</span> <span class="kt">int</span> <span class="n">nbBindings</span><span class="p">)</span> <span class="k">noexcept</span> <span class="k">override</span> <span class="p">{</span>
-    <span class="k">if</span> <span class="p">(</span><span class="n">it_</span> <span class="o">!=</span> <span class="n">batched_data_</span><span class="p">.</span><span class="n">end</span><span class="p">())</span> <span class="p">{</span>
-      <span class="k">auto</span> <span class="n">status</span> <span class="o">=</span> <span class="n">get_batch_impl</span><span class="p">(</span><span class="n">bindings</span><span class="p">,</span> <span class="n">names</span><span class="p">,</span> <span class="n">nbBindings</span><span class="p">,</span> <span class="o">*</span><span class="n">it_</span><span class="p">);</span>
-      <span class="n">it_</span> <span class="o">=</span> <span class="o">++</span><span class="n">it_</span><span class="p">;</span>
-      <span class="k">return</span> <span class="n">status</span><span class="p">;</span>
-    <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
-      <span class="c1">// Reset iterator if incase calibrator is going to be used again</span>
-      <span class="n">it_</span> <span class="o">=</span> <span class="n">batched_data_</span><span class="p">.</span><span class="n">begin</span><span class="p">();</span>
-      <span class="k">return</span> <span class="nb">false</span><span class="p">;</span>
-    <span class="p">}</span>
-  <span class="p">}</span>
+<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">getBatch</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">bindings</span><span class="p">[],</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">names</span><span class="p">[],</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">nbBindings</span><span class="p">)</span><span class="w"> </span><span class="k">noexcept</span><span class="w"> </span><span class="k">override</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">it_</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">batched_data_</span><span class="p">.</span><span class="n">end</span><span class="p">())</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="k">auto</span><span class="w"> </span><span class="n">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">get_batch_impl</span><span class="p">(</span><span class="n">bindings</span><span class="p">,</span><span class="w"> </span><span class="n">names</span><span class="p">,</span><span class="w"> </span><span class="n">nbBindings</span><span class="p">,</span><span class="w"> </span><span class="o">*</span><span class="n">it_</span><span class="p">);</span><span class="w"></span>
+<span class="w">      </span><span class="n">it_</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">++</span><span class="n">it_</span><span class="p">;</span><span class="w"></span>
+<span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="n">status</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="c1">// Reset iterator if incase calibrator is going to be used again</span>
+<span class="w">      </span><span class="n">it_</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">batched_data_</span><span class="p">.</span><span class="n">begin</span><span class="p">();</span><span class="w"></span>
+<span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
 
-  <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">readCalibrationCache</span><span class="p">(</span><span class="kt">size_t</span><span class="o">&amp;</span> <span class="n">length</span><span class="p">)</span> <span class="k">noexcept</span> <span class="k">override</span> <span class="p">{</span>
-    <span class="k">if</span> <span class="p">(</span><span class="n">use_cache_</span><span class="p">)</span> <span class="p">{</span>
-      <span class="n">std</span><span class="o">::</span><span class="n">stringstream</span> <span class="n">ss</span><span class="p">;</span>
-      <span class="n">ss</span> <span class="o">&lt;&lt;</span> <span class="s">"Reading Calibration Cache from "</span> <span class="o">&lt;&lt;</span> <span class="n">cache_file_path_</span><span class="p">;</span>
-      <span class="n">logging</span><span class="o">::</span><span class="n">log</span><span class="p">(</span><span class="n">logging</span><span class="o">::</span><span class="n">Level</span><span class="o">::</span><span class="n">kINFO</span><span class="p">,</span> <span class="n">ss</span><span class="p">.</span><span class="n">str</span><span class="p">());</span>
+<span class="w">  </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">readCalibrationCache</span><span class="p">(</span><span class="kt">size_t</span><span class="o">&amp;</span><span class="w"> </span><span class="n">length</span><span class="p">)</span><span class="w"> </span><span class="k">noexcept</span><span class="w"> </span><span class="k">override</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">use_cache_</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">stringstream</span><span class="w"> </span><span class="n">ss</span><span class="p">;</span><span class="w"></span>
+<span class="w">      </span><span class="n">ss</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"Reading Calibration Cache from "</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">cache_file_path_</span><span class="p">;</span><span class="w"></span>
+<span class="w">      </span><span class="n">logging</span><span class="o">::</span><span class="n">log</span><span class="p">(</span><span class="n">logging</span><span class="o">::</span><span class="n">Level</span><span class="o">::</span><span class="n">kINFO</span><span class="p">,</span><span class="w"> </span><span class="n">ss</span><span class="p">.</span><span class="n">str</span><span class="p">());</span><span class="w"></span>
 
-      <span class="n">cache_</span><span class="p">.</span><span class="n">clear</span><span class="p">();</span>
-      <span class="n">std</span><span class="o">::</span><span class="n">ifstream</span> <span class="n">input</span><span class="p">(</span><span class="n">cache_file_path_</span><span class="p">,</span> <span class="n">std</span><span class="o">::</span><span class="n">ios</span><span class="o">::</span><span class="n">binary</span><span class="p">);</span>
-      <span class="n">input</span> <span class="o">&gt;&gt;</span> <span class="n">std</span><span class="o">::</span><span class="n">noskipws</span><span class="p">;</span>
-      <span class="k">if</span> <span class="p">(</span><span class="n">input</span><span class="p">.</span><span class="n">good</span><span class="p">())</span> <span class="p">{</span>
-        <span class="n">std</span><span class="o">::</span><span class="n">copy</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">istream_iterator</span><span class="o">&lt;</span><span class="kt">char</span><span class="o">&gt;</span><span class="p">(</span><span class="n">input</span><span class="p">),</span> <span class="n">std</span><span class="o">::</span><span class="n">istream_iterator</span><span class="o">&lt;</span><span class="kt">char</span><span class="o">&gt;</span><span class="p">(),</span> <span class="n">std</span><span class="o">::</span><span class="n">back_inserter</span><span class="p">(</span><span class="n">cache_</span><span class="p">));</span>
-        <span class="n">logging</span><span class="o">::</span><span class="n">log</span><span class="p">(</span><span class="n">logging</span><span class="o">::</span><span class="n">Level</span><span class="o">::</span><span class="n">kDEBUG</span><span class="p">,</span> <span class="s">"Cache read"</span><span class="p">);</span>
-      <span class="p">}</span>
-      <span class="n">length</span> <span class="o">=</span> <span class="n">cache_</span><span class="p">.</span><span class="n">size</span><span class="p">();</span>
-      <span class="k">return</span> <span class="n">length</span> <span class="o">?</span> <span class="n">cache_</span><span class="p">.</span><span class="n">data</span><span class="p">()</span> <span class="o">:</span> <span class="k">nullptr</span><span class="p">;</span>
-    <span class="p">}</span>
-    <span class="k">return</span> <span class="k">nullptr</span><span class="p">;</span>
-  <span class="p">}</span>
+<span class="w">      </span><span class="n">cache_</span><span class="p">.</span><span class="n">clear</span><span class="p">();</span><span class="w"></span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">ifstream</span><span class="w"> </span><span class="nf">input</span><span class="p">(</span><span class="n">cache_file_path_</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">ios</span><span class="o">::</span><span class="n">binary</span><span class="p">);</span><span class="w"></span>
+<span class="w">      </span><span class="n">input</span><span class="w"> </span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">noskipws</span><span class="p">;</span><span class="w"></span>
+<span class="w">      </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">input</span><span class="p">.</span><span class="n">good</span><span class="p">())</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">std</span><span class="o">::</span><span class="n">copy</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">istream_iterator</span><span class="o">&lt;</span><span class="kt">char</span><span class="o">&gt;</span><span class="p">(</span><span class="n">input</span><span class="p">),</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">istream_iterator</span><span class="o">&lt;</span><span class="kt">char</span><span class="o">&gt;</span><span class="p">(),</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">back_inserter</span><span class="p">(</span><span class="n">cache_</span><span class="p">));</span><span class="w"></span>
+<span class="w">        </span><span class="n">logging</span><span class="o">::</span><span class="n">log</span><span class="p">(</span><span class="n">logging</span><span class="o">::</span><span class="n">Level</span><span class="o">::</span><span class="n">kDEBUG</span><span class="p">,</span><span class="w"> </span><span class="s">"Cache read"</span><span class="p">);</span><span class="w"></span>
+<span class="w">      </span><span class="p">}</span><span class="w"></span>
+<span class="w">      </span><span class="n">length</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cache_</span><span class="p">.</span><span class="n">size</span><span class="p">();</span><span class="w"></span>
+<span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="n">length</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">cache_</span><span class="p">.</span><span class="n">data</span><span class="p">()</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">nullptr</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="k">nullptr</span><span class="p">;</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
 
-  <span class="kt">void</span> <span class="n">writeCalibrationCache</span><span class="p">(</span><span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">cache</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">length</span><span class="p">)</span> <span class="k">noexcept</span> <span class="k">override</span> <span class="p">{</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">ofstream</span> <span class="n">cache_file</span><span class="p">(</span><span class="n">cache_file_path_</span><span class="p">,</span> <span class="n">std</span><span class="o">::</span><span class="n">ios</span><span class="o">::</span><span class="n">binary</span><span class="p">);</span>
-    <span class="n">cache_file</span><span class="p">.</span><span class="n">write</span><span class="p">(</span><span class="k">reinterpret_cast</span><span class="o">&lt;</span><span class="k">const</span> <span class="kt">char</span><span class="o">*&gt;</span><span class="p">(</span><span class="n">cache</span><span class="p">),</span> <span class="n">length</span><span class="p">);</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">stringstream</span> <span class="n">ss</span><span class="p">;</span>
-    <span class="n">ss</span> <span class="o">&lt;&lt;</span> <span class="s">"Saved Calibration Cache to "</span> <span class="o">&lt;&lt;</span> <span class="n">cache_file_path_</span><span class="p">;</span>
-    <span class="n">logging</span><span class="o">::</span><span class="n">log</span><span class="p">(</span><span class="n">logging</span><span class="o">::</span><span class="n">Level</span><span class="o">::</span><span class="n">kINFO</span><span class="p">,</span> <span class="n">ss</span><span class="p">.</span><span class="n">str</span><span class="p">());</span>
-  <span class="p">}</span>
+<span class="w">  </span><span class="kt">void</span><span class="w"> </span><span class="n">writeCalibrationCache</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">cache</span><span class="p">,</span><span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="n">length</span><span class="p">)</span><span class="w"> </span><span class="k">noexcept</span><span class="w"> </span><span class="k">override</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">ofstream</span><span class="w"> </span><span class="nf">cache_file</span><span class="p">(</span><span class="n">cache_file_path_</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">ios</span><span class="o">::</span><span class="n">binary</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">cache_file</span><span class="p">.</span><span class="n">write</span><span class="p">(</span><span class="k">reinterpret_cast</span><span class="o">&lt;</span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*&gt;</span><span class="p">(</span><span class="n">cache</span><span class="p">),</span><span class="w"> </span><span class="n">length</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">stringstream</span><span class="w"> </span><span class="n">ss</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">ss</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"Saved Calibration Cache to "</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">cache_file_path_</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">logging</span><span class="o">::</span><span class="n">log</span><span class="p">(</span><span class="n">logging</span><span class="o">::</span><span class="n">Level</span><span class="o">::</span><span class="n">kINFO</span><span class="p">,</span><span class="w"> </span><span class="n">ss</span><span class="p">.</span><span class="n">str</span><span class="p">());</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
 
-  <span class="k">operator</span> <span class="n">nvinfer1</span><span class="o">::</span><span class="n">IInt8Calibrator</span><span class="o">*</span><span class="p">()</span> <span class="p">{</span>
-    <span class="k">return</span> <span class="k">reinterpret_cast</span><span class="o">&lt;</span><span class="n">nvinfer1</span><span class="o">::</span><span class="n">IInt8Calibrator</span><span class="o">*&gt;</span><span class="p">(</span><span class="k">this</span><span class="p">);</span>
-  <span class="p">}</span>
+<span class="w">  </span><span class="k">operator</span><span class="w"> </span><span class="n">nvinfer1</span><span class="o">::</span><span class="n">IInt8Calibrator</span><span class="o">*</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="k">reinterpret_cast</span><span class="o">&lt;</span><span class="n">nvinfer1</span><span class="o">::</span><span class="n">IInt8Calibrator</span><span class="o">*&gt;</span><span class="p">(</span><span class="k">this</span><span class="p">);</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
 
- <span class="k">private</span><span class="o">:</span>
-  <span class="n">DataLoader</span><span class="o">*</span> <span class="n">dataloader_</span><span class="p">;</span>
-  <span class="k">const</span> <span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span> <span class="n">cache_file_path_</span><span class="p">;</span>
-  <span class="kt">size_t</span> <span class="n">cache_size_</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
-  <span class="kt">bool</span> <span class="n">use_cache_</span><span class="p">;</span>
-  <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">char</span><span class="o">&gt;</span> <span class="n">cache_</span><span class="p">;</span>
-  <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span><span class="o">&gt;</span> <span class="n">batched_data_</span><span class="p">;</span>
-  <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span><span class="o">&gt;::</span><span class="n">iterator</span> <span class="n">it_</span><span class="p">;</span>
-<span class="p">};</span>
+<span class="w"> </span><span class="k">private</span><span class="o">:</span><span class="w"></span>
+<span class="w">  </span><span class="n">DataLoader</span><span class="o">*</span><span class="w"> </span><span class="n">dataloader_</span><span class="p">;</span><span class="w"></span>
+<span class="w">  </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span><span class="w"> </span><span class="n">cache_file_path_</span><span class="p">;</span><span class="w"></span>
+<span class="w">  </span><span class="kt">size_t</span><span class="w"> </span><span class="n">cache_size_</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">use_cache_</span><span class="p">;</span><span class="w"></span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">char</span><span class="o">&gt;</span><span class="w"> </span><span class="n">cache_</span><span class="p">;</span><span class="w"></span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span><span class="o">&gt;</span><span class="w"> </span><span class="n">batched_data_</span><span class="p">;</span><span class="w"></span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">torch</span><span class="o">::</span><span class="n">Tensor</span><span class="o">&gt;::</span><span class="n">iterator</span><span class="w"> </span><span class="n">it_</span><span class="p">;</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
 
-<span class="k">template</span> <span class="o">&lt;</span><span class="k">typename</span> <span class="n">Algorithm</span><span class="o">&gt;</span>
-<span class="k">class</span> <span class="nc">Int8CacheCalibrator</span> <span class="o">:</span> <span class="n">Algorithm</span> <span class="p">{</span>
- <span class="k">public</span><span class="o">:</span>
-  <span class="n">Int8CacheCalibrator</span><span class="p">(</span><span class="k">const</span> <span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span> <span class="n">cache_file_path</span><span class="p">)</span> <span class="o">:</span> <span class="n">cache_file_path_</span><span class="p">(</span><span class="n">cache_file_path</span><span class="p">)</span> <span class="p">{}</span>
+<span class="k">template</span><span class="w"> </span><span class="o">&lt;</span><span class="k">typename</span> <span class="nc">Algorithm</span><span class="o">&gt;</span><span class="w"></span>
+<span class="k">class</span> <span class="nc">Int8CacheCalibrator</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">Algorithm</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w"> </span><span class="k">public</span><span class="o">:</span><span class="w"></span>
+<span class="w">  </span><span class="n">Int8CacheCalibrator</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span><span class="w"> </span><span class="n">cache_file_path</span><span class="p">)</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">cache_file_path_</span><span class="p">(</span><span class="n">cache_file_path</span><span class="p">)</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
 
-  <span class="kt">int</span> <span class="n">getBatchSize</span><span class="p">()</span> <span class="k">const</span> <span class="k">noexcept</span> <span class="k">override</span> <span class="p">{</span>
-    <span class="c1">// HACK: Torch-TensorRT only uses explict batch sizing, INT8 Calibrator does not</span>
-    <span class="c1">// work when reporting the batch size here and having explicity batching.</span>
-    <span class="c1">// So we just report batch size 1 (warnings will still be printed out).</span>
-    <span class="k">return</span> <span class="mi">1</span><span class="p">;</span>
-  <span class="p">}</span>
+<span class="w">  </span><span class="kt">int</span><span class="w"> </span><span class="n">getBatchSize</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">noexcept</span><span class="w"> </span><span class="k">override</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="c1">// HACK: Torch-TensorRT only uses explict batch sizing, INT8 Calibrator does not</span>
+<span class="w">    </span><span class="c1">// work when reporting the batch size here and having explicity batching.</span>
+<span class="w">    </span><span class="c1">// So we just report batch size 1 (warnings will still be printed out).</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
 
-  <span class="kt">bool</span> <span class="n">getBatch</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span> <span class="n">bindings</span><span class="p">[],</span> <span class="k">const</span> <span class="kt">char</span><span class="o">*</span> <span class="n">names</span><span class="p">[],</span> <span class="kt">int</span> <span class="n">nbBindings</span><span class="p">)</span> <span class="k">noexcept</span> <span class="k">override</span> <span class="p">{</span>
-    <span class="k">return</span> <span class="nb">false</span><span class="p">;</span>
-  <span class="p">}</span>
+<span class="w">  </span><span class="kt">bool</span><span class="w"> </span><span class="n">getBatch</span><span class="p">(</span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">bindings</span><span class="p">[],</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">names</span><span class="p">[],</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">nbBindings</span><span class="p">)</span><span class="w"> </span><span class="k">noexcept</span><span class="w"> </span><span class="k">override</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nb">false</span><span class="p">;</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
 
-  <span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">readCalibrationCache</span><span class="p">(</span><span class="kt">size_t</span><span class="o">&amp;</span> <span class="n">length</span><span class="p">)</span> <span class="k">noexcept</span> <span class="k">override</span> <span class="p">{</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">stringstream</span> <span class="n">ss</span><span class="p">;</span>
-    <span class="n">ss</span> <span class="o">&lt;&lt;</span> <span class="s">"Reading Calibration Cache from "</span> <span class="o">&lt;&lt;</span> <span class="n">cache_file_path_</span><span class="p">;</span>
-    <span class="n">logging</span><span class="o">::</span><span class="n">log</span><span class="p">(</span><span class="n">logging</span><span class="o">::</span><span class="n">Level</span><span class="o">::</span><span class="n">kINFO</span><span class="p">,</span> <span class="n">ss</span><span class="p">.</span><span class="n">str</span><span class="p">());</span>
+<span class="w">  </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">readCalibrationCache</span><span class="p">(</span><span class="kt">size_t</span><span class="o">&amp;</span><span class="w"> </span><span class="n">length</span><span class="p">)</span><span class="w"> </span><span class="k">noexcept</span><span class="w"> </span><span class="k">override</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">stringstream</span><span class="w"> </span><span class="n">ss</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">ss</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"Reading Calibration Cache from "</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">cache_file_path_</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">logging</span><span class="o">::</span><span class="n">log</span><span class="p">(</span><span class="n">logging</span><span class="o">::</span><span class="n">Level</span><span class="o">::</span><span class="n">kINFO</span><span class="p">,</span><span class="w"> </span><span class="n">ss</span><span class="p">.</span><span class="n">str</span><span class="p">());</span><span class="w"></span>
 
-    <span class="n">cache_</span><span class="p">.</span><span class="n">clear</span><span class="p">();</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">ifstream</span> <span class="n">input</span><span class="p">(</span><span class="n">cache_file_path_</span><span class="p">,</span> <span class="n">std</span><span class="o">::</span><span class="n">ios</span><span class="o">::</span><span class="n">binary</span><span class="p">);</span>
-    <span class="n">input</span> <span class="o">&gt;&gt;</span> <span class="n">std</span><span class="o">::</span><span class="n">noskipws</span><span class="p">;</span>
-    <span class="k">if</span> <span class="p">(</span><span class="n">input</span><span class="p">.</span><span class="n">good</span><span class="p">())</span> <span class="p">{</span>
-      <span class="n">std</span><span class="o">::</span><span class="n">copy</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">istream_iterator</span><span class="o">&lt;</span><span class="kt">char</span><span class="o">&gt;</span><span class="p">(</span><span class="n">input</span><span class="p">),</span> <span class="n">std</span><span class="o">::</span><span class="n">istream_iterator</span><span class="o">&lt;</span><span class="kt">char</span><span class="o">&gt;</span><span class="p">(),</span> <span class="n">std</span><span class="o">::</span><span class="n">back_inserter</span><span class="p">(</span><span class="n">cache_</span><span class="p">));</span>
-      <span class="n">logging</span><span class="o">::</span><span class="n">log</span><span class="p">(</span><span class="n">logging</span><span class="o">::</span><span class="n">Level</span><span class="o">::</span><span class="n">kDEBUG</span><span class="p">,</span> <span class="s">"Cache read"</span><span class="p">);</span>
-    <span class="p">}</span>
-    <span class="n">length</span> <span class="o">=</span> <span class="n">cache_</span><span class="p">.</span><span class="n">size</span><span class="p">();</span>
-    <span class="k">return</span> <span class="n">length</span> <span class="o">?</span> <span class="n">cache_</span><span class="p">.</span><span class="n">data</span><span class="p">()</span> <span class="o">:</span> <span class="k">nullptr</span><span class="p">;</span>
-  <span class="p">}</span>
+<span class="w">    </span><span class="n">cache_</span><span class="p">.</span><span class="n">clear</span><span class="p">();</span><span class="w"></span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">ifstream</span><span class="w"> </span><span class="nf">input</span><span class="p">(</span><span class="n">cache_file_path_</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">ios</span><span class="o">::</span><span class="n">binary</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">input</span><span class="w"> </span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">noskipws</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">input</span><span class="p">.</span><span class="n">good</span><span class="p">())</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">copy</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">istream_iterator</span><span class="o">&lt;</span><span class="kt">char</span><span class="o">&gt;</span><span class="p">(</span><span class="n">input</span><span class="p">),</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">istream_iterator</span><span class="o">&lt;</span><span class="kt">char</span><span class="o">&gt;</span><span class="p">(),</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">back_inserter</span><span class="p">(</span><span class="n">cache_</span><span class="p">));</span><span class="w"></span>
+<span class="w">      </span><span class="n">logging</span><span class="o">::</span><span class="n">log</span><span class="p">(</span><span class="n">logging</span><span class="o">::</span><span class="n">Level</span><span class="o">::</span><span class="n">kDEBUG</span><span class="p">,</span><span class="w"> </span><span class="s">"Cache read"</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="n">length</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cache_</span><span class="p">.</span><span class="n">size</span><span class="p">();</span><span class="w"></span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">length</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">cache_</span><span class="p">.</span><span class="n">data</span><span class="p">()</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">nullptr</span><span class="p">;</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
 
-  <span class="kt">void</span> <span class="n">writeCalibrationCache</span><span class="p">(</span><span class="k">const</span> <span class="kt">void</span><span class="o">*</span> <span class="n">cache</span><span class="p">,</span> <span class="kt">size_t</span> <span class="n">length</span><span class="p">)</span> <span class="k">noexcept</span> <span class="k">override</span> <span class="p">{</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">ofstream</span> <span class="n">cache_file</span><span class="p">(</span><span class="n">cache_file_path_</span><span class="p">,</span> <span class="n">std</span><span class="o">::</span><span class="n">ios</span><span class="o">::</span><span class="n">binary</span><span class="p">);</span>
-    <span class="n">cache_file</span><span class="p">.</span><span class="n">write</span><span class="p">(</span><span class="k">reinterpret_cast</span><span class="o">&lt;</span><span class="k">const</span> <span class="kt">char</span><span class="o">*&gt;</span><span class="p">(</span><span class="n">cache</span><span class="p">),</span> <span class="n">length</span><span class="p">);</span>
-    <span class="n">std</span><span class="o">::</span><span class="n">stringstream</span> <span class="n">ss</span><span class="p">;</span>
-    <span class="n">ss</span> <span class="o">&lt;&lt;</span> <span class="s">"Saved Calibration Cache to "</span> <span class="o">&lt;&lt;</span> <span class="n">cache_file_path_</span><span class="p">;</span>
-    <span class="n">logging</span><span class="o">::</span><span class="n">log</span><span class="p">(</span><span class="n">logging</span><span class="o">::</span><span class="n">Level</span><span class="o">::</span><span class="n">kINFO</span><span class="p">,</span> <span class="n">ss</span><span class="p">.</span><span class="n">str</span><span class="p">());</span>
-  <span class="p">}</span>
+<span class="w">  </span><span class="kt">void</span><span class="w"> </span><span class="n">writeCalibrationCache</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="o">*</span><span class="w"> </span><span class="n">cache</span><span class="p">,</span><span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="n">length</span><span class="p">)</span><span class="w"> </span><span class="k">noexcept</span><span class="w"> </span><span class="k">override</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">ofstream</span><span class="w"> </span><span class="nf">cache_file</span><span class="p">(</span><span class="n">cache_file_path_</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">ios</span><span class="o">::</span><span class="n">binary</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">cache_file</span><span class="p">.</span><span class="n">write</span><span class="p">(</span><span class="k">reinterpret_cast</span><span class="o">&lt;</span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*&gt;</span><span class="p">(</span><span class="n">cache</span><span class="p">),</span><span class="w"> </span><span class="n">length</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">stringstream</span><span class="w"> </span><span class="n">ss</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">ss</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"Saved Calibration Cache to "</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">cache_file_path_</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">logging</span><span class="o">::</span><span class="n">log</span><span class="p">(</span><span class="n">logging</span><span class="o">::</span><span class="n">Level</span><span class="o">::</span><span class="n">kINFO</span><span class="p">,</span><span class="w"> </span><span class="n">ss</span><span class="p">.</span><span class="n">str</span><span class="p">());</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
 
-  <span class="k">operator</span> <span class="n">nvinfer1</span><span class="o">::</span><span class="n">IInt8Calibrator</span><span class="o">*</span><span class="p">()</span> <span class="p">{</span>
-    <span class="k">return</span> <span class="k">reinterpret_cast</span><span class="o">&lt;</span><span class="n">nvinfer1</span><span class="o">::</span><span class="n">IInt8Calibrator</span><span class="o">*&gt;</span><span class="p">(</span><span class="k">this</span><span class="p">);</span>
-  <span class="p">}</span>
+<span class="w">  </span><span class="k">operator</span><span class="w"> </span><span class="n">nvinfer1</span><span class="o">::</span><span class="n">IInt8Calibrator</span><span class="o">*</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="k">reinterpret_cast</span><span class="o">&lt;</span><span class="n">nvinfer1</span><span class="o">::</span><span class="n">IInt8Calibrator</span><span class="o">*&gt;</span><span class="p">(</span><span class="k">this</span><span class="p">);</span><span class="w"></span>
+<span class="w">  </span><span class="p">}</span><span class="w"></span>
 
- <span class="k">private</span><span class="o">:</span>
-  <span class="k">const</span> <span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span> <span class="n">cache_file_path_</span><span class="p">;</span>
-  <span class="kt">size_t</span> <span class="n">cache_size_</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
-  <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">char</span><span class="o">&gt;</span> <span class="n">cache_</span><span class="p">;</span>
-<span class="p">};</span>
+<span class="w"> </span><span class="k">private</span><span class="o">:</span><span class="w"></span>
+<span class="w">  </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span><span class="w"> </span><span class="n">cache_file_path_</span><span class="p">;</span><span class="w"></span>
+<span class="w">  </span><span class="kt">size_t</span><span class="w"> </span><span class="n">cache_size_</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">char</span><span class="o">&gt;</span><span class="w"> </span><span class="n">cache_</span><span class="p">;</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
 
-<span class="k">template</span> <span class="o">&lt;</span><span class="k">typename</span> <span class="n">Algorithm</span> <span class="o">=</span> <span class="n">nvinfer1</span><span class="o">::</span><span class="n">IInt8EntropyCalibrator2</span><span class="p">,</span> <span class="k">typename</span> <span class="n">DataLoader</span><span class="o">&gt;</span>
-<span class="n">TORCHTRT_API</span> <span class="kr">inline</span> <span class="n">Int8Calibrator</span><span class="o">&lt;</span><span class="n">Algorithm</span><span class="p">,</span> <span class="n">DataLoader</span><span class="o">&gt;</span> <span class="n">make_int8_calibrator</span><span class="p">(</span>
-    <span class="n">DataLoader</span> <span class="n">dataloader</span><span class="p">,</span>
-    <span class="k">const</span> <span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span> <span class="n">cache_file_path</span><span class="p">,</span>
-    <span class="kt">bool</span> <span class="n">use_cache</span><span class="p">)</span> <span class="p">{</span>
-  <span class="k">return</span> <span class="n">Int8Calibrator</span><span class="o">&lt;</span><span class="n">Algorithm</span><span class="p">,</span> <span class="n">DataLoader</span><span class="o">&gt;</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">dataloader</span><span class="p">),</span> <span class="n">cache_file_path</span><span class="p">,</span> <span class="n">use_cache</span><span class="p">);</span>
-<span class="p">}</span>
+<span class="k">template</span><span class="w"> </span><span class="o">&lt;</span><span class="k">typename</span> <span class="nc">Algorithm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nvinfer1</span><span class="o">::</span><span class="n">IInt8EntropyCalibrator2</span><span class="p">,</span><span class="w"> </span><span class="k">typename</span> <span class="nc">DataLoader</span><span class="o">&gt;</span><span class="w"></span>
+<span class="n">TORCHTRT_API</span><span class="w"> </span><span class="kr">inline</span><span class="w"> </span><span class="n">Int8Calibrator</span><span class="o">&lt;</span><span class="n">Algorithm</span><span class="p">,</span><span class="w"> </span><span class="n">DataLoader</span><span class="o">&gt;</span><span class="w"> </span><span class="n">make_int8_calibrator</span><span class="p">(</span><span class="w"></span>
+<span class="w">    </span><span class="n">DataLoader</span><span class="w"> </span><span class="n">dataloader</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span><span class="w"> </span><span class="n">cache_file_path</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="n">use_cache</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">Int8Calibrator</span><span class="o">&lt;</span><span class="n">Algorithm</span><span class="p">,</span><span class="w"> </span><span class="n">DataLoader</span><span class="o">&gt;</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">move</span><span class="p">(</span><span class="n">dataloader</span><span class="p">),</span><span class="w"> </span><span class="n">cache_file_path</span><span class="p">,</span><span class="w"> </span><span class="n">use_cache</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
 
-<span class="k">template</span> <span class="o">&lt;</span><span class="k">typename</span> <span class="n">Algorithm</span> <span class="o">=</span> <span class="n">nvinfer1</span><span class="o">::</span><span class="n">IInt8EntropyCalibrator2</span><span class="o">&gt;</span>
-<span class="n">TORCHTRT_API</span> <span class="kr">inline</span> <span class="n">Int8CacheCalibrator</span><span class="o">&lt;</span><span class="n">Algorithm</span><span class="o">&gt;</span> <span class="n">make_int8_cache_calibrator</span><span class="p">(</span><span class="k">const</span> <span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span> <span class="n">cache_file_path</span><span class="p">)</span> <span class="p">{</span>
-  <span class="k">return</span> <span class="n">Int8CacheCalibrator</span><span class="o">&lt;</span><span class="n">Algorithm</span><span class="o">&gt;</span><span class="p">(</span><span class="n">cache_file_path</span><span class="p">);</span>
-<span class="p">}</span>
+<span class="k">template</span><span class="w"> </span><span class="o">&lt;</span><span class="k">typename</span> <span class="nc">Algorithm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nvinfer1</span><span class="o">::</span><span class="n">IInt8EntropyCalibrator2</span><span class="o">&gt;</span><span class="w"></span>
+<span class="n">TORCHTRT_API</span><span class="w"> </span><span class="kr">inline</span><span class="w"> </span><span class="n">Int8CacheCalibrator</span><span class="o">&lt;</span><span class="n">Algorithm</span><span class="o">&gt;</span><span class="w"> </span><span class="n">make_int8_cache_calibrator</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&amp;</span><span class="w"> </span><span class="n">cache_file_path</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">Int8CacheCalibrator</span><span class="o">&lt;</span><span class="n">Algorithm</span><span class="o">&gt;</span><span class="p">(</span><span class="n">cache_file_path</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
 
-<span class="p">}</span> <span class="c1">// namespace ptq</span>
-<span class="p">}</span> <span class="c1">// namespace torch_tensorrt</span>
+<span class="p">}</span><span class="w"> </span><span class="c1">// namespace ptq</span>
+<span class="p">}</span><span class="w"> </span><span class="c1">// namespace torch_tensorrt</span>
 </pre>
+         </div>
         </div>
-       </div>
+       </section>
       </article>
      </div>
     </div>
@@ -672,7 +663,7 @@
       <a href="http://www.sphinx-doc.org/">
        Sphinx
       </a>
-      3.1.2.
+      4.3.0.
              and
       <a href="https://github.com/bashtage/sphinx-material/">
        Material for

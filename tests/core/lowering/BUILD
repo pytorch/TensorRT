@@ -43,7 +43,15 @@ lowering_test(
 )
 
 lowering_test(
+    name = "test_reduce_gelu",
+)
+
+lowering_test(
     name = "test_remove_detach_pass",
+)
+
+lowering_test(
+    name = "test_view_to_reshape_pass",
 )
 
 lowering_test(
@@ -71,8 +79,10 @@ test_suite(
         ":test_operator_aliasing_pass",
         ":test_remove_contiguous_pass",
         ":test_remove_detach_pass",
+        ":test_view_to_reshape_pass",
         ":test_remove_dropout_pass",
         ":test_reduce_to_pass",
+        ":test_reduce_gelu",
         ":test_unpack_hardswish",
         ":test_unpack_reduce_ops"
     ],

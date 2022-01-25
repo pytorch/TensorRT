@@ -26,25 +26,27 @@ class TestAccuracy(ModelTestCase):
                                                               batch_size=1,
                                                               shuffle=False,
                                                               num_workers=1)
-        self.calibrator = torchtrt.ptq.DataLoaderCalibrator(self.testing_dataloader,
-                                                           cache_file='./calibration.cache',
-                                                           use_cache=False,
-                                                           algo_type=torchtrt.ptq.CalibrationAlgo.ENTROPY_CALIBRATION_2,
-                                                           device=torch.device('cuda:0'))
+        self.calibrator = torchtrt.ptq.DataLoaderCalibrator(
+            self.testing_dataloader,
+            cache_file='./calibration.cache',
+            use_cache=False,
+            algo_type=torchtrt.ptq.CalibrationAlgo.ENTROPY_CALIBRATION_2,
+            device=torch.device('cuda:0'))
 
         self.spec = {
             "forward":
-                torchtrt.ts.TensorRTCompileSpec(**{
-                    "inputs": [torchtrt.Input([1, 3, 32, 32])],
-                    "enabled_precisions": {torch.float, torch.half, torch.int8},
-                    "calibrator": self.calibrator,
-                    "device": {
-                        "device_type": torchtrt.DeviceType.GPU,
-                        "gpu_id": 0,
-                        "dla_core": 0,
-                        "allow_gpu_fallback": False,
-                    }
-                })
+                torchtrt.ts.TensorRTCompileSpec(
+                    **{
+                        "inputs": [torchtrt.Input([1, 3, 32, 32])],
+                        "enabled_precisions": {torch.float, torch.half, torch.int8},
+                        "calibrator": self.calibrator,
+                        "device": {
+                            "device_type": torchtrt.DeviceType.GPU,
+                            "gpu_id": 0,
+                            "dla_core": 0,
+                            "allow_gpu_fallback": False,
+                        }
+                    })
         }
 
     def compute_accuracy(self, testing_dataloader, model):

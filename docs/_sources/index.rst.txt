@@ -53,6 +53,7 @@ Getting Started
    _notebooks/Resnet50-example
    _notebooks/ssd-object-detection-demo
    _notebooks/vgg-qat
+   _notebooks/EfficientNet-example 
 
 
 Python API Documenation

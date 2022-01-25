@@ -1,5 +1,6 @@
 #include <string>
 #include "core/compiler.h"
+#include "core/lowering/passes/passes.h"
 #include "gtest/gtest.h"
 #include "tests/util/util.h"
 #include "torch/csrc/jit/ir/irparser.h"
@@ -200,6 +201,7 @@ TEST(Converters, ATenEluConvertsCorrectly) {
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
 
+#ifndef DISABLE_TEST_IN_CI
 TEST(Converters, ATenGELUConvertsCorrectly) {
   const auto graph = R"IR(
       graph(%0 : Tensor):
@@ -210,6 +212,10 @@ TEST(Converters, ATenGELUConvertsCorrectly) {
   torch::jit::parseIR(graph, &*g);
 
   auto in = at::randint(-5, 5, {5}, {at::kCUDA});
+
+  // Lower aten::gelu to pointwise operators using Fast approximation
+  // Gelu(x) = 0.5 * x * (1.0 + torch.tanh(x * 0.7978845608 * (1.0 + 0.044715 * x * x)))
+  torch_tensorrt::core::lowering::passes::ReduceGelu(g);
 
   auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
@@ -225,3 +231,4 @@ TEST(Converters, ATenGELUConvertsCorrectly) {
 
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 5e-2));
 }
+#endif

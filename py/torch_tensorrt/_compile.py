@@ -161,6 +161,7 @@ def convert_method_to_trt_engine(module: Any,
         ts_mod = module
         if module_type == _ModuleType.nn:
             logging.log(
+                logging.Level.Info,
                 "Module was provided as a torch.nn.Module, trying to script the module with torch.jit.script. In the event of a failure please preconvert your module to TorchScript"
             )
             ts_mod = torch.jit.script(module)

@@ -26,11 +26,12 @@ class TestAccuracy(ModelTestCase):
                                                               batch_size=1,
                                                               shuffle=False,
                                                               num_workers=1)
-        self.calibrator = torchtrt.ptq.DataLoaderCalibrator(self.testing_dataloader,
-                                                           cache_file='./calibration.cache',
-                                                           use_cache=False,
-                                                           algo_type=torchtrt.ptq.CalibrationAlgo.ENTROPY_CALIBRATION_2,
-                                                           device=torch.device('cuda:0'))
+        self.calibrator = torchtrt.ptq.DataLoaderCalibrator(
+            self.testing_dataloader,
+            cache_file='./calibration.cache',
+            use_cache=False,
+            algo_type=torchtrt.ptq.CalibrationAlgo.ENTROPY_CALIBRATION_2,
+            device=torch.device('cuda:0'))
 
     def compute_accuracy(self, testing_dataloader, model):
         total = 0

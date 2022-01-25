@@ -30,12 +30,30 @@ class TestCompile(ModelTestCase):
         self.assertTrue(same < 2e-2)
 
     def test_compile_script(self):
-        trt_mod = torchtrt.ts.compile(self.scripted_model,
-                                  inputs=[self.input],
-                                  device=torchtrt.Device(gpu_id=0),
-                                  enabled_precisions={torch.float})
+        with torch.no_grad():
+            trt_mod = torchtrt.ts.compile(self.scripted_model,
+                                          inputs=[self.input],
+                                          device=torchtrt.Device(gpu_id=0),
+                                          enabled_precisions={torch.float})
+            same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
+            self.assertTrue(same < 2e-2)
+
+    def test_compile_global(self):
+        trt_mod = torchtrt.compile(self.scripted_model,
+                                   inputs=[self.input],
+                                   device=torchtrt.Device(gpu_id=0),
+                                   enabled_precisions={torch.float})
         same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
         self.assertTrue(same < 2e-2)
+
+    def test_compile_global_nn_mod(self):
+        with torch.no_grad():
+            trt_mod = torchtrt.compile(self.model,
+                                       inputs=[self.input],
+                                       device=torchtrt.Device(gpu_id=0),
+                                       enabled_precisions={torch.float})
+            same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
+            self.assertTrue(same < 2e-2)
 
     def test_from_torch_tensor(self):
         compile_spec = {
@@ -207,16 +225,16 @@ class TestInputTypeDefaultsFP32Model(ModelTestCase):
     def test_input_use_default_fp32(self):
         ts_model = torch.jit.script(self.model)
         trt_mod = torchtrt.ts.compile(ts_model,
-                                  inputs=[torchtrt.Input(self.input.shape)],
-                                  enabled_precisions={torch.float, torch.half})
+                                      inputs=[torchtrt.Input(self.input.shape)],
+                                      enabled_precisions={torch.float, torch.half})
         trt_mod(self.input)
 
     def test_input_respect_user_setting_fp32_weights_fp16_in(self):
         ts_model = torch.jit.script(self.model)
         trt_mod = torchtrt.ts.compile(ts_model,
-                                  inputs=[self.input.half()],
-                                  require_full_compilation=True,
-                                  enabled_precisions={torch.float, torch.half})
+                                      inputs=[self.input.half()],
+                                      require_full_compilation=True,
+                                      enabled_precisions={torch.float, torch.half})
         trt_mod(self.input.half())
 
     def test_input_respect_user_setting_fp32_weights_fp16_in_non_constructor(self):
@@ -225,9 +243,9 @@ class TestInputTypeDefaultsFP32Model(ModelTestCase):
         input_spec.dtype = torch.half
 
         trt_mod = torchtrt.ts.compile(ts_model,
-                                  inputs=[input_spec],
-                                  require_full_compilation=True,
-                                  enabled_precisions={torch.float, torch.half})
+                                      inputs=[input_spec],
+                                      require_full_compilation=True,
+                                      enabled_precisions={torch.float, torch.half})
         trt_mod(self.input.half())
 
 
@@ -241,8 +259,8 @@ class TestInputTypeDefaultsFP16Model(ModelTestCase):
         half_mod.half()
 
         trt_mod = torchtrt.ts.compile(half_mod,
-                                  inputs=[torchtrt.Input(self.input.shape)],
-                                  enabled_precisions={torch.float, torch.half})
+                                      inputs=[torchtrt.Input(self.input.shape)],
+                                      enabled_precisions={torch.float, torch.half})
         trt_mod(self.input.half())
 
     def test_input_use_default_fp16_without_fp16_enabled(self):
@@ -257,9 +275,9 @@ class TestInputTypeDefaultsFP16Model(ModelTestCase):
         half_mod.half()
 
         trt_mod = torchtrt.ts.compile(half_mod,
-                                  inputs=[self.input],
-                                  require_full_compilation=True,
-                                  enabled_precisions={torch.float, torch.half})
+                                      inputs=[self.input],
+                                      require_full_compilation=True,
+                                      enabled_precisions={torch.float, torch.half})
         trt_mod(self.input)
 
     def test_input_respect_user_setting_fp16_weights_fp32_in_non_constuctor(self):
@@ -270,9 +288,9 @@ class TestInputTypeDefaultsFP16Model(ModelTestCase):
         input_spec.dtype = torch.float
 
         trt_mod = torchtrt.ts.compile(half_mod,
-                                  inputs=[input_spec],
-                                  require_full_compilation=True,
-                                  enabled_precisions={torch.float, torch.half})
+                                      inputs=[input_spec],
+                                      require_full_compilation=True,
+                                      enabled_precisions={torch.float, torch.half})
         trt_mod(self.input)
 
 
@@ -352,14 +370,15 @@ class TestDevice(unittest.TestCase):
         self.assertEqual(device.device_type, torchtrt.DeviceType.GPU)
         self.assertEqual(device.gpu_id, 0)
 
+
 class TestInput(unittest.TestCase):
 
     def _verify_correctness(self, struct: torchtrt.Input, target: Dict) -> bool:
         internal = struct._to_internal()
 
-        list_eq = lambda al, bl: all([a == b for (a, b) in zip (al, bl)])
+        list_eq = lambda al, bl: all([a == b for (a, b) in zip(al, bl)])
 
-        eq = lambda a, b : a == b
+        eq = lambda a, b: a == b
 
         def field_is_correct(field, equal_fn, a1, a2):
             equal = equal_fn(a1, a2)
@@ -371,12 +390,12 @@ class TestInput(unittest.TestCase):
         opt_ = field_is_correct("opt", list_eq, internal.opt, target["opt"])
         max_ = field_is_correct("max", list_eq, internal.max, target["max"])
         is_dynamic_ = field_is_correct("is_dynamic", eq, internal.input_is_dynamic, target["input_is_dynamic"])
-        explicit_set_dtype_ = field_is_correct("explicit_dtype", eq, internal._explicit_set_dtype, target["explicit_set_dtype"])
+        explicit_set_dtype_ = field_is_correct("explicit_dtype", eq, internal._explicit_set_dtype,
+                                               target["explicit_set_dtype"])
         dtype_ = field_is_correct("dtype", eq, int(internal.dtype), int(target["dtype"]))
         format_ = field_is_correct("format", eq, int(internal.format), int(target["format"]))
 
-        return all([min_,opt_,max_,is_dynamic_,explicit_set_dtype_,dtype_,format_])
-
+        return all([min_, opt_, max_, is_dynamic_, explicit_set_dtype_, dtype_, format_])
 
     def test_infer_from_example_tensor(self):
         shape = [1, 3, 255, 255]
@@ -393,7 +412,6 @@ class TestInput(unittest.TestCase):
         example_tensor = torch.randn(shape).half()
         i = torchtrt.Input._from_tensor(example_tensor)
         self.assertTrue(self._verify_correctness(i, target))
-
 
     def test_static_shape(self):
         shape = [1, 3, 255, 255]
@@ -482,7 +500,9 @@ class TestInput(unittest.TestCase):
         self.assertTrue(self._verify_correctness(i, target))
 
         tensor_shape = lambda shape: torch.randn(shape).shape
-        i = torchtrt.Input(min_shape=tensor_shape(min_shape), opt_shape=tensor_shape(opt_shape), max_shape=tensor_shape(max_shape))
+        i = torchtrt.Input(min_shape=tensor_shape(min_shape),
+                           opt_shape=tensor_shape(opt_shape),
+                           max_shape=tensor_shape(max_shape))
         self.assertTrue(self._verify_correctness(i, target))
 
 
@@ -502,7 +522,8 @@ def test_suite():
     suite = unittest.TestSuite()
     suite.addTest(unittest.makeSuite(TestLoggingAPIs))
     suite.addTest(TestCompile.parametrize(TestCompile, model=models.resnet18(pretrained=True)))
-    suite.addTest(TestCompile.parametrize(TestCompile, model=models.mobilenet_v2(pretrained=True)))
+    # Disabling mobilenet_v2 test due to https://nvbugs/3433655
+    # suite.addTest(TestCompile.parametrize(TestCompile, model=models.mobilenet_v2(pretrained=True)))
     suite.addTest(TestCompileHalf.parametrize(TestCompileHalf, model=models.resnet18(pretrained=True)))
     suite.addTest(TestCompileHalfDefault.parametrize(TestCompileHalfDefault, model=models.resnet18(pretrained=True)))
     suite.addTest(TestPTtoTRTtoPT.parametrize(TestPTtoTRTtoPT, model=models.resnet18(pretrained=True)))

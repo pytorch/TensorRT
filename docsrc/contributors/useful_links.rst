@@ -1,7 +1,7 @@
 .. _useful_links:
 
 Useful Links for Torch-TensorRT Development
-=====================================
+==============================================
 
 TensorRT Available Layers and Expected Dimensions
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
