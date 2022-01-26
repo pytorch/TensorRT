@@ -84,6 +84,10 @@ converter_test(
 )
 
 converter_test(
+    name = "test_reflection_pad",
+)
+
+converter_test(
     name = "test_replication_pad",
 )
 
@@ -150,6 +154,7 @@ test_suite(
         ":test_normalize",
         ":test_pooling",
         ":test_reduce",
+        ":test_reflection_pad",
         ":test_replication_pad",
         ":test_select",
         ":test_shuffle",
