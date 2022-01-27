@@ -14,11 +14,28 @@ class _IRType(Enum):
     fx = 1
 
 
-def _module_ir(module: Any, ir: str) -> _IRType.ts:
-    # Possible module types
-    module_is_tsable = any(
-        isinstance(module, t) for t in [torch.nn.Module, torch.jit.ScriptModule, torch.jit.ScriptFunction])
-    module_is_fxable = any(isinstance(module, t) for t in [torch.nn.Module, torch.fx.GraphModule])
+class _ModuleType(Enum):
+    """Enum to set the minimum required logging level to print a message to stdout
+    """
+    nn = 0
+    ts = 1
+    fx = 2
+
+
+def _parse_module_type(module: Any) -> _ModuleType:
+    if any(isinstance(module, t) for t in [torch.jit.ScriptModule, torch.jit.ScriptFunction]):
+        return _ModuleType.ts
+    elif isinstance(module, torch.fx.GraphModule):
+        return _ModuleType.fx
+    elif isinstance(module, torch.nn.Module):
+        return _ModuleType.nn
+    else:
+        raise RuntimeError("Module is an unknown format")
+
+
+def _get_target_ir(module_type: _ModuleType, ir: str) -> _IRType:
+    module_is_tsable = any([module_type == t for t in [_ModuleType.nn, _ModuleType.ts]])
+    module_is_fxable = any([module_type == t for t in [_ModuleType.nn, _ModuleType.fx]])
 
     ir_targets_torchscript = any([ir == opt for opt in ["torchscript", "ts"]])
     ir_targets_fx = ir == "fx"
@@ -26,7 +43,7 @@ def _module_ir(module: Any, ir: str) -> _IRType.ts:
     if module_is_tsable and ir_targets_torchscript:
         return _IRType.ts
     elif module_is_fxable and ir_targets_fx:
-        if isinstance(module, torch.fx.GraphModule):
+        if module_type == _ModuleType.fx:
             raise ValueError("Was given a torch.fx.GraphModule, fx is not currently supported by Torch-TensorRT")
         elif ir_targets_fx:
             raise ValueError("Preferred ir was set to \"fx\" which is currently not supported by Torch-TensorRT")
@@ -85,10 +102,11 @@ def compile(module: Any, ir="default", inputs=[], enabled_precisions=set([_enums
     Returns:
         torch.nn.Module: Compiled Module, when run it will execute via TensorRT
     """
-    target_ir = _module_ir(module, ir)
+    module_type = _parse_module_type(module)
+    target_ir = _get_target_ir(module_type, ir)
     if target_ir == _IRType.ts:
         ts_mod = module
-        if isinstance(module, torch.nn.Module):
+        if module_type == _ModuleType.nn:
             logging.log(
                 logging.Level.Info,
                 "Module was provided as a torch.nn.Module, trying to script the module with torch.jit.script. In the event of a failure please preconvert your module to TorchScript"
@@ -134,14 +152,14 @@ def convert_method_to_trt_engine(module: Any,
         enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
         ir (str): The requested strategy to compile. (Options: default - Let Torch-TensorRT decide, ts - TorchScript with scripting path)
         **kwargs: Additional settings for the specific requested strategy (See submodules for more info)
-
     Returns:
         bytes: Serialized TensorRT engine, can either be saved to a file or deserialized via TensorRT APIs
     """
-    target_ir = _module_ir(module, ir)
+    module_type = _parse_module_type(module)
+    target_ir = _get_target_ir(module_type, ir)
     if target_ir == _IRType.ts:
         ts_mod = module
-        if isinstance(module, torch.nn.Module):
+        if module_type == _ModuleType.nn:
             logging.log(
                 logging.Level.Info,
                 "Module was provided as a torch.nn.Module, trying to script the module with torch.jit.script. In the event of a failure please preconvert your module to TorchScript"
