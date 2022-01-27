@@ -1,3 +1,4 @@
+#include "ATen/ATen.h"
 #include "ATen/InitialTensorOptions.h"
 #include "ATen/core/List.h"
 #include "ATen/core/functional.h"
