@@ -85,6 +85,9 @@ struct SegmentedBlock {
   const std::vector<at::ScalarType>& in_types() const {
     return in_types_;
   }
+  void update_id(BlockID new_id) {
+    id_ = new_id;
+  }
   void update_target(SegmentedBlockTarget new_target) {
     target_ = new_target;
   }
