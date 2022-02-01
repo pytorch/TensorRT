@@ -2,7 +2,7 @@
 
 #include <string>
 #include <vector>
-
+#include "ATen/ATen.h"
 #include "ATen/Tensor.h"
 #include "core/ir/ir.h"
 #include "core/util/prelude.h"
