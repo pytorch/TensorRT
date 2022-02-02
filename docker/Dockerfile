@@ -5,8 +5,7 @@ FROM ${BASE_IMG} as base
 FROM base as torch-tensorrt-builder-base
 
 # Removing any bazel or torch-tensorrt pre-installed from the base image
-
-RUN rm -rf /opt/torch-tensorrt /usr/bin/bazel
+RUN rm -rf /opt/pytorch/torch_tensorrt /usr/bin/bazel
 
 ARG ARCH="x86_64"
 ARG TARGETARCH="amd64"
@@ -27,6 +26,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends locales ninja-b
 
 FROM torch-tensorrt-builder-base as torch-tensorrt-builder
 
+# Removing any bazel or torch-tensorrt pre-installed from the base image
+RUN rm -rf /opt/pytorch/torch_tensorrt
+
 COPY . /workspace/torch_tensorrt/src
 WORKDIR /workspace/torch_tensorrt/src
 RUN cp ./docker/WORKSPACE.docker WORKSPACE
@@ -35,6 +37,9 @@ RUN cp ./docker/WORKSPACE.docker WORKSPACE
 RUN ./docker/dist-build.sh
 
 FROM base as torch-tensorrt
+
+# Removing any bazel or torch-tensorrt pre-installed from the base image
+RUN rm -rf /opt/pytorch/torch_tensorrt
 
 # copy source repo
 COPY . /workspace/torch_tensorrt
@@ -48,7 +53,7 @@ RUN pip3 install *.whl && rm -fr /workspace/torch_tensorrt/py/dist/* *.whl
 
 ENV LD_LIBRARY_PATH /opt/conda/lib/python3.8/site-packages/torch/lib:/opt/conda/lib/python3.8/site-packages/torch_tensorrt/lib:${LD_LIBRARY_PATH}
 ENV PATH /opt/conda/lib/python3.8/site-packages/torch_tensorrt/bin:${PATH}
-
+#
 WORKDIR /workspace
 RUN mv /workspace/torch_tensorrt /opt/pytorch/torch_tensorrt
 RUN cp /opt/pytorch/torch_tensorrt/docker/WORKSPACE.docker /opt/pytorch/torch_tensorrt/WORKSPACE
