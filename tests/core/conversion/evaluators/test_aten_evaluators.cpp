@@ -666,3 +666,39 @@ TEST(Evaluators, AtenFormatRaiseExceptionEvaluatesCorrectly) {
     ASSERT_TRUE(false);
   }
 }
+
+TEST(Evaluators, RangeLengthEvaluatesCorrectly) {
+  const auto graph = R"IR(
+      graph():
+        %1 : int = prim::Constant[value=1]()
+        %2 : int = prim::Constant[value=10]()
+        %3 : int = prim::Constant[value=2]()
+        %4 : int = aten::__range_length(%1, %2, %3)
+        return (%3))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto jit_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {});
+  auto trt_results = torch_tensorrt::tests::util::EvaluateGraph(g->block(), {});
+
+  ASSERT_TRUE(jit_results[0] == trt_results[0]);
+}
+
+TEST(Evaluators, RangeLengthNegEvaluatesCorrectly) {
+  const auto graph = R"IR(
+      graph():
+        %1 : int = prim::Constant[value=10]()
+        %2 : int = prim::Constant[value=1]()
+        %3 : int = prim::Constant[value=-2]()
+        %4 : int = aten::__range_length(%1, %2, %3)
+        return (%3))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto jit_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {});
+  auto trt_results = torch_tensorrt::tests::util::EvaluateGraph(g->block(), {});
+
+  ASSERT_TRUE(jit_results[0] == trt_results[0]);
+}
