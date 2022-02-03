@@ -718,7 +718,25 @@ auto aten_registrations TORCHTRT_UNUSED =
                       torch::jit::pop(stack, output);
                       return output;
                     },
-                    EvalOptions().validSchemas({"aten::format(str self, ...) -> (str)"})});
+                    EvalOptions().validSchemas({"aten::format(str self, ...) -> (str)"})})
+        .evaluator({c10::Symbol::fromQualString("aten::__range_length"),
+                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+                      auto lo = args.at(n->input(0)).unwrapToInt();
+                      auto hi = args.at(n->input(1)).unwrapToInt();
+                      auto step = args.at(n->input(2)).unwrapToInt();
+
+                      if (step == 0) {
+                        TORCHTRT_THROW_ERROR("aten::__range_length() arg 3 must not be zero");
+                      }
+                      if (step > 0 && lo < hi) {
+                        return 1 + (hi - 1 - lo) / step;
+                      } else if (step < 0 && lo > hi) {
+                        return 1 + (lo - 1 - hi) / (0 - step);
+                      } else {
+                        return 0;
+                      }
+                    },
+                    EvalOptions().validSchemas({"aten::__range_length(int lo, int hi, int step) -> int"})});
 } // namespace
 } // namespace evaluators
 } // namespace conversion
