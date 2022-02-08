@@ -9,14 +9,19 @@ void pointwise_test_helper(
     bool singleInput,
     bool dynamicInput = false,
     std::vector<int64_t> shape1 = {5},
-    std::vector<int64_t> shape2 = {5}) {
+    std::vector<int64_t> shape2 = {5},
+    bool negative_input = false) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph_ir, g.get());
 
   // singleInput case is enabled when elementwise operation is performed
   // with an input and a constant embedded in graph
   std::vector<at::Tensor> torch_inputs;
-  torch_inputs.push_back(at::randint(1, 5, shape1, {at::kCUDA}));
+  if (negative_input) {
+    torch_inputs.push_back(at::randint(-5, 5, shape1, {at::kCUDA}));
+  } else {
+    torch_inputs.push_back(at::randint(1, 5, shape1, {at::kCUDA}));
+  }
   if (!singleInput) {
     torch_inputs.push_back(at::randint(1, 5, shape2, {at::kCUDA}));
   }
@@ -139,6 +144,45 @@ TEST(Converters, ATenDivWithScalarConvertsCorrectly) {
         %1 : Tensor = aten::div(%0, %scalar)
         return (%1))IR";
   pointwise_test_helper(graph, true);
+}
+
+TEST(Converters, ATenDivRoundingFloorConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor, %1 : Tensor):
+        %3 : str = prim::Constant[value="floor"]()
+        %2 : Tensor = aten::div(%0, %1, %3)
+        return (%2))IR";
+  pointwise_test_helper(graph, false, false, {5}, {5}, true);
+  pointwise_test_helper(graph, false, false, {3, 4}, {4}, true);
+  pointwise_test_helper(graph, false, false, {4}, {3, 4}, true);
+  pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3}, true);
+  pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3}, true);
+}
+
+TEST(Converters, ATenDivRoundingTruncConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor, %1 : Tensor):
+        %3 : str = prim::Constant[value="trunc"]()
+        %2 : Tensor = aten::div(%0, %1, %3)
+        return (%2))IR";
+  pointwise_test_helper(graph, false, false, {5}, {5}, true);
+  pointwise_test_helper(graph, false, false, {3, 4}, {4}, true);
+  pointwise_test_helper(graph, false, false, {4}, {3, 4}, true);
+  pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3}, true);
+  pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3}, true);
+}
+
+TEST(Converters, ATenDivRoundingNoneConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor, %1 : Tensor):
+        %3 : None = prim::Constant()
+        %2 : Tensor = aten::div(%0, %1, %3)
+        return (%2))IR";
+  pointwise_test_helper(graph, false, false, {5}, {5}, true);
+  pointwise_test_helper(graph, false, false, {3, 4}, {4}, true);
+  pointwise_test_helper(graph, false, false, {4}, {3, 4}, true);
+  pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3}, true);
+  pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3}, true);
 }
 
 TEST(Converters, ATenPowTensorConvertsCorrectly) {
