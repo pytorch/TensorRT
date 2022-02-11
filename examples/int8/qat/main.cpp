@@ -33,8 +33,6 @@ torch::jit::Module compile_int8_qat_model(const std::string& data_dir, torch::ji
   auto compile_spec = torch_tensorrt::ts::CompileSpec(inputs);
   /// Set operating precision to INT8
   compile_spec.enabled_precisions.insert(torch::kI8);
-  /// Set max batch size for the engine
-  compile_spec.max_batch_size = 32;
   /// Set a larger workspace
   compile_spec.workspace_size = 1 << 28;
 
@@ -126,4 +124,3 @@ int main(int argc, const char* argv[]) {
   print_avg_std_dev("TRT quantized model", trt_runtimes, dims[0][0]);
   trt_mod.save("/tmp/qat_vgg16.trt.ts");
 }
-
