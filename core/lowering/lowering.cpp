@@ -64,6 +64,7 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, LowerInfo lower_info) {
   passes::RemoveNOPs(g);
   passes::AliasOperators(g);
   passes::SiluToSigmoidMultipication(g);
+  passes::RemoveSingleUse0DTensors(g);
   passes::RemoveUnnecessaryCasts(g);
   LOG_GRAPH(*g);
 }
