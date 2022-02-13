@@ -50,8 +50,9 @@ auto batch_norm_registrations TORCHTRT_UNUSED =
               auto orig_shape = input->getDimensions();
               auto shape = util::toVec(orig_shape);
               auto tensor_type = util::TRTDataTypeToScalarType(input->getType());
-              auto options = torch::TensorOptions().dtype(tensor_type).device(torch::kCUDA, ctx->settings.device.gpu_id);
-              
+              auto options =
+                  torch::TensorOptions().dtype(tensor_type).device(torch::kCUDA, ctx->settings.device.gpu_id);
+
               torch::Tensor gamma, beta, mean, var;
               LOG_DEBUG("Input :" << orig_shape << "/" << input->getType());
               // affine=True
