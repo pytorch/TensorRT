@@ -460,9 +460,6 @@ int main(int argc, char** argv) {
     compile_settings.debug = true;
   }
 
-  if (use_strict_types) {
-    compile_settings.strict_types = true;
-  }
 
   if (allow_gpu_fallback) {
     compile_settings.device.allow_gpu_fallback = true;
@@ -586,9 +583,6 @@ int main(int argc, char** argv) {
     compile_settings.workspace_size = args::get(workspace_size);
   }
 
-  if (max_batch_size) {
-    compile_settings.max_batch_size = args::get(max_batch_size);
-  }
 
   if (truncate_long_and_double) {
     compile_settings.truncate_long_and_double = true;
