@@ -36,6 +36,39 @@ TEST(Converters, ATenBatchNormConvertsCorrectly) {
       torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
 }
 
+TEST(Converters, ATenBatchNormAffineFalseConvertsCorrectly) {
+  // BatchNorm(ch, affine=False)
+  const auto graph = R"IR(
+      graph(%0 : Tensor,
+            %1: NoneType = prim::Constant(),
+            %2: NoneType = prim::Constant(),
+            %3: Float(5, strides=[1]),
+            %4: Float(5, strides=[1])):
+        %5 : bool = prim::Constant[value=0]()
+        %6 : float = prim::Constant[value=1.0000000000000001e-05]()
+        %7 : float = prim::Constant[value=0.10000000000000001]()
+        %8 : Tensor = aten::batch_norm(%0, %1, %2, %3, %4, %5, %6, %7, %5)
+        return (%8))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto in = at::randint(1, 10, {1, 5, 5, 5}, {at::kCUDA});
+
+  torch::jit::IValue gamma, beta; // NoneType
+  auto mean = at::randint(1, 10, {5}, {at::kCUDA});
+  auto var = at::randint(1, 10, {5}, {at::kCUDA});
+
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {gamma, beta, mean, var});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
+
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {gamma, beta, mean, var});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
+
+  ASSERT_TRUE(
+      torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
+}
+
 TEST(Converters, ATenBatchNorm1DConvertsCorrectly) {
   const auto graph = R"IR(
       graph(%0 : Tensor,
