@@ -1,8 +1,12 @@
-import torch
+# @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
+import torch
 from fx2trt_oss.fx.converter_registry import tensorrt_converter
 
-from .converter_utils import get_dyn_range, get_inputs_from_args_and_kwargs
+from .converter_utils import (
+    get_dyn_range,
+    get_inputs_from_args_and_kwargs,
+)
 
 
 quantize_per_tensor_inputs = ["input", "scale", "zero_point", "dtype"]

@@ -1,7 +1,7 @@
 # Owner(s): ["oncall: aiacc"]
 
 import torch
-import torch.fx.experimental.fx_acc.acc_ops as acc_ops
+import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
 import torch.nn as nn
 from torch.testing._internal.common_fx2trt import AccTestCase
 from torch.testing._internal.common_utils import run_tests

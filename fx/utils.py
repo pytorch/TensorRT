@@ -1,7 +1,8 @@
 from typing import List
 
-import torch
+# @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
+import torch
 
 from .types import Shape, TRTDataType
 

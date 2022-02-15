@@ -3,7 +3,7 @@
 import torch
 import torch.fx
 import torch.nn as nn
-import torch.fx.experimental.fx_acc.acc_tracer as acc_tracer
+import fx2trt_oss.tracer.acc_tracer.acc_tracer as acc_tracer
 from fx2trt_oss.fx.tools.trt_splitter import TRTSplitter
 from fx2trt_oss.fx import TRTInterpreter, InputTensorSpec, TRTModule
 
@@ -81,12 +81,12 @@ graph():
     %x : [#users=1] = placeholder[target=x]
     %linear_weight : [#users=1] = get_attr[target=linear.weight]
     %linear_bias : [#users=1] = get_attr[target=linear.bias]
-    %linear_1 : [#users=1] = call_function[target=torch.fx.experimental.fx_acc.acc_ops.linear](args = (), ...
-    %relu_1 : [#users=1] = call_function[target=torch.fx.experimental.fx_acc.acc_ops.relu](args = (), ...
+    %linear_1 : [#users=1] = call_function[target=fx2trt_oss.tracer.acc_tracer.acc_ops.linear](args = (), ...
+    %relu_1 : [#users=1] = call_function[target=fx2trt_oss.tracer.acc_tracer.acc_ops.relu](args = (), ...
     return relu_1
 graph():
     %relu_1 : [#users=1] = placeholder[target=relu_1]
-    %linalg_norm_1 : [#users=1] = call_function[target=torch.fx.experimental.fx_acc.acc_ops.linalg_norm](args = (), ...
+    %linalg_norm_1 : [#users=1] = call_function[target=fx2trt_oss.tracer.acc_tracer.acc_ops.linalg_norm](args = (), ...
     return linalg_norm_1
 """
 

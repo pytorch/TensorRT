@@ -2,10 +2,11 @@ import torch.fx
 import torchvision.models as models
 from fx2trt_oss.fx import TRTInterpreter, InputTensorSpec, TRTModule
 from torch.ao.quantization.quantize_fx import prepare_fx, convert_fx
-import torch.fx.experimental.fx_acc.acc_tracer as acc_tracer
+import fx2trt_oss.tracer.acc_tracer.acc_tracer as acc_tracer
 import copy
 from torch.fx.passes import shape_prop
 from torch.fx.experimental.normalize import NormalizeArgs
+# @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 
 rn18 = models.resnet18().eval()

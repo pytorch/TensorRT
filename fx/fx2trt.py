@@ -1,7 +1,10 @@
 import warnings
 from typing import List, NamedTuple, Any, Optional, Sequence, Dict
 
+import fx2trt_oss.fx.diagnostics as diagnostics
 import numpy
+
+# @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch
 import torch.fx
@@ -11,7 +14,6 @@ from torch.fx.passes.shape_prop import TensorMetadata
 from .converter_registry import CONVERTERS
 from .input_tensor_spec import InputTensorSpec
 from .utils import torch_dtype_to_trt, get_dynamic_dims
-import fx2trt_oss.fx.diagnostics as diagnostics
 
 
 class TRTInterpreterResult(NamedTuple):

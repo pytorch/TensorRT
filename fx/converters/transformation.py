@@ -1,5 +1,6 @@
-import torch
+# @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
+import torch
 from fx2trt_oss.fx.converter_registry import tensorrt_converter
 
 from .converter_utils import mark_as_int8_layer

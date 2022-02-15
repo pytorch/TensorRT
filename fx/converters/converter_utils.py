@@ -3,6 +3,8 @@ import warnings
 from typing import Any, Tuple, Sequence, Union, List, Optional, Dict, Callable
 
 import numpy as np
+
+# @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch
 from torch.fx.node import Target, Argument

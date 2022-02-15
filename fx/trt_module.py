@@ -1,5 +1,6 @@
 from typing import List, Any, Sequence
 
+# @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch
 

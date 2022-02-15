@@ -1,7 +1,7 @@
 # Owner(s): ["oncall: aiacc"]
 
 import torch
-import torch.fx.experimental.fx_acc.acc_ops as acc_ops
+import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
 from torch.testing._internal.common_fx2trt import AccTestCase, InputTensorSpec
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
@@ -10,13 +10,15 @@ from torch.testing._internal.common_utils import run_tests
 class TestLinearConverter(AccTestCase):
     @parameterized.expand(
         [
-            ("default"),
-            ("no_bias", False),
+            ("default", [1,512]),
+            ("matrix", [32,512]),
+            ("no_bias", [1,512], False),
         ]
     )
     def test_linear(
         self,
         test_name,
+        shape,
         bias=True,
     ):
         class TestModule(torch.nn.Module):
@@ -27,7 +29,7 @@ class TestLinearConverter(AccTestCase):
             def forward(self, x):
                 return self.linear(x)
 
-        inputs = [torch.randn(1, 512)]
+        inputs = [torch.randn(shape)]
         self.run_test(TestModule(), inputs, expected_ops={acc_ops.linear})
 
     def test_linear_with_dynamic_shape(self):

@@ -2,13 +2,15 @@ import dataclasses as dc
 import logging
 from typing import Callable, List, Any, Sequence, Type, Set, Optional
 
+import fx2trt_oss.fx.diagnostics as diagnostics
+import fx2trt_oss.tracer.acc_tracer.acc_tracer as acc_tracer
+
+# @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch
 import torch.fx as fx
-import torch.fx.experimental.fx_acc.acc_tracer as acc_tracer
 import torch.nn as nn
 from torch.fx.experimental.const_fold import split_const_subgraphs
-import fx2trt_oss.fx.diagnostics as diagnostics
 from torch.fx.passes.splitter_base import SplitResult
 
 from .fx2trt import (

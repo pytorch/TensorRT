@@ -3,10 +3,12 @@ import operator
 import warnings
 from typing import Dict, Tuple, Sequence, cast, Optional, Union
 
+import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
 import numpy as np
+
+# @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch
-import torch.fx.experimental.fx_acc.acc_ops as acc_ops
 from fx2trt_oss.fx.converter_registry import tensorrt_converter
 from fx2trt_oss.fx.types import *  # noqa: F403
 from fx2trt_oss.fx.utils import (
@@ -1523,46 +1525,30 @@ def acc_ops_linear(
         "Currently we only support one dynmaic "
         "dim for linear and it can't be the last dim."
     )
+    weight = get_trt_tensor(network, kwargs["weight"].t(), f"{name}_weight")
 
-    # TODO: Need to benchmark the performance of lowering linear as fully_connected versus
-    # lowering as matmul + add. TensorRT documentation suggests to always lower it as
-    # matmul + add but we found in some cases this results in performance regression compared
-    # with lowering to fully_connected layer.
-    layer = network.add_shuffle(input_val)
-    layer.reshape_dims = tuple(input_val.shape) + (1, 1)
-    set_layer_name(layer, target, f"{name}_pre_shuffle")
-    bias = to_numpy(kwargs["bias"])  # type: ignore[arg-type]
-
-    if network.has_explicit_precision:
-        weight = get_trt_tensor(network, kwargs["weight"], f"{name}_weight")
-        # will need to use uninitialized weight and set it later to support
-        # ITensor weights
-        dummy_weight = trt.Weights()
-
-        # add fully connected
-        layer = network.add_fully_connected(
-            input=layer.get_output(0),
-            num_outputs=weight.shape[0],
-            kernel=dummy_weight,
-            bias=bias,
-        )
-        layer.set_input(1, weight)
+    preset_diff = 0
+    if len(input_val.shape) == 1:
+        preset_diff -= 1
+        input_op = trt.MatrixOperation.VECTOR
     else:
-        weight = to_numpy(kwargs["weight"])  # type: ignore[arg-type]
-        layer = network.add_fully_connected(
-            input=layer.get_output(0),
-            num_outputs=weight.shape[0],
-            kernel=weight,
-            bias=bias,
-        )
-    set_layer_name(layer, target, name)
+        input_op = trt.MatrixOperation.NONE
 
-    # reshape back
-    layer = network.add_shuffle(layer.get_output(0))
-    layer.reshape_dims = tuple(input_val.shape[:-1]) + (kwargs["weight"].shape[0],)  # type: ignore[union-attr]
-    set_layer_name(layer, target, f"{name}_post_shuffle")
+    input_val, weight = broadcast(network, input_val, weight, f"{name}_input", f"{name}_weight", preset_diff)
+    matmul_layer = network.add_matrix_multiply(input_val, input_op, weight, trt.MatrixOperation.NONE)
+    set_layer_name(matmul_layer, target, f"{name}_matmul")
+    res = matmul_layer.get_output(0)
 
-    return layer.get_output(0)
+    if kwargs["bias"] is not None:
+        bias = get_trt_tensor(network, kwargs["bias"], f"{name}_bias")  # type: ignore[arg-type]
+        res = add_binary_elementwise_layer(
+            network,
+            matmul_layer.get_output(0),
+            bias,
+            trt.ElementWiseOperation.SUM,
+            target,
+            f"{name}_add")
+    return res
 
 
 def add_clamp(network, input, val, op):

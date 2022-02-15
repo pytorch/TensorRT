@@ -1,10 +1,10 @@
-from dataclasses import replace, field, dataclass
+import typing as t
 from copy import deepcopy
+from dataclasses import replace, field, dataclass
 
 import torch
-import typing as t
-from fx2trt_oss.fx import lower_to_trt
 import torchvision
+from fx2trt_oss.fx import lower_to_trt
 
 
 """

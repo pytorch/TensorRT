@@ -2,8 +2,8 @@ import warnings
 
 import torch
 import torch.fx
-import torch.fx.experimental.fx_acc.acc_ops as acc_ops
-from torch.fx.experimental.fx_acc.acc_utils import (
+import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
+from fx2trt_oss.tracer.acc_tracer.acc_utils import (
     get_attr,
 )
 
@@ -17,15 +17,15 @@ def fuse_sparse_matmul_add(gm: torch.fx.GraphModule):
     def forward(self, x):
         a = self.a
         b = self.b
-        addmm_mm = torch.fx.experimental.fx_acc.acc_ops.matmul(input = a, other = b);  a = b = None
-        addmm_add = torch.fx.experimental.fx_acc.acc_ops.add(input = addmm_mm, other = x);  addmm_mm = x = None
+        addmm_mm = fx2trt_oss.tracer.acc_tracer.acc_ops.matmul(input = a, other = b);  a = b = None
+        addmm_add = fx2trt_oss.tracer.acc_tracer.acc_ops.add(input = addmm_mm, other = x);  addmm_mm = x = None
         return addmm_add
 
     After:
     def forward(self, x):
         a = self.a
         b = self.b
-        linear_1 = torch.fx.experimental.fx_acc.acc_ops.linear(input = a, weight = b, bias = x);  a = b = x = None
+        linear_1 = fx2trt_oss.tracer.acc_tracer.acc_ops.linear(input = a, weight = b, bias = x);  a = b = x = None
         return linear_1
     """
     counter = 0
@@ -181,9 +181,10 @@ def fuse_unsqueeze_cat_sum(gm: torch.fx.GraphModule):
 
 
 try:
+    # @manual=//deeplearning/trt/python:py_tensorrt
     import tensorrt as trt
     from fx2trt_oss.fx.converter_registry import tensorrt_converter
-    from fx2trt_oss.fx.converters.acc_ops_converters import (
+    from fx2trt_oss.fx.converters.converter_utils import (
         get_trt_tensor,
         add_binary_elementwise_layer,
         broadcast,

@@ -1,8 +1,14 @@
-import torch
+# @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
+import torch
 from fx2trt_oss.fx.converter_registry import tensorrt_converter
 
-from .converter_utils import extend_mod_attr_to_tuple, mark_as_int8_layer, to_numpy, get_dyn_range
+from .converter_utils import (
+    extend_mod_attr_to_tuple,
+    mark_as_int8_layer,
+    to_numpy,
+    get_dyn_range,
+)
 
 def common_conv(network, mod, dimension, input_val, layer_name, is_quantized):
     if mod.padding_mode != "zeros":

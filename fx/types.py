@@ -1,5 +1,6 @@
 from typing import Tuple, Sequence
 
+# @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 
 if hasattr(trt, "__version__"):

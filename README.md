@@ -2,7 +2,7 @@
 This package provide pure eager-mode tooling to convert a PyTorch nn.Module to a TensorRT engine.
 
 ## Installation
-First, let's install PyTorch. 
+First, let's install PyTorch.
 ```
 conda install -y pytorch cudatoolkit=11.3 -c pytorch-nightly
 ```
@@ -18,15 +18,12 @@ Then, it's simply as this.
 cd fx2trt
 python setup.py install
 ```
-## Test 
-Follow instruction in [pytorch/benchmark](https://github.com/pytorch/benchmark) to setup some benchmarks. 
+## Test
+Follow instruction in [pytorch/benchmark](https://github.com/pytorch/benchmark) to setup some benchmarks.
 
 Then try using `--fx2trt` for individual cases, e.g.
 ```
 cd benchmark
 python run.py resnet50 -d cuda -t eval -m eager --fx2trt
 ```
-And you should expect TensorRT logs being printed and the case ran through without error. 
-
-
-
+And you should expect TensorRT logs being printed and the case ran through without error.

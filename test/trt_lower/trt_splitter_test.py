@@ -5,12 +5,12 @@ import operator
 import torch  # isort:skip
 import torch.fx  # isort:skip
 
-import torch.fx.experimental.fx_acc.acc_ops as acc_ops
+import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
 import torch.fx.passes.operator_support as op_support
 import torch.fx.passes.shape_prop as shape_prop
 from fx2trt_oss.fx.tools.trt_splitter import TRTSplitter
 from torch.fx.passes import splitter_base
-from torch.fx.experimental.fx_acc import acc_tracer
+from fx2trt_oss.tracer.acc_tracer import acc_tracer
 from torch.testing._internal.common_utils import TestCase, run_tests
 
 

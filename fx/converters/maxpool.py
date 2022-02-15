@@ -1,8 +1,12 @@
-import torch
+# @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
+import torch
 from fx2trt_oss.fx.converter_registry import tensorrt_converter
 
-from .converter_utils import mark_as_int8_layer, extend_mod_attr_to_tuple
+from .converter_utils import (
+    mark_as_int8_layer,
+    extend_mod_attr_to_tuple,
+)
 
 def common_maxpool(network, mod, dimension, input_val, layer_name):
     kernel_size = extend_mod_attr_to_tuple(mod, "kernel_size", dimension)

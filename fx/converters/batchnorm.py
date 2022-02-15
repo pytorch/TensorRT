@@ -1,9 +1,15 @@
-import torch
 import numpy as np
+
+# @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
+import torch
 from fx2trt_oss.fx.converter_registry import tensorrt_converter
 
-from .converter_utils import mark_as_int8_layer, to_numpy, get_dyn_range
+from .converter_utils import (
+    mark_as_int8_layer,
+    to_numpy,
+    get_dyn_range,
+)
 
 def common_batchnorm(network, mod, input_val, layer_name, is_quantized):
     scale = to_numpy(mod.weight) / np.sqrt(
