@@ -305,60 +305,71 @@ void MapInputsAndDetermineDTypes(
     CompileSpec& cfg,
     std::shared_ptr<torch::jit::Graph>& g,
     ir::StaticParams& static_params,
-    ir::TypeMap& first_use_type_map) {
+    ir::CollectionTypeMap& first_use_type_map) {
+    // ir::TypeMap& first_use_type_map) {
   // Associate input specs with inputs
-  cfg.convert_info.inputs = std::move(ir::associate_specs_with_inputs(g, cfg.inputs, static_params));
-  auto tensor_inputs = ir::get_tensor_inputs(g, static_params);
-  LOG_DEBUG("In MapInputsAndDetermineDTypes " << "g->inputs() size " << g->inputs().size() << ", tensor_inputs size " << tensor_inputs.size());
+  // cfg.convert_info.inputs = std::move(ir::associate_specs_with_inputs(g, cfg.inputs, static_params));
+  cfg.convert_info.collection_inputs = std::move(ir::associate_specs_with_collection_inputs(g, cfg.graph_inputs, static_params));
+
+  auto collection_inputs = ir::get_collection_inputs(g, static_params);
+  LOG_DEBUG("In MapInputsAndDetermineDTypes " << "g->inputs() size " << g->inputs().size() << ", collection_inputs size " << collection_inputs.size());
   // for (auto& in : g->inputs()) {
   //   if (static_params.find(in) == static_params.end()) {
-    for (auto in : tensor_inputs) {
-      ir::Input& spec = cfg.convert_info.inputs.find(in)->second;
-      c10::optional<at::ScalarType> est_type_opt = {};
+    for (auto in : collection_inputs) {
+      std::vector<ir::Input>& spec = cfg.convert_info.collection_inputs.find(in)->second;
+      // ir::Input& spec = cfg.convert_info.inputs.find(in)->second;
+      // c10::optional<at::ScalarType> est_type_opt = {};
+      std::vector<c10::optional<at::ScalarType>> est_type_opt;
+      
       auto est_it = first_use_type_map.find(in);
       if (est_it != first_use_type_map.end()) {
         est_type_opt = first_use_type_map.find(in)->second;
       }
-      if (est_type_opt && !spec.dtype_is_user_defined) {
-        // If we can calculate the type from the graph and the type was not defined by the user then use the calculated
-        // type
-        LOG_INFO(
-            "Since input type is not explicitly defined, infering using first tensor calculation\n  Found input "
-            << in->debugName() << " has type " << est_type_opt.value()
-            << ". If this is incorrect explicitly set dtype for input and file a bug");
-        spec.dtype = util::ScalarTypeToTRTDataType(est_type_opt.value());
-      } else if (!est_type_opt && !spec.dtype_is_user_defined) {
-        // If we cannot calculate the type and the user did not define the type, then default to FP32
-        LOG_WARNING(
-            "Cannot infer input type from calcuations in graph for input "
-            << in->debugName() << ". Assuming it is Float32. If not, specify input type explicity");
-        spec.dtype = nvinfer1::DataType::kFLOAT;
-      } else if (spec.dtype_is_user_defined && cfg.partition_info.enabled) {
-        if (!est_type_opt) {
-          LOG_INFO("Cannot infer input tensor dtype in graph. Using user provided input dtype settings");
-          first_use_type_map[in] = {util::TRTDataTypeToScalarType(cfg.convert_info.inputs.find(in)->second.dtype)};
-        } else {
-          if (util::TRTDataTypeToScalarType(cfg.convert_info.inputs.find(in)->second.dtype) != est_type_opt.value()) {
-            std::stringstream ss;
-            ss << "For input " << in->debugName() << ", found user specified input dtype as ";
-            ss << cfg.convert_info.inputs.find(in)->second.dtype;
-            ss << ", however when inspecting the graph, the input type expected was inferred to be ";
-            ss << est_type_opt.value() << std::endl;
-            ss << "The compiler is going to use the user setting " << cfg.convert_info.inputs.find(in)->second.dtype;
-            ss << "\nThis conflict may cause an error at runtime due to partial compilation being enabled and therefore\n";
-            ss << "compatibility with PyTorch's data type convention is required.\n";
-            ss << "If you do indeed see errors at runtime either:\n";
-            ss << "- Remove the dtype spec for " << in->debugName() << std::endl;
-            ss << "- Disable partial compilation by setting require_full_compilation to True";
-            auto warn_str = ss.str();
-            LOG_WARNING(warn_str);
+      // traverse elements in est_type_out and spec
+      for (int i = 0; i < est_type_opt.size(); i++) {
+        if (est_type_opt[i] && !spec[i].dtype_is_user_defined) {
+          // If we can calculate the type from the graph and the type was not defined by the user then use the calculated
+          // type
+          LOG_INFO(
+              "Since input type is not explicitly defined, infering using first tensor calculation\n  Found input "
+              << in->debugName() << " has type " << est_type_opt[i].value()
+              << ". If this is incorrect explicitly set dtype for input and file a bug");
+          spec[i].dtype = util::ScalarTypeToTRTDataType(est_type_opt[i].value());
+        } else if (!est_type_opt[i] && !spec[i].dtype_is_user_defined) {
+          // If we cannot calculate the type and the user did not define the type, then default to FP32
+          LOG_WARNING(
+              "Cannot infer input type from calcuations in graph for input "
+              << in->debugName() << ". Assuming it is Float32. If not, specify input type explicity");
+          spec[i].dtype = nvinfer1::DataType::kFLOAT;
+        } else if (spec[i].dtype_is_user_defined && cfg.partition_info.enabled) {
+          if (!est_type_opt[i]) {
+            LOG_INFO("Cannot infer input tensor dtype in graph, unable to verify user input dtype settings");
+          } else {
+            // if (util::TRTDataTypeToScalarType(cfg.convert_info.inputs.find(in)->second.dtype) != est_type_opt.value()) {
+              if (util::TRTDataTypeToScalarType(cfg.convert_info.collection_inputs.find(in)->second[i].dtype) != est_type_opt[i].value()) {
+              std::stringstream ss;
+              ss << "For input " << in->debugName() << ", found user specified input dtype as ";
+              ss << cfg.convert_info.collection_inputs.find(in)->second[i].dtype;
+              // ss << cfg.convert_info.inputs.find(in)->second.dtype;
+              ss << ", however when inspecting the graph, the input type expected was inferred to be ";
+              ss << est_type_opt[i].value() << std::endl;
+              // ss << "The compiler is going to use the user setting " << cfg.convert_info.inputs.find(in)->second.dtype;
+              ss << "The compiler is going to use the user setting " << cfg.convert_info.collection_inputs.find(in)->second[i].dtype;
+              ss << "\nThis conflict may cause an error at runtime due to partial compilation being enabled and therefore\n";
+              ss << "compatibility with PyTorch's data type convention is required.\n";
+              ss << "If you do indeed see errors at runtime either:\n";
+              ss << "- Remove the dtype spec for " << in->debugName() << std::endl;
+              ss << "- Disable partial compilation by setting require_full_compilation to True";
+              auto warn_str = ss.str();
+              LOG_WARNING(warn_str);
+              // Overwrite type map with user settings
+              // first_use_type_map[in] = {util::TRTDataTypeToScalarType(cfg.convert_info.inputs.find(in)->second.dtype)};
+              first_use_type_map[in][i] = {util::TRTDataTypeToScalarType(cfg.convert_info.collection_inputs.find(in)->second[i].dtype)};
+            }
           }
-          // Overwrite type map with user settings
-          // We use this map for partitiioning since we need c10::ScalarTypes not nvinfer::DataTypes
-          first_use_type_map[in] = {util::TRTDataTypeToScalarType(cfg.convert_info.inputs.find(in)->second.dtype)};
+        } else {
+          // The user defined the type so no changes are necessary
         }
-      } else {
-        // The user defined the type so no changes are necessary
       }
     }
   // }
@@ -383,7 +394,8 @@ std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::
   auto params = graph_and_parameters.second;
   auto static_params = ir::get_static_params(g->inputs(), params);
   // Infer the type of an input from the weights of the calculation
-  auto first_use_types = ir::get_block_first_calc_dtypes_opt(g->block());
+  // auto first_use_types = ir::get_block_first_calc_dtypes_opt(g->block());
+  auto first_use_types = ir::get_block_first_calc_dtypes_opt_collection(g->block());
 
   // GPU default WS size : 1 GB
   // Set WS = 256 Mb for Jetson nano/TX1 like platforms whose compute capability is 5.X.
@@ -423,7 +435,8 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
       auto params = graph_and_parameters.second;
       auto static_params = ir::get_static_params(g->inputs(), params);
       // Infer the type of an input from the weights of the calculation
-      auto first_use_types = ir::get_block_first_calc_dtypes_opt(g->block());
+      // auto first_use_types = ir::get_block_first_calc_dtypes_opt(g->block());
+      auto first_use_types = ir::get_block_first_calc_dtypes_opt_collection(g->block());
 
       MapInputsAndDetermineDTypes(cfg, g, static_params, first_use_types);
       auto isBlockConvertible = conversion::VerifyConverterSupportForBlock(g->block(), true);

@@ -83,8 +83,8 @@ TEST(CppAPITests, TestCollection) {
   // // Compile module
   auto trt_mod = torch_tensorrt::torchscript::compile(mod, compile_settings);
   LOG_DEBUG("Finish compile");
-  // auto trt_out = trt_mod.forward(complex_inputs);
-  auto trt_out = trt_mod.forward(complex_inputs_list);
+  auto trt_out = trt_mod.forward(complex_inputs);
+  // auto trt_out = trt_mod.forward(complex_inputs_list);
 
 
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(out.toTensor(), trt_out.toTensor(), 1e-5));
