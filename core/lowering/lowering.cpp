@@ -32,7 +32,7 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, LowerInfo lower_info) {
   torch::jit::InlineFunctionalGraphs(g);
   torch::jit::PeepholeOptimize(g, false);
   torch::jit::FuseLinear(g);
-  torch::jit::LowerAllTuples(g);
+  // torch::jit::LowerAllTuples(g);
   if (!lower_info.disable_cse) {
     torch::jit::EliminateCommonSubexpression(g);
   }

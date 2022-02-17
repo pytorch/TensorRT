@@ -22,7 +22,7 @@ struct CompileSpec {
     inputs = graph_inputs.flattened_inputs;
   }
   ir::GraphInputs graph_inputs;
-  std::vector<ir::Input> inputs;
+  std::vector<ir::Input> inputs; // can be replaced by graph_inputs
   conversion::ConversionInfo convert_info;
   lowering::LowerInfo lower_info;
   partitioning::PartitionInfo partition_info;
