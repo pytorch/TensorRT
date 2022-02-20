@@ -58,8 +58,8 @@ c10::optional<at::ScalarType> get_value_first_calc_dtype_opt(torch::jit::Block* 
   auto consumers = in->uses();
   auto search_list = std::vector<torch::jit::Use>(consumers.begin(), consumers.end());
 
-  for (auto& u : search_list) {
-    auto n = u.user;
+  for (auto iter = search_list.begin(); iter != search_list.end(); ++iter) {
+    auto n = iter->user;
     LOG_GRAPH("Node we are looking at: " << util::node_info(n));
     auto ins = n->inputs();
     auto outs = n->outputs();
@@ -94,7 +94,9 @@ c10::optional<at::ScalarType> get_value_first_calc_dtype_opt(torch::jit::Block* 
       for (auto o : outs) {
         if (o->type() == c10::TensorType::get()) {
           auto o_uses = o->uses();
+          int offset = iter - search_list.begin();
           search_list.insert(search_list.end(), o_uses.begin(), o_uses.end());
+          iter = search_list.begin() + offset;
         }
       }
       continue;
@@ -123,7 +125,9 @@ c10::optional<at::ScalarType> get_value_first_calc_dtype_opt(torch::jit::Block* 
     for (auto o : outs) {
       if (o->type() == c10::TensorType::get()) {
         auto o_uses = o->uses();
+        int offset = iter - search_list.begin();
         search_list.insert(search_list.end(), o_uses.begin(), o_uses.end());
+        iter = search_list.begin() + offset;
       }
     }
   }

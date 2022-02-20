@@ -209,7 +209,6 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
   info.convert_info.engine_settings.disable_tf32 = disable_tf32;
   info.convert_info.engine_settings.refit = refit;
   info.convert_info.engine_settings.debug = debug;
-  info.convert_info.engine_settings.strict_types = strict_types;
   info.convert_info.engine_settings.device.device_type = toTRTDeviceType(device.device_type);
   info.convert_info.engine_settings.device.gpu_id = device.gpu_id;
   info.convert_info.engine_settings.device.dla_core = device.dla_core;
@@ -217,6 +216,7 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
   info.partition_info.enabled = torch_fallback.enabled;
   info.partition_info.min_block_size = torch_fallback.min_block_size;
   info.partition_info.forced_fallback_operators = torch_fallback.forced_fallback_operators;
+  info.partition_info.truncate_long_and_double = truncate_long_and_double;
   info.lower_info.forced_fallback_modules = torch_fallback.forced_fallback_modules;
   info.convert_info.engine_settings.truncate_long_and_double = truncate_long_and_double;
 
@@ -227,8 +227,6 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
   info.convert_info.engine_settings.num_avg_timing_iters = num_avg_timing_iters;
   TORCHTRT_CHECK(workspace_size >= 0, "workspace_size must be 0 or greater");
   info.convert_info.engine_settings.workspace_size = workspace_size;
-  TORCHTRT_CHECK(max_batch_size >= 0, "max_batch_size must be 0 or greater");
-  info.convert_info.engine_settings.max_batch_size = max_batch_size;
   return info;
 }
 
@@ -249,13 +247,11 @@ std::string CompileSpec::stringify() {
   ss << "    \"Sparsity\": " << sparse_weights << std::endl;
   ss << "    \"Refit\": " << refit << std::endl;
   ss << "    \"Debug\": " << debug << std::endl;
-  ss << "    \"Strict Types\": " << strict_types << std::endl;
   ss << "    \"Device\": " << device.to_str() << std::endl;
   ss << "    \"Engine Capability\": " << to_str(capability) << std::endl;
   ss << "    \"Num Min Timing Iters\": " << num_min_timing_iters << std::endl;
   ss << "    \"Num Avg Timing Iters\": " << num_avg_timing_iters << std::endl;
   ss << "    \"Workspace Size\": " << workspace_size << std::endl;
-  ss << "    \"Max Batch Size\": " << max_batch_size << std::endl;
   ss << "    \"Truncate long and double\": " << truncate_long_and_double << std::endl;
   ss << "    \"Torch Fallback\": " << torch_fallback.to_str();
   ss << "}";

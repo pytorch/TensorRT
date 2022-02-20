@@ -280,9 +280,21 @@ GraphAndMapping ConstructFallbackGraph(
     }
   }
 
-  for (auto& output : block->outputs()) {
-    if (old_to_new_g.count(output)) {
-      new_g->registerOutput(old_to_new_g[output]);
+  if (block->outputs().size() > 1) {
+    std::vector<torch::jit::Value*> fallback_graph_vector;
+    for (auto& output : block->outputs()) {
+      if (old_to_new_g.count(output)) {
+        fallback_graph_vector.push_back(old_to_new_g[output]);
+      }
+    }
+    torch::jit::ArrayRef<torch::jit::Value*> fallback_graph_outputs(fallback_graph_vector);
+    auto return_tuple_node = new_g->createTuple(fallback_graph_outputs);
+    new_g->block()->appendNode(return_tuple_node);
+    // Set the output as the produced tuple
+    new_g->registerOutput(return_tuple_node->outputs()[0]);
+  } else {
+    if (old_to_new_g.count(block->outputs()[0])) {
+      new_g->registerOutput(old_to_new_g[block->outputs()[0]]);
     }
   }
   return {new_g, old_to_new_g};
@@ -416,7 +428,7 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
       if (cfg.partition_info.enabled &&
           !(cfg.lower_info.forced_fallback_modules.size() == 0 &&
             cfg.partition_info.forced_fallback_operators.size() == 0 &&
-            conversion::VerifyConverterSupportForBlock(g->block(), false))) {
+            conversion::VerifyConverterSupportForBlock(g->block(), true))) {
         auto input_ivalues_map = partitioning::generateRandomInputs(cfg.convert_info.inputs, first_use_types);
         auto graph_and_mapping = ConstructFallbackGraph(new_mod, g->block(), input_ivalues_map, cfg, static_params);
         new_g = graph_and_mapping.first;

@@ -865,7 +865,6 @@ to use
       <span class="s2">"inputs"</span><span class="p">:</span> <span class="p">[</span><span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">Input</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">])],</span>
       <span class="s2">"enabled_precisions"</span><span class="p">:</span> <span class="p">{</span><span class="n">torch</span><span class="o">.</span><span class="n">float</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">int8</span><span class="p">},</span>
       <span class="s2">"calibrator"</span><span class="p">:</span> <span class="n">calibrator</span><span class="p">,</span>
-      <span class="s2">"max_batch_size"</span><span class="p">:</span> <span class="mi">32</span><span class="p">,</span>
   <span class="p">}</span>
 
 <span class="n">trt_mod</span> <span class="o">=</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">compile_settings</span><span class="p">)</span>

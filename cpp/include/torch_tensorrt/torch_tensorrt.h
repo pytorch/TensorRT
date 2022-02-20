@@ -627,12 +627,6 @@ struct TORCHTRT_API CompileSpec {
   bool truncate_long_and_double = false;
 
   /**
-   * Restrict operating type to only the lowest enabled operation precision
-   * (enabled_precisions)
-   */
-  bool strict_types = false;
-
-  /**
    * Target Device
    */
   Device device;
@@ -655,11 +649,6 @@ struct TORCHTRT_API CompileSpec {
    * Maximum size of workspace given to TensorRT
    */
   uint64_t workspace_size = 0;
-
-  /**
-   * Maximum batch size (must be >= 1 to be set, 0 means not set)
-   */
-  uint64_t max_batch_size = 0;
 
   /**
    * Calibration dataloaders for each input for post training quantizatiom

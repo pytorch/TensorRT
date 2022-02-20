@@ -53,7 +53,6 @@ TEST(CppAPITests, RuntimeThreadSafety) {
 
   // FP32 execution
   compile_settings.enabled_precisions = {torch::kFloat};
-  compile_settings.strict_types = true;
   auto trt_mod = torch_tensorrt::ts::compile(mod, compile_settings);
   std::cout << "torch_tensorrt::ts::compile" << std::endl;
 

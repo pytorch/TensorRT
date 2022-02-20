@@ -38,7 +38,6 @@ at the documentation for the Torch-TensorRT ``TensorRTCompileSpec`` API.
                 "enabled_precisions": {torch.float, torch.half},
                 "refit": False,
                 "debug": False,
-                "strict_types": False,
                 "device": {
                     "device_type": torch_tensorrt.DeviceType.GPU,
                     "gpu_id": 0,
@@ -48,7 +47,6 @@ at the documentation for the Torch-TensorRT ``TensorRTCompileSpec`` API.
                 "capability": torch_tensorrt.EngineCapability.default,
                 "num_min_timing_iters": 2,
                 "num_avg_timing_iters": 1,
-                "max_batch_size": 0,
             })
         }
 

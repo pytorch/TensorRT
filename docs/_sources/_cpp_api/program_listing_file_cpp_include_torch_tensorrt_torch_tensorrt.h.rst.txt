@@ -247,8 +247,6 @@ Program Listing for File torch_tensorrt.h
    
      bool truncate_long_and_double = false;
    
-     bool strict_types = false;
-   
      Device device;
    
      EngineCapability capability = EngineCapability::kSTANDARD;
@@ -257,8 +255,6 @@ Program Listing for File torch_tensorrt.h
      uint64_t num_avg_timing_iters = 1;
    
      uint64_t workspace_size = 0;
-   
-     uint64_t max_batch_size = 0;
    
      nvinfer1::IInt8Calibrator* ptq_calibrator = nullptr;
    

@@ -196,10 +196,6 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> _ts_C.CompileSpec:
         assert isinstance(compile_spec["debug"], bool)
         info.debug = compile_spec["debug"]
 
-    if "strict_types" in compile_spec:
-        assert isinstance(compile_spec["strict_types"], bool)
-        info.strict_types = compile_spec["strict_types"]
-
     if "device" in compile_spec:
         info.device = _parse_device(compile_spec["device"])
 
@@ -219,10 +215,6 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> _ts_C.CompileSpec:
         assert type(compile_spec["workspace_size"]) is int
         info.workspace_size = compile_spec["workspace_size"]
 
-    if "max_batch_size" in compile_spec:
-        assert type(compile_spec["max_batch_size"]) is int
-        info.max_batch_size = compile_spec["max_batch_size"]
-
     if "truncate_long_and_double" in compile_spec:
         assert type(compile_spec["truncate_long_and_double"]) is bool
         info.truncate_long_and_double = compile_spec["truncate_long_and_double"]
@@ -240,12 +232,10 @@ def TensorRTCompileSpec(inputs=[],
                         enabled_precisions=set(),
                         refit=False,
                         debug=False,
-                        strict_types=False,
                         capability=_enums.EngineCapability.default,
                         num_min_timing_iters=2,
                         num_avg_timing_iters=1,
                         workspace_size=0,
-                        max_batch_size=0,
                         truncate_long_and_double=False,
                         calibrator=None) -> torch.classes.tensorrt.CompileSpec:
     """Utility to create a formated spec dictionary for using the PyTorch TensorRT backend
@@ -276,12 +266,10 @@ def TensorRTCompileSpec(inputs=[],
         enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
         refit (bool): Enable refitting
         debug (bool): Enable debuggable engine
-        strict_types (bool): Kernels should strictly run in a particular operating precision. Enabled precision should only have one type in the set
         capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
         num_min_timing_iters (int): Number of minimization timing iterations used to select kernels
         num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
         workspace_size (int): Maximum size of workspace given to TensorRT
-        max_batch_size (int): Maximum batch size (must be >= 1 to be set, 0 means not set)
         truncate_long_and_double (bool): Truncate weights provided in int64 or double (float64) to int32 and float32
         calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
 
@@ -298,12 +286,10 @@ def TensorRTCompileSpec(inputs=[],
         "enabled_precisions": enabled_precisions,  # Enabling FP16 kernels
         "refit": refit,  # enable refit
         "debug": debug,  # enable debuggable engine
-        "strict_types": strict_types,  # kernels should strictly run in operating precision
         "capability": capability,  # Restrict kernel selection to safe gpu kernels or safe dla kernels
         "num_min_timing_iters": num_min_timing_iters,  # Number of minimization timing iterations used to select kernels
         "num_avg_timing_iters": num_avg_timing_iters,  # Number of averaging timing iterations used to select kernels
         "workspace_size": workspace_size,  # Maximum size of workspace given to TensorRT
-        "max_batch_size": max_batch_size,  # Maximum batch size (must be >= 1 to be set, 0 means not set)
         "calibrator": calibrator,
         "truncate_long_and_double": truncate_long_and_double
     }
@@ -348,12 +334,10 @@ def TensorRTCompileSpec(inputs=[],
     backend_spec._set_refit(parsed_spec.refit)
     backend_spec._set_debug(parsed_spec.debug)
     backend_spec._set_refit(parsed_spec.refit)
-    backend_spec._set_strict_types(parsed_spec.strict_types)
     backend_spec._set_capability(int(parsed_spec.capability))
     backend_spec._set_num_min_timing_iters(parsed_spec.num_min_timing_iters)
     backend_spec._set_num_avg_timing_iters(parsed_spec.num_avg_timing_iters)
     backend_spec._set_workspace_size(parsed_spec.workspace_size)
-    backend_spec._set_max_batch_size(parsed_spec.max_batch_size)
     backend_spec._set_truncate_long_and_double(parsed_spec.truncate_long_and_double)
     backend_spec._set_ptq_calibrator(parsed_spec._get_calibrator_handle())
 

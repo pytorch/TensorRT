@@ -636,14 +636,6 @@
            <em class="sig-param">
             <span class="n">
              <span class="pre">
-              max_batch_size=0
-             </span>
-            </span>
-           </em>
-           ,
-           <em class="sig-param">
-            <span class="n">
-             <span class="pre">
               calibrator=None
              </span>
             </span>
@@ -999,18 +991,6 @@ to select device type.
               <li>
                <p>
                 <strong>
-                 max_batch_size
-                </strong>
-                (
-                <em>
-                 int
-                </em>
-                ) – Maximum batch size (must be &gt;= 1 to be set, 0 means not set)
-               </p>
-              </li>
-              <li>
-               <p>
-                <strong>
                  truncate_long_and_double
                 </strong>
                 (
@@ -1278,14 +1258,6 @@ to select device type.
             <span class="n">
              <span class="pre">
               workspace_size=0
-             </span>
-            </span>
-           </em>
-           ,
-           <em class="sig-param">
-            <span class="n">
-             <span class="pre">
-              max_batch_size=0
              </span>
             </span>
            </em>
@@ -1623,18 +1595,6 @@ to select device type.
                  int
                 </em>
                 ) – Maximum size of workspace given to TensorRT
-               </p>
-              </li>
-              <li>
-               <p>
-                <strong>
-                 max_batch_size
-                </strong>
-                (
-                <em>
-                 int
-                </em>
-                ) – Maximum batch size (must be &gt;= 1 to be set, 0 means not set)
                </p>
               </li>
               <li>
@@ -2066,14 +2026,6 @@ Registers the forward method to execute the TensorRT engine with the function si
            <em class="sig-param">
             <span class="n">
              <span class="pre">
-              strict_types=False
-             </span>
-            </span>
-           </em>
-           ,
-           <em class="sig-param">
-            <span class="n">
-             <span class="pre">
               capability=&lt;EngineCapability.default:
              </span>
              <span class="pre">
@@ -2102,14 +2054,6 @@ Registers the forward method to execute the TensorRT engine with the function si
             <span class="n">
              <span class="pre">
               workspace_size=0
-             </span>
-            </span>
-           </em>
-           ,
-           <em class="sig-param">
-            <span class="n">
-             <span class="pre">
-              max_batch_size=0
              </span>
             </span>
            </em>
@@ -2147,7 +2091,7 @@ Registers the forward method to execute the TensorRT engine with the function si
               at
              </span>
              <span class="pre">
-              0x7f46e97338f0&gt;
+              0x7f8ddf3bc030&gt;
              </span>
             </span>
            </span>
@@ -2360,18 +2304,6 @@ to select device type.
               <li>
                <p>
                 <strong>
-                 strict_types
-                </strong>
-                (
-                <em>
-                 bool
-                </em>
-                ) – Kernels should strictly run in a particular operating precision. Enabled precision should only have one type in the set
-               </p>
-              </li>
-              <li>
-               <p>
-                <strong>
                  capability
                 </strong>
                 (
@@ -2417,18 +2349,6 @@ to select device type.
                  int
                 </em>
                 ) – Maximum size of workspace given to TensorRT
-               </p>
-              </li>
-              <li>
-               <p>
-                <strong>
-                 max_batch_size
-                </strong>
-                (
-                <em>
-                 int
-                </em>
-                ) – Maximum batch size (must be &gt;= 1 to be set, 0 means not set)
                </p>
               </li>
               <li>
