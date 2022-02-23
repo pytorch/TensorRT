@@ -1,3 +1,4 @@
+# flake8: noqa
 import math
 import operator
 import warnings
@@ -396,7 +397,34 @@ def acc_ops_batch_norm(
 
 
 @tensorrt_converter(acc_ops.layer_norm)
-def acc_ops_layer_norm(
+def acc_ops_layer_norm(network, target, args, kwargs, name):
+    input_val = kwargs["input"]
+
+    if not isinstance(input_val, trt.tensorrt.ITensor):
+        raise RuntimeError(f"LayerNorm received input {input_val} that is not part "
+                           "of the TensorRT region!")
+
+    gamma = kwargs["weight"].detach().cpu().float().numpy()
+    gamma_field = trt.PluginField("gamma", gamma, trt.PluginFieldType.FLOAT32)
+    beta = kwargs["bias"].detach().cpu().float().numpy()
+    beta_field = trt.PluginField("beta", beta, trt.PluginFieldType.FLOAT32)
+    eps_field = trt.PluginField("eps", np.array([kwargs["eps"]], dtype=np.float32), trt.PluginFieldType.FLOAT32)
+    field_collection = trt.PluginFieldCollection([gamma_field, beta_field, eps_field])
+
+    try:
+        if network.has_implicit_batch_dimension:
+            plugin = get_trt_plugin("layer_norm", field_collection, "1", "fx2trt")
+        else:
+            plugin = get_trt_plugin("LayerNormDynamic", field_collection, "1", "fx2trt")
+    except AssertionError:
+        print("Unable to find layer norm plugin, fall back to TensorRT implementation.")
+        return layer_norm(network, target, args, kwargs, name)
+    layer = network.add_plugin_v2([input_val], plugin)
+    layer.name = name
+    return layer.get_output(0)
+
+
+def layer_norm(
     network: TRTNetwork,
     target: Target,
     args: Tuple[Argument, ...],
@@ -1057,6 +1085,24 @@ def acc_ops_minimum(
         network, kwargs["input"], kwargs["other"], trt.ElementWiseOperation.MIN, target, name
     )
 
+@tensorrt_converter(acc_ops.fmod)
+def acc_ops_fmod(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    # NOTE: TRT doesnt currently implement fmod so we need multiple operations to perform it
+    trunc_div_value = trunc_div(kwargs["input"], kwargs["other"], network, target, name + "_trunc_div")
+    prod_value = add_binary_elementwise_layer(
+        network, trunc_div_value, kwargs["other"], trt.ElementWiseOperation.PROD, target, name + "_prod"
+    )
+    sub_value = add_binary_elementwise_layer(
+        network, kwargs["input"], prod_value, trt.ElementWiseOperation.SUB, target, name + "_sub"
+    )
+    return sub_value
+
 
 @tensorrt_converter(acc_ops.max_pool2d)
 def acc_ops_max_pool2d(
@@ -1527,6 +1573,14 @@ def acc_ops_linear(
     )
     weight = get_trt_tensor(network, kwargs["weight"].t(), f"{name}_weight")
 
+    if isinstance(kwargs["weight"], torch.Tensor):
+        weight = get_trt_tensor(network, kwargs["weight"].t(), f"{name}_weight")
+        weight_op = trt.MatrixOperation.NONE
+    else:
+        assert isinstance(kwargs["weight"], TRTTensor), f"Expect weight to be trt tensor but got {type(kwargs['weight'])}"
+        weight = kwargs["weight"]
+        weight_op = trt.MatrixOperation.TRANSPOSE
+
     preset_diff = 0
     if len(input_val.shape) == 1:
         preset_diff -= 1
@@ -1535,7 +1589,7 @@ def acc_ops_linear(
         input_op = trt.MatrixOperation.NONE
 
     input_val, weight = broadcast(network, input_val, weight, f"{name}_input", f"{name}_weight", preset_diff)
-    matmul_layer = network.add_matrix_multiply(input_val, input_op, weight, trt.MatrixOperation.NONE)
+    matmul_layer = network.add_matrix_multiply(input_val, input_op, weight, weight_op)
     set_layer_name(matmul_layer, target, f"{name}_matmul")
     res = matmul_layer.get_output(0)
 

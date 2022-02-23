@@ -19,6 +19,7 @@ elementwise_ops = [
     ((lambda x, y: torch.div(x, y, rounding_mode="trunc")), acc_ops.trunc_div, not NEED_TEST_BOTH_CONSTANTS_CASE),
     ((lambda x, y: torch.div(x, y, rounding_mode="floor")), acc_ops.floor_div, NEED_TEST_BOTH_CONSTANTS_CASE),
     ((lambda x, y: torch.div(x, y)), acc_ops.div, NEED_TEST_BOTH_CONSTANTS_CASE),
+    ((lambda x, y: torch.fmod(x, y)), acc_ops.fmod, not NEED_TEST_BOTH_CONSTANTS_CASE),
     # torch.floor_divide rounds result toward zero, rather than -Inf.
     # https://github.com/pytorch/pytorch/issues/43874
     ((lambda x, y: torch.floor_divide(x, y)), acc_ops.trunc_div, not NEED_TEST_BOTH_CONSTANTS_CASE),

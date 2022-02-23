@@ -465,6 +465,7 @@ def dropout_mapper(node: torch.fx.Node, mod: nn.Module):
 
 try:
     from torchvision.ops import stochastic_depth
+    assert callable(stochastic_depth)
 except Exception as e:
     warnings.warn(f"Unable to import torchvision related libraries.: {e}")
 else:
@@ -1045,6 +1046,14 @@ def min_dim_reduce(*, input, dim=None, keepdim=False):
 @register_acc_op
 def minimum(*, input, other):
     return torch.minimum(input=input, other=other)
+
+
+@register_acc_op_properties(AccOpProperty.pointwise)
+@register_acc_op_mapping(op_and_target=("call_function", torch.fmod))
+@register_acc_op_mapping(op_and_target=("call_method", "fmod"))
+@register_acc_op
+def fmod(*, input, other):
+    return torch.fmod(input=input, other=other)
 
 
 @register_acc_op_properties(AccOpProperty.pointwise, AccOpProperty.unary)

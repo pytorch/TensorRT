@@ -240,7 +240,6 @@ class LowerTrtInterpreter:
             strict_type_constraints=self.lower_setting.strict_type_constraints,
             algorithm_selector=algo_selector,
             timing_cache=cache_data,
-            profiling_verbosity=trt.ProfilingVerbosity.DETAILED,
         )
 
         # Update timing cache file if needed

@@ -1531,6 +1531,10 @@ class AccTracerTest(unittest.TestCase):
         self._make_acc_op_function_test(acc_ops.div, lambda x: torch.div(x, 2))
         self._make_acc_op_function_test(acc_ops.div, lambda x: x / 2)
 
+    def test_fmod(self):
+        self._make_acc_op_function_test(acc_ops.fmod, lambda x: torch.fmod(x, 1.3))
+        self._make_acc_op_function_test(acc_ops.fmod, lambda x: torch.fmod(x, -0.4))
+
     def test_floor_div(self):
         self._make_acc_op_function_test(
             acc_ops.floor_div, lambda x: torch.div(x, 2, rounding_mode="floor")
@@ -2036,6 +2040,7 @@ class AccTracerTest(unittest.TestCase):
                 acc_ops.sub,
                 acc_ops.mul,
                 acc_ops.div,
+                acc_ops.fmod,
                 acc_ops.floor_div,
                 acc_ops.trunc_div,
                 acc_ops.pow,
