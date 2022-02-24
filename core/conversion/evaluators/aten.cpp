@@ -288,14 +288,18 @@ auto aten_registrations TORCHTRT_UNUSED =
         .evaluator({c10::Symbol::fromQualString("aten::extend"),
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                       if (args.at(n->input(0)).IValue()->isList() && args.at(n->input(1)).IValue()->isList()) {
-                        auto self = args.at(n->input(0)).IValue()->to<c10::List<c10::IValue>>();
+                        c10::IValue* self_ptr = args.at(n->input(0)).IValueMut();
+                        auto self = self_ptr->to<c10::List<c10::IValue>>();
                         auto other = args.at(n->input(1)).IValue()->to<c10::List<c10::IValue>>();
                         const int64_t other_size = other.size();
 
+                        // Modify value in place
                         for (int64_t i = 0; i < other_size; i++) {
                           self.push_back(other.get(i));
                         }
-                        return self;
+
+                        *self_ptr = c10::IValue(self);
+                        return {};
                       } else {
                         TORCHTRT_THROW_ERROR(
                             "Unimplemented data type for aten::extend.t evaluator: "
