@@ -5,7 +5,6 @@
 #include "NvInfer.h"
 #include "third_party/args/args.hpp"
 #include "torch/script.h"
-#include "torch/torch.h"
 
 #include "torch_tensorrt/logging.h"
 #include "torch_tensorrt/ptq.h"
@@ -38,8 +37,7 @@ int main(int argc, char** argv) {
 
   args::Flag build_debuggable_engine(
       parser, "build-debuggable-engine", "Creates a debuggable engine", {"build-debuggable-engine"});
-  args::Flag use_strict_types(
-      parser, "use-strict-types", "Restrict operating type to only use set operation precision", {"use-strict-types"});
+
   args::Flag allow_gpu_fallback(
       parser,
       "allow-gpu-fallback",
@@ -56,7 +54,7 @@ int main(int argc, char** argv) {
       parser,
       "method_name",
       "Check the support for end to end compilation of a specified method in the TorchScript module",
-      {"supported", "is-supported", "check-support", "check-method-op-support"});
+      {"check-method-support"});
 
   args::Flag disable_tf32(
       parser, "disable-tf32", "Prevent Float32 layers from using the TF32 data format", {"disable-tf32"});
@@ -105,7 +103,7 @@ int main(int argc, char** argv) {
 
   args::ValueFlag<uint64_t> min_block_size(
       parser,
-      "min-block-size",
+      "num_ops",
       "Minimum number of contiguous TensorRT supported ops to compile a subgraph to TensorRT",
       {"mbs", "min-block-size"});
 
@@ -238,7 +236,6 @@ int main(int argc, char** argv) {
   if (build_debuggable_engine) {
     compile_settings.debug = true;
   }
-
 
   if (allow_gpu_fallback) {
     compile_settings.device.allow_gpu_fallback = true;

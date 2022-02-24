@@ -31,17 +31,12 @@ torchtrtc [input_file_path] [output_file_path]
         --i, --info                       Dumps info messages generated during
                                           compilation onto the console
       --build-debuggable-engine         Creates a debuggable engine
-      --use-strict-types                Restrict operating type to only use set
-                                        operation precision
       --allow-gpu-fallback              (Only used when targeting DLA
                                         (device-type)) Lets engine run layers on
                                         GPU if they are not supported on DLA
       --require-full-compilation        Require that the model should be fully
                                         compiled to TensorRT or throw an error
-      --is-supported=[method_name],
-      --supported=[method_name],
-      --check-support=[method_name],
-      --check-method-op-support=[method_name]
+      --check-method-support=[method_name]
                                         Check the support for end to end
                                         compilation of a specified method in the
                                         TorchScript module
@@ -79,8 +74,8 @@ torchtrtc [input_file_path] [output_file_path]
                                         (Repeatable) Module that should always
                                         be run in Pytorch for execution (partial
                                         compilation must be enabled)
-      --mbs=[min-block-size],
-      --min-block-size=[min-block-size] Minimum number of contiguous TensorRT
+      --mbs=[num_ops],
+      --min-block-size=[num_ops]        Minimum number of contiguous TensorRT
                                         supported ops to compile a subgraph to
                                         TensorRT
       --embed-engine                    Whether to treat input file as a
@@ -122,6 +117,7 @@ torchtrtc [input_file_path] [output_file_path]
                                         32)@f16%NHWC"
       "--" can be used to terminate flag options and force all following
       arguments to be treated as positional options
+
 ```
 
 e.g.
