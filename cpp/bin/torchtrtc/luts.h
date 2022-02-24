@@ -8,7 +8,7 @@
 namespace torchtrtc {
 namespace luts {
 
-at::ScalarType to_torch_dtype(torchtrt::DataType dtype) {
+inline at::ScalarType to_torch_dtype(torchtrt::DataType dtype) {
   switch (dtype) {
     case torchtrt::DataType::kHalf:
       return at::kHalf;
