@@ -54,7 +54,7 @@ int main(int argc, char** argv) {
 
   args::ValueFlag<std::string> check_method_op_support(
       parser,
-      "check-method-op-support",
+      "method_name",
       "Check the support for end to end compilation of a specified method in the TorchScript module",
       {"supported", "is-supported", "check-support", "check-method-op-support"});
 
@@ -93,15 +93,15 @@ int main(int argc, char** argv) {
 
   args::ValueFlagList<std::string> torch_executed_ops(
       parser,
-      "torch-executed-ops",
+      "op_name",
       "(Repeatable) Operator in the graph that should always be run in PyTorch for execution (partial compilation must be enabled)",
-      {"teo", "torch-executed-ops"});
+      {"teo", "torch-executed-op"});
 
   args::ValueFlagList<std::string> torch_executed_mods(
       parser,
-      "torch-executed-mods",
+      "module_name",
       "(Repeatable) Module that should always be run in Pytorch for execution (partial compilation must be enabled)",
-      {"tem", "torch-executed-mods"});
+      {"tem", "torch-executed-mod"});
 
   args::ValueFlag<uint64_t> min_block_size(
       parser,
