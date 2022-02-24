@@ -10,7 +10,14 @@ config_setting(
 cc_binary(
     name = "torchtrtc",
     srcs = [
+        "accuracy.h",
+        "accuracy.cpp",
+        "fileio.h",
+        "fileio.cpp",
+        "luts.h",
         "main.cpp",
+        "parser_util.h",
+        "parser_util.cpp"
     ],
     deps = [
         "//third_party/args",
