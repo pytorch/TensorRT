@@ -329,6 +329,7 @@ void MapInputsAndDetermineDTypes(
       } else if (spec.dtype_is_user_defined && cfg.partition_info.enabled) {
         if (!est_type_opt) {
           LOG_INFO("Cannot infer input tensor dtype in graph, unable to verify user input dtype settings");
+          first_use_type_map[in] = {util::TRTDataTypeToScalarType(cfg.convert_info.inputs.find(in)->second.dtype)};
         } else {
           if (util::TRTDataTypeToScalarType(cfg.convert_info.inputs.find(in)->second.dtype) != est_type_opt.value()) {
             std::stringstream ss;
