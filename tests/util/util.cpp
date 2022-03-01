@@ -5,21 +5,19 @@ namespace torch_tensorrt {
 namespace tests {
 namespace util {
 
-bool checkRtol(const at::Tensor& diff, const std::vector<at::Tensor> inputs, float threshold) {
-  double maxValue = 0.0;
-  for (auto& tensor : inputs) {
-    maxValue = fmax(tensor.abs().max().item<float>(), maxValue);
-  }
-  std::cout << "Max Difference: " << diff.abs().max().item<float>() << std::endl;
-  std::cout << "Acceptable Threshold: " << threshold << std::endl;
-  return diff.abs().max().item<float>() <= threshold * maxValue;
-}
 
-bool almostEqual(const at::Tensor& a, const at::Tensor& b, float threshold) {
+bool almostEqual(const at::Tensor& a, const at::Tensor& b, float threshold, float atol=1e-8, float rtol=1e-5) {
   LOG_GRAPH(a << std::endl << b << std::endl);
   auto a_float = a.toType(at::kFloat);
   auto b_float = b.toType(at::kFloat);
-  return checkRtol(a_float - b_float, {a_float, b_float}, threshold);
+
+  auto diff = a_float - b_float;
+  auto result = diff.abs().max().item<float>() - (atol + rtol * b.abs().max().item<float>());
+
+  std::cout << "Max Difference: " << result << std::endl;
+  std::cout << "Acceptable Threshold: " << threshold << std::endl;
+
+  return result <= threshold;
 }
 
 bool exactlyEqual(const at::Tensor& a, const at::Tensor& b) {
