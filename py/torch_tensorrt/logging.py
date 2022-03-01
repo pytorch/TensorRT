@@ -1,6 +1,4 @@
 from enum import Enum
-from hashlib import new
-from imp import new_module
 from torch_tensorrt._C import _get_logging_prefix, _set_logging_prefix, \
                               _get_reportable_log_level, _set_reportable_log_level, \
                               _get_is_colored_output_on,  _set_is_colored_output_on, \
@@ -99,7 +97,6 @@ def log(level: Level, msg: str):
     """
     _log(Level._to_internal_level(level), msg)
 
-
     InternalError = LogLevel.INTERNAL_ERROR
     Error = LogLevel.ERROR
     Warning = LogLevel.WARNING
@@ -107,7 +104,16 @@ def log(level: Level, msg: str):
     Debug = LogLevel.DEBUG
     Graph = LogLevel.GRAPH
 
+
 class internal_errors:
+    """Context-manager to limit displayed log messages to just internal errors
+
+    Example::
+
+    with torch_tensorrt.logging.internal_errors():
+        outputs = model_torchtrt(inputs)
+    """
+
     def __enter__(self):
         self.external_lvl = get_reportable_log_level()
         set_reportable_log_level(Level.InternalError)
@@ -115,7 +121,16 @@ class internal_errors:
     def __exit__(self, exc_type, exc_value, exc_tb):
         set_reportable_log_level(self.external_lvl)
 
+
 class errors:
+    """Context-manager to limit displayed log messages to just errors and above
+
+    Example::
+
+    with torch_tensorrt.logging.errors():
+        outputs = model_torchtrt(inputs)
+    """
+
     def __enter__(self):
         self.external_lvl = get_reportable_log_level()
         set_reportable_log_level(Level.Error)
@@ -123,7 +138,16 @@ class errors:
     def __exit__(self, exc_type, exc_value, exc_tb):
         set_reportable_log_level(self.external_lvl)
 
+
 class warnings:
+    """Context-manager to limit displayed log messages to just warnings and above
+
+    Example::
+
+    with torch_tensorrt.logging.warnings():
+        model_trt = torch_tensorrt.compile(model, **spec)
+    """
+
     def __enter__(self):
         self.external_lvl = get_reportable_log_level()
         set_reportable_log_level(Level.Warning)
@@ -131,7 +155,16 @@ class warnings:
     def __exit__(self, exc_type, exc_value, exc_tb):
         set_reportable_log_level(self.external_lvl)
 
+
 class info:
+    """Context-manager to display all info and greater severity messages
+
+    Example::
+
+    with torch_tensorrt.logging.info():
+        model_trt = torch_tensorrt.compile(model, **spec)
+    """
+
     def __enter__(self):
         self.external_lvl = get_reportable_log_level()
         set_reportable_log_level(Level.Info)
@@ -139,7 +172,16 @@ class info:
     def __exit__(self, exc_type, exc_value, exc_tb):
         set_reportable_log_level(self.external_lvl)
 
+
 class debug:
+    """Context-manager to display full debug information through the logger
+
+    Example::
+
+    with torch_tensorrt.logging.debug():
+        model_trt = torch_tensorrt.compile(model, **spec)
+    """
+
     def __enter__(self):
         self.external_lvl = get_reportable_log_level()
         set_reportable_log_level(Level.Debug)
@@ -147,7 +189,17 @@ class debug:
     def __exit__(self, exc_type, exc_value, exc_tb):
         set_reportable_log_level(self.external_lvl)
 
+
 class graphs:
+    """Context-manager to display the results of intermediate lowering passes
+    as well as full debug information through the logger
+
+    Example::
+
+    with torch_tensorrt.logging.graphs():
+        model_trt = torch_tensorrt.compile(model, **spec)
+    """
+
     def __enter__(self):
         self.external_lvl = get_reportable_log_level()
         set_reportable_log_level(Level.Graph)
