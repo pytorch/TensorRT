@@ -1,4 +1,6 @@
 from enum import Enum
+from hashlib import new
+from imp import new_module
 from torch_tensorrt._C import _get_logging_prefix, _set_logging_prefix, \
                               _get_reportable_log_level, _set_reportable_log_level, \
                               _get_is_colored_output_on,  _set_is_colored_output_on, \
@@ -96,3 +98,60 @@ def log(level: Level, msg: str):
         msg (str): Actual message text
     """
     _log(Level._to_internal_level(level), msg)
+
+
+    InternalError = LogLevel.INTERNAL_ERROR
+    Error = LogLevel.ERROR
+    Warning = LogLevel.WARNING
+    Info = LogLevel.INFO
+    Debug = LogLevel.DEBUG
+    Graph = LogLevel.GRAPH
+
+class InternalErrors:
+    def __enter__(self):
+        self.external_lvl = get_reportable_log_level()
+        set_reportable_log_level(Level.InternalError)
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        set_reportable_log_level(self.external_lvl)
+
+class Errors:
+    def __enter__(self):
+        self.external_lvl = get_reportable_log_level()
+        set_reportable_log_level(Level.Error)
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        set_reportable_log_level(self.external_lvl)
+
+class Warnings:
+    def __enter__(self):
+        self.external_lvl = get_reportable_log_level()
+        set_reportable_log_level(Level.Warning)
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        set_reportable_log_level(self.external_lvl)
+
+class Info:
+    def __enter__(self):
+        self.external_lvl = get_reportable_log_level()
+        set_reportable_log_level(Level.Info)
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        set_reportable_log_level(self.external_lvl)
+
+class Debug:
+    def __enter__(self):
+        self.external_lvl = get_reportable_log_level()
+        set_reportable_log_level(Level.Debug)
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        set_reportable_log_level(self.external_lvl)
+
+class Graphs:
+    def __enter__(self):
+        self.external_lvl = get_reportable_log_level()
+        set_reportable_log_level(Level.Graph)
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        set_reportable_log_level(self.external_lvl)
+
