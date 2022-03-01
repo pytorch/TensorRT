@@ -107,7 +107,7 @@ def log(level: Level, msg: str):
     Debug = LogLevel.DEBUG
     Graph = LogLevel.GRAPH
 
-class InternalErrors:
+class internal_errors:
     def __enter__(self):
         self.external_lvl = get_reportable_log_level()
         set_reportable_log_level(Level.InternalError)
@@ -115,7 +115,7 @@ class InternalErrors:
     def __exit__(self, exc_type, exc_value, exc_tb):
         set_reportable_log_level(self.external_lvl)
 
-class Errors:
+class errors:
     def __enter__(self):
         self.external_lvl = get_reportable_log_level()
         set_reportable_log_level(Level.Error)
@@ -123,7 +123,7 @@ class Errors:
     def __exit__(self, exc_type, exc_value, exc_tb):
         set_reportable_log_level(self.external_lvl)
 
-class Warnings:
+class warnings:
     def __enter__(self):
         self.external_lvl = get_reportable_log_level()
         set_reportable_log_level(Level.Warning)
@@ -131,7 +131,7 @@ class Warnings:
     def __exit__(self, exc_type, exc_value, exc_tb):
         set_reportable_log_level(self.external_lvl)
 
-class Info:
+class info:
     def __enter__(self):
         self.external_lvl = get_reportable_log_level()
         set_reportable_log_level(Level.Info)
@@ -139,7 +139,7 @@ class Info:
     def __exit__(self, exc_type, exc_value, exc_tb):
         set_reportable_log_level(self.external_lvl)
 
-class Debug:
+class debug:
     def __enter__(self):
         self.external_lvl = get_reportable_log_level()
         set_reportable_log_level(Level.Debug)
@@ -147,11 +147,10 @@ class Debug:
     def __exit__(self, exc_type, exc_value, exc_tb):
         set_reportable_log_level(self.external_lvl)
 
-class Graphs:
+class graphs:
     def __enter__(self):
         self.external_lvl = get_reportable_log_level()
         set_reportable_log_level(Level.Graph)
 
     def __exit__(self, exc_type, exc_value, exc_tb):
         set_reportable_log_level(self.external_lvl)
-
