@@ -180,7 +180,7 @@ def run_trt_compatibility_tests(session, use_host_env=False):
     copy_model(session)
     session.chdir(os.path.join(TOP_DIR, 'tests/py'))
     tests = [
-        "test_trt_intercompatability.py",
+        "test_trt_intercompatibility.py",
         "test_ptq_trt_calibrator.py",
     ]
     for test in tests:
