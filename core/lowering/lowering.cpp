@@ -1,6 +1,7 @@
 #include "torch/csrc/jit/passes/common_subexpression_elimination.h"
 #include "torch/csrc/jit/passes/create_functional_graphs.h"
 #include "torch/csrc/jit/passes/dead_code_elimination.h"
+#include "torch/csrc/jit/passes/erase_number_types.h"
 #include "torch/csrc/jit/passes/freeze_module.h"
 #include "torch/csrc/jit/passes/fuse_linear.h"
 #include "torch/csrc/jit/passes/guard_elimination.h"
@@ -62,6 +63,8 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, LowerInfo lower_info) {
   passes::RemoveNOPs(g);
   passes::AliasOperators(g);
   passes::SiluToSigmoidMultipication(g);
+  passes::RemoveSingleUse0DTensors(g);
+  passes::RemoveUnnecessaryCasts(g);
   LOG_GRAPH(*g);
 }
 

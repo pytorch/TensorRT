@@ -22,6 +22,7 @@ cc_library(
         "remove_contiguous.cpp",
         "remove_dropout.cpp",
         "remove_nops.cpp",
+        "remove_unnecessary_casts.cpp",
         "silu_to_sigmoid_multiplication.cpp",
         "unpack_addmm.cpp",
         "unpack_batch_norm.cpp",
