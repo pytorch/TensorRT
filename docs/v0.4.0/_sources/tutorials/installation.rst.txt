@@ -85,7 +85,7 @@ You need to download the tarball distributions of TensorRT and cuDNN from the NV
     * https://developer.nvidia.com/cudnn
     * https://developer.nvidia.com/tensorrt
 
-Place these files in a directory (the directories ``thrid_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]`` exist for this purpose)
+Place these files in a directory (the directories ``third_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]`` exist for this purpose)
 
 Then compile referencing the directory with the tarballs
 
@@ -96,7 +96,7 @@ Release Build
 
 .. code-block:: shell
 
-    bazel build //:libtrtorch -c opt --distdir thrid_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]
+    bazel build //:libtrtorch -c opt --distdir third_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]
 
 A tarball with the include files and library can then be found in ``bazel-bin``
 
@@ -109,7 +109,7 @@ To build with debug symbols use the following command
 
 .. code-block:: shell
 
-    bazel build //:libtrtorch -c dbg --distdir thrid_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]
+    bazel build //:libtrtorch -c dbg --distdir third_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]
 
 A tarball with the include files and library can then be found in ``bazel-bin``
 
@@ -120,7 +120,7 @@ To build using the pre-CXX11 ABI use the ``pre_cxx11_abi`` config
 
 .. code-block:: shell
 
-    bazel build //:libtrtorch --config pre_cxx11_abi -c [dbg/opt] --distdir thrid_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]
+    bazel build //:libtrtorch --config pre_cxx11_abi -c [dbg/opt] --distdir third_party/distdir/[x86_64-linux-gnu | aarch64-linux-gnu]
 
 A tarball with the include files and library can then be found in ``bazel-bin``
 
