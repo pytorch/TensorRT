@@ -1,7 +1,7 @@
 import warnings
-from typing import List, NamedTuple, Any, Optional, Sequence, Dict
+from typing import List, NamedTuple, Any, Optional, Sequence, Dict, Callable
 
-import fx2trt_oss.fx.diagnostics as diagnostics
+from fx2trt_oss.fx.observer import Observer
 import numpy
 
 # @manual=//deeplearning/trt/python:py_tensorrt
@@ -14,6 +14,8 @@ from torch.fx.passes.shape_prop import TensorMetadata
 from .converter_registry import CONVERTERS
 from .input_tensor_spec import InputTensorSpec
 from .utils import torch_dtype_to_trt, get_dynamic_dims
+
+TRT_INTERPRETER_CALL_PRE_OBSERVER: Observer[Callable[[torch.fx.GraphModule], None]] = Observer("TRT_INTERPRETER_CALL_PRE_OBSERVER")
 
 
 class TRTInterpreterResult(NamedTuple):
@@ -153,17 +155,14 @@ class TRTInterpreter(torch.fx.Interpreter):
         timing_cache=None,
         profiling_verbosity=None,
     ) -> TRTInterpreterResult:
-        diagnostics.write(
-            "trt_interpreter.graph.input",
-            lambda: str(self.module.graph),
-        )
+        TRT_INTERPRETER_CALL_PRE_OBSERVER.observe(self.module)
 
         # For float outputs, we set their dtype to fp16 only if fp16_mode=True and
         # force_fp32_output=False.
         self.output_fp16 = not force_fp32_output and fp16_mode
 
         if int8_mode and not self.builder.platform_has_fast_int8:
-            warnings.warn("Current platform doesn't support fast native int8!")
+            raise RuntimeError("Current platform doesn't support fast native int8!")
 
         if fp16_mode and not self.builder.platform_has_fast_fp16:
             warnings.warn("Current platform doesn't support fast native fp16!")

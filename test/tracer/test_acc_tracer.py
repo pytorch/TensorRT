@@ -319,6 +319,49 @@ class AccTracerTest(unittest.TestCase):
 
         self.assertTrue(torch.equal(m(input), traced(input)))
 
+    def test_conv3d(self):
+        """
+        Test that a conv is traced as expected.
+        """
+
+        class TestModule(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.conv = nn.Conv3d(8, 7, 3, stride=2)
+
+            def forward(self, a: torch.Tensor) -> torch.Tensor:
+                return self.conv(a)
+
+        m = TestModule()
+        input = torch.randn(3, 8, 8, 10, 10)
+        traced = acc_tracer.trace(m, [input])
+
+        ph = weight_attr = bias_attr = conv = None
+        for node in traced.graph.nodes:
+            if node.op == "placeholder":
+                self.assertEqual(str(node.target), "a")
+                ph = node
+            elif node.op == "get_attr" and node.target == "conv.weight":
+                weight_attr = node
+            elif node.op == "get_attr" and node.target == "conv.bias":
+                bias_attr = node
+            elif node.op == "call_function":
+                self.assertEqual(node.target, acc_ops.conv3d)
+                self.assertEqual(node.kwargs["input"], ph)
+                self.assertEqual(node.kwargs["weight"], weight_attr)
+                self.assertEqual(node.kwargs["bias"], bias_attr)
+                self.assertEqual(node.kwargs["stride"], (2, 2, 2))
+                self.assertEqual(node.kwargs["padding"], (0, 0, 0))
+                self.assertEqual(node.kwargs["dilation"], (1, 1, 1))
+                self.assertEqual(node.kwargs["groups"], 1)
+                conv = node
+            elif node.op == "output":
+                self.assertEqual(conv, node.args[0])
+            else:
+                self.fail(f"Unexpected node: {node.format_node()}")
+
+        self.assertTrue(torch.equal(m(input), traced(input)))
+
     def test_embedding_bag(self):
         """
         Test that an embedding_bag is traced as expected.
@@ -557,7 +600,7 @@ class AccTracerTest(unittest.TestCase):
 
         m = TestModule()
         test_input = torch.randn(1, 3)
-        traced = acc_tracer.trace(m, test_input)
+        traced = acc_tracer.trace(m, [test_input])
         ph = weight_attr = bias_attr = linear = None
         for node in traced.graph.nodes:
             if node.op == "placeholder":
@@ -1317,7 +1360,7 @@ class AccTracerTest(unittest.TestCase):
 
         m = TestModule()
         x = torch.randn(3, 4, 5)
-        traced = acc_tracer.trace(m, x)
+        traced = acc_tracer.trace(m, [x])
         ph_x = hardsigmoid_y = res_y = None
         for node in traced.graph.nodes:
             if node.op == "placeholder":
@@ -2074,6 +2117,7 @@ class AccTracerTest(unittest.TestCase):
                 acc_ops.size,
                 acc_ops.split,
                 acc_ops.conv2d,
+                acc_ops.conv3d,
                 acc_ops.batch_norm,
                 acc_ops.embedding_bag,
                 acc_ops.embedding_bag_byte_rowwise_offsets,

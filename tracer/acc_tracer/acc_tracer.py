@@ -210,6 +210,8 @@ class ConditionalExceptionWrapper(nn.Module):
 class AccRewritingTracer(Tracer):
     # Add an explicit check for mutable operations, which break symbolic tracing.
     check_mutable_operations = True
+    # Disble proxying buffers, which currently breaks some quantization code
+    proxy_buffer_attributes = False
 
     # Note: Treat ConditionalExceptionWrapper as a leaf so that we don't
     # trace into it, because it contains control flow and raises an exception.
@@ -287,7 +289,7 @@ def _rewrite(mod_to_rewrite: nn.Module, allow_list: Optional[Set] = None, leaf_m
             # into RewrittenModule.
             for method_name in dir(base_class):
                 method = getattr(base_class, method_name, None)
-                if method is None:
+                if method is None and method_name not in {"__doc__"}:
                     _LOGGER.warning(f"{__qualname__} does not have attribute {method_name}")
 
                 if builtins.type(method) is not FunctionType:
@@ -433,6 +435,7 @@ def trace(
     )
 
     assert isinstance(rewritten_mod, nn.Module)
+    assert isinstance(sample_inputs, list) or isinstance(sample_inputs, tuple)
     # Note: use the rewritten_mod here as the root. This is necessary because
     # RewrittenModule includes a new module for the ConditionalExceptionWrapper.
     traced = torch.fx.GraphModule(rewritten_mod, rewritten_graph)

@@ -1,42 +1,41 @@
 # Owner(s): ["oncall: quantization"]
 
-import torch
+import copy
+import itertools
+import operator
+import unittest
+
 import fx2trt_oss.tracer.acc_tracer.acc_tracer as acc_tracer
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.nn.quantized._reference as nnqr
 from fx2trt_oss.fx import (
     TRTInterpreter,
     InputTensorSpec,
     TRTModule,
 )
-from torch.ao.quantization import (
-    default_qconfig
+from fx2trt_oss.fx.lower import run_const_fold
+from fx2trt_oss.tracer.acc_tracer import acc_ops
+from torch.ao.quantization import default_qconfig
+from torch.ao.quantization._quantize_fx_do_not_use import (
+    _convert_fx_do_not_use,
+)
+from torch.ao.quantization.fx.backend_config.observation_type import ObservationType
+from torch.ao.quantization.fx.match_utils import (
+    MatchAllNode,
 )
 from torch.ao.quantization.quantize_fx import (
     prepare_fx,
     prepare_qat_fx,
     get_tensorrt_backend_config_dict,
 )
-from torch.ao.quantization._quantize_fx_do_not_use import (
-    _convert_fx_do_not_use,
-)
-from torch.ao.quantization.fx.match_utils import (
-    MatchAllNode,
-)
+from torch.testing._internal.common_cuda import TEST_CUDA
+from torch.testing._internal.common_quantization import NodeSpec as ns
 from torch.testing._internal.common_quantization import (
     QuantizationTestCase,
 )
-from torch.ao.quantization.fx.backend_config.observation_type import ObservationType
-
-import torch.nn.functional as F
-import torch.nn as nn
-import torch.nn.quantized._reference as nnqr
-
-from torch.testing._internal.common_cuda import TEST_CUDA
 from torch.testing._internal.common_utils import run_tests
-from torch.testing._internal.common_quantization import NodeSpec as ns
-import unittest
-import itertools
-import copy
-import operator
 
 def lower_to_trt(model, inputs, shape_ranges):
     """ Lower a quantized model to TensorRT
@@ -657,7 +656,7 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
                 y = self.conv(x)
                 return self.standalone(x, y)
 
-        from torch.ao.quantization.fx.backend_config_dict.observation_type import ObservationType
+        from torch.ao.quantization.fx.backend_config.observation_type import ObservationType
         weighted_op_quint8_dtype_config = {
             # optional, input activation dtype
             # TODO: change back to torch.qint8 after input_quantized_idxs and output_quantized_idxs
@@ -742,6 +741,33 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
             ns.call_method("dequantize"): 3,
         }
         self.checkGraphModuleNodes(m.standalone, expected_node_occurrence=standalone_node_occurrence)
+
+    def test_quant_dequant_not_fold(self):
+        class LinearModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.linear = torch.nn.Linear(5, 10).float()
+                self.relu = torch.nn.ReLU()
+
+            def forward(self, x):
+                return self.relu(self.linear(x))
+
+        model = LinearModule().eval()
+        inputs = torch.rand(8, 5)
+
+        prepared = prepare_fx(model, {"": self.qconfig}, backend_config_dict=self.trt_backend_config_dict)
+        quantized = _convert_fx_do_not_use(
+            prepared, is_reference=True, backend_config_dict=self.trt_backend_config_dict)
+
+        model = acc_tracer.trace(quantized, inputs)
+        model = run_const_fold(model)
+
+        no_const = {
+            ns.call_function(acc_ops.quantize_per_tensor): 3,
+            ns.call_function(acc_ops.dequantize): 3,
+        }
+        self.checkGraphModuleNodes(model, expected_node_occurrence=no_const)
+
 
 if __name__ == "__main__":
     run_tests()

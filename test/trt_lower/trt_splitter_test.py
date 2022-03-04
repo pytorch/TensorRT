@@ -78,7 +78,7 @@ class TestSplit(TestCase):
                 d = b + c
                 return d
 
-        mod = acc_tracer.trace(SimpleModule(), torch.randn(2, 3))
+        mod = acc_tracer.trace(SimpleModule(), [torch.randn(2, 3)])
 
         # Making b and c run on ACC
         splitter = TRTSplitter(
@@ -127,7 +127,7 @@ class TestSplit(TestCase):
                 x = self.conv(x)
                 return self.linear(x - self.b)
 
-        mod = acc_tracer.trace(SimpleModule(), torch.randn(1, 1, 1, 1))
+        mod = acc_tracer.trace(SimpleModule(), [torch.randn(1, 1, 1, 1)])
         mod.eval()
 
         splitter = TRTSplitter(
@@ -167,7 +167,7 @@ class TestSplit(TestCase):
             def forward(self, a):
                 return a
 
-        mod = acc_tracer.trace(SimpleModule(), torch.randn(2, 3))
+        mod = acc_tracer.trace(SimpleModule(), [torch.randn(2, 3)])
 
         # Mark any operation as runnable on ACC
         class CustomOpSupport(op_support.OperatorSupportBase):
@@ -196,7 +196,7 @@ class TestSplit(TestCase):
                 res, ind = torch.topk(x, 3)
                 return torch.sigmoid(res), ind
 
-        mod = acc_tracer.trace(MultiOutputModule(), torch.randn(2, 3))
+        mod = acc_tracer.trace(MultiOutputModule(), [torch.randn(2, 3)])
 
         # Mark any operation as runnable on ACC
         class CustomOpSupport(op_support.OperatorSupportBase):
@@ -263,7 +263,7 @@ class TestSplit(TestCase):
             def forward(self, x):
                 return self.relu_module(x) + self.sin_module(x)
 
-        mod = acc_tracer.trace(TestModule3(ReluModule(), SinModule()), torch.randn(2, 3))
+        mod = acc_tracer.trace(TestModule3(ReluModule(), SinModule()), [torch.randn(2, 3)])
 
         # Making sin(x) run on ACC
         splitter = TRTSplitter(
@@ -315,7 +315,7 @@ class TestSplit(TestCase):
                 f = torch.tanh(e)
                 return f
 
-        mod = acc_tracer.trace(TestModule(), torch.randn(2, 3))
+        mod = acc_tracer.trace(TestModule(), [torch.randn(2, 3)])
 
         # Making relu and sigmoid execute on ACC
         splitter = TRTSplitter(
@@ -379,7 +379,7 @@ class TestSplit(TestCase):
                 f = torch.tanh(e)
                 return f
 
-        mod = acc_tracer.trace(TestModule(), torch.randn(2, 3))
+        mod = acc_tracer.trace(TestModule(), [torch.randn(2, 3)])
 
         # Set sin, cos and tanh as acc node and split with settings
         class CustomOpSupport(op_support.OperatorSupport):
@@ -566,7 +566,7 @@ class TestSplit(TestCase):
             def is_node_supported(self, submodules, node):
                 return False
 
-        module_original = acc_tracer.trace(TestModule(), torch.randn(4, 5))
+        module_original = acc_tracer.trace(TestModule(), [torch.randn(4, 5)])
 
         splitter = TRTSplitter(
             module=module_original,
@@ -618,7 +618,7 @@ class TestSplit(TestCase):
             def is_node_supported(self, submodules, node):
                 return False
 
-        module_original = acc_tracer.trace(TestModule(), torch.randn(2, 3))
+        module_original = acc_tracer.trace(TestModule(), [torch.randn(2, 3)])
 
         splitter = TRTSplitter(
             module=module_original,
@@ -665,7 +665,7 @@ class TestSplitComplexGraph(TestCase):
             return f
 
     def test_split_complex_graph_1(self):
-        mod = acc_tracer.trace(self.TestModule(), torch.randn(2, 3))
+        mod = acc_tracer.trace(self.TestModule(), [torch.randn(2, 3)])
 
         # Making 'c' and 'd' run on ACC
         splitter = TRTSplitter(
@@ -1101,7 +1101,7 @@ class TestAccFusionsFinder(TestCase):
                 f = torch.tanh(e)
                 return f
 
-        mod = acc_tracer.trace(TestModule(), torch.randn(2, 3))
+        mod = acc_tracer.trace(TestModule(), [torch.randn(2, 3)])
 
         # Set sin, cos and tanh as acc node and split with settings
         class CustomOpSupport(op_support.OperatorSupport):

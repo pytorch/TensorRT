@@ -1,8 +1,7 @@
 import dataclasses as dc
 import logging
-from typing import Callable, List, Any, Sequence, Type, Set, Optional
+from typing import Callable, List, Any, Sequence, Type, Set, Optional, Tuple
 
-import fx2trt_oss.fx.diagnostics as diagnostics
 import fx2trt_oss.tracer.acc_tracer.acc_tracer as acc_tracer
 
 # @manual=//deeplearning/trt/python:py_tensorrt
@@ -10,11 +9,13 @@ import tensorrt as trt
 import torch
 import torch.fx as fx
 import torch.nn as nn
+from fx2trt_oss.tracer.acc_tracer import acc_ops
 from torch.fx.experimental.const_fold import split_const_subgraphs
 from torch.fx.passes.splitter_base import SplitResult
 
 from .fx2trt import (
     TRTInterpreter,
+    TRTInterpreterResult,
 )
 from .input_tensor_spec import (
     InputTensorSpec,
@@ -34,11 +35,50 @@ from .tools.trt_splitter import TRTSplitter, TRTSplitterSetting
 from .trt_module import (
     TRTModule,
 )
+from fx2trt_oss.fx.observer import Observer
 
 
 logger = logging.getLogger(__name__)
 
 Input = Sequence[Any]
+
+# ----------------------------------------------------------------------
+# OBSERVERS
+# ----------------------------------------------------------------------
+# List of observers. We can subscribe to them by calling its `add(callback)`
+# function from anywhere in code:
+#
+# >>> from fx2trt_oss.fx.lower import FUSE_PASSES_POST_OBSERVER
+# >>> with FUSE_PASSES_POST_OBSERVER.add(print_module_and_input):
+# >>>     # print_module_and_input will be called right after the fuse passes
+# >>>     lower(module, sample_input)
+
+# Observer for the model after the fuse passes.
+FUSE_PASSES_POST_OBSERVER: Observer[
+    Callable[[nn.Module, Input], None]
+] = Observer("FUSE_PASSES_POST_OBSERVER")
+
+# Observer for the TRT split submodules before lowering
+LOWER_SPLIT_PRE_OBSERVER: Observer[
+    Callable[[str, nn.Module, Input], None]
+] = Observer("LOWER_SPLIT_PRE_OBSERVER")
+
+# Observer for the TRT split submodules after lowering
+LOWER_SPLIT_POST_OBSERVER: Observer[
+    Callable[[str, nn.Module, Input], None]
+] = Observer("LOWER_SPLIT_PRE_OBSERVER")
+# ----------------------------------------------------------------------
+
+
+@dc.dataclass(frozen=True)
+class PassContext:
+    input: Input
+    lower_setting: "LowerSetting"
+    module_name: str = ""
+
+
+# Function signature for a graph module pass
+PassFunc = Callable[[nn.Module, PassContext], Tuple[nn.Module, PassContext]]
 
 
 def lower_to_trt(
@@ -84,6 +124,7 @@ def lower_to_trt(
         verbose_log=verbose_log,
         timing_cache_prefix=timing_cache_prefix,
         save_timing_cache=save_timing_cache,
+        cuda_graph_batch_size=cuda_graph_batch_size,
     )
     lowerer = Lowerer.create(lower_setting=lower_setting)
     return lowerer(module, input)
@@ -140,6 +181,8 @@ class LowerSetting:
 
     leaf_module_list (Optional[Set[nn.Module]]): Optional leaf module list where
     modules will not be traced into.
+
+    cuda_graph_batch_size (int): Cuda graph batch size, default to be -1.
     """
     max_batch_size: int = 2048
     input_specs: List[InputTensorSpec] = dc.field(default_factory=list)
@@ -157,6 +200,7 @@ class LowerSetting:
     save_timing_cache: bool = False
     ast_rewriter_allow_list: Optional[Set[Type[nn.Module]]] = None
     leaf_module_list: Optional[Set[Type[nn.Module]]] = None
+    cuda_graph_batch_size: int = -1
 
 
 def run_const_fold(traced_mod: torch.fx.GraphModule) -> torch.fx.GraphModule:
@@ -164,11 +208,11 @@ def run_const_fold(traced_mod: torch.fx.GraphModule) -> torch.fx.GraphModule:
     # weights -> quant -> dequant -> op during constant folding when the model is
     # a quantized int8 model.
     def skip_folding_quant_dequant(node: torch.fx.Node):
-        if node.target != torch.quantize_per_tensor:
+        if node.target != acc_ops.quantize_per_tensor:
             return False
         # If quantize_per_node -> dequantize, then skip folding.
         for user in node.users:
-            if user.target == "dequantize":
+            if user.target == acc_ops.dequantize:
                 return True
         return False
 
@@ -177,11 +221,11 @@ def run_const_fold(traced_mod: torch.fx.GraphModule) -> torch.fx.GraphModule:
     return const_split_mod
 
 
-def default_split_function(model: fx.GraphModule, inputs: Input, lower_setting: LowerSetting) -> SplitResult:
+def default_split_function(model: fx.GraphModule, inputs: Input, lower_setting: LowerSetting, min_acc_module_size: int = 10) -> SplitResult:
     splitter_setting = TRTSplitterSetting()
     splitter_setting.use_implicit_batch_dim = not lower_setting.explicit_batch_dimension
     # TODO: avoid hardcode here by introducing another flag in lowering setting.
-    splitter_setting.min_acc_module_size = 10
+    splitter_setting.min_acc_module_size = min_acc_module_size
     splitter = TRTSplitter(model, inputs, settings=splitter_setting)
     splitter.node_support_preview()
     return splitter.generate_split_results()
@@ -199,7 +243,7 @@ class LowerTrtInterpreter:
         )
         return LowerTrtInterpreter(lower_setting, timing_cache_manager)
 
-    def __call__(self, mod, input, split_name):
+    def __call__(self, mod, input, split_name) -> TRTInterpreterResult:
         input_specs_val = (
             self.lower_setting.input_specs
             if self.lower_setting.input_specs
@@ -209,6 +253,7 @@ class LowerTrtInterpreter:
             mod = fuse_permute_matmul(mod)
             mod = fuse_permute_linear(mod)
             mod = fuse_unsqueeze_cat_sum(mod)
+            FUSE_PASSES_POST_OBSERVER.observe(mod, input)
 
         # Prepare algorithm selector and timing_cache for TRTInterpreter
         algo_selector = None
@@ -232,7 +277,7 @@ class LowerTrtInterpreter:
             else trt.Logger.WARNING,
         )
 
-        interp_result = interpreter.run(
+        interp_result: TRTInterpreterResult = interpreter.run(
             max_batch_size=self.lower_setting.max_batch_size,
             max_workspace_size=self.lower_setting.max_workspace_size,
             fp16_mode=self.lower_setting.fp16_mode,
@@ -283,15 +328,13 @@ class Lowerer:
 
     trace_func: Callable[[nn.Module, Input], fx.GraphModule]
     split_func: Callable[[fx.GraphModule, Input, LowerSetting], SplitResult]
-    trt_interpreter: LowerTrtInterpreter
+    lower_pass: PassFunc
     lower_setting: LowerSetting
-    trt_module_observer: Optional[Callable[[str, nn.Module, List[torch.Tensor]], None]]
 
     @classmethod
     def create(
         cls,
         lower_setting: LowerSetting,
-        trt_module_observer: Optional[Callable[[str, nn.Module, List[torch.Tensor]], None]] = None,
     ) -> "Lowerer":
         """Instantiate a `Lowerer` instance."""
 
@@ -302,16 +345,14 @@ class Lowerer:
                 ast_rewriter_allow_list=lower_setting.ast_rewriter_allow_list,
                 leaf_module_list=lower_setting.leaf_module_list),  # type: ignore[arg-type]
             split_func=default_split_function,
-            trt_interpreter=LowerTrtInterpreter.create(lower_setting),
+            lower_pass=create_lower_pass(create_lower_trt_interpreter),
             lower_setting=lower_setting,
-            trt_module_observer=trt_module_observer,
         )
 
     def __call__(
         self,
         module: nn.Module,
         inputs: Input,
-        cuda_graph_batch_size: int = -1,
     ) -> nn.Module:
         module.eval()
 
@@ -337,22 +378,41 @@ class Lowerer:
 
         for submod_name, submod_inputs in split_result.submodule_inputs.items():
             submod = getattr(split_result.split_module, submod_name)
-            diagnostics.write(f"lower.split.{submod_name}.module.graph", lambda: str(submod.graph))
-            if self.trt_module_observer:
-                self.trt_module_observer(submod_name, submod, submod_inputs)  # type: ignore[arg-type]
+
+            LOWER_SPLIT_PRE_OBSERVER.observe(submod_name, submod, submod_inputs)
 
             # We only lower acc submodules.
             if not submod_name.startswith(split_result.non_acc_submodule_prefix):
-                interp_res = self.trt_interpreter(
-                    submod, submod_inputs, submod_name
+                lowered_module, ctx = self.lower_pass(
+                    submod,
+                    PassContext(submod_inputs, self.lower_setting, submod_name),
                 )
-
-                trt_module = TRTModule(
-                    engine=interp_res.engine,
-                    input_names=interp_res.input_names,
-                    output_names=interp_res.output_names,
-                    cuda_graph_batch_size=cuda_graph_batch_size,
-                )
-                setattr(split_result.split_module, submod_name, trt_module)
+                setattr(split_result.split_module, submod_name, lowered_module)
+                LOWER_SPLIT_POST_OBSERVER.observe(submod_name, lowered_module, ctx.input)
 
         return split_result.split_module
+
+
+def create_lower_pass(
+    create_trt_interpreter: Callable[[PassContext], LowerTrtInterpreter],
+) -> PassFunc:
+
+    def lower_pass(mod: nn.Module, ctx: PassContext) -> Tuple[nn.Module, PassContext]:
+        """
+        Create a module transformation pass which lowers an `fx.GraphModule` into a
+        `TRTModule`
+        """
+        interpreter = create_trt_interpreter(ctx)
+        interp_res: TRTInterpreterResult = interpreter(mod, ctx.input, ctx.module_name)
+        trt_module = TRTModule(
+            engine=interp_res.engine,
+            input_names=interp_res.input_names,
+            output_names=interp_res.output_names,
+            cuda_graph_batch_size=ctx.lower_setting.cuda_graph_batch_size,
+        )
+        return trt_module, ctx
+    return lower_pass
+
+
+def create_lower_trt_interpreter(ctx: PassContext) -> LowerTrtInterpreter:
+    return LowerTrtInterpreter.create(ctx.lower_setting)

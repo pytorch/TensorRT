@@ -22,7 +22,7 @@ class TestTRTOperatorSupport(TestCase):
                 return torch.add(input=x, other=x)
 
         mod = TestModule()
-        traced_mod = acc_tracer.trace(mod, torch.randn(1, 2, 1, 1))
+        traced_mod = acc_tracer.trace(mod, [torch.randn(1, 2, 1, 1)])
         op_support = create_trt_operator_support()
         for node in traced_mod.graph.nodes:
             self.assertTrue(op_support.is_node_supported(mod, node))
@@ -35,7 +35,7 @@ class TestTRTOperatorSupport(TestCase):
                 return torch.split(y, 2)
 
         mod = TestModule()
-        traced_mod = acc_tracer.trace(mod, torch.randn(5, 2))
+        traced_mod = acc_tracer.trace(mod, [torch.randn(5, 2)])
         op_support = create_trt_operator_support(use_implicit_batch_dim=False)
 
         for node in traced_mod.graph.nodes:
@@ -52,7 +52,7 @@ class TestTRTOperatorSupport(TestCase):
                 return nn.functional.gelu(y)
 
         mod = TestModule()
-        traced_mod = acc_tracer.trace(mod, torch.randn(5, 2))
+        traced_mod = acc_tracer.trace(mod, [torch.randn(5, 2)])
         op_support = create_trt_operator_support(use_implicit_batch_dim=True)
 
         for node in traced_mod.graph.nodes:
@@ -70,7 +70,7 @@ class TestTRTOperatorSupport(TestCase):
                 return torch.quantize_per_tensor(x, scale, zeros, torch.quint8)
 
         mod = TestModule()
-        traced_mod = acc_tracer.trace(mod, torch.randn(5, 2))
+        traced_mod = acc_tracer.trace(mod, [torch.randn(5, 2)])
         op_support = create_trt_operator_support(use_implicit_batch_dim=True)
 
         for node in traced_mod.graph.nodes:

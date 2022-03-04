@@ -6,6 +6,8 @@ import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
 from fx2trt_oss.tracer.acc_tracer.acc_utils import (
     get_attr,
 )
+from fx2trt_oss.fx.observer import observable
+
 
 def fuse_sparse_matmul_add(gm: torch.fx.GraphModule):
     """
@@ -97,6 +99,7 @@ def check_permute(node: torch.fx.Node):
     return permutation == allowed_permutation
 
 
+@observable()
 def fuse_permute_linear(gm: torch.fx.GraphModule):
     """
     Fuse pattern like permute + linear if permute is transposing the last two dimension.
@@ -118,6 +121,7 @@ def fuse_permute_linear(gm: torch.fx.GraphModule):
     return gm
 
 
+@observable()
 def fuse_permute_matmul(gm: torch.fx.GraphModule):
     """
     Fuse pattern like permute + matmul if permute is transposing the last two dimension.
@@ -147,6 +151,7 @@ def fuse_permute_matmul(gm: torch.fx.GraphModule):
     return gm
 
 
+@observable()
 def fuse_unsqueeze_cat_sum(gm: torch.fx.GraphModule):
     for node in gm.graph.nodes:
         if node.target != acc_ops.sum:

@@ -120,6 +120,18 @@ class Fx2trtDiagnosticsTest(TestCase):
             False,
         )
 
+        _test_cond(
+            diag.CollectionConditions.not_(  # returns False
+                diag.CollectionConditions.always(),  # returns True
+            ),
+            False,
+        )
+
+        _test_cond(
+            diag.CollectionConditions.when_not_in_tests(),
+            False,  # Yes we are in test right now
+        )
+
         # nested
         _test_cond(
             diag.CollectionConditions.any(

@@ -135,6 +135,10 @@ class CollectionConditions:
         )
 
     @classmethod
+    def not_(cls, condition: "CollectionCondition") -> "CollectionCondition":
+        return lambda ctx: not condition(ctx)
+
+    @classmethod
     def always(cls) -> "CollectionCondition":
         """Always collect"""
         return lambda ctx: True
@@ -151,14 +155,24 @@ class CollectionConditions:
         return lambda ctx: ctx.exception is not None
 
     @classmethod
-    def when_called_by_function(cls, func_name: str) -> "CollectionCondition":
+    def when_called_by_function(cls, func_name: str, match_prefix: bool = False) -> "CollectionCondition":
         def _when_called_by_function(ctx: CollectionConditionContext) -> bool:
             frames = inspect.stack()
             for frame in frames:
-                if frame[3] == func_name:
-                    return True
+                if match_prefix:
+                    if frame[3].startswith(func_name):
+                        return True
+                else:
+                    if frame[3] == func_name:
+                        return True
             return False
         return _when_called_by_function
+
+    @classmethod
+    def when_not_in_tests(cls) -> CollectionCondition:
+        return CollectionConditions.not_(
+            CollectionConditions.when_called_by_function("test_", match_prefix=True)
+        )
 
 
 class DiagnosticsCollector:

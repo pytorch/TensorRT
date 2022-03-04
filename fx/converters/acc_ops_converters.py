@@ -18,13 +18,12 @@ from fx2trt_oss.fx.utils import (
 )
 from torch.fx.immutable_collections import immutable_list
 from torch.fx.node import Target, Argument
-from torch.fx.passes.shape_prop import TensorMetadata
 
 from .converter_utils import *  # noqa: F403
 
-
+@tensorrt_converter(acc_ops.conv3d)
 @tensorrt_converter(acc_ops.conv2d)
-def acc_ops_conv2d(
+def acc_ops_convnd(
     network: TRTNetwork,
     target: Target,
     args: Tuple[Argument, ...],
@@ -35,7 +34,7 @@ def acc_ops_conv2d(
 
     if not isinstance(input_val, TRTTensor):
         raise RuntimeError(
-            f"Conv2d received input {input_val} that is not part "
+            f"Conv received input {input_val} that is not part "
             "of the TensorRT region!"
         )
 
@@ -57,8 +56,7 @@ def acc_ops_conv2d(
         # will need to use uninitialized weight and set it later to support
         # ITensor weights
         dummy_weight = trt.Weights()
-
-        layer = network.add_convolution(
+        layer = network.add_convolution_nd(
             input=input_val,
             num_output_maps=weight.shape[0],
             kernel_shape=weight.shape[2:],
@@ -73,7 +71,7 @@ def acc_ops_conv2d(
                 f"linear {name} has weight of type {type(kwargs['weight'])}, Expect Optional[Tenosr]"
             )
         weight = to_numpy(kwargs["weight"])
-        layer = network.add_convolution(
+        layer = network.add_convolution_nd(
             input=input_val,
             num_output_maps=weight.shape[0],
             kernel_shape=weight.shape[2:],
@@ -82,9 +80,9 @@ def acc_ops_conv2d(
         )
 
     set_layer_name(layer, target, name)
-    layer.stride = kwargs["stride"]
-    layer.padding = kwargs["padding"]
-    layer.dilation = kwargs["dilation"]
+    layer.stride_nd = kwargs["stride"]
+    layer.padding_nd = kwargs["padding"]
+    layer.dilation_nd = kwargs["dilation"]
     if kwargs["groups"] is not None:
         layer.num_groups = kwargs["groups"]
 
@@ -1435,7 +1433,7 @@ def acc_ops_reshape(
             "of the TensorRT region!"
         )
 
-    shape = TensorMetadata(*kwargs["acc_out_ty"]).shape  # type: ignore[misc]
+    shape = kwargs["acc_out_ty"].shape  # type: ignore[misc]
     if network.has_implicit_batch_dimension:
         shape = shape[1:]
 
@@ -1934,10 +1932,10 @@ def acc_ops_quantize_per_tensor(
         raise RuntimeError(f"{name} received input {input_val} that is not part "
                            "of the TensorRT region!")
 
-    qparams = TensorMetadata(*kwargs["acc_out_ty"]).qparams  # type: ignore[misc]
+    qparams = kwargs["acc_out_ty"].qparams  # type: ignore[misc]
     q_scale = qparams["scale"]
     q_zero_point = qparams["zero_point"]
-    dtype = TensorMetadata(*kwargs["acc_out_ty"]).dtype  # type: ignore[misc]
+    dtype = kwargs["acc_out_ty"].dtype  # type: ignore[misc]
     if dtype not in (torch.quint8, torch.qint8, torch.qint32):
         raise RuntimeError("Only support (torch.quint8, torch.qint8, torch.qint32) "
                            f"quantized type in quantize_per_tensor, get {dtype}.")
@@ -1970,11 +1968,11 @@ def acc_ops_quantize_per_channel(
         raise RuntimeError(f"{name} received input {input_val} that is not part "
                            "of the TensorRT region!")
 
-    qparams = TensorMetadata(*kwargs["acc_out_ty"]).qparams  # type: ignore[misc]
+    qparams = kwargs["acc_out_ty"].qparams  # type: ignore[misc]
     q_per_channel_scales = qparams["scale"]
     q_per_channel_zero_points = qparams["zero_point"]
     q_per_channel_axis = qparams["axis"]
-    dtype = TensorMetadata(*kwargs["acc_out_ty"]).dtype  # type: ignore[misc]
+    dtype = kwargs["acc_out_ty"].dtype  # type: ignore[misc]
     if dtype not in (torch.quint8, torch.qint8, torch.qint32):
         raise RuntimeError("Only support (torch.quint8, torch.qint8, torch.qint32) "
                            f"quantized type in quantize_per_tensor, get {dtype}.")
@@ -2017,7 +2015,7 @@ def acc_ops_dequantize(
         raise RuntimeError(f"{name} received input {input_val} that is not part "
                            "of the TensorRT region!")
 
-    qparams = TensorMetadata(*input_val_tensor_meta).qparams  # type: ignore[misc]
+    qparams = input_val_tensor_meta.qparams  # type: ignore[misc]
     qscheme = qparams["qscheme"]
     if qscheme == torch.per_tensor_affine:
         q_scale = qparams["scale"]
@@ -2037,7 +2035,7 @@ def acc_ops_dequantize(
     else:
         raise RuntimeError("Unsupported qscheme in dequantize: {qscheme}")
 
-    dtype = TensorMetadata(*input_val_tensor_meta).dtype  # type: ignore[misc]
+    dtype = input_val_tensor_meta.dtype  # type: ignore[misc]
 
     if dtype not in (torch.quint8, torch.qint8, torch.qint32):
         raise RuntimeError("Only support (torch.quint8, torch.qint8, torch.qint32) "
