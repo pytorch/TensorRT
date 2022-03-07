@@ -12,6 +12,8 @@ Resources:
 - [Comprehensive Discusion (GTC Event)](https://www.nvidia.com/en-us/on-demand/session/gtcfall21-a31107/)
 - [Pre-built Docker Container](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch). To use this container, make an NGC account and sign in to NVIDIA's registry with an API key. Refer to [this guide](https://docs.nvidia.com/ngc/ngc-catalog-user-guide/index.html#registering-activating-ngc-account) for the same.
 
+## NVIDIA NGC Container
+Torch-TensorRT is distributed in the ready-to-run NVIDIA [NGC PyTorch Container](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch) starting with 21.11. We recommend using this prebuilt container to experiment & develop with Torch-TensorRT; it has all dependencies with the proper versions as well as example notebooks included.
 
 ## Building a docker container for Torch-TensorRT
 
