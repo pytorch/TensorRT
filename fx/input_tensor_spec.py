@@ -50,7 +50,7 @@ class InputTensorSpec(NamedTuple):
         return cls(tensor.shape, tensor.dtype, tensor.device)
 
     @classmethod
-    def from_tensors(cls, tensors: Iterable[torch.Tensor]) -> List["InputTensorSpec"]:
+    def from_tensors(cls, tensors: Sequence[torch.Tensor]) -> List["InputTensorSpec"]:
         """
         Produce a list of InputTenosrSpec named tuples which contain
         the information of all the given PyTorch tensors.
@@ -61,6 +61,7 @@ class InputTensorSpec(NamedTuple):
         Returns:
             A list of InputTensorSpec named tuples.
         """
+        assert isinstance(tensors, (list, tuple))
         return [cls.from_tensor(t) for t in tensors]
 
     @classmethod

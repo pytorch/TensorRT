@@ -1,54 +1,55 @@
 # Owner(s): ["oncall: aiacc"]
 
 import logging
-# @manual=//deeplearning/trt/fx2trt_oss:torch_fx2trt
-from fx2trt_oss.fx.lower import Lowerer
-from fx2trt_oss.fx import LowerSetting
+import unittest
+
+from fx2trt_oss.fx import LowerSetting, Lowerer
 import torch
 import torch.fx as fx
 import torch.nn as nn
-from torch.testing._internal.common_utils import TestCase, run_tests
-
 
 logger = logging.getLogger(__name__)
 
 
-class Fx2trtLowerTests(TestCase):
+class Fx2trtLowerTests(unittest.TestCase):
     def test_fx2trt_lower(self):
+        class _Mod(nn.Module):
+            def forward(self, x):
+                return (x, 2 * x)
+
         mod = _Mod()
         mod_traced = fx.symbolic_trace(mod)
         input = [torch.rand(4)]
         lower = Lowerer.create(LowerSetting())
-        mod_lowered = lower(mod_traced, input)
-        assert mod_lowered
+        lower(mod_traced, input)
 
     def test_lower_with_batchnorm_act_rewrite(self):
-        class TestModule(torch.nn.BatchNorm1d):
+        class MyBatchNorm(nn.BatchNorm2d):
             def forward(self, x):
-                return x
+                self._check_input_dim(x)
+                return x + 1
 
+        class TestModule(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.bn = MyBatchNorm(3)
 
-        module = TestModule(2)
-        inputs = torch.randn(1)
-        lower = Lowerer.create(LowerSetting(ast_rewriter_allow_list={TestModule}))
-        result = lower(module, inputs)
-        assert result
+            def forward(self, x):
+                return self.bn(x)
 
+        module = TestModule()
+        inputs = [torch.randn(1, 3, 224, 224)]
+        lower = Lowerer.create(LowerSetting(ast_rewriter_allow_list={MyBatchNorm}))
+        lower(module, inputs)
 
-class _Mod(nn.Module):
-    def forward(self, x):
-        return (x, 2 * x)
+    def test_lower_const_fold(self):
+        class TestModule(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.a = nn.Parameter(torch.randn(1))
 
-if __name__ == '__main__':
-    run_tests()
+            def forward(self, x):
+                return (torch.sqrt(x), self.a)
 
-def test_lower_const_fold():
-    class TestModule(torch.nn.Module):
-        def __init__(self):
-            self.a = torch.randn(1)
-
-        def forward(self, x):
-            return (torch.sqrt(x), self.a)
-
-    lower = Lowerer.create(LowerSetting())
-    assert lower(TestModule(), [2, 2])
+        lower = Lowerer.create(LowerSetting())
+        lower(TestModule(), [torch.randn([2, 2])])

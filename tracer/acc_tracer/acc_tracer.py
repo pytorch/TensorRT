@@ -6,16 +6,16 @@ import logging
 import textwrap
 import warnings
 from types import FunctionType
-from typing import Dict, Optional, Any, Type, Tuple, Set, List
+from typing import Sequence, Dict, Optional, Any, Type, Tuple, Set
 
 import fx2trt_oss.tracer.acc_tracer.acc_normalizer as acc_normalizer
 import fx2trt_oss.tracer.acc_tracer.acc_ops  # noqa: F401
 import torch
 import torch.jit as jit
 import torch.nn as nn
-from torch.fx.experimental.normalize import NormalizeArgs
 from torch._sources import normalize_source_lines
 from torch.fx import Graph, Tracer
+from torch.fx.experimental.normalize import NormalizeArgs
 from torch.fx.passes import shape_prop
 
 
@@ -370,7 +370,7 @@ def _remove_exceptions(gm: torch.fx.GraphModule) -> bool:
 
 def trace(
     mod: nn.Module,
-    sample_inputs: List[torch.Tensor],
+    sample_inputs: Sequence[Any],
     remove_assertions: bool = True,
     remove_exceptions: bool = True,
     use_acc_normalization: bool = True,
@@ -435,7 +435,7 @@ def trace(
     )
 
     assert isinstance(rewritten_mod, nn.Module)
-    assert isinstance(sample_inputs, list) or isinstance(sample_inputs, tuple)
+    assert isinstance(sample_inputs, (list, tuple))
     # Note: use the rewritten_mod here as the root. This is necessary because
     # RewrittenModule includes a new module for the ConditionalExceptionWrapper.
     traced = torch.fx.GraphModule(rewritten_mod, rewritten_graph)
