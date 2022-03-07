@@ -70,7 +70,7 @@ struct SegmentedBlock {
   }
   void eraseInput(size_t i);
   void eraseOutput(size_t i);
-  bool contain_raw_value(torch::jit::Value* input) {
+  bool contain_raw_value(torch::jit::Value* input) const {
     return old_to_new_.count(input);
   }
   void register_inshapes(std::vector<ir::Input>& in_shapes) {
@@ -91,7 +91,7 @@ struct SegmentedBlock {
   void update_target(SegmentedBlockTarget new_target) {
     target_ = new_target;
   }
-  enum SegmentedBlockTarget target() {
+  enum SegmentedBlockTarget target() const {
     return target_;
   }
 

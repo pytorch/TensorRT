@@ -22,6 +22,14 @@ inline bool isTensorOrTensorList(torch::jit::Value* val) {
       val->type()->isSubtypeOf(torch::jit::ListType::ofTensors());
 }
 
+inline bool isTensorList(torch::jit::Value* val) {
+  return val->type()->isSubtypeOf(torch::jit::ListType::ofTensors());
+}
+
+inline bool isTensor(torch::jit::Value* val) {
+  return val->type()->isSubtypeOf(torch::jit::TensorType::get());
+}
+
 bool isAllNodesSupported(const std::vector<torch::jit::Node*>& nodes) {
   for (auto node : nodes) {
     if (!conversion::OpSupported(node)) {
@@ -70,6 +78,62 @@ std::vector<torch::jit::Node*> getDependencyNodes(std::vector<torch::jit::Value*
   }
   std::reverse(stk.begin(), stk.end());
   return stk;
+}
+
+std::vector<torch::jit::Node*> getOutputNodes(torch::jit::Value* value,
+                                              const std::unordered_set<torch::jit::Node*> &seg_block_nodes) {
+  // use bfs to get the DAG outputs nodes for input value
+  std::queue<torch::jit::Value*> q;
+  std::vector<torch::jit::Node*> stk;
+  std::unordered_set<torch::jit::Node*> visited;
+  q.push(value);
+
+  // top-down order traveling
+  while (!q.empty()) {
+    auto cur_val = q.front();
+    q.pop();
+    for (auto use : cur_val->uses()) {
+      auto node = use.user;
+      // use node must be in seg_block_nodes
+      if (seg_block_nodes.count(node) != 0 && !visited.count(node)) {
+        stk.push_back(node);
+        visited.insert(node);
+        // travel its' all outputs
+        for (auto output: node->outputs()) {
+          if (!isTensor(output)) {
+            q.push(output);
+          }
+        }
+      }
+    }
+  }
+
+  // top-down order and we don't need reverse it
+  return stk;
+}
+
+std::pair<std::unordered_map<torch::jit::Value*, SegmentedBlock>, SegmentedBlock>
+segmentBlocksWithTensorListInputs(SegmentedBlock& seg_block,
+                                  const std::unordered_map<torch::jit::Value*, SegmentedBlock> &tensorlist_inputs) {
+  std::unordered_set<torch::jit::Node*> all_append_nodes;
+  std::unordered_map<torch::jit::Value*, SegmentedBlock> append_blocks;
+  const std::unordered_set<torch::jit::Node*> seg_block_nodes(seg_block.raw_nodes().begin(),
+                                                              seg_block.raw_nodes().end());
+  for (auto input_pair: tensorlist_inputs) {
+    auto append_nodes = getOutputNodes(input_pair.first, seg_block_nodes);
+    append_blocks[input_pair.first] = SegmentedBlock(input_pair.second.target(), append_nodes);
+    all_append_nodes.insert(append_nodes.begin(), append_nodes.end());
+  }
+
+  std::vector<torch::jit::Node*> trt_nodes;
+  for (auto node : seg_block.raw_nodes()) {
+    if (all_append_nodes.count(node) == 0) {
+      trt_nodes.emplace_back(node);
+    }
+  }
+  SegmentedBlock trt_block(SegmentedBlock::kTensorRT, trt_nodes);
+
+  return std::pair<std::unordered_map<torch::jit::Value*, SegmentedBlock>, SegmentedBlock>(append_blocks, trt_block);
 }
 
 PartitionedGraph segmentBlocksWithNonTensorInputs(SegmentedBlock& seg_block) {
@@ -136,15 +200,9 @@ PartitionedGraph segmentBlocksWithNonTensorInputs(SegmentedBlock& seg_block) {
   return new_seg_blocks;
 }
 
-void resolveNonTensorInputs(PartitionedGraph& segmented_blocks) { // , std::shared_ptr<torch::jit::Graph> g
-  // create a list so we can insert SegmentedBlock without losing the iterators
-  std::list<SegmentedBlock> segmented_blocks_list(segmented_blocks.begin(), segmented_blocks.end());
-  std::unordered_map<size_t, std::list<SegmentedBlock>::iterator> idx_to_iter;
-  auto iter = segmented_blocks_list.begin();
-  for (size_t i = 0; i < segmented_blocks.size(); ++i, ++iter) {
-    idx_to_iter[i] = iter;
-  }
-
+std::unordered_map<torch::jit::Value*, usage_info> getInputUsageCounts(
+    const PartitionedGraph& segmented_blocks,
+    const std::function<bool(torch::jit::Value*)> &condition) {
   // usage_counts is a map which stores non-tensor inputs as keys and the values are indices of segmented blocks which
   // have these non-tensor inputs. Iterate through the graph (segmented blocks) from bottom to top. When we find a
   // non-tensor input in a segmented block of index "i", store it in the usage_counts map. Now for each non-tensor
@@ -154,7 +212,7 @@ void resolveNonTensorInputs(PartitionedGraph& segmented_blocks) { // , std::shar
   std::unordered_map<torch::jit::Value*, usage_info> usage_counts;
   for (int i = segmented_blocks.size() - 1; i >= 0; --i) {
     for (auto input : segmented_blocks[i].raw_inputs()) {
-      if (!isTensorOrTensorList(input)) {
+      if (condition(input)) {
         segmented_blocks[i].target() == SegmentedBlock::kTorch ? usage_counts[input].torch_use_id.push_back(i)
                                                                : usage_counts[input].tensorrt_use_id.push_back(i);
       }
@@ -169,7 +227,27 @@ void resolveNonTensorInputs(PartitionedGraph& segmented_blocks) { // , std::shar
       }
     }
   }
+  return usage_counts;
+}
 
+std::unordered_map<size_t, std::list<SegmentedBlock>::iterator>
+remapListIdx2Iter(std::list<SegmentedBlock> &segmented_blocks_list) {
+  std::unordered_map<size_t, std::list<SegmentedBlock>::iterator> idx_to_iter;
+  auto iter = segmented_blocks_list.begin();
+  for (int i = 0; i < segmented_blocks_list.size(); ++i, ++iter) {
+    idx_to_iter[i] = iter;
+  }
+  return idx_to_iter;
+}
+
+void resolveNonTensorInputBlocks(PartitionedGraph& segmented_blocks) {
+  // get input usage counts and blocks_list
+  std::list<SegmentedBlock> segmented_blocks_list(segmented_blocks.cbegin(), segmented_blocks.cend());
+  auto usage_counts = getInputUsageCounts(
+      segmented_blocks, [](torch::jit::Value* input) -> bool { return !isTensorOrTensorList(input); });
+  auto idx_to_iter = remapListIdx2Iter(segmented_blocks_list);
+
+  // update blocks_list
   std::unordered_set<int> updated_segments;
   for (auto& use : usage_counts) {
     auto use_info = use.second;
@@ -201,6 +279,65 @@ void resolveNonTensorInputs(PartitionedGraph& segmented_blocks) { // , std::shar
   segmented_blocks.clear();
   segmented_blocks.insert(segmented_blocks.begin(), segmented_blocks_list.begin(), segmented_blocks_list.end());
   return;
+}
+
+void resolveTensorListInputBlocks(PartitionedGraph& segmented_blocks) {
+  // get input usage counts and blocks_list
+  std::list<SegmentedBlock> segmented_blocks_list(segmented_blocks.cbegin(), segmented_blocks.cend());
+  auto usage_counts = getInputUsageCounts(
+      segmented_blocks, [](torch::jit::Value* input) -> bool { return isTensorList(input); });
+  auto idx_to_iter = remapListIdx2Iter(segmented_blocks_list);
+
+  std::unordered_set<int> updated_segments;
+  // we need resegment tensorrt block which's input is tensorlist as it only support tensor input
+  for (auto &use : usage_counts) {
+    auto use_info = use.second;
+    // we only need update tensorrt segment_block and we need travels all tensorrt block usage
+    for (auto i : use_info.tensorrt_use_id) {
+      if (!updated_segments.count(i)) {
+        // get all tensorlist inputs of tensort segment block
+        std::unordered_map<torch::jit::Value*, SegmentedBlock> tensorlist_inputs_pair;
+        for (auto input : segmented_blocks[i].raw_inputs()) {
+          if (isTensorList(input)) {
+            tensorlist_inputs_pair[input] = segmented_blocks[usage_counts[input].produce_id];
+          }
+        }
+
+        // inputs of trt_block must be tensor
+        auto seg_blocks = segmentBlocksWithTensorListInputs(segmented_blocks[i], tensorlist_inputs_pair);
+        auto append_blocks = seg_blocks.first;
+        auto trt_block = seg_blocks.second;
+        auto next_iter = segmented_blocks_list.erase(idx_to_iter[i]);
+        // when nodes is not empty in trt_block
+        if (trt_block.raw_nodes().size() > 0) {
+          segmented_blocks_list.insert(next_iter, trt_block);
+        }
+
+        // append blocks' nodes to its' producer
+        for (auto append_block: append_blocks) {
+          auto input = append_block.first;
+          auto block = append_block.second;
+          // append nodes to segmented_blocks_list
+          auto producer = idx_to_iter[usage_counts[input].produce_id];
+          for (auto n: block.raw_nodes()) {
+            producer->cloneNode(n);
+          }
+        }
+        updated_segments.insert(i);
+      }
+    }
+  }
+  segmented_blocks.clear();
+  segmented_blocks.insert(segmented_blocks.begin(), segmented_blocks_list.begin(), segmented_blocks_list.end());
+  return;
+}
+
+void resolveNonTensorInputs(PartitionedGraph& segmented_blocks) { // , std::shared_ptr<torch::jit::Graph> g
+  // make sure that all inputs should be tensor or tensorList
+  resolveNonTensorInputBlocks(segmented_blocks);
+
+  // we need resegment tensorrt block which's input is tensorlist
+  resolveTensorListInputBlocks(segmented_blocks);
 }
 
 void registerSegmentsOutputs(PartitionedGraph& segmented_blocks, torch::jit::Block* block) {
@@ -397,10 +534,18 @@ PartitionedGraph Partition(
   PartitionedGraph segmented_blocks = segment_graph(block, partition_info);
 
   // resolve nonTensor inputs/outputs
+  LOG_DEBUG("Resolving nonTensor inputs/outputs of segmented_blocks");
   resolveNonTensorInputs(segmented_blocks);
+  for (auto segmengted_block: segmented_blocks) {
+    LOG_DEBUG(segmengted_block);
+  }
 
   // register input/output torch::jit::Value for segmented graphs
+  LOG_DEBUG("Registering input/output torch::jit::Value for segmented graphs");
   registerSegmentsOutputs(segmented_blocks, block);
+  for (auto segmengted_block: segmented_blocks) {
+    LOG_DEBUG(segmengted_block);
+  }
 
   // run shape analysis on each segmented block
   runShapeAnalysis(segmented_blocks, example_tensor_map, partition_info);
