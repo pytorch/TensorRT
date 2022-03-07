@@ -1376,6 +1376,52 @@ def acc_ops_adaptive_avg_pool2d(
 
     return layer.get_output(0)
 
+@tensorrt_converter(acc_ops.avg_pool1d)
+def acc_ops_avg_pool1d(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    input_val = kwargs["input"]
+
+    if not isinstance(input_val, TRTTensor):
+        raise RuntimeError(
+            f"AvgPool1d received input {input_val} that is not part "
+            "of the TensorRT region!"
+        )
+
+    kernel_size = extend_attr_to_tuple(kwargs["kernel_size"], 1)
+    stride = extend_attr_to_tuple(kwargs["stride"], 1)
+    padding = extend_attr_to_tuple(kwargs["padding"], 1)
+    ceil_mode = kwargs["ceil_mode"]
+    count_include_pad = kwargs["count_include_pad"]
+
+    shuffle_layer = network.add_shuffle(input_val)
+    shuffle_layer.reshape_dims = tuple(input_val.shape) + (1,)
+    set_layer_name(shuffle_layer, target, name + "_shuffle1")
+    shuffle_out = shuffle_layer.get_output(0)
+
+    layer = network.add_pooling_nd(
+        input=shuffle_out, type=trt.PoolingType.AVERAGE, window_size=(kernel_size[0], 1)
+    )
+
+    layer.stride_nd = stride + (1,)
+    layer.padding_nd = padding + (0,)
+    layer.average_count_excludes_padding = False if count_include_pad else True
+    set_layer_name(layer, target, name)
+    if ceil_mode:
+        layer.padding_mode = trt.PaddingMode.EXPLICIT_ROUND_UP
+
+    output = layer.get_output(0)
+    layer = network.add_shuffle(output)
+    layer.reshape_dims = tuple(output.shape)[:-1]
+    set_layer_name(layer, target, name + "_shuffle2")
+
+
+
+    return layer.get_output(0)
 
 @tensorrt_converter(acc_ops.avg_pool2d)
 def acc_ops_avg_pool2d(

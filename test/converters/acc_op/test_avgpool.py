@@ -13,6 +13,43 @@ class TestAvgPoolConverter(AccTestCase):
             ("default", 1),
             ("kernal_size", 3),
             ("stride", 1, 2),
+            ("tuple_parameters", 2, (1,), (1,)),
+            param("padding", 2, padding=1),
+            param("ceil_mode", 1, ceil_mode=True),
+            param("include_pad", 2, padding=1, count_include_pad=False),
+        ]
+    )
+    def test_avg_pool1d(
+        self,
+        test_name,
+        kernel_size,
+        stride=1,
+        padding=0,
+        ceil_mode=False,
+        count_include_pad=True
+    ):
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.avg_pool = torch.nn.AvgPool1d(
+                    kernel_size,
+                    stride,
+                    padding,
+                    ceil_mode,
+                    count_include_pad
+                )
+
+            def forward(self, x):
+                return self.avg_pool(x)
+
+        inputs = [torch.randn(1, 3, 224)]
+        self.run_test(TestModule(), inputs, expected_ops={acc_ops.avg_pool1d})
+
+    @parameterized.expand(
+        [
+            ("default", 1),
+            ("kernal_size", 3),
+            ("stride", 1, 2),
             ("tuple_parameters", 2, (1, 1), (1, 1)),
             param("padding", 2, padding=1),
             param("ceil_mode", 1, ceil_mode=True),

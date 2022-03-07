@@ -2066,6 +2066,7 @@ class AccTracerTest(unittest.TestCase):
                 acc_ops.flatten,
                 acc_ops.adaptive_avg_pool2d,
                 acc_ops.avg_pool2d,
+                acc_ops.avg_pool1d,
                 acc_ops.add,
                 acc_ops.min_full_reduce,
                 acc_ops.min_dim_reduce,

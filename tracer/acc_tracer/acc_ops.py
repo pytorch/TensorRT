@@ -103,6 +103,26 @@ def max_pool2d(
 def adaptive_avg_pool2d(*, input, output_size):
     return nn.functional.adaptive_avg_pool2d(input=input, output_size=output_size)
 
+@register_acc_op_mapping(op_and_target=("call_function", nn.functional.avg_pool1d))
+@register_acc_op
+def avg_pool1d(
+    *,
+    input,
+    kernel_size,
+    stride,
+    padding,
+    ceil_mode,
+    count_include_pad
+):
+    return nn.functional.avg_pool1d(
+        input=input,
+        kernel_size=kernel_size,
+        stride=stride,
+        padding=padding,
+        ceil_mode=ceil_mode,
+        count_include_pad=count_include_pad
+    )
+
 
 @register_acc_op_mapping(op_and_target=("call_function", nn.functional.avg_pool2d))
 @register_acc_op
