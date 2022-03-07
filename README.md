@@ -1,5 +1,4 @@
 # FX2TRT
-testing
 This package provide pure eager-mode tooling to convert a PyTorch nn.Module to a TensorRT engine.
 
 ## Installation
