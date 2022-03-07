@@ -1615,7 +1615,6 @@ def acc_ops_linear(
         "Currently we only support one dynmaic "
         "dim for linear and it can't be the last dim."
     )
-    weight = get_trt_tensor(network, kwargs["weight"].t(), f"{name}_weight")
 
     if isinstance(kwargs["weight"], torch.Tensor):
         weight = get_trt_tensor(network, kwargs["weight"].t(), f"{name}_weight")
