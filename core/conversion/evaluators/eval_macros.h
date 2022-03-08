@@ -77,7 +77,7 @@
        },                                                                                              \
        EvalOptions().validSchemas(schemas)});
 
-#define DEFINE_ARITHMATIC_TWO_INPUT_EVALUATOR(name, node_kind, operation, schemas)                        \
+#define DEFINE_ARITHMATIC_TWO_INPUT_EVALUATOR(name, node_kind, operation, schemas)                     \
   auto name##_registrations TORCHTRT_UNUSED = RegisterNodeEvaluators().evaluator(                      \
       {c10::Symbol::fromQualString(node_kind),                                                         \
        [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {              \
