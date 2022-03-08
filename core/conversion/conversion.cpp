@@ -229,6 +229,11 @@ void MarkOutputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> outp
           LOG_INFO(
               ctx->logger, "Marking Output " << out->debugName() << " named " << name << " in engine (ctx.MarkOutput)");
           ctx->num_outputs += 1;
+        } else if (out_ivalue.isNone()) { // skip a None output layer
+          std::string name = std::string("output_") + std::to_string(ctx->num_outputs);
+          LOG_INFO(
+              ctx->logger, "Skipping None Output " << out->debugName() << " named " << name << " in engine (ctx.MarkOutput)");
+          ctx->num_outputs += 1;
         } else {
           TORCHTRT_THROW_ERROR("Unknown output type. Only a single tensor or a TensorList type is supported.");
         }
