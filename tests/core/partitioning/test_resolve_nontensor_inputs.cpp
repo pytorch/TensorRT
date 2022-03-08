@@ -6,8 +6,9 @@
 #include "torch/csrc/jit/ir/irparser.h"
 #include "torch/script.h"
 
-bool checkSegmentedBlockInputType(const torch_tensorrt::core::partitioning::SegmentedBlock &segmented_block,
-                                  const std::function<bool(torch::jit::TypePtr)> &condition) {
+bool checkSegmentedBlockInputType(
+    const torch_tensorrt::core::partitioning::SegmentedBlock& segmented_block,
+    const std::function<bool(torch::jit::TypePtr)>& condition) {
   for (auto input : segmented_block.raw_inputs()) {
     if (!condition(input->type())) {
       return false;
@@ -126,20 +127,18 @@ TEST(Partitioning, ResolveNonTensorInputsCorrectly) {
       torch_tensorrt::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info);
 
   int torch_block_cnt = 0, trt_block_cnt = 0;
-  for (const auto &segmented_block: segmented_blocks) {
+  for (const auto& segmented_block : segmented_blocks) {
     if (segmented_block.target() == torch_tensorrt::core::partitioning::SegmentedBlock::kTensorRT) {
       ++trt_block_cnt;
-      ASSERT_TRUE(checkSegmentedBlockInputType(
-            segmented_block,
-            [] (torch::jit::TypePtr type_ptr) { return type_ptr->isSubtypeOf(torch::jit::TensorType::get()); }));
+      ASSERT_TRUE(checkSegmentedBlockInputType(segmented_block, [](torch::jit::TypePtr type_ptr) {
+        return type_ptr->isSubtypeOf(torch::jit::TensorType::get());
+      }));
     } else {
       ++torch_block_cnt;
-      ASSERT_TRUE(checkSegmentedBlockInputType(
-            segmented_block,
-            [] (torch::jit::TypePtr type_ptr) {
-              return type_ptr->isSubtypeOf(torch::jit::TensorType::get()) ||
-                  type_ptr->isSubtypeOf(torch::jit::ListType::ofTensors());
-            }));
+      ASSERT_TRUE(checkSegmentedBlockInputType(segmented_block, [](torch::jit::TypePtr type_ptr) {
+        return type_ptr->isSubtypeOf(torch::jit::TensorType::get()) ||
+            type_ptr->isSubtypeOf(torch::jit::ListType::ofTensors());
+      }));
     }
   }
   ASSERT_TRUE(trt_block_cnt == 1 && torch_block_cnt == 1);
@@ -186,20 +185,18 @@ TEST(Partitioning, ResolveTensorListInputsInTrtCorrectly) {
       torch_tensorrt::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info);
 
   int torch_block_cnt = 0, trt_block_cnt = 0;
-  for (const auto &segmented_block: segmented_blocks) {
+  for (const auto& segmented_block : segmented_blocks) {
     if (segmented_block.target() == torch_tensorrt::core::partitioning::SegmentedBlock::kTensorRT) {
       ++trt_block_cnt;
-      ASSERT_TRUE(checkSegmentedBlockInputType(
-            segmented_block,
-            [] (torch::jit::TypePtr type_ptr) { return type_ptr->isSubtypeOf(torch::jit::TensorType::get()); }));
+      ASSERT_TRUE(checkSegmentedBlockInputType(segmented_block, [](torch::jit::TypePtr type_ptr) {
+        return type_ptr->isSubtypeOf(torch::jit::TensorType::get());
+      }));
     } else {
       ++torch_block_cnt;
-      ASSERT_TRUE(checkSegmentedBlockInputType(
-            segmented_block,
-            [] (torch::jit::TypePtr type_ptr) {
-              return type_ptr->isSubtypeOf(torch::jit::TensorType::get()) ||
-                  type_ptr->isSubtypeOf(torch::jit::ListType::ofTensors());
-            }));
+      ASSERT_TRUE(checkSegmentedBlockInputType(segmented_block, [](torch::jit::TypePtr type_ptr) {
+        return type_ptr->isSubtypeOf(torch::jit::TensorType::get()) ||
+            type_ptr->isSubtypeOf(torch::jit::ListType::ofTensors());
+      }));
     }
   }
   ASSERT_TRUE(trt_block_cnt == 2 && torch_block_cnt == 2);
