@@ -103,7 +103,7 @@ DEFINE_GENERIC_TWO_INPUT_EVALUATOR(
 DEFINE_ARITHMATIC_TWO_INPUT_EVALUATOR(
     pow,
     "aten::pow",
-    pow(a,b),
+    pow(a, b),
     std::set<std::string>({
         "aten::pow.int(int a, int b) -> (float)",
         "aten::pow.float(float a, float b) -> (float)",
@@ -114,7 +114,7 @@ DEFINE_ARITHMATIC_TWO_INPUT_EVALUATOR(
 DEFINE_TWO_INPUT_SIMPLE_EVALUATOR(
     and,
     "aten::__and__",
-    a && b,
+    a&& b,
     bool,
     std::set<std::string>({"aten::__and__(int a, int b) -> (bool)", "aten::__and__.bool(bool a, bool b) -> (bool)"}));
 DEFINE_TWO_INPUT_SIMPLE_EVALUATOR(or, "aten::__or__", a || b, bool, {"aten::__or__(int a, int b) -> (bool)"});

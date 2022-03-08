@@ -105,7 +105,8 @@ void AddLayer(ConversionCtx* ctx, const torch::jit::Node* n) {
       // Node input has not been converted yet or is a prim op
       TORCHTRT_THROW_ERROR(
           "Unable to retrieve all node inputs for node: "
-          << util::node_info(n) << " (ctx.AddLayer)\nSpecifically failed to retrieve value for input: %" << input->debugName());
+          << util::node_info(n) << " (ctx.AddLayer)\nSpecifically failed to retrieve value for input: %"
+          << input->debugName());
     }
   }
 
@@ -541,8 +542,9 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b, bool suppress_er
     }
 
     if (!suppress_errors) {
-      unsupported_msg << "You can either implement converters for these ops in your application or request implementation"
-                    << std::endl;
+      unsupported_msg
+          << "You can either implement converters for these ops in your application or request implementation"
+          << std::endl;
       unsupported_msg << "https://www.github.com/nvidia/Torch-TensorRT/issues" << std::endl;
       unsupported_msg << std::endl << "In Module:" << std::endl;
 
