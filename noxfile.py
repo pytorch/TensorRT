@@ -322,3 +322,8 @@ def l2_multi_gpu_tests(session):
 def l2_multi_gpu_tests_host_deps(session):
     """Makes sure that Torch-TensorRT can operate on multi-gpu systems using host dependencies"""
     run_l2_multi_gpu_tests(session, use_host_env=True)
+
+@nox.session(python=["3"], reuse_venv=True)
+def download_test_models(session):
+    """Grab all the models needed for testing"""
+    download_models(session, use_host_env=True)
