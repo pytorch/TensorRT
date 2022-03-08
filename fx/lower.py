@@ -23,7 +23,6 @@ from .input_tensor_spec import (
 from .passes.fuse_pass import (
     fuse_permute_linear,
     fuse_permute_matmul,
-    fuse_unsqueeze_cat_sum,
 )
 from .passes.remove_duplicate_output_args import (
     remove_duplicate_output_args,
@@ -252,7 +251,6 @@ class LowerTrtInterpreter:
         if self.lower_setting.enable_fuse:
             mod = fuse_permute_matmul(mod)
             mod = fuse_permute_linear(mod)
-            mod = fuse_unsqueeze_cat_sum(mod)
             FUSE_PASSES_POST_OBSERVER.observe(mod, input)
 
         # Prepare algorithm selector and timing_cache for TRTInterpreter
