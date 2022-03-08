@@ -1,3 +1,5 @@
+#include <math.h>
+
 #include "ATen/core/List.h"
 #include "ATen/core/functional.h"
 #include "ATen/core/ivalue.h"
@@ -98,10 +100,21 @@ DEFINE_GENERIC_TWO_INPUT_EVALUATOR(
         "aten::ge.float_int(float a, int b) -> (bool)",
     }));
 
+DEFINE_ARITHMATIC_TWO_INPUT_EVALUATOR(
+    pow,
+    "aten::pow",
+    pow(a,b),
+    std::set<std::string>({
+        "aten::pow.int(int a, int b) -> (float)",
+        "aten::pow.float(float a, float b) -> (float)",
+        "aten::pow.int_float(int a, float b) -> (float)",
+        "aten::pow.float_int(float a, int b) -> (float)",
+    }));
+
 DEFINE_TWO_INPUT_SIMPLE_EVALUATOR(
     and,
     "aten::__and__",
-    a&& b,
+    a && b,
     bool,
     std::set<std::string>({"aten::__and__(int a, int b) -> (bool)", "aten::__and__.bool(bool a, bool b) -> (bool)"}));
 DEFINE_TWO_INPUT_SIMPLE_EVALUATOR(or, "aten::__or__", a || b, bool, {"aten::__or__(int a, int b) -> (bool)"});
