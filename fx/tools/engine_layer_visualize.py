@@ -1,5 +1,3 @@
-# (c) Facebook, Inc. and its affiliates. Confidential and proprietary.
-
 import argparse
 import re
 from typing import NamedTuple, List, Optional, Dict, Any, Tuple
@@ -17,9 +15,6 @@ supported.
 
 Usage:
     python fx2trt_oss.fx/tools/engine_layer_visualize.py --log_file aaa --profile_file bbb
-
-Usage(Facebook):
-    buck run //caffe2:trt_engine_layer_visualize -- --log_file aaa --profile_file bbb
 """
 
 

@@ -198,7 +198,7 @@ class TRTModule(torch.nn.Module):
 
             return tuple(outputs)
 
-    def enable_profiling(self):
+    def enable_profiling(self, profiler: "trt.IProfiler"=None):
         """
         Enable TensorRT profiling. After calling this function, TensorRT will report
         time spent on each layer in stdout for each forward run.
@@ -206,7 +206,7 @@ class TRTModule(torch.nn.Module):
         self._check_initialized()
 
         if not self.context.profiler:
-            self.context.profiler = trt.Profiler()
+            self.context.profiler = trt.Profiler() if profiler is None else profiler
 
     def disable_profiling(self):
         """

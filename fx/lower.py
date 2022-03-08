@@ -53,7 +53,7 @@ Input = Sequence[Any]
 # >>>     # print_module_and_input will be called right after the fuse passes
 # >>>     lower(module, sample_input)
 
-# Observer for the model after the fuse passes. 
+# Observer for the model after the fuse passes.
 FUSE_PASSES_POST_OBSERVER: Observer[
     Callable[[nn.Module, Input], None]
 ] = Observer("FUSE_PASSES_POST_OBSERVER")
@@ -66,7 +66,7 @@ LOWER_SPLIT_PRE_OBSERVER: Observer[
 # Observer for the TRT split submodules after lowering
 LOWER_SPLIT_POST_OBSERVER: Observer[
     Callable[[str, nn.Module, Input], None]
-] = Observer("LOWER_SPLIT_PRE_OBSERVER")
+] = Observer("LOWER_SPLIT_POST_OBSERVER")
 # ----------------------------------------------------------------------
 
 
