@@ -9,6 +9,7 @@ import tensorrt as trt
 import torch
 import torch.fx as fx
 import torch.nn as nn
+from fx2trt_oss.fx.observer import Observer
 from fx2trt_oss.tracer.acc_tracer import acc_ops
 from torch.fx.experimental.const_fold import split_const_subgraphs
 from torch.fx.passes.splitter_base import SplitResult
@@ -34,7 +35,6 @@ from .tools.trt_splitter import TRTSplitter, TRTSplitterSetting
 from .trt_module import (
     TRTModule,
 )
-from fx2trt_oss.fx.observer import Observer
 
 
 logger = logging.getLogger(__name__)
@@ -182,6 +182,8 @@ class LowerSetting:
     modules will not be traced into.
 
     cuda_graph_batch_size (int): Cuda graph batch size, default to be -1.
+
+    verbose_profile (bool): verbosity of profiler, default to False
     """
     max_batch_size: int = 2048
     input_specs: List[InputTensorSpec] = dc.field(default_factory=list)
@@ -200,6 +202,7 @@ class LowerSetting:
     ast_rewriter_allow_list: Optional[Set[Type[nn.Module]]] = None
     leaf_module_list: Optional[Set[Type[nn.Module]]] = None
     cuda_graph_batch_size: int = -1
+    verbose_profile: bool = False
 
 
 def run_const_fold(traced_mod: torch.fx.GraphModule) -> torch.fx.GraphModule:
@@ -283,6 +286,9 @@ class LowerTrtInterpreter:
             strict_type_constraints=self.lower_setting.strict_type_constraints,
             algorithm_selector=algo_selector,
             timing_cache=cache_data,
+            profiling_verbosity=trt.ProfilingVerbosity.DETAILED
+            if self.lower_setting.verbose_profile
+            else trt.ProfilingVerbosity.LAYER_NAMES_ONLY,
         )
 
         # Update timing cache file if needed

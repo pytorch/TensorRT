@@ -217,3 +217,10 @@ class TRTModule(torch.nn.Module):
         torch.cuda.synchronize()
         del self.context
         self.context = self.engine.create_execution_context()
+
+    def get_layer_info(self) -> str:
+        """
+        Get layer info of the engine. Only support for TRT > 8.2. 
+        """
+        inspector = self.engine.create_engine_inspector()
+        return inspector.get_engine_information(trt.LayerInformationFormat.JSON)
