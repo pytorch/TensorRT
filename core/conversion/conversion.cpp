@@ -231,7 +231,7 @@ void MarkOutputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> outp
           ctx->num_outputs += 1;
         } else if (out_ivalue.isNone()) { // skip a None output layer
           std::string name = std::string("output_") + std::to_string(ctx->num_outputs);
-          LOG_INFO(
+          LOG_WARNING(
               ctx->logger, "Skipping None Output " << out->debugName() << " named " << name << " in engine (ctx.MarkOutput)");
           ctx->num_outputs += 1;
         } else {
