@@ -1101,6 +1101,53 @@ def acc_ops_fmod(
     )
     return sub_value
 
+@tensorrt_converter(acc_ops.max_pool1d, no_explicit_batch_dim=True)
+def acc_ops_max_pool1d(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    if not network.has_implicit_batch_dimension:
+        raise RuntimeError("Current implementation does not support dynamic shape. Make sure that the network has an explicit batch dimension!")
+
+    input_trt = kwargs["input"]
+
+    # adds unsqueeze layer -> max pool 2d -> squeeze layer to emulate max pool 1d.
+    unsqueeze_layer = network.add_shuffle(input=input_trt)
+    unsqueeze_layer.reshape_dims = tuple([*input_trt.shape, 1])
+    set_layer_name(unsqueeze_layer, target, name+"_unsqueeze")
+
+    input_trt = unsqueeze_layer.get_output(0)
+
+    kernel_size = kwargs["kernel_size"]
+    stride = kwargs["stride"]
+    padding = kwargs["padding"]
+    dilation = kwargs["dilation"]
+    ceil_mode = kwargs["ceil_mode"]
+
+    if any([not isinstance(param, int) for param in  [kernel_size, stride, padding, dilation]]):
+        raise RuntimeError(f"Parameters kernel_size, stride, padding, and dilation should be of type int.")
+    if dilation != 1:
+        raise RuntimeError(
+            f"Only support dilation=1 for maxpool, but got {dilation}"
+        )
+
+    max_pooling_layer = network.add_pooling(
+        input=input_trt, type=trt.PoolingType.MAX, window_size=(kernel_size, 1)
+    )
+    max_pooling_layer.stride_nd = (stride, 1)
+    max_pooling_layer.padding_nd =  (padding, 0)
+    set_layer_name(max_pooling_layer, target, name)
+
+    if ceil_mode:
+        max_pooling_layer.padding_mode = trt.PaddingMode.EXPLICIT_ROUND_UP
+    input_trt = max_pooling_layer.get_output(0)
+    squeeze_layer = network.add_shuffle(input=input_trt)
+    squeeze_layer.reshape_dims = tuple(input_trt.shape[:-1])
+    set_layer_name(squeeze_layer, target, name+"_squeeze")
+    return squeeze_layer.get_output(0)
 
 @tensorrt_converter(acc_ops.max_pool2d)
 def acc_ops_max_pool2d(
