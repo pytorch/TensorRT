@@ -253,6 +253,42 @@ auto select_registrations TORCHTRT_UNUSED =
                       return true;
                     }
                   }})
+        .pattern({"aten::index.Tensor(Tensor self, Tensor?[] indices) -> (Tensor)",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    auto in = args[0].ITensorOrFreeze(ctx);
+                    auto ts = args[1].IValue()->toListRef();
+
+                    std::vector<nvinfer1::ITensor*> tensors;
+                    for (auto t : ts) {
+                      if (t.isTensor()) {
+                        auto torch_tensor = t.toTensor();
+                        tensors.push_back(tensor_to_const(ctx, torch_tensor));
+                      } else {
+                        auto cont = t.toCustomClass<TensorContainer>();
+                        tensors.push_back(cont->tensor());
+                      }
+                    }
+
+                    TORCHTRT_CHECK(
+                        tensors.size() == 1,
+                        "This version of Torch-TensorRT only supports one index in aten::index.Tensor");
+                    auto indicesTensor = tensors[0];
+                    // Set datatype for indices tensor to INT32
+                    auto identity = ctx->net->addIdentity(*indicesTensor);
+                    identity->setOutputType(0, nvinfer1::DataType::kINT32);
+                    indicesTensor = identity->getOutput(0);
+
+                    // IGatherLayer takes in input tensor, the indices, and the axis of input tensor to take indices
+                    // from
+                    auto gather_layer = ctx->net->addGather(*in, *indicesTensor, 0);
+                    TORCHTRT_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
+                    auto gather_out = gather_layer->getOutput(0);
+
+                    auto out = ctx->AssociateValueAndTensor(n->outputs()[0], gather_out);
+
+                    LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+                    return true;
+                  }})
         .pattern(
             {"aten::slice.Tensor(Tensor(a) self, int dim=0, int? start=None, int? end=None, int step=1) -> Tensor(a)",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
