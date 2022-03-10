@@ -1,6 +1,6 @@
 import dataclasses as dc
 import logging
-from typing import Callable, List, Any, Sequence, Type, Set, Optional, Tuple
+from typing import Callable, List, Any, Sequence, Type, Set, Optional, Tuple, NamedTuple
 
 import fx2trt_oss.tracer.acc_tracer.acc_tracer as acc_tracer
 
@@ -69,12 +69,10 @@ LOWER_SPLIT_POST_OBSERVER: Observer[
 # ----------------------------------------------------------------------
 
 
-@dc.dataclass(frozen=True)
-class PassContext:
+class PassContext(NamedTuple):
     input: Input
     lower_setting: "LowerSetting"
     module_name: str = ""
-
 
 # Function signature for a graph module pass
 PassFunc = Callable[[nn.Module, PassContext], Tuple[nn.Module, PassContext]]
