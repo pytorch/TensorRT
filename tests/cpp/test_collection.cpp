@@ -6,15 +6,10 @@
 #include "torch_tensorrt/torch_tensorrt.h"
 
 
-TEST(CppAPITests, TestCollection) {
-
+TEST(CppAPITests, TestCollectionTupleInput) {
 
   std::string path =
-  // "/opt/trtorch/tuple2model.ts";
-  // "/opt/trtorch/tuple2_list2_v3.ts";
-  // "/opt/trtorch/tuple2_tuple2_v3.ts";
-  "/opt/trtorch/tuple2_v3.ts";
-  // "/opt/trtorch/list2_list2_v3.ts";
+  "/root/Torch-TensorRT/tuple_input.ts";
   torch::Tensor in0 = torch::randn({1, 3, 512, 512}, torch::kCUDA).to(torch::kFloat);
   std::vector<at::Tensor> inputs;
   inputs.push_back(in0);
@@ -90,6 +85,53 @@ TEST(CppAPITests, TestCollection) {
   auto trt_out = trt_mod.forward(complex_inputs);
   // auto trt_out = trt_mod.forward(complex_inputs_list);
 
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(out.toTensor(), trt_out.toTensor(), 1e-5));
+}
+
+
+TEST(CppAPITests, TestCollectionNormalInput) {
+
+  std::string path =
+  "/root/Torch-TensorRT/normal_model.ts";
+  torch::Tensor in0 = torch::randn({1, 3, 512, 512}, torch::kCUDA).to(torch::kFloat);
+  std::vector<at::Tensor> inputs;
+  inputs.push_back(in0);
+  inputs.push_back(in0);
+
+  torch::jit::Module mod;
+  try {
+    // Deserialize the ScriptModule from a file using torch::jit::load().
+    mod = torch::jit::load(path);
+  } catch (const c10::Error& e) {
+    std::cerr << "error loading the model\n";
+  }
+  mod.eval();
+  mod.to(torch::kCUDA);
+  
+
+  std::vector<torch::jit::IValue> inputs_;
+
+  for (auto in : inputs) {
+    inputs_.push_back(torch::jit::IValue(in.clone()));
+  }
+
+  auto out = mod.forward(inputs_);
+  LOG_DEBUG("Finish torchscirpt forward");
+
+  std::vector<torch_tensorrt::Input> input_range;
+  input_range.push_back({in0.sizes(), torch::kF32});
+  input_range.push_back({in0.sizes(), torch::kF32});
+  torch_tensorrt::ts::CompileSpec compile_settings(input_range);
+  compile_settings.require_full_compilation = true;
+  compile_settings.min_block_size = 1;
+
+  // // FP16 execution
+  // compile_settings.enabled_precisions = {torch::kHalf};
+  // // Compile module
+  auto trt_mod = torch_tensorrt::torchscript::compile(mod, compile_settings);
+  LOG_DEBUG("Finish compile");
+  auto trt_out = trt_mod.forward(inputs_);
 
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(out.toTensor(), trt_out.toTensor(), 1e-5));
 }
