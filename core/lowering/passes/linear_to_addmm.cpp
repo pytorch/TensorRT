@@ -1,4 +1,3 @@
-
 #include <torch/csrc/jit/runtime/operator.h>
 #include "torch/csrc/jit/ir/alias_analysis.h"
 #include "torch/csrc/jit/jit_log.h"
@@ -7,6 +6,7 @@
 #include "torch/csrc/jit/passes/guard_elimination.h"
 #include "torch/csrc/jit/passes/peephole.h"
 #include "torch/csrc/jit/runtime/graph_executor.h"
+#include "torch/csrc/jit/api/function_impl.h"
 
 #include "core/util/prelude.h"
 #include "torch/csrc/jit/passes/subgraph_rewrite.h"
@@ -34,7 +34,7 @@ void replaceLinearWithBiasNonePattern(std::shared_ptr<torch::jit::Graph> graph) 
         continue;
       } else {
         torch::jit::WithInsertPoint guard(*it);
-        std::shared_ptr<torch::jit::Graph> d_graph = decompose_funcs.get_function("linear").graph();
+	std::shared_ptr<torch::jit::Graph> d_graph = toGraphFunction(decompose_funcs.get_function("linear")).graph();
         torch::jit::Value* new_output = insertGraph(*it->owningGraph(), *d_graph, it->inputs()).at(0);
         new_output->setType(it->output()->type());
         it->output()->replaceAllUsesWith(new_output);

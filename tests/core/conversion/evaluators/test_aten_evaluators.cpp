@@ -651,13 +651,14 @@ TEST(Evaluators, AtenFormatRaiseExceptionEvaluatesCorrectly) {
         %3 : str = prim::Constant[value="res5_2"]()
         %5713 : Tensor = prim::Uninitialized()
         %4 : str = aten::format(%2, %1, %3)
+        %4.1 : str = prim::Constant[value="RuntimeError"]()
         %5 : bool = aten::eq(%1, %3)
         %y : Tensor = prim::If(%5)
             block0():
                 %194 : Tensor = aten::add(%x_1, %x_2, %0)
                 -> (%194)
             block1():
-                prim::RaiseException(%4)
+                prim::RaiseException(%4, %4.1)
                 -> (%5713)
         return (%y))IR";
   auto g = std::make_shared<torch::jit::Graph>();

@@ -90,14 +90,9 @@ cc_library(
     srcs = select({
         ":windows": [
             "lib/caffe2_nvrtc.lib",
-            "lib/caffe2_detectron_ops_gpu.lib",
-            "lib/caffe2_module_test_dynamic.lib",
         ],
         "//conditions:default": [
             "lib/libcaffe2_nvrtc.so",
-            "lib/libcaffe2_detectron_ops_gpu.so",
-            "lib/libcaffe2_observers.so",
-            "lib/libcaffe2_module_test_dynamic.so",
         ],
     }),
     hdrs = glob([
