@@ -63,16 +63,23 @@ std::unordered_map<const torch::jit::Value*, torch::jit::IValue> generateRandomI
       std::vector<torch::jit::IValue> list;
       c10::TypePtr elementType = c10::TensorType::get();
       auto generic_list = c10::impl::GenericList(elementType);
+      LOG_DEBUG("generateRandomInputs, 0");
       for (int i = 0; i < input.second.size(); i++) {
-        auto in = generateSingleInput(input.second[i], types[input.first][i]);
+        // types for list is {}
+        // auto in = generateSingleInput(input.second[i], types[input.first][i]);
+        // TODO: need to decide the input type of list elements in ir.cpp
+        c10::optional<at::ScalarType> type_opt = {};
+        auto in = generateSingleInput(input.second[i], type_opt);
         // list.push_back(in.clone());
         generic_list.push_back(in.clone());
+        LOG_DEBUG("generateRandomInputs, 1");
       }
       // c10::TypePtr elementType = list[0].type();
-
+      LOG_DEBUG("generateRandomInputs, 2");
       // generic_list.append(list);
-      ivalue_map[input.first] = generic_list;
+      ivalue_map[input.first] = c10::IValue(generic_list);
       // jit_inputs_ivalues.push_back(list);
+      LOG_DEBUG("generateRandomInputs, finish generate random input of list type");
     } else if (input.first->type()->kind() == torch::jit::TypeKind::TupleType) {
       // create tuple
       // auto tuple = torch::jit::Tuple::create(ivalues_maps[input]);
