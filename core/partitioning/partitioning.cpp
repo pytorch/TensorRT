@@ -391,6 +391,7 @@ PartitionedGraph segment_graph(torch::jit::Block* block, const PartitionInfo& pa
 PartitionedGraph Partition(
     torch::jit::Block* block,
     std::unordered_map<const torch::jit::Value*, torch::jit::IValue>& example_tensor_map,
+    // std::unordered_map<const torch::jit::Value*, std::vector<torch::jit::IValue>>& example_tensor_map,
     const PartitionInfo& partition_info) {
   LOG_DEBUG(partition_info);
   // segment lowering global graph into blocks

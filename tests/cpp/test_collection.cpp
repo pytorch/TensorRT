@@ -70,10 +70,14 @@ TEST(CppAPITests, TestCollection) {
 
 
   torch::jit::IValue complex_input_shape(input_shape_tuple);
+  std::tuple<torch::jit::IValue> input_tuple2(complex_input_shape);
+  torch::jit::IValue complex_input_shape2(input_tuple2);
   // torch::jit::IValue complex_input_shape(list);
 
-  auto compile_settings = torch_tensorrt::ts::CompileSpec(complex_input_shape);
+  auto compile_settings = torch_tensorrt::ts::CompileSpec(complex_input_shape2);
   compile_settings.require_full_compilation = false;
+  compile_settings.min_block_size = 1;
+
   // compile_settings.torch_executed_modules.push_back("model1");
   // compile_settings.torch_executed_ops.push_back("aten::sub");
 

@@ -521,7 +521,7 @@ struct TORCHTRT_API Input : torch::CustomClassHolder{
  */
 struct TORCHTRT_API GraphInputs {
   torch::jit::IValue input_signature;   // nested Input, full input spec
-  std::vector<Input> flattened_inputs;  // flattend Input
+  // std::vector<Input> flattened_inputs;  // flattend Input
 };
 
 /**
@@ -599,9 +599,7 @@ struct TORCHTRT_API CompileSpec {
    *
    * @param inputs
    */
-  CompileSpec(torch::jit::IValue input_signature) {
-    graph_inputs.input_signature = input_signature;
-  }
+  CompileSpec(torch::jit::IValue input_signature);
   // Defaults should reflect TensorRT defaults for BuilderConfig
 
   /**

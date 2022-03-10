@@ -439,8 +439,10 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
           !(cfg.lower_info.forced_fallback_modules.size() == 0 &&
             cfg.partition_info.forced_fallback_operators.size() == 0 &&
             conversion::VerifyConverterSupportForBlock(g->block(), false))) {
-        auto input_ivalues_map = partitioning::generateRandomInputs(cfg.convert_info.inputs, first_use_types);
-        auto graph_and_mapping = ConstructFallbackGraph(new_mod, g->block(), input_ivalues_map, cfg, static_params);
+        // auto input_ivalues_map = partitioning::generateRandomInputs(cfg.convert_info.inputs, first_use_types);
+        auto collection_input_ivalues_map = partitioning::generateRandomInputs(cfg.convert_info.collection_inputs, first_use_types);
+        // auto graph_and_mapping = ConstructFallbackGraph(new_mod, g->block(), input_ivalues_map, cfg, static_params);
+        auto graph_and_mapping = ConstructFallbackGraph(new_mod, g->block(), collection_input_ivalues_map, cfg, static_params);
         new_g = graph_and_mapping.first;
         LOG_INFO("Segmented Graph: " << *new_g);
 
@@ -454,6 +456,7 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
         TORCHTRT_CHECK(
             conversion::VerifyConverterSupportForBlock(g->block()),
             "Not all operations in graph are supported by the compiler");
+        // TODO find the right
         auto engine = conversion::ConvertBlockToEngine(g->block(), cfg.convert_info, static_params);
         AddEngineToGraph(new_mod, new_g, engine, cuda_device);
       }

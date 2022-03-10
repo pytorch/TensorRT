@@ -18,10 +18,11 @@ CollectionInputSpecMap associate_specs_with_collection_inputs(
     ir::GraphInputs graph_inputs,
     StaticParams& static_params) {
   auto tensor_inputs = get_collection_inputs(g, static_params);
-  return pair_input_vals_with_specs(tensor_inputs, graph_inputs.collection_inputs);
+  return pair_input_vals_with_specs_collection(tensor_inputs, graph_inputs.collection_inputs);
 }
 
 InputSpecMap pair_input_vals_with_specs(std::vector<const torch::jit::Value*> vals, std::vector<Input> specs) {
+  LOG_DEBUG("pair_input_vals_with_specs");
   TORCHTRT_CHECK(
       vals.size() == specs.size(),
       "Expected dimension specifications for all input tensors"
@@ -35,7 +36,8 @@ InputSpecMap pair_input_vals_with_specs(std::vector<const torch::jit::Value*> va
   return a;
 }
 
-CollectionInputSpecMap pair_input_vals_with_specs(std::vector<const torch::jit::Value*> vals, std::vector<std::vector<Input>>& specs) {
+CollectionInputSpecMap pair_input_vals_with_specs_collection(std::vector<const torch::jit::Value*> vals, std::vector<std::vector<Input>>& specs) {
+  LOG_DEBUG("pair_input_vals_with_specs collection");
   TORCHTRT_CHECK(
       vals.size() == specs.size(),
       "Expected dimension specifications for all input tensors"
@@ -96,7 +98,7 @@ std::vector<const torch::jit::Value*> get_collection_inputs(
     StaticParams& static_params) {
   std::vector<const torch::jit::Value*> input_tensors;
   auto inputs = g->inputs();
-  LOG_DEBUG("Inputs size " << inputs.size());
+  LOG_DEBUG("get_collection_inputs, inputs size " << inputs.size());
   for (auto in : inputs) {
     LOG_DEBUG("input debug name: " << in->debugName());
     // Disregarding inputs that are not tensors or are static
@@ -110,12 +112,9 @@ std::vector<const torch::jit::Value*> get_collection_inputs(
     // } else if (in->type()->isSubtypeOf(c10::TupleType::create()) && static_params.find(in) == static_params.end()) {
       input_tensors.push_back(in); // push original tuple
       at::ArrayRef<torch::jit::Value*> unpack_tuple = torch::jit::createTupleUnpack(in);
-      LOG_DEBUG("Tuple size " << unpack_tuple.size());
-      // for (auto item: unpack_tuple) {
-      //   input_tensors.push_back(in);
-      // }
+      LOG_DEBUG("get_collection_inputs, tuple size " << unpack_tuple.size());
     } else if (in->type()->kind() == torch::jit::TypeKind::ListType && static_params.find(in) == static_params.end()) {
-      LOG_DEBUG("List use size " << in->uses().size());
+      LOG_DEBUG("get_collection_inputs, list use size " << in->uses().size());
       input_tensors.push_back(in); // push original list
     }
   }
@@ -244,13 +243,11 @@ CollectionTypeMap get_block_first_calc_dtypes_opt_collection(torch::jit::Block* 
       torch::jit::Value* in = i;
       types.insert({in, {get_value_first_calc_dtype_opt(b, i)}});
     } else if(i->type()->kind() == torch::jit::TypeKind::TupleType) {
-      LOG_DEBUG("get_block_first_calc_dtypes_opt TupleType");
-
-      
-      // TODO: how to evaluate the data type of tuple element
+      LOG_DEBUG("get_block_first_calc_dtypes_opt_collection TupleType");
+      // TODO: to evaluate the data type of tuple element
       // make sure very time get the same ptr
       at::ArrayRef<torch::jit::Value*> unpack_tuple = torch::jit::createTupleUnpack(i);
-      LOG_DEBUG("get_block_first_calc_dtypes_opt: tuple size " << unpack_tuple.size());
+      LOG_DEBUG("get_block_first_calc_dtypes_opt_collection: tuple size " << unpack_tuple.size());
       std::vector<c10::optional<at::ScalarType>> empty_dytpes(unpack_tuple.size());
       types.insert({i, empty_dytpes}); // insert an empty 
       // for (auto item: unpack_tuple) {
@@ -259,10 +256,9 @@ CollectionTypeMap get_block_first_calc_dtypes_opt_collection(torch::jit::Block* 
       // }
 
     } else if(i->type()->kind() == torch::jit::TypeKind::ListType) {
-      // TODO: how to evaluate the data type of tuple element
+      // TODO: to decide the size of list and type of list element
       LOG_DEBUG("get_block_first_calc_dtypes_opt ListType");
       types.insert({i, {}}); // insert an empty 
-      // LOG_INFO("Unsupported type of c10::ListType::ofTensors()");
 
     }
   }
