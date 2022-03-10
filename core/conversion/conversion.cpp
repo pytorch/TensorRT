@@ -133,7 +133,11 @@ void AddLayer(ConversionCtx* ctx, const torch::jit::Node* n) {
 void AddInputs(
     ConversionCtx* ctx,
     c10::ArrayRef<const torch::jit::Value*> inputs,
-    std::unordered_map<const torch::jit::Value*, ir::Input>& input_specs) {
+    ConversionInfo& conversion_info) {
+    // std::unordered_map<const torch::jit::Value*, ir::Input>& input_specs) {
+  std::unordered_map<const torch::jit::Value*, ir::Input>& input_specs = conversion_info.inputs;
+  std::unordered_map<const torch::jit::Value*, std::vector<ir::Input>> collection_input_spec = conversion_info.collection_inputs;
+  
   std::vector<const torch::jit::Value*> input_tensors;
   for (auto in : inputs) {
     // Disregarding inputs that are not tensors
@@ -161,9 +165,15 @@ void AddInputs(
   for (auto input : input_tensors) {
     const torch::jit::Value* in = input;
     TORCHTRT_CHECK(
-        input_specs.find(in) != input_specs.end(),
+        input_specs.find(in) != input_specs.end() || collection_input_spec.find(in) != collection_input_spec.end(),
         "Cannot find an input spec associated with input: " << in->debugName());
-    ir::Input& spec = input_specs.find(in)->second;
+    ir::Input spec;
+    if (input_specs.find(in) != input_specs.end()) {
+        spec = input_specs.find(in)->second;
+    } else {
+      spec = collection_input_spec.find(in)->second[0]; // assume input is tensor
+    }
+    // ir::Input& spec = input_specs.find(in)->second;
 
     std::string name = std::string("input_") + std::to_string(ctx->num_inputs);
     LOG_INFO(
@@ -386,7 +396,8 @@ void ConvertBlockToNetDef(
 
   auto inputs = b->inputs();
   AddParamsToCtxValueMap(ctx, static_params);
-  AddInputs(ctx, inputs, build_info.inputs);
+  // AddInputs(ctx, inputs, build_info.inputs);
+  AddInputs(ctx, inputs, build_info);
 
   auto nodes = b->nodes();
 
