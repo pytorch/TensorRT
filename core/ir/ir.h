@@ -42,17 +42,17 @@ struct Input : torch::CustomClassHolder {
 
 // Add to spec
 struct GraphInputs {
-  GraphInputs() {}
-  GraphInputs(torch::jit::IValue inputs) {
-    input_signature = inputs;
-    // TODO flatten IValue
-  }
-  GraphInputs(std::vector<Input> inputs) {
-    flattened_inputs = inputs;
-    // TODO construct the IValue
-  }
+//   GraphInputs() {}
+//   GraphInputs(torch::jit::IValue inputs) {
+//     input_signature = inputs;
+//     // TODO flatten IValue
+//   }
+  // GraphInputs(std::vector<Input> inputs) {
+  //   flattened_inputs = inputs;
+  //   // TODO construct the IValue
+  // }
   torch::jit::IValue input_signature;  // nested Input, full input spec
-  std::vector<Input> flattened_inputs;  // flattend Input
+  std::vector<Input> flattened_inputs;  // flattend Input, can be removed
   std::vector<std::vector<Input>> collection_inputs; // only support two layer nesting, e.g. ((a, b), [c, d], e)
 };
 
@@ -76,7 +76,7 @@ CollectionInputSpecMap associate_specs_with_collection_inputs(
     ir::GraphInputs graph_inputs,
     StaticParams& static_params);
 InputSpecMap pair_input_vals_with_specs(std::vector<const torch::jit::Value*> vals, std::vector<Input> specs);
-CollectionInputSpecMap pair_input_vals_with_specs(std::vector<const torch::jit::Value*> vals, std::vector<std::vector<Input>>& specs);
+CollectionInputSpecMap pair_input_vals_with_specs_collection(std::vector<const torch::jit::Value*> vals, std::vector<std::vector<Input>>& specs);
 std::vector<const torch::jit::Value*> get_tensor_inputs(
     std::shared_ptr<torch::jit::Graph>& g,
     StaticParams& static_params);

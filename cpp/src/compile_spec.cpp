@@ -20,82 +20,123 @@ CompileSpec::CompileSpec(std::vector<c10::ArrayRef<int64_t>> fixed_sizes) {
   for (auto in : fixed_sizes) {
     inputs.push_back(Input(in));
   }
-  graph_inputs.flattened_inputs = inputs;
+  // graph_inputs.flattened_inputs = inputs;
 }
 
 CompileSpec::CompileSpec(std::vector<std::vector<int64_t>> fixed_sizes) {
   for (auto in : fixed_sizes) {
     inputs.push_back(Input(in));
   }
-  graph_inputs.flattened_inputs = inputs;
+  // graph_inputs.flattened_inputs = inputs;
 }
 
-void flatten_dfs(std::vector<torchtrt::core::ir::Input>& flattened_inputs, torch::jit::IValue input_ivalue, torch::jit::IValue& converted_ivalue) {
+CompileSpec::CompileSpec(torch::jit::IValue input_signature) {
+    graph_inputs.input_signature = input_signature;
+}
+
+void flatten_dfs(std::vector<torchtrt::core::ir::Input>& flattened_inputs, std::vector<std::vector<torchtrt::core::ir::Input>>& collection_inputs, 
+                 torch::jit::IValue input_ivalue, torch::jit::IValue& converted_ivalue, int level, int index) {
     if (input_ivalue.isTuple()) {
       auto input_tuple = input_ivalue.toTuple();
       std::vector<torch::jit::IValue> converted_elements;
+      int idx = 0;
+      if (level == 0) {
+        collection_inputs.resize(input_tuple->elements().size());
+      }
       for (auto item: input_tuple->elements()) {
         torch::jit::IValue converted_item;
-        flatten_dfs(flattened_inputs, item, converted_item);
+        int cur_idx = level < 1 ? idx: index;
+        flatten_dfs(flattened_inputs, collection_inputs, item, converted_item, level+1, cur_idx);
         converted_elements.push_back(converted_item);
         auto tuple_ptr = c10::ivalue::Tuple::create(converted_elements);
         converted_ivalue = torch::jit::IValue(tuple_ptr);
+        idx++;
       }
     } else if(input_ivalue.isList()) {
       auto input_list = input_ivalue.toList().vec();
+      if (level == 0) {
+        collection_inputs.resize(input_list.size());
+      }
       c10::TypePtr type = input_list[0].type();
       auto converted_elements = c10::impl::GenericList(type);
       // std::vector<torch::jit::IValue> converted_elements;
+      int idx = 0;
       for (auto item: input_list) {
+        int cur_idx = level < 1 ? idx: index;
         torch::jit::IValue converted_item;
-        flatten_dfs(flattened_inputs, item, converted_item);
+        flatten_dfs(flattened_inputs, collection_inputs, item, converted_item, level+1, cur_idx);
         converted_elements.push_back(converted_item);
+        idx++;
       }
       converted_ivalue = torch::jit::IValue(converted_elements);
     } else if(input_ivalue.isCustomClass()) {
       torchtrt::core::ir::Input cur_input = to_internal_input(*(input_ivalue.toCustomClass<torchtrt::Input>()));
       flattened_inputs.push_back(cur_input);
       converted_ivalue = torch::jit::IValue(std::move(c10::make_intrusive<torch_tensorrt::core::ir::Input>(cur_input)));
+      if (level == 0) {  // a single value like A
+        collection_inputs.resize(1);
+        collection_inputs[0].push_back(cur_input);
+      } else if (level == 1) { // like A in [A, A] or [(B, B), A]
+        collection_inputs[index].push_back(cur_input);
+      } else if (level == 2) {  // like A in [(A, A), C]
+        collection_inputs[index].push_back(cur_input);
+      } else {// only support 2 level
+        LOG_ERROR("3 level of input specs is not supported");
+      }
     }
 }
+
 
 torch_tensorrt::core::ir::GraphInputs to_internal_graph_inputs(GraphInputs external_graph_input) {
   torch_tensorrt::core::ir::GraphInputs internal_graph_input;
 
-  // flattened version
-  if (external_graph_input.flattened_inputs.size() > 0) {
-    // std::vector<torch::jit::IValue> input_shape_list;
-    auto empty_ivalue = torch::jit::IValue(c10::make_intrusive<torchtrt::core::ir::Input>(torchtrt::core::ir::Input()));
-    c10::TypePtr type = empty_ivalue.type();
-    auto input_shape_list = c10::impl::GenericList(type);
-    std::vector<torchtrt::core::ir::Input> internal_input = to_vec_internal_inputs(external_graph_input.flattened_inputs);
-    for (auto input_shape: internal_input) {
-      auto input_shape_ivalue = torch::jit::IValue(std::move(c10::make_intrusive<torchtrt::core::ir::Input>(input_shape)));
-      input_shape_list.push_back(input_shape_ivalue);
-    }
+  // // flattened version
+  // if (external_graph_input.flattened_inputs.size() > 0) {
+  //   // std::vector<torch::jit::IValue> input_shape_list;
+  //   auto empty_ivalue = torch::jit::IValue(c10::make_intrusive<torchtrt::core::ir::Input>(torchtrt::core::ir::Input()));
+  //   c10::TypePtr type = empty_ivalue.type();
+  //   auto input_shape_list = c10::impl::GenericList(type);
+  //   std::vector<torchtrt::core::ir::Input> internal_input = to_vec_internal_inputs(external_graph_input.flattened_inputs);
+  //   for (auto input_shape: internal_input) {
+  //     auto input_shape_ivalue = torch::jit::IValue(std::move(c10::make_intrusive<torchtrt::core::ir::Input>(input_shape)));
+  //     input_shape_list.push_back(input_shape_ivalue);
+  //   }
 
-    torch::jit::IValue input_signature(input_shape_list);
-    internal_graph_input.flattened_inputs = internal_input;
-    internal_graph_input.input_signature = input_signature;
+  //   torch::jit::IValue input_signature(input_shape_list);
+  //   internal_graph_input.flattened_inputs = internal_input;
+  //   internal_graph_input.input_signature = input_signature;
     
-  }
-  // nested version
-  else {
+  // }
+  // // nested version
+  // else {
     std::vector<torchtrt::core::ir::Input> flattened_inputs;
-    torch::jit::IValue input_signature;
-    flatten_dfs(flattened_inputs, external_graph_input.input_signature, input_signature);
-    internal_graph_input.flattened_inputs = flattened_inputs;
-    internal_graph_input.input_signature = input_signature;
-    printf("in nested version branch\n");
+    std::vector<std::vector<torchtrt::core::ir::Input>> collection_inputs;
 
-  }
+    torch::jit::IValue converted_input_signature;
+    flatten_dfs(flattened_inputs, collection_inputs, external_graph_input.input_signature, converted_input_signature, 0, 0);
+    internal_graph_input.flattened_inputs = flattened_inputs;
+    internal_graph_input.input_signature = converted_input_signature;
+    internal_graph_input.collection_inputs = collection_inputs;
+
+    LOG_DEBUG("compile_spec.cpp, to_internal_graph_inputs, flattened_inputs size " << flattened_inputs.size() << ", collection_inputs size "<< collection_inputs.size());
+
   return internal_graph_input;
 }
 
 torchtrt::core::CompileSpec to_internal_compile_spec(CompileSpec external) {
   torchtrt::core::CompileSpec internal(to_vec_internal_inputs(external.inputs));
-  internal.graph_inputs = to_internal_graph_inputs(external.graph_inputs);
-  internal.inputs = internal.graph_inputs.flattened_inputs;
+  if (internal.inputs.size() == 0) {
+    LOG_DEBUG("to_internal_compile_spec, Input size == 0, using graph_input");
+    internal.graph_inputs = to_internal_graph_inputs(external.graph_inputs);
+    internal.inputs = internal.graph_inputs.flattened_inputs;
+  } else {
+    LOG_DEBUG("to_internal_compile_spec, Input size != 0, using original Input to construct collection_input");
+    internal.graph_inputs.collection_inputs.resize(internal.inputs.size());
+    for (int i = 0; i < internal.inputs.size(); i++) {
+      internal.graph_inputs.collection_inputs[i].push_back(internal.inputs[i]);
+    }
+  }
+
 
   for (auto p : external.enabled_precisions) {
     internal.convert_info.engine_settings.enabled_precisions.insert(toTRTDataType(p));

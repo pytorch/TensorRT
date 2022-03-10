@@ -8,27 +8,90 @@ namespace torch_tensorrt {
 namespace core {
 namespace partitioning {
 
+at::Tensor generateSingleInput(ir::Input& input, c10::optional<at::ScalarType>& type_opt) {
+      auto cur_shape = input.input_shape;
+      std::vector<int64_t> shape;
+      shape.insert(shape.begin(), std::begin(cur_shape.d), std::begin(cur_shape.d) + cur_shape.nbDims);
+      // auto type_opt = types[input.first][i];
+      auto type = at::kFloat;
+      if (type_opt) {
+        type = type_opt.value();
+      } else {
+        LOG_WARNING("Input type for doing shape analysis could not be determined, defaulting to F32");
+      }
+      auto in = at::randint(5, shape, {at::kCUDA}).to(type);
+      // ivalue_map[input.first] = in.clone();
+      return in;
+}
+
 std::unordered_map<const torch::jit::Value*, torch::jit::IValue> generateRandomInputs(
-    std::unordered_map<const torch::jit::Value*, ir::Input>& inputs,
-    std::unordered_map<const torch::jit::Value*, c10::optional<at::ScalarType>>& types) {
+// std::unordered_map<const torch::jit::Value*, std::vector<torch::jit::IValue>> generateRandomInputs(
+    // std::unordered_map<const torch::jit::Value*, ir::Input>& inputs,
+    std::unordered_map<const torch::jit::Value*, std::vector<ir::Input>>& inputs,
+    // std::unordered_map<const torch::jit::Value*, c10::optional<at::ScalarType>>& types) {
+    std::unordered_map<const torch::jit::Value*, std::vector<c10::optional<at::ScalarType>>>& types) {
   // generate random inputs for running pytorch segments
   std::unordered_map<const torch::jit::Value*, torch::jit::IValue> ivalue_map;
-
-  uint64_t in_i = 0;
+  // std::unordered_map<const torch::jit::Value*, std::vector<torch::jit::IValue>> ivalue_map;
+  // TODO
+  // uint64_t in_i = 0;
   for (auto& input : inputs) {
-    auto cur_shape = input.second.input_shape;
-    std::vector<int64_t> shape;
-    shape.insert(shape.begin(), std::begin(cur_shape.d), std::begin(cur_shape.d) + cur_shape.nbDims);
-    auto type_opt = types[input.first];
-    auto type = at::kFloat;
-    if (type_opt) {
-      type = type_opt.value();
+
+    // for (int i = 0; i < input.second.size(); i++) {
+    //   auto cur_shape = input.second[i].input_shape;
+    //   std::vector<int64_t> shape;
+    //   shape.insert(shape.begin(), std::begin(cur_shape.d), std::begin(cur_shape.d) + cur_shape.nbDims);
+    //   auto type_opt = types[input.first][i];
+    //   auto type = at::kFloat;
+    //   if (type_opt) {
+    //     type = type_opt.value();
+    //   } else {
+    //     LOG_WARNING("Input type for doing shape analysis could not be determined, defaulting to F32");
+    //   }
+    //   auto in = at::randint(5, shape, {at::kCUDA}).to(type);
+    //   // ivalue_map[input.first] = in.clone();
+    //   ivalue_map[input.first].push_back(in.clone());
+    //   // in_i++;
+    // }
+
+    if (input.first->type()->kind() == torch::jit::TypeKind::ListType) {
+      // create list
+      // auto list = c10::impl::GenericList(c10::TensorType::get());
+      // list.append(ivalues_maps[input]);
+      LOG_DEBUG("generateRandomInputs, generate random input of list type");
+      // jit_inputs_ivalues.push_back(ivalues_maps[input].toList());
+      std::vector<torch::jit::IValue> list;
+      c10::TypePtr elementType = c10::TensorType::get();
+      auto generic_list = c10::impl::GenericList(elementType);
+      for (int i = 0; i < input.second.size(); i++) {
+        auto in = generateSingleInput(input.second[i], types[input.first][i]);
+        // list.push_back(in.clone());
+        generic_list.push_back(in.clone());
+      }
+      // c10::TypePtr elementType = list[0].type();
+
+      // generic_list.append(list);
+      ivalue_map[input.first] = generic_list;
+      // jit_inputs_ivalues.push_back(list);
+    } else if (input.first->type()->kind() == torch::jit::TypeKind::TupleType) {
+      // create tuple
+      // auto tuple = torch::jit::Tuple::create(ivalues_maps[input]);
+      LOG_DEBUG("generateRandomInputs, generate random input of tuple type");
+      std::vector<torch::jit::IValue> list;
+      for (int i = 0; i < input.second.size(); i++) {
+        auto in = generateSingleInput(input.second[i], types[input.first][i]);
+        list.push_back(in.clone());
+      }
+      auto tuple = c10::ivalue::Tuple::create(list); // create tuple ptr
+      
+      ivalue_map[input.first] = c10::IValue(tuple);
+      // jit_inputs_ivalues.push_back(tuple);
     } else {
-      LOG_WARNING("Input type for doing shape analysis could not be determined, defaulting to F32");
+      LOG_DEBUG("generateRandomInputs, generate random input of tensor type");
+      auto in = generateSingleInput(input.second[0], types[input.first][0]);
+      ivalue_map[input.first] = in.clone();
+      
     }
-    auto in = at::randint(5, shape, {at::kCUDA}).to(type);
-    ivalue_map[input.first] = in.clone();
-    in_i++;
   }
   return ivalue_map;
 }
@@ -36,6 +99,7 @@ std::unordered_map<const torch::jit::Value*, torch::jit::IValue> generateRandomI
 void getSegmentsOutputByRunning(
     SegmentedBlock& seg_block,
     std::unordered_map<const torch::jit::Value*, torch::jit::IValue>& ivalues_maps,
+    // std::unordered_map<const torch::jit::Value*, std::vector<torch::jit::IValue>>& ivalues_maps,
     const PartitionInfo& partition_info) {
   // create a module to run the graph
   auto g = seg_block.g();
@@ -79,8 +143,16 @@ void getSegmentsOutputByRunning(
     } else if (input->type()->isSubtypeOf(torch::jit::BoolType::get())) {
       jit_inputs_ivalues.push_back(ivalues_maps[input].toBool());
     } else if (input->type()->kind() == torch::jit::TypeKind::ListType) {
+      // create list
+      // auto list = c10::impl::GenericList(c10::TensorType::get());
+      // list.append(ivalues_maps[input]);
+      LOG_DEBUG("getSegmentsOutputByRunning, handle list type");
       jit_inputs_ivalues.push_back(ivalues_maps[input].toList());
+      // jit_inputs_ivalues.push_back(list);
     } else if (input->type()->kind() == torch::jit::TypeKind::TupleType) {
+      // create tuple
+      // auto tuple = torch::jit::Tuple::create(ivalues_maps[input]);
+      LOG_DEBUG("getSegmentsOutputByRunning, handle tuple type");
       jit_inputs_ivalues.push_back(ivalues_maps[input].toTuple());
     } else if (input->type()->kind() == torch::jit::TypeKind::NumberType) {
       jit_inputs_ivalues.push_back(ivalues_maps[input].toScalar());
@@ -141,6 +213,7 @@ void getSegmentsOutputByRunning(
       }
       input_types.push_back(cur_ivalue.toTensor().scalar_type());
     }
+    // TODO: tuple and list inputs in subgraph
   }
 
   seg_block.register_inshapes(input_shapes);
