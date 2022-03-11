@@ -49,6 +49,8 @@ torch::jit::Module compile_int8_model(const std::string& data_dir, torch::jit::M
   compile_spec.enabled_precisions.insert(torch::kI8);
   /// Use the TensorRT Entropy Calibrator
   compile_spec.ptq_calibrator = calibrator;
+  /// Truncate Float64
+  compile_spec.truncate_long_and_double = true;
   /// Set a larger workspace
   compile_spec.workspace_size = 1 << 28;
 
