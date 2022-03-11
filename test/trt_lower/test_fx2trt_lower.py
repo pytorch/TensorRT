@@ -3,7 +3,7 @@
 import logging
 import unittest
 
-from fx2trt_oss.fx import LowerSetting, Lowerer
+from fx2trt_oss.fx.lower import LowerSetting, Lowerer
 import torch
 import torch.fx as fx
 import torch.nn as nn
