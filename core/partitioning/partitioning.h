@@ -14,6 +14,17 @@ namespace torch_tensorrt {
 namespace core {
 namespace partitioning {
 
+class PartitionCtx {
+ public:
+  uint64_t get_block_id() {
+    auto id = next_id;
+    ++next_id;
+    return id;
+  }
+ private:
+  uint64_t next_id = 0;
+};
+
 typedef std::vector<SegmentedBlock> PartitionedGraph;
 
 PartitionedGraph segment_graph(torch::jit::Block* block, const PartitionInfo& partition_info);

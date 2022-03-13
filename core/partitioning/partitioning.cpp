@@ -200,6 +200,10 @@ void resolveNonTensorInputs(PartitionedGraph& segmented_blocks) { // , std::shar
   }
   segmented_blocks.clear();
   segmented_blocks.insert(segmented_blocks.begin(), segmented_blocks_list.begin(), segmented_blocks_list.end());
+  PartitionCtx partition_context;
+  for (auto& seg_block : segmented_blocks) {
+    seg_block.update_id(partition_context.get_block_id());
+  }
   return;
 }
 
