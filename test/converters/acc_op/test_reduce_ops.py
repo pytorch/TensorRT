@@ -22,6 +22,12 @@ class TestReduceConverter(AccTestCase):
             (f"{acc_op.__name__}_three_dim_keepdim", (1, 2, 3), True, op, acc_op),
             (f"{acc_op.__name__}_dim0_keepdim", 0, True, op, acc_op),
             (f"{acc_op.__name__}_dim0_no_keepdim", 0, False, op, acc_op),
+            (f"{acc_op.__name__}_neg_single_dim_no_keepdim", -1, False, op, acc_op),
+            (f"{acc_op.__name__}_neg_single_dim_keepdim", -1, True, op, acc_op),
+            (f"{acc_op.__name__}_neg_two_dim_no_keepdim", (-1, -2), False, op, acc_op),
+            (f"{acc_op.__name__}_neg_two_dim_keepdim", (-1, -2), True, op, acc_op),
+            (f"{acc_op.__name__}_neg_pos_two_dim_no_keepdim", (-1, 1), False, op, acc_op),
+            (f"{acc_op.__name__}_neg_pos_two_dim_keepdim", (-1, 1), True, op, acc_op),
         ]
     )
     def test_reduce(self, test_name, dim, keepdim, op, expected_acc_op):

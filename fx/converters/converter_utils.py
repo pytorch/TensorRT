@@ -523,6 +523,11 @@ def add_reduce_layer(
     else:
         dim = kwargs["dim"]  # type: ignore[assignment]
 
+    if not network.has_implicit_batch_dimension:
+        dim = tuple(len(input_val.shape) + i if i < 0 else i for i in dim)
+    else:
+        dim = tuple(len(input_val.shape) + i + 1 if i < 0 else i for i in dim)
+
     keepdim = False if "keepdim" not in kwargs else kwargs["keepdim"]
     layer = network.add_reduce(
         input_val,
