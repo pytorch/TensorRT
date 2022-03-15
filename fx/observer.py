@@ -93,7 +93,7 @@ class ObserveContext:
         args: the args passed to the callable
         kwargs: the kwargs passed to the callable
         return_value: the return value returned by the callable, only available
-            when observing the callable after its invocation (via 
+            when observing the callable after its invocation (via
             `CallableObservers.post`)
     """
     callable: t.Callable
@@ -111,7 +111,7 @@ def observable():
     >>> @observable()
     >>> def func_to_observe(x, y) -> int:
     >>>     ...
-    >>>  
+    >>>
     >>> def log(ctx: ObserveContext):
     >>>     print(
     >>>         f"called {ctx.callable.__name__} with {ctx.args} {ctx.kwargs}"
@@ -135,7 +135,7 @@ class CallableObservers:
     post: Observer[t.Callable[[ObserveContext], None]]
 
 
-class ObservedCallable(t.Protocol):
+class ObservedCallable:
     """
     Interface for an observed callable
     """
