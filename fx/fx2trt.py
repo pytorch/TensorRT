@@ -155,6 +155,8 @@ class TRTInterpreter(torch.fx.Interpreter):
         timing_cache=None,
         profiling_verbosity=None,
     ) -> TRTInterpreterResult:
+        assert not (fp16_mode and int8_mode), "We cannot enable both fp16 and int8 mode."
+
         TRT_INTERPRETER_CALL_PRE_OBSERVER.observe(self.module)
 
         # For float outputs, we set their dtype to fp16 only if fp16_mode=True and
@@ -193,7 +195,6 @@ class TRTInterpreter(torch.fx.Interpreter):
             builder_config.set_flag(trt.BuilderFlag.INT8)
 
         if sparse_weights:
-            assert fp16_mode or int8_mode, "We can only enable sparsity in fp16 or int8 mode."
             builder_config.set_flag(trt.BuilderFlag.SPARSE_WEIGHTS)
 
         if strict_type_constraints:

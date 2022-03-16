@@ -80,6 +80,7 @@ def lower_to_trt(
     max_workspace_size=1 << 25,
     explicit_batch_dimension=False,
     fp16_mode=True,
+    int8_mode=False,
     verbose_log=False,
     timing_cache_prefix="",
     save_timing_cache=False,
@@ -96,6 +97,7 @@ def lower_to_trt(
         max_workspace_size: Maximum size of workspace given to TensorRT.
         explicit_batch_dimension: Use explicit batch dimension in TensorRT if set True, otherwise use implicit batch dimension.
         fp16_mode: fp16 config given to TRTModule.
+        int8_mode: int8 config given to TRTModule.
         verbose_log: Enable verbose log for TensorRT if set True.
         timing_cache_prefix: Timing cache file name for timing cache used by fx2trt.
         save_timing_cache: Update timing cache with current timing cache data if set to True.
@@ -109,6 +111,7 @@ def lower_to_trt(
         max_workspace_size=max_workspace_size,
         explicit_batch_dimension=explicit_batch_dimension,
         fp16_mode=fp16_mode,
+        int8_mode=int8_mode,
         verbose_log=verbose_log,
         timing_cache_prefix=timing_cache_prefix,
         save_timing_cache=save_timing_cache,
