@@ -68,8 +68,9 @@ std::unordered_map<const torch::jit::Value*, torch::jit::IValue> generateRandomI
         // types for list is {}
         // auto in = generateSingleInput(input.second[i], types[input.first][i]);
         // TODO: need to decide the input type of list elements in ir.cpp
-        c10::optional<at::ScalarType> type_opt = {};
-        auto in = generateSingleInput(input.second[i], type_opt);
+        // c10::optional<at::ScalarType> type_opt = {};
+        // auto in = generateSingleInput(input.second[i], type_opt);
+        auto in = generateSingleInput(input.second[i], types[input.first][i]);
         // list.push_back(in.clone());
         generic_list.push_back(in.clone());
         LOG_DEBUG("generateRandomInputs, 1");

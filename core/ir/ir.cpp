@@ -250,10 +250,13 @@ CollectionTypeMap get_block_first_calc_dtypes_opt_collection(torch::jit::Block* 
       LOG_DEBUG("get_block_first_calc_dtypes_opt_collection TupleType");
       // TODO: to evaluate the data type of tuple element
       // make sure very time get the same ptr
+      c10::optional<at::ScalarType> tp = get_value_first_calc_dtype_opt(b, i);
       at::ArrayRef<torch::jit::Value*> unpack_tuple = torch::jit::createTupleUnpack(i);
       LOG_DEBUG("get_block_first_calc_dtypes_opt_collection: tuple size " << unpack_tuple.size());
-      std::vector<c10::optional<at::ScalarType>> empty_dytpes(unpack_tuple.size());
-      types.insert({i, empty_dytpes}); // insert an empty 
+      // Assume all tuple has the same datatype
+      // std::vector<c10::optional<at::ScalarType>> dytpes(unpack_tuple.size(), tp);
+      std::vector<c10::optional<at::ScalarType>> dytpes(unpack_tuple.size());
+      types.insert({i, dytpes}); // insert an empty 
       // for (auto item: unpack_tuple) {
       //   torch::jit::Value* in = item;
       //   types.insert({in, get_value_first_calc_dtype_opt(b, i)});
@@ -261,8 +264,11 @@ CollectionTypeMap get_block_first_calc_dtypes_opt_collection(torch::jit::Block* 
 
     } else if(i->type()->kind() == torch::jit::TypeKind::ListType) {
       // TODO: to decide the size of list and type of list element
-      LOG_DEBUG("get_block_first_calc_dtypes_opt ListType");
-      types.insert({i, {}}); // insert an empty 
+      LOG_DEBUG("get_block_first_calc_dtypes_opt ListType: use size " << i->uses().size());
+      c10::optional<at::ScalarType> tp = get_value_first_calc_dtype_opt(b, i);
+      // std::vector<c10::optional<at::ScalarType>> dytpes(i->uses().size());
+      std::vector<c10::optional<at::ScalarType>> dytpes(i->uses().size(), tp);
+      types.insert({i, dytpes}); // insert an empty
 
     }
   }
