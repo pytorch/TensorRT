@@ -7,9 +7,16 @@ from fx2trt_oss.tracer.acc_tracer.acc_utils import (
     get_attr,
 )
 from fx2trt_oss.fx.observer import observable
+from fx2trt_oss.fx.passes.pass_utils import log_before_after, validate_inference
+from typing import Any
 
+# Create an alias for module input type to avoid littering pyre-ignore for Any
+# throughout the file.
+Input = Any
 
-def fuse_sparse_matmul_add(gm: torch.fx.GraphModule):
+@log_before_after
+@validate_inference(atol=1e-3, rtol=1e-2)
+def fuse_sparse_matmul_add(gm: torch.fx.GraphModule, input: Input):
     """
     Replace acc_ops.matmul + acc_ops.add with acc_ops.linear
     TRT8.2 can take advantage of structured sparsity (2:4), but the graph needs contain a single FC layer.
@@ -100,7 +107,9 @@ def check_permute(node: torch.fx.Node):
 
 
 @observable()
-def fuse_permute_linear(gm: torch.fx.GraphModule):
+@log_before_after
+@validate_inference(atol=1e-3, rtol=1e-2)
+def fuse_permute_linear(gm: torch.fx.GraphModule, input: Input):
     """
     Fuse pattern like permute + linear if permute is transposing the last two dimension.
     """
@@ -122,7 +131,9 @@ def fuse_permute_linear(gm: torch.fx.GraphModule):
 
 
 @observable()
-def fuse_permute_matmul(gm: torch.fx.GraphModule):
+@log_before_after
+@validate_inference(atol=1e-3, rtol=1e-2)
+def fuse_permute_matmul(gm: torch.fx.GraphModule, input: Input):
     """
     Fuse pattern like permute + matmul if permute is transposing the last two dimension.
     """
@@ -149,7 +160,6 @@ def fuse_permute_matmul(gm: torch.fx.GraphModule):
     gm.graph.lint()
     gm.recompile()
     return gm
-
 
 try:
     # @manual=//deeplearning/trt/python:py_tensorrt

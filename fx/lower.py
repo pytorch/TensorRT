@@ -21,10 +21,8 @@ from .fx2trt import (
 from .input_tensor_spec import (
     InputTensorSpec,
 )
-from .passes.fuse_pass import (
-    fuse_permute_linear,
-    fuse_permute_matmul,
-)
+from .passes.pass_utils import chain_passes, PassFunc
+from .passes.lower_basic_pass import fuse_permute_matmul,fuse_permute_linear
 from .passes.remove_duplicate_output_args import (
     remove_duplicate_output_args,
 )
@@ -74,9 +72,6 @@ class PassContext(NamedTuple):
     lower_setting: "LowerSetting"
     module_name: str = ""
 
-# Function signature for a graph module pass
-PassFunc = Callable[[nn.Module, PassContext], Tuple[nn.Module, PassContext]]
-
 
 def lower_to_trt(
     module: nn.Module,
@@ -85,7 +80,6 @@ def lower_to_trt(
     max_workspace_size=1 << 25,
     explicit_batch_dimension=False,
     fp16_mode=True,
-    enable_fuse=True,
     verbose_log=False,
     timing_cache_prefix="",
     save_timing_cache=False,
@@ -102,8 +96,6 @@ def lower_to_trt(
         max_workspace_size: Maximum size of workspace given to TensorRT.
         explicit_batch_dimension: Use explicit batch dimension in TensorRT if set True, otherwise use implicit batch dimension.
         fp16_mode: fp16 config given to TRTModule.
-        enable_fuse: Enable pass fusion during lowering if set to true. l=Lowering will try to find pattern defined
-        in fx2trt_oss.fx.passes from original module, and replace with optimized pass before apply lowering.
         verbose_log: Enable verbose log for TensorRT if set True.
         timing_cache_prefix: Timing cache file name for timing cache used by fx2trt.
         save_timing_cache: Update timing cache with current timing cache data if set to True.
@@ -117,7 +109,6 @@ def lower_to_trt(
         max_workspace_size=max_workspace_size,
         explicit_batch_dimension=explicit_batch_dimension,
         fp16_mode=fp16_mode,
-        enable_fuse=enable_fuse,
         verbose_log=verbose_log,
         timing_cache_prefix=timing_cache_prefix,
         save_timing_cache=save_timing_cache,
@@ -153,14 +144,12 @@ class LowerSetting:
     strict_type_constraints: Require TensorRT engine to strictly follow data type
     setting at execution time.
 
-    enable_fuse: Enable pass fuse duirng lowering, i.e. fuse multiple operations
-    as (a->b->c->d)=>(e). Current available fuse source patterns are:
-    sparse->matmul->add
+    customized_fuse_pass: List of custmozied pass to apply during lowering process.
+
+    lower_basic_fuse_pass: Enable basic pass fuse duirng lowering, i.e. fuse multiple operations
+    as (a->b->c->d)=>(e). Current basic fuse patterns are:
     permute->linear
     permute->matmul
-    unsqueeze->cat->sum
-
-    enable_fuse_for_sparsity: Enable pass fuse for sparsity.
 
     verbose_log: Enable TensorRT engine verbose log mode.
 
@@ -191,8 +180,8 @@ class LowerSetting:
     int8_mode: bool = False
     max_workspace_size: int = 1 << 30
     strict_type_constraints: bool = False
-    enable_fuse: bool = True
-    enable_fuse_for_sparsity = False
+    customized_fuse_pass: Sequence = ()
+    lower_basic_fuse_pass: Sequence = (fuse_permute_matmul,fuse_permute_linear)
     verbose_log: bool = False
     algo_selector = None
     timing_cache_prefix: str = ""
@@ -249,10 +238,10 @@ class LowerTrtInterpreter:
             if self.lower_setting.input_specs
             else InputTensorSpec.from_tensors(input)
         )
-        if self.lower_setting.enable_fuse:
-            mod = fuse_permute_matmul(mod)
-            mod = fuse_permute_linear(mod)
-            FUSE_PASSES_POST_OBSERVER.observe(mod, input)
+
+        if self.lower_setting.lower_basic_fuse_pass:
+            lower_pass = chain_passes(*self.lower_setting.lower_basic_fuse_pass)
+            lower_pass(mod, input)
 
         # Prepare algorithm selector and timing_cache for TRTInterpreter
         algo_selector = None
@@ -363,14 +352,16 @@ class Lowerer:
             inputs = tuple(x.half() if x.dtype == torch.float32 else x for x in inputs)
 
         # Ensure ast_rewrite is done for input module before const_fold.
-        traced_mod = self.trace_func(module, inputs)  # type: ignore[misc]
+        tracer = chain_passes(self.trace_func, *self.lower_setting.customized_fuse_pass)
+        traced_mod = tracer(module, inputs)  # type: ignore[misc]
 
         # Run const folding.
         traced_mod = run_const_fold(traced_mod)
 
         # Retrace here to eliminate no-op introduced by const folding and map new introduced
         # nodes to acc op nodes.
-        traced_mod = self.trace_func(traced_mod, inputs)  # type: ignore[misc]
+        traced_mod = tracer(traced_mod, inputs)  # type: ignore[misc]
+        FUSE_PASSES_POST_OBSERVER.observe(traced_mod, inputs)
 
         # Run split.
         split_result = self.split_func(traced_mod, inputs, self.lower_setting)  # type: ignore[misc,operator]

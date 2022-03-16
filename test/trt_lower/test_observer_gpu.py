@@ -29,7 +29,7 @@ class ObserverGPUTests(TestCase):
 
         with execution_verifier() as verify_execution:
 
-            lowerer = lower.Lowerer.create(lower_setting=lower.LowerSetting(enable_fuse=True))
+            lowerer = lower.Lowerer.create(lower_setting=lower.LowerSetting())
             # Update `lowerer.split_func` to make sure the test model is split
             # onto the trt partition:
             lowerer = replace(
