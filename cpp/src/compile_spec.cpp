@@ -90,25 +90,6 @@ void flatten_dfs(std::vector<torchtrt::core::ir::Input>& flattened_inputs, std::
 torch_tensorrt::core::ir::GraphInputs to_internal_graph_inputs(GraphInputs external_graph_input) {
   torch_tensorrt::core::ir::GraphInputs internal_graph_input;
 
-  // // flattened version
-  // if (external_graph_input.flattened_inputs.size() > 0) {
-  //   // std::vector<torch::jit::IValue> input_shape_list;
-  //   auto empty_ivalue = torch::jit::IValue(c10::make_intrusive<torchtrt::core::ir::Input>(torchtrt::core::ir::Input()));
-  //   c10::TypePtr type = empty_ivalue.type();
-  //   auto input_shape_list = c10::impl::GenericList(type);
-  //   std::vector<torchtrt::core::ir::Input> internal_input = to_vec_internal_inputs(external_graph_input.flattened_inputs);
-  //   for (auto input_shape: internal_input) {
-  //     auto input_shape_ivalue = torch::jit::IValue(std::move(c10::make_intrusive<torchtrt::core::ir::Input>(input_shape)));
-  //     input_shape_list.push_back(input_shape_ivalue);
-  //   }
-
-  //   torch::jit::IValue input_signature(input_shape_list);
-  //   internal_graph_input.flattened_inputs = internal_input;
-  //   internal_graph_input.input_signature = input_signature;
-    
-  // }
-  // // nested version
-  // else {
     std::vector<torchtrt::core::ir::Input> flattened_inputs;
     std::vector<std::vector<torchtrt::core::ir::Input>> collection_inputs;
 
@@ -134,6 +115,7 @@ torchtrt::core::CompileSpec to_internal_compile_spec(CompileSpec external) {
     internal.graph_inputs.collection_inputs.resize(internal.inputs.size());
     for (int i = 0; i < internal.inputs.size(); i++) {
       internal.graph_inputs.collection_inputs[i].push_back(internal.inputs[i]);
+      internal.graph_inputs.flattened_inputs = internal.inputs;
     }
   }
 

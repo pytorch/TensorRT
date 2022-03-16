@@ -10,9 +10,10 @@ TEST(CppAPITests, TestCollectionTupleInput) {
 
   std::string path =
   "/root/Torch-TensorRT/tuple_input.ts";
-  torch::Tensor in0 = torch::randn({1, 3, 512, 512}, torch::kCUDA).to(torch::kFloat);
-  std::vector<at::Tensor> inputs;
-  inputs.push_back(in0);
+  // torch::Tensor in0 = torch::randn({1, 3, 512, 512}, torch::kCUDA).to(torch::kFloat);
+  torch::Tensor in0 = torch::randn({1, 3, 512, 512}, torch::kCUDA).to(torch::kHalf);
+  // std::vector<at::Tensor> inputs;
+  // inputs.push_back(in0);
 
   torch::jit::Module mod;
   try {
@@ -23,13 +24,13 @@ TEST(CppAPITests, TestCollectionTupleInput) {
   }
   mod.eval();
   mod.to(torch::kCUDA);
-  
 
-  std::vector<torch::jit::IValue> inputs_;
 
-  for (auto in : inputs) {
-    inputs_.push_back(torch::jit::IValue(in.clone()));
-  }
+  // std::vector<torch::jit::IValue> inputs_;
+
+  // for (auto in : inputs) {
+  //   inputs_.push_back(torch::jit::IValue(in.clone()));
+  // }
 
 
   std::vector<torch::jit::IValue> complex_inputs, complex_inputs_list;
@@ -42,16 +43,12 @@ TEST(CppAPITests, TestCollectionTupleInput) {
   // torch::jit::IValue input_list_ivalue = torch::jit::IValue(input_list);
 
   complex_inputs.push_back(input_tuple);
-  // complex_inputs_list.push_back(in0);
-  // complex_inputs_list.push_back(in0);
-
-
 
   auto out = mod.forward(complex_inputs);
   LOG_DEBUG("Finish torchscirpt forward");
 
-
-  auto input_shape = torch_tensorrt::Input(in0.sizes(), torch_tensorrt::DataType::kUnknown);
+  // auto input_shape = torch_tensorrt::Input(in0.sizes(), torch_tensorrt::DataType::kUnknown);
+  auto input_shape = torch_tensorrt::Input(in0.sizes(), torch_tensorrt::DataType::kHalf);
 
   auto input_shape_ivalue = torch::jit::IValue(std::move(c10::make_intrusive<torch_tensorrt::Input>(input_shape)));
 
@@ -63,7 +60,6 @@ TEST(CppAPITests, TestCollectionTupleInput) {
 
   std::tuple<torch::jit::IValue, torch::jit::IValue> input_shape_tuple(input_shape_ivalue, input_shape_ivalue);
 
-
   torch::jit::IValue complex_input_shape(input_shape_tuple);
   std::tuple<torch::jit::IValue> input_tuple2(complex_input_shape);
   torch::jit::IValue complex_input_shape2(input_tuple2);
@@ -74,13 +70,12 @@ TEST(CppAPITests, TestCollectionTupleInput) {
   compile_settings.min_block_size = 1;
 
   // // FP16 execution
-  // compile_settings.enabled_precisions = {torch::kHalf};
+  compile_settings.enabled_precisions = {torch::kHalf};
   // // Compile module
   auto trt_mod = torch_tensorrt::torchscript::compile(mod, compile_settings);
   LOG_DEBUG("Finish compile");
   auto trt_out = trt_mod.forward(complex_inputs);
-  // auto trt_out = trt_mod.forward(complex_inputs_list);
-
+  // std::cout << out.toTensor() << std::endl;
 
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(out.toTensor(), trt_out.toTensor(), 1e-5));
 }
@@ -90,7 +85,7 @@ TEST(CppAPITests, TestCollectionNormalInput) {
 
   std::string path =
   "/root/Torch-TensorRT/normal_model.ts";
-  torch::Tensor in0 = torch::randn({1, 3, 512, 512}, torch::kCUDA).to(torch::kFloat);
+  torch::Tensor in0 = torch::randn({1, 3, 512, 512}, torch::kCUDA).to(torch::kHalf);
   std::vector<at::Tensor> inputs;
   inputs.push_back(in0);
   inputs.push_back(in0);
@@ -116,14 +111,14 @@ TEST(CppAPITests, TestCollectionNormalInput) {
   LOG_DEBUG("Finish torchscirpt forward");
 
   std::vector<torch_tensorrt::Input> input_range;
-  input_range.push_back({in0.sizes(), torch::kF32});
-  input_range.push_back({in0.sizes(), torch::kF32});
+  input_range.push_back({in0.sizes(), torch::kF16});
+  input_range.push_back({in0.sizes(), torch::kF16});
   torch_tensorrt::ts::CompileSpec compile_settings(input_range);
   compile_settings.require_full_compilation = true;
   compile_settings.min_block_size = 1;
 
   // // FP16 execution
-  // compile_settings.enabled_precisions = {torch::kHalf};
+  compile_settings.enabled_precisions = {torch::kHalf};
   // // Compile module
   auto trt_mod = torch_tensorrt::torchscript::compile(mod, compile_settings);
   LOG_DEBUG("Finish compile");
@@ -138,7 +133,7 @@ TEST(CppAPITests, TestCollectionListInput) {
 
   std::string path =
   "/root/Torch-TensorRT/list_input.ts";
-  torch::Tensor in0 = torch::randn({1, 3, 512, 512}, torch::kCUDA).to(torch::kFloat);
+  torch::Tensor in0 = torch::randn({1, 3, 512, 512}, torch::kCUDA).to(torch::kHalf);
   std::vector<at::Tensor> inputs;
   inputs.push_back(in0);
 
@@ -173,7 +168,8 @@ TEST(CppAPITests, TestCollectionListInput) {
   LOG_DEBUG("Finish torchscirpt forward");
 
 
-  auto input_shape = torch_tensorrt::Input(in0.sizes(), torch_tensorrt::DataType::kUnknown);
+  // auto input_shape = torch_tensorrt::Input(in0.sizes(), torch_tensorrt::DataType::kUnknown);
+  auto input_shape = torch_tensorrt::Input(in0.sizes(), torch_tensorrt::DataType::kHalf);
 
   auto input_shape_ivalue = torch::jit::IValue(std::move(c10::make_intrusive<torch_tensorrt::Input>(input_shape)));
 
@@ -194,13 +190,13 @@ TEST(CppAPITests, TestCollectionListInput) {
   compile_settings.torch_executed_ops.push_back("aten::__getitem__");
 
   // // FP16 execution
-  // compile_settings.enabled_precisions = {torch::kHalf};
+  compile_settings.enabled_precisions = {torch::kHalf};
   // // Compile module
   auto trt_mod = torch_tensorrt::torchscript::compile(mod, compile_settings);
   LOG_DEBUG("Finish compile");
   auto trt_out = trt_mod.forward(complex_inputs);
   // auto trt_out = trt_mod.forward(complex_inputs_list);
 
-
+  // std::cout << out.toTensor() << std::endl;
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(out.toTensor(), trt_out.toTensor(), 1e-5));
 }

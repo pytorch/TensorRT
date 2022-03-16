@@ -52,7 +52,7 @@ struct GraphInputs {
   //   // TODO construct the IValue
   // }
   torch::jit::IValue input_signature;  // nested Input, full input spec
-  std::vector<Input> flattened_inputs;  // flattend Input, can be removed
+  std::vector<Input> flattened_inputs;  // flattend Input
   std::vector<std::vector<Input>> collection_inputs; // only support two layer nesting, e.g. ((a, b), [c, d], e)
 };
 

@@ -331,10 +331,22 @@ void MapInputsAndDetermineDTypes(
           spec[i].dtype = nvinfer1::DataType::kFLOAT;
         } else if (spec[i].dtype_is_user_defined && cfg.partition_info.enabled) {
           if (!est_type_opt[i]) {
-            LOG_INFO("Cannot infer input tensor dtype in graph, unable to verify user input dtype settings");
+            LOG_INFO("Cannot infer input tensor dtype in graph, compiler is going to use the user setting");
+            // TODO set input data type
+
+            std::stringstream ss;
+            ss << "For input " << in->debugName() << ", found user specified input dtype as ";
+            ss << cfg.convert_info.collection_inputs.find(in)->second[i].dtype;
+            // ss << cfg.convert_info.inputs.find(in)->second.dtype;
+            ss << ". The compiler is going to use the user setting " << cfg.convert_info.collection_inputs.find(in)->second[i].dtype;
+            auto warn_str = ss.str();
+            LOG_WARNING(warn_str);
+            // Overwrite type map with user settings
+            first_use_type_map[in][i] = {util::TRTDataTypeToScalarType(cfg.convert_info.collection_inputs.find(in)->second[i].dtype)};
+
           } else {
             // if (util::TRTDataTypeToScalarType(cfg.convert_info.inputs.find(in)->second.dtype) != est_type_opt.value()) {
-              if (util::TRTDataTypeToScalarType(cfg.convert_info.collection_inputs.find(in)->second[i].dtype) != est_type_opt[i].value()) {
+            if (util::TRTDataTypeToScalarType(cfg.convert_info.collection_inputs.find(in)->second[i].dtype) != est_type_opt[i].value()) {
               std::stringstream ss;
               ss << "For input " << in->debugName() << ", found user specified input dtype as ";
               ss << cfg.convert_info.collection_inputs.find(in)->second[i].dtype;

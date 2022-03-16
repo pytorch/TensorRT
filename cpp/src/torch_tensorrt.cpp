@@ -30,7 +30,6 @@ torch::jit::script::Module compile(const torch::jit::script::Module& module, Com
   LOG_DEBUG(get_build_info());
   // Want to export a much simpler (non TRT header dependent) API so doing the
   // type conversion here
-  printf("in torch_tensorrt::ts::compile\n");
   return torch_tensorrt::core::CompileGraph(module, to_internal_compile_spec(info));
 }
 
