@@ -21,14 +21,14 @@ check_clean:
 clean: check_clean
 	rm -rf $(BUILDDIR)/*
 ifndef VERSION
-	rm -rf /tmp/trtorch_docs
-	mkdir -p /tmp/trtorch_docs
-	mv $(DESTDIR)/v* /tmp/trtorch_docs
+	rm -rf /tmp/torchtrt_docs
+	mkdir -p /tmp/torchtrt_docs
+	mv $(DESTDIR)/v* /tmp/torchtrt_docs
 endif
 	rm -r $(DESTDIR)/*
 ifndef VERSION
-	mv /tmp/trtorch_docs/v* $(DESTDIR)
-	rm -rf /tmp/trtorch_docs
+	mv /tmp/torchtrt_docs/v* $(DESTDIR)
+	rm -rf /tmp/torchtrt_docs
 endif
 	rm -rf $(SOURCEDIR)/_cpp_api
 	rm -rf $(SOURCEDIR)/_notebooks

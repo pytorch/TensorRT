@@ -1,50 +1,54 @@
-workspace(name = "TRTorch")
+workspace(name = "Torch-TensorRT")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 
-git_repository(
+http_archive(
     name = "rules_python",
-    remote = "https://github.com/bazelbuild/rules_python.git",
-    commit = "4fcc24fd8a850bdab2ef2e078b1de337eea751a6",
-    shallow_since = "1589292086 -0400"
+    sha256 = "778197e26c5fbeb07ac2a2c5ae405b30f6cb7ad1f5510ea6fdac03bded96cc6f",
+    url = "https://github.com/bazelbuild/rules_python/releases/download/0.2.0/rules_python-0.2.0.tar.gz",
 )
 
-load("@rules_python//python:repositories.bzl", "py_repositories")
-py_repositories()
-
-load("@rules_python//python:pip.bzl", "pip_repositories", "pip3_import")
-pip_repositories()
+load("@rules_python//python:pip.bzl", "pip_install")
 
 http_archive(
     name = "rules_pkg",
-    url = "https://github.com/bazelbuild/rules_pkg/releases/download/0.2.4/rules_pkg-0.2.4.tar.gz",
-    sha256 = "4ba8f4ab0ff85f2484287ab06c0d871dcb31cc54d439457d28fd4ae14b18450a",
+    sha256 = "038f1caa773a7e35b3663865ffb003169c6a71dc995e39bf4815792f385d837d",
+    urls = [
+        "https://mirror.bazel.build/github.com/bazelbuild/rules_pkg/releases/download/0.4.0/rules_pkg-0.4.0.tar.gz",
+        "https://github.com/bazelbuild/rules_pkg/releases/download/0.4.0/rules_pkg-0.4.0.tar.gz",
+    ],
 )
 
 load("@rules_pkg//:deps.bzl", "rules_pkg_dependencies")
+
 rules_pkg_dependencies()
 
 git_repository(
     name = "googletest",
-    remote = "https://github.com/google/googletest",
     commit = "703bd9caab50b139428cea1aaff9974ebee5742e",
-    shallow_since = "1570114335 -0400"
+    remote = "https://github.com/google/googletest",
+    shallow_since = "1570114335 -0400",
+)
+
+# External dependency for torch_tensorrt if you already have precompiled binaries.
+local_repository(
+    name = "torch_tensorrt",
+    path = "/opt/conda/lib/python3.8/site-packages/torch_tensorrt"
 )
 
 # CUDA should be installed on the system locally
 new_local_repository(
     name = "cuda",
-    path = "/usr/local/cuda-10.2/",
     build_file = "@//third_party/cuda:BUILD",
+    path = "/usr/local/cuda-11.3/",
 )
 
 new_local_repository(
     name = "cublas",
-    path = "/usr",
     build_file = "@//third_party/cublas:BUILD",
+    path = "/usr",
 )
-
 #############################################################################################################
 # Tarballs and fetched dependencies (default - use in cases when building from precompiled bin and tarballs)
 #############################################################################################################
@@ -52,17 +56,17 @@ new_local_repository(
 http_archive(
     name = "libtorch",
     build_file = "@//third_party/libtorch:BUILD",
+    sha256 = "190e963e739d5f7c2dcf94b3994de8fcd335706a4ebb333812ea7d8c841beb06",
     strip_prefix = "libtorch",
-    urls = ["https://download.pytorch.org/libtorch/cu102/libtorch-cxx11-abi-shared-with-deps-1.5.1.zip"],
-    sha256 = "cf0691493d05062fe3239cf76773bae4c5124f4b039050dbdd291c652af3ab2a"
+    urls = ["https://download.pytorch.org/libtorch/cu113/libtorch-cxx11-abi-shared-with-deps-1.10.0%2Bcu113.zip"],
 )
 
 http_archive(
     name = "libtorch_pre_cxx11_abi",
     build_file = "@//third_party/libtorch:BUILD",
+    sha256 = "0996a6a4ea8bbc1137b4fb0476eeca25b5efd8ed38955218dec1b73929090053",
     strip_prefix = "libtorch",
-    sha256 = "818977576572eadaf62c80434a25afe44dbaa32ebda3a0919e389dcbe74f8656",
-    urls = ["https://download.pytorch.org/libtorch/cu102/libtorch-shared-with-deps-1.5.1.zip"],
+    urls = ["https://download.pytorch.org/libtorch/cu113/libtorch-shared-with-deps-1.10.0%2Bcu113.zip"],
 )
 
 # Download these tarballs manually from the NVIDIA website
@@ -71,18 +75,22 @@ http_archive(
 
 http_archive(
     name = "cudnn",
-    urls = ["https://developer.nvidia.com/compute/machine-learning/cudnn/secure/7.6.5.32/Production/10.2_20191118/cudnn-10.2-linux-x64-v7.6.5.32.tgz",],
     build_file = "@//third_party/cudnn/archive:BUILD",
-    sha256 = "600267f2caaed2fd58eb214ba669d8ea35f396a7d19b94822e6b36f9f7088c20",
-    strip_prefix = "cuda"
+    sha256 = "0e5d2df890b9967efa6619da421310d97323565a79f05a1a8cb9b7165baad0d7",
+    strip_prefix = "cuda",
+    urls = [
+        "https://developer.nvidia.com/compute/machine-learning/cudnn/secure/8.2.4/11.4_20210831/cudnn-11.4-linux-x64-v8.2.4.15.tgz",
+    ],
 )
 
 http_archive(
     name = "tensorrt",
-    urls = ["https://developer.nvidia.com/compute/machine-learning/tensorrt/secure/7.0/7.0.0.11/tars/TensorRT-7.0.0.11.Ubuntu-18.04.x86_64-gnu.cuda-10.2.cudnn7.6.tar.gz",],
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    sha256 = "c7d73b2585b18aae68b740249efa8c8ba5ae852abe9a023720595432a8eb4efd",
-    strip_prefix = "TensorRT-7.0.0.11"
+    sha256 = "da130296ac6636437ff8465812eb55dbab0621747d82dc4fe9b9376f00d214af",
+    strip_prefix = "TensorRT-8.2.2.1",
+    urls = [
+        "https://developer.nvidia.com/compute/machine-learning/tensorrt/secure/8.2.2.1/tars/tensorrt-8.2.2.1.linux.x86_64-gnu.cuda-11.4.cudnn8.2.tar.gz",
+    ],
 )
 
 ####################################################################################
@@ -120,22 +128,20 @@ http_archive(
 #   build_file = "@//third_party/tensorrt/local:BUILD"
 #)
 
-#########################################################################
-# Testing Dependencies (optional - comment out on aarch64)
-#########################################################################
-pip3_import(
-    name = "trtorch_py_deps",
-    requirements = "//py:requirements.txt"
+# #########################################################################
+# # Testing Dependencies (optional - comment out on aarch64)
+# #########################################################################
+# pip_install(
+#     name = "torch_tensorrt_py_deps",
+#     requirements = "//py:requirements.txt",
+# )
+
+# pip_install(
+#     name = "py_test_deps",
+#     requirements = "//tests/py:requirements.txt",
+# )
+
+pip_install(
+    name = "pylinter_deps",
+    requirements = "//tools/linter:requirements.txt",
 )
-
-load("@trtorch_py_deps//:requirements.bzl", "pip_install")
-pip_install()
-
-pip3_import(
-    name = "py_test_deps",
-    requirements = "//tests/py:requirements.txt"
-)
-
-load("@py_test_deps//:requirements.bzl", "pip_install")
-pip_install()
-

@@ -1,24 +1,23 @@
-#include "torch/csrc/jit/passes/guard_elimination.h"
 #include "torch/csrc/jit/ir/alias_analysis.h"
 #include "torch/csrc/jit/jit_log.h"
 #include "torch/csrc/jit/passes/constant_propagation.h"
+#include "torch/csrc/jit/passes/dead_code_elimination.h"
+#include "torch/csrc/jit/passes/guard_elimination.h"
 #include "torch/csrc/jit/passes/peephole.h"
 #include "torch/csrc/jit/runtime/graph_executor.h"
-#include "torch/csrc/jit/passes/dead_code_elimination.h"
 
 #include "core/util/prelude.h"
 
 #include <vector>
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace lowering {
 namespace passes {
 namespace {
 using namespace torch::jit;
 struct AddMMBranchFusion {
-  AddMMBranchFusion(std::shared_ptr<Graph> graph)
-    : graph_(std::move(graph)) {}
+  AddMMBranchFusion(std::shared_ptr<Graph> graph) : graph_(std::move(graph)) {}
 
   void run() {
     findAddMMVariantsNodes(graph_->block());
@@ -26,7 +25,7 @@ struct AddMMBranchFusion {
     LOG_GRAPH("Post aten::addmm branch fusion: " << *graph_);
   }
 
-private:
+ private:
   bool isAddMMVariantsNode(Node* n) {
     /// Check if this Node hosts a pattern like so:
     /// %ret : Tensor = prim::If(%622)
@@ -35,7 +34,7 @@ private:
     ///   -> (%ret.1)
     /// block1():
     ///   %output.1 : Tensor = aten::matmul(%x9.1, %3677)
-    ///   %output0.1 : Tensor = aten::add_(%output.1, %self.fc.bias, %3)
+    ///   %output0.1 : Tensor = aten::add(%output.1, %self.fc.bias, %3)
     ///   -> (%output0.1)
 
     if (n->blocks().size() != 2) {
@@ -45,21 +44,18 @@ private:
     auto arm2 = n->blocks()[1];
 
     auto arm1_start = arm1->nodes().begin();
-    if ((*arm1_start)->kind().toQualString() != std::string("aten::addmm")
-        && (*(++arm1_start))->kind() != prim::Return) {
-      // Make sure that block0 is solely just the aten::addmm op and the return
-      return false;
-    }
-
     auto arm2_start = arm2->nodes().begin();
-    if ((*arm2_start)->kind().toQualString() != std::string("aten::matmul")
-        && (*(++arm2_start))->kind().toQualString() != std::string("aten::add_")
-        && (*(++arm2_start))->kind() != prim::Return) {
-      // Make sure that block1 is solely the return
-      return false;
+
+    if ((*arm1_start)->kind().toQualString() == std::string("aten::addmm") &&
+        (*(++arm1_start))->kind() == prim::Return &&
+        (*arm2_start)->kind().toQualString() == std::string("aten::matmul") &&
+        (*(++arm2_start))->kind().toQualString() == std::string("aten::add") &&
+        (*(++arm2_start))->kind() == prim::Return) {
+      // Make sure that block0 is solely just the aten::addmm op and block1 is matmul + add
+      return true;
     }
 
-    return true;
+    return false;
   }
 
   void findAddMMVariantsNodes(Block* b) {
@@ -75,7 +71,7 @@ private:
         auto new_addmm_node = b->owningGraph()->create(c10::Symbol::fromQualString("aten::addmm"), input_values, 1);
         n->replaceAllUsesWith(new_addmm_node);
 
-        auto old_insert_point =  b->owningGraph()->insertPoint();
+        auto old_insert_point = b->owningGraph()->insertPoint();
         b->owningGraph()->setInsertPoint(n);
         b->owningGraph()->insertNode(new_addmm_node);
         b->owningGraph()->setInsertPoint(old_insert_point);
@@ -97,4 +93,4 @@ void FuseAddMMBranches(std::shared_ptr<Graph> graph) {
 } // namespace passes
 } // namespace lowering
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

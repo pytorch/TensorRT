@@ -1,36 +1,34 @@
 #pragma once
 
-#include <string>
 #include <map>
+#include <string>
 
-#include "torch/csrc/jit/ir/ir.h"
 #include "core/conversion/conversionctx/ConversionCtx.h"
-#include "core/conversion/converters/Weights.h"
+#include "core/conversion/tensorcontainer/TensorContainer.h"
 #include "core/util/prelude.h"
+#include "torch/csrc/jit/ir/ir.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace conversion {
 
 class Var : torch::CustomClassHolder {
-public:
-  enum Type {
-    kITensor,
-    kIValue,
-    kNone
-  };
+ public:
+  enum Type { kITensor, kIValue, kNone };
 
   Var();
-  Var(const torch::jit::IValue* p);
+  Var(torch::jit::IValue* p);
   Var(nvinfer1::ITensor* p);
   Var(const Var& a);
   Var& operator=(const Var& a);
-  Var& operator=(const torch::jit::IValue* in);
+  Var& operator=(torch::jit::IValue* in);
   Var& operator=(nvinfer1::ITensor* in);
   const torch::jit::IValue* IValue() const;
+  torch::jit::IValue* IValueMut() const;
   nvinfer1::ITensor* ITensor() const;
 
-  //TODO: Can we consolidate this in a way that prevents requesting invalid types
+  // TODO: Can we consolidate this in a way that prevents requesting invalid
+  // types
   at::Tensor unwrapToTensor(at::Tensor default_val);
   at::Tensor unwrapToTensor();
   int64_t unwrapToInt(int64_t default_val);
@@ -39,6 +37,8 @@ public:
   double unwrapToDouble();
   bool unwrapToBool(bool default_val);
   bool unwrapToBool();
+  std::string unwrapToString(std::string default_val);
+  std::string unwrapToString();
   c10::Scalar unwrapToScalar(c10::Scalar default_val);
   c10::Scalar unwrapToScalar();
   c10::List<int64_t> unwrapToIntList(c10::List<int64_t> default_val);
@@ -51,9 +51,9 @@ public:
   c10::List<at::Tensor> unwrapToTensorList();
   nvinfer1::ITensor* ITensorOrFreeze(ConversionCtx* ctx);
 
-  template<typename T>
+  template <typename T>
   T unwrapTo(T default_val);
-  template<typename T>
+  template <typename T>
   T unwrapTo();
 
   bool isIValue() const;
@@ -61,9 +61,10 @@ public:
   bool isNone() const;
   Var::Type type() const;
   std::string type_name() const;
-private:
+
+ private:
   union VarContainer {
-    const torch::jit::IValue* ivalue;
+    torch::jit::IValue* ivalue;
     nvinfer1::ITensor* tensor;
     void* none;
   };
@@ -74,6 +75,6 @@ private:
 
 } // namespace conversion
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt
 
 #include "core/conversion/var/Var_inl.h"

@@ -2,25 +2,26 @@
 
 #include "core/util/prelude.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace core {
 namespace lowering {
 namespace passes {
 
 // // May be abusing aten::_tensor_to_list(Tensor self) -> int[]
 // // Treating it as an emit_constant by the converters
-// // We could register a custom op (trt::emit_constant) which we can use to convert
+// // We could register a custom op (trt::emit_constant) which we can use to
+// convert
 // // constant tensors to TRT ITensors
 void UnpackBatchNorm(std::shared_ptr<torch::jit::Graph>& graph) {
-    // Convert BatchNorm into individual operators
-    // batch_norm = gamma * (in - mu) / sqrt(var + epsilon) + beta
-    std::string batch_norm_pattern = R"IR(
+  // Convert BatchNorm into individual operators
+  // batch_norm = gamma * (in - mu) / sqrt(var + epsilon) + beta
+  std::string batch_norm_pattern = R"IR(
        graph(%input, %gamma, %beta, %mean,
              %var, %training, %momentum, %eps, %cudnn):
            %1 = aten::batch_norm(%input, %gamma, %beta, %mean, %var, %training, %momentum, %eps, %cudnn)
            return (%1))IR";
 
-    std::string expanded_batch_norm_pattern = R"IR(
+  std::string expanded_batch_norm_pattern = R"IR(
         graph(%input, %gamma, %beta, %mean,
               %var, %training, %momentum, %eps, %cudnn):
             %gamma_trt = trt::const(%gamma)
@@ -38,15 +39,15 @@ void UnpackBatchNorm(std::shared_ptr<torch::jit::Graph>& graph) {
             %8 = aten::add(%6, %beta_trt, %7)
             return(%8))IR";
 
-    torch::jit::SubgraphRewriter unpack_batch_norm;
-    unpack_batch_norm.RegisterRewritePattern(batch_norm_pattern, expanded_batch_norm_pattern);
-    unpack_batch_norm.runOnGraph(graph);
-    LOG_DEBUG("[Lowering Batch Norm]: momentum disregarded");
-    LOG_DEBUG("[Lowering Batch Norm]: training disregarded");
-    LOG_DEBUG("[Lowering Batch Norm]: cudnn disregarded");
-    LOG_GRAPH("Post unpack batchnorm: " << *graph);
+  torch::jit::SubgraphRewriter unpack_batch_norm;
+  unpack_batch_norm.RegisterRewritePattern(batch_norm_pattern, expanded_batch_norm_pattern);
+  unpack_batch_norm.runOnGraph(graph);
+  LOG_DEBUG("[Lowering Batch Norm]: momentum disregarded");
+  LOG_DEBUG("[Lowering Batch Norm]: training disregarded");
+  LOG_DEBUG("[Lowering Batch Norm]: cudnn disregarded");
+  LOG_GRAPH("Post unpack batchnorm: " << *graph);
 }
 } // Namespace passes
 } // namespace lowering
 } // namespace core
-} // namespace trtorch
+} // namespace torch_tensorrt

@@ -1,8 +1,8 @@
 ---
 name: "✨ Feature request"
 about: Suggest an idea for this project
-title: "✨[Feature] An idea about a new feature in TRTorch"
-labels: enhancement
+title: "✨[Feature] An idea about a new feature in Torch-TensorRT"
+labels: feature request
 assignees: narendasan
 
 ---

@@ -1,18 +1,33 @@
 # Contribution Guidelines
 
-### Developing TRTorch
+### Developing Torch-TensorRT
 
-Do try to fill an issue with your feature or bug before filling a PR (op support is generally an exception as long as you provide tests to prove functionality). There is also a backlog (https://github.com/NVIDIA/TRTorch/issues) of issues which are tagged with the area of focus, a coarse priority level and whether the issue may be accessible to new contributors. Let us know if you are interested in working on a issue. We are happy to provide guidance and mentorship for new contributors. Though note, there is no claiming of issues, we prefer getting working code quickly vs. addressing concerns about "wasted work".
+Do try to fill an issue with your feature or bug before filling a PR (op support is generally an exception as long as you provide tests to prove functionality). There is also a backlog (https://github.com/NVIDIA/Torch-TensorRT/issues) of issues which are tagged with the area of focus, a coarse priority level and whether the issue may be accessible to new contributors. Let us know if you are interested in working on a issue. We are happy to provide guidance and mentorship for new contributors. Though note, there is no claiming of issues, we prefer getting working code quickly vs. addressing concerns about "wasted work".
 
 #### Communication
 
-The primary location for discussion is GitHub issues. This is the best place for questions about the project and discussion about specific issues.
+The primary location for discussion is GitHub issues and Github discussions. This is the best place for questions about the project and discussion about specific issues.
 
 We use the PyTorch Slack for communication about core development, integration with PyTorch and other communication that doesn't make sense in GitHub issues. If you need an invite, take a look at the [PyTorch README](https://github.com/pytorch/pytorch/blob/master/README.md) for instructions on requesting one.
 
 ### Coding Guidelines
 
-- We generally follow the coding guidelines used in PyTorch, right now this is not strictly enforced, but match the style used in the code already
+- We generally follow the coding guidelines used in PyTorch
+
+    - Use the built in linting tools to ensure that your code matches the style guidelines
+      ```sh
+      # C++ Linting (After installing clang-format [Version 9.0.0])
+      # Print non-conforming sections of code
+      bazel run //tools/linter:cpplint_diff -- //...
+      # Modify code to conform with style guidelines
+      bazel run //tools/linter:cpplint -- //...
+
+      # Python Linting
+      # Print non-conforming sections of code
+      bazel run //tools/linter:pylint_diff -- //...
+      # Modify code to conform with style guidelines
+      bazel run //tools/linter:pylint -- //...
+      ```
 
 - Avoid introducing unnecessary complexity into existing code so that maintainability and readability are preserved
 

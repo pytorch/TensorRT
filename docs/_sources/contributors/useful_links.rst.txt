@@ -1,7 +1,7 @@
 .. _useful_links:
 
-Useful Links for TRTorch Development
-=====================================
+Useful Links for Torch-TensorRT Development
+==============================================
 
 TensorRT Available Layers and Expected Dimensions
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -32,4 +32,3 @@ PyTorch IR Documentation
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 * https://github.com/pytorch/pytorch/blob/master/torch/csrc/jit/OVERVIEW.md
-

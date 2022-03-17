@@ -1,59 +1,53 @@
 #pragma once
 
 #include <exception>
-#include <string>
 #include <sstream>
+#include <string>
 #include <vector>
 
 // Simplified version of the c10 Exception infrastructure
 // https://github.com/pytorch/pytorch/blob/master/c10/util/Exception.h
 
-// Hopefully makes it easer to merge codebases later and still gives better errors
+// Hopefully makes it easer to merge codebases later and still gives better
+// errors
 
-namespace trtorch
-{
+namespace torch_tensorrt {
 
 class Error : public std::exception {
-    std::vector<std::string> msg_stack_;
-    std::string msg_;
-    const void* caller_;
+  std::vector<std::string> msg_stack_;
+  std::string msg_;
+  const void* caller_;
 
-public:
-    Error(
-        const std::string& msg,
-        const void* caller = nullptr);
-    Error(
-        const char* file,
-        const uint32_t line,
-        const std::string& msg,
-        const void* caller = nullptr);
-    
-    void AppendMessage(const std::string& msg);
-    
-    std::string msg() const;
-    
-    const std::vector<std::string>& msg_stack() const {
-        return msg_stack_;
-    }
-    
-    const char* what() const noexcept override {
-        return msg_.c_str();
-    }
-    
-    const void* caller() const noexcept {
-        return caller_;
-    }
+ public:
+  Error(const std::string& msg, const void* caller = nullptr);
+  Error(const char* file, const uint32_t line, const std::string& msg, const void* caller = nullptr);
+
+  void AppendMessage(const std::string& msg);
+
+  std::string msg() const;
+
+  const std::vector<std::string>& msg_stack() const {
+    return msg_stack_;
+  }
+
+  const char* what() const noexcept override {
+    return msg_.c_str();
+  }
+
+  const void* caller() const noexcept {
+    return caller_;
+  }
 };
 
 std::string GetExceptionString(const std::exception& e);
 
 namespace detail {
 inline std::string if_empty_then(std::string x, std::string y) {
-    if (x.empty()) {
-        return y;
-    } else {
-        return x;
-    }
+  if (x.empty()) {
+    return y;
+  } else {
+    return x;
+  }
 }
 
 template <typename T>
@@ -78,9 +72,9 @@ inline std::ostream& _str(std::ostream& ss, const T& t, const Args&... args) {
 
 template <typename... Args>
 inline std::string _str_wrapper(const Args&... args) {
-    std::ostringstream ss;
-    _str(ss, args...);
-    return ss.str();
+  std::ostringstream ss;
+  _str(ss, args...);
+  return ss.str();
 }
 } // namespace detail
 
@@ -97,5 +91,4 @@ inline std::string str(const std::string& str) {
 inline std::string str(const char* c_str) {
   return c_str;
 }
-} // namespace trtorch
-
+} // namespace torch_tensorrt

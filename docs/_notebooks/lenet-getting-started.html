@@ -3,6 +3,7 @@
  <head>
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
   <meta content="width=device-width,initial-scale=1" name="viewport"/>
   <meta content="ie=edge" http-equiv="x-ua-compatible"/>
   <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
@@ -36,10 +37,10 @@
   <script src="../_static/javascripts/modernizr.js">
   </script>
   <title>
-   TRTorch Getting Started - LeNet — TRTorch master documentation
+   Torch-TensorRT Getting Started - LeNet — Torch-TensorRT master documentation
   </title>
-  <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/pygments.css" rel="stylesheet" type="text/css"/>
+  <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
   <link href="../_static/collapsible-lists/css/tree_view.css" rel="stylesheet" type="text/css"/>
   <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js">
   </script>
@@ -49,18 +50,21 @@
   </script>
   <script src="../_static/doctools.js">
   </script>
-  <script src="../_static/language_data.js">
-  </script>
   <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js">
   </script>
   <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
   </script>
   <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
   </script>
+  <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
+  </script>
+  <script>
+   window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}
+  </script>
   <link href="../genindex.html" rel="index" title="Index"/>
   <link href="../search.html" rel="search" title="Search"/>
-  <link href="../py_api/trtorch.html" rel="next" title="trtorch"/>
-  <link href="../tutorials/trtorchc.html" rel="prev" title="trtorchc"/>
+  <link href="Resnet50-example.html" rel="next" title="Torch-TensorRT Getting Started - ResNet 50"/>
+  <link href="../tutorials/using_dla.html" rel="prev" title="DLA"/>
  </head>
  <body data-md-color-accent="light-green" data-md-color-primary="light-green" dir="ltr">
   <svg class="md-svg">
@@ -82,7 +86,7 @@
    <nav class="md-header-nav md-grid">
     <div class="md-flex navheader">
      <div class="md-flex__cell md-flex__cell--shrink">
-      <a class="md-header-nav__button md-logo" href="../index.html" title="TRTorch master documentation">
+      <a class="md-header-nav__button md-logo" href="../index.html" title="Torch-TensorRT master documentation">
        <i class="md-icon">
         
        </i>
@@ -95,10 +99,10 @@
      <div class="md-flex__cell md-flex__cell--stretch">
       <div class="md-flex__ellipsis md-header-nav__title" data-md-component="title">
        <span class="md-header-nav__topic">
-        TRTorch
+        Torch-TensorRT
        </span>
        <span class="md-header-nav__topic">
-        TRTorch Getting Started - LeNet
+        Torch-TensorRT Getting Started - LeNet
        </span>
       </div>
      </div>
@@ -109,7 +113,7 @@
        <label class="md-search__overlay" for="__search">
        </label>
        <div class="md-search__inner" role="search">
-        <form action="../search.html" class="md-search__form" method="GET" name="search">
+        <form action="../search.html" class="md-search__form" method="get" name="search">
          <input autocapitalize="off" autocomplete="off" class="md-search__input" data-md-component="query" data-md-state="active" name="q" placeholder="Search" spellcheck="false" type="text"/>
          <label class="md-icon md-search__icon" for="__search">
          </label>
@@ -133,7 +137,7 @@
      </div>
      <div class="md-flex__cell md-flex__cell--shrink">
       <div class="md-header-nav__source">
-       <a class="md-source" data-md-source="github" href="https://github.com/nvidia/TRTorch/" title="Go to repository">
+       <a class="md-source" data-md-source="github" href="https://github.com/nvidia/Torch-TensorRT/" title="Go to repository">
         <div class="md-source__icon">
          <svg height="28" viewbox="0 0 24 24" width="28" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
           <use height="24" width="24" xlink:href="#__github">
@@ -141,7 +145,7 @@
          </svg>
         </div>
         <div class="md-source__repository">
-         TRTorch
+         Torch-TensorRT
         </div>
        </a>
       </div>
@@ -151,16 +155,34 @@
        Versions
       </button>
       <div class="dropdown-content md-hero">
-       <a href="https://nvidia.github.io/TRTorch/" title="master">
+       <a href="https://nvidia.github.io/Torch-TensorRT/" title="master">
         master
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.0.3/" title="v0.0.3">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v1.0.0/" title="v1.0.0">
+        v1.0.0
+       </a>
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.4.1/" title="v0.4.1">
+        v0.4.1
+       </a>
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.4.0/" title="v0.4.0">
+        v0.4.0
+       </a>
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.3.0/" title="v0.3.0">
+        v0.3.0
+       </a>
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.2.0/" title="v0.2.0">
+        v0.2.0
+       </a>
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.1.0/" title="v0.1.0">
+        v0.1.0
+       </a>
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.0.3/" title="v0.0.3">
         v0.0.3
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.0.2/" title="v0.0.2">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.0.2/" title="v0.0.2">
         v0.0.2
        </a>
-       <a href="https://nvidia.github.io/TRTorch/v0.0.1/" title="v0.0.1">
+       <a href="https://nvidia.github.io/Torch-TensorRT/v0.0.1/" title="v0.0.1">
         v0.0.1
        </a>
       </div>
@@ -174,7 +196,7 @@
      <ul class="md-tabs__list">
       <li class="md-tabs__item">
        <a class="md-tabs__link" href="../index.html">
-        TRTorch master documentation
+        Torch-TensorRT master documentation
        </a>
       </li>
      </ul>
@@ -187,17 +209,17 @@
        <div class="md-sidebar__inner">
         <nav class="md-nav md-nav--primary" data-md-level="0">
          <label class="md-nav__title md-nav__title--site" for="__drawer">
-          <a class="md-nav__button md-logo" href="../index.html" title="TRTorch master documentation">
+          <a class="md-nav__button md-logo" href="../index.html" title="Torch-TensorRT master documentation">
            <i class="md-icon">
             
            </i>
           </a>
-          <a href="../index.html" title="TRTorch master documentation">
-           TRTorch
+          <a href="../index.html" title="Torch-TensorRT master documentation">
+           Torch-TensorRT
           </a>
          </label>
          <div class="md-nav__source">
-          <a class="md-source" data-md-source="github" href="https://github.com/nvidia/TRTorch/" title="Go to repository">
+          <a class="md-source" data-md-source="github" href="https://github.com/nvidia/Torch-TensorRT/" title="Go to repository">
            <div class="md-source__icon">
             <svg height="28" viewbox="0 0 24 24" width="28" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
              <use height="24" width="24" xlink:href="#__github">
@@ -205,7 +227,7 @@
             </svg>
            </div>
            <div class="md-source__repository">
-            TRTorch
+            Torch-TensorRT
            </div>
           </a>
          </div>
@@ -223,8 +245,28 @@
            </a>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="../tutorials/getting_started.html">
-            Getting Started
+           <a class="md-nav__link" href="../tutorials/getting_started_with_cpp_api.html">
+            Getting Started with C++
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/getting_started_with_python_api.html">
+            Using Torch-TensorRT in Python
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/creating_torchscript_module_in_python.html">
+            Creating a TorchScript Module
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/creating_torchscript_module_in_python.html#working-with-torchscript-in-python">
+            Working with TorchScript in Python
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">
+            Saving TorchScript Module to Disk
            </a>
           </li>
           <li class="md-nav__item">
@@ -233,8 +275,23 @@
            </a>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="../tutorials/trtorchc.html">
-            trtorchc
+           <a class="md-nav__link" href="../tutorials/torchtrtc.html">
+            torchtrtc
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/use_from_pytorch.html">
+            Using Torch-TensorRT Directly From PyTorch
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/runtime.html">
+            Deploying Torch-TensorRT Programs
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../tutorials/using_dla.html">
+            DLA
            </a>
           </li>
           <li class="md-nav__item">
@@ -247,10 +304,10 @@
           <li class="md-nav__item">
            <input class="md-toggle md-nav__toggle" data-md-toggle="toc" id="__toc" type="checkbox"/>
            <label class="md-nav__link md-nav__link--active" for="__toc">
-            TRTorch Getting Started - LeNet
+            Torch-TensorRT Getting Started - LeNet
            </label>
            <a class="md-nav__link md-nav__link--active" href="#">
-            TRTorch Getting Started - LeNet
+            Torch-TensorRT Getting Started - LeNet
            </a>
            <nav class="md-nav md-nav--secondary">
             <label class="md-nav__title" for="__toc">
@@ -259,7 +316,7 @@
             <ul class="md-nav__list" data-md-scrollfix="">
              <li class="md-nav__item">
               <a class="md-nav__link" href="#notebooks-lenet-getting-started--page-root">
-               TRTorch Getting Started - LeNet
+               Torch-TensorRT Getting Started - LeNet
               </a>
               <nav class="md-nav">
                <ul class="md-nav__list">
@@ -337,6 +394,26 @@
            </nav>
           </li>
           <li class="md-nav__item">
+           <a class="md-nav__link" href="Resnet50-example.html">
+            Torch-TensorRT Getting Started - ResNet 50
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="ssd-object-detection-demo.html">
+            Object Detection with Torch-TensorRT (SSD)
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="vgg-qat.html">
+            Deploying Quantization Aware Trained models in INT8 using Torch-TensorRT
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="EfficientNet-example.html">
+            Torch-TensorRT Getting Started - EfficientNet-B0
+           </a>
+          </li>
+          <li class="md-nav__item">
            <span class="md-nav__link caption">
             <span class="caption-text">
              Python API Documenation
@@ -344,13 +421,23 @@
            </span>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/trtorch.html">
-            trtorch
+           <a class="md-nav__link" href="../py_api/torch_tensorrt.html">
+            torch_tensorrt
            </a>
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../py_api/logging.html">
-            trtorch.logging
+            torch_tensorrt.logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/ptq.html">
+            torch_tensorrt.ptq
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../py_api/ts.html">
+            torch_tensorrt.ts
            </a>
           </li>
           <li class="md-nav__item">
@@ -361,8 +448,28 @@
            </span>
           </li>
           <li class="md-nav__item">
-           <a class="md-nav__link" href="../_cpp_api/trtorch_cpp.html">
-            TRTorch C++ API
+           <a class="md-nav__link" href="../_cpp_api/torch_tensort_cpp.html">
+            Torch-TensorRT C++ API
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt.html">
+            Namespace torch_tensorrt
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt__logging.html">
+            Namespace torch_tensorrt::logging
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt__torchscript.html">
+            Namespace torch_tensorrt::torchscript
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt__ptq.html">
+            Namespace torch_tensorrt::ptq
            </a>
           </li>
           <li class="md-nav__item">
@@ -384,7 +491,19 @@
           </li>
           <li class="md-nav__item">
            <a class="md-nav__link" href="../contributors/useful_links.html">
-            Useful Links for TRTorch Development
+            Useful Links for Torch-TensorRT Development
+           </a>
+          </li>
+          <li class="md-nav__item">
+           <span class="md-nav__link caption">
+            <span class="caption-text">
+             Indices
+            </span>
+           </span>
+          </li>
+          <li class="md-nav__item">
+           <a class="md-nav__link" href="../indices/supported_ops.html">
+            Operators Supported
            </a>
           </li>
          </ul>
@@ -402,7 +521,7 @@
          <ul class="md-nav__list" data-md-scrollfix="">
           <li class="md-nav__item">
            <a class="md-nav__link" href="#notebooks-lenet-getting-started--page-root">
-            TRTorch Getting Started - LeNet
+            Torch-TensorRT Getting Started - LeNet
            </a>
            <nav class="md-nav">
             <ul class="md-nav__list">
@@ -489,21 +608,35 @@
         /* CSS for nbsphinx extension */
 
 /* remove conflicting styling from Sphinx themes */
-div.nbinput.container,
-div.nbinput.container div.prompt,
-div.nbinput.container div.input_area,
-div.nbinput.container div[class*=highlight],
-div.nbinput.container div[class*=highlight] pre,
-div.nboutput.container,
-div.nboutput.container div.prompt,
-div.nboutput.container div.output_area,
-div.nboutput.container div[class*=highlight],
-div.nboutput.container div[class*=highlight] pre {
-    background: none;
+div.nbinput.container div.prompt *,
+div.nboutput.container div.prompt *,
+div.nbinput.container div.input_area pre,
+div.nboutput.container div.output_area pre,
+div.nbinput.container div.input_area .highlight,
+div.nboutput.container div.output_area .highlight {
     border: none;
-    padding: 0 0;
+    padding: 0;
     margin: 0;
     box-shadow: none;
+}
+
+div.nbinput.container > div[class*=highlight],
+div.nboutput.container > div[class*=highlight] {
+    margin: 0;
+}
+
+div.nbinput.container div.prompt *,
+div.nboutput.container div.prompt * {
+    background: none;
+}
+
+div.nboutput.container div.output_area .highlight,
+div.nboutput.container div.output_area pre {
+    background: unset;
+}
+
+div.nboutput.container div.output_area div.highlight {
+    color: unset;  /* override Pygments text color */
 }
 
 /* avoid gaps between output lines */
@@ -604,7 +737,7 @@ div.nboutput.container div.output_area {
 div.nbinput.container div.input_area {
     border: 1px solid #e0e0e0;
     border-radius: 2px;
-    background: #f5f5f5;
+    /*background: #f5f5f5;*/
 }
 
 /* override MathJax center alignment in output cells */
@@ -670,6 +803,7 @@ div.nboutput.container div.output_area.rendered_html,
 div.nboutput.container div.output_area > div.output_javascript,
 div.nboutput.container div.output_area:not(.rendered_html) > img{
     padding: 5px;
+    margin: 0;
 }
 
 /* fix copybtn overflow problem in chromium (needed for 'sphinx_copybutton') */
@@ -727,249 +861,345 @@ div.rendered_html tbody tr:hover {
         <div class="input_area highlight-ipython3 notranslate">
          <div class="highlight">
           <pre>
-<span></span><span class="c1"># Copyright 2019 NVIDIA Corporation. All Rights Reserved.</span>
-<span class="c1">#</span>
-<span class="c1"># Licensed under the Apache License, Version 2.0 (the "License");</span>
-<span class="c1"># you may not use this file except in compliance with the License.</span>
-<span class="c1"># You may obtain a copy of the License at</span>
-<span class="c1">#</span>
-<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
-<span class="c1">#</span>
-<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
-<span class="c1"># distributed under the License is distributed on an "AS IS" BASIS,</span>
-<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
-<span class="c1"># See the License for the specific language governing permissions and</span>
-<span class="c1"># limitations under the License.</span>
-<span class="c1"># ==============================================================================</span>
+<span></span># Copyright 2019 NVIDIA Corporation. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
 </pre>
          </div>
         </div>
        </div>
        <p>
-        <img alt="6458f6ab275c4583b11018ba9f1cb910" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
+        <img alt="f44e852a36cb4e91a72bc23aa15ba336" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
        </p>
-       <h1 id="notebooks-lenet-getting-started--page-root">
-        TRTorch Getting Started - LeNet
-        <a class="headerlink" href="#notebooks-lenet-getting-started--page-root" title="Permalink to this headline">
-         ¶
-        </a>
-       </h1>
-       <h2 id="Overview">
-        Overview
-        <a class="headerlink" href="#Overview" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <p>
-        In the practice of developing machine learning models, there are few tools as approachable as PyTorch for developing and experimenting in designing machine learning models. The power of PyTorch comes from its deep integration into Python, its flexibility and its approach to automatic differentiation and execution (eager execution). However, when moving from research into production, the requirements change and we may no longer want that deep Python integration and we want optimization to get the
+       <section id="Torch-TensorRT-Getting-Started---LeNet">
+        <h1 id="notebooks-lenet-getting-started--page-root">
+         Torch-TensorRT Getting Started - LeNet
+         <a class="headerlink" href="#notebooks-lenet-getting-started--page-root" title="Permalink to this headline">
+          ¶
+         </a>
+        </h1>
+        <section id="Overview">
+         <h2 id="Overview">
+          Overview
+          <a class="headerlink" href="#Overview" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <p>
+          In the practice of developing machine learning models, there are few tools as approachable as PyTorch for developing and experimenting in designing machine learning models. The power of PyTorch comes from its deep integration into Python, its flexibility and its approach to automatic differentiation and execution (eager execution). However, when moving from research into production, the requirements change and we may no longer want that deep Python integration and we want optimization to get the
 best performance we can on our deployment platform. In PyTorch 1.0, TorchScript was introduced as a method to separate your PyTorch model from Python, make it portable and optimizable. TorchScript uses PyTorch’s JIT compiler to transform your normal PyTorch code which gets interpreted by the Python interpreter to an intermediate representation (IR) which can have optimizations run on it and at runtime can get interpreted by the PyTorch JIT interpreter. For PyTorch this has opened up a whole new
 world of possibilities, including deployment in other languages like C++. It also introduces a structured graph based format that we can use to do down to the kernel level optimization of models for inference.
-       </p>
-       <p>
-        When deploying on NVIDIA GPUs TensorRT, NVIDIA’s Deep Learning Optimization SDK and Runtime is able to take models from any major framework and specifically tune them to perform better on specific target hardware in the NVIDIA family be it an A100, TITAN V, Jetson Xavier or NVIDIA’s Deep Learning Accelerator. TensorRT performs a couple sets of optimizations to achieve this. TensorRT fuses layers and tensors in the model graph, it then uses a large kernel library to select implementations that
+         </p>
+         <p>
+          When deploying on NVIDIA GPUs TensorRT, NVIDIA’s Deep Learning Optimization SDK and Runtime is able to take models from any major framework and specifically tune them to perform better on specific target hardware in the NVIDIA family be it an A100, TITAN V, Jetson Xavier or NVIDIA’s Deep Learning Accelerator. TensorRT performs a couple sets of optimizations to achieve this. TensorRT fuses layers and tensors in the model graph, it then uses a large kernel library to select implementations that
 perform best on the target GPU. TensorRT also has strong support for reduced operating precision execution which allows users to leverage the Tensor Cores on Volta and newer GPUs as well as reducing memory and computation footprints on device.
-       </p>
-       <p>
-        TRTorch is a compiler that uses TensorRT to optimize TorchScript code, compiling standard TorchScript modules into ones that internally run with TensorRT optimizations. This enables you to continue to remain in the PyTorch ecosystem, using all the great features PyTorch has such as module composability, its flexible tensor implementation, data loaders and more. TRTorch is available to use with both PyTorch and LibTorch.
-       </p>
-       <h3 id="Learning-objectives">
-        Learning objectives
-        <a class="headerlink" href="#Learning-objectives" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        This notebook demonstrates the steps for compiling a TorchScript module with TRTorch on a simple LeNet network.
-       </p>
-       <h2 id="Content">
-        Content
-        <a class="headerlink" href="#Content" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <ol class="arabic simple">
-        <li>
-         <p>
-          <a class="reference external" href="#1">
-           Requirements
-          </a>
          </p>
-        </li>
-        <li>
          <p>
-          <a class="reference external" href="#2">
-           Creating TorchScript modules
-          </a>
+          Torch-TensorRT is a compiler that uses TensorRT to optimize TorchScript code, compiling standard TorchScript modules into ones that internally run with TensorRT optimizations. This enables you to continue to remain in the PyTorch ecosystem, using all the great features PyTorch has such as module composability, its flexible tensor implementation, data loaders and more. Torch-TensorRT is available to use with both PyTorch and LibTorch.
          </p>
-        </li>
-        <li>
+         <section id="Learning-objectives">
+          <h3 id="Learning-objectives">
+           Learning objectives
+           <a class="headerlink" href="#Learning-objectives" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           This notebook demonstrates the steps for compiling a TorchScript module with Torch-TensorRT on a simple LeNet network.
+          </p>
+         </section>
+        </section>
+        <section id="Content">
+         <h2 id="Content">
+          Content
+          <a class="headerlink" href="#Content" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <ol class="arabic simple">
+          <li>
+           <p>
+            <a class="reference external" href="#1">
+             Requirements
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference external" href="#2">
+             Creating TorchScript modules
+            </a>
+           </p>
+          </li>
+          <li>
+           <p>
+            <a class="reference external" href="#3">
+             Compiling with Torch-TensorRT
+            </a>
+           </p>
+          </li>
+         </ol>
          <p>
-          <a class="reference external" href="#3">
-           Compiling with TRTorch
-          </a>
+          ## 1. Requirements
          </p>
-        </li>
-       </ol>
-       <p>
-        ## 1. Requirements
-       </p>
-       <p>
-        Follow the steps in
-        <code class="docutils literal notranslate">
-         <span class="pre">
-          notebooks/README
-         </span>
-        </code>
-        to prepare a Docker container, within which you can run this notebook.
-       </p>
-       <p>
-        ## 2. Creating TorchScript modules
-       </p>
-       <p>
-        Here we create two submodules for a feature extractor and a classifier and stitch them together in a single LeNet module. In this case this is overkill but modules give us granular control over our program including where we decide to optimize and where we don’t. It is also the unit that the TorchScript compiler operates on. So you can decide to only convert/optimize the feature extractor and leave the classifier in standard PyTorch or you can convert the whole thing. When compiling your module
+         <p>
+          Follow the steps in
+          <code class="docutils literal notranslate">
+           <span class="pre">
+            notebooks/README
+           </span>
+          </code>
+          to prepare a Docker container, within which you can run this notebook.
+         </p>
+         <div class="nbinput docutils container">
+          <div class="prompt highlight-none notranslate">
+           <div class="highlight">
+            <pre><span></span>[2]:
+</pre>
+           </div>
+          </div>
+          <div class="input_area highlight-ipython3 notranslate">
+           <div class="highlight">
+            <pre>
+<span></span>!pip install ipywidgets --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host=files.pythonhosted.org
+</pre>
+           </div>
+          </div>
+         </div>
+         <div class="nboutput nblast docutils container">
+          <div class="prompt empty docutils container">
+          </div>
+          <div class="output_area docutils container">
+           <div class="highlight">
+            <pre>
+Looking in indexes: https://pypi.org/simple, https://pypi.ngc.nvidia.com
+Collecting ipywidgets
+  Downloading ipywidgets-7.6.5-py2.py3-none-any.whl (121 kB)
+     |████████████████████████████████| 121 kB 11.4 MB/s eta 0:00:01
+Requirement already satisfied: nbformat&gt;=4.2.0 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (5.1.3)
+Collecting widgetsnbextension~=3.5.0
+  Downloading widgetsnbextension-3.5.2-py2.py3-none-any.whl (1.6 MB)
+     |████████████████████████████████| 1.6 MB 73.4 MB/s eta 0:00:01
+Requirement already satisfied: traitlets&gt;=4.3.1 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (5.1.1)
+Requirement already satisfied: ipython&gt;=4.0.0 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (7.30.0)
+Requirement already satisfied: ipython-genutils~=0.2.0 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (0.2.0)
+Collecting jupyterlab-widgets&gt;=1.0.0
+  Downloading jupyterlab_widgets-1.0.2-py3-none-any.whl (243 kB)
+     |████████████████████████████████| 243 kB 132.2 MB/s eta 0:00:01
+Requirement already satisfied: ipykernel&gt;=4.5.1 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (6.6.0)
+Requirement already satisfied: matplotlib-inline&lt;0.2.0,&gt;=0.1.0 in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets) (0.1.3)
+Requirement already satisfied: tornado&lt;7.0,&gt;=4.2 in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets) (6.1)
+Requirement already satisfied: debugpy&lt;2.0,&gt;=1.0.0 in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets) (1.5.1)
+Requirement already satisfied: jupyter-client&lt;8.0 in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets) (7.1.0)
+Requirement already satisfied: backcall in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (0.2.0)
+Requirement already satisfied: pygments in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (2.10.0)
+Requirement already satisfied: pexpect&gt;4.3 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (4.8.0)
+Requirement already satisfied: jedi&gt;=0.16 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (0.18.1)
+Requirement already satisfied: decorator in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (5.1.0)
+Requirement already satisfied: pickleshare in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (0.7.5)
+Requirement already satisfied: prompt-toolkit!=3.0.0,!=3.0.1,&lt;3.1.0,&gt;=2.0.0 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (3.0.22)
+Requirement already satisfied: setuptools&gt;=18.5 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (59.4.0)
+Requirement already satisfied: parso&lt;0.9.0,&gt;=0.8.0 in /opt/conda/lib/python3.8/site-packages (from jedi&gt;=0.16-&gt;ipython&gt;=4.0.0-&gt;ipywidgets) (0.8.3)
+Requirement already satisfied: entrypoints in /opt/conda/lib/python3.8/site-packages (from jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (0.3)
+Requirement already satisfied: python-dateutil&gt;=2.1 in /opt/conda/lib/python3.8/site-packages (from jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (2.8.2)
+Requirement already satisfied: nest-asyncio&gt;=1.5 in /opt/conda/lib/python3.8/site-packages (from jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (1.5.4)
+Requirement already satisfied: jupyter-core&gt;=4.6.0 in /opt/conda/lib/python3.8/site-packages (from jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (4.9.1)
+Requirement already satisfied: pyzmq&gt;=13 in /opt/conda/lib/python3.8/site-packages (from jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (22.3.0)
+Requirement already satisfied: jsonschema!=2.5.0,&gt;=2.4 in /opt/conda/lib/python3.8/site-packages (from nbformat&gt;=4.2.0-&gt;ipywidgets) (4.2.1)
+Requirement already satisfied: attrs&gt;=17.4.0 in /opt/conda/lib/python3.8/site-packages (from jsonschema!=2.5.0,&gt;=2.4-&gt;nbformat&gt;=4.2.0-&gt;ipywidgets) (21.2.0)
+Requirement already satisfied: importlib-resources&gt;=1.4.0 in /opt/conda/lib/python3.8/site-packages (from jsonschema!=2.5.0,&gt;=2.4-&gt;nbformat&gt;=4.2.0-&gt;ipywidgets) (5.4.0)
+Requirement already satisfied: pyrsistent!=0.17.0,!=0.17.1,!=0.17.2,&gt;=0.14.0 in /opt/conda/lib/python3.8/site-packages (from jsonschema!=2.5.0,&gt;=2.4-&gt;nbformat&gt;=4.2.0-&gt;ipywidgets) (0.18.0)
+Requirement already satisfied: zipp&gt;=3.1.0 in /opt/conda/lib/python3.8/site-packages (from importlib-resources&gt;=1.4.0-&gt;jsonschema!=2.5.0,&gt;=2.4-&gt;nbformat&gt;=4.2.0-&gt;ipywidgets) (3.6.0)
+Requirement already satisfied: ptyprocess&gt;=0.5 in /opt/conda/lib/python3.8/site-packages (from pexpect&gt;4.3-&gt;ipython&gt;=4.0.0-&gt;ipywidgets) (0.7.0)
+Requirement already satisfied: wcwidth in /opt/conda/lib/python3.8/site-packages (from prompt-toolkit!=3.0.0,!=3.0.1,&lt;3.1.0,&gt;=2.0.0-&gt;ipython&gt;=4.0.0-&gt;ipywidgets) (0.2.5)
+Requirement already satisfied: six&gt;=1.5 in /opt/conda/lib/python3.8/site-packages (from python-dateutil&gt;=2.1-&gt;jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (1.16.0)
+Requirement already satisfied: notebook&gt;=4.4.1 in /opt/conda/lib/python3.8/site-packages (from widgetsnbextension~=3.5.0-&gt;ipywidgets) (6.4.1)
+Requirement already satisfied: prometheus-client in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.12.0)
+Requirement already satisfied: Send2Trash&gt;=1.5.0 in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (1.8.0)
+Requirement already satisfied: argon2-cffi in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (21.1.0)
+Requirement already satisfied: jinja2 in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (3.0.3)
+Requirement already satisfied: nbconvert in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (6.3.0)
+Requirement already satisfied: terminado&gt;=0.8.3 in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.12.1)
+Requirement already satisfied: cffi&gt;=1.0.0 in /opt/conda/lib/python3.8/site-packages (from argon2-cffi-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (1.15.0)
+Requirement already satisfied: pycparser in /opt/conda/lib/python3.8/site-packages (from cffi&gt;=1.0.0-&gt;argon2-cffi-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (2.21)
+Requirement already satisfied: MarkupSafe&gt;=2.0 in /opt/conda/lib/python3.8/site-packages (from jinja2-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (2.0.1)
+Requirement already satisfied: nbclient&lt;0.6.0,&gt;=0.5.0 in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.5.9)
+Requirement already satisfied: pandocfilters&gt;=1.4.1 in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (1.5.0)
+Requirement already satisfied: jupyterlab-pygments in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.1.2)
+Requirement already satisfied: testpath in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.5.0)
+Requirement already satisfied: mistune&lt;2,&gt;=0.8.1 in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.8.4)
+Requirement already satisfied: bleach in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (4.1.0)
+Requirement already satisfied: defusedxml in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.7.1)
+Requirement already satisfied: webencodings in /opt/conda/lib/python3.8/site-packages (from bleach-&gt;nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.5.1)
+Requirement already satisfied: packaging in /opt/conda/lib/python3.8/site-packages (from bleach-&gt;nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (21.3)
+Requirement already satisfied: pyparsing!=3.0.5,&gt;=2.0.2 in /opt/conda/lib/python3.8/site-packages (from packaging-&gt;bleach-&gt;nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (3.0.6)
+Installing collected packages: widgetsnbextension, jupyterlab-widgets, ipywidgets
+Successfully installed ipywidgets-7.6.5 jupyterlab-widgets-1.0.2 widgetsnbextension-3.5.2
+<span class="ansi-yellow-fg">WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv</span>
+</pre>
+           </div>
+          </div>
+         </div>
+         <p>
+          ## 2. Creating TorchScript modules
+         </p>
+         <p>
+          Here we create two submodules for a feature extractor and a classifier and stitch them together in a single LeNet module. In this case this is overkill but modules give us granular control over our program including where we decide to optimize and where we don’t. It is also the unit that the TorchScript compiler operates on. So you can decide to only convert/optimize the feature extractor and leave the classifier in standard PyTorch or you can convert the whole thing. When compiling your module
 to TorchScript, there are two paths: Tracing and Scripting.
-       </p>
-       <div class="nbinput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[2]:
+         </p>
+         <div class="nbinput nblast docutils container">
+          <div class="prompt highlight-none notranslate">
+           <div class="highlight">
+            <pre><span></span>[3]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
-<span></span><span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">from</span> <span class="nn">torch</span> <span class="kn">import</span> <span class="n">nn</span>
-<span class="kn">import</span> <span class="nn">torch.nn.functional</span> <span class="k">as</span> <span class="nn">F</span>
+           </div>
+          </div>
+          <div class="input_area highlight-ipython3 notranslate">
+           <div class="highlight">
+            <pre>
+<span></span>import torch
+from torch import nn
+import torch.nn.functional as F
 
-<span class="k">class</span> <span class="nc">LeNetFeatExtractor</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="nb">super</span><span class="p">(</span><span class="n">LeNetFeatExtractor</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">conv1</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">conv2</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Conv2d</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">16</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+class LeNetFeatExtractor(nn.Module):
+    def __init__(self):
+        super(LeNetFeatExtractor, self).__init__()
+        self.conv1 = nn.Conv2d(1, 128, 3)
+        self.conv2 = nn.Conv2d(128, 16, 3)
 
-    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
-        <span class="n">x</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">max_pool2d</span><span class="p">(</span><span class="n">F</span><span class="o">.</span><span class="n">relu</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">conv1</span><span class="p">(</span><span class="n">x</span><span class="p">)),</span> <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
-        <span class="n">x</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">max_pool2d</span><span class="p">(</span><span class="n">F</span><span class="o">.</span><span class="n">relu</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">conv2</span><span class="p">(</span><span class="n">x</span><span class="p">)),</span> <span class="mi">2</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">x</span>
+    def forward(self, x):
+        x = F.max_pool2d(F.relu(self.conv1(x)), (2, 2))
+        x = F.max_pool2d(F.relu(self.conv2(x)), 2)
+        return x
 
-<span class="k">class</span> <span class="nc">LeNetClassifier</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="nb">super</span><span class="p">(</span><span class="n">LeNetClassifier</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">fc1</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">16</span> <span class="o">*</span> <span class="mi">6</span> <span class="o">*</span> <span class="mi">6</span><span class="p">,</span> <span class="mi">120</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">fc2</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">120</span><span class="p">,</span> <span class="mi">84</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">fc3</span> <span class="o">=</span> <span class="n">nn</span><span class="o">.</span><span class="n">Linear</span><span class="p">(</span><span class="mi">84</span><span class="p">,</span> <span class="mi">10</span><span class="p">)</span>
+class LeNetClassifier(nn.Module):
+    def __init__(self):
+        super(LeNetClassifier, self).__init__()
+        self.fc1 = nn.Linear(16 * 6 * 6, 120)
+        self.fc2 = nn.Linear(120, 84)
+        self.fc3 = nn.Linear(84, 10)
 
-    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
-        <span class="n">x</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">flatten</span><span class="p">(</span><span class="n">x</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
-        <span class="n">x</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">relu</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fc1</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
-        <span class="n">x</span> <span class="o">=</span> <span class="n">F</span><span class="o">.</span><span class="n">relu</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fc2</span><span class="p">(</span><span class="n">x</span><span class="p">))</span>
-        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">fc3</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">x</span>
+    def forward(self, x):
+        x = torch.flatten(x,1)
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = self.fc3(x)
+        return x
 
-<span class="k">class</span> <span class="nc">LeNet</span><span class="p">(</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span><span class="p">):</span>
-    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="nb">super</span><span class="p">(</span><span class="n">LeNet</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">feat</span> <span class="o">=</span> <span class="n">LeNetFeatExtractor</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">classifer</span> <span class="o">=</span> <span class="n">LeNetClassifier</span><span class="p">()</span>
+class LeNet(nn.Module):
+    def __init__(self):
+        super(LeNet, self).__init__()
+        self.feat = LeNetFeatExtractor()
+        self.classifer = LeNetClassifier()
 
-    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
-        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">feat</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
-        <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">classifer</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">x</span>
-
-</pre>
-         </div>
-        </div>
-       </div>
-       <p>
-        Let us define a helper function to benchmark a model.
-       </p>
-       <div class="nbinput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[9]:
-</pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
-<span></span><span class="kn">import</span> <span class="nn">time</span>
-<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-
-<span class="kn">import</span> <span class="nn">torch.backends.cudnn</span> <span class="k">as</span> <span class="nn">cudnn</span>
-<span class="n">cudnn</span><span class="o">.</span><span class="n">benchmark</span> <span class="o">=</span> <span class="kc">True</span>
-
-<span class="k">def</span> <span class="nf">benchmark</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">input_shape</span><span class="o">=</span><span class="p">(</span><span class="mi">1024</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="s1">'fp32'</span><span class="p">,</span> <span class="n">nwarmup</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">nruns</span><span class="o">=</span><span class="mi">10000</span><span class="p">):</span>
-    <span class="n">input_data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">input_shape</span><span class="p">)</span>
-    <span class="n">input_data</span> <span class="o">=</span> <span class="n">input_data</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">dtype</span><span class="o">==</span><span class="s1">'fp16'</span><span class="p">:</span>
-        <span class="n">input_data</span> <span class="o">=</span> <span class="n">input_data</span><span class="o">.</span><span class="n">half</span><span class="p">()</span>
-
-    <span class="nb">print</span><span class="p">(</span><span class="s2">"Warm up ..."</span><span class="p">)</span>
-    <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
-        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">nwarmup</span><span class="p">):</span>
-            <span class="n">features</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">input_data</span><span class="p">)</span>
-    <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">synchronize</span><span class="p">()</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">"Start timing ..."</span><span class="p">)</span>
-    <span class="n">timings</span> <span class="o">=</span> <span class="p">[]</span>
-    <span class="k">with</span> <span class="n">torch</span><span class="o">.</span><span class="n">no_grad</span><span class="p">():</span>
-        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">nruns</span><span class="o">+</span><span class="mi">1</span><span class="p">):</span>
-            <span class="n">start_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
-            <span class="n">features</span> <span class="o">=</span> <span class="n">model</span><span class="p">(</span><span class="n">input_data</span><span class="p">)</span>
-            <span class="n">torch</span><span class="o">.</span><span class="n">cuda</span><span class="o">.</span><span class="n">synchronize</span><span class="p">()</span>
-            <span class="n">end_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
-            <span class="n">timings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">end_time</span> <span class="o">-</span> <span class="n">start_time</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">i</span><span class="o">%</span><span class="k">1000</span>==0:
-                <span class="nb">print</span><span class="p">(</span><span class="s1">'Iteration </span><span class="si">%d</span><span class="s1">/</span><span class="si">%d</span><span class="s1">, ave batch time </span><span class="si">%.2f</span><span class="s1"> ms'</span><span class="o">%</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">nruns</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">timings</span><span class="p">)</span><span class="o">*</span><span class="mi">1000</span><span class="p">))</span>
-
-    <span class="nb">print</span><span class="p">(</span><span class="s2">"Input shape:"</span><span class="p">,</span> <span class="n">input_data</span><span class="o">.</span><span class="n">size</span><span class="p">())</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">"Output features size:"</span><span class="p">,</span> <span class="n">features</span><span class="o">.</span><span class="n">size</span><span class="p">())</span>
-
-    <span class="nb">print</span><span class="p">(</span><span class="s1">'Average batch time: </span><span class="si">%.2f</span><span class="s1"> ms'</span><span class="o">%</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">timings</span><span class="p">)</span><span class="o">*</span><span class="mi">1000</span><span class="p">))</span>
-</pre>
-         </div>
-        </div>
-       </div>
-       <h3 id="PyTorch-model">
-        PyTorch model
-        <a class="headerlink" href="#PyTorch-model" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[10]:
-</pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
-<span></span><span class="n">model</span> <span class="o">=</span> <span class="n">LeNet</span><span class="p">()</span>
-<span class="n">model</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
+    def forward(self, x):
+        x = self.feat(x)
+        x = self.classifer(x)
+        return x
 
 </pre>
+           </div>
+          </div>
          </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[10]:
+         <p>
+          Let us define a helper function to benchmark a model.
+         </p>
+         <div class="nbinput nblast docutils container">
+          <div class="prompt highlight-none notranslate">
+           <div class="highlight">
+            <pre><span></span>[4]:
 </pre>
+           </div>
+          </div>
+          <div class="input_area highlight-ipython3 notranslate">
+           <div class="highlight">
+            <pre>
+<span></span>import time
+import numpy as np
+
+import torch.backends.cudnn as cudnn
+cudnn.benchmark = True
+
+def benchmark(model, input_shape=(1024, 1, 32, 32), dtype='fp32', nwarmup=50, nruns=1000):
+    input_data = torch.randn(input_shape)
+    input_data = input_data.to("cuda")
+    if dtype=='fp16':
+        input_data = input_data.half()
+
+    print("Warm up ...")
+    with torch.no_grad():
+        for _ in range(nwarmup):
+            features = model(input_data)
+    torch.cuda.synchronize()
+    print("Start timing ...")
+    timings = []
+    with torch.no_grad():
+        for i in range(1, nruns+1):
+            start_time = time.time()
+            features = model(input_data)
+            torch.cuda.synchronize()
+            end_time = time.time()
+            timings.append(end_time - start_time)
+            if i%100==0:
+                print('Iteration %d/%d, ave batch time %.2f ms'%(i, nruns, np.mean(timings)*1000))
+
+    print("Input shape:", input_data.size())
+    print("Output features size:", features.size())
+
+    print('Average batch time: %.2f ms'%(np.mean(timings)*1000))
+</pre>
+           </div>
+          </div>
          </div>
-        </div>
-        <div class="output_area docutils container">
-         <div class="highlight">
-          <pre>
+         <section id="PyTorch-model">
+          <h3 id="PyTorch-model">
+           PyTorch model
+           <a class="headerlink" href="#PyTorch-model" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[5]:
+</pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
+<span></span>model = LeNet()
+model.to("cuda").eval()
+
+</pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[5]:
+</pre>
+            </div>
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
 LeNet(
   (feat): LeNetFeatExtractor(
-    (conv1): Conv2d(1, 6, kernel_size=(3, 3), stride=(1, 1))
-    (conv2): Conv2d(6, 16, kernel_size=(3, 3), stride=(1, 1))
+    (conv1): Conv2d(1, 128, kernel_size=(3, 3), stride=(1, 1))
+    (conv2): Conv2d(128, 16, kernel_size=(3, 3), stride=(1, 1))
   )
   (classifer): LeNetClassifier(
     (fc1): Linear(in_features=576, out_features=120, bias=True)
@@ -978,87 +1208,89 @@ LeNet(
   )
 )
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[11]:
+            </div>
+           </div>
+          </div>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[6]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
-<span></span><span class="n">benchmark</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
+<span></span>benchmark(model)
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area docutils container">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
 Warm up ...
 Start timing ...
-Iteration 1000/10000, ave batch time 0.93 ms
-Iteration 2000/10000, ave batch time 0.93 ms
-Iteration 3000/10000, ave batch time 0.93 ms
-Iteration 4000/10000, ave batch time 0.93 ms
-Iteration 5000/10000, ave batch time 0.93 ms
-Iteration 6000/10000, ave batch time 0.93 ms
-Iteration 7000/10000, ave batch time 0.93 ms
-Iteration 8000/10000, ave batch time 0.93 ms
-Iteration 9000/10000, ave batch time 0.93 ms
-Iteration 10000/10000, ave batch time 0.93 ms
+Iteration 100/1000, ave batch time 5.44 ms
+Iteration 200/1000, ave batch time 5.46 ms
+Iteration 300/1000, ave batch time 5.47 ms
+Iteration 400/1000, ave batch time 5.47 ms
+Iteration 500/1000, ave batch time 5.47 ms
+Iteration 600/1000, ave batch time 5.47 ms
+Iteration 700/1000, ave batch time 5.47 ms
+Iteration 800/1000, ave batch time 5.47 ms
+Iteration 900/1000, ave batch time 5.47 ms
+Iteration 1000/1000, ave batch time 5.47 ms
 Input shape: torch.Size([1024, 1, 32, 32])
 Output features size: torch.Size([1024, 10])
-Average batch time: 0.93 ms
+Average batch time: 5.47 ms
 </pre>
-         </div>
-        </div>
-       </div>
-       <p>
-        When compiling your module to TorchScript, there are two paths: Tracing and Scripting.
-       </p>
-       <h3 id="Tracing">
-        Tracing
-        <a class="headerlink" href="#Tracing" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        Tracing follows the path of execution when the module is called and records what happens. This recording is what the TorchScript IR will describe. To trace an instance of our LeNet module, we can call torch.jit.trace with an example input.
-       </p>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[12]:
+            </div>
+           </div>
+          </div>
+          <p>
+           When compiling your module to TorchScript, there are two paths: Tracing and Scripting.
+          </p>
+         </section>
+         <section id="Tracing">
+          <h3 id="Tracing">
+           Tracing
+           <a class="headerlink" href="#Tracing" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           Tracing follows the path of execution when the module is called and records what happens. This recording is what the TorchScript IR will describe. To trace an instance of our LeNet module, we can call torch.jit.trace with an example input.
+          </p>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[7]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
-<span></span><span class="n">traced_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">torch</span><span class="o">.</span><span class="n">empty</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">32</span><span class="p">,</span><span class="mi">32</span><span class="p">])</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">))</span>
-<span class="n">traced_model</span>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
+<span></span>traced_model = torch.jit.trace(model, torch.empty([1,1,32,32]).to("cuda"))
+traced_model
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[12]:
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[7]:
 </pre>
-         </div>
-        </div>
-        <div class="output_area docutils container">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
 LeNet(
   original_name=LeNet
   (feat): LeNetFeatExtractor(
@@ -1074,100 +1306,102 @@ LeNet(
   )
 )
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[13]:
+            </div>
+           </div>
+          </div>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[8]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
-<span></span><span class="n">benchmark</span><span class="p">(</span><span class="n">traced_model</span><span class="p">)</span>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
+<span></span>benchmark(traced_model)
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area docutils container">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
 Warm up ...
 Start timing ...
-Iteration 1000/10000, ave batch time 0.68 ms
-Iteration 2000/10000, ave batch time 0.68 ms
-Iteration 3000/10000, ave batch time 0.68 ms
-Iteration 4000/10000, ave batch time 0.68 ms
-Iteration 5000/10000, ave batch time 0.68 ms
-Iteration 6000/10000, ave batch time 0.68 ms
-Iteration 7000/10000, ave batch time 0.68 ms
-Iteration 8000/10000, ave batch time 0.68 ms
-Iteration 9000/10000, ave batch time 0.68 ms
-Iteration 10000/10000, ave batch time 0.68 ms
+Iteration 100/1000, ave batch time 5.46 ms
+Iteration 200/1000, ave batch time 5.48 ms
+Iteration 300/1000, ave batch time 5.48 ms
+Iteration 400/1000, ave batch time 5.48 ms
+Iteration 500/1000, ave batch time 5.48 ms
+Iteration 600/1000, ave batch time 5.48 ms
+Iteration 700/1000, ave batch time 5.48 ms
+Iteration 800/1000, ave batch time 5.48 ms
+Iteration 900/1000, ave batch time 5.48 ms
+Iteration 1000/1000, ave batch time 5.48 ms
 Input shape: torch.Size([1024, 1, 32, 32])
 Output features size: torch.Size([1024, 10])
-Average batch time: 0.68 ms
+Average batch time: 5.48 ms
 </pre>
-         </div>
-        </div>
-       </div>
-       <h3 id="Scripting">
-        Scripting
-        <a class="headerlink" href="#Scripting" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        Scripting actually inspects your code with a compiler and generates an equivalent TorchScript program. The difference is that since tracing simply follows the execution of your module, it cannot pick up control flow for instance, it will only follow the code path that a particular input triggers. By working from the Python code, the compiler can include these components. We can run the script compiler on our LeNet module by calling torch.jit.script.
-       </p>
-       <div class="nbinput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[14]:
+            </div>
+           </div>
+          </div>
+         </section>
+         <section id="Scripting">
+          <h3 id="Scripting">
+           Scripting
+           <a class="headerlink" href="#Scripting" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           Scripting actually inspects your code with a compiler and generates an equivalent TorchScript program. The difference is that since tracing simply follows the execution of your module, it cannot pick up control flow for instance, it will only follow the code path that a particular input triggers. By working from the Python code, the compiler can include these components. We can run the script compiler on our LeNet module by calling torch.jit.script.
+          </p>
+          <div class="nbinput nblast docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[9]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
-<span></span><span class="n">model</span> <span class="o">=</span> <span class="n">LeNet</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">)</span><span class="o">.</span><span class="n">eval</span><span class="p">()</span>
-<span class="n">script_model</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">script</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
+<span></span>model = LeNet().to("cuda").eval()
+script_model = torch.jit.script(model)
 
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[15]:
+            </div>
+           </div>
+          </div>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[10]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
-<span></span><span class="n">script_model</span>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
+<span></span>script_model
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[15]:
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[10]:
 </pre>
-         </div>
-        </div>
-        <div class="output_area docutils container">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
 RecursiveScriptModule(
   original_name=LeNet
   (feat): RecursiveScriptModule(
@@ -1183,257 +1417,293 @@ RecursiveScriptModule(
   )
 )
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[16]:
+            </div>
+           </div>
+          </div>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[11]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
-<span></span><span class="n">benchmark</span><span class="p">(</span><span class="n">script_model</span><span class="p">)</span>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
+<span></span>benchmark(script_model)
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area docutils container">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
 Warm up ...
 Start timing ...
-Iteration 1000/10000, ave batch time 0.68 ms
-Iteration 2000/10000, ave batch time 0.68 ms
-Iteration 3000/10000, ave batch time 0.68 ms
-Iteration 4000/10000, ave batch time 0.68 ms
-Iteration 5000/10000, ave batch time 0.68 ms
-Iteration 6000/10000, ave batch time 0.68 ms
-Iteration 7000/10000, ave batch time 0.68 ms
-Iteration 8000/10000, ave batch time 0.68 ms
-Iteration 9000/10000, ave batch time 0.68 ms
-Iteration 10000/10000, ave batch time 0.68 ms
+Iteration 100/1000, ave batch time 5.47 ms
+Iteration 200/1000, ave batch time 5.49 ms
+Iteration 300/1000, ave batch time 5.49 ms
+Iteration 400/1000, ave batch time 5.49 ms
+Iteration 500/1000, ave batch time 5.49 ms
+Iteration 600/1000, ave batch time 5.49 ms
+Iteration 700/1000, ave batch time 5.49 ms
+Iteration 800/1000, ave batch time 5.49 ms
+Iteration 900/1000, ave batch time 5.49 ms
+Iteration 1000/1000, ave batch time 5.49 ms
 Input shape: torch.Size([1024, 1, 32, 32])
 Output features size: torch.Size([1024, 10])
-Average batch time: 0.68 ms
+Average batch time: 5.49 ms
 </pre>
-         </div>
-        </div>
-       </div>
-       <p>
-        ## 3. Compiling with TRTorch
-       </p>
-       <h3 id="TorchScript-traced-model">
-        TorchScript traced model
-        <a class="headerlink" href="#TorchScript-traced-model" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        First, we compile the TorchScript traced model with TRTorch. Notice the performance impact.
-       </p>
-       <div class="nbinput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[17]:
+            </div>
+           </div>
+          </div>
+          <p>
+           ## 3. Compiling with Torch-TensorRT
+          </p>
+         </section>
+         <section id="TorchScript-traced-model">
+          <h3 id="TorchScript-traced-model">
+           TorchScript traced model
+           <a class="headerlink" href="#TorchScript-traced-model" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           First, we compile the TorchScript traced model with Torch-TensorRT. Notice the performance impact.
+          </p>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[12]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
-<span></span><span class="kn">import</span> <span class="nn">trtorch</span>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
+<span></span>import torch_tensorrt
 
-<span class="n">compile_settings</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">"input_shapes"</span><span class="p">:</span> <span class="p">[</span>
-        <span class="p">{</span>
-            <span class="s2">"min"</span> <span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">],</span>
-            <span class="s2">"opt"</span> <span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">33</span><span class="p">,</span> <span class="mi">33</span><span class="p">],</span>
-            <span class="s2">"max"</span> <span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">34</span><span class="p">,</span> <span class="mi">34</span><span class="p">],</span>
-        <span class="p">}</span>
-    <span class="p">],</span>
-    <span class="s2">"op_precision"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span> <span class="c1"># Run with FP16</span>
-<span class="p">}</span>
+# We use a batch-size of 1024, and half precision
+compile_settings = {
+    "inputs": [torch_tensorrt.Input(
+            min_shape=[1024, 1, 32, 32],
+            opt_shape=[1024, 1, 33, 33],
+            max_shape=[1024, 1, 34, 34],
+            dtype=torch.half
+        )],
+    "enabled_precisions": {torch.half} # Run with FP16
+}
 
-<span class="n">trt_ts_module</span> <span class="o">=</span> <span class="n">trtorch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">traced_model</span><span class="p">,</span> <span class="n">compile_settings</span><span class="p">)</span>
+trt_ts_module = torch_tensorrt.compile(traced_model, **compile_settings)
 
-<span class="n">input_data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">))</span>
-<span class="n">input_data</span> <span class="o">=</span> <span class="n">input_data</span><span class="o">.</span><span class="n">half</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">)</span>
+input_data = torch.randn((1024, 1, 32, 32))
+input_data = input_data.half().to("cuda")
 
-<span class="n">input_data</span> <span class="o">=</span> <span class="n">input_data</span><span class="o">.</span><span class="n">half</span><span class="p">()</span>
-<span class="n">result</span> <span class="o">=</span> <span class="n">trt_ts_module</span><span class="p">(</span><span class="n">input_data</span><span class="p">)</span>
-<span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_ts_module</span><span class="p">,</span> <span class="s2">"trt_ts_module.ts"</span><span class="p">)</span>
+input_data = input_data.half()
+result = trt_ts_module(input_data)
+torch.jit.save(trt_ts_module, "trt_ts_module.ts")
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[18]:
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area stderr docutils container">
+            <div class="highlight">
+             <pre>
+WARNING: [Torch-TensorRT] - For input x.1, found user specified input dtype as Float16, however when inspecting the graph, the input type expected was inferred to be Float
+The compiler is going to use the user setting Float16
+This conflict may cause an error at runtime due to partial compilation being enabled and therefore
+compatibility with PyTorch's data type convention is required.
+If you do indeed see errors at runtime either:
+- Remove the dtype spec for x.1
+- Disable partial compilation by setting require_full_compilation to True
+WARNING: [Torch-TensorRT] - Dilation not used in Max pooling converter
+WARNING: [Torch-TensorRT] - Dilation not used in Max pooling converter
+WARNING: [Torch-TensorRT TorchScript Conversion Context] - Max value of this profile is not valid
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
-<span></span><span class="n">benchmark</span><span class="p">(</span><span class="n">trt_ts_module</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">"fp16"</span><span class="p">)</span>
+            </div>
+           </div>
+          </div>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[13]:
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area docutils container">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
+<span></span>benchmark(trt_ts_module, input_shape=(1024, 1, 32, 32), dtype="fp16")
+</pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
 Warm up ...
 Start timing ...
-Iteration 1000/10000, ave batch time 0.24 ms
-Iteration 2000/10000, ave batch time 0.24 ms
-Iteration 3000/10000, ave batch time 0.24 ms
-Iteration 4000/10000, ave batch time 0.24 ms
-Iteration 5000/10000, ave batch time 0.24 ms
-Iteration 6000/10000, ave batch time 0.24 ms
-Iteration 7000/10000, ave batch time 0.23 ms
-Iteration 8000/10000, ave batch time 0.23 ms
-Iteration 9000/10000, ave batch time 0.23 ms
-Iteration 10000/10000, ave batch time 0.23 ms
+Iteration 100/1000, ave batch time 1.64 ms
+Iteration 200/1000, ave batch time 1.63 ms
+Iteration 300/1000, ave batch time 1.67 ms
+Iteration 400/1000, ave batch time 1.66 ms
+Iteration 500/1000, ave batch time 1.65 ms
+Iteration 600/1000, ave batch time 1.65 ms
+Iteration 700/1000, ave batch time 1.65 ms
+Iteration 800/1000, ave batch time 1.64 ms
+Iteration 900/1000, ave batch time 1.64 ms
+Iteration 1000/1000, ave batch time 1.64 ms
 Input shape: torch.Size([1024, 1, 32, 32])
-Output features size: torch.Size([1, 10])
-Average batch time: 0.23 ms
+Output features size: torch.Size([1024, 10])
+Average batch time: 1.64 ms
 </pre>
-         </div>
-        </div>
-       </div>
-       <h3 id="TorchScript-script-model">
-        TorchScript script model
-        <a class="headerlink" href="#TorchScript-script-model" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        Next, we compile the TorchScript script model with TRTorch. Notice the performance impact.
-       </p>
-       <div class="nbinput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[19]:
+            </div>
+           </div>
+          </div>
+         </section>
+         <section id="TorchScript-script-model">
+          <h3 id="TorchScript-script-model">
+           TorchScript script model
+           <a class="headerlink" href="#TorchScript-script-model" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           Next, we compile the TorchScript script model with Torch-TensorRT. Notice the performance impact.
+          </p>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[14]:
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
-<span></span><span class="kn">import</span> <span class="nn">trtorch</span>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
+<span></span>import torch_tensorrt
 
-<span class="n">compile_settings</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">"input_shapes"</span><span class="p">:</span> <span class="p">[</span>
-        <span class="p">{</span>
-            <span class="s2">"min"</span> <span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">],</span>
-            <span class="s2">"opt"</span> <span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">33</span><span class="p">,</span> <span class="mi">33</span><span class="p">],</span>
-            <span class="s2">"max"</span> <span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">34</span><span class="p">,</span> <span class="mi">34</span><span class="p">],</span>
-        <span class="p">}</span>
-    <span class="p">],</span>
-    <span class="s2">"op_precision"</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span> <span class="c1"># Run with FP16</span>
-<span class="p">}</span>
+# We use a batch-size of 1024, and half precision
+compile_settings = {
+    "inputs": [torch_tensorrt.Input(
+            min_shape=[1024, 1, 32, 32],
+            opt_shape=[1024, 1, 33, 33],
+            max_shape=[1024, 1, 34, 34],
+            dtype=torch.half
+        )],
+    "enabled_precisions": {torch.half} # Run with FP16
+}
 
-<span class="n">trt_script_module</span> <span class="o">=</span> <span class="n">trtorch</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">script_model</span><span class="p">,</span> <span class="n">compile_settings</span><span class="p">)</span>
+trt_script_module = torch_tensorrt.compile(script_model, **compile_settings)
 
-<span class="n">input_data</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">randn</span><span class="p">((</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">32</span><span class="p">,</span> <span class="mi">32</span><span class="p">))</span>
-<span class="n">input_data</span> <span class="o">=</span> <span class="n">input_data</span><span class="o">.</span><span class="n">half</span><span class="p">()</span><span class="o">.</span><span class="n">to</span><span class="p">(</span><span class="s2">"cuda"</span><span class="p">)</span>
+input_data = torch.randn((1024, 1, 32, 32))
+input_data = input_data.half().to("cuda")
 
-<span class="n">input_data</span> <span class="o">=</span> <span class="n">input_data</span><span class="o">.</span><span class="n">half</span><span class="p">()</span>
-<span class="n">result</span> <span class="o">=</span> <span class="n">trt_script_module</span><span class="p">(</span><span class="n">input_data</span><span class="p">)</span>
-<span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">trt_script_module</span><span class="p">,</span> <span class="s2">"trt_script_module.ts"</span><span class="p">)</span>
+input_data = input_data.half()
+result = trt_script_module(input_data)
+torch.jit.save(trt_script_module, "trt_script_module.ts")
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nbinput docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[20]:
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area stderr docutils container">
+            <div class="highlight">
+             <pre>
+WARNING: [Torch-TensorRT] - For input x.1, found user specified input dtype as Float16, however when inspecting the graph, the input type expected was inferred to be Float
+The compiler is going to use the user setting Float16
+This conflict may cause an error at runtime due to partial compilation being enabled and therefore
+compatibility with PyTorch's data type convention is required.
+If you do indeed see errors at runtime either:
+- Remove the dtype spec for x.1
+- Disable partial compilation by setting require_full_compilation to True
+WARNING: [Torch-TensorRT] - Dilation not used in Max pooling converter
+WARNING: [Torch-TensorRT] - Dilation not used in Max pooling converter
+WARNING: [Torch-TensorRT TorchScript Conversion Context] - Max value of this profile is not valid
 </pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
-<span></span><span class="n">benchmark</span><span class="p">(</span><span class="n">trt_ts_module</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="s2">"fp16"</span><span class="p">)</span>
+            </div>
+           </div>
+          </div>
+          <div class="nbinput docutils container">
+           <div class="prompt highlight-none notranslate">
+            <div class="highlight">
+             <pre><span></span>[15]:
 </pre>
-         </div>
-        </div>
-       </div>
-       <div class="nboutput nblast docutils container">
-        <div class="prompt empty docutils container">
-        </div>
-        <div class="output_area docutils container">
-         <div class="highlight">
-          <pre>
+            </div>
+           </div>
+           <div class="input_area highlight-ipython3 notranslate">
+            <div class="highlight">
+             <pre>
+<span></span>benchmark(trt_script_module, input_shape=(1024, 1, 32, 32), dtype="fp16")
+</pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
 Warm up ...
 Start timing ...
-Iteration 1000/10000, ave batch time 0.20 ms
-Iteration 2000/10000, ave batch time 0.20 ms
-Iteration 3000/10000, ave batch time 0.20 ms
-Iteration 4000/10000, ave batch time 0.21 ms
-Iteration 5000/10000, ave batch time 0.21 ms
-Iteration 6000/10000, ave batch time 0.21 ms
-Iteration 7000/10000, ave batch time 0.21 ms
-Iteration 8000/10000, ave batch time 0.21 ms
-Iteration 9000/10000, ave batch time 0.21 ms
-Iteration 10000/10000, ave batch time 0.21 ms
+Iteration 100/1000, ave batch time 1.62 ms
+Iteration 200/1000, ave batch time 1.62 ms
+Iteration 300/1000, ave batch time 1.62 ms
+Iteration 400/1000, ave batch time 1.62 ms
+Iteration 500/1000, ave batch time 1.62 ms
+Iteration 600/1000, ave batch time 1.62 ms
+Iteration 700/1000, ave batch time 1.62 ms
+Iteration 800/1000, ave batch time 1.62 ms
+Iteration 900/1000, ave batch time 1.62 ms
+Iteration 1000/1000, ave batch time 1.62 ms
 Input shape: torch.Size([1024, 1, 32, 32])
-Output features size: torch.Size([1, 10])
-Average batch time: 0.21 ms
+Output features size: torch.Size([1024, 10])
+Average batch time: 1.62 ms
 </pre>
-         </div>
-        </div>
-       </div>
-       <h2 id="Conclusion">
-        Conclusion
-        <a class="headerlink" href="#Conclusion" title="Permalink to this headline">
-         ¶
-        </a>
-       </h2>
-       <p>
-        In this notebook, we have walked through the complete process of compiling TorchScript models with TRTorch and test the performance impact of the optimization.
-       </p>
-       <h3 id="What’s-next">
-        What’s next
-        <a class="headerlink" href="#What’s-next" title="Permalink to this headline">
-         ¶
-        </a>
-       </h3>
-       <p>
-        Now it’s time to try TRTorch on your own model. Fill out issues at
-        <a class="reference external" href="https://github.com/NVIDIA/TRTorch">
-         https://github.com/NVIDIA/TRTorch
-        </a>
-        . Your involvement will help future development of TRTorch.
-       </p>
-       <div class="nbinput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[ ]:
-</pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
-<span></span>
-</pre>
-         </div>
-        </div>
-       </div>
+            </div>
+           </div>
+          </div>
+         </section>
+        </section>
+        <section id="Conclusion">
+         <h2 id="Conclusion">
+          Conclusion
+          <a class="headerlink" href="#Conclusion" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <p>
+          In this notebook, we have walked through the complete process of compiling TorchScript models with Torch-TensorRT and test the performance impact of the optimization.
+         </p>
+         <section id="What’s-next">
+          <h3 id="What’s-next">
+           What’s next
+           <a class="headerlink" href="#What’s-next" title="Permalink to this headline">
+            ¶
+           </a>
+          </h3>
+          <p>
+           Now it’s time to try Torch-TensorRT on your own model. Fill out issues at
+           <a class="reference external" href="https://github.com/NVIDIA/Torch-TensorRT">
+            https://github.com/NVIDIA/Torch-TensorRT
+           </a>
+           . Your involvement will help future development of Torch-TensorRT.
+          </p>
+         </section>
+        </section>
+       </section>
       </article>
      </div>
     </div>
@@ -1442,7 +1712,7 @@ Average batch time: 0.21 ms
   <footer class="md-footer">
    <div class="md-footer-nav">
     <nav class="md-footer-nav__inner md-grid">
-     <a class="md-flex md-footer-nav__link md-footer-nav__link--prev" href="../tutorials/trtorchc.html" rel="prev" title="trtorchc">
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--prev" href="../tutorials/using_dla.html" rel="prev" title="DLA">
       <div class="md-flex__cell md-flex__cell--shrink">
        <i class="md-icon md-icon--arrow-back md-footer-nav__button">
        </i>
@@ -1452,17 +1722,17 @@ Average batch time: 0.21 ms
         <span class="md-footer-nav__direction">
          Previous
         </span>
-        trtorchc
+        DLA
        </span>
       </div>
      </a>
-     <a class="md-flex md-footer-nav__link md-footer-nav__link--next" href="../py_api/trtorch.html" rel="next" title="trtorch">
+     <a class="md-flex md-footer-nav__link md-footer-nav__link--next" href="Resnet50-example.html" rel="next" title="Torch-TensorRT Getting Started - ResNet 50">
       <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
        <span class="md-flex__ellipsis">
         <span class="md-footer-nav__direction">
          Next
         </span>
-        trtorch
+        Torch-TensorRT Getting Started - ResNet 50
        </span>
       </div>
       <div class="md-flex__cell md-flex__cell--shrink">
@@ -1476,13 +1746,13 @@ Average batch time: 0.21 ms
     <div class="md-footer-meta__inner md-grid">
      <div class="md-footer-copyright">
       <div class="md-footer-copyright__highlight">
-       © Copyright 2020, NVIDIA Corporation.
+       © Copyright 2021, NVIDIA Corporation.
       </div>
       Created using
       <a href="http://www.sphinx-doc.org/">
        Sphinx
       </a>
-      3.1.2.
+      4.3.0.
              and
       <a href="https://github.com/bashtage/sphinx-material/">
        Material for

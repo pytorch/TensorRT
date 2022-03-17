@@ -1,5 +1,8 @@
+"component: torchtrtc":
+  - cpp/torchtrtc/**/*
+
 "component: api [C++]":
-  - cpp/api/**/*
+  - cpp/**/*
 
 "component: api [Python]":
   - py/**/*
@@ -16,8 +19,11 @@
 "component: evaluators":
   - core/conversion/evaluators/**/*
 
-"component: execution":
-  - core/execution/**/*
+"component: partitioning":
+  - core/partitioning/**/*
+
+"component: runtime":
+  - core/runtime/**/*
 
 "component: lowering":
   - core/lowering/**/*
@@ -32,4 +38,4 @@
 "documentation":
   - docs/**/*
   - docsrc/**/*
- 
+

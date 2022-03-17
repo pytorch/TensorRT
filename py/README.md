@@ -1,43 +1,48 @@
-# trtorch
+# torch_tensorrt
 
 > Ahead of Time (AOT) compiling for PyTorch JIT
 
-TRTorch is a compiler for PyTorch/TorchScript, targeting NVIDIA GPUs via NVIDIA's TensorRT Deep Learning Optimizer and Runtime. Unlike PyTorch's Just-In-Time (JIT) compiler, TRTorch is an Ahead-of-Time (AOT) compiler, meaning that before you deploy your TorchScript code, you go through an explicit compile step to convert a standard TorchScript program into an module targeting a TensorRT engine. TRTorch operates as a PyTorch extention and compiles modules that integrate into the JIT runtime seamlessly. After compilation using the optimized graph should feel no different than running a TorchScript module. You also have access to TensorRT's suite of configurations at compile time, so you are able to specify operating precision (FP32/FP16/INT8) and other settings for your module.
+Torch-TensorRT is a compiler for PyTorch/TorchScript, targeting NVIDIA GPUs via NVIDIA's TensorRT Deep Learning Optimizer and Runtime. Unlike PyTorch's Just-In-Time (JIT) compiler, Torch-TensorRT is an Ahead-of-Time (AOT) compiler, meaning that before you deploy your TorchScript code, you go through an explicit compile step to convert a standard TorchScript program into an module targeting a TensorRT engine. Torch-TensorRT operates as a PyTorch extention and compiles modules that integrate into the JIT runtime seamlessly. After compilation using the optimized graph should feel no different than running a TorchScript module. You also have access to TensorRT's suite of configurations at compile time, so you are able to specify operating precision (FP32/FP16/INT8) and other settings for your module.
 
 ## Example Usage
 
 ``` python
-import torch
-import torchvision
-import trtorch
+import torch_tensorrt
 
-# Get a model
-model = torchvision.models.alexnet(pretrained=True).eval().cuda()
+...
 
-# Create some example data
-data = torch.randn((1, 3, 224, 224)).to("cuda")
+trt_ts_module = torch_tensorrt.compile(torch_script_module,
+    inputs = [example_tensor, # Provide example tensor for input shape or...
+        torch_tensorrt.Input( # Specify input object with shape and dtype
+            min_shape=[1, 3, 224, 224],
+            opt_shape=[1, 3, 512, 512],
+            max_shape=[1, 3, 1024, 1024],
+            # For static size shape=[1, 3, 224, 224]
+            dtype=torch.half) # Datatype of input tensor. Allowed options torch.(float|half|int8|int32|bool)
+    ],
+    enabled_precisions = {torch.half}, # Run with FP16)
 
-# Trace the module with example data
-traced_model = torch.jit.trace(model, [data])
+result = trt_ts_module(input_data) # run inference
+torch.jit.save(trt_ts_module, "trt_torchscript_module.ts") # save the TRT embedded Torchscript
 
-# Compile module
-compiled_trt_model = trtorch.compile(model, {
-    "input_shape": [data.shape],
-    "op_precision": torch.half, # Run in FP16
-})
-
-results = compiled_trt_model(data.half())
 ```
 
 ## Installation
 
-```
-python3 setup.py install
-```
+| ABI / Platform                          | Installation command                                         |
+| --------------------------------------- | ------------------------------------------------------------ |
+| Pre CXX11 ABI (Linux x86_64)            | python3 setup.py install                                     |
+| CXX ABI  (Linux x86_64)                 | python3 setup.py install --use-cxx11-abi                     |
+| Pre CXX11 ABI (Jetson platform aarch64) | python3 setup.py install --jetpack-version 4.6               |
+| CXX11 ABI (Jetson platform aarch64)     | python3 setup.py install --jetpack-version 4.6 --use-cxx11-abi |
+
+For Linux x86_64 platform, Pytorch libraries default to pre cxx11 abi. So, please use `python3 setup.py install`.
+
+On Jetson platforms, NVIDIA hosts <a href="https://forums.developer.nvidia.com/t/pytorch-for-jetson-version-1-10-now-available/72048">pre-built Pytorch wheel files</a>. These wheel files are built with CXX11 ABI. So on jetson platforms, please use `python3 setup.py install --jetpack-version 4.6 --use-cxx11-abi`   
 
 ## Under the Hood
 
-When a traced module is provided to TRTorch, the compiler takes the internal representation and transforms it into one like this:
+When a traced module is provided to Torch-TensorRT, the compiler takes the internal representation and transforms it into one like this:
 
 ```
 graph(%input.2 : Tensor):
@@ -82,11 +87,11 @@ graph(%input.2 : Tensor):
 ```
 
 The graph has now been transformed from a collection of modules much like how your PyTorch Modules are collections of modules, each managing their own parameters into a single graph
-with the parameters inlined into the graph and all of the operations laid out. TRTorch has also executed a number of optimizations and mappings to make the graph easier to translate
+with the parameters inlined into the graph and all of the operations laid out. Torch-TensorRT has also executed a number of optimizations and mappings to make the graph easier to translate
 to TensorRT. From here the compiler can assemble the TensorRT engine by following the dataflow through the graph.
 
-When the graph construction phase is complete, TRTorch produces a serialized TensorRT engine. From here depending on the API, this engine is returned to the user or moves into the graph
-construction phase. Here TRTorch creates a JIT Module to execute the TensorRT engine which will be instantiated and managed by the TRTorch runtime.
+When the graph construction phase is complete, Torch-TensorRT produces a serialized TensorRT engine. From here depending on the API, this engine is returned to the user or moves into the graph
+construction phase. Here Torch-TensorRT creates a JIT Module to execute the TensorRT engine which will be instantiated and managed by the Torch-TensorRT runtime.
 
 Here is the graph that you get back after compilation is complete:
 
@@ -102,31 +107,31 @@ graph(%self.1 : __torch__.___torch_mangle_10.LeNet_trt,
 You can see the call where the engine is executed, based on a constant which is the ID of the engine, telling JIT how to find the engine and the input tensor which will be fed to TensorRT.
 The engine represents the exact same calculations as what is done by running a normal PyTorch module but optimized to run on your GPU.
 
-TRTorch converts from TorchScript by generating layers or subgraphs in correspondance with instructions seen in the graph. Converters are small modules of code used to map one specific
+Torch-TensorRT converts from TorchScript by generating layers or subgraphs in correspondance with instructions seen in the graph. Converters are small modules of code used to map one specific
 operation to a layer or subgraph in TensorRT. Not all operations are support, but if you need to implement one, you can in C++.
 
 ## Registering Custom Converters
 
-Operations are mapped to TensorRT through the use of modular converters, a function that takes a node from a the JIT graph and produces an equivalent layer or subgraph in TensorRT. TRTorch
+Operations are mapped to TensorRT through the use of modular converters, a function that takes a node from a the JIT graph and produces an equivalent layer or subgraph in TensorRT. Torch-TensorRT
 ships with a library of these converters stored in a registry, that will be executed depending on the node being parsed. For instance a `aten::relu(%input0.4)` instruction will trigger the
-relu converter to be run on it, producing an activation layer in the TensorRT graph. But since this library is not exhaustive you may need to write your own to get TRTorch to support your module.
+relu converter to be run on it, producing an activation layer in the TensorRT graph. But since this library is not exhaustive you may need to write your own to get Torch-TensorRT to support your module.
 
-Shipped with the TRTorch distribution are the internal core API headers. You can therefore access the converter registry and add a converter for the op you need.
+Shipped with the Torch-TensorRT distribution are the internal core API headers. You can therefore access the converter registry and add a converter for the op you need.
 
-For example, if we try to compile a graph with a build of TRTorch that doesn’t support the flatten operation (`aten::flatten`) you may see this error:
+For example, if we try to compile a graph with a build of Torch-TensorRT that doesn’t support the flatten operation (`aten::flatten`) you may see this error:
 
 ```
-terminate called after throwing an instance of 'trtorch::Error'
+terminate called after throwing an instance of 'torch_tensorrt::Error'
 what():  [enforce fail at core/conversion/conversion.cpp:109] Expected converter to be true but got false
 Unable to convert node: %input.1 : Tensor = aten::flatten(%x.1, %11, %5) # x.py:25:0 (conversion.AddLayer)
 Schema: aten::flatten.using_ints(Tensor self, int start_dim=0, int end_dim=-1) -> (Tensor)
 Converter for aten::flatten requested, but no such converter was found.
 If you need a converter for this operator, you can try implementing one yourself
-or request a converter: https://www.github.com/NVIDIA/TRTorch/issues
+or request a converter: https://www.github.com/NVIDIA/Torch-TensorRT/issues
 ```
 
-We can register a converter for this operator in our application. All of the tools required to build a converter can be imported by including `trtorch/core/conversion/converters/converters.h`.
-We start by creating an instance of the self-registering `class trtorch::core::conversion::converters::RegisterNodeConversionPatterns()` which will register converters in the global converter
+We can register a converter for this operator in our application. All of the tools required to build a converter can be imported by including `Torch-TensorRT/core/conversion/converters/converters.h`.
+We start by creating an instance of the self-registering `class torch_tensorrt::core::conversion::converters::RegisterNodeConversionPatterns()` which will register converters in the global converter
 registry, associating a function schema like `aten::flatten.using_ints(Tensor self, int start_dim=0, int end_dim=-1) -> (Tensor)` with a lambda that will take the state of the conversion, the
 node/operation in question to convert and all of the inputs to the node and produces as a side effect a new layer in the TensorRT network. Arguments are passed as a vector of inspectable unions
 of TensorRT ITensors and Torch IValues in the order arguments are listed in the schema.
@@ -136,24 +141,24 @@ we can quickly get the output size by just running the operation in PyTorch inst
 
 ```c++
 #include "torch/script.h"
-#include "trtorch/trtorch.h"
-#include "trtorch/core/conversion/converters/converters.h"
+#include "torch_tensorrt/torch_tensorrt.h"
+#include "torch_tensorrt/core/conversion/converters/converters.h"
 
-static auto flatten_converter = trtorch::core::conversion::converters::RegisterNodeConversionPatterns()
+static auto flatten_converter = torch_tensorrt::core::conversion::converters::RegisterNodeConversionPatterns()
     .pattern({
         "aten::flatten.using_ints(Tensor self, int start_dim=0, int end_dim=-1) -> (Tensor)",
-        [](trtorch::core::conversion::ConversionCtx* ctx,
+        [](torch_tensorrt::core::conversion::ConversionCtx* ctx,
            const torch::jit::Node* n,
-           trtorch::core::conversion::converters::args& args) -> bool {
+           torch_tensorrt::core::conversion::converters::args& args) -> bool {
             auto in = args[0].ITensor();
             auto start_dim = args[1].unwrapToInt();
             auto end_dim = args[2].unwrapToInt();
-            auto in_shape = trtorch::core::util::toVec(in->getDimensions());
+            auto in_shape = torch_tensorrt::core::util::toVec(in->getDimensions());
             auto out_shape = torch::flatten(torch::rand(in_shape), start_dim, end_dim).sizes();
 
             auto shuffle = ctx->net->addShuffle(*in);
-            shuffle->setReshapeDimensions(trtorch::core::util::toDims(out_shape));
-            shuffle->setName(trtorch::core::util::node_info(n).c_str());
+            shuffle->setReshapeDimensions(torch_tensorrt::core::util::toDims(out_shape));
+            shuffle->setName(torch_tensorrt::core::util::node_info(n).c_str());
 
             auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], shuffle->getOutput(0));
             return true;
@@ -164,5 +169,5 @@ static auto flatten_converter = trtorch::core::conversion::converters::RegisterN
 To use this converter in Python, it is recommended to use PyTorch’s [C++ / CUDA Extention](https://pytorch.org/tutorials/advanced/cpp_extension.html#custom-c-and-cuda-extensions) template to wrap
 your library of converters into a `.so` that you can load with `ctypes.CDLL()` in your Python application.
 
-You can find more information on all the details of writing converters in the contributors documentation ([Writing Converters](https://nvidia.github.io/TRTorch/contributors/writing_converters.html#writing-converters)). If you
+You can find more information on all the details of writing converters in the contributors documentation ([Writing Converters](https://nvidia.github.io/Torch-TensorRT/contributors/writing_converters.html#writing-converters)). If you
 find yourself with a large library of converter implementations, do consider upstreaming them, PRs are welcome and it would be great for the community to benefit as well.

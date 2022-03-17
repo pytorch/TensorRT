@@ -10,19 +10,22 @@ and track the activations in FP32 to calibrate a mapping to INT8 that minimizes 
 FP32 inference and INT8 inference.
 
 Users writing TensorRT applications are required to setup a calibrator class which will provide sample data to
-the TensorRT calibrator. With TRTorch we look to leverage existing infrastructure in PyTorch to make implementing
+the TensorRT calibrator. With Torch-TensorRT we look to leverage existing infrastructure in PyTorch to make implementing
 calibrators easier.
 
 LibTorch provides a ``DataLoader`` and ``Dataset`` API which steamlines preprocessing and batching input data.
-This section of the PyTorch documentation has more information https://pytorch.org/tutorials/advanced/cpp_frontend.html#loading-data.
-TRTorch uses Dataloaders as the base of a generic calibrator implementation. So you will be able to reuse or quickly
+These APIs are exposed via both C++ and Python interface which makes it easier for the end user.
+For C++ interface, we use ``torch::Dataset`` and ``torch::data::make_data_loader`` objects to construct and perform pre-processing on datasets.
+The equivalent functionality in python interface uses ``torch.utils.data.Dataset`` and ``torch.utils.data.DataLoader``.
+This section of the PyTorch documentation has more information https://pytorch.org/tutorials/advanced/cpp_frontend.html#loading-data and https://pytorch.org/tutorials/recipes/recipes/loading_data_recipe.html.
+Torch-TensorRT uses Dataloaders as the base of a generic calibrator implementation. So you will be able to reuse or quickly
 implement a ``torch::Dataset`` for your target domain, place it in a DataLoader and create a INT8 Calibrator
-which you can provide to TRTorch to run INT8 Calibration during compliation of your module.
+which you can provide to Torch-TensorRT to run INT8 Calibration during compliation of your module.
 
-.. _writing_ptq:
+.. _writing_ptq_cpp:
 
-How to create your own PTQ application
-----------------------------------------
+How to create your own PTQ application in C++
+-----------------------------------------------
 
 Here is an example interface of a ``torch::Dataset`` class for CIFAR10:
 
@@ -94,17 +97,17 @@ some take time, then define the preprocessing to apply to the images in the data
                                                                                                 .workers(2));
 
 
-Next we create a calibrator from the ``calibration_dataloader`` using the calibrator factory (found in ``trtorch/ptq.h``):
+Next we create a calibrator from the ``calibration_dataloader`` using the calibrator factory (found in ``torch_tensorrt/ptq.h``):
 
 .. code-block:: c++
 
-    #include "trtorch/ptq.h"
+    #include "torch_tensorrt/ptq.h"
     ...
 
-    auto calibrator = trtorch::ptq::make_int8_calibrator(std::move(calibration_dataloader), calibration_cache_file, true);
+    auto calibrator = torch_tensorrt::ptq::make_int8_calibrator(std::move(calibration_dataloader), calibration_cache_file, true);
 
 Here we also define a location to write a calibration cache file to which we can use to reuse the calibration data without needing the dataset and whether or not
-we should use the cache file if it exists. There also exists a ``trtorch::ptq::make_int8_cache_calibrator`` factory which creates a calibrator that uses the cache
+we should use the cache file if it exists. There also exists a ``torch_tensorrt::ptq::make_int8_cache_calibrator`` factory which creates a calibrator that uses the cache
 only for cases where you may do engine building on a machine that has limited storage (i.e. no space for a full dataset) or to have a simpiler deployment application.
 
 The calibrator factories create a calibrator that inherits from a ``nvinfer1::IInt8Calibrator`` virtual class (``nvinfer1::IInt8EntropyCalibrator2`` by default) which
@@ -113,29 +116,91 @@ defines the calibration algorithm used when calibrating. You can explicitly make
 .. code-block:: c++
 
     // MinMax Calibrator is geared more towards NLP tasks
-    auto calibrator = trtorch::ptq::make_int8_calibrator<nvinfer1::IInt8MinMaxCalibrator>(std::move(calibration_dataloader), calibration_cache_file, true);
+    auto calibrator = torch_tensorrt::ptq::make_int8_calibrator<nvinfer1::IInt8MinMaxCalibrator>(std::move(calibration_dataloader), calibration_cache_file, true);
 
-Then all thats required to setup the module for INT8 calibration is to set the following compile settings in the `trtorch::ExtraInfo` struct and compiling the module:
+Then all thats required to setup the module for INT8 calibration is to set the following compile settings in the `torch_tensorrt::CompileSpec` struct and compiling the module:
 
 .. code-block:: c++
 
     std::vector<std::vector<int64_t>> input_shape = {{32, 3, 32, 32}};
     /// Configure settings for compilation
-    auto extra_info = trtorch::ExtraInfo({input_shape});
+    auto compile_spec = torch_tensorrt::CompileSpec({input_shape});
     /// Set operating precision to INT8
-    extra_info.op_precision = torch::kI8;
+    compile_spec.enabled_precisions.insert(torch::kF16);
+    compile_spec.enabled_precisions.insert(torch::kI8);
     /// Use the TensorRT Entropy Calibrator
-    extra_info.ptq_calibrator = calibrator;
+    compile_spec.ptq_calibrator = calibrator;
     /// Set a larger workspace (you may get better performace from doing so)
-    extra_info.workspace_size = 1 << 28;
+    compile_spec.workspace_size = 1 << 28;
 
-    auto trt_mod = trtorch::CompileGraph(mod, extra_info);
+    auto trt_mod = torch_tensorrt::CompileGraph(mod, compile_spec);
 
 If you have an existing Calibrator implementation for TensorRT you may directly set the ``ptq_calibrator`` field with a pointer to your calibrator and it will work as well.
-
 From here not much changes in terms of how to execution works. You are still able to fully use LibTorch as the sole interface for inference. Data should remain
-in FP32 precision when it's passed into `trt_mod.forward`. There exists an example application in the TRTorch demo that takes you from training a VGG16 network on
-CIFAR10 to deploying in INT8 with TRTorch here: https://github.com/NVIDIA/TRTorch/tree/master/cpp/ptq
+in FP32 precision when it's passed into `trt_mod.forward`. There exists an example application in the Torch-TensorRT demo that takes you from training a VGG16 network on
+CIFAR10 to deploying in INT8 with Torch-TensorRT here: https://github.com/NVIDIA/Torch-TensorRT/tree/master/cpp/ptq
+
+.. _writing_ptq_python:
+
+How to create your own PTQ application in Python
+--------------------------------------------------
+
+Torch-TensorRT Python API provides an easy and convenient way to use pytorch dataloaders with TensorRT calibrators. ``DataLoaderCalibrator`` class can be used to create
+a TensorRT calibrator by providing desired configuration. The following code demonstrates an example on how to use it
+
+.. code-block:: python
+
+    testing_dataset = torchvision.datasets.CIFAR10(root='./data',
+                                                            train=False,
+                                                            download=True,
+                                                            transform=transforms.Compose([
+                                                                transforms.ToTensor(),
+                                                                transforms.Normalize((0.4914, 0.4822, 0.4465),
+                                                                                     (0.2023, 0.1994, 0.2010))
+                                                            ]))
+
+    testing_dataloader = torch.utils.data.DataLoader(testing_dataset,
+                                                          batch_size=1,
+                                                          shuffle=False,
+                                                          num_workers=1)
+    calibrator = torch_tensorrt.ptq.DataLoaderCalibrator(testing_dataloader,
+                                                  cache_file='./calibration.cache',
+                                                  use_cache=False,
+                                                  algo_type=torch_tensorrt.ptq.CalibrationAlgo.ENTROPY_CALIBRATION_2,
+                                                  device=torch.device('cuda:0'))
+
+    compile_spec = {
+             "inputs": [torch_tensorrt.Input((1, 3, 32, 32))],
+             "enabled_precisions": {torch.float, torch.half, torch.int8},
+             "calibrator": calibrator,
+             "device": {
+                 "device_type": torch_tensorrt.DeviceType.GPU,
+                 "gpu_id": 0,
+                 "dla_core": 0,
+                 "allow_gpu_fallback": False,
+                 "disable_tf32": False
+             }
+         }
+    trt_mod = torch_tensorrt.compile(model, compile_spec)
+
+In the cases where there is a pre-existing calibration cache file that users want to use, ``CacheCalibrator`` can be used without any dataloaders. The following example demonstrates how
+to use ``CacheCalibrator`` to use in INT8 mode.
+
+.. code-block:: python
+
+  calibrator = torch_tensorrt.ptq.CacheCalibrator("./calibration.cache")
+
+  compile_settings = {
+        "inputs": [torch_tensorrt.Input([1, 3, 32, 32])],
+        "enabled_precisions": {torch.float, torch.half, torch.int8},
+        "calibrator": calibrator,
+    }
+
+  trt_mod = torch_tensorrt.compile(model, compile_settings)
+
+If you already have an existing calibrator class (implemented directly using TensorRT API), you can directly set the calibrator field to your class which can be very convenient.
+For a demo on how PTQ can be performed on a VGG network using Torch-TensorRT API, you can refer to https://github.com/NVIDIA/Torch-TensorRT/blob/master/tests/py/test_ptq_dataloader_calibrator.py
+and https://github.com/NVIDIA/Torch-TensorRT/blob/master/tests/py/test_ptq_trt_calibrator.py
 
 Citations
 ^^^^^^^^^^^

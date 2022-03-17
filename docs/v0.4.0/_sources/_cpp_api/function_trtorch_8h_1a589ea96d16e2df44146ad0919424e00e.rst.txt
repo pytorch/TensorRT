@@ -1,0 +1,13 @@
+.. _exhale_function_trtorch_8h_1a589ea96d16e2df44146ad0919424e00e:
+
+Function trtorch::set_device
+============================
+
+- Defined in :ref:`file_cpp_include_trtorch_trtorch.h`
+
+
+Function Documentation
+----------------------
+
+
+.. doxygenfunction:: trtorch::set_device(const int)

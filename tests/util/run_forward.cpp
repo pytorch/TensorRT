@@ -1,28 +1,27 @@
-#include "torch/script.h"
-#include "trtorch/trtorch.h"
 #include "tests/util/util.h"
+#include "torch/script.h"
+#include "torch_tensorrt/torch_tensorrt.h"
 
-namespace trtorch {
+namespace torch_tensorrt {
 namespace tests {
 namespace util {
 
 torch::jit::IValue RunModuleForward(torch::jit::Module& mod, std::vector<torch::jit::IValue> inputs) {
-    mod.to(at::kCUDA);
-    return mod.forward(inputs);
+  mod.to(at::kCUDA);
+  return mod.forward(inputs);
 }
 
-
 std::vector<at::Tensor> RunModuleForwardAsEngine(torch::jit::Module& mod, std::vector<at::Tensor> inputs) {
-    auto forward_graph = mod.get_method("forward");
-    std::vector<c10::ArrayRef<int64_t>> input_ranges;
-    for (auto in : inputs) {
-        input_ranges.push_back(in.sizes());
-    }
+  auto forward_graph = mod.get_method("forward");
+  std::vector<c10::ArrayRef<int64_t>> input_ranges;
+  for (auto in : inputs) {
+    input_ranges.push_back(in.sizes());
+  }
 
-    auto engine = trtorch::ConvertGraphToTRTEngine(mod, "forward", input_ranges);
-    return RunEngine(engine, inputs);
+  auto engine = torch_tensorrt::ts::convert_method_to_trt_engine(mod, "forward", input_ranges);
+  return RunEngine(engine, inputs);
 }
 
 } // namespace util
 } // namespace tests
-} // namespace trtorch
+} // namespace torch_tensorrt
