@@ -84,5 +84,70 @@ class TestAvgPoolConverter(AccTestCase):
         inputs = [torch.randn(1, 3, 224, 224)]
         self.run_test(TestModule(), inputs, expected_ops={acc_ops.avg_pool2d})
 
+    @parameterized.expand(
+        [
+            ("kernal_size", 1),
+            param("stride", 2, stride=()),
+        ]
+    )
+    def test_stride_none__avg_pool1d(
+        self,
+        test_name,
+        kernel_size,
+        stride=None,
+        padding=0,
+        ceil_mode=False,
+        count_include_pad=True
+    ):
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, x):
+                return torch.nn.functional.avg_pool1d(
+                    x,
+                    kernel_size,
+                    stride=stride,
+                    padding=padding,
+                    ceil_mode=ceil_mode,
+                    count_include_pad=count_include_pad,
+                )
+
+        inputs = [torch.randn(1, 3, 224)]
+        self.run_test(TestModule(), inputs, expected_ops={acc_ops.avg_pool1d})
+
+    @parameterized.expand(
+        [
+            ("kernal_size", 2),
+            param("stride", 2, stride=()),
+        ]
+    )
+    def test_stride_none_avg_pool2d(
+        self,
+        test_name,
+        kernel_size,
+        stride=None,
+        padding=0,
+        ceil_mode=False,
+        count_include_pad=True,
+        divisor_override=None,
+    ):
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+            def forward(self, x):
+                return torch.nn.functional.avg_pool2d(
+                    x,
+                    kernel_size,
+                    stride=stride,
+                    padding=padding,
+                    ceil_mode=ceil_mode,
+                    count_include_pad=count_include_pad,
+                    divisor_override=divisor_override,
+                )
+
+        inputs = [torch.randn(1, 3, 224, 224)]
+        self.run_test(TestModule(), inputs, expected_ops={acc_ops.avg_pool2d})
+
 if __name__ == '__main__':
     run_tests()

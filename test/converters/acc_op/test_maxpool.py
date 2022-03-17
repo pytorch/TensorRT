@@ -92,5 +92,58 @@ class TestMaxPoolConverter(AccTestCase):
             TestModule(), input_specs, expected_ops={acc_ops.max_pool2d}
         )
 
+    @parameterized.expand(
+        [
+            ("default", 1),
+            param("stride", 2, stride=()),
+        ]
+    )
+    def test_stride_none_max_pool1d(self,
+        test_name,
+        kernel_size,
+        stride=None,
+        padding=0,
+        dilation=1,
+        ceil_mode=False,
+    ):
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, x):
+                return torch.nn.functional.max_pool1d(
+                    x, kernel_size, stride=stride, padding=padding, ceil_mode=ceil_mode, dilation=dilation
+                )
+
+        inputs = [torch.randn(1, 3, 224)]
+        self.run_test(TestModule(), inputs, expected_ops={acc_ops.max_pool1d}, test_explicit_batch_dim=False,)
+
+
+    @parameterized.expand(
+        [
+            ("default", 1),
+            param("stride", 2, stride=()),
+        ]
+    )
+    def test_stride_none_max_pool2d(
+        self,
+        test_name,
+        kernel_size,
+        stride=None,
+        padding=0,
+        ceil_mode=False,
+    ):
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, x):
+                return  torch.nn.functional.max_pool2d(
+                    x, kernel_size, stride=stride, padding=padding, ceil_mode=ceil_mode
+                )
+
+        inputs = [torch.randn(1, 3, 224, 224)]
+        self.run_test(TestModule(), inputs, expected_ops={acc_ops.max_pool2d})
+
 if __name__ == '__main__':
     run_tests()

@@ -1121,24 +1121,28 @@ def acc_ops_max_pool1d(
 
     input_trt = unsqueeze_layer.get_output(0)
 
-    kernel_size = kwargs["kernel_size"]
-    stride = kwargs["stride"]
-    padding = kwargs["padding"]
-    dilation = kwargs["dilation"]
+    kernel_size = extend_attr_to_tuple(kwargs["kernel_size"], 1)
+    stride = extend_attr_to_tuple(kwargs["stride"], 1)
+    padding = extend_attr_to_tuple(kwargs["padding"], 1)
+    dilation = extend_attr_to_tuple(kwargs["dilation"], 1)
+
     ceil_mode = kwargs["ceil_mode"]
 
-    if any([not isinstance(param, int) for param in  [kernel_size, stride, padding, dilation]]):
+    if len(stride) == 0 or stride[0] == None:
+        stride = kernel_size
+
+    if any([not isinstance(param, int) for param in  [kernel_size[0], stride[0], padding[0], dilation[0]]]):
         raise RuntimeError(f"Parameters kernel_size, stride, padding, and dilation should be of type int.")
-    if dilation != 1:
+    if dilation[0] != 1:
         raise RuntimeError(
             f"Only support dilation=1 for maxpool, but got {dilation}"
         )
 
     max_pooling_layer = network.add_pooling(
-        input=input_trt, type=trt.PoolingType.MAX, window_size=(kernel_size, 1)
+        input=input_trt, type=trt.PoolingType.MAX, window_size=(kernel_size[0], 1)
     )
-    max_pooling_layer.stride_nd = (stride, 1)
-    max_pooling_layer.padding_nd =  (padding, 0)
+    max_pooling_layer.stride_nd = stride +(1,)
+    max_pooling_layer.padding_nd = padding + (0,)
     set_layer_name(max_pooling_layer, target, name)
 
     if ceil_mode:
@@ -1170,6 +1174,9 @@ def acc_ops_max_pool2d(
     padding = extend_attr_to_tuple(kwargs["padding"], 2)
     dilation = extend_attr_to_tuple(kwargs["dilation"], 2)
     ceil_mode = kwargs["ceil_mode"]
+
+    if len(stride) == 0 or stride[0] == None:
+        stride = kernel_size
 
     if dilation != (1, 1):
         raise RuntimeError(
@@ -1445,6 +1452,9 @@ def acc_ops_avg_pool1d(
     ceil_mode = kwargs["ceil_mode"]
     count_include_pad = kwargs["count_include_pad"]
 
+    if len(stride) == 0 or stride[0] == None:
+        stride = kernel_size
+
     shuffle_layer = network.add_shuffle(input_val)
     shuffle_layer.reshape_dims = tuple(input_val.shape) + (1,)
     set_layer_name(shuffle_layer, target, name + "_shuffle1")
@@ -1492,6 +1502,9 @@ def acc_ops_avg_pool2d(
     ceil_mode = kwargs["ceil_mode"]
     count_include_pad = kwargs["count_include_pad"]
     divisor_override = kwargs["divisor_override"]
+
+    if len(stride) == 0 or stride[0] == None:
+        stride = kernel_size
 
     if divisor_override:
         raise RuntimeError("TensorRT does not support divisor_override.")
