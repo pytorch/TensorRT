@@ -5,13 +5,6 @@ import tensorrt as trt
 import torch
 
 from .types import Shape, TRTDataType
-from enum import Enum
-
-
-class LowerPrecision(Enum):
-    FP32 = "fp32"
-    FP16 = "fp16"
-    INT8 = "int8"
 
 
 def torch_dtype_to_trt(dtype: torch.dtype) -> TRTDataType:

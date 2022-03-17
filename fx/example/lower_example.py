@@ -5,7 +5,6 @@ from dataclasses import replace, field, dataclass
 import torch
 import torchvision
 from fx2trt_oss.fx import lower_to_trt
-from fx2trt_oss.fx.utils import LowerPrecision
 
 
 """
@@ -168,7 +167,7 @@ def run_configuration_benchmark(
         time = benchmark_torch_function(conf.batch_iter, lambda: module(*input))
     elif not conf.jit:
         # Run lowering eager mode benchmark
-        lowered_module = lower_to_trt(module, input, max_batch_size=conf.batch_size, lower_precision=LowerPrecision.FP16 if conf.fp16 else LowerPrecision.FP32)
+        lowered_module = lower_to_trt(module, input, max_batch_size=conf.batch_size, fp16_mode=conf.fp16)
         time = benchmark_torch_function(conf.batch_iter, lambda: lowered_module(*input))
     else:
         print("Lowering with JIT is not available!", "red")

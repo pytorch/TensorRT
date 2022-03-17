@@ -33,7 +33,6 @@ from .tools.trt_splitter import TRTSplitter, TRTSplitterSetting
 from .trt_module import (
     TRTModule,
 )
-from .utils import LowerPrecision
 
 
 logger = logging.getLogger(__name__)
@@ -80,7 +79,8 @@ def lower_to_trt(
     max_batch_size: int = 2048,
     max_workspace_size=1 << 25,
     explicit_batch_dimension=False,
-    lower_precision=LowerPrecision.FP16,
+    fp16_mode=True,
+    int8_mode=False,
     verbose_log=False,
     timing_cache_prefix="",
     save_timing_cache=False,
@@ -96,7 +96,8 @@ def lower_to_trt(
         max_batch_size: Maximum batch size (must be >= 1 to be set, 0 means not set)
         max_workspace_size: Maximum size of workspace given to TensorRT.
         explicit_batch_dimension: Use explicit batch dimension in TensorRT if set True, otherwise use implicit batch dimension.
-        lower_precision: lower precision config given to TRTModule. Can select between fp32, fp16 and int8.
+        fp16_mode: fp16 config given to TRTModule.
+        int8_mode: int8 config given to TRTModule.
         verbose_log: Enable verbose log for TensorRT if set True.
         timing_cache_prefix: Timing cache file name for timing cache used by fx2trt.
         save_timing_cache: Update timing cache with current timing cache data if set to True.
@@ -109,7 +110,8 @@ def lower_to_trt(
         max_batch_size=max_batch_size,
         max_workspace_size=max_workspace_size,
         explicit_batch_dimension=explicit_batch_dimension,
-        lower_precision=lower_precision,
+        fp16_mode=fp16_mode,
+        int8_mode=int8_mode,
         verbose_log=verbose_log,
         timing_cache_prefix=timing_cache_prefix,
         save_timing_cache=save_timing_cache,
@@ -135,7 +137,9 @@ class LowerSetting:
 
     explicit_precision: Use explicit precision during lowering.
 
-    lower_precision: lower_precision during lowering. Can select between fp32, fp16 and int8.
+    fp16_mode: Enable FP16 dtype during lowering.
+
+    int8_mode: Enable Int8 dtype during lowering.
 
     max_workspace_size: The maximum workspace size. The maximum GPU temporary
     memory which the TensorRT engine can use at execution time.
@@ -175,7 +179,8 @@ class LowerSetting:
     input_specs: List[InputTensorSpec] = dc.field(default_factory=list)
     explicit_batch_dimension: bool = True
     explicit_precision: bool = False
-    lower_precision: LowerPrecision = LowerPrecision.FP32
+    fp16_mode: bool = False
+    int8_mode: bool = False
     max_workspace_size: int = 1 << 30
     strict_type_constraints: bool = False
     customized_fuse_pass: Sequence = ()
@@ -266,7 +271,8 @@ class LowerTrtInterpreter:
         interp_result: TRTInterpreterResult = interpreter.run(
             max_batch_size=self.lower_setting.max_batch_size,
             max_workspace_size=self.lower_setting.max_workspace_size,
-            lower_precision=self.lower_setting.lower_precision,
+            fp16_mode=self.lower_setting.fp16_mode,
+            int8_mode=self.lower_setting.int8_mode,
             strict_type_constraints=self.lower_setting.strict_type_constraints,
             algorithm_selector=algo_selector,
             timing_cache=cache_data,
@@ -344,7 +350,7 @@ class Lowerer:
     ) -> nn.Module:
         module.eval()
 
-        if self.lower_setting.lower_precision == LowerPrecision.FP16:
+        if self.lower_setting.fp16_mode:
             module.half()
             inputs = tuple(x.half() if x.dtype == torch.float32 else x for x in inputs)
 
