@@ -487,8 +487,7 @@ std::string ConvertBlockToEngine(
 std::unordered_map<c10::OperatorName, std::string> GetUnsupportedOpsInBlock(const torch::jit::Block* b) {
   std::unordered_map<c10::OperatorName, std::string> unsupported_ops;
   for (const auto n : b->nodes()) {
-    if (n->kind() != torch::jit::prim::Loop && n->kind() != torch::jit::prim::If && !OpSupported(n) &&
-        n->kind() != torch::jit::prim::DictConstruct) {
+    if (n->kind() != torch::jit::prim::Loop && n->kind() != torch::jit::prim::If && !OpSupported(n)) {
       auto schema = n->maybeSchema();
       TORCHTRT_CHECK(
           schema,
