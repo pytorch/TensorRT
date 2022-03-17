@@ -487,7 +487,8 @@ std::string ConvertBlockToEngine(
 std::unordered_map<c10::OperatorName, std::string> GetUnsupportedOpsInBlock(const torch::jit::Block* b) {
   std::unordered_map<c10::OperatorName, std::string> unsupported_ops;
   for (const auto n : b->nodes()) {
-    if (n->kind() != torch::jit::prim::Loop && n->kind() != torch::jit::prim::If && !OpSupported(n)) {
+    if (n->kind() != torch::jit::prim::Loop && n->kind() != torch::jit::prim::If && !OpSupported(n) &&
+        n->kind() != torch::jit::prim::DictConstruct) {
       auto schema = n->maybeSchema();
       TORCHTRT_CHECK(
           schema,
@@ -544,9 +545,7 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b, bool suppress_er
     unsupported_msg << "https://www.github.com/nvidia/Torch-TensorRT/issues" << std::endl;
     unsupported_msg << std::endl << "In Module:" << std::endl;
 
-    if (!suppress_errors) {
-      LOG_ERROR(unsupported_msg.str());
-    }
+    LOG_DEBUG(unsupported_msg.str());
 
     std::unordered_map<std::string, std::unordered_set<std::string>> unsupported_node_locations;
     for (const auto n : b->nodes()) {
@@ -571,8 +570,9 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b, bool suppress_er
       for (const auto& str : type.second) {
         traceback << str;
       }
-      auto tb_str = traceback.str();
-      LOG_ERROR(tb_str);
+      if (!suppress_errors) {
+        LOG_ERROR(traceback.str());
+      }
     }
 
     return false;
