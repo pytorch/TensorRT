@@ -79,6 +79,22 @@ class ListInputOutput(nn.Module):
         r = [r1, r2]
         return r
 
+class ComplexModel(nn.Module):
+    def __init__(self):
+        super(ComplexModel, self).__init__()
+        self.list_model = ListInputOutput()
+        self.tuple_model = TupleInputOutput()
+
+    def forward(self, z: List[torch.Tensor]):
+        r1 = z[0] + z[1]
+        r2 = z[0] - z[1]
+        r3 = (r1, r2)
+        r4 = [r2, r1]
+        tuple_out = self.tuple_model(r3)
+        list_out = self.list_model(r4)
+        r = (tuple_out[1], list_out[0])
+        return r
+
 input_data = torch.randn((16, 3, 32, 32))
 input_data = input_data.float().to("cuda")
 
@@ -116,3 +132,10 @@ print(list_input_ts.graph)
 result = list_input_ts([input_data, input_data])
 list_input_ts.to("cuda").eval()
 torch.jit.save(list_input_ts, "./list_input_output.ts")
+
+complex_model = ComplexModel()
+complex_model_ts = torch.jit.script(complex_model)
+print(complex_model_ts.graph)
+result = complex_model_ts([input_data, input_data])
+complex_model_ts.to("cuda").eval()
+torch.jit.save(complex_model_ts, "./complex_model.ts")
