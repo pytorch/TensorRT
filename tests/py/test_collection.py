@@ -59,6 +59,25 @@ class ListInput(nn.Module):
         r = z[0] + z[1]
         return r
 
+class TupleInputOutput(nn.Module):
+    def __init__(self):
+        super(TupleInputOutput, self).__init__()
+
+    def forward(self, z: Tuple[torch.Tensor, torch.Tensor]):
+        r1 = z[0] + z[1]
+        r2 = z[0] - z[1]
+        r = (r1, r2)
+        return r
+
+class ListInputOutput(nn.Module):
+    def __init__(self):
+        super(ListInputOutput, self).__init__()
+
+    def forward(self, z: List[torch.Tensor]):
+        r1 = z[0] + z[1]
+        r2 = z[0] - z[1]
+        r = [r1, r2]
+        return r
 
 input_data = torch.randn((16, 3, 32, 32))
 input_data = input_data.float().to("cuda")
@@ -83,3 +102,17 @@ print(list_input_ts.graph)
 result = list_input_ts([input_data, input_data])
 list_input_ts.to("cuda").eval()
 torch.jit.save(list_input_ts, "./list_input.ts")
+
+tuple_input = TupleInputOutput()
+tuple_input_ts = torch.jit.script(tuple_input)
+print(tuple_input_ts.graph)
+result = tuple_input_ts((input_data, input_data))
+tuple_input_ts.to("cuda").eval()
+torch.jit.save(tuple_input_ts, "./tuple_input_output.ts")
+
+list_input = ListInputOutput()
+list_input_ts = torch.jit.script(list_input)
+print(list_input_ts.graph)
+result = list_input_ts([input_data, input_data])
+list_input_ts.to("cuda").eval()
+torch.jit.save(list_input_ts, "./list_input_output.ts")
