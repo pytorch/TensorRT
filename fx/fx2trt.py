@@ -13,7 +13,7 @@ from torch.fx.passes.shape_prop import TensorMetadata
 
 from .converter_registry import CONVERTERS
 from .input_tensor_spec import InputTensorSpec
-from .utils import torch_dtype_to_trt, get_dynamic_dims
+from .utils import torch_dtype_to_trt, get_dynamic_dims, LowerPrecision
 
 TRT_INTERPRETER_CALL_PRE_OBSERVER: Observer[Callable[[torch.fx.GraphModule], None]] = Observer("TRT_INTERPRETER_CALL_PRE_OBSERVER")
 
@@ -146,8 +146,7 @@ class TRTInterpreter(torch.fx.Interpreter):
         self,
         max_batch_size=64,
         max_workspace_size=1 << 25,
-        fp16_mode=True,
-        int8_mode=False,
+        lower_precision=LowerPrecision.FP16,
         sparse_weights=False,
         force_fp32_output=False,
         strict_type_constraints=False,
@@ -155,18 +154,16 @@ class TRTInterpreter(torch.fx.Interpreter):
         timing_cache=None,
         profiling_verbosity=None,
     ) -> TRTInterpreterResult:
-        assert not (fp16_mode and int8_mode), "We cannot enable both fp16 and int8 mode."
-
         TRT_INTERPRETER_CALL_PRE_OBSERVER.observe(self.module)
 
-        # For float outputs, we set their dtype to fp16 only if fp16_mode=True and
+        # For float outputs, we set their dtype to fp16 only if LowerPrecision.FP16 and
         # force_fp32_output=False.
-        self.output_fp16 = not force_fp32_output and fp16_mode
+        self.output_fp16 = not force_fp32_output and lower_precision == LowerPrecision.FP16
 
-        if int8_mode and not self.builder.platform_has_fast_int8:
+        if lower_precision == LowerPrecision.INT8 and not self.builder.platform_has_fast_int8:
             raise RuntimeError("Current platform doesn't support fast native int8!")
 
-        if fp16_mode and not self.builder.platform_has_fast_fp16:
+        if lower_precision == LowerPrecision.FP16 and not self.builder.platform_has_fast_fp16:
             warnings.warn("Current platform doesn't support fast native fp16!")
 
         self.input_specs_iter = 0
@@ -188,10 +185,10 @@ class TRTInterpreter(torch.fx.Interpreter):
             builder_config.profiling_verbosity = profiling_verbosity \
                 if profiling_verbosity else \
                 trt.ProfilingVerbosity.LAYER_NAMES_ONLY
-        if fp16_mode:
+        if lower_precision == LowerPrecision.FP16:
             builder_config.set_flag(trt.BuilderFlag.FP16)
 
-        if int8_mode:
+        if lower_precision == LowerPrecision.INT8:
             builder_config.set_flag(trt.BuilderFlag.INT8)
 
         if sparse_weights:
