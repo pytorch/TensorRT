@@ -523,6 +523,9 @@ def add_reduce_layer(
     else:
         dim = kwargs["dim"]  # type: ignore[assignment]
 
+    if not isinstance(dim, Sequence):
+        dim = (dim,)
+
     if not network.has_implicit_batch_dimension:
         dim = tuple(len(input_val.shape) + i if i < 0 else i for i in dim)
     else:
