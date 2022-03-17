@@ -67,28 +67,6 @@ std::vector<const torch::jit::Value*> get_tensor_inputs(
     if (in->type()->isSubtypeOf(c10::TensorType::get()) && static_params.find(in) == static_params.end()) {
       input_tensors.push_back(in);
     } 
-    // else if (in->type()->cast<c10::TupleType>() && static_params.find(in) == static_params.end()) {
-    // // } else if (in->type()->isSubtypeOf(c10::TupleType::create()) && static_params.find(in) == static_params.end()) {
-    //   at::ArrayRef<torch::jit::Value*> unpack_tuple = torch::jit::createTupleUnpack(in);
-    //   LOG_DEBUG("Tuple size " << unpack_tuple.size());
-    //   for (auto item: unpack_tuple) {
-    //     input_tensors.push_back(in);
-    //   }
-    // } else if (in->type()->isSubtypeOf(c10::ListType::ofTensors()) && static_params.find(in) == static_params.end()) {
-      
-    //   LOG_DEBUG("List use size " << in->uses().size());
-    //   // for (auto use : in->uses()) {
-    //   //   LOG_DEBUG(use.user->outputs()[0]->debugName());
-    //   // }
-    //   // TODO: set the correct list number according to the Input IValue
-    //   int n = 2;
-    //   auto unpack_node = g->createListUnpack(in, n);
-    //   g->block()->appendNode(unpack_node);
-    //   for (auto item: unpack_node->outputs()) {
-    //     input_tensors.push_back(item);
-    //   }
-    //   LOG_DEBUG("Unpack List of size " << n);
-    // }
   }
   return input_tensors;
 }
@@ -101,11 +79,6 @@ std::vector<const torch::jit::Value*> get_collection_inputs(
   LOG_DEBUG("get_collection_inputs, inputs size " << inputs.size());
   for (auto in : inputs) {
     LOG_DEBUG("input debug name: " << in->debugName());
-    // Disregarding inputs that are not tensors or are static
-    //
-    // Ex.
-    // self.1:__torch__.alexnet -> ignored
-    // input.1:Tensor -> used
     if (in->type()->isSubtypeOf(c10::TensorType::get()) && static_params.find(in) == static_params.end()) {
       input_tensors.push_back(in);
     } else if (in->type()->kind() == torch::jit::TypeKind::TupleType && static_params.find(in) == static_params.end()) {
@@ -242,6 +215,7 @@ CollectionTypeMap get_block_first_calc_dtypes_opt_collection(torch::jit::Block* 
     if (i->type() == c10::TensorType::get()) {
       torch::jit::Value* in = i;
       types.insert({in, {get_value_first_calc_dtype_opt(b, i)}});
+
     } else if(i->type()->kind() == torch::jit::TypeKind::TupleType) {
       LOG_DEBUG("get_block_first_calc_dtypes_opt_collection TupleType");
       // TODO: to evaluate the data type of tuple element
@@ -249,14 +223,10 @@ CollectionTypeMap get_block_first_calc_dtypes_opt_collection(torch::jit::Block* 
       c10::optional<at::ScalarType> tp = get_value_first_calc_dtype_opt(b, i);
       at::ArrayRef<torch::jit::Value*> unpack_tuple = torch::jit::createTupleUnpack(i);
       LOG_DEBUG("get_block_first_calc_dtypes_opt_collection: tuple size " << unpack_tuple.size());
-      // Assume all tuple has the same datatype
+      // TODO: calculate the tuple element type
       // std::vector<c10::optional<at::ScalarType>> dytpes(unpack_tuple.size(), tp);
       std::vector<c10::optional<at::ScalarType>> dytpes(unpack_tuple.size());
       types.insert({i, dytpes}); // insert an empty 
-      // for (auto item: unpack_tuple) {
-      //   torch::jit::Value* in = item;
-      //   types.insert({in, get_value_first_calc_dtype_opt(b, i)});
-      // }
 
     } else if(i->type()->kind() == torch::jit::TypeKind::ListType) {
       // TODO: to decide the size of list and type of list element
@@ -265,7 +235,6 @@ CollectionTypeMap get_block_first_calc_dtypes_opt_collection(torch::jit::Block* 
       // std::vector<c10::optional<at::ScalarType>> dytpes(i->uses().size());
       std::vector<c10::optional<at::ScalarType>> dytpes(i->uses().size(), tp);
       types.insert({i, dytpes}); // insert an empty
-
     }
   }
   return types;

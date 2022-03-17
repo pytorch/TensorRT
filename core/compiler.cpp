@@ -295,14 +295,14 @@ void MapInputsAndDetermineDTypes(
     ir::StaticParams& static_params,
     ir::CollectionTypeMap& first_use_type_map) {
     // ir::TypeMap& first_use_type_map) {
-  // Associate input specs with inputs
-  // cfg.convert_info.inputs = std::move(ir::associate_specs_with_inputs(g, cfg.inputs, static_params));
-  cfg.convert_info.collection_inputs = std::move(ir::associate_specs_with_collection_inputs(g, cfg.graph_inputs, static_params));
+    // Associate input specs with inputs
+    // cfg.convert_info.inputs = std::move(ir::associate_specs_with_inputs(g, cfg.inputs, static_params));
+    cfg.convert_info.collection_inputs = std::move(ir::associate_specs_with_collection_inputs(g, cfg.graph_inputs, static_params));
 
-  auto collection_inputs = ir::get_collection_inputs(g, static_params);
-  LOG_DEBUG("In MapInputsAndDetermineDTypes " << "g->inputs() size " << g->inputs().size() << ", collection_inputs size " << collection_inputs.size());
-  // for (auto& in : g->inputs()) {
-  //   if (static_params.find(in) == static_params.end()) {
+    auto collection_inputs = ir::get_collection_inputs(g, static_params);
+    LOG_DEBUG("In MapInputsAndDetermineDTypes " << "g->inputs() size " << g->inputs().size() << ", collection_inputs size " << collection_inputs.size());
+    // for (auto& in : g->inputs()) {
+    //   if (static_params.find(in) == static_params.end()) {
     for (auto in : collection_inputs) {
       std::vector<ir::Input>& spec = cfg.convert_info.collection_inputs.find(in)->second;
       // ir::Input& spec = cfg.convert_info.inputs.find(in)->second;

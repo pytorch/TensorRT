@@ -521,7 +521,6 @@ struct TORCHTRT_API Input : torch::CustomClassHolder{
  */
 struct TORCHTRT_API GraphInputs {
   torch::jit::IValue input_signature;   // nested Input, full input spec
-  // std::vector<Input> flattened_inputs;  // flattend Input
 };
 
 /**
