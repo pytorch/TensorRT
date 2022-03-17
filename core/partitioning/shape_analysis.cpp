@@ -56,34 +56,18 @@ std::unordered_map<const torch::jit::Value*, torch::jit::IValue> generateRandomI
 
     if (input.first->type()->kind() == torch::jit::TypeKind::ListType) {
       // create list
-      // auto list = c10::impl::GenericList(c10::TensorType::get());
-      // list.append(ivalues_maps[input]);
       LOG_DEBUG("generateRandomInputs, generate random input of list type");
-      // jit_inputs_ivalues.push_back(ivalues_maps[input].toList());
       std::vector<torch::jit::IValue> list;
       c10::TypePtr elementType = c10::TensorType::get();
       auto generic_list = c10::impl::GenericList(elementType);
-      LOG_DEBUG("generateRandomInputs, 0");
       for (int i = 0; i < input.second.size(); i++) {
-        // types for list is {}
-        // auto in = generateSingleInput(input.second[i], types[input.first][i]);
-        // TODO: need to decide the input type of list elements in ir.cpp
-        // c10::optional<at::ScalarType> type_opt = {};
-        // auto in = generateSingleInput(input.second[i], type_opt);
         auto in = generateSingleInput(input.second[i], types[input.first][i]);
-        // list.push_back(in.clone());
         generic_list.push_back(in.clone());
-        LOG_DEBUG("generateRandomInputs, 1");
       }
-      // c10::TypePtr elementType = list[0].type();
-      LOG_DEBUG("generateRandomInputs, 2");
-      // generic_list.append(list);
       ivalue_map[input.first] = c10::IValue(generic_list);
-      // jit_inputs_ivalues.push_back(list);
       LOG_DEBUG("generateRandomInputs, finish generate random input of list type");
     } else if (input.first->type()->kind() == torch::jit::TypeKind::TupleType) {
       // create tuple
-      // auto tuple = torch::jit::Tuple::create(ivalues_maps[input]);
       LOG_DEBUG("generateRandomInputs, generate random input of tuple type");
       std::vector<torch::jit::IValue> list;
       for (int i = 0; i < input.second.size(); i++) {
@@ -91,9 +75,7 @@ std::unordered_map<const torch::jit::Value*, torch::jit::IValue> generateRandomI
         list.push_back(in.clone());
       }
       auto tuple = c10::ivalue::Tuple::create(list); // create tuple ptr
-      
       ivalue_map[input.first] = c10::IValue(tuple);
-      // jit_inputs_ivalues.push_back(tuple);
     } else {
       LOG_DEBUG("generateRandomInputs, generate random input of tensor type");
       auto in = generateSingleInput(input.second[0], types[input.first][0]);
@@ -152,14 +134,10 @@ void getSegmentsOutputByRunning(
       jit_inputs_ivalues.push_back(ivalues_maps[input].toBool());
     } else if (input->type()->kind() == torch::jit::TypeKind::ListType) {
       // create list
-      // auto list = c10::impl::GenericList(c10::TensorType::get());
-      // list.append(ivalues_maps[input]);
       LOG_DEBUG("getSegmentsOutputByRunning, handle list type");
-      jit_inputs_ivalues.push_back(ivalues_maps[input].toList());
-      // jit_inputs_ivalues.push_back(list);
+      jit_inputs_ivalues.push_back(ivalues_maps[input].toList());;
     } else if (input->type()->kind() == torch::jit::TypeKind::TupleType) {
       // create tuple
-      // auto tuple = torch::jit::Tuple::create(ivalues_maps[input]);
       LOG_DEBUG("getSegmentsOutputByRunning, handle tuple type");
       jit_inputs_ivalues.push_back(ivalues_maps[input].toTuple());
     } else if (input->type()->kind() == torch::jit::TypeKind::NumberType) {

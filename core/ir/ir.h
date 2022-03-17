@@ -12,8 +12,6 @@ namespace core {
 namespace ir {
 
 struct Input : torch::CustomClassHolder {
-  // Input(std::vector<int64_t> shape);
-  // Input(std::vector<int64_t> min_shape, std::vector<int64_t> opt_shape, std::vector<int64_t> max_shape);
   Input() {};
   Input(
       std::vector<int64_t> shape,
@@ -42,15 +40,6 @@ struct Input : torch::CustomClassHolder {
 
 // Add to spec
 struct GraphInputs {
-//   GraphInputs() {}
-//   GraphInputs(torch::jit::IValue inputs) {
-//     input_signature = inputs;
-//     // TODO flatten IValue
-//   }
-  // GraphInputs(std::vector<Input> inputs) {
-  //   flattened_inputs = inputs;
-  //   // TODO construct the IValue
-  // }
   torch::jit::IValue input_signature;  // nested Input, full input spec
   std::vector<Input> flattened_inputs;  // flattend Input
   std::vector<std::vector<Input>> collection_inputs; // only support two layer nesting, e.g. ((a, b), [c, d], e)
