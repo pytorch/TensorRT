@@ -1597,6 +1597,7 @@ class AccTracerTest(unittest.TestCase):
         """
 
         self._make_acc_op_function_test(acc_ops.reshape, lambda x: x.view(1, -1))
+        self._make_acc_op_function_test(acc_ops.reshape, lambda x: x.view([1, -1]))
 
     def test_narrow(self):
         """

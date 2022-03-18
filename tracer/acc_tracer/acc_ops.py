@@ -1668,14 +1668,6 @@ def custom_narrow_mapper(node: torch.fx.Node, mod: nn.Module) -> torch.fx.Node:
     ],
     kwargs_to_move_to_acc_out_ty=[("shape", "shape")],
 )
-@register_acc_op_mapping(
-    op_and_target=("call_method", "view"),
-    arg_replacement_tuples=[
-        ("input", "input"),
-        ("*", "shape"),
-    ],
-    kwargs_to_move_to_acc_out_ty=[("shape", "shape")],
-)
 @register_acc_op
 def reshape(*, input, acc_out_ty=None):
     assert acc_out_ty is not None
@@ -1689,11 +1681,18 @@ def reshape(*, input, acc_out_ty=None):
         ("*", "shape"),
     ],
 )
+@register_custom_acc_mapper_fn(
+    op_and_target=("call_method", "view"),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("*", "shape"),
+    ],
+)
 def custom_tensor_reshape_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
     """
-    For Tensor.reshape node, args could be (input, 1, 2, 3) or (input, (1, 2, 3)).
-    Here we do some special handling with the `shape` arg in order to map it to
-    acc_ops.reshape. It also handles the case when `shape` is a list instead of
+    For Tensor.reshape and Tensor.view nodes, args could be (input, 1, 2, 3) or (input,
+    (1, 2, 3)).  Here we do some special handling with the `shape` arg in order to map
+    it to acc_ops.reshape. It also handles the case when `shape` is a list instead of
     tuple.
     """
     input_node = node.kwargs["input"]

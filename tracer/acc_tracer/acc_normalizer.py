@@ -286,7 +286,8 @@ def get_normalized_kwargs(
         orig_kwargs_names, new_kwarg_name, is_optional = replacement_tuple
 
         # Check if this is a varg and if so break/process the rest outside the loop.
-        if len(orig_kwargs_names) == 1 and orig_kwargs_names[0] == "*":
+        if "*" in orig_kwargs_names:
+            assert len(orig_kwargs_names) == 1
             assert i == len(arg_replacement_tuples) - 1
             final_arg_is_varg = True
             break
