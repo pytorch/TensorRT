@@ -1989,11 +1989,11 @@ class AccTracerTest(unittest.TestCase):
             else:
                 self.fail(f"Unexpected node: {node.format_node()}")
 
-        # Check the tensor metadatas are correct given the input is a list.
-        self.assertTrue(isinstance(ph.meta["tensor_meta"], list))
-        self.assertEqual(len(ph.meta["tensor_meta"]), 2)
-        self.assertEqual(getitem_0.meta["tensor_meta"], ph.meta["tensor_meta"][0])
-        self.assertEqual(getitem_1.meta["tensor_meta"], ph.meta["tensor_meta"][1])
+        # Check the tensor ranks are correct given the input is a list.
+        self.assertTrue(isinstance(ph.meta["tensor_rank"], list))
+        self.assertEqual(len(ph.meta["tensor_rank"]), 2)
+        self.assertEqual(getitem_0.meta["tensor_rank"], ph.meta["tensor_rank"][0])
+        self.assertEqual(getitem_1.meta["tensor_rank"], ph.meta["tensor_rank"][1])
 
         self.assertTrue(torch.equal(m(input), traced(input)))
 

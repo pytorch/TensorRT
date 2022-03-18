@@ -1,17 +1,18 @@
 import inspect
 import json
 import os
-from typing import Any, Tuple, Callable, Union, Dict, List, Optional
 import re
+from typing import Any, Tuple, Callable, Union, Dict, List, Optional
 
 import torch
 import torch.fx
+from torch.fx.graph_module import GraphModule
+from torch.fx.immutable_collections import immutable_list
+from torch.fx.node import _get_qualified_name
+from torch.fx.passes import graph_drawer
 from torch.fx.passes.graph_manipulation import (
     serialize_module,
 )
-from torch.fx.graph_module import GraphModule
-from torch.fx.node import _get_qualified_name
-from torch.fx.passes import graph_drawer
 from torch.fx.passes.shape_prop import TensorMetadata
 
 
@@ -173,3 +174,18 @@ def get_unique_attr_name_in_module(mod_traced: torch.fx.GraphModule, name: str) 
             name = f"{base}_{int(num) + 1}"
 
     return name
+
+
+def map_tensor_metadata(a: Any, fn: Callable):
+    """
+    Map some `fn` to `a`, where `a` is either a TensorMetadata, or else a tuple/list
+    recursively containing TensorMetadata.
+    """
+    if isinstance(a, TensorMetadata):
+        return fn(a)
+    elif isinstance(a, tuple):
+        return tuple(map_tensor_metadata(elem, fn) for elem in a)
+    assert isinstance(
+        a, list
+    ), f"Only supporting tuple/list/TensorMetadata, but found {type(a)}"
+    return immutable_list(map_tensor_metadata(elem, fn) for elem in a)

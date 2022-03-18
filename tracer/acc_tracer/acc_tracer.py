@@ -10,6 +10,7 @@ from typing import Sequence, Dict, Optional, Any, Type, Tuple, Set
 
 import fx2trt_oss.tracer.acc_tracer.acc_normalizer as acc_normalizer
 import fx2trt_oss.tracer.acc_tracer.acc_ops  # noqa: F401
+import fx2trt_oss.tracer.acc_tracer.acc_utils as acc_utils
 import torch
 import torch.jit as jit
 import torch.nn as nn
@@ -249,7 +250,11 @@ DEFAULT_REWRITE_ALLOW_LIST = {
 }
 
 
-def _rewrite(mod_to_rewrite: nn.Module, allow_list: Optional[Set] = None, leaf_module_list: Optional[Set] = None) -> nn.Module:
+def _rewrite(
+    mod_to_rewrite: nn.Module,
+    allow_list: Optional[Set] = None,
+    leaf_module_list: Optional[Set] = None,
+) -> nn.Module:
     if allow_list is None:
         allow_list = DEFAULT_REWRITE_ALLOW_LIST
     else:
@@ -270,7 +275,7 @@ def _rewrite(mod_to_rewrite: nn.Module, allow_list: Optional[Set] = None, leaf_m
             return m
 
         # If m is an already-rewritten RewrittenModule, then use the original base class.
-        base_class : Type[nn.Module] = getattr(m, "_base_class_origin", type(m))
+        base_class: Type[nn.Module] = getattr(m, "_base_class_origin", type(m))
 
         # Keep track of all the ConditionalExceptionWrappers that the
         # Acc_Rewriter calls into in this module so we can add them in init
@@ -290,7 +295,9 @@ def _rewrite(mod_to_rewrite: nn.Module, allow_list: Optional[Set] = None, leaf_m
             for method_name in dir(base_class):
                 method = getattr(base_class, method_name, None)
                 if method is None and method_name not in {"__doc__"}:
-                    _LOGGER.warning(f"{__qualname__} does not have attribute {method_name}")
+                    _LOGGER.warning(
+                        f"{__qualname__} does not have attribute {method_name}"
+                    )
 
                 if builtins.type(method) is not FunctionType:
                     continue
@@ -366,6 +373,15 @@ def _remove_exceptions(gm: torch.fx.GraphModule) -> bool:
             gm.graph.erase_node(node)
             changed = True
     return changed
+
+
+def _replace_tensor_meta_with_rank(gm: torch.fx.GraphModule):
+    for node in gm.graph.nodes:
+        if node.op != "output" and "tensor_meta" in node.meta:
+            node.meta["tensor_rank"] = acc_utils.map_tensor_metadata(
+                node.meta["tensor_meta"], lambda x: len(x.shape)
+            )
+            del node.meta["tensor_meta"]
 
 
 def trace(
@@ -450,9 +466,13 @@ def trace(
     # nodes after removing assertions and exceptions.
     traced.graph.eliminate_dead_code()
 
+    # Run shape prop to add node.meta["type"] to nodes, needed for NormalizeArgs.
+    shape_prop.ShapeProp(traced).propagate(*sample_inputs)
+    # Swap out tensor_meta for tensor_rank, because we don't actually want to rely on
+    # tensor_meta yet for normalization/lowering, though rank shouldn't change.
+    _replace_tensor_meta_with_rank(traced)
     # Now normalize args/kwargs to make default values visible. Leave args/kwargs as
     # they were, since all-kwarg normalization is broken, and we don't need it anyway.
-    shape_prop.ShapeProp(traced).propagate(*sample_inputs)
     traced = NormalizeArgs(traced, normalize_to_only_use_kwargs=False).transform()
 
     # Normalize to acc-specialized wrappers for consistency across op naming and

@@ -320,8 +320,7 @@ def cat(*, tensors, dim):
 )
 def transpose_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
     # Get the dim-permutation/shuffle
-    shape_as_list = node.meta["tensor_meta"].shape
-    ranks = len(shape_as_list)
+    ranks = node.meta["tensor_rank"]
     shuffle = list(range(ranks))
     dim0 = cast(int, node.kwargs["dim0"])
     dim1 = cast(int, node.kwargs["dim1"])
@@ -422,7 +421,7 @@ def addmm_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
     ],
 )
 def t_mapper(node: torch.fx.Node, _: nn.Module):
-    ranks = len(node.meta["tensor_meta"].shape)
+    ranks = node.meta["tensor_rank"]
     shuffle = [1, 0] if (ranks > 1) else [0]
 
     with node.graph.inserting_before(node):
@@ -1842,7 +1841,7 @@ def packed_quantized_linear_mapper(
         }
 
         new_node = node.graph.call_function(quantized_linear, kwargs=kwargs)
-        new_node.meta = node.meta
+        new_node.meta = node.meta.copy()
         return new_node
 
 
