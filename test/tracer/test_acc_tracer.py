@@ -1314,6 +1314,49 @@ class AccTracerTest(unittest.TestCase):
             acc_ops.matmul, lambda x: torch.bmm(x, x), input_shape=(2, 4, 4)
         )
 
+    def test_baddbmm_with_alpha_beta(self):
+        class TestModule(torch.nn.Module):
+            def forward(self, input: torch.Tensor, a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+                return torch.baddbmm(input, a, b, alpha = 1.2, beta = 1.1)
+
+        m = TestModule()
+        input, a, b = torch.randn(10, 2, 3), torch.randn(10, 2, 4), torch.randn(10, 4, 3)
+        traced = acc_tracer.trace(m, [input, a, b])
+
+        ph_in = ph_a = ph_b = mm = add = mm_mul = add_mul = None
+        for node in traced.graph.nodes:
+            if node.op == "placeholder":
+                if str(node.target) == "a":
+                    ph_a = node
+                elif str(node.target) == "b":
+                    ph_b = node
+                else:
+                    self.assertTrue(str(node.target) == "input")
+                    ph_in = node
+            elif node.op == "call_function":
+                if node.target == acc_ops.matmul:
+                    self.assertEqual(node.kwargs["input"], ph_a)
+                    self.assertEqual(node.kwargs["other"], ph_b)
+                    mm = node
+                elif node.target == acc_ops.add:
+                    self.assertEqual(node.kwargs["input"], mm_mul)
+                    self.assertEqual(node.kwargs["other"], add_mul)
+                    add = node
+                elif mm_mul:
+                    self.assertEqual(node.kwargs["input"], ph_in)
+                    self.assertEqual(node.kwargs["other"], 1.1)
+                    add_mul = node
+
+                else:
+                    self.assertEqual(node.kwargs["input"], mm)
+                    self.assertEqual(node.kwargs["other"], 1.2)
+                    mm_mul = node
+            elif node.op == "output":
+                self.assertEqual(add, node.args[0])
+            else:
+                self.fail(f"Unexpected node: {node.format_node()}")
+        torch.testing.assert_allclose(m(input, a, b), traced(input, a, b))
+
     def test_tile(self):
         return self._make_acc_op_function_test(
             acc_ops.tile, lambda x: torch.tile(x, (2, 1, 2)), input_shape=(1, 2)
@@ -1716,7 +1759,7 @@ class AccTracerTest(unittest.TestCase):
         input, a, b = torch.randn(2, 2), torch.randn(2, 2), torch.randn(2, 2)
         traced = acc_tracer.trace(m, [input, a, b])
 
-        ph_in = ph_a = ph_b = mm = add = mm_mul = add_mul = None
+        ph_in = ph_a = ph_b = mm = add = mm_mul = add_mul = reshape = None
         for node in traced.graph.nodes:
             if node.op == "placeholder":
                 if str(node.target) == "a":
