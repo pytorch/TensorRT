@@ -1101,6 +1101,49 @@ def acc_ops_fmod(
     )
     return sub_value
 
+
+@tensorrt_converter(acc_ops.embedding, no_implicit_batch_dim=True)
+def acc_ops_embedding(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    if network.has_implicit_batch_dimension:
+        raise RuntimeError("The `embedding` function should be called with explicit batch dimension.")
+
+    indices_tensor = kwargs["input"]
+    embedding_tensor = kwargs["weight"]
+
+    # unsupported parameters
+    padding_idx = kwargs["padding_idx"]
+    max_norm = kwargs["max_norm"]
+    norm_type = kwargs["norm_type"]
+    scale_grad_by_freq = kwargs["scale_grad_by_freq"]
+    sparse = kwargs["sparse"]
+
+    if padding_idx is not None:
+        raise RuntimeError(f"Currently we don't support specifying padding_idx, got {padding_idx}.")
+
+    if max_norm is not None:
+        raise RuntimeError(f"Currently we don't support specifying max_norm, got {max_norm}.")
+
+    if norm_type != 2.0:
+        raise RuntimeError(f"Currently we don't support specifying max_norm, got {norm_type} for norm_type.")
+
+    if scale_grad_by_freq:
+        raise RuntimeError("Currently we don't support scale gradient by word frequency.")
+
+    if sparse:
+        raise RuntimeError("Currently we don't support sparse gradient.")
+
+    # Implement embedding lookup with gather layer
+    gather_layer = network.add_gather(embedding_tensor, indices_tensor, axis=0)
+    set_layer_name(gather_layer, target, name + "_gather")
+    return gather_layer.get_output(0)
+
+
 @tensorrt_converter(acc_ops.max_pool1d, no_explicit_batch_dim=True)
 def acc_ops_max_pool1d(
     network: TRTNetwork,

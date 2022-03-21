@@ -80,6 +80,14 @@ def squeeze(*, input, dim=None):
     return input.squeeze(dim=dim)
 
 
+@register_acc_op_mapping(op_and_target=("call_function", nn.functional.embedding))
+@register_acc_op
+def embedding(
+    *, input, weight, padding_idx, max_norm, norm_type, scale_grad_by_freq, sparse
+):
+    return torch.nn.functional.embedding(**locals())
+
+
 @register_acc_op_mapping(op_and_target=("call_function", nn.functional.max_pool1d))
 @register_acc_op
 def max_pool1d(
@@ -94,6 +102,7 @@ def max_pool1d(
         ceil_mode=ceil_mode,
         return_indices=return_indices,
     )
+
 
 @register_acc_op_mapping(op_and_target=("call_function", nn.functional.max_pool2d))
 @register_acc_op
@@ -118,24 +127,17 @@ def max_pool2d(
 def adaptive_avg_pool2d(*, input, output_size):
     return nn.functional.adaptive_avg_pool2d(input=input, output_size=output_size)
 
+
 @register_acc_op_mapping(op_and_target=("call_function", nn.functional.avg_pool1d))
 @register_acc_op
-def avg_pool1d(
-    *,
-    input,
-    kernel_size,
-    stride,
-    padding,
-    ceil_mode,
-    count_include_pad
-):
+def avg_pool1d(*, input, kernel_size, stride, padding, ceil_mode, count_include_pad):
     return nn.functional.avg_pool1d(
         input=input,
         kernel_size=kernel_size,
         stride=stride,
         padding=padding,
         ceil_mode=ceil_mode,
-        count_include_pad=count_include_pad
+        count_include_pad=count_include_pad,
     )
 
 
@@ -499,6 +501,7 @@ def dropout_mapper(node: torch.fx.Node, mod: nn.Module):
 
 try:
     from torchvision.ops import stochastic_depth
+
     assert callable(stochastic_depth)
 except Exception as e:
     warnings.warn(f"Unable to import torchvision related libraries.: {e}")
@@ -902,6 +905,7 @@ def prod(*, input, dim=None, keepdim=False, dtype=None):
         return torch.prod(input, dim=dim, keepdim=keepdim, dtype=dtype)
     else:
         return input.prod(dtype=dtype)
+
 
 @register_custom_acc_mapper_fn(
     op_and_target=("call_method", "prod"),

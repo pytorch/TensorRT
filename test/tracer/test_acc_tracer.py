@@ -2063,6 +2063,7 @@ class AccTracerTest(unittest.TestCase):
             acc_normalizer._acc_ops,
             {
                 acc_ops.linear,
+                acc_ops.embedding,
                 acc_ops.max_pool1d,
                 acc_ops.max_pool2d,
                 acc_ops.flatten,
