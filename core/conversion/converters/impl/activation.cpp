@@ -87,6 +87,26 @@ auto acthardtanh TORCHTRT_UNUSED =
 
                bool to_reshape = false;
                auto original_shape = in->getDimensions();
+
+               // Out_tensor of ParametricReLU shape is all 0, when slopes nDims is not equal to in nDims.
+               // Since make sure splopes nDims is equal to in nDims.
+               if(slopes.ndimension() == 1 and original_shape.nbDims != slopes.ndimension() ){
+                   std::vector<int64_t > slopes_new_shape(original_shape.nbDims,1 );
+                   auto first_inputs_allowed_formats = ctx->net->getInput(0)->getAllowedFormats();
+                   for(size_t inputs_index = 1;inputs_index < ctx->num_inputs;inputs_index++){
+                       auto inputs_allowed_formats = ctx->net->getInput(inputs_index)->getAllowedFormats();
+                       TORCHTRT_CHECK(first_inputs_allowed_formats == inputs_allowed_formats,
+                           "Unable to create batch prelu layer from node,since the formats(like NHWC or NCHW) of inputs is different: " << *n);
+                   }
+                   if( 1U << static_cast<int>(nvinfer1::TensorFormat::kLINEAR)==  first_inputs_allowed_formats ){
+                       slopes_new_shape[1] = slopes.sizes().vec()[0];
+                   }
+                   else{
+                       slopes_new_shape[original_shape.nbDims-1] = slopes.sizes().vec()[0];
+                   }
+                   slopes.reshape(slopes_new_shape);
+               }
+
                if (slopes.numel() != 1 &&
                    !util::broadcastable(
                        in->getDimensions(),
