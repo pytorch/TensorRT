@@ -354,9 +354,24 @@ def contiguous(*, input):
 
 
 @register_acc_op_properties(AccOpProperty.unary)
-@register_acc_op_mapping(op_and_target=("call_function", torch.nn.functional.softmax))
+@register_acc_op_mapping(
+    op_and_target=("call_method", "softmax"),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("dim", "dim"),
+        ("dtype", "dtype", this_arg_is_optional),
+    ],
+)
+@register_acc_op_mapping(
+    op_and_target=("call_function", torch.nn.functional.softmax),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("dim", "dim"),
+        ("dtype", "dtype", this_arg_is_optional),
+    ],
+    )
 @register_acc_op
-def softmax(*, input, dim, dtype):
+def softmax(*, input, dim, dtype=None):
     """
     _stacklevel are ignored here.
     """
@@ -471,7 +486,13 @@ def square_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
         new_node.meta = node.meta.copy()
         return new_node
 
-
+@register_acc_op_mapping(
+    op_and_target=("call_function", operator.matmul),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("mat2", "other"),
+    ],
+)
 @register_acc_op_mapping(
     op_and_target=("call_function", torch.bmm),
     arg_replacement_tuples=[
@@ -1612,6 +1633,19 @@ def getitem(*, input, idx):
 @register_acc_op
 def nan_to_num(*, input, nan=0.0, posinf=None, neginf=None):
     return torch.nan_to_num(input, nan=nan, posinf=posinf, neginf=neginf)
+
+
+@register_acc_op_properties(AccOpProperty.unary)
+@register_acc_op_mapping(
+    op_and_target=("call_method", "expand"),
+     arg_replacement_tuples=[
+        ("input", "input"),
+        ("*", "sizes"),
+    ],
+)
+@register_acc_op
+def expand(*, input, sizes):
+    return input.expand(*sizes)
 
 
 @register_acc_op_properties(AccOpProperty.unary)

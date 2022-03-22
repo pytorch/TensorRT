@@ -1654,6 +1654,36 @@ def acc_ops_slice_tensor(
     return layer.get_output(0)
 
 
+@tensorrt_converter(acc_ops.expand)
+def acc_ops_expand_tensor(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    input_t = kwargs["input"]
+    shape = kwargs["sizes"].copy()
+
+    input_val = get_trt_tensor(network, input_t, f"{name}_input")
+
+    if network.has_implicit_batch_dimension:
+        shape = shape[1:]
+
+    ranks = len(input_val.shape)
+    # TRT does not support different dimension size
+    assert len(shape) == ranks
+    shape = [input_val.shape[i] if shape[i] == -1 else shape[i] for i in range(ranks)]
+
+    inshape = tuple(input_val.shape)
+    shape = tuple(shape)
+    start = tuple([0]*ranks)
+    stride = tuple([int(i == o) for i, o in zip(inshape, shape)])  # stride == 1 if dimensions match, 0 otherwise
+    layer = network.add_slice(input_val, start=start, shape=shape, stride=stride)
+    set_layer_name(layer, target, name)
+    return layer.get_output(0)
+
+
 @tensorrt_converter(acc_ops.split, no_explicit_batch_dim=True)
 def acc_ops_split(
     network: TRTNetwork,
