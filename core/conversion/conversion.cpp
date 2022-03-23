@@ -105,7 +105,8 @@ void AddLayer(ConversionCtx* ctx, const torch::jit::Node* n) {
       // Node input has not been converted yet or is a prim op
       TORCHTRT_THROW_ERROR(
           "Unable to retrieve all node inputs for node: "
-          << util::node_info(n) << " (ctx.AddLayer)\nSpecifically failed to retrieve value for input: " << *input_node);
+          << util::node_info(n) << " (ctx.AddLayer)\nSpecifically failed to retrieve value for input: %"
+          << input->debugName());
     }
   }
 
@@ -534,17 +535,23 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b, bool suppress_er
   if (unsupported_ops.size() != 0) {
     std::stringstream unsupported_msg;
     unsupported_msg
-        << "Method requested cannot be compiled by Torch-TensorRT.TorchScript.\nUnsupported operators listed below:"
+        << "Method requested cannot be compiled end to end by Torch-TensorRT.TorchScript.\nUnsupported operators listed below:"
         << std::endl;
     for (auto s : unsupported_ops) {
       unsupported_msg << "  - " << s.second << std::endl;
     }
-    unsupported_msg << "You can either implement converters for these ops in your application or request implementation"
-                    << std::endl;
-    unsupported_msg << "https://www.github.com/nvidia/Torch-TensorRT/issues" << std::endl;
-    unsupported_msg << std::endl << "In Module:" << std::endl;
 
-    LOG_DEBUG(unsupported_msg.str());
+    if (!suppress_errors) {
+      unsupported_msg
+          << "You can either implement converters for these ops in your application or request implementation"
+          << std::endl;
+      unsupported_msg << "https://www.github.com/nvidia/Torch-TensorRT/issues" << std::endl;
+      unsupported_msg << std::endl << "In Module:" << std::endl;
+
+      LOG_ERROR(unsupported_msg.str());
+    } else {
+      LOG_INFO(unsupported_msg.str());
+    }
 
     std::unordered_map<std::string, std::unordered_set<std::string>> unsupported_node_locations;
     for (const auto n : b->nodes()) {
@@ -569,8 +576,12 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b, bool suppress_er
       for (const auto& str : type.second) {
         traceback << str;
       }
+
+      auto tb_str = traceback.str();
       if (!suppress_errors) {
-        LOG_ERROR(traceback.str());
+        LOG_ERROR(tb_str);
+      } else {
+        LOG_DEBUG(tb_str);
       }
     }
 
