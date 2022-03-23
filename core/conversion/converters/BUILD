@@ -79,6 +79,7 @@ cc_library(
         "impl/squeeze.cpp",
         "impl/stack.cpp",
         "impl/topk.cpp",
+        "impl/max.cpp",
         "impl/unary.cpp",
         "impl/unsqueeze.cpp",
     ],
