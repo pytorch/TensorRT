@@ -367,6 +367,7 @@ class TestLoggingAPIs(unittest.TestCase):
         lvl = torchtrt.logging.get_reportable_log_level()
         self.assertEqual(base_lvl, lvl)
 
+
 class TestDevice(unittest.TestCase):
 
     def test_from_string_constructor(self):
