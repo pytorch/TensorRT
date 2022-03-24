@@ -2154,5 +2154,6 @@ class AccTracerTest(unittest.TestCase):
                 acc_ops.rescale_quantize_per_channel,
                 acc_ops.nan_to_num,
                 acc_ops.expand,
+                acc_ops.masked_fill,
             },
         )

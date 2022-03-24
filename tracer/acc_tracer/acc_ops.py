@@ -256,6 +256,29 @@ def unsqueeze(*, input, dim):
 def tile(*, input, dims):
     return torch.tile(input=input, dims=dims)
 
+@register_custom_acc_mapper_fn(
+    op_and_target=("call_method", "repeat"),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("*", "sizes"),
+    ],
+)
+def repeat_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
+    """
+    Map repeat to tile.
+    """
+    with node.graph.inserting_before(node):
+        inputs = node.kwargs["input"]
+        dims = node.kwargs["sizes"][0]
+        new_node = node.graph.create_node(
+            "call_function",
+            tile,
+            kwargs={"input": inputs, "dims": dims},
+            name=f"{node.name}_repeat_map",
+        )
+        new_node.meta = node.meta.copy()
+        return new_node
+
 
 @register_custom_acc_mapper_fn(
     op_and_target=("call_function", torch.stack),
@@ -1647,6 +1670,18 @@ def nan_to_num(*, input, nan=0.0, posinf=None, neginf=None):
 def expand(*, input, sizes):
     return input.expand(*sizes)
 
+
+@register_acc_op_mapping(
+    op_and_target=("call_method", "masked_fill"),
+     arg_replacement_tuples=[
+        ("input", "input"),
+        ("mask", "mask"),
+        ("value", "value"),
+    ],
+)
+@register_acc_op
+def masked_fill(*, input, mask, value):
+    return input.masked_fill(mask, value)
 
 @register_acc_op_properties(AccOpProperty.unary)
 @register_acc_op

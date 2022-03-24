@@ -1117,14 +1117,11 @@ def acc_ops_embedding(
     embedding_tensor = kwargs["weight"]
 
     # unsupported parameters
-    padding_idx = kwargs["padding_idx"]
+    # ignore padding_idx since it is meaningful for training only
     max_norm = kwargs["max_norm"]
     norm_type = kwargs["norm_type"]
     scale_grad_by_freq = kwargs["scale_grad_by_freq"]
     sparse = kwargs["sparse"]
-
-    if padding_idx is not None:
-        raise RuntimeError(f"Currently we don't support specifying padding_idx, got {padding_idx}.")
 
     if max_norm is not None:
         raise RuntimeError(f"Currently we don't support specifying max_norm, got {max_norm}.")
@@ -1681,6 +1678,54 @@ def acc_ops_expand_tensor(
     stride = tuple([int(i == o) for i, o in zip(inshape, shape)])  # stride == 1 if dimensions match, 0 otherwise
     layer = network.add_slice(input_val, start=start, shape=shape, stride=stride)
     set_layer_name(layer, target, name)
+    return layer.get_output(0)
+
+
+@tensorrt_converter(acc_ops.masked_fill, no_implicit_batch_dim=True)
+def acc_ops_masked_fill_tensor(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    input_t = kwargs["input"]
+    mask_t = kwargs["mask"]
+    value_t = kwargs["value"]
+    if network.has_implicit_batch_dimension:
+        raise RuntimeError("We don't support masked_fill with implicit batch dimension due to select layer!")
+
+    shape = list(input_t.shape)
+    mask_shape = list(mask_t.shape)
+
+    assert type(value_t) in (float, int, torch.Tensor), f"value {value_t} is not one of (float, int, torch.Tensor)!"
+
+    if type(mask_t) != TRTTensor:
+        assert mask_t.dtype == torch.bool, "mask dtype is not bool!"
+        if mask_shape != shape:
+            mask_t = mask_t.expand(shape)
+        mask_t = mask_t.to(torch.int32)
+        mask_const = get_trt_tensor(network, mask_t, f"{name}_mask")
+        mask_layer = network.add_identity(mask_const)
+        mask_layer.set_output_type(0, trt.bool)
+        set_layer_name(mask_layer, target, f"{name}_mask")
+        mask_val = mask_layer.get_output(0)
+    else:
+        assert mask_t.dtype == trt.bool, "mask dtype is not bool!"
+        if mask_shape != shape:
+            mask_val = acc_ops_expand_tensor(network, target, None, {"input": mask_t, "sizes": shape}, name=f"{name}_expand")
+        else:
+            mask_val = mask_t
+
+    if type(value_t) is torch.Tensor:
+        value_t = value_t.cpu().numpy()
+    value_t = float(value_t)
+    value_t = torch.ones(shape)*value_t
+
+    input_val = get_trt_tensor(network, input_t, f"{name}_input")
+    value_val = get_trt_tensor(network, value_t, f"{name}_input")
+    layer = network.add_select(mask_val, value_val, input_val)
+    set_layer_name(layer, target, f"{name}_select")
     return layer.get_output(0)
 
 
