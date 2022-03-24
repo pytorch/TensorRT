@@ -85,9 +85,8 @@ void getSegmentsOutputByRunning(
       jit_inputs_ivalues.push_back(ivalues_maps[input].toScalar());
     } else {
       TORCHTRT_THROW_ERROR(
-          "Unable to find type for value: " << input->debugName()
-                                            << " to get the ivalues. The type for this value should be "
-                                            << input->type()->str() << " \n");
+          "Expected to find type " << input->type()->str() << " for value " << input->debugName()
+                                   << " but get nothing. ");
     }
   }
 
