@@ -1008,6 +1008,80 @@ def mean(*, input, dim=None, keepdim=False, dtype=None):
 def mean_mapper(node, mod):
     return reduce_op_mapper(node, mod, mean)
 
+@register_custom_acc_mapper_fn(
+    op_and_target=("call_method", "std"),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("unbiased", "unbiased"),
+        ("dim", "dim", this_arg_is_optional),
+        ("keepdim", "keepdim", this_arg_is_optional),
+        ("dtype", "dtype", this_arg_is_optional),
+    ],
+)
+@register_custom_acc_mapper_fn(
+    op_and_target=("call_function", torch.std),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("unbiased", "unbiased"),
+        ("dim", "dim", this_arg_is_optional),
+        ("keepdim", "keepdim", this_arg_is_optional),
+        ("dtype", "dtype", this_arg_is_optional),
+    ],
+)
+def std_mapper(node, mod):
+    """
+    Formula of std: sqrt(sum(pow(X-mean(X))))/N)
+    This op is mapped to a few existing ops
+    """
+    input_node = node.kwargs["input"]
+    unbiased = node.kwargs.get("unbiased")
+    dim = node.kwargs.get("dim")
+    keepdim = node.kwargs.get("keepdim")
+    assert unbiased is True, "We currently do not support `std` with unbiased=False"
+    assert dim is not None and keepdim is not None, "We currently do not support `std` with dim=None and keepdim=None"
+
+    with node.graph.inserting_before(node):
+        # mean(X)
+        mean_kwargs = {
+            "input": input_node,
+            "dim": dim,
+            "keepdim": keepdim,
+        }
+        mean_node = node.graph.call_function(mean, kwargs=mean_kwargs)
+        mean_node.meta["type"] = torch.Tensor
+        # X-mean(X)
+        sub_kwargs = {
+            "input": input_node,
+            "other": mean_node,
+        }
+        sub_node = node.graph.call_function(sub, kwargs=sub_kwargs)
+        sub_node.meta["type"] = torch.Tensor
+        # pow(X-mean(X))
+        pow_kwargs = {
+            "input": sub_node,
+            "exponent": 2.0,
+        }
+        pow_node = node.graph.call_function(pow, kwargs=pow_kwargs)
+        pow_node.meta["type"] = torch.Tensor
+        # sum(pow(X-mean(X))))/N
+        post_mean_kwargs = {
+            "input": pow_node,
+            "dim": dim,
+            "keepdim": keepdim,
+        }
+        post_mean_node = node.graph.call_function(mean, kwargs=post_mean_kwargs)
+        post_mean_node.meta["type"] = torch.Tensor
+        # sqrt(sum(pow(X-mean(X))))/N)
+        sqrt_kwargs = {
+            "input": post_mean_node,
+        }
+        sqrt_node = node.graph.call_function(sqrt, kwargs=sqrt_kwargs)
+        sqrt_node.meta["type"] = torch.Tensor
+
+        output_node = sqrt_node
+        output_node.meta = node.meta.copy()
+        return output_node
+
 
 @register_custom_acc_mapper_fn(
     op_and_target=("call_method", "max"),
