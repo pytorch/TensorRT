@@ -1203,6 +1203,29 @@ def min_dim_reduce(*, input, dim=None, keepdim=False):
 def minimum(*, input, other):
     return torch.minimum(input=input, other=other)
 
+@register_acc_op_properties(AccOpProperty.pointwise)
+@register_acc_op_mapping(op_and_target=("call_function", torch.eq))
+@register_acc_op_mapping(op_and_target=("call_method", "eq"))
+@register_acc_op
+def eq(*, input, other):
+    return torch.eq(input=input, other=other)
+
+
+@register_acc_op_properties(AccOpProperty.pointwise)
+@register_acc_op_mapping(op_and_target=("call_function", torch.gt))
+@register_acc_op_mapping(op_and_target=("call_method", "gt"))
+@register_acc_op
+def gt(*, input, other):
+    return torch.gt(input=input, other=other)
+
+
+@register_acc_op_properties(AccOpProperty.pointwise)
+@register_acc_op_mapping(op_and_target=("call_function", torch.le))
+@register_acc_op_mapping(op_and_target=("call_method", "le"))
+@register_acc_op
+def le(*, input, other):
+    return torch.le(input=input, other=other)
+
 
 @register_acc_op_properties(AccOpProperty.pointwise)
 @register_acc_op_mapping(op_and_target=("call_function", torch.fmod))

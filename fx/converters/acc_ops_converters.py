@@ -1083,6 +1083,52 @@ def acc_ops_minimum(
         network, kwargs["input"], kwargs["other"], trt.ElementWiseOperation.MIN, target, name
     )
 
+
+@tensorrt_converter(acc_ops.eq, no_implicit_batch_dim=True)
+def acc_ops_eq(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    if network.has_implicit_batch_dimension:
+        raise RuntimeError("The `eq` function should be called with explicit batch dimension.")
+    return add_binary_elementwise_layer(
+        network, kwargs["input"], kwargs["other"], trt.ElementWiseOperation.EQUAL, target, name
+    )
+
+
+@tensorrt_converter(acc_ops.gt, no_implicit_batch_dim=True)
+def acc_ops_gt(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    if network.has_implicit_batch_dimension:
+        raise RuntimeError("The `gt` function should be called with explicit batch dimension.")
+    return add_binary_elementwise_layer(
+        network, kwargs["input"], kwargs["other"], trt.ElementWiseOperation.GREATER, target, name
+    )
+
+
+@tensorrt_converter(acc_ops.le, no_implicit_batch_dim=True)
+def acc_ops_le(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    if network.has_implicit_batch_dimension:
+        raise RuntimeError("The `le` function should be called with explicit batch dimension.")
+    return add_binary_elementwise_layer(
+        network, kwargs["input"], kwargs["other"], trt.ElementWiseOperation.LESS, target, name
+    )
+
+
 @tensorrt_converter(acc_ops.fmod)
 def acc_ops_fmod(
     network: TRTNetwork,
