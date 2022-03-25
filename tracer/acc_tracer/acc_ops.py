@@ -130,7 +130,15 @@ def adaptive_avg_pool2d(*, input, output_size):
 
 @register_acc_op_mapping(op_and_target=("call_function", nn.functional.avg_pool1d))
 @register_acc_op
-def avg_pool1d(*, input, kernel_size, stride, padding, ceil_mode, count_include_pad):
+def avg_pool1d(
+    *,
+    input,
+    kernel_size,
+    stride,
+    padding,
+    ceil_mode,
+    count_include_pad,
+):
     return nn.functional.avg_pool1d(
         input=input,
         kernel_size=kernel_size,
@@ -2163,3 +2171,24 @@ def cumsum(*, input, dim, dtype=None):
 @register_acc_op
 def chunk(*, input, chunks, dim=0):
     return torch.chunk(input=input, chunks=chunks, dim=dim)
+
+
+@register_acc_op_mapping(op_and_target=("call_function", torch.gather),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("dim", "dim"),
+        ("index", "index"),
+        ("sparse_grad", "sparse_grad", this_arg_is_optional),
+    ],
+)
+@register_acc_op
+def gather(*, input, dim, index, sparse_grad=False):
+    return torch.gather(input=input, dim=dim, index=index, sparse_grad=sparse_grad)
+
+
+@register_acc_op_mapping(
+    op_and_target=("call_function", torch.index_select),
+)
+@register_acc_op
+def index_select(*, input, dim, index):
+    return torch.index_select(input, dim, index)

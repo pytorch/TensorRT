@@ -2102,6 +2102,78 @@ class AccTracerTest(unittest.TestCase):
         gm_retrace = acc_tracer.trace(gm, [a])
         self.assertTrue(torch.equal(m(a), gm_retrace(a)))
 
+    def test_index_select(self):
+        class TestModule(nn.Module):
+            def __init__(self, dim, index):
+                super().__init__()
+                self._dim = dim
+                self._index = index
+
+            def forward(self, a: torch.Tensor) -> torch.Tensor:
+                return torch.index_select(a, self._dim, self._index)
+
+        dim = 0
+        index = torch.tensor([1, 0])
+        m = TestModule(dim, index)
+        _input = [torch.randn(2, 3), torch.randn(2, 3)]
+        traced = acc_tracer.trace(m, _input)
+
+        ph = index = index_select = None
+
+        for node in traced.graph.nodes:
+            if node.op == "placeholder":
+                self.assertEqual(str(node.target), "a")
+                ph = node
+            elif node.op == "call_function" and node.target == acc_ops.index_select:
+                    self.assertTrue(node.kwargs["input"] == ph)
+                    self.assertTrue(node.kwargs["index"] == index)
+                    self.assertTrue(node.kwargs["dim"] == dim)
+                    index_select = node
+            elif node.op == "output":
+                self.assertEqual(index_select, node.args[0])
+            elif node.op == "get_attr":
+                # There only be one™ const node
+                self.assertTrue(index is None)
+                index = node
+            else:
+                self.fail(f"Unexpected node: {node.format_node()}")
+
+    def test_gather(self):
+        class TestModule(nn.Module):
+            def __init__(self, dim, index):
+                super().__init__()
+                self._dim = dim
+                self._index = index
+
+            def forward(self, a: torch.Tensor) -> torch.Tensor:
+                return torch.gather(a, self._dim, self._index)
+
+        dim = 0
+        index = torch.tensor([[1, 0], [0, 1]])
+        m = TestModule(dim, index)
+        _input = [torch.randn(2, 3), torch.randn(2, 3)]
+        traced = acc_tracer.trace(m, _input)
+
+        ph = index = gather = None
+
+        for node in traced.graph.nodes:
+            if node.op == "placeholder":
+                self.assertEqual(str(node.target), "a")
+                ph = node
+            elif node.op == "call_function" and node.target == acc_ops.gather:
+                    self.assertTrue(node.kwargs["input"] == ph)
+                    self.assertTrue(node.kwargs["index"] == index)
+                    self.assertTrue(node.kwargs["dim"] == dim)
+                    gather = node
+            elif node.op == "output":
+                self.assertEqual(gather, node.args[0])
+            elif node.op == "get_attr":
+                # There only be one™ const node
+                self.assertTrue(index is None)
+                index = node
+            else:
+                self.fail(f"Unexpected node: {node.format_node()}")
+
     def test_all_acc_ops_registered(self):
         self.assertEqual(
             acc_normalizer._acc_ops,
@@ -2203,5 +2275,7 @@ class AccTracerTest(unittest.TestCase):
                 acc_ops.eq,
                 acc_ops.gt,
                 acc_ops.le,
+                acc_ops.gather,
+                acc_ops.index_select,
             },
         )
