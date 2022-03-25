@@ -880,7 +880,7 @@ div.rendered_html tbody tr:hover {
         </div>
        </div>
        <p>
-        <img alt="005557b0859f4741a911c5170c3e09a2" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
+        <img alt="f44e852a36cb4e91a72bc23aa15ba336" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
        </p>
        <section id="Torch-TensorRT-Getting-Started---LeNet">
         <h1 id="notebooks-lenet-getting-started--page-root">
@@ -962,10 +962,10 @@ perform best on the target GPU. TensorRT also has strong support for reduced ope
           </code>
           to prepare a Docker container, within which you can run this notebook.
          </p>
-         <div class="nbinput nblast docutils container">
+         <div class="nbinput docutils container">
           <div class="prompt highlight-none notranslate">
            <div class="highlight">
-            <pre><span></span>[ ]:
+            <pre><span></span>[2]:
 </pre>
            </div>
           </div>
@@ -973,6 +973,80 @@ perform best on the target GPU. TensorRT also has strong support for reduced ope
            <div class="highlight">
             <pre>
 <span></span>!pip install ipywidgets --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host=files.pythonhosted.org
+</pre>
+           </div>
+          </div>
+         </div>
+         <div class="nboutput nblast docutils container">
+          <div class="prompt empty docutils container">
+          </div>
+          <div class="output_area docutils container">
+           <div class="highlight">
+            <pre>
+Looking in indexes: https://pypi.org/simple, https://pypi.ngc.nvidia.com
+Collecting ipywidgets
+  Downloading ipywidgets-7.6.5-py2.py3-none-any.whl (121 kB)
+     |████████████████████████████████| 121 kB 11.4 MB/s eta 0:00:01
+Requirement already satisfied: nbformat&gt;=4.2.0 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (5.1.3)
+Collecting widgetsnbextension~=3.5.0
+  Downloading widgetsnbextension-3.5.2-py2.py3-none-any.whl (1.6 MB)
+     |████████████████████████████████| 1.6 MB 73.4 MB/s eta 0:00:01
+Requirement already satisfied: traitlets&gt;=4.3.1 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (5.1.1)
+Requirement already satisfied: ipython&gt;=4.0.0 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (7.30.0)
+Requirement already satisfied: ipython-genutils~=0.2.0 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (0.2.0)
+Collecting jupyterlab-widgets&gt;=1.0.0
+  Downloading jupyterlab_widgets-1.0.2-py3-none-any.whl (243 kB)
+     |████████████████████████████████| 243 kB 132.2 MB/s eta 0:00:01
+Requirement already satisfied: ipykernel&gt;=4.5.1 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (6.6.0)
+Requirement already satisfied: matplotlib-inline&lt;0.2.0,&gt;=0.1.0 in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets) (0.1.3)
+Requirement already satisfied: tornado&lt;7.0,&gt;=4.2 in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets) (6.1)
+Requirement already satisfied: debugpy&lt;2.0,&gt;=1.0.0 in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets) (1.5.1)
+Requirement already satisfied: jupyter-client&lt;8.0 in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets) (7.1.0)
+Requirement already satisfied: backcall in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (0.2.0)
+Requirement already satisfied: pygments in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (2.10.0)
+Requirement already satisfied: pexpect&gt;4.3 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (4.8.0)
+Requirement already satisfied: jedi&gt;=0.16 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (0.18.1)
+Requirement already satisfied: decorator in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (5.1.0)
+Requirement already satisfied: pickleshare in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (0.7.5)
+Requirement already satisfied: prompt-toolkit!=3.0.0,!=3.0.1,&lt;3.1.0,&gt;=2.0.0 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (3.0.22)
+Requirement already satisfied: setuptools&gt;=18.5 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (59.4.0)
+Requirement already satisfied: parso&lt;0.9.0,&gt;=0.8.0 in /opt/conda/lib/python3.8/site-packages (from jedi&gt;=0.16-&gt;ipython&gt;=4.0.0-&gt;ipywidgets) (0.8.3)
+Requirement already satisfied: entrypoints in /opt/conda/lib/python3.8/site-packages (from jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (0.3)
+Requirement already satisfied: python-dateutil&gt;=2.1 in /opt/conda/lib/python3.8/site-packages (from jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (2.8.2)
+Requirement already satisfied: nest-asyncio&gt;=1.5 in /opt/conda/lib/python3.8/site-packages (from jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (1.5.4)
+Requirement already satisfied: jupyter-core&gt;=4.6.0 in /opt/conda/lib/python3.8/site-packages (from jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (4.9.1)
+Requirement already satisfied: pyzmq&gt;=13 in /opt/conda/lib/python3.8/site-packages (from jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (22.3.0)
+Requirement already satisfied: jsonschema!=2.5.0,&gt;=2.4 in /opt/conda/lib/python3.8/site-packages (from nbformat&gt;=4.2.0-&gt;ipywidgets) (4.2.1)
+Requirement already satisfied: attrs&gt;=17.4.0 in /opt/conda/lib/python3.8/site-packages (from jsonschema!=2.5.0,&gt;=2.4-&gt;nbformat&gt;=4.2.0-&gt;ipywidgets) (21.2.0)
+Requirement already satisfied: importlib-resources&gt;=1.4.0 in /opt/conda/lib/python3.8/site-packages (from jsonschema!=2.5.0,&gt;=2.4-&gt;nbformat&gt;=4.2.0-&gt;ipywidgets) (5.4.0)
+Requirement already satisfied: pyrsistent!=0.17.0,!=0.17.1,!=0.17.2,&gt;=0.14.0 in /opt/conda/lib/python3.8/site-packages (from jsonschema!=2.5.0,&gt;=2.4-&gt;nbformat&gt;=4.2.0-&gt;ipywidgets) (0.18.0)
+Requirement already satisfied: zipp&gt;=3.1.0 in /opt/conda/lib/python3.8/site-packages (from importlib-resources&gt;=1.4.0-&gt;jsonschema!=2.5.0,&gt;=2.4-&gt;nbformat&gt;=4.2.0-&gt;ipywidgets) (3.6.0)
+Requirement already satisfied: ptyprocess&gt;=0.5 in /opt/conda/lib/python3.8/site-packages (from pexpect&gt;4.3-&gt;ipython&gt;=4.0.0-&gt;ipywidgets) (0.7.0)
+Requirement already satisfied: wcwidth in /opt/conda/lib/python3.8/site-packages (from prompt-toolkit!=3.0.0,!=3.0.1,&lt;3.1.0,&gt;=2.0.0-&gt;ipython&gt;=4.0.0-&gt;ipywidgets) (0.2.5)
+Requirement already satisfied: six&gt;=1.5 in /opt/conda/lib/python3.8/site-packages (from python-dateutil&gt;=2.1-&gt;jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (1.16.0)
+Requirement already satisfied: notebook&gt;=4.4.1 in /opt/conda/lib/python3.8/site-packages (from widgetsnbextension~=3.5.0-&gt;ipywidgets) (6.4.1)
+Requirement already satisfied: prometheus-client in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.12.0)
+Requirement already satisfied: Send2Trash&gt;=1.5.0 in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (1.8.0)
+Requirement already satisfied: argon2-cffi in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (21.1.0)
+Requirement already satisfied: jinja2 in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (3.0.3)
+Requirement already satisfied: nbconvert in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (6.3.0)
+Requirement already satisfied: terminado&gt;=0.8.3 in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.12.1)
+Requirement already satisfied: cffi&gt;=1.0.0 in /opt/conda/lib/python3.8/site-packages (from argon2-cffi-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (1.15.0)
+Requirement already satisfied: pycparser in /opt/conda/lib/python3.8/site-packages (from cffi&gt;=1.0.0-&gt;argon2-cffi-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (2.21)
+Requirement already satisfied: MarkupSafe&gt;=2.0 in /opt/conda/lib/python3.8/site-packages (from jinja2-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (2.0.1)
+Requirement already satisfied: nbclient&lt;0.6.0,&gt;=0.5.0 in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.5.9)
+Requirement already satisfied: pandocfilters&gt;=1.4.1 in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (1.5.0)
+Requirement already satisfied: jupyterlab-pygments in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.1.2)
+Requirement already satisfied: testpath in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.5.0)
+Requirement already satisfied: mistune&lt;2,&gt;=0.8.1 in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.8.4)
+Requirement already satisfied: bleach in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (4.1.0)
+Requirement already satisfied: defusedxml in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.7.1)
+Requirement already satisfied: webencodings in /opt/conda/lib/python3.8/site-packages (from bleach-&gt;nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.5.1)
+Requirement already satisfied: packaging in /opt/conda/lib/python3.8/site-packages (from bleach-&gt;nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (21.3)
+Requirement already satisfied: pyparsing!=3.0.5,&gt;=2.0.2 in /opt/conda/lib/python3.8/site-packages (from packaging-&gt;bleach-&gt;nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (3.0.6)
+Installing collected packages: widgetsnbextension, jupyterlab-widgets, ipywidgets
+Successfully installed ipywidgets-7.6.5 jupyterlab-widgets-1.0.2 widgetsnbextension-3.5.2
+<span class="ansi-yellow-fg">WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv</span>
 </pre>
            </div>
           </div>
@@ -987,7 +1061,7 @@ to TorchScript, there are two paths: Tracing and Scripting.
          <div class="nbinput nblast docutils container">
           <div class="prompt highlight-none notranslate">
            <div class="highlight">
-            <pre><span></span>[2]:
+            <pre><span></span>[3]:
 </pre>
            </div>
           </div>
@@ -1044,7 +1118,7 @@ class LeNet(nn.Module):
          <div class="nbinput nblast docutils container">
           <div class="prompt highlight-none notranslate">
            <div class="highlight">
-            <pre><span></span>[3]:
+            <pre><span></span>[4]:
 </pre>
            </div>
           </div>
@@ -1098,7 +1172,7 @@ def benchmark(model, input_shape=(1024, 1, 32, 32), dtype='fp32', nwarmup=50, nr
           <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[4]:
+             <pre><span></span>[5]:
 </pre>
             </div>
            </div>
@@ -1115,7 +1189,7 @@ model.to("cuda").eval()
           <div class="nboutput nblast docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[4]:
+             <pre><span></span>[5]:
 </pre>
             </div>
            </div>
@@ -1140,7 +1214,7 @@ LeNet(
           <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[5]:
+             <pre><span></span>[6]:
 </pre>
             </div>
            </div>
@@ -1160,19 +1234,19 @@ LeNet(
              <pre>
 Warm up ...
 Start timing ...
-Iteration 100/1000, ave batch time 6.49 ms
-Iteration 200/1000, ave batch time 6.49 ms
-Iteration 300/1000, ave batch time 6.49 ms
-Iteration 400/1000, ave batch time 6.49 ms
-Iteration 500/1000, ave batch time 6.49 ms
-Iteration 600/1000, ave batch time 6.49 ms
-Iteration 700/1000, ave batch time 6.49 ms
-Iteration 800/1000, ave batch time 6.49 ms
-Iteration 900/1000, ave batch time 6.49 ms
-Iteration 1000/1000, ave batch time 6.49 ms
+Iteration 100/1000, ave batch time 5.44 ms
+Iteration 200/1000, ave batch time 5.46 ms
+Iteration 300/1000, ave batch time 5.47 ms
+Iteration 400/1000, ave batch time 5.47 ms
+Iteration 500/1000, ave batch time 5.47 ms
+Iteration 600/1000, ave batch time 5.47 ms
+Iteration 700/1000, ave batch time 5.47 ms
+Iteration 800/1000, ave batch time 5.47 ms
+Iteration 900/1000, ave batch time 5.47 ms
+Iteration 1000/1000, ave batch time 5.47 ms
 Input shape: torch.Size([1024, 1, 32, 32])
 Output features size: torch.Size([1024, 10])
-Average batch time: 6.49 ms
+Average batch time: 5.47 ms
 </pre>
             </div>
            </div>
@@ -1194,7 +1268,7 @@ Average batch time: 6.49 ms
           <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[6]:
+             <pre><span></span>[7]:
 </pre>
             </div>
            </div>
@@ -1210,7 +1284,7 @@ traced_model
           <div class="nboutput nblast docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[6]:
+             <pre><span></span>[7]:
 </pre>
             </div>
            </div>
@@ -1238,7 +1312,7 @@ LeNet(
           <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[7]:
+             <pre><span></span>[8]:
 </pre>
             </div>
            </div>
@@ -1258,19 +1332,19 @@ LeNet(
              <pre>
 Warm up ...
 Start timing ...
-Iteration 100/1000, ave batch time 6.49 ms
-Iteration 200/1000, ave batch time 6.49 ms
-Iteration 300/1000, ave batch time 6.49 ms
-Iteration 400/1000, ave batch time 6.49 ms
-Iteration 500/1000, ave batch time 6.49 ms
-Iteration 600/1000, ave batch time 6.49 ms
-Iteration 700/1000, ave batch time 6.49 ms
-Iteration 800/1000, ave batch time 6.49 ms
-Iteration 900/1000, ave batch time 6.49 ms
-Iteration 1000/1000, ave batch time 6.49 ms
+Iteration 100/1000, ave batch time 5.46 ms
+Iteration 200/1000, ave batch time 5.48 ms
+Iteration 300/1000, ave batch time 5.48 ms
+Iteration 400/1000, ave batch time 5.48 ms
+Iteration 500/1000, ave batch time 5.48 ms
+Iteration 600/1000, ave batch time 5.48 ms
+Iteration 700/1000, ave batch time 5.48 ms
+Iteration 800/1000, ave batch time 5.48 ms
+Iteration 900/1000, ave batch time 5.48 ms
+Iteration 1000/1000, ave batch time 5.48 ms
 Input shape: torch.Size([1024, 1, 32, 32])
 Output features size: torch.Size([1024, 10])
-Average batch time: 6.49 ms
+Average batch time: 5.48 ms
 </pre>
             </div>
            </div>
@@ -1289,7 +1363,7 @@ Average batch time: 6.49 ms
           <div class="nbinput nblast docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[8]:
+             <pre><span></span>[9]:
 </pre>
             </div>
            </div>
@@ -1306,7 +1380,7 @@ script_model = torch.jit.script(model)
           <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[9]:
+             <pre><span></span>[10]:
 </pre>
             </div>
            </div>
@@ -1321,7 +1395,7 @@ script_model = torch.jit.script(model)
           <div class="nboutput nblast docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[9]:
+             <pre><span></span>[10]:
 </pre>
             </div>
            </div>
@@ -1349,7 +1423,7 @@ RecursiveScriptModule(
           <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[10]:
+             <pre><span></span>[11]:
 </pre>
             </div>
            </div>
@@ -1369,19 +1443,19 @@ RecursiveScriptModule(
              <pre>
 Warm up ...
 Start timing ...
-Iteration 100/1000, ave batch time 6.48 ms
-Iteration 200/1000, ave batch time 6.48 ms
-Iteration 300/1000, ave batch time 6.49 ms
-Iteration 400/1000, ave batch time 6.49 ms
-Iteration 500/1000, ave batch time 6.49 ms
-Iteration 600/1000, ave batch time 6.48 ms
-Iteration 700/1000, ave batch time 6.48 ms
-Iteration 800/1000, ave batch time 6.48 ms
-Iteration 900/1000, ave batch time 6.48 ms
-Iteration 1000/1000, ave batch time 6.48 ms
+Iteration 100/1000, ave batch time 5.47 ms
+Iteration 200/1000, ave batch time 5.49 ms
+Iteration 300/1000, ave batch time 5.49 ms
+Iteration 400/1000, ave batch time 5.49 ms
+Iteration 500/1000, ave batch time 5.49 ms
+Iteration 600/1000, ave batch time 5.49 ms
+Iteration 700/1000, ave batch time 5.49 ms
+Iteration 800/1000, ave batch time 5.49 ms
+Iteration 900/1000, ave batch time 5.49 ms
+Iteration 1000/1000, ave batch time 5.49 ms
 Input shape: torch.Size([1024, 1, 32, 32])
 Output features size: torch.Size([1024, 10])
-Average batch time: 6.48 ms
+Average batch time: 5.49 ms
 </pre>
             </div>
            </div>
@@ -1403,7 +1477,7 @@ Average batch time: 6.48 ms
           <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[11]:
+             <pre><span></span>[12]:
 </pre>
             </div>
            </div>
@@ -1450,7 +1524,6 @@ If you do indeed see errors at runtime either:
 - Disable partial compilation by setting require_full_compilation to True
 WARNING: [Torch-TensorRT] - Dilation not used in Max pooling converter
 WARNING: [Torch-TensorRT] - Dilation not used in Max pooling converter
-WARNING: [Torch-TensorRT TorchScript Conversion Context] - Detected invalid timing cache, setup a local cache instead
 WARNING: [Torch-TensorRT TorchScript Conversion Context] - Max value of this profile is not valid
 </pre>
             </div>
@@ -1459,7 +1532,7 @@ WARNING: [Torch-TensorRT TorchScript Conversion Context] - Max value of this pro
           <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[12]:
+             <pre><span></span>[13]:
 </pre>
             </div>
            </div>
@@ -1479,19 +1552,19 @@ WARNING: [Torch-TensorRT TorchScript Conversion Context] - Max value of this pro
              <pre>
 Warm up ...
 Start timing ...
-Iteration 100/1000, ave batch time 1.92 ms
-Iteration 200/1000, ave batch time 1.98 ms
-Iteration 300/1000, ave batch time 2.05 ms
-Iteration 400/1000, ave batch time 2.07 ms
-Iteration 500/1000, ave batch time 2.08 ms
-Iteration 600/1000, ave batch time 2.09 ms
-Iteration 700/1000, ave batch time 2.09 ms
-Iteration 800/1000, ave batch time 2.09 ms
-Iteration 900/1000, ave batch time 2.10 ms
-Iteration 1000/1000, ave batch time 2.09 ms
+Iteration 100/1000, ave batch time 1.64 ms
+Iteration 200/1000, ave batch time 1.63 ms
+Iteration 300/1000, ave batch time 1.67 ms
+Iteration 400/1000, ave batch time 1.66 ms
+Iteration 500/1000, ave batch time 1.65 ms
+Iteration 600/1000, ave batch time 1.65 ms
+Iteration 700/1000, ave batch time 1.65 ms
+Iteration 800/1000, ave batch time 1.64 ms
+Iteration 900/1000, ave batch time 1.64 ms
+Iteration 1000/1000, ave batch time 1.64 ms
 Input shape: torch.Size([1024, 1, 32, 32])
 Output features size: torch.Size([1024, 10])
-Average batch time: 2.09 ms
+Average batch time: 1.64 ms
 </pre>
             </div>
            </div>
@@ -1510,7 +1583,7 @@ Average batch time: 2.09 ms
           <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[13]:
+             <pre><span></span>[14]:
 </pre>
             </div>
            </div>
@@ -1555,12 +1628,9 @@ compatibility with PyTorch's data type convention is required.
 If you do indeed see errors at runtime either:
 - Remove the dtype spec for x.1
 - Disable partial compilation by setting require_full_compilation to True
-WARNING: [Torch-TensorRT TorchScript Conversion Context] - The logger passed into createInferBuilder differs from one already provided for an existing builder, runtime, or refitter. TensorRT maintains only a single logger pointer at any given time, so the existing value, which can be retrieved with getLogger(), will be used instead. In order to use a new logger, first destroy all existing builder, runner or refitter objects.
-
 WARNING: [Torch-TensorRT] - Dilation not used in Max pooling converter
 WARNING: [Torch-TensorRT] - Dilation not used in Max pooling converter
-WARNING: [Torch-TensorRT] - Detected invalid timing cache, setup a local cache instead
-WARNING: [Torch-TensorRT] - Max value of this profile is not valid
+WARNING: [Torch-TensorRT TorchScript Conversion Context] - Max value of this profile is not valid
 </pre>
             </div>
            </div>
@@ -1568,7 +1638,7 @@ WARNING: [Torch-TensorRT] - Max value of this profile is not valid
           <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[14]:
+             <pre><span></span>[15]:
 </pre>
             </div>
            </div>
@@ -1588,19 +1658,19 @@ WARNING: [Torch-TensorRT] - Max value of this profile is not valid
              <pre>
 Warm up ...
 Start timing ...
-Iteration 100/1000, ave batch time 1.82 ms
-Iteration 200/1000, ave batch time 1.90 ms
-Iteration 300/1000, ave batch time 2.00 ms
-Iteration 400/1000, ave batch time 2.05 ms
-Iteration 500/1000, ave batch time 2.06 ms
-Iteration 600/1000, ave batch time 2.08 ms
-Iteration 700/1000, ave batch time 2.13 ms
-Iteration 800/1000, ave batch time 2.15 ms
-Iteration 900/1000, ave batch time 2.15 ms
-Iteration 1000/1000, ave batch time 2.17 ms
+Iteration 100/1000, ave batch time 1.62 ms
+Iteration 200/1000, ave batch time 1.62 ms
+Iteration 300/1000, ave batch time 1.62 ms
+Iteration 400/1000, ave batch time 1.62 ms
+Iteration 500/1000, ave batch time 1.62 ms
+Iteration 600/1000, ave batch time 1.62 ms
+Iteration 700/1000, ave batch time 1.62 ms
+Iteration 800/1000, ave batch time 1.62 ms
+Iteration 900/1000, ave batch time 1.62 ms
+Iteration 1000/1000, ave batch time 1.62 ms
 Input shape: torch.Size([1024, 1, 32, 32])
 Output features size: torch.Size([1024, 10])
-Average batch time: 2.17 ms
+Average batch time: 1.62 ms
 </pre>
             </div>
            </div>

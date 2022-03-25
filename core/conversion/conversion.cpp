@@ -1,6 +1,6 @@
-#include <sstream>
-
 #include "core/conversion/conversion.h"
+#include <torch/torch.h>
+#include <sstream>
 #include "core/conversion/conversionctx/ConversionCtx.h"
 #include "core/conversion/converters/converters.h"
 #include "core/conversion/evaluators/evaluators.h"
@@ -105,7 +105,8 @@ void AddLayer(ConversionCtx* ctx, const torch::jit::Node* n) {
       // Node input has not been converted yet or is a prim op
       TORCHTRT_THROW_ERROR(
           "Unable to retrieve all node inputs for node: "
-          << util::node_info(n) << " (ctx.AddLayer)\nSpecifically failed to retrieve value for input: " << *input_node);
+          << util::node_info(n) << " (ctx.AddLayer)\nSpecifically failed to retrieve value for input: %"
+          << input->debugName());
     }
   }
 
@@ -234,10 +235,28 @@ void MarkOutputs(ConversionCtx* ctx, at::ArrayRef<const torch::jit::Value*> outp
         }
       }
     } else {
-      std::string name = std::string("output_") + std::to_string(ctx->num_outputs);
+      bool setOutput = false;
+      auto num_inputs = ctx->net->getNbInputs();
       auto out_tensor = it->second;
-      out_tensor->setName(name.c_str());
-      ctx->net->markOutput(*out_tensor);
+      std::string name = std::string("output_") + std::to_string(ctx->num_outputs);
+
+      // Check if the output tensor is one of the inputs to the network. If so, apply an identity layer to it.
+      for (int64_t i = 0; i < num_inputs; i++) {
+        if (out_tensor == ctx->net->getInput(i)) {
+          LOG_DEBUG(
+              "One of the inputs named "
+              << ctx->net->getInput(i)->getName()
+              << " to the network is marked as an output tensor. Applying an identity layer and marking this tensor as output");
+          auto id_out_tensor = converters::applyIdentityOp(ctx, out_tensor, name);
+          ctx->net->markOutput(*id_out_tensor);
+          setOutput = true;
+        }
+      }
+
+      if (!setOutput) {
+        out_tensor->setName(name.c_str());
+        ctx->net->markOutput(*out_tensor);
+      }
       LOG_INFO(
           ctx->logger, "Marking Output " << out->debugName() << " named " << name << " in engine (ctx.MarkOutput)");
       ctx->num_outputs += 1;
@@ -516,18 +535,22 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b, bool suppress_er
   if (unsupported_ops.size() != 0) {
     std::stringstream unsupported_msg;
     unsupported_msg
-        << "Method requested cannot be compiled by Torch-TensorRT.TorchScript.\nUnsupported operators listed below:"
+        << "Method requested cannot be compiled end to end by Torch-TensorRT.TorchScript.\nUnsupported operators listed below:"
         << std::endl;
     for (auto s : unsupported_ops) {
       unsupported_msg << "  - " << s.second << std::endl;
     }
-    unsupported_msg << "You can either implement converters for these ops in your application or request implementation"
-                    << std::endl;
-    unsupported_msg << "https://www.github.com/nvidia/Torch-TensorRT/issues" << std::endl;
-    unsupported_msg << std::endl << "In Module:" << std::endl;
 
     if (!suppress_errors) {
+      unsupported_msg
+          << "You can either implement converters for these ops in your application or request implementation"
+          << std::endl;
+      unsupported_msg << "https://www.github.com/nvidia/Torch-TensorRT/issues" << std::endl;
+      unsupported_msg << std::endl << "In Module:" << std::endl;
+
       LOG_ERROR(unsupported_msg.str());
+    } else {
+      LOG_INFO(unsupported_msg.str());
     }
 
     std::unordered_map<std::string, std::unordered_set<std::string>> unsupported_node_locations;
@@ -554,7 +577,11 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b, bool suppress_er
         traceback << str;
       }
       auto tb_str = traceback.str();
-      LOG_ERROR(tb_str);
+      if (!suppress_errors) {
+        LOG_ERROR(tb_str);
+      } else {
+        LOG_DEBUG(tb_str);
+      }
     }
 
     return false;

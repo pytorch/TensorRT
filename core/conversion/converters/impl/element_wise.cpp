@@ -331,8 +331,29 @@ auto element_wise_registrations TORCHTRT_UNUSED =
                     // Should implement self / other
                     auto self = args[0].ITensorOrFreeze(ctx);
                     auto other = args[1].ITensorOrFreeze(ctx);
-                    auto div =
-                        add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, util::node_info(n));
+                    std::string rounding_mode = "default";
+                    if (args[2].isIValue() && args[2].IValue()->isString()) {
+                      rounding_mode = args[2].unwrapToString();
+                    }
+                    nvinfer1::ILayer* div = nullptr;
+                    if (rounding_mode == "floor") {
+                      div = add_elementwise(
+                          ctx, nvinfer1::ElementWiseOperation::kFLOOR_DIV, self, other, util::node_info(n));
+                    } else if (rounding_mode == "trunc") {
+                      // trunc = floor(abs(div)) * sign(div)
+                      auto tmp_div = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, "tmp_div");
+                      auto abs = ctx->net->addUnary(*tmp_div->getOutput(0), nvinfer1::UnaryOperation::kABS);
+                      auto floor = ctx->net->addUnary(*abs->getOutput(0), nvinfer1::UnaryOperation::kFLOOR);
+                      auto sign = ctx->net->addUnary(*tmp_div->getOutput(0), nvinfer1::UnaryOperation::kSIGN);
+                      div = add_elementwise(
+                          ctx,
+                          nvinfer1::ElementWiseOperation::kPROD,
+                          floor->getOutput(0),
+                          sign->getOutput(0),
+                          util::node_info(n));
+                    } else {
+                      div = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, self, other, util::node_info(n));
+                    }
 
                     TORCHTRT_CHECK(div, "Unable to create div layer from node: " << *n);
 

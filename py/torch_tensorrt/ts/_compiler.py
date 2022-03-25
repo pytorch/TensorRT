@@ -22,7 +22,6 @@ def compile(module: torch.jit.ScriptModule,
             num_min_timing_iters=2,
             num_avg_timing_iters=1,
             workspace_size=0,
-            max_batch_size=0,
             calibrator=None,
             truncate_long_and_double=False,
             require_full_compilation=False,
@@ -71,7 +70,6 @@ def compile(module: torch.jit.ScriptModule,
         num_min_timing_iters (int): Number of minimization timing iterations used to select kernels
         num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
         workspace_size (int): Maximum size of workspace given to TensorRT
-        max_batch_size (int): Maximum batch size (must be >= 1 to be set, 0 means not set)
         truncate_long_and_double (bool): Truncate weights provided in int64 or double (float64) to int32 and float32
         calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
         require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch
@@ -105,7 +103,6 @@ def compile(module: torch.jit.ScriptModule,
         "num_min_timing_iters": num_min_timing_iters,  # Number of minimization timing iterations used to select kernels
         "num_avg_timing_iters": num_avg_timing_iters,  # Number of averaging timing iterations used to select kernels
         "workspace_size": workspace_size,  # Maximum size of workspace given to TensorRT
-        "max_batch_size": max_batch_size,  # Maximum batch size (must be >= 1 to be set, 0 means not set)
         "calibrator": calibrator,
         "truncate_long_and_double": truncate_long_and_double,
         "torch_fallback": {
@@ -135,7 +132,6 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule,
                                  num_min_timing_iters=2,
                                  num_avg_timing_iters=1,
                                  workspace_size=0,
-                                 max_batch_size=0,
                                  truncate_long_and_double=False,
                                  calibrator=None) -> str:
     """Convert a TorchScript module method to a serialized TensorRT engine
@@ -178,7 +174,6 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule,
         num_min_timing_iters (int): Number of minimization timing iterations used to select kernels
         num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
         workspace_size (int): Maximum size of workspace given to TensorRT
-        max_batch_size (int): Maximum batch size (must be >= 1 to be set, 0 means not set)
         truncate_long_and_double (bool): Truncate weights provided in int64 or double (float64) to int32 and float32
         calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
 
@@ -203,7 +198,6 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule,
         "num_min_timing_iters": num_min_timing_iters,  # Number of minimization timing iterations used to select kernels
         "num_avg_timing_iters": num_avg_timing_iters,  # Number of averaging timing iterations used to select kernels
         "workspace_size": workspace_size,  # Maximum size of workspace given to TensorRT
-        "max_batch_size": max_batch_size,  # Maximum batch size (must be >= 1 to be set, 0 means not set)
         "calibrator": calibrator,
         "truncate_long_and_double": truncate_long_and_double
     }

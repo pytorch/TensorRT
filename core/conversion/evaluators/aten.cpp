@@ -1,3 +1,5 @@
+#include <math.h>
+
 #include "ATen/core/List.h"
 #include "ATen/core/functional.h"
 #include "ATen/core/ivalue.h"
@@ -96,6 +98,17 @@ DEFINE_GENERIC_TWO_INPUT_EVALUATOR(
         "aten::ge.float(float a, float b) -> (bool)",
         "aten::ge.int_float(int a, float b) -> (bool)",
         "aten::ge.float_int(float a, int b) -> (bool)",
+    }));
+
+DEFINE_ARITHMATIC_TWO_INPUT_EVALUATOR(
+    pow,
+    "aten::pow",
+    pow(a, b),
+    std::set<std::string>({
+        "aten::pow.int(int a, int b) -> (float)",
+        "aten::pow.float(float a, float b) -> (float)",
+        "aten::pow.int_float(int a, float b) -> (float)",
+        "aten::pow.float_int(float a, int b) -> (float)",
     }));
 
 DEFINE_TWO_INPUT_SIMPLE_EVALUATOR(
@@ -310,6 +323,31 @@ auto aten_registrations TORCHTRT_UNUSED =
                     },
                     EvalOptions().validSchemas({
                         "aten::append.t(t[](a!) self, t(c -> *) el) -> (t[](a!))",
+                    })})
+        .evaluator({c10::Symbol::fromQualString("aten::extend"),
+                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+                      if (args.at(n->input(0)).IValue()->isList() && args.at(n->input(1)).IValue()->isList()) {
+                        c10::IValue* self_ptr = args.at(n->input(0)).IValueMut();
+                        auto self = self_ptr->to<c10::List<c10::IValue>>();
+                        auto other = args.at(n->input(1)).IValue()->to<c10::List<c10::IValue>>();
+                        const int64_t other_size = other.size();
+
+                        // Modify value in place
+                        for (int64_t i = 0; i < other_size; i++) {
+                          self.push_back(other.get(i));
+                        }
+
+                        *self_ptr = c10::IValue(self);
+                        return {};
+                      } else {
+                        TORCHTRT_THROW_ERROR(
+                            "Unimplemented data type for aten::extend.t evaluator: "
+                            << args.at(n->input(0)).IValue()->type()->str() << ", "
+                            << args.at(n->input(1)).IValue()->type()->str());
+                      }
+                    },
+                    EvalOptions().validSchemas({
+                        "aten::extend.t(t[](a!) self, t[] other) -> ()",
                     })})
         .evaluator({c10::Symbol::fromQualString("aten::neg"),
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
@@ -646,14 +684,11 @@ auto aten_registrations TORCHTRT_UNUSED =
                  {"aten::tensor(t[] data, *, int? dtype=None, Device? device=None, bool requires_grad=False) -> (Tensor)"})})
         .evaluator({c10::Symbol::fromQualString("aten::arange"),
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-                      int input_size = n->inputs().size();
-                      int scalar_count = 0;
-                      for (int i = 0; i < input_size; i++) {
-                        if (args.at(n->input(i)).IValue()->isScalar()) {
-                          scalar_count += 1;
-                        }
-                      }
-                      if (scalar_count == 1) {
+                      auto schema = n->maybeSchema();
+                      TORCHTRT_CHECK(schema, "Unable to get schema for node: " << *n);
+                      auto name = schema->operator_name();
+
+                      if (c10::toString(name) == "aten::arange") {
                         if (args.at(n->input(0)).IValue()->isInt()) {
                           int end_scalar = args.at(n->input(0)).unwrapToInt();
                           return torch::arange(end_scalar);
@@ -661,7 +696,7 @@ auto aten_registrations TORCHTRT_UNUSED =
                           float end_scalar = args.at(n->input(0)).unwrapToScalar().to<float>();
                           return torch::arange(end_scalar);
                         }
-                      } else if (scalar_count == 2) {
+                      } else if (c10::toString(name) == "aten::arange.start") {
                         if (args.at(n->input(0)).IValue()->isDouble() || args.at(n->input(1)).IValue()->isDouble()) {
                           float start_scalar = args.at(n->input(0)).unwrapToScalar().to<float>();
                           float end_scalar = args.at(n->input(1)).unwrapToScalar().to<float>();
@@ -671,7 +706,7 @@ auto aten_registrations TORCHTRT_UNUSED =
                           int end_scalar = args.at(n->input(1)).unwrapToInt();
                           return torch::arange(start_scalar, end_scalar);
                         }
-                      } else if (scalar_count == 3) {
+                      } else if (c10::toString(name) == "aten::arange.start_step") {
                         if (args.at(n->input(0)).IValue()->isDouble() || args.at(n->input(1)).IValue()->isDouble() ||
                             args.at(n->input(2)).IValue()->isDouble()) {
                           float start_scalar = args.at(n->input(0)).unwrapToScalar().to<float>();
@@ -685,8 +720,7 @@ auto aten_registrations TORCHTRT_UNUSED =
                           return torch::arange(start_scalar, end_scalar, step_scalar);
                         }
                       } else {
-                        TORCHTRT_THROW_ERROR(
-                            "Invalid input argument size for aten::arange, input argument size: " << input_size);
+                        TORCHTRT_THROW_ERROR("Unsupported aten::arange variant: " << name);
                       }
                       return {};
                     },
@@ -748,7 +782,25 @@ auto aten_registrations TORCHTRT_UNUSED =
                       torch::jit::pop(stack, output);
                       return output;
                     },
-                    EvalOptions().validSchemas({"aten::format(str self, ...) -> (str)"})});
+                    EvalOptions().validSchemas({"aten::format(str self, ...) -> (str)"})})
+        .evaluator({c10::Symbol::fromQualString("aten::__range_length"),
+                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+                      auto lo = args.at(n->input(0)).unwrapToInt();
+                      auto hi = args.at(n->input(1)).unwrapToInt();
+                      auto step = args.at(n->input(2)).unwrapToInt();
+
+                      if (step == 0) {
+                        TORCHTRT_THROW_ERROR("aten::__range_length() arg 3 must not be zero");
+                      }
+                      if (step > 0 && lo < hi) {
+                        return 1 + (hi - 1 - lo) / step;
+                      } else if (step < 0 && lo > hi) {
+                        return 1 + (lo - 1 - hi) / (0 - step);
+                      } else {
+                        return 0;
+                      }
+                    },
+                    EvalOptions().validSchemas({"aten::__range_length(int lo, int hi, int step) -> int"})});
 } // namespace
 } // namespace evaluators
 } // namespace conversion

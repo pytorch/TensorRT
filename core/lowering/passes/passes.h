@@ -24,6 +24,7 @@ void ReduceGelu(std::shared_ptr<torch::jit::Graph>& graph);
 void MarkNodesForFallback(std::shared_ptr<torch::jit::Graph>& g, bool delete_delims);
 void RemoveBNDimCheck(std::shared_ptr<torch::jit::Graph> graph);
 void RemoveContiguous(std::shared_ptr<torch::jit::Graph>& graph);
+void ViewToReshape(std::shared_ptr<torch::jit::Graph>& graph);
 void RemoveDropout(std::shared_ptr<torch::jit::Graph>& graph);
 void RemoveNOPs(std::shared_ptr<torch::jit::Graph> graph);
 void UnpackAddMM(std::shared_ptr<torch::jit::Graph>& graph);

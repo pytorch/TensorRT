@@ -74,10 +74,10 @@ py_test(
 )
 
 py_test(
-    name = "test_trt_intercompatability",
+    name = "test_trt_intercompatibility",
     srcs = [
         "model_test_case.py",
-        "test_trt_intercompatability.py",
+        "test_trt_intercompatibility.py",
     ],
     deps = [
         requirement("torchvision"),

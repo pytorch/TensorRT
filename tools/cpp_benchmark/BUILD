@@ -1,7 +1,7 @@
 package(default_visibility = ["//visibility:public"])
 
 cc_binary(
-    name = "benchmark",
+    name = "cpp_benchmark",
     srcs = [
         "main.cpp",
         "timer.h",

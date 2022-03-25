@@ -121,6 +121,13 @@ nvinfer1::ILayer* add_elementwise(
   return ele;
 }
 
+nvinfer1::ITensor* applyIdentityOp(ConversionCtx* ctx, nvinfer1::ITensor* tensor, const std::string& tensor_name) {
+  auto id_layer = ctx->net->addIdentity(*tensor);
+  auto id_out_tensor = id_layer->getOutput(0);
+  id_out_tensor->setName(tensor_name.c_str());
+  return id_out_tensor;
+}
+
 nvinfer1::ITensor* castITensor(ConversionCtx* ctx, nvinfer1::ITensor* tensor, nvinfer1::DataType dtype) {
   if (tensor->getType() != dtype) {
     std::ostringstream tensor_id;

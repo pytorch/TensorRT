@@ -86,10 +86,10 @@ http_archive(
 http_archive(
     name = "tensorrt",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    sha256 = "3177435024ff4aa5a6dba8c1ed06ab11cc0e1bf3bb712dfa63a43422f41313f3",
-    strip_prefix = "TensorRT-8.0.3.4",
+    sha256 = "da130296ac6636437ff8465812eb55dbab0621747d82dc4fe9b9376f00d214af",
+    strip_prefix = "TensorRT-8.2.2.1",
     urls = [
-        "https://developer.nvidia.com/compute/machine-learning/tensorrt/secure/8.0.3/tars/tensorrt-8.0.3.4.linux.x86_64-gnu.cuda-11.3.cudnn8.2.tar.gz",
+        "https://developer.nvidia.com/compute/machine-learning/tensorrt/secure/8.2.2.1/tars/tensorrt-8.2.2.1.linux.x86_64-gnu.cuda-11.4.cudnn8.2.tar.gz",
     ],
 )
 
@@ -128,18 +128,18 @@ http_archive(
 #   build_file = "@//third_party/tensorrt/local:BUILD"
 #)
 
-#########################################################################
-# Testing Dependencies (optional - comment out on aarch64)
-#########################################################################
-pip_install(
-    name = "torch_tensorrt_py_deps",
-    requirements = "//py:requirements.txt",
-)
+# #########################################################################
+# # Testing Dependencies (optional - comment out on aarch64)
+# #########################################################################
+# pip_install(
+#     name = "torch_tensorrt_py_deps",
+#     requirements = "//py:requirements.txt",
+# )
 
-pip_install(
-    name = "py_test_deps",
-    requirements = "//tests/py:requirements.txt",
-)
+# pip_install(
+#     name = "py_test_deps",
+#     requirements = "//tests/py:requirements.txt",
+# )
 
 pip_install(
     name = "pylinter_deps",

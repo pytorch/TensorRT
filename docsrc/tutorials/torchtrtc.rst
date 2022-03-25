@@ -19,7 +19,7 @@ to standard TorchScript. Load with ``torch.jit.load()`` and run like you would r
     torchtrtc [input_file_path] [output_file_path]
       [input_specs...] {OPTIONS}
 
-      Torch-TensorRT is a compiler for TorchScript, it will compile and optimize
+      torchtrtc is a compiler for TorchScript, it will compile and optimize
       TorchScript programs to run on NVIDIA GPUs using TensorRT
 
     OPTIONS:
@@ -34,20 +34,21 @@ to standard TorchScript. Load with ``torch.jit.load()`` and run like you would r
           --i, --info                       Dumps info messages generated during
                                             compilation onto the console
         --build-debuggable-engine         Creates a debuggable engine
-        --use-strict-types                Restrict operating type to only use set
-                                          operation precision
         --allow-gpu-fallback              (Only used when targeting DLA
                                           (device-type)) Lets engine run layers on
                                           GPU if they are not supported on DLA
         --require-full-compilation        Require that the model should be fully
                                           compiled to TensorRT or throw an error
+        --check-method-support=[method_name]
+                                          Check the support for end to end
+                                          compilation of a specified method in the
+                                          TorchScript module
         --disable-tf32                    Prevent Float32 layers from using the
                                           TF32 data format
         --sparse-weights                  Enable sparsity for weights of conv and
                                           FC layers
         -p[precision...],
-        --enabled-precision=[precision...]
-                                          (Repeatable) Enabling an operating
+        --enable-precision=[precision...] (Repeatable) Enabling an operating
                                           precision for kernels to use when
                                           building the engine (Int8 requires a
                                           calibration-cache argument) [ float |
@@ -66,20 +67,18 @@ to standard TorchScript. Load with ``torch.jit.load()`` and run like you would r
         --calibration-cache-file=[file_path]
                                           Path to calibration cache file to use
                                           for post training quantization
-        --teo=[torch-executed-ops...],
-        --torch-executed-ops=[torch-executed-ops...]
-                                          (Repeatable) Operator in the graph that
+        --teo=[op_name...],
+        --torch-executed-op=[op_name...]  (Repeatable) Operator in the graph that
                                           should always be run in PyTorch for
                                           execution (partial compilation must be
                                           enabled)
-        --tem=[torch-executed-mods...],
-        --torch-executed-mods=[torch-executed-mods...]
+        --tem=[module_name...],
+        --torch-executed-mod=[module_name...]
                                           (Repeatable) Module that should always
                                           be run in Pytorch for execution (partial
                                           compilation must be enabled)
-        --mbs=[torch-executed-mods...],
-        --min-block-size=[torch-executed-mods...]
-                                          Minimum number of contiguous TensorRT
+        --mbs=[num_ops],
+        --min-block-size=[num_ops]        Minimum number of contiguous TensorRT
                                           supported ops to compile a subgraph to
                                           TensorRT
         --embed-engine                    Whether to treat input file as a
@@ -93,8 +92,6 @@ to standard TorchScript. Load with ``torch.jit.load()`` and run like you would r
                                           used to select kernels
         --workspace-size=[workspace_size] Maximum size of workspace given to
                                           TensorRT
-        --max-batch-size=[max_batch_size] Maximum batch size (must be >= 1 to be
-                                          set, 0 means not set)
         -t[threshold],
         --threshold=[threshold]           Maximum acceptable numerical deviation
                                           from standard torchscript output

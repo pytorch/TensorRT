@@ -49,8 +49,6 @@ torch::jit::Module compile_int8_model(const std::string& data_dir, torch::jit::M
   compile_spec.enabled_precisions.insert(torch::kI8);
   /// Use the TensorRT Entropy Calibrator
   compile_spec.ptq_calibrator = calibrator;
-  /// Set max batch size for the engine
-  compile_spec.max_batch_size = 32;
   /// Set a larger workspace
   compile_spec.workspace_size = 1 << 28;
 

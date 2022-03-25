@@ -870,7 +870,7 @@ div.rendered_html tbody tr:hover {
         </div>
        </div>
        <p>
-        <img alt="9e10cf6123eb4ee4ad3c071b9caebeae" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
+        <img alt="dfba0f28efcf4af9818bc0f23e89a56f" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
        </p>
        <section id="Torch-TensorRT-Getting-Started---EfficientNet-B0">
         <h1 id="notebooks-efficientnet-example--page-root">
@@ -964,7 +964,7 @@ perform best on the target GPU. TensorRT also has strong support for reduced ope
           <div class="input_area highlight-ipython3 notranslate">
            <div class="highlight">
             <pre>
-<span></span>!pip install numpy==1.21.2 scipy==1.5.2 Pillow==6.2.0 scikit-image==0.17.2 matplotlib==3.3.0 timm
+<span></span>!pip install timm==0.4.12
 !nvidia-smi
 </pre>
            </div>
@@ -976,61 +976,25 @@ perform best on the target GPU. TensorRT also has strong support for reduced ope
           <div class="output_area docutils container">
            <div class="highlight">
             <pre>
-Requirement already satisfied: numpy==1.21.2 in /opt/conda/lib/python3.8/site-packages (1.21.2)
-Requirement already satisfied: scipy==1.5.2 in /opt/conda/lib/python3.8/site-packages (1.5.2)
-Requirement already satisfied: Pillow==6.2.0 in /opt/conda/lib/python3.8/site-packages (6.2.0)
-Requirement already satisfied: scikit-image==0.17.2 in /opt/conda/lib/python3.8/site-packages (0.17.2)
-Requirement already satisfied: matplotlib==3.3.0 in /opt/conda/lib/python3.8/site-packages (3.3.0)
-Requirement already satisfied: PyWavelets&gt;=1.1.1 in /opt/conda/lib/python3.8/site-packages (from scikit-image==0.17.2) (1.1.1)
-Requirement already satisfied: tifffile&gt;=2019.7.26 in /opt/conda/lib/python3.8/site-packages (from scikit-image==0.17.2) (2021.10.12)
-Requirement already satisfied: networkx&gt;=2.0 in /opt/conda/lib/python3.8/site-packages (from scikit-image==0.17.2) (2.0)
-Requirement already satisfied: imageio&gt;=2.3.0 in /opt/conda/lib/python3.8/site-packages (from scikit-image==0.17.2) (2.9.0)
-Requirement already satisfied: pyparsing!=2.0.4,!=2.1.2,!=2.1.6,&gt;=2.0.3 in /opt/conda/lib/python3.8/site-packages (from matplotlib==3.3.0) (2.4.7)
-Requirement already satisfied: python-dateutil&gt;=2.1 in /opt/conda/lib/python3.8/site-packages (from matplotlib==3.3.0) (2.8.2)
-Requirement already satisfied: kiwisolver&gt;=1.0.1 in /opt/conda/lib/python3.8/site-packages (from matplotlib==3.3.0) (1.3.2)
-Requirement already satisfied: cycler&gt;=0.10 in /opt/conda/lib/python3.8/site-packages (from matplotlib==3.3.0) (0.10.0)
-Requirement already satisfied: six in /opt/conda/lib/python3.8/site-packages (from cycler&gt;=0.10-&gt;matplotlib==3.3.0) (1.16.0)
-Requirement already satisfied: decorator&gt;=4.1.0 in /opt/conda/lib/python3.8/site-packages (from networkx&gt;=2.0-&gt;scikit-image==0.17.2) (5.0.9)
+Looking in indexes: https://pypi.org/simple, https://pypi.ngc.nvidia.com
+Requirement already satisfied: timm==0.4.12 in /opt/conda/lib/python3.8/site-packages (0.4.12)
+Requirement already satisfied: torchvision in /opt/conda/lib/python3.8/site-packages (from timm==0.4.12) (0.11.0a0)
+Requirement already satisfied: torch&gt;=1.4 in /opt/conda/lib/python3.8/site-packages (from timm==0.4.12) (1.11.0a0+b6df043)
+Requirement already satisfied: typing_extensions in /opt/conda/lib/python3.8/site-packages (from torch&gt;=1.4-&gt;timm==0.4.12) (4.0.1)
+Requirement already satisfied: pillow!=8.3.0,&gt;=5.3.0 in /opt/conda/lib/python3.8/site-packages (from torchvision-&gt;timm==0.4.12) (9.0.0)
+Requirement already satisfied: numpy in /opt/conda/lib/python3.8/site-packages (from torchvision-&gt;timm==0.4.12) (1.21.4)
 <span class="ansi-yellow-fg">WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv</span>
-Tue Oct 26 00:13:31 2021
+Fri Jan 14 09:26:31 2022
 +-----------------------------------------------------------------------------+
-| NVIDIA-SMI 450.51.06    Driver Version: 450.51.06    CUDA Version: 11.4     |
+| NVIDIA-SMI 470.57.02    Driver Version: 470.57.02    CUDA Version: 11.5     |
 |-------------------------------+----------------------+----------------------+
 | GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |
 | Fan  Temp  Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |
 |                               |                      |               MIG M. |
 |===============================+======================+======================|
-|   0  Tesla V100-PCIE...  On   | 00000000:1A:00.0 Off |                    0 |
-| N/A   37C    P0    24W / 250W |      0MiB / 32510MiB |      0%      Default |
-|                               |                      |                  N/A |
-+-------------------------------+----------------------+----------------------+
-|   1  Tesla V100-PCIE...  On   | 00000000:1B:00.0 Off |                    0 |
-| N/A   33C    P0    22W / 250W |      0MiB / 32510MiB |      0%      Default |
-|                               |                      |                  N/A |
-+-------------------------------+----------------------+----------------------+
-|   2  Tesla V100-PCIE...  On   | 00000000:3D:00.0 Off |                    0 |
-| N/A   32C    P0    24W / 250W |      0MiB / 32510MiB |      0%      Default |
-|                               |                      |                  N/A |
-+-------------------------------+----------------------+----------------------+
-|   3  Tesla V100-PCIE...  On   | 00000000:3E:00.0 Off |                    0 |
-| N/A   33C    P0    24W / 250W |      0MiB / 32510MiB |      0%      Default |
-|                               |                      |                  N/A |
-+-------------------------------+----------------------+----------------------+
-|   4  Tesla V100-PCIE...  On   | 00000000:88:00.0 Off |                    0 |
-| N/A   32C    P0    25W / 250W |      0MiB / 32510MiB |      0%      Default |
-|                               |                      |                  N/A |
-+-------------------------------+----------------------+----------------------+
-|   5  Tesla V100-PCIE...  On   | 00000000:89:00.0 Off |                    0 |
-| N/A   31C    P0    22W / 250W |      0MiB / 32510MiB |      0%      Default |
-|                               |                      |                  N/A |
-+-------------------------------+----------------------+----------------------+
-|   6  Tesla V100-PCIE...  On   | 00000000:B1:00.0 Off |                    0 |
-| N/A   32C    P0    24W / 250W |      0MiB / 32510MiB |      0%      Default |
-|                               |                      |                  N/A |
-+-------------------------------+----------------------+----------------------+
-|   7  Tesla V100-PCIE...  On   | 00000000:B2:00.0 Off |                    0 |
-| N/A   32C    P0    25W / 250W |      0MiB / 32510MiB |      0%      Default |
-|                               |                      |                  N/A |
+|   0  NVIDIA A30          On   | 00000000:41:00.0 Off |                    0 |
+| N/A   44C    P0    35W / 165W |      0MiB / 24258MiB |      0%      Default |
+|                               |                      |             Disabled |
 +-------------------------------+----------------------+----------------------+
 
 +-----------------------------------------------------------------------------+
@@ -1095,7 +1059,7 @@ Tue Oct 26 00:13:31 2021
           <div class="nbinput nblast docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[1]:
+             <pre><span></span>[3]:
 </pre>
             </div>
            </div>
@@ -1115,15 +1079,14 @@ import torch.backends.cudnn as cudnn
           <div class="nbinput nblast docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[9]:
+             <pre><span></span>[4]:
 </pre>
             </div>
            </div>
            <div class="input_area highlight-ipython3 notranslate">
             <div class="highlight">
              <pre>
-<span></span>torch.hub._validate_not_a_forked_repo=lambda a,b,c: True
-efficientnet_b0_model = timm.create_model('efficientnet_b0',pretrained=True)
+<span></span>efficientnet_b0_model = timm.create_model('efficientnet_b0',pretrained=True)
 model = efficientnet_b0_model.eval().to("cuda")
 </pre>
             </div>
@@ -1219,14 +1182,14 @@ model = efficientnet_b0_model.eval().to("cuda")
           <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[4]:
+             <pre><span></span>[5]:
 </pre>
             </div>
            </div>
            <div class="input_area highlight-ipython3 notranslate">
             <div class="highlight">
              <pre>
-<span></span>!mkdir ./data
+<span></span>!mkdir -p ./data
 !wget  -O ./data/img0.JPG "https://d17fnq9dkz9hgj.cloudfront.net/breed-uploads/2018/08/siberian-husky-detail.jpg?bust=1535566590&amp;width=630"
 !wget  -O ./data/img1.JPG "https://www.hakaimagazine.com/wp-content/uploads/header-gulf-birds.jpg"
 !wget  -O ./data/img2.JPG "https://www.artis.nl/media/filer_public_thumbnails/filer_public/00/f1/00f1b6db-fbed-4fef-9ab0-84e944ff11f8/chimpansee_amber_r_1920x1080.jpg__1920x1080_q85_subject_location-923%2C365_subsampling-2.jpg"
@@ -1243,60 +1206,60 @@ model = efficientnet_b0_model.eval().to("cuda")
            <div class="output_area docutils container">
             <div class="highlight">
              <pre>
---2021-11-11 13:32:41--  https://d17fnq9dkz9hgj.cloudfront.net/breed-uploads/2018/08/siberian-husky-detail.jpg?bust=1535566590&amp;width=630
-Resolving d17fnq9dkz9hgj.cloudfront.net (d17fnq9dkz9hgj.cloudfront.net)... 13.33.183.154, 13.33.183.132, 13.33.183.166, ...
-Connecting to d17fnq9dkz9hgj.cloudfront.net (d17fnq9dkz9hgj.cloudfront.net)|13.33.183.154|:443... connected.
+--2022-01-14 09:26:34--  https://d17fnq9dkz9hgj.cloudfront.net/breed-uploads/2018/08/siberian-husky-detail.jpg?bust=1535566590&amp;width=630
+Resolving d17fnq9dkz9hgj.cloudfront.net (d17fnq9dkz9hgj.cloudfront.net)... 18.65.227.99, 18.65.227.37, 18.65.227.223, ...
+Connecting to d17fnq9dkz9hgj.cloudfront.net (d17fnq9dkz9hgj.cloudfront.net)|18.65.227.99|:443... connected.
 HTTP request sent, awaiting response... 200 OK
 Length: 24112 (24K) [image/jpeg]
 Saving to: ‘./data/img0.JPG’
 
-./data/img0.JPG     100%[===================&gt;]  23.55K  --.-KB/s    in 0.002s
+./data/img0.JPG     100%[===================&gt;]  23.55K  --.-KB/s    in 0.003s
 
-2021-11-11 13:32:41 (13.7 MB/s) - ‘./data/img0.JPG’ saved [24112/24112]
+2022-01-14 09:26:34 (6.74 MB/s) - ‘./data/img0.JPG’ saved [24112/24112]
 
---2021-11-11 13:32:42--  https://www.hakaimagazine.com/wp-content/uploads/header-gulf-birds.jpg
-Resolving www.hakaimagazine.com (www.hakaimagazine.com)... 23.185.0.4, 2620:12a:8000::4, 2620:12a:8001::4
-Connecting to www.hakaimagazine.com (www.hakaimagazine.com)|23.185.0.4|:443... connected.
+--2022-01-14 09:26:35--  https://www.hakaimagazine.com/wp-content/uploads/header-gulf-birds.jpg
+Resolving www.hakaimagazine.com (www.hakaimagazine.com)... 164.92.73.117
+Connecting to www.hakaimagazine.com (www.hakaimagazine.com)|164.92.73.117|:443... connected.
 HTTP request sent, awaiting response... 200 OK
 Length: 452718 (442K) [image/jpeg]
 Saving to: ‘./data/img1.JPG’
 
-./data/img1.JPG     100%[===================&gt;] 442.11K  --.-KB/s    in 0.1s
+./data/img1.JPG     100%[===================&gt;] 442.11K  --.-KB/s    in 0.03s
 
-2021-11-11 13:32:42 (4.43 MB/s) - ‘./data/img1.JPG’ saved [452718/452718]
+2022-01-14 09:26:35 (14.2 MB/s) - ‘./data/img1.JPG’ saved [452718/452718]
 
---2021-11-11 13:32:43--  https://www.artis.nl/media/filer_public_thumbnails/filer_public/00/f1/00f1b6db-fbed-4fef-9ab0-84e944ff11f8/chimpansee_amber_r_1920x1080.jpg__1920x1080_q85_subject_location-923%2C365_subsampling-2.jpg
+--2022-01-14 09:26:35--  https://www.artis.nl/media/filer_public_thumbnails/filer_public/00/f1/00f1b6db-fbed-4fef-9ab0-84e944ff11f8/chimpansee_amber_r_1920x1080.jpg__1920x1080_q85_subject_location-923%2C365_subsampling-2.jpg
 Resolving www.artis.nl (www.artis.nl)... 94.75.225.20
 Connecting to www.artis.nl (www.artis.nl)|94.75.225.20|:443... connected.
 HTTP request sent, awaiting response... 200 OK
 Length: 361413 (353K) [image/jpeg]
 Saving to: ‘./data/img2.JPG’
 
-./data/img2.JPG     100%[===================&gt;] 352.94K   618KB/s    in 0.6s
+./data/img2.JPG     100%[===================&gt;] 352.94K   812KB/s    in 0.4s
 
-2021-11-11 13:32:45 (618 KB/s) - ‘./data/img2.JPG’ saved [361413/361413]
+2022-01-14 09:26:38 (812 KB/s) - ‘./data/img2.JPG’ saved [361413/361413]
 
---2021-11-11 13:32:45--  https://www.familyhandyman.com/wp-content/uploads/2018/09/How-to-Avoid-Snakes-Slithering-Up-Your-Toilet-shutterstock_780480850.jpg
-Resolving www.familyhandyman.com (www.familyhandyman.com)... 104.18.202.107, 104.18.201.107, 2606:4700::6812:ca6b, ...
+--2022-01-14 09:26:39--  https://www.familyhandyman.com/wp-content/uploads/2018/09/How-to-Avoid-Snakes-Slithering-Up-Your-Toilet-shutterstock_780480850.jpg
+Resolving www.familyhandyman.com (www.familyhandyman.com)... 104.18.202.107, 104.18.201.107, 2606:4700::6812:c96b, ...
 Connecting to www.familyhandyman.com (www.familyhandyman.com)|104.18.202.107|:443... connected.
 HTTP request sent, awaiting response... 200 OK
 Length: 90994 (89K) [image/jpeg]
 Saving to: ‘./data/img3.JPG’
 
-./data/img3.JPG     100%[===================&gt;]  88.86K  --.-KB/s    in 0.02s
+./data/img3.JPG     100%[===================&gt;]  88.86K  --.-KB/s    in 0.006s
 
-2021-11-11 13:32:46 (3.96 MB/s) - ‘./data/img3.JPG’ saved [90994/90994]
+2022-01-14 09:26:39 (14.1 MB/s) - ‘./data/img3.JPG’ saved [90994/90994]
 
---2021-11-11 13:32:46--  https://s3.amazonaws.com/deep-learning-models/image-models/imagenet_class_index.json
-Resolving s3.amazonaws.com (s3.amazonaws.com)... 52.217.170.104
-Connecting to s3.amazonaws.com (s3.amazonaws.com)|52.217.170.104|:443... connected.
+--2022-01-14 09:26:39--  https://s3.amazonaws.com/deep-learning-models/image-models/imagenet_class_index.json
+Resolving s3.amazonaws.com (s3.amazonaws.com)... 52.217.193.56
+Connecting to s3.amazonaws.com (s3.amazonaws.com)|52.217.193.56|:443... connected.
 HTTP request sent, awaiting response... 200 OK
 Length: 35363 (35K) [application/octet-stream]
 Saving to: ‘./data/imagenet_class_index.json’
 
-./data/imagenet_cla 100%[===================&gt;]  34.53K   156KB/s    in 0.2s
+./data/imagenet_cla 100%[===================&gt;]  34.53K  --.-KB/s    in 0.07s
 
-2021-11-11 13:32:47 (156 KB/s) - ‘./data/imagenet_class_index.json’ saved [35363/35363]
+2022-01-14 09:26:39 (477 KB/s) - ‘./data/imagenet_class_index.json’ saved [35363/35363]
 
 </pre>
             </div>
@@ -1305,7 +1268,7 @@ Saving to: ‘./data/imagenet_class_index.json’
           <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[5]:
+             <pre><span></span>[6]:
 </pre>
             </div>
            </div>
@@ -1345,7 +1308,7 @@ for i in range(4):
           <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[6]:
+             <pre><span></span>[7]:
 </pre>
             </div>
            </div>
@@ -1376,7 +1339,7 @@ Number of classes in ImageNet: 1000
           <div class="nbinput nblast docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[10]:
+             <pre><span></span>[8]:
 </pre>
             </div>
            </div>
@@ -1417,7 +1380,7 @@ def predict(img_path, model):
           <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[11]:
+             <pre><span></span>[9]:
 </pre>
             </div>
            </div>
@@ -1442,13 +1405,25 @@ def predict(img_path, model):
           <div class="nboutput docutils container">
            <div class="prompt empty docutils container">
            </div>
+           <div class="output_area stderr docutils container">
+            <div class="highlight">
+             <pre>
+/opt/conda/lib/python3.8/site-packages/torchvision/transforms/transforms.py:282: UserWarning: Argument interpolation should be of type InterpolationMode instead of int. Please, use InterpolationMode enum.
+  warnings.warn(
+</pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput docutils container">
+           <div class="prompt empty docutils container">
+           </div>
            <div class="output_area docutils container">
             <div class="highlight">
              <pre>
-./data/img0.JPG - Predicted: ['n02109961', 'Eskimo_dog'], Probablility: 0.3987327516078949
-./data/img1.JPG - Predicted: ['n01537544', 'indigo_bunting'], Probablility: 0.2334718406200409
-./data/img2.JPG - Predicted: ['n02481823', 'chimpanzee'], Probablility: 0.9695370197296143
-./data/img3.JPG - Predicted: ['n01739381', 'vine_snake'], Probablility: 0.22777587175369263
+./data/img0.JPG - Predicted: ['n02109961', 'Eskimo_dog'], Probablility: 0.39899951219558716
+./data/img1.JPG - Predicted: ['n01537544', 'indigo_bunting'], Probablility: 0.2334723174571991
+./data/img2.JPG - Predicted: ['n02481823', 'chimpanzee'], Probablility: 0.9695206880569458
+./data/img3.JPG - Predicted: ['n01739381', 'vine_snake'], Probablility: 0.22776055335998535
 </pre>
             </div>
            </div>
@@ -1457,7 +1432,7 @@ def predict(img_path, model):
            <div class="prompt empty docutils container">
            </div>
            <div class="output_area docutils container">
-            <img alt="../_images/_notebooks_EfficientNet-example_14_1.png" src="../_images/_notebooks_EfficientNet-example_14_1.png"/>
+            <img alt="../_images/_notebooks_EfficientNet-example_14_2.png" src="../_images/_notebooks_EfficientNet-example_14_2.png"/>
            </div>
           </div>
          </section>
@@ -1474,7 +1449,7 @@ def predict(img_path, model):
           <div class="nbinput nblast docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[20]:
+             <pre><span></span>[10]:
 </pre>
             </div>
            </div>
@@ -1516,7 +1491,7 @@ def benchmark(model, input_shape=(1024, 1, 224, 224), dtype='fp32', nwarmup=50, 
           <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[23]:
+             <pre><span></span>[11]:
 </pre>
             </div>
            </div>
@@ -1537,19 +1512,19 @@ benchmark(model, input_shape=(128, 3, 224, 224), nruns=100)
              <pre>
 Warm up ...
 Start timing ...
-Iteration 10/100, ave batch time 44.96 ms
-Iteration 20/100, ave batch time 44.96 ms
-Iteration 30/100, ave batch time 44.95 ms
-Iteration 40/100, ave batch time 44.96 ms
-Iteration 50/100, ave batch time 44.96 ms
-Iteration 60/100, ave batch time 44.96 ms
-Iteration 70/100, ave batch time 44.96 ms
-Iteration 80/100, ave batch time 44.96 ms
-Iteration 90/100, ave batch time 44.96 ms
-Iteration 100/100, ave batch time 44.96 ms
+Iteration 10/100, avg batch time 48.25 ms
+Iteration 20/100, avg batch time 48.25 ms
+Iteration 30/100, avg batch time 48.25 ms
+Iteration 40/100, avg batch time 48.26 ms
+Iteration 50/100, avg batch time 48.26 ms
+Iteration 60/100, avg batch time 48.27 ms
+Iteration 70/100, avg batch time 48.28 ms
+Iteration 80/100, avg batch time 48.29 ms
+Iteration 90/100, avg batch time 48.30 ms
+Iteration 100/100, avg batch time 48.30 ms
 Input shape: torch.Size([128, 3, 224, 224])
 Output features size: torch.Size([128, 1000])
-Average throughput: 2846.67 images/second
+Average throughput: 2649.96 images/second
 </pre>
             </div>
            </div>
@@ -1605,7 +1580,7 @@ Average throughput: 2846.67 images/second
          <div class="nbinput nblast docutils container">
           <div class="prompt highlight-none notranslate">
            <div class="highlight">
-            <pre><span></span>[24]:
+            <pre><span></span>[12]:
 </pre>
            </div>
           </div>
@@ -1624,7 +1599,7 @@ traced_model = torch.jit.trace(model, [torch.randn((128, 3, 224, 224)).to("cuda"
          <div class="nbinput nblast docutils container">
           <div class="prompt highlight-none notranslate">
            <div class="highlight">
-            <pre><span></span>[25]:
+            <pre><span></span>[13]:
 </pre>
            </div>
           </div>
@@ -1640,7 +1615,7 @@ torch.jit.save(traced_model, "efficientnet_b0_traced.jit.pt")
          <div class="nbinput docutils container">
           <div class="prompt highlight-none notranslate">
            <div class="highlight">
-            <pre><span></span>[26]:
+            <pre><span></span>[14]:
 </pre>
            </div>
           </div>
@@ -1661,19 +1636,19 @@ benchmark(traced_model, input_shape=(128, 3, 224, 224), nruns=100)
             <pre>
 Warm up ...
 Start timing ...
-Iteration 10/100, ave batch time 45.12 ms
-Iteration 20/100, ave batch time 45.11 ms
-Iteration 30/100, ave batch time 45.12 ms
-Iteration 40/100, ave batch time 45.12 ms
-Iteration 50/100, ave batch time 45.12 ms
-Iteration 60/100, ave batch time 45.12 ms
-Iteration 70/100, ave batch time 45.12 ms
-Iteration 80/100, ave batch time 45.12 ms
-Iteration 90/100, ave batch time 45.13 ms
-Iteration 100/100, ave batch time 45.13 ms
+Iteration 10/100, avg batch time 49.27 ms
+Iteration 20/100, avg batch time 49.27 ms
+Iteration 30/100, avg batch time 49.28 ms
+Iteration 40/100, avg batch time 49.28 ms
+Iteration 50/100, avg batch time 49.30 ms
+Iteration 60/100, avg batch time 49.31 ms
+Iteration 70/100, avg batch time 49.31 ms
+Iteration 80/100, avg batch time 49.32 ms
+Iteration 90/100, avg batch time 49.32 ms
+Iteration 100/100, avg batch time 49.33 ms
 Input shape: torch.Size([128, 3, 224, 224])
 Output features size: torch.Size([128, 1000])
-Average throughput: 2836.47 images/second
+Average throughput: 2594.89 images/second
 </pre>
            </div>
           </div>
@@ -1700,7 +1675,7 @@ Average throughput: 2836.47 images/second
           <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[27]:
+             <pre><span></span>[15]:
 </pre>
             </div>
            </div>
@@ -1740,7 +1715,6 @@ WARNING: [Torch-TensorRT] - Mean converter disregards dtype
 WARNING: [Torch-TensorRT] - Mean converter disregards dtype
 WARNING: [Torch-TensorRT] - Mean converter disregards dtype
 WARNING: [Torch-TensorRT] - Mean converter disregards dtype
-WARNING: [Torch-TensorRT TorchScript Conversion Context] - Detected invalid timing cache, setup a local cache instead
 </pre>
             </div>
            </div>
@@ -1748,7 +1722,7 @@ WARNING: [Torch-TensorRT TorchScript Conversion Context] - Detected invalid timi
           <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[28]:
+             <pre><span></span>[16]:
 </pre>
             </div>
            </div>
@@ -1769,19 +1743,19 @@ benchmark(trt_model_fp32, input_shape=(128, 3, 224, 224), nruns=100)
              <pre>
 Warm up ...
 Start timing ...
-Iteration 10/100, ave batch time 34.14 ms
-Iteration 20/100, ave batch time 33.76 ms
-Iteration 30/100, ave batch time 33.60 ms
-Iteration 40/100, ave batch time 33.51 ms
-Iteration 50/100, ave batch time 33.47 ms
-Iteration 60/100, ave batch time 33.43 ms
-Iteration 70/100, ave batch time 33.43 ms
-Iteration 80/100, ave batch time 33.43 ms
-Iteration 90/100, ave batch time 33.43 ms
-Iteration 100/100, ave batch time 33.42 ms
+Iteration 10/100, avg batch time 35.94 ms
+Iteration 20/100, avg batch time 35.98 ms
+Iteration 30/100, avg batch time 35.98 ms
+Iteration 40/100, avg batch time 35.99 ms
+Iteration 50/100, avg batch time 36.00 ms
+Iteration 60/100, avg batch time 36.00 ms
+Iteration 70/100, avg batch time 36.00 ms
+Iteration 80/100, avg batch time 36.00 ms
+Iteration 90/100, avg batch time 36.01 ms
+Iteration 100/100, avg batch time 36.01 ms
 Input shape: torch.Size([128, 3, 224, 224])
 Output features size: torch.Size([128, 1000])
-Average throughput: 3829.92 images/second
+Average throughput: 3554.86 images/second
 </pre>
             </div>
            </div>
@@ -1797,7 +1771,7 @@ Average throughput: 3829.92 images/second
           <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[29]:
+             <pre><span></span>[17]:
 </pre>
             </div>
            </div>
@@ -1828,8 +1802,6 @@ compatibility with PyTorch's data type convention is required.
 If you do indeed see errors at runtime either:
 - Remove the dtype spec for x.1
 - Disable partial compilation by setting require_full_compilation to True
-WARNING: [Torch-TensorRT TorchScript Conversion Context] - The logger passed into createInferBuilder differs from one already provided for an existing builder, runtime, or refitter. TensorRT maintains only a single logger pointer at any given time, so the existing value, which can be retrieved with getLogger(), will be used instead. In order to use a new logger, first destroy all existing builder, runner or refitter objects.
-
 WARNING: [Torch-TensorRT] - Mean converter disregards dtype
 WARNING: [Torch-TensorRT] - Mean converter disregards dtype
 WARNING: [Torch-TensorRT] - Mean converter disregards dtype
@@ -1846,7 +1818,6 @@ WARNING: [Torch-TensorRT] - Mean converter disregards dtype
 WARNING: [Torch-TensorRT] - Mean converter disregards dtype
 WARNING: [Torch-TensorRT] - Mean converter disregards dtype
 WARNING: [Torch-TensorRT] - Mean converter disregards dtype
-WARNING: [Torch-TensorRT] - Detected invalid timing cache, setup a local cache instead
 </pre>
             </div>
            </div>
@@ -1854,7 +1825,7 @@ WARNING: [Torch-TensorRT] - Detected invalid timing cache, setup a local cache i
           <div class="nbinput docutils container">
            <div class="prompt highlight-none notranslate">
             <div class="highlight">
-             <pre><span></span>[34]:
+             <pre><span></span>[18]:
 </pre>
             </div>
            </div>
@@ -1875,19 +1846,19 @@ benchmark(trt_model_fp16, input_shape=(128, 3, 224, 224), dtype='fp16', nruns=10
              <pre>
 Warm up ...
 Start timing ...
-Iteration 10/100, ave batch time 18.82 ms
-Iteration 20/100, ave batch time 18.82 ms
-Iteration 30/100, ave batch time 18.71 ms
-Iteration 40/100, ave batch time 18.65 ms
-Iteration 50/100, ave batch time 18.63 ms
-Iteration 60/100, ave batch time 18.61 ms
-Iteration 70/100, ave batch time 18.62 ms
-Iteration 80/100, ave batch time 18.62 ms
-Iteration 90/100, ave batch time 18.60 ms
-Iteration 100/100, ave batch time 18.60 ms
+Iteration 10/100, avg batch time 18.71 ms
+Iteration 20/100, avg batch time 18.61 ms
+Iteration 30/100, avg batch time 18.56 ms
+Iteration 40/100, avg batch time 18.54 ms
+Iteration 50/100, avg batch time 18.53 ms
+Iteration 60/100, avg batch time 18.55 ms
+Iteration 70/100, avg batch time 18.56 ms
+Iteration 80/100, avg batch time 18.55 ms
+Iteration 90/100, avg batch time 18.54 ms
+Iteration 100/100, avg batch time 18.53 ms
 Input shape: torch.Size([128, 3, 224, 224])
 Output features size: torch.Size([128, 1000])
-Average throughput: 6882.55 images/second
+Average throughput: 6906.14 images/second
 </pre>
             </div>
            </div>

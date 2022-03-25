@@ -72,7 +72,7 @@ std::vector<torch::jit::Node*> getDependencyNodes(std::vector<torch::jit::Value*
   return stk;
 }
 
-std::vector<SegmentedBlock> segmentBlocksWithNonTensorInputs(SegmentedBlock& seg_block) {
+PartitionedGraph segmentBlocksWithNonTensorInputs(SegmentedBlock& seg_block) {
   // reconstruct segmented_block if this block requires nonTensor input
   std::vector<torch::jit::Value*> nontensor_inputs;
   // Gather all non-tensor inputs for this seg_block
@@ -83,7 +83,7 @@ std::vector<SegmentedBlock> segmentBlocksWithNonTensorInputs(SegmentedBlock& seg
   }
 
   std::vector<torch::jit::Node*> dependency_nodes = getDependencyNodes(nontensor_inputs);
-  std::vector<SegmentedBlock> new_seg_blocks;
+  PartitionedGraph new_seg_blocks;
   // if current block is kTorch or current block is TensorRT and all dependent nodes are also supported, merge the
   // dependency nodes at the beginning of the current segmented_block and return this merged segmented_block
   if (seg_block.target() == SegmentedBlock::kTorch || isAllNodesSupported(dependency_nodes)) {
@@ -109,7 +109,7 @@ std::vector<SegmentedBlock> segmentBlocksWithNonTensorInputs(SegmentedBlock& seg
         // If tensorrt_nodes is not empty, the previous nodes were all tensorrt_nodes. Construct a
         // TensorRT segmented_block and clear the tensorrt_nodes list to be later used for new TRT segments.
         if (!tensorrt_nodes.empty()) {
-          new_seg_blocks.emplace_back(SegmentedBlock::kTensorRT, tensorrt_nodes);
+          new_seg_blocks.emplace_back(new_seg_blocks.size(), SegmentedBlock::kTensorRT, tensorrt_nodes);
           tensorrt_nodes.clear();
         }
         pytorch_nodes.push_back(n);
@@ -118,7 +118,7 @@ std::vector<SegmentedBlock> segmentBlocksWithNonTensorInputs(SegmentedBlock& seg
         // If pytorch_nodes is not empty, the previous nodes were all pytorch_nodes. Construct a
         // Pytorch segmented_block and clear the pytorch_nodes list to be later used for new Pytorch segments.
         if (!pytorch_nodes.empty()) {
-          new_seg_blocks.emplace_back(SegmentedBlock::kTorch, pytorch_nodes);
+          new_seg_blocks.emplace_back(new_seg_blocks.size(), SegmentedBlock::kTorch, pytorch_nodes);
           pytorch_nodes.clear();
         }
         tensorrt_nodes.push_back(n);
@@ -127,9 +127,9 @@ std::vector<SegmentedBlock> segmentBlocksWithNonTensorInputs(SegmentedBlock& seg
 
     // Form the last segmented_block with the left over nodes in tensorrt_nodes or pytorch_nodes correspondingly.
     if (!tensorrt_nodes.empty()) {
-      new_seg_blocks.emplace_back(SegmentedBlock::kTensorRT, tensorrt_nodes);
+      new_seg_blocks.emplace_back(new_seg_blocks.size(), SegmentedBlock::kTensorRT, tensorrt_nodes);
     } else {
-      new_seg_blocks.emplace_back(SegmentedBlock::kTorch, pytorch_nodes);
+      new_seg_blocks.emplace_back(new_seg_blocks.size(), SegmentedBlock::kTorch, pytorch_nodes);
     }
   }
 
@@ -176,7 +176,7 @@ void resolveNonTensorInputs(PartitionedGraph& segmented_blocks) { // , std::shar
     // if the segment that produce this nonTensor value is kTensorRT but consumed in kTorch, inject nodes in the first
     // kTorch segment.
     if (segmented_blocks[use_info.produce_id].target() == SegmentedBlock::kTensorRT && !use_info.torch_use_id.empty()) {
-      auto first_torch_id = use_info.torch_use_id.front();
+      auto first_torch_id = use_info.torch_use_id.back();
       if (!updated_segments.count(first_torch_id)) {
         // Segmented Blocks with non-tensor inputs will have to be re-segmented as
         // Torch-TensorRT doesn't support non-tensor inputs for a module.
@@ -303,9 +303,8 @@ void finalize_block(
     PartitionedGraph& g,
     SegmentedBlock::SegmentedBlockTarget kind,
     std::vector<torch::jit::Node*>& nodes) {
-  SegmentedBlock::BlockID b_id = g.size();
   LOG_DEBUG("Finalizing in progress " << SegmentedBlock::target_to_str(kind) << " block");
-  g.emplace_back(b_id, kind, nodes);
+  g.emplace_back(g.size(), kind, nodes);
   nodes.clear();
   LOG_DEBUG(g.back());
 }
@@ -405,6 +404,10 @@ PartitionedGraph Partition(
 
   // run shape analysis on each segmented block
   runShapeAnalysis(segmented_blocks, example_tensor_map, partition_info);
+
+  for (uint64_t i = 0; i < segmented_blocks.size(); i++) {
+    segmented_blocks[i].update_id(i);
+  }
 
   LOG_INFO(segmented_blocks);
 

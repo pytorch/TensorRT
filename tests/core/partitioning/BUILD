@@ -32,6 +32,10 @@ partitioning_test(
   name = "test_stitched_graph",
 )
 
+partitioning_test(
+  name = "test_resolve_nontensor_inputs",
+)
+
 cc_test(
   name = "test_fallback_graph_output",
   srcs = ["test_fallback_graph_output.cpp"],
@@ -86,6 +90,7 @@ test_suite(
         ":test_stitched_graph",
         ":test_fallback_graph_output",
         ":test_loop_fallback",
-        ":test_conditionals"
+        ":test_conditionals",
+        ":test_resolve_nontensor_inputs"
     ]
 )
