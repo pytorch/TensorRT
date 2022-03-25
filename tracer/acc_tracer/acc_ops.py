@@ -2192,3 +2192,27 @@ def gather(*, input, dim, index, sparse_grad=False):
 @register_acc_op
 def index_select(*, input, dim, index):
     return torch.index_select(input, dim, index)
+
+
+@register_custom_acc_mapper_fn(
+    op_and_target=("call_method", "expand_as"),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("other", "other"),
+    ]
+)
+def expand_as_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
+    """
+    Maps expand_as(other) to expand(other.size())
+    """
+    with node.graph.inserting_before(node):
+        size_node = node.graph.call_function(
+            size, kwargs={"input": node.kwargs["other"]}
+        )
+        size_node.meta["type"] = torch.Size
+
+        expand_node = node.graph.call_function(
+            expand, kwargs={"input": node.kwargs["input"], "sizes": size_node}
+        )
+        expand_node.meta = node.meta.copy()
+        return expand_node
