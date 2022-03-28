@@ -482,4 +482,7 @@ def trace(
 
     traced.recompile()
 
+    # Run shape prop to again to populate tensor_meta after normalize.
+    shape_prop.ShapeProp(traced).propagate(*sample_inputs)
+
     return traced
