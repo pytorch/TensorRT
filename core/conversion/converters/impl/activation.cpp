@@ -105,7 +105,7 @@ auto acthardtanh TORCHTRT_UNUSED =
                  } else {
                    slopes_new_shape[original_shape.nbDims - 1] = slopes.sizes().vec()[0];
                  }
-                 slopes.reshape(slopes_new_shape);
+                 slopes = slopes.reshape(slopes_new_shape);
                }
 
                if (slopes.numel() != 1 &&
