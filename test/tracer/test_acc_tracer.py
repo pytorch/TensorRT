@@ -319,6 +319,49 @@ class AccTracerTest(unittest.TestCase):
 
         self.assertTrue(torch.equal(m(input), traced(input)))
 
+    def test_conv1d(self):
+        """
+        Test that a conv is traced as expected.
+        """
+
+        class TestModule(nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.conv = nn.Conv1d(8, 7, 3, stride=2)
+
+            def forward(self, a: torch.Tensor) -> torch.Tensor:
+                return self.conv(a)
+
+        m = TestModule()
+        input = torch.randn(3, 8, 8)
+        traced = acc_tracer.trace(m, [input])
+
+        ph = weight_attr = bias_attr = conv = None
+        for node in traced.graph.nodes:
+            if node.op == "placeholder":
+                self.assertEqual(str(node.target), "a")
+                ph = node
+            elif node.op == "get_attr" and node.target == "conv.weight":
+                weight_attr = node
+            elif node.op == "get_attr" and node.target == "conv.bias":
+                bias_attr = node
+            elif node.op == "call_function":
+                self.assertEqual(node.target, acc_ops.conv1d)
+                self.assertEqual(node.kwargs["input"], ph)
+                self.assertEqual(node.kwargs["weight"], weight_attr)
+                self.assertEqual(node.kwargs["bias"], bias_attr)
+                self.assertEqual(node.kwargs["stride"], (2,))
+                self.assertEqual(node.kwargs["padding"], (0,))
+                self.assertEqual(node.kwargs["dilation"], (1,))
+                self.assertEqual(node.kwargs["groups"], 1)
+                conv = node
+            elif node.op == "output":
+                self.assertEqual(conv, node.args[0])
+            else:
+                self.fail(f"Unexpected node: {node.format_node()}")
+
+        self.assertTrue(torch.equal(m(input), traced(input)))
+
     def test_conv3d(self):
         """
         Test that a conv is traced as expected.
@@ -2236,6 +2279,7 @@ class AccTracerTest(unittest.TestCase):
                 acc_ops.ceil,
                 acc_ops.size,
                 acc_ops.split,
+                acc_ops.conv1d,
                 acc_ops.conv2d,
                 acc_ops.conv3d,
                 acc_ops.conv_transpose2d,
