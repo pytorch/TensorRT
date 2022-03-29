@@ -1,15 +1,17 @@
 # Owner(s): ["oncall: aiacc"]
 
+import os
+
+import fx2trt_oss.tracer.acc_tracer.acc_tracer as acc_tracer
 import torch
 import torch.fx
-import fx2trt_oss.tracer.acc_tracer.acc_tracer as acc_tracer
 from fx2trt_oss.fx import (
     TRTInterpreter,
     InputTensorSpec,
     TRTModule,
 )
+from fx2trt_oss.fx.utils import LowerPrecision
 from torch.testing._internal.common_utils import TestCase, run_tests
-import os
 
 
 class TestTRTModule(TestCase):
@@ -24,7 +26,7 @@ class TestTRTModule(TestCase):
 
         mod = acc_tracer.trace(mod, inputs)
         interp = TRTInterpreter(mod, input_specs=InputTensorSpec.from_tensors(inputs))
-        trt_mod = TRTModule(*interp.run(fp16_mode=False))
+        trt_mod = TRTModule(*interp.run(lower_precision=LowerPrecision.FP32))
         torch.save(trt_mod, "trt.pt")
         reload_trt_mod = torch.load("trt.pt")
 
@@ -44,7 +46,7 @@ class TestTRTModule(TestCase):
 
         mod = acc_tracer.trace(mod, inputs)
         interp = TRTInterpreter(mod, input_specs=InputTensorSpec.from_tensors(inputs))
-        trt_mod = TRTModule(*interp.run(fp16_mode=False))
+        trt_mod = TRTModule(*interp.run(lower_precision=LowerPrecision.FP32))
         st = trt_mod.state_dict()
 
         new_trt_mod = TRTModule()

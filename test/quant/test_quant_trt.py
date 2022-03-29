@@ -16,16 +16,15 @@ from fx2trt_oss.fx import (
     TRTModule,
 )
 from fx2trt_oss.fx.lower import run_const_fold
+from fx2trt_oss.fx.utils import LowerPrecision
 from fx2trt_oss.tracer.acc_tracer import acc_ops
 from torch.ao.quantization import default_qconfig
-from torch.ao.quantization.quantize_fx import (
-    convert_fx,
-)
 from torch.ao.quantization.fx.backend_config.observation_type import ObservationType
 from torch.ao.quantization.fx.match_utils import (
     MatchAllNode,
 )
 from torch.ao.quantization.quantize_fx import (
+    convert_fx,
     prepare_fx,
     prepare_qat_fx,
     get_tensorrt_backend_config_dict,
@@ -53,7 +52,7 @@ def lower_to_trt(model, inputs, shape_ranges):
         model,
         input_specs,
         explicit_batch_dimension=True, explicit_precision=True)
-    result = interp.run(fp16_mode=False, int8_mode=True)
+    result = interp.run(lower_precision=LowerPrecision.INT8)
     trt_mod = TRTModule(result.engine, result.input_names, result.output_names)
     return trt_mod
 
