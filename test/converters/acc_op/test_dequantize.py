@@ -1,5 +1,3 @@
-# Owner(s): ["oncall: aiacc"]
-
 import unittest
 
 import tensorrt as trt

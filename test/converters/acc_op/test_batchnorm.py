@@ -1,5 +1,3 @@
-# Owner(s): ["oncall: aiacc"]
-
 import torch
 import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
 from torch.testing._internal.common_fx2trt import AccTestCase, InputTensorSpec

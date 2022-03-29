@@ -396,7 +396,9 @@ def add_binary_elementwise_layer(
     )
     layer = network.add_elementwise(lhs_val, rhs_val, op_type)
     set_layer_name(layer, target, name)
-    return layer.get_output(0)
+    output = layer.get_output(0)
+    output.name = output.name + "_" + name
+    return output
 
 
 def squeeze_left(const: torch.Tensor):
@@ -669,3 +671,29 @@ def get_python_op_from_trt_elementwise_op(trt_op: TRTElementWiseOp) -> Callable[
         return operator.floordiv
     else:
         raise RuntimeError(f"{trt_op} is not supported yet!")
+
+def dtype_uniform(network, target, name, input, other):
+    table = {trt.bool:0, trt.int32:1, trt.float16:2, trt.float32:3}
+    input_dtype = input.dtype
+    other_dtype = other.dtype
+    if table[input_dtype] > table[other_dtype]:
+        layer = network.add_identity(other)
+        layer.set_output_type(0, input_dtype)
+        set_layer_name(layer, target, f"{name}_other_dtype_change")
+        other = layer.get_output(0)
+    elif table[input_dtype] < table[other_dtype]:
+        layer = network.add_identity(input)
+        layer.set_output_type(0, other_dtype)
+        set_layer_name(layer, target, f"{name}_input_dtype_change")
+        input = layer.get_output(0)
+    elif table[input_dtype] == 0 and table[other_dtype] == 0:
+        layer_i = network.add_identity(input)
+        layer_i.set_output_type(0, trt.int32)
+        set_layer_name(layer_i, target, f"{name}_input_dtype_change")
+        input = layer_i.get_output(0)
+
+        layer_o = network.add_identity(other)
+        layer_o.set_output_type(0, trt.int32)
+        set_layer_name(layer_o, target, f"{name}_other_dtype_change")
+        other = layer_o.get_output(0)
+    return input, other

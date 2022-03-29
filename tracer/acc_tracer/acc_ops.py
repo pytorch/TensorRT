@@ -277,7 +277,7 @@ def repeat_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
     """
     with node.graph.inserting_before(node):
         inputs = node.kwargs["input"]
-        dims = node.kwargs["sizes"][0]
+        dims = node.kwargs["sizes"]
         new_node = node.graph.create_node(
             "call_function",
             tile,
@@ -1020,8 +1020,8 @@ def mean_mapper(node, mod):
     op_and_target=("call_method", "std"),
     arg_replacement_tuples=[
         ("input", "input"),
-        ("unbiased", "unbiased"),
-        ("dim", "dim", this_arg_is_optional),
+        ("dim", "dim"),
+        ("unbiased", "unbiased", this_arg_is_optional),
         ("keepdim", "keepdim", this_arg_is_optional),
         ("dtype", "dtype", this_arg_is_optional),
     ],
@@ -1030,8 +1030,8 @@ def mean_mapper(node, mod):
     op_and_target=("call_function", torch.std),
     arg_replacement_tuples=[
         ("input", "input"),
-        ("unbiased", "unbiased"),
-        ("dim", "dim", this_arg_is_optional),
+        ("dim", "dim"),
+        ("unbiased", "unbiased", this_arg_is_optional),
         ("keepdim", "keepdim", this_arg_is_optional),
         ("dtype", "dtype", this_arg_is_optional),
     ],
@@ -1042,10 +1042,10 @@ def std_mapper(node, mod):
     This op is mapped to a few existing ops
     """
     input_node = node.kwargs["input"]
-    unbiased = node.kwargs.get("unbiased")
+    # unbiased = node.kwargs.get("unbiased")
     dim = node.kwargs.get("dim")
     keepdim = node.kwargs.get("keepdim")
-    assert unbiased is True, "We currently do not support `std` with unbiased=False"
+    # assert unbiased is False or unbiased is None, "We currently do not support `std` with unbiased=True where n-1 is used"
     assert dim is not None and keepdim is not None, "We currently do not support `std` with dim=None and keepdim=None"
 
     with node.graph.inserting_before(node):
@@ -1212,6 +1212,7 @@ def minimum(*, input, other):
     return torch.minimum(input=input, other=other)
 
 @register_acc_op_properties(AccOpProperty.pointwise)
+@register_acc_op_mapping(op_and_target=("call_function", operator.eq))
 @register_acc_op_mapping(op_and_target=("call_function", torch.eq))
 @register_acc_op_mapping(op_and_target=("call_method", "eq"))
 @register_acc_op
@@ -1220,6 +1221,7 @@ def eq(*, input, other):
 
 
 @register_acc_op_properties(AccOpProperty.pointwise)
+@register_acc_op_mapping(op_and_target=("call_function", operator.gt))
 @register_acc_op_mapping(op_and_target=("call_function", torch.gt))
 @register_acc_op_mapping(op_and_target=("call_method", "gt"))
 @register_acc_op
@@ -1228,11 +1230,12 @@ def gt(*, input, other):
 
 
 @register_acc_op_properties(AccOpProperty.pointwise)
-@register_acc_op_mapping(op_and_target=("call_function", torch.le))
-@register_acc_op_mapping(op_and_target=("call_method", "le"))
+@register_acc_op_mapping(op_and_target=("call_function", operator.lt))
+@register_acc_op_mapping(op_and_target=("call_function", torch.lt))
+@register_acc_op_mapping(op_and_target=("call_method", "lt"))
 @register_acc_op
-def le(*, input, other):
-    return torch.le(input=input, other=other)
+def lt(*, input, other):
+    return torch.lt(input=input, other=other)
 
 
 @register_acc_op_properties(AccOpProperty.pointwise)
@@ -2216,3 +2219,16 @@ def expand_as_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
         )
         expand_node.meta = node.meta.copy()
         return expand_node
+@register_acc_op_mapping(
+    op_and_target=("call_function", torch.nn.functional.interpolate),
+     arg_replacement_tuples=[
+        ("input", "input"),
+        ("size", "size", this_arg_is_optional),
+        ("scale_factor", "scale_factor", this_arg_is_optional),
+        ("mode", "mode", this_arg_is_optional),
+        ("align_corners", "align_corners", this_arg_is_optional),
+    ],
+)
+@register_acc_op
+def interpolate(*, input, size=None, scale_factor=None, mode='nearest', align_corners=None):
+    return torch.nn.functional.interpolate(input=input, size=size, scale_factor=scale_factor, mode=mode, align_corners=align_corners)

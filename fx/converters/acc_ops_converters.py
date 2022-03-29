@@ -1163,8 +1163,19 @@ def acc_ops_eq(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     if network.has_implicit_batch_dimension:
         raise RuntimeError("The `eq` function should be called with explicit batch dimension.")
+
+    input_t = kwargs["input"]
+    other_t =  kwargs["other"]
+    if isinstance(other_t, (torch.Tensor, bool)):
+        if isinstance(other_t, bool):
+            other_t = int(other_t)
+        elif other_t.dtype == torch.bool:
+            other_t = other_t.to(torch.int32)
+    other_t = get_trt_tensor(network, other_t, f"{name}_other_t")
+    input_t, other_t = dtype_uniform(network, target, name, input_t, other_t)
+
     return add_binary_elementwise_layer(
-        network, kwargs["input"], kwargs["other"], trt.ElementWiseOperation.EQUAL, target, name
+        network, input_t, other_t, trt.ElementWiseOperation.EQUAL, target, name
     )
 
 
@@ -1178,13 +1189,23 @@ def acc_ops_gt(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     if network.has_implicit_batch_dimension:
         raise RuntimeError("The `gt` function should be called with explicit batch dimension.")
+
+    input_t = kwargs["input"]
+    other_t =  kwargs["other"]
+    if isinstance(other_t, (torch.Tensor, bool)):
+        if isinstance(other_t, bool):
+            other_t = int(other_t)
+        elif other_t.dtype == torch.bool:
+            other_t = other_t.to(torch.int32)
+    other_t = get_trt_tensor(network, other_t, f"{name}_other_t")
+    input_t, other_t = dtype_uniform(network, target, name, input_t, other_t)
     return add_binary_elementwise_layer(
-        network, kwargs["input"], kwargs["other"], trt.ElementWiseOperation.GREATER, target, name
+        network, input_t, other_t, trt.ElementWiseOperation.GREATER, target, name
     )
 
 
-@tensorrt_converter(acc_ops.le, no_implicit_batch_dim=True)
-def acc_ops_le(
+@tensorrt_converter(acc_ops.lt, no_implicit_batch_dim=True)
+def acc_ops_lt(
     network: TRTNetwork,
     target: Target,
     args: Tuple[Argument, ...],
@@ -1193,8 +1214,19 @@ def acc_ops_le(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     if network.has_implicit_batch_dimension:
         raise RuntimeError("The `le` function should be called with explicit batch dimension.")
+
+    input_t = kwargs["input"]
+    other_t =  kwargs["other"]
+    if isinstance(other_t, (torch.Tensor, bool)):
+        if isinstance(other_t, bool):
+            other_t = int(other_t)
+        elif other_t.dtype == torch.bool:
+            other_t = other_t.to(torch.int32)
+    other_t = get_trt_tensor(network, other_t, f"{name}_other_t")
+    input_t, other_t = dtype_uniform(network, target, name, input_t, other_t)
+
     return add_binary_elementwise_layer(
-        network, kwargs["input"], kwargs["other"], trt.ElementWiseOperation.LESS, target, name
+        network, input_t, other_t, trt.ElementWiseOperation.LESS, target, name
     )
 
 
@@ -1230,6 +1262,18 @@ def acc_ops_embedding(
 
     indices_tensor = kwargs["input"]
     embedding_tensor = kwargs["weight"]
+    if isinstance(indices_tensor, torch.Tensor) and indices_tensor.dtype == torch.int64:
+        indices_tensor = indices_tensor.to(torch.int32)
+        warnings.warn(
+            "Embedding op has indices_tensor dtype=int64. Reduce it to int32 to run on TRT. Accuracy may not be correct!"
+        )
+    if isinstance(embedding_tensor, torch.Tensor) and embedding_tensor.dtype == torch.int64:
+        embedding_tensor = embedding_tensor.to(torch.int32)
+        warnings.warn(
+            "Embedding op has embedding_tensor dtype=int64. Reduce it to int32 to run on TRT. Accuracy may not be correct!"
+        )
+    indices_tensor = get_trt_tensor(network, indices_tensor, f"{name}_indices_tensor")
+    embedding_tensor = get_trt_tensor(network, embedding_tensor, f"{name}_embedding_tensor")
 
     # unsupported parameters
     # ignore padding_idx since it is meaningful for training only
@@ -1775,7 +1819,7 @@ def acc_ops_expand_tensor(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_t = kwargs["input"]
-    shape = kwargs["sizes"].copy()
+    shape = list(kwargs["sizes"])
 
     input_val = get_trt_tensor(network, input_t, f"{name}_input")
 
@@ -1834,9 +1878,9 @@ def acc_ops_masked_fill_tensor(
 
     if type(value_t) is torch.Tensor:
         value_t = value_t.cpu().numpy()
-    value_t = float(value_t)
-    value_t = torch.ones(shape)*value_t
-
+    # cast to input type
+    input_dtype = torch_dtype_from_trt(input_t.dtype)
+    value_t = (torch.ones(shape)*value_t).to(input_dtype)
     input_val = get_trt_tensor(network, input_t, f"{name}_input")
     value_val = get_trt_tensor(network, value_t, f"{name}_input")
     layer = network.add_select(mask_val, value_val, input_val)
@@ -2563,3 +2607,66 @@ def acc_ops_hardtanh(
         alpha=kwargs["min_val"],
         beta=kwargs["max_val"],
     )
+
+
+@tensorrt_converter(acc_ops.interpolate)
+def acc_ops_interpolate(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    input_val = kwargs["input"]
+    size = kwargs["size"]
+    scale_factor = kwargs["scale_factor"]
+    mode = kwargs["mode"]
+    align_corners = kwargs["align_corners"]
+
+    if not isinstance(input_val, TRTTensor):
+        raise RuntimeError(f"interpolate received input {input_val} that is not part "
+                           "of the TensorRT region!")
+
+    dim = input_val.shape
+    ranks = len(input_val.shape)
+    if network.has_implicit_batch_dimension:
+        assert(ranks >=2 and ranks <= 4), "Interpolate expects inputs are 3D,4D,5D in shape"
+        ranks = ranks - 1
+    else:
+        assert(ranks >=3 and ranks <= 5), "Interpolate expects inputs are 3D,4D,5D in shape"
+        ranks = ranks - 2
+
+    layer = network.add_resize(input_val)
+    if network.has_implicit_batch_dimension:
+        if size != None:
+            if not isinstance(size, Sequence):
+                layer.shape = [dim[0]] + [size] * ranks
+            else:
+                layer.shape = [dim[0]] + list(size)
+        if scale_factor != None:
+            if not isinstance(scale_factor, Sequence):
+                layer.scales = [1] + [scale_factor] * ranks
+            else:
+                layer.scales = [1] + list(scale_factor)
+    else:
+        if size != None:
+            if not isinstance(size, Sequence):
+                layer.shape = [dim[0], dim[1]] + [size] * ranks
+            else:
+                layer.shape = [dim[0], dim[1]] + list(size)
+        if scale_factor != None:
+            if not isinstance(scale_factor, Sequence):
+                layer.scales = [1, 1] + [scale_factor] * ranks
+            else:
+                layer.scales = [1, 1] + list(scale_factor)
+
+    if mode.lower() in ["linear","bilinear","trilinear"]:
+        layer.resize_mode = trt.ResizeMode.LINEAR
+    else:
+        layer.resize_mode=trt.ResizeMode.NEAREST
+
+    if align_corners != None:
+        layer.coordinate_transformation = trt.ResizeCoordinateTransformation.ALIGN_CORNERS
+
+    set_layer_name(layer, target, name)
+    return layer.get_output(0)

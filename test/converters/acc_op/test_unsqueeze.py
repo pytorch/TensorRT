@@ -1,5 +1,3 @@
-# Owner(s): ["oncall: aiacc"]
-
 import torch
 import torch.fx
 import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops

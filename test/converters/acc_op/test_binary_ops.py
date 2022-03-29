@@ -1,5 +1,3 @@
-# Owner(s): ["oncall: aiacc"]
-
 from typing import Callable
 
 import torch

@@ -300,9 +300,15 @@ class TRTInterpreter(torch.fx.Interpreter):
             raise RuntimeError("TensorRT requires all outputs to be Tensor!")
 
         for i, output in enumerate(outputs):
+            if any(op_name in output.name.split("_") for op_name in ("eq", "gt", "lt")):
+                output_bool = True
+            else:
+                output_bool = False
             name = f"output{i}"
             output.name = name
             self.network.mark_output(output)
-            if self.output_fp16 and output.dtype == trt.float32:
+            if output_bool:
+                output.dtype = trt.bool
+            elif self.output_fp16 and output.dtype == trt.float32:
                 output.dtype = trt.float16
             self._output_names.append(name)
