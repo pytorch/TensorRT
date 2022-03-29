@@ -128,18 +128,18 @@ http_archive(
 #   build_file = "@//third_party/tensorrt/local:BUILD"
 #)
 
-#########################################################################
-# Testing Dependencies (optional - comment out on aarch64)
-#########################################################################
-pip_install(
-    name = "torch_tensorrt_py_deps",
-    requirements = "//py:requirements.txt",
-)
+# #########################################################################
+# # Testing Dependencies (optional - comment out on aarch64)
+# #########################################################################
+# pip_install(
+#     name = "torch_tensorrt_py_deps",
+#     requirements = "//py:requirements.txt",
+# )
 
-pip_install(
-    name = "py_test_deps",
-    requirements = "//tests/py:requirements.txt",
-)
+# pip_install(
+#     name = "py_test_deps",
+#     requirements = "//tests/py:requirements.txt",
+# )
 
 pip_install(
     name = "pylinter_deps",

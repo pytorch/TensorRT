@@ -17,13 +17,14 @@ class Var : torch::CustomClassHolder {
   enum Type { kITensor, kIValue, kNone };
 
   Var();
-  Var(const torch::jit::IValue* p);
+  Var(torch::jit::IValue* p);
   Var(nvinfer1::ITensor* p);
   Var(const Var& a);
   Var& operator=(const Var& a);
-  Var& operator=(const torch::jit::IValue* in);
+  Var& operator=(torch::jit::IValue* in);
   Var& operator=(nvinfer1::ITensor* in);
   const torch::jit::IValue* IValue() const;
+  torch::jit::IValue* IValueMut() const;
   nvinfer1::ITensor* ITensor() const;
 
   // TODO: Can we consolidate this in a way that prevents requesting invalid
@@ -63,7 +64,7 @@ class Var : torch::CustomClassHolder {
 
  private:
   union VarContainer {
-    const torch::jit::IValue* ivalue;
+    torch::jit::IValue* ivalue;
     nvinfer1::ITensor* tensor;
     void* none;
   };
