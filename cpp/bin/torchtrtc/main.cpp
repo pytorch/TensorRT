@@ -460,7 +460,6 @@ int main(int argc, char** argv) {
     compile_settings.debug = true;
   }
 
-
   if (allow_gpu_fallback) {
     compile_settings.device.allow_gpu_fallback = true;
   }
@@ -582,7 +581,6 @@ int main(int argc, char** argv) {
   if (workspace_size) {
     compile_settings.workspace_size = args::get(workspace_size);
   }
-
 
   if (truncate_long_and_double) {
     compile_settings.truncate_long_and_double = true;
