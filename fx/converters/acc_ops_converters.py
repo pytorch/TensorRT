@@ -172,7 +172,8 @@ def acc_ops_convnd(
 
 
 @tensorrt_converter(acc_ops.conv_transpose2d)
-def acc_ops_conv_transpose2d(
+@tensorrt_converter(acc_ops.conv_transpose3d)
+def acc_ops_conv_transposend(
     network: TRTNetwork,
     target: Target,
     args: Tuple[Argument, ...],
@@ -195,7 +196,7 @@ def acc_ops_conv_transpose2d(
     # right now
     if kwargs["bias"] is not None and not isinstance(kwargs["bias"], torch.Tensor):
         raise RuntimeError(
-            f"conv {name} has bias of type {type(kwargs['bias'])}, Expect Optional[Tensor]"
+            f"ConvTranspose {name} has bias of type {type(kwargs['bias'])}, Expect Optional[Tensor]"
         )
     bias = to_numpy(kwargs["bias"])  # type: ignore[arg-type]
 
@@ -205,10 +206,11 @@ def acc_ops_conv_transpose2d(
         # will need to use uninitialized weight and set it later to support
         # ITensor weights
         dummy_weight = trt.Weights()
-        # nn.ConvTranspose2d weight size is (in_channels, out_channels/groups, kernel_0, kernel_1)
+
+        # nn.ConvTranspose2d/3d weight size is (in_channels, out_channels/groups, kernel_0, kernel_1, [kernel_2])
         layer = network.add_deconvolution_nd(
             input=input_val,
-            num_output_maps=weight.shape[1]*kwargs["groups"],
+            num_output_maps=weight.shape[1] * kwargs["groups"],
             kernel_shape=weight.shape[2:],
             kernel=dummy_weight,
             bias=bias,
@@ -221,10 +223,10 @@ def acc_ops_conv_transpose2d(
                 f"conv {name} has weight of type {type(kwargs['weight'])}, Expect Optional[Tensor]"
             )
         weight = to_numpy(kwargs["weight"])
-        # nn.ConvTranspose2d weight size is (in_channels, out_channels/groups, kernel_0, kernel_1)
+        # nn.ConvTranspose2d/3d weight size is (in_channels, out_channels/groups, kernel_0, kernel_1, [kernel_2])
         layer = network.add_deconvolution_nd(
             input=input_val,
-            num_output_maps=weight.shape[1]*kwargs["groups"],
+            num_output_maps=weight.shape[1] * kwargs["groups"],
             kernel_shape=weight.shape[2:],
             kernel=weight,
             bias=bias,

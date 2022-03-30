@@ -1446,6 +1446,21 @@ def conv_transpose2d(*, input, weight, bias, stride, padding, output_padding, gr
     )
 
 
+@register_acc_op_mapping(op_and_target=("call_function", torch.nn.functional.conv_transpose3d))
+@register_acc_op
+def conv_transpose3d(*, input, weight, bias, stride, padding, output_padding, groups, dilation):
+    return nn.functional.conv_transpose3d(
+        input=input,
+        weight=weight,
+        bias=bias,
+        stride=stride,
+        padding=padding,
+        output_padding=output_padding,
+        groups=groups,
+        dilation=dilation,
+    )
+
+
 @register_acc_op_mapping(op_and_target=("call_function", nn.functional.batch_norm))
 @register_acc_op
 def batch_norm(
