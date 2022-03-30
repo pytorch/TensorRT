@@ -34,6 +34,8 @@ from .trt_module import (
     TRTModule,
 )
 from .utils import LowerPrecision
+from fx2trt_oss.fx.passes.pass_utils import validate_inference, decorate_method
+
 
 logger = logging.getLogger(__name__)
 
@@ -336,6 +338,8 @@ class Lowerer:
             lower_setting=lower_setting,
         )
 
+
+    @decorate_method(validate_inference(atol=1e-1, rtol=1e-1))
     def __call__(
         self,
         module: nn.Module,

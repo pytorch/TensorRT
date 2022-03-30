@@ -1,5 +1,5 @@
 from typing import List, Any, Callable
-from torch import fx
+from torch import nn, fx
 import logging
 import torch
 import tempfile
@@ -40,14 +40,14 @@ def validate_inference(rtol=None, atol=None):
             module: fx.GraphModule, input: Input
         ) -> fx.GraphModule:
             res0 = module(*input)
-            module = pass_(module, input)
+            processed_module = pass_(module, input)
             res1 = module(*input)
 
             tensor_res_0 = _collect_tensors(res0)
             tensor_res_1 = _collect_tensors(res1)
 
             for kk, (x, y) in enumerate(zip(tensor_res_0, tensor_res_1)):
-                kwargs = {}
+                kwargs = {"equal_nan": True}
                 if rtol:
                     kwargs["rtol"] = rtol
                 if atol:
@@ -55,11 +55,26 @@ def validate_inference(rtol=None, atol=None):
                 assert torch.allclose(
                     x, y, **kwargs
                 ), f"pass {pass_} failed correctness check due to output {kk}"
-            return module
+            return processed_module
 
         return pass_with_validation
 
     return _validate_inference
+
+
+Decorator = Callable[[Callable], Callable]
+def decorate_method(dec_for_function: Decorator) -> Decorator:
+
+    def dec_for_method(unbounded_method) -> Callable:
+        def decorated_unbounded_method(self, *args, **kwargs):
+            @dec_for_function
+            def bounded_method(*args, **kwargs):
+                return unbounded_method(self, *args, **kwargs)
+            return bounded_method(*args, **kwargs)
+
+        return decorated_unbounded_method
+
+    return dec_for_method
 
 
 def log_before_after(pass_: PassFunc) -> PassFunc:
