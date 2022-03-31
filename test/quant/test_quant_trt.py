@@ -752,7 +752,7 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
                 return self.relu(self.linear(x))
 
         model = LinearModule().eval()
-        inputs = torch.rand(8, 5)
+        inputs = [torch.rand(8, 5)]
 
         prepared = prepare_fx(model, {"": self.qconfig}, backend_config_dict=self.trt_backend_config_dict)
         quantized = convert_fx(
