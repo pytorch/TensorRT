@@ -1,4 +1,4 @@
-# Owner(s): ["oncall: aiacc"]
+# Owner(s): ["oncall: gpu_enablement"]
 
 import torch
 import torch.fx

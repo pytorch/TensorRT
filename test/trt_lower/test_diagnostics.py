@@ -1,4 +1,4 @@
-# Owner(s): ["oncall: aiacc"]
+# Owner(s): ["oncall: gpu_enablement"]
 from typing import Union
 from unittest import TestCase
 import functools

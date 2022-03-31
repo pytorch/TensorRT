@@ -1,4 +1,4 @@
-# Owner(s): ["oncall: aiacc"]
+# Owner(s): ["oncall: gpu_enablement"]
 from unittest import TestCase
 import functools
 import fx2trt_oss.fx.observer as ob
