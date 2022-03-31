@@ -25,38 +25,17 @@ at::Tensor generateSingleInput(ir::Input& input, c10::optional<at::ScalarType>& 
 }
 
 std::unordered_map<const torch::jit::Value*, torch::jit::IValue> generateRandomInputs(
-// std::unordered_map<const torch::jit::Value*, std::vector<torch::jit::IValue>> generateRandomInputs(
-    // std::unordered_map<const torch::jit::Value*, ir::Input>& inputs,
     std::unordered_map<const torch::jit::Value*, std::vector<ir::Input>>& inputs,
-    // std::unordered_map<const torch::jit::Value*, c10::optional<at::ScalarType>>& types) {
     std::unordered_map<const torch::jit::Value*, std::vector<c10::optional<at::ScalarType>>>& types) {
+
   // generate random inputs for running pytorch segments
   std::unordered_map<const torch::jit::Value*, torch::jit::IValue> ivalue_map;
-  // std::unordered_map<const torch::jit::Value*, std::vector<torch::jit::IValue>> ivalue_map;
-  // TODO
-  // uint64_t in_i = 0;
-  for (auto& input : inputs) {
 
-    // for (int i = 0; i < input.second.size(); i++) {
-    //   auto cur_shape = input.second[i].input_shape;
-    //   std::vector<int64_t> shape;
-    //   shape.insert(shape.begin(), std::begin(cur_shape.d), std::begin(cur_shape.d) + cur_shape.nbDims);
-    //   auto type_opt = types[input.first][i];
-    //   auto type = at::kFloat;
-    //   if (type_opt) {
-    //     type = type_opt.value();
-    //   } else {
-    //     LOG_WARNING("Input type for doing shape analysis could not be determined, defaulting to F32");
-    //   }
-    //   auto in = at::randint(5, shape, {at::kCUDA}).to(type);
-    //   // ivalue_map[input.first] = in.clone();
-    //   ivalue_map[input.first].push_back(in.clone());
-    //   // in_i++;
-    // }
+
+  for (auto& input : inputs) {
 
     if (input.first->type()->kind() == torch::jit::TypeKind::ListType) {
       // create list
-      LOG_DEBUG("generateRandomInputs, generate random input of list type");
       std::vector<torch::jit::IValue> list;
       c10::TypePtr elementType = c10::TensorType::get();
       auto generic_list = c10::impl::GenericList(elementType);
@@ -65,10 +44,8 @@ std::unordered_map<const torch::jit::Value*, torch::jit::IValue> generateRandomI
         generic_list.push_back(in.clone());
       }
       ivalue_map[input.first] = c10::IValue(generic_list);
-      LOG_DEBUG("generateRandomInputs, finish generate random input of list type");
     } else if (input.first->type()->kind() == torch::jit::TypeKind::TupleType) {
       // create tuple
-      LOG_DEBUG("generateRandomInputs, generate random input of tuple type");
       std::vector<torch::jit::IValue> list;
       for (int i = 0; i < input.second.size(); i++) {
         auto in = generateSingleInput(input.second[i], types[input.first][i]);
@@ -77,7 +54,6 @@ std::unordered_map<const torch::jit::Value*, torch::jit::IValue> generateRandomI
       auto tuple = c10::ivalue::Tuple::create(list); // create tuple ptr
       ivalue_map[input.first] = c10::IValue(tuple);
     } else {
-      LOG_DEBUG("generateRandomInputs, generate random input of tensor type");
       auto in = generateSingleInput(input.second[0], types[input.first][0]);
       ivalue_map[input.first] = in.clone();
       
@@ -89,7 +65,6 @@ std::unordered_map<const torch::jit::Value*, torch::jit::IValue> generateRandomI
 void getSegmentsOutputByRunning(
     SegmentedBlock& seg_block,
     std::unordered_map<const torch::jit::Value*, torch::jit::IValue>& ivalues_maps,
-    // std::unordered_map<const torch::jit::Value*, std::vector<torch::jit::IValue>>& ivalues_maps,
     const PartitionInfo& partition_info) {
   // create a module to run the graph
   auto g = seg_block.g();
@@ -134,11 +109,9 @@ void getSegmentsOutputByRunning(
       jit_inputs_ivalues.push_back(ivalues_maps[input].toBool());
     } else if (input->type()->kind() == torch::jit::TypeKind::ListType) {
       // create list
-      LOG_DEBUG("getSegmentsOutputByRunning, handle list type");
       jit_inputs_ivalues.push_back(ivalues_maps[input].toList());;
     } else if (input->type()->kind() == torch::jit::TypeKind::TupleType) {
       // create tuple
-      LOG_DEBUG("getSegmentsOutputByRunning, handle tuple type");
       jit_inputs_ivalues.push_back(ivalues_maps[input].toTuple());
     } else if (input->type()->kind() == torch::jit::TypeKind::NumberType) {
       jit_inputs_ivalues.push_back(ivalues_maps[input].toScalar());

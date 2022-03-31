@@ -81,7 +81,7 @@ void flatten_dfs(std::vector<torchtrt::core::ir::Input>& flattened_inputs, std::
       } else if (level == 2) {  // like A in [(A, A), C]
         collection_inputs[index].push_back(cur_input);
       } else {// only support 2 level
-        LOG_ERROR("3 level of input specs is not supported");
+        LOG_ERROR("Input nesting depth exceeds currently supported depth (3), use 1 level: [A, B], or 2 level: [A, (B, C)]");
       }
     }
 }
@@ -99,7 +99,7 @@ torch_tensorrt::core::ir::GraphInputs to_internal_graph_inputs(GraphInputs exter
     internal_graph_input.input_signature = converted_input_signature;
     internal_graph_input.collection_inputs = collection_inputs;
 
-    LOG_DEBUG("compile_spec.cpp, to_internal_graph_inputs, flattened_inputs size " << flattened_inputs.size() << ", collection_inputs size "<< collection_inputs.size());
+    LOG_DEBUG("Convert external_graph_input to internal_graph_inputs, total input input spec number: " << flattened_inputs.size() << ", top level input spec number "<< collection_inputs.size());
 
   return internal_graph_input;
 }
@@ -107,11 +107,11 @@ torch_tensorrt::core::ir::GraphInputs to_internal_graph_inputs(GraphInputs exter
 torchtrt::core::CompileSpec to_internal_compile_spec(CompileSpec external) {
   torchtrt::core::CompileSpec internal(to_vec_internal_inputs(external.inputs));
   if (internal.inputs.size() == 0) {
-    LOG_DEBUG("to_internal_compile_spec, Input size == 0, using graph_input");
+    LOG_DEBUG("GraphInput.inputs size == 0, using GraphInput.input_signature to get Input spec");
     internal.graph_inputs = to_internal_graph_inputs(external.graph_inputs);
     internal.inputs = internal.graph_inputs.flattened_inputs;
   } else {
-    LOG_DEBUG("to_internal_compile_spec, Input size != 0, using original Input to construct collection_input");
+    LOG_DEBUG("GraphInput.inputs size != 0, using GraphInput.inputs to get Input spec");
     internal.graph_inputs.collection_inputs.resize(internal.inputs.size());
     for (int i = 0; i < internal.inputs.size(); i++) {
       internal.graph_inputs.collection_inputs[i].push_back(internal.inputs[i]);

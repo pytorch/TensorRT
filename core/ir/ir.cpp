@@ -22,7 +22,6 @@ CollectionInputSpecMap associate_specs_with_collection_inputs(
 }
 
 InputSpecMap pair_input_vals_with_specs(std::vector<const torch::jit::Value*> vals, std::vector<Input> specs) {
-  LOG_DEBUG("pair_input_vals_with_specs");
   TORCHTRT_CHECK(
       vals.size() == specs.size(),
       "Expected dimension specifications for all input tensors"
@@ -37,7 +36,6 @@ InputSpecMap pair_input_vals_with_specs(std::vector<const torch::jit::Value*> va
 }
 
 CollectionInputSpecMap pair_input_vals_with_specs_collection(std::vector<const torch::jit::Value*> vals, std::vector<std::vector<Input>>& specs) {
-  LOG_DEBUG("pair_input_vals_with_specs collection");
   TORCHTRT_CHECK(
       vals.size() == specs.size(),
       "Expected dimension specifications for all input tensors"
@@ -56,9 +54,9 @@ std::vector<const torch::jit::Value*> get_tensor_inputs(
     StaticParams& static_params) {
   std::vector<const torch::jit::Value*> input_tensors;
   auto inputs = g->inputs();
-  LOG_DEBUG("Inputs size " << inputs.size());
+  LOG_DEBUG("Raw inputs size of get_tensor_inputs: " << inputs.size());
   for (auto in : inputs) {
-    LOG_DEBUG("input debug name: " << in->debugName());
+    LOG_DEBUG("Handle input of debug name: " << in->debugName());
     // Disregarding inputs that are not tensors or are static
     //
     // Ex.
@@ -76,9 +74,9 @@ std::vector<const torch::jit::Value*> get_collection_inputs(
     StaticParams& static_params) {
   std::vector<const torch::jit::Value*> input_tensors;
   auto inputs = g->inputs();
-  LOG_DEBUG("get_collection_inputs, inputs size " << inputs.size());
+  LOG_DEBUG("Raw inputs size of get_collection_inputs: " << inputs.size());
   for (auto in : inputs) {
-    LOG_DEBUG("input debug name: " << in->debugName());
+    LOG_DEBUG("Handle input of debug name: " << in->debugName());
     if (in->type()->isSubtypeOf(c10::TensorType::get()) && static_params.find(in) == static_params.end()) {
       input_tensors.push_back(in);
     } else if (in->type()->kind() == torch::jit::TypeKind::TupleType && static_params.find(in) == static_params.end()) {
@@ -101,12 +99,9 @@ c10::optional<at::ScalarType> get_value_first_calc_dtype_opt(torch::jit::Block* 
   auto b_ins = b->inputs();
   std::unordered_set<torch::jit::Value*> b_in_set(b_ins.begin(), b_ins.end());
 
-  // TORCHTRT_ASSERT(
-  //     in->type() == c10::TensorType::get(), "Input is not a tensor, cannot check for dtype based on calculation");
-
   auto consumers = in->uses();
   auto search_list = std::vector<torch::jit::Use>(consumers.begin(), consumers.end());
-  LOG_DEBUG("Users number for " << in->debugName() << ": " << consumers.size());
+
   while(search_list.size() > 0) {
     // after insertion, original iterator will be invalid
     auto& u = search_list.front();
@@ -221,13 +216,11 @@ CollectionTypeMap get_block_first_calc_dtypes_opt_collection(torch::jit::Block* 
       types.insert({in, {get_value_first_calc_dtype_opt(b, i)}});
 
     } else if(i->type()->kind() == torch::jit::TypeKind::TupleType) {
-      LOG_DEBUG("get_block_first_calc_dtypes_opt_collection TupleType");
       // TODO: to evaluate the data type of tuple element
       // make sure very time get the same ptr
-      c10::optional<at::ScalarType> tp = get_value_first_calc_dtype_opt(b, i);
+      // c10::optional<at::ScalarType> tp = get_value_first_calc_dtype_opt(b, i);
       at::ArrayRef<torch::jit::Value*> unpack_tuple = torch::jit::createTupleUnpack(i);
-      LOG_DEBUG("get_block_first_calc_dtypes_opt_collection: tuple size " << unpack_tuple.size());
-      // TODO: calculate the tuple element type
+      // TODO: calculate the tuple element type, currently we use {} as default datatype
       // std::vector<c10::optional<at::ScalarType>> dytpes(unpack_tuple.size(), tp);
       std::vector<c10::optional<at::ScalarType>> dytpes(unpack_tuple.size());
       types.insert({i, dytpes}); // insert an empty 
