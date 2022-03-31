@@ -44,6 +44,11 @@ new_local_repository(
     build_file = "@//third_party/cublas:BUILD",
 )
 
+local_repository(
+    name = "torch_tensorrt",
+    path = "/usr/local/lib/python3.8/dist-packages/torch_tensorrt"
+)
+
 #############################################################################################################
 # Tarballs and fetched dependencies (default - use in cases when building from precompiled bin and tarballs)
 #############################################################################################################
