@@ -517,10 +517,11 @@ struct TORCHTRT_API Input : torch::CustomClassHolder{
 /**
  * @brief A struct to hold complex inputs
  *
- * This struct can either hold a conplex inputs of shape or a flattened one,
+ * This struct can either hold a complex inputs of shape or a flattened one,
  */
 struct TORCHTRT_API GraphInputs {
-  torch::jit::IValue input_signature;   // nested Input, full input spec
+  torch::jit::IValue input_signature;  // nested Input, full input spec
+  std::vector<Input> inputs; // flatten input spec
 };
 
 /**
@@ -590,24 +591,16 @@ struct TORCHTRT_API CompileSpec {
    *
    * @param inputs
    */
-  CompileSpec(std::vector<Input> inputs) : inputs(std::move(inputs)) {}
+  CompileSpec(std::vector<Input> inputs);
 
   /**
    * @brief Construct a new Extra Info object from IValue.
    * The IValue store a complex Input
    *
-   * @param inputs
+   * @param input_signature
    */
   CompileSpec(torch::jit::IValue input_signature);
   // Defaults should reflect TensorRT defaults for BuilderConfig
-
-  /**
-   * @brief Specifications for inputs to the engine, can either be a single size or a range defined by min, opt and max
-   * sizes Users can also specify expected input type as well as tensor memory format
-   *
-   * Order in vector should match call order for the function
-   */
-  std::vector<Input> inputs;
 
   /**
    * @brief Specifications for inputs to the engine, can store a IValue which has stored complex Input

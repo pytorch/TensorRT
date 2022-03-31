@@ -14,12 +14,13 @@ namespace torch_tensorrt {
 namespace core {
 
 struct CompileSpec {
-  CompileSpec(std::vector<ir::Input> inputs) : inputs(inputs) {}
+  CompileSpec(std::vector<ir::Input> inputs) {
+    graph_inputs.inputs = inputs;
+  }
   CompileSpec(torch::jit::IValue& input_signature) {
     graph_inputs.input_signature = input_signature;
   }
   ir::GraphInputs graph_inputs;
-  std::vector<ir::Input> inputs; // can be replaced by graph_inputs
   conversion::ConversionInfo convert_info;
   lowering::LowerInfo lower_info;
   partitioning::PartitionInfo partition_info;
