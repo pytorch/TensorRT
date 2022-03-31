@@ -8,7 +8,7 @@
 
 TEST(CppAPITests, TestCollectionNormalInput) {
 
-  std::string path = "/root/Torch-TensorRT/normal_model.ts";
+  std::string path = "tests/modules/normal_model.jit.pt";
   torch::Tensor in0 = torch::randn({1, 3, 512, 512}, torch::kCUDA).to(torch::kHalf);
   std::vector<at::Tensor> inputs;
   inputs.push_back(in0);
@@ -53,7 +53,7 @@ TEST(CppAPITests, TestCollectionNormalInput) {
 
 TEST(CppAPITests, TestCollectionTupleInput) {
 
-  std::string path = "/root/Torch-TensorRT/tuple_input.ts";
+  std::string path = "tests/modules/tuple_input.jit.pt";
   torch::Tensor in0 = torch::randn({1, 3, 512, 512}, torch::kCUDA).to(torch::kHalf);
 
   torch::jit::Module mod;
@@ -103,7 +103,7 @@ TEST(CppAPITests, TestCollectionTupleInput) {
 
 TEST(CppAPITests, TestCollectionListInput) {
 
-  std::string path = "/root/Torch-TensorRT/list_input.ts";
+  std::string path = "tests/modules/list_input.jit.pt";
   torch::Tensor in0 = torch::randn({1, 3, 512, 512}, torch::kCUDA).to(torch::kHalf);
   std::vector<at::Tensor> inputs;
   inputs.push_back(in0);
@@ -169,7 +169,7 @@ TEST(CppAPITests, TestCollectionListInput) {
 
 TEST(CppAPITests, TestCollectionTupleInputOutput) {
 
-  std::string path = "/root/Torch-TensorRT/tuple_input_output.ts";
+  std::string path = "tests/modules/tuple_input_output.jit.pt";
 
   torch::Tensor in0 = torch::randn({1, 3, 512, 512}, torch::kCUDA).to(torch::kHalf);
 
@@ -224,7 +224,7 @@ TEST(CppAPITests, TestCollectionTupleInputOutput) {
 
 TEST(CppAPITests, TestCollectionListInputOutput) {
 
-  std::string path = "/root/Torch-TensorRT/list_input_output.ts";
+  std::string path = "tests/modules/list_input_output.jit.pt";
   torch::Tensor in0 = torch::randn({1, 3, 512, 512}, torch::kCUDA).to(torch::kHalf);
   std::vector<at::Tensor> inputs;
   inputs.push_back(in0);
@@ -296,7 +296,7 @@ TEST(CppAPITests, TestCollectionListInputOutput) {
 
 TEST(CppAPITests, TestCollectionComplexModel) {
 
-  std::string path = "/root/Torch-TensorRT/complex_model.ts";
+  std::string path = "tests/modules/complex_model.jit.pt";
   torch::Tensor in0 = torch::randn({1, 3, 512, 512}, torch::kCUDA).to(torch::kHalf);
   std::vector<at::Tensor> inputs;
   inputs.push_back(in0);

@@ -3,11 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
 import timm
-<<<<<<< HEAD
 from transformers import BertModel, BertTokenizer, BertConfig
-=======
 from typing import Tuple, List, Dict
->>>>>>> feat: [collection] move collection test model to hub.py
 
 torch.hub._validate_not_a_forked_repo = lambda a, b, c: True
 
@@ -286,29 +283,29 @@ class ComplexModel(nn.Module):
 normal_model = Normal()
 normal_model_ts = torch.jit.script(normal_model)
 normal_model_ts.to("cuda").eval()
-torch.jit.save(normal_model_ts, "normal_model.ts")
+torch.jit.save(normal_model_ts, "normal_model.jit.pt")
 
 tuple_input = TupleInput()
 tuple_input_ts = torch.jit.script(tuple_input)
 tuple_input_ts.to("cuda").eval()
-torch.jit.save(tuple_input_ts, "tuple_input.ts")
+torch.jit.save(tuple_input_ts, "tuple_input.jit.pt")
 
 list_input = ListInput()
 list_input_ts = torch.jit.script(list_input)
 list_input_ts.to("cuda").eval()
-torch.jit.save(list_input_ts, "list_input.ts")
+torch.jit.save(list_input_ts, "list_input.jit.pt")
 
 tuple_input = TupleInputOutput()
 tuple_input_ts = torch.jit.script(tuple_input)
 tuple_input_ts.to("cuda").eval()
-torch.jit.save(tuple_input_ts, "tuple_input_output.ts")
+torch.jit.save(tuple_input_ts, "tuple_input_output.jit.pt")
 
 list_input = ListInputOutput()
 list_input_ts = torch.jit.script(list_input)
 list_input_ts.to("cuda").eval()
-torch.jit.save(list_input_ts, "list_input_output.ts")
+torch.jit.save(list_input_ts, "list_input_output.jit.pt")
 
 complex_model = ComplexModel()
 complex_model_ts = torch.jit.script(complex_model)
 complex_model_ts.to("cuda").eval()
-torch.jit.save(complex_model_ts, "complex_model.ts")
+torch.jit.save(complex_model_ts, "complex_model.jit.pt")
