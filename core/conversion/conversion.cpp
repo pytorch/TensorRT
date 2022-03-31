@@ -134,9 +134,8 @@ void AddInputs(
     ConversionCtx* ctx,
     c10::ArrayRef<const torch::jit::Value*> inputs,
     ConversionInfo& conversion_info) {
-    // std::unordered_map<const torch::jit::Value*, ir::Input>& input_specs) {
   std::unordered_map<const torch::jit::Value*, ir::Input>& input_specs = conversion_info.inputs;
-  std::unordered_map<const torch::jit::Value*, std::vector<ir::Input>> collection_input_spec = conversion_info.collection_inputs;
+  std::unordered_map<const torch::jit::Value*, std::vector<ir::Input>> collection_input_spec = conversion_info.collection_input_spec_map;
   
   std::vector<const torch::jit::Value*> input_tensors;
   for (auto in : inputs) {
@@ -396,7 +395,6 @@ void ConvertBlockToNetDef(
 
   auto inputs = b->inputs();
   AddParamsToCtxValueMap(ctx, static_params);
-  // AddInputs(ctx, inputs, build_info.inputs);
   AddInputs(ctx, inputs, build_info);
 
   auto nodes = b->nodes();

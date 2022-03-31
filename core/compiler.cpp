@@ -294,13 +294,13 @@ void MapInputsAndDetermineDTypes(
     std::shared_ptr<torch::jit::Graph>& g,
     ir::StaticParams& static_params,
     ir::CollectionTypeMap& first_use_type_map) {
-    cfg.convert_info.collection_inputs = std::move(ir::associate_specs_with_collection_inputs(g, cfg.graph_inputs, static_params));
+    cfg.convert_info.collection_input_spec_map = std::move(ir::associate_specs_with_collection_inputs(g, cfg.graph_inputs, static_params));
 
     auto collection_inputs = ir::get_collection_inputs(g, static_params);
     LOG_DEBUG("In MapInputsAndDetermineDTypes, the g->inputs() size is " << g->inputs().size() << ", CollectionInputSpecMap size is" << collection_inputs.size());
 
     for (auto in : collection_inputs) {
-      std::vector<ir::Input>& spec = cfg.convert_info.collection_inputs.find(in)->second;
+      std::vector<ir::Input>& spec = cfg.convert_info.collection_input_spec_map.find(in)->second;
       std::vector<c10::optional<at::ScalarType>> est_type_opt;
       
       auto est_it = first_use_type_map.find(in);
@@ -327,21 +327,21 @@ void MapInputsAndDetermineDTypes(
             LOG_INFO("Cannot infer input tensor dtype in graph, compiler is going to use the user setting");
             std::stringstream ss;
             ss << "For input " << in->debugName() << ", found user specified input dtype as ";
-            ss << cfg.convert_info.collection_inputs.find(in)->second[i].dtype;
-            ss << ". The compiler is going to use the user setting " << cfg.convert_info.collection_inputs.find(in)->second[i].dtype;
+            ss << cfg.convert_info.collection_input_spec_map.find(in)->second[i].dtype;
+            ss << ". The compiler is going to use the user setting " << cfg.convert_info.collection_input_spec_map.find(in)->second[i].dtype;
             auto warn_str = ss.str();
             LOG_WARNING(warn_str);
             // Overwrite type map with user settings
-            first_use_type_map[in][i] = {util::TRTDataTypeToScalarType(cfg.convert_info.collection_inputs.find(in)->second[i].dtype)};
+            first_use_type_map[in][i] = {util::TRTDataTypeToScalarType(cfg.convert_info.collection_input_spec_map.find(in)->second[i].dtype)};
 
           } else {
-            if (util::TRTDataTypeToScalarType(cfg.convert_info.collection_inputs.find(in)->second[i].dtype) != est_type_opt[i].value()) {
+            if (util::TRTDataTypeToScalarType(cfg.convert_info.collection_input_spec_map.find(in)->second[i].dtype) != est_type_opt[i].value()) {
               std::stringstream ss;
               ss << "For input " << in->debugName() << ", found user specified input dtype as ";
-              ss << cfg.convert_info.collection_inputs.find(in)->second[i].dtype;
+              ss << cfg.convert_info.collection_input_spec_map.find(in)->second[i].dtype;
               ss << ", however when inspecting the graph, the input type expected was inferred to be ";
               ss << est_type_opt[i].value() << std::endl;
-              ss << "The compiler is going to use the user setting " << cfg.convert_info.collection_inputs.find(in)->second[i].dtype;
+              ss << "The compiler is going to use the user setting " << cfg.convert_info.collection_input_spec_map.find(in)->second[i].dtype;
               ss << "\nThis conflict may cause an error at runtime due to partial compilation being enabled and therefore\n";
               ss << "compatibility with PyTorch's data type convention is required.\n";
               ss << "If you do indeed see errors at runtime either:\n";
@@ -350,7 +350,7 @@ void MapInputsAndDetermineDTypes(
               auto warn_str = ss.str();
               LOG_WARNING(warn_str);
               // Overwrite type map with user settings
-              first_use_type_map[in][i] = {util::TRTDataTypeToScalarType(cfg.convert_info.collection_inputs.find(in)->second[i].dtype)};
+              first_use_type_map[in][i] = {util::TRTDataTypeToScalarType(cfg.convert_info.collection_input_spec_map.find(in)->second[i].dtype)};
             }
           }
         } else {
@@ -436,7 +436,7 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
           !(cfg.lower_info.forced_fallback_modules.size() == 0 &&
             cfg.partition_info.forced_fallback_operators.size() == 0 &&
             conversion::VerifyConverterSupportForBlock(g->block(), false))) {
-        auto collection_input_ivalues_map = partitioning::generateRandomInputs(cfg.convert_info.collection_inputs, first_use_types);
+        auto collection_input_ivalues_map = partitioning::generateRandomInputs(cfg.convert_info.collection_input_spec_map, first_use_types);
         auto graph_and_mapping = ConstructFallbackGraph(new_mod, g->block(), collection_input_ivalues_map, cfg, static_params);
         new_g = graph_and_mapping.first;
         LOG_INFO("Segmented Graph: " << *new_g);
