@@ -297,7 +297,7 @@ class TRTInterpreter(torch.fx.Interpreter):
             raise RuntimeError("TensorRT requires all outputs to be Tensor!")
 
         for i, output in enumerate(outputs):
-            if any(op_name in output.name.split("_") for op_name in ("eq", "gt", "lt")):
+            if any(op_name in output.name.split("_") for op_name in ("eq", "gt", "lt", "or", "xor")):
                 output_bool = True
             else:
                 output_bool = False

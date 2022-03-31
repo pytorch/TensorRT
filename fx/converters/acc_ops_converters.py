@@ -1313,6 +1313,73 @@ def acc_ops_lt(
         network, input_t, other_t, trt.ElementWiseOperation.LESS, target, name
     )
 
+@tensorrt_converter(acc_ops.logical_or, no_implicit_batch_dim=True)
+def acc_ops_logical_or(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    if network.has_implicit_batch_dimension:
+        raise RuntimeError("The `logical_or` function should be called with explicit batch dimension.")
+
+    input_t = kwargs["input"]
+    other_t =  kwargs["other"]
+    if isinstance(other_t, (torch.Tensor, bool)):
+        if isinstance(other_t, bool):
+            other_t = int(other_t)
+        elif other_t.dtype == torch.bool:
+            other_t = other_t.to(torch.int32)
+    other_t = get_trt_tensor(network, other_t, f"{name}_other_t")
+    if input_t.dtype != trt.bool:
+        layer_i = network.add_identity(input_t)
+        layer_i.set_output_type(0, trt.bool)
+        set_layer_name(layer_i, target, f"{name}_input_dtype_change")
+        input_t = layer_i.get_output(0)
+    if other_t.dtype != trt.bool:
+        layer_o = network.add_identity(other_t)
+        layer_o.set_output_type(0, trt.bool)
+        set_layer_name(layer_o, target, f"{name}_other_dtype_change")
+        other_t = layer_o.get_output(0)
+
+    return add_binary_elementwise_layer(
+        network, input_t, other_t, trt.ElementWiseOperation.OR, target, name
+    )
+
+@tensorrt_converter(acc_ops.logical_xor, no_implicit_batch_dim=True)
+def acc_ops_logical_xor(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    if network.has_implicit_batch_dimension:
+        raise RuntimeError("The `logical_xor` function should be called with explicit batch dimension.")
+
+    input_t = kwargs["input"]
+    other_t =  kwargs["other"]
+    if isinstance(other_t, (torch.Tensor, bool)):
+        if isinstance(other_t, bool):
+            other_t = int(other_t)
+        elif other_t.dtype == torch.bool:
+            other_t = other_t.to(torch.int32)
+    other_t = get_trt_tensor(network, other_t, f"{name}_other_t")
+    if input_t.dtype != trt.bool:
+        layer_i = network.add_identity(input_t)
+        layer_i.set_output_type(0, trt.bool)
+        set_layer_name(layer_i, target, f"{name}_input_dtype_change")
+        input_t = layer_i.get_output(0)
+    if other_t.dtype != trt.bool:
+        layer_o = network.add_identity(other_t)
+        layer_o.set_output_type(0, trt.bool)
+        set_layer_name(layer_o, target, f"{name}_other_dtype_change")
+        other_t = layer_o.get_output(0)
+
+    return add_binary_elementwise_layer(
+        network, input_t, other_t, trt.ElementWiseOperation.XOR, target, name
+    )
 
 @tensorrt_converter(acc_ops.fmod)
 def acc_ops_fmod(

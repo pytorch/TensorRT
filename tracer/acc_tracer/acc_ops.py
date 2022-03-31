@@ -1237,6 +1237,22 @@ def gt(*, input, other):
 def lt(*, input, other):
     return torch.lt(input=input, other=other)
 
+@register_acc_op_properties(AccOpProperty.pointwise)
+@register_acc_op_mapping(op_and_target=("call_function", operator.or_))
+@register_acc_op_mapping(op_and_target=("call_function", torch.logical_or))
+@register_acc_op_mapping(op_and_target=("call_method", "logical_or"))
+@register_acc_op
+def logical_or(*, input, other):
+    return torch.logical_or(input=input, other=other)
+
+@register_acc_op_properties(AccOpProperty.pointwise)
+@register_acc_op_mapping(op_and_target=("call_function", operator.xor))
+@register_acc_op_mapping(op_and_target=("call_function", torch.logical_xor))
+@register_acc_op_mapping(op_and_target=("call_method", "logical_xor"))
+@register_acc_op
+def logical_xor(*, input, other):
+    return torch.logical_xor(input=input, other=other)
+
 
 @register_acc_op_properties(AccOpProperty.pointwise)
 @register_acc_op_mapping(op_and_target=("call_function", torch.fmod))
