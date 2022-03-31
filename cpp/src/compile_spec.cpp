@@ -18,21 +18,25 @@ torchtrt::core::runtime::CudaDevice to_internal_cuda_device(Device device);
 namespace torchscript {
 CompileSpec::CompileSpec(std::vector<c10::ArrayRef<int64_t>> fixed_sizes) {
   for (auto in : fixed_sizes) {
-    inputs.push_back(Input(in));
+    graph_inputs.inputs.push_back(Input(in));
   }
-  // graph_inputs.flattened_inputs = inputs;
 }
 
 CompileSpec::CompileSpec(std::vector<std::vector<int64_t>> fixed_sizes) {
   for (auto in : fixed_sizes) {
-    inputs.push_back(Input(in));
+    graph_inputs.inputs.push_back(Input(in));
   }
-  // graph_inputs.flattened_inputs = inputs;
+}
+
+CompileSpec::CompileSpec(std::vector<Input> inputs) {
+    graph_inputs.inputs = std::move(inputs);
 }
 
 CompileSpec::CompileSpec(torch::jit::IValue input_signature) {
     graph_inputs.input_signature = input_signature;
 }
+
+
 
 void flatten_dfs(std::vector<torchtrt::core::ir::Input>& flattened_inputs, std::vector<std::vector<torchtrt::core::ir::Input>>& collection_inputs, 
                  torch::jit::IValue input_ivalue, torch::jit::IValue& converted_ivalue, int level, int index) {
@@ -59,7 +63,6 @@ void flatten_dfs(std::vector<torchtrt::core::ir::Input>& flattened_inputs, std::
       }
       c10::TypePtr type = input_list[0].type();
       auto converted_elements = c10::impl::GenericList(type);
-      // std::vector<torch::jit::IValue> converted_elements;
       int idx = 0;
       for (auto item: input_list) {
         int cur_idx = level < 1 ? idx: index;
@@ -95,7 +98,7 @@ torch_tensorrt::core::ir::GraphInputs to_internal_graph_inputs(GraphInputs exter
 
     torch::jit::IValue converted_input_signature;
     flatten_dfs(flattened_inputs, collection_inputs, external_graph_input.input_signature, converted_input_signature, 0, 0);
-    internal_graph_input.flattened_inputs = flattened_inputs;
+    internal_graph_input.inputs = flattened_inputs;
     internal_graph_input.input_signature = converted_input_signature;
     internal_graph_input.collection_inputs = collection_inputs;
 
@@ -105,17 +108,15 @@ torch_tensorrt::core::ir::GraphInputs to_internal_graph_inputs(GraphInputs exter
 }
 
 torchtrt::core::CompileSpec to_internal_compile_spec(CompileSpec external) {
-  torchtrt::core::CompileSpec internal(to_vec_internal_inputs(external.inputs));
-  if (internal.inputs.size() == 0) {
+  torchtrt::core::CompileSpec internal(to_vec_internal_inputs(external.graph_inputs.inputs));
+  if (internal.graph_inputs.inputs.size() == 0) {
     LOG_DEBUG("GraphInput.inputs size == 0, using GraphInput.input_signature to get Input spec");
     internal.graph_inputs = to_internal_graph_inputs(external.graph_inputs);
-    internal.inputs = internal.graph_inputs.flattened_inputs;
   } else {
     LOG_DEBUG("GraphInput.inputs size != 0, using GraphInput.inputs to get Input spec");
-    internal.graph_inputs.collection_inputs.resize(internal.inputs.size());
-    for (int i = 0; i < internal.inputs.size(); i++) {
-      internal.graph_inputs.collection_inputs[i].push_back(internal.inputs[i]);
-      internal.graph_inputs.flattened_inputs = internal.inputs;
+    internal.graph_inputs.collection_inputs.resize(internal.graph_inputs.inputs.size());
+    for (int i = 0; i < internal.graph_inputs.inputs.size(); i++) {
+      internal.graph_inputs.collection_inputs[i].push_back(internal.graph_inputs.inputs[i]);
     }
   }
 
