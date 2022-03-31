@@ -14,12 +14,8 @@ namespace torch_tensorrt {
 namespace core {
 
 struct CompileSpec {
-  CompileSpec(std::vector<ir::Input> inputs) : inputs(inputs) {
-    // graph_inputs = ir::GraphInputs(inputs);
-  }
+  CompileSpec(std::vector<ir::Input> inputs) : inputs(inputs) {}
   CompileSpec(torch::jit::IValue& input_signature) {
-    // graph_inputs = ir::GraphInputs(input_signature);
-    // inputs = graph_inputs.flattened_inputs;
     graph_inputs.input_signature = input_signature;
   }
   ir::GraphInputs graph_inputs;

@@ -13,7 +13,7 @@ namespace conversion {
 
 struct ConversionInfo {
   ir::InputSpecMap inputs;
-  ir::CollectionInputSpecMap collection_inputs;
+  ir::CollectionInputSpecMap collection_input_spec_map;
   BuilderSettings engine_settings;
 };
 
