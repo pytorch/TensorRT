@@ -8,22 +8,14 @@ namespace lowering {
 namespace passes {
 
 void ReduceToOperation(std::shared_ptr<torch::jit::Graph>& graph) {
-  std::string to_device_pattern = R"IR(
-        graph(%x, %device, %dtype, %nb, %copy, %format):
-            %out : Tensor = aten::to(%x, %device, %dtype, %nb, %copy, %format)
-            return (%out))IR";
-  std::string to_dtype_pattern = R"IR(
-        graph(%x, %device, %dtype, %nb, %copy, %format):
-            %out : Tensor = aten::to(%x, %dtype, %nb, %copy, %format)
-            return (%out))IR";
   std::string to_dtype_layout_pattern = R"IR(
-        graph(%x, %device, %dtype, %layout, %pm, %nb, %copy, %format):
-            %out : Tensor = aten::to(%x, %device, %dtype, %layout, %pm, %nb, %copy, %format)
+        graph(%x, %dtype, %layout, %device, %pm, %nb, %copy, %format):
+            %out : Tensor = aten::to(%x, %dtype, %layout, %device, %pm, %nb, %copy, %format)
             return (%out))IR";
 
   std::string to_dtype_multi_input_pattern = R"IR(
-        graph(%x, %device, %dtype, %layout, %pm, %nb, %copy, %format):
-            %out : Tensor = aten::to(%x, %dtype, %nb, %copy, %format)
+        graph(%x, %dtype, %layout, %device, %pm, %nb, %copy, %format):
+            %out : Tensor = aten::to(%x, %device, %dtype, %nb, %copy, %format)
             return (%out))IR";
 
   std::string to_type_as_pattern = R"IR(
@@ -37,11 +29,6 @@ void ReduceToOperation(std::shared_ptr<torch::jit::Graph>& graph) {
             %6 : None = prim::Constant()
             %out : Tensor = aten::to(%input, %other, %5, %5, %6)
             return (%out))IR";
-
-  // replace aten::to.device with aten::to.dtype
-  torch::jit::SubgraphRewriter map_aten_device_to_dtype;
-  map_aten_device_to_dtype.RegisterRewritePattern(to_device_pattern, to_dtype_pattern);
-  map_aten_device_to_dtype.runOnGraph(graph);
 
   // replace aten::to.dtype_layout with aten::to.dtype
   torch::jit::SubgraphRewriter map_aten_dtype_layout;
