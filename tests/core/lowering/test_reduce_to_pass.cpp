@@ -8,11 +8,11 @@
 
 TEST(LoweringPasses, ReduceToCorrectly) {
   std::string source_graph = R"IR(
-    graph(%x, %device, %dtype, %nb, %copy, %format):
-        %out : Tensor = aten::to(%x, %device, %dtype, %nb, %copy, %format)
+    graph(%x, %dtype, %device, %nb, %copy, %format):
+        %out : Tensor = aten::to(%x, %dtype, %device, %nb, %copy, %format)
         return (%out))IR";
   std::string target_graph = R"IR(
-    graph(%x, %device, %dtype, %nb, %copy, %format):
+    graph(%x, %dtype, %device, %nb, %copy, %format):
         %out : Tensor = aten::to(%x, %dtype, %nb, %copy, %format)
         return (%out))IR";
 
@@ -30,11 +30,11 @@ TEST(LoweringPasses, ReduceToCorrectly) {
 
 TEST(LoweringPasses, ReduceToDtypeLayoutCorrectly) {
   std::string source_graph = R"IR(
-    graph(%x, %device, %dtype, %layout, %pm, %nb, %copy, %format):
-        %out : Tensor = aten::to(%x, %device, %dtype, %layout, %pm, %nb, %copy, %format)
+    graph(%x, %dtype, %device, %layout, %pm, %nb, %copy, %format):
+        %out : Tensor = aten::to(%x, %dtype, %device, %layout, %pm, %nb, %copy, %format)
         return (%out))IR";
   std::string target_graph = R"IR(
-    graph(%x, %device, %dtype, %layout, %pm, %nb, %copy, %format):
+    graph(%x, %dtype, %device, %layout, %pm, %nb, %copy, %format):
         %out : Tensor = aten::to(%x, %dtype, %nb, %copy, %format)
         return (%out))IR";
 
