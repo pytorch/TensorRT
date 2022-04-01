@@ -1,5 +1,6 @@
 #include <string>
 #include "core/compiler.h"
+#include "core/lowering/passes/passes.h"
 #include "gtest/gtest.h"
 #include "tests/util/util.h"
 #include "torch/csrc/jit/ir/irparser.h"
@@ -422,4 +423,53 @@ TEST(Converters, ATenLEScalarConvertsCorrectly) {
       %2 : Tensor = aten::le(%0, %scalar)
       return (%2))IR";
   pointwise_test_helper(graph, true, false, {5, 5});
+}
+
+TEST(Converters, ATenRemainderConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor, %1 : Tensor):
+        %2 : Tensor = aten::remainder(%0, %1)
+        return (%2))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, &*g);
+
+  auto input1 = at::randint(-5, 5, {4, 5}, {at::kCUDA});
+  auto input2 = at::randint(1, 5, {5}, {at::kCUDA});
+
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {input1, input2});
+
+  torch_tensorrt::core::lowering::passes::ReduceRemainder(g);
+
+  input1 = at::clone(input1);
+  input2 = at::clone(input2);
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {input1, input2});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 5e-2));
+}
+
+TEST(Converters, ATenRemainderWithScalarConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor):
+        %scalar : float = prim::Constant[value=2.4]()
+        %1 : Tensor = aten::remainder(%0, %scalar)
+        return (%1))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, &*g);
+
+  auto in = at::randint(-5, 5, {5}, {at::kCUDA});
+
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
+
+  torch_tensorrt::core::lowering::passes::ReduceRemainder(g);
+
+  in = at::clone(in);
+  params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngine(g, params, {in});
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0], 2e-6));
 }
