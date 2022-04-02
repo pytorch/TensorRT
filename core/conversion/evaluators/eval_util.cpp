@@ -118,6 +118,34 @@ void checkSequenceSize(int64_t n, int64_t dim, int64_t seq_size) {
   }
 }
 
+at::Tensor scalar_to_tensor_util(const at::Scalar& s, const at::Device device = at::kCPU) {
+  // This function is basically same with the one in
+  // https://github.com/pytorch/pytorch/blob/master/aten/src/ATen/ScalarOps.h, what different here is that Int and Float
+  // won't be upgraded to kDouble or kLong since we don't support these 2 types in conversion
+  if (device == at::kCPU) {
+    if (s.isFloatingPoint()) {
+      return at::detail::scalar_tensor_static(s, at::kFloat, at::kCPU);
+    } else if (s.isComplex()) {
+      return at::detail::scalar_tensor_static(s, at::kComplexDouble, at::kCPU);
+    } else if (s.isBoolean()) {
+      return at::detail::scalar_tensor_static(s, at::kBool, at::kCPU);
+    } else {
+      AT_ASSERT(s.isIntegral(false));
+      return at::detail::scalar_tensor_static(s, at::kInt, at::kCPU);
+    }
+  }
+  if (s.isFloatingPoint()) {
+    return at::scalar_tensor(s, at::device(device).dtype(at::kFloat));
+  } else if (s.isBoolean()) {
+    return at::scalar_tensor(s, at::device(device).dtype(at::kBool));
+  } else if (s.isComplex()) {
+    return at::scalar_tensor(s, at::device(device).dtype(at::kComplexDouble));
+  } else {
+    AT_ASSERT(s.isIntegral(false));
+    return at::scalar_tensor(s, at::device(device).dtype(at::kInt));
+  }
+}
+
 template <typename DTYPE>
 void storeLastDimension(
     char* data,
