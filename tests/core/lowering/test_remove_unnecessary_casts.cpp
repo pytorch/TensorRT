@@ -102,8 +102,7 @@ TEST(LoweringPasses, RemoveSingleUse0DTensorsIntCorrectly) {
 
   auto first_op = *(sg->block()->nodes().begin());
   torch::jit::WithInsertPoint guard(first_op);
-  torch::jit::Value* r = sg->insertConstant(
-      c10::scalar_to_tensor(8), c10::nullopt, first_op->scope());
+  torch::jit::Value* r = sg->insertConstant(c10::scalar_to_tensor(8), c10::nullopt, first_op->scope());
   r->copyMetadata(first_op->output());
   r->setType(c10::TensorType::get());
   first_op->output()->replaceAllUsesWith(r);
@@ -141,8 +140,7 @@ TEST(LoweringPasses, RemoveSingleUse0DTensorsFloatCorrectly) {
 
   auto first_op = *(sg->block()->nodes().begin());
   torch::jit::WithInsertPoint guard(first_op);
-  torch::jit::Value* r = sg->insertConstant(
-      c10::scalar_to_tensor(8.0), c10::nullopt, first_op->scope());
+  torch::jit::Value* r = sg->insertConstant(c10::scalar_to_tensor(8.0), c10::nullopt, first_op->scope());
   r->copyMetadata(first_op->output());
   r->setType(c10::TensorType::get());
   first_op->output()->replaceAllUsesWith(r);

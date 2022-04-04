@@ -1,5 +1,5 @@
-#include "torch/csrc/jit/passes/subgraph_rewrite.h"
 #include "torch/csrc/jit/ir/constants.h"
+#include "torch/csrc/jit/passes/subgraph_rewrite.h"
 
 #include "core/util/prelude.h"
 
@@ -9,7 +9,6 @@ namespace torch_tensorrt {
 namespace core {
 namespace lowering {
 namespace passes {
-
 
 // Presumably this is safe since torch::jit::EraseNumberTypesOnBlock exists which just
 // removes prim::TensorToNum, aten::Float, aten::Int and prim::NumToTensor nodes outright
@@ -77,8 +76,8 @@ void RemoveSingleUse0DTensors(std::shared_ptr<torch::jit::Graph>& g) {
               if (user->output()->uses().size() == 1) {
                 auto potential_cast = user->output()->uses()[0].user;
                 // The downstream user is aten::Int
-                if (potential_cast->kind() == c10::Symbol::fromQualString("aten::Int")
-                    || potential_cast->kind() == c10::Symbol::fromQualString("aten::Float")) {
+                if (potential_cast->kind() == c10::Symbol::fromQualString("aten::Int") ||
+                    potential_cast->kind() == c10::Symbol::fromQualString("aten::Float")) {
                   LOG_GRAPH("Downstream user is aten::Int/aten::Float");
                   auto arg = use.offset;
 
@@ -88,13 +87,11 @@ void RemoveSingleUse0DTensors(std::shared_ptr<torch::jit::Graph>& g) {
                         LOG_GRAPH("Input " << k << " is a Tensor");
                         if (user->inputs()[k]->node()->kind() == c10::Symbol::fromQualString("prim::NumToTensor")) {
                           auto num_to_tensor = user->inputs()[k]->node();
-                          
-                          LOG_GRAPH("Found a prim::NumToTensor / aten::[Int/Float] pair with an intermediate operation:\n    " 
-                                      << *(*it)
-                                      << *num_to_tensor
-                                      << *user 
-                                      << *potential_cast);
-                          
+
+                          LOG_GRAPH(
+                              "Found a prim::NumToTensor / aten::[Int/Float] pair with an intermediate operation:\n    "
+                              << *(*it) << *num_to_tensor << *user << *potential_cast);
+
                           // Replace the Tensor Constant with a scalar constant
                           LOG_GRAPH("Deleting 0-dim Tensor: " << **it);
                           torch::jit::WithInsertPoint gaurd(*it);
@@ -126,19 +123,16 @@ void RemoveSingleUse0DTensors(std::shared_ptr<torch::jit::Graph>& g) {
                             // has a different schema than the original
                             case c10::aten::add:
                               new_node = g->create(
-                                user->kind(),
-                                torch::jit::ArrayRef<torch::jit::Value*>({user->inputs()[0], user->inputs()[1]}),
-                                1);
+                                  user->kind(),
+                                  torch::jit::ArrayRef<torch::jit::Value*>({user->inputs()[0], user->inputs()[1]}),
+                                  1);
                               new_node->insertAfter(user);
                               new_node->outputs()[0]->setType(c10::IntType::get());
                               user->outputs()[0]->replaceAllUsesWith(new_node->outputs()[0]);
                               user->destroy();
                               break;
                             default:
-                              new_node = g->create(
-                                user->kind(),
-                                user->inputs(),
-                                1);
+                              new_node = g->create(user->kind(), user->inputs(), 1);
                               new_node->insertAfter(user);
                               new_node->outputs()[0]->setType(c10::IntType::get());
                               user->outputs()[0]->replaceAllUsesWith(new_node->outputs()[0]);
@@ -148,7 +142,7 @@ void RemoveSingleUse0DTensors(std::shared_ptr<torch::jit::Graph>& g) {
 
                           LOG_GRAPH("New intermediate operation: " << *new_node);
                           LOG_GRAPH(new_node->schema());
-                          
+
                           // Delete aten::Int
                           LOG_GRAPH("Deleting aten::[Int/Float]: " << *potential_cast);
                           potential_cast->output()->replaceAllUsesWith(potential_cast->inputs()[0]);
@@ -163,11 +157,10 @@ void RemoveSingleUse0DTensors(std::shared_ptr<torch::jit::Graph>& g) {
           }
         }
       }
-    } 
+    }
   }
   LOG_ERROR("Post removing single use 0-dim Tensor operations: " << *g);
 }
-
 
 } // namespace passes
 } // namespace lowering
