@@ -576,6 +576,7 @@ bool VerifyConverterSupportForBlock(const torch::jit::Block* b, bool suppress_er
       for (const auto& str : type.second) {
         traceback << str;
       }
+
       auto tb_str = traceback.str();
       if (!suppress_errors) {
         LOG_ERROR(tb_str);
