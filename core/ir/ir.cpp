@@ -102,11 +102,8 @@ c10::optional<at::ScalarType> get_value_first_calc_dtype_opt(torch::jit::Block* 
   auto consumers = in->uses();
   auto search_list = std::vector<torch::jit::Use>(consumers.begin(), consumers.end());
 
-  while(search_list.size() > 0) {
-    // after insertion, original iterator will be invalid
-    auto& u = search_list.front();
-    search_list.erase(search_list.begin());
-    auto n = u.user;
+  for (auto iter = search_list.begin(); iter != search_list.end(); ++iter) {
+    auto n = iter->user;
     LOG_GRAPH("Node we are looking at: " << util::node_info(n));
     auto ins = n->inputs();
     auto outs = n->outputs();
