@@ -1,3 +1,5 @@
+#include <math.h>
+
 #include "ATen/core/List.h"
 #include "ATen/core/functional.h"
 #include "ATen/core/ivalue.h"
@@ -96,6 +98,17 @@ DEFINE_GENERIC_TWO_INPUT_EVALUATOR(
         "aten::ge.float(float a, float b) -> (bool)",
         "aten::ge.int_float(int a, float b) -> (bool)",
         "aten::ge.float_int(float a, int b) -> (bool)",
+    }));
+
+DEFINE_ARITHMATIC_TWO_INPUT_EVALUATOR(
+    pow,
+    "aten::pow",
+    pow(a, b),
+    std::set<std::string>({
+        "aten::pow.int(int a, int b) -> (float)",
+        "aten::pow.float(float a, float b) -> (float)",
+        "aten::pow.int_float(int a, float b) -> (float)",
+        "aten::pow.float_int(float a, int b) -> (float)",
     }));
 
 DEFINE_TWO_INPUT_SIMPLE_EVALUATOR(
@@ -284,6 +297,31 @@ auto aten_registrations TORCHTRT_UNUSED =
                     },
                     EvalOptions().validSchemas({
                         "aten::append.t(t[](a!) self, t(c -> *) el) -> (t[](a!))",
+                    })})
+        .evaluator({c10::Symbol::fromQualString("aten::extend"),
+                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+                      if (args.at(n->input(0)).IValue()->isList() && args.at(n->input(1)).IValue()->isList()) {
+                        c10::IValue* self_ptr = args.at(n->input(0)).IValueMut();
+                        auto self = self_ptr->to<c10::List<c10::IValue>>();
+                        auto other = args.at(n->input(1)).IValue()->to<c10::List<c10::IValue>>();
+                        const int64_t other_size = other.size();
+
+                        // Modify value in place
+                        for (int64_t i = 0; i < other_size; i++) {
+                          self.push_back(other.get(i));
+                        }
+
+                        *self_ptr = c10::IValue(self);
+                        return {};
+                      } else {
+                        TORCHTRT_THROW_ERROR(
+                            "Unimplemented data type for aten::extend.t evaluator: "
+                            << args.at(n->input(0)).IValue()->type()->str() << ", "
+                            << args.at(n->input(1)).IValue()->type()->str());
+                      }
+                    },
+                    EvalOptions().validSchemas({
+                        "aten::extend.t(t[](a!) self, t[] other) -> ()",
                     })})
         .evaluator({c10::Symbol::fromQualString("aten::neg"),
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {

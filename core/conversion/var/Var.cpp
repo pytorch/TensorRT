@@ -13,7 +13,7 @@ Var::Var() {
   type_ = Type::kNone;
 }
 
-Var::Var(const torch::jit::IValue* p) : type_(Type::kIValue) {
+Var::Var(torch::jit::IValue* p) : type_(Type::kIValue) {
   ptr_.ivalue = p;
 }
 
@@ -56,7 +56,7 @@ Var& Var::operator=(const Var& a) {
   return (*this);
 }
 
-Var& Var::operator=(const torch::jit::IValue* in) {
+Var& Var::operator=(torch::jit::IValue* in) {
   ptr_.ivalue = in;
   type_ = Type::kIValue;
   return (*this);
@@ -116,6 +116,10 @@ nvinfer1::ITensor* Var::ITensorOrFreeze(ConversionCtx* ctx) {
 }
 
 const torch::jit::IValue* Var::IValue() const {
+  return IValueMut();
+}
+
+torch::jit::IValue* Var::IValueMut() const {
   TORCHTRT_CHECK(isIValue(), "Requested IValue from Var, however Var type is " << type_name());
   if (type_ == Type::kIValue) {
     return ptr_.ivalue;
