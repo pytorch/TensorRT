@@ -103,7 +103,7 @@ c10::optional<at::ScalarType> get_value_first_calc_dtype_opt(torch::jit::Block* 
   auto search_list = std::vector<torch::jit::Use>(consumers.begin(), consumers.end());
 
 //<<<<<<< HEAD
-  while(search_list.size() > 0) {
+//  while(search_list.size() > 0) {
 //    // after insertion, original iterator will be invalid
 //    auto& u = search_list.front();
 //    search_list.erase(search_list.begin());
