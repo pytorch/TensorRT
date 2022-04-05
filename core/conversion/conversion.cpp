@@ -487,12 +487,10 @@ std::string ConvertBlockToEngine(
 std::unordered_map<c10::OperatorName, std::string> GetUnsupportedOpsInBlock(const torch::jit::Block* b) {
   std::unordered_map<c10::OperatorName, std::string> unsupported_ops;
   for (const auto n : b->nodes()) {
-    if (n->kind() != torch::jit::prim::Loop && n->kind() != torch::jit::prim::If && !OpSupported(n) &&
-        n->kind() != torch::jit::prim::DictConstruct) {
-      auto schema = n->maybeSchema();
-      TORCHTRT_CHECK(
-          schema,
-          "Unable to get schema for Node " << util::node_info(n) << " (conversion.VerifyCoverterSupportForBlock)");
+    auto schema = n->maybeSchema();
+    // Some ops like torch::jit::prim::Loop, torch::jit::prim::If, torch::jit::prim::DictConstruct don't have a schema but they are supported.
+    // torch::jit::prim::DictConstruct is supported via fallback only
+    if (schema && !OpSupported(n)) {
       std::stringstream ss;
       ss << *schema;
       unsupported_ops[schema->operator_name()] = ss.str();
