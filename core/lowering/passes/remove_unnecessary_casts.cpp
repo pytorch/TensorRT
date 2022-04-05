@@ -159,7 +159,7 @@ void RemoveSingleUse0DTensors(std::shared_ptr<torch::jit::Graph>& g) {
       }
     }
   }
-  LOG_ERROR("Post removing single use 0-dim Tensor operations: " << *g);
+  LOG_GRAPH("Post removing single use 0-dim Tensor operations: " << *g);
 }
 
 } // namespace passes
