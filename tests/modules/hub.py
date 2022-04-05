@@ -191,7 +191,6 @@ conditional_model = FallbackIf().eval().cuda()
 conditional_script_model = torch.jit.script(conditional_model)
 torch.jit.save(conditional_script_model, "conditional_scripted.jit.pt")
 
-
 enc = BertTokenizer.from_pretrained("bert-base-uncased")
 text = "[CLS] Who was Jim Henson ? [SEP] Jim Henson was a puppeteer [SEP]"
 tokenized_text = enc.tokenize(text)
