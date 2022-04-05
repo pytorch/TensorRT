@@ -217,4 +217,4 @@ model.eval()
 model = BertModel.from_pretrained("bert-base-uncased", torchscript=True)
 
 traced_model = torch.jit.trace(model, [tokens_tensor, segments_tensors])
-torch.jit.save(traced_model, "bert_base_uncased_traced.jit..pt")
+torch.jit.save(traced_model, "bert_base_uncased_traced.jit.pt")

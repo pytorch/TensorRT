@@ -4,8 +4,8 @@
 TEST_P(CppAPITests, CompiledModuleIsClose) {
   std::vector<torch::jit::IValue> jit_inputs_ivalues;
   std::vector<torch::jit::IValue> trt_inputs_ivalues;
-  for (auto in_shape : input_shapes) {
-    auto in = at::randint(5, in_shape, {at::kCUDA});
+  for (uint64_t i = 0; i < input_shapes.size(); i++) {
+    auto in = at::randint(5, input_shapes[i], {at::kCUDA}).to(input_types[i]);
     jit_inputs_ivalues.push_back(in.clone());
     trt_inputs_ivalues.push_back(in.clone());
   }
@@ -31,4 +31,4 @@ TEST_P(CppAPITests, CompiledModuleIsClose) {
 INSTANTIATE_TEST_SUITE_P(
     CompiledModuleForwardIsCloseSuite,
     CppAPITests,
-    testing::Values(PathAndInSize({"tests/modules/resnet18_traced.jit.pt", {{1, 3, 224, 224}}, 2e-5})));
+    testing::Values(PathAndInput({"tests/modules/resnet18_traced.jit.pt", {{1, 3, 224, 224}}, {at::kFloat}, 2e-5})));

@@ -78,7 +78,7 @@ TEST_P(CppAPITests, InputsRespectUserSettingFP16WeightsFP32In) {
   }
 
   auto in = torch_tensorrt::Input(input_shapes[0]);
-  in.dtype = torch::kF32;
+  in.dtype = torch::kFloat;
   auto spec = torch_tensorrt::ts::CompileSpec({in});
   spec.enabled_precisions.insert(torch_tensorrt::DataType::kHalf);
 
@@ -116,4 +116,4 @@ TEST_P(CppAPITests, InputsRespectUserSettingFP32WeightsFP16In) {
 INSTANTIATE_TEST_SUITE_P(
     CompiledModuleForwardIsCloseSuite,
     CppAPITests,
-    testing::Values(PathAndInSize({"tests/modules/resnet18_traced.jit.pt", {{1, 3, 224, 224}}, 2e-5})));
+    testing::Values(PathAndInput({"tests/modules/resnet18_traced.jit.pt", {{1, 3, 224, 224}}, {at::kFloat} /*unused*/, 2e-5})));
