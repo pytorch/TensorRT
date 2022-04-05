@@ -50,27 +50,35 @@ auto batch_norm_registrations TORCHTRT_UNUSED =
               auto orig_shape = input->getDimensions();
               auto shape = util::toVec(orig_shape);
               auto tensor_type = util::TRTDataTypeToScalarType(input->getType());
-              auto options = torch::TensorOptions().dtype(tensor_type);
+              auto options =
+                  torch::TensorOptions().dtype(tensor_type).device(torch::kCUDA, ctx->settings.device.gpu_id);
 
               torch::Tensor gamma, beta, mean, var;
+              LOG_DEBUG("Input :" << orig_shape << "/" << input->getType());
+              // affine=True
+              LOG_DEBUG("Args[1] gamma : " << args[1].isIValue() << " / " << args[1].IValue()->isNone());
+              LOG_DEBUG("Args[2] beta : " << args[2].isIValue() << " / " << args[2].IValue()->isNone());
+              // track_running_stats=True
+              LOG_DEBUG("Args[3] mean : " << args[3].isIValue() << " / " << args[3].IValue()->isNone());
+              LOG_DEBUG("Args[4] var : " << args[4].isIValue() << " / " << args[4].IValue()->isNone());
+              LOG_DEBUG("use_input_stats, momemtum, cudnn_enabled disregarded");
+              LOG_DEBUG("ctx->input_is_dynamic : " << ctx->input_is_dynamic);
 
+              auto channel_dim = shape[1];
               if (ctx->input_is_dynamic) {
-                gamma = args[1].unwrapToTensor();
-                beta = args[2].unwrapToTensor();
+                gamma = args[1].unwrapToTensor(at::full(channel_dim, 1, options));
+                beta = args[2].unwrapToTensor(at::full(channel_dim, 0, options));
                 mean = args[3].unwrapToTensor();
                 var = args[4].unwrapToTensor();
               } else {
-                gamma = args[1].unwrapToTensor(at::full({shape}, 1, {options}));
-                beta = args[2].unwrapToTensor(at::full({shape}, 1, {options}));
-                mean = args[3].unwrapToTensor(at::full({shape}, 0, {options}));
-                var = args[4].unwrapToTensor(at::full({shape}, 0, {options}));
+                gamma = args[1].unwrapToTensor(at::full(channel_dim, 1, options));
+                beta = args[2].unwrapToTensor(at::full(channel_dim, 0, options));
+                mean = args[3].unwrapToTensor(at::full(channel_dim, 0, options));
+                var = args[4].unwrapToTensor(at::full(channel_dim, 0, options));
               }
 
               auto eps = static_cast<float>(args[7].unwrapToDouble(1e-5f));
 
-              LOG_DEBUG("momentum disregarded");
-              LOG_DEBUG("training disregarded");
-              LOG_DEBUG("cudnn disregarded");
               TORCHTRT_CHECK(orig_shape.nbDims >= 2, "Unable to create batch normalization layer from node: " << *n);
 
               // Expand spatial dims from 1D to 2D if needed
