@@ -57,6 +57,13 @@ struct Input : torch::CustomClassHolder {
   std::string to_str();
 };
 
+struct GraphInputs : torch::CustomClassHolder {
+  torch::jit::IValue input_signature;  // nested Input, full input spec
+  std::vector<Input> inputs; // flatten input spec
+  ADD_FIELD_GET_SET(input_signature, torch::jit::IValue);
+  std::string to_str();
+};
+
 enum DeviceType : int8_t {
   kGPU,
   kDLA,
@@ -156,6 +163,7 @@ struct CompileSpec : torch::CustomClassHolder {
   ADD_FIELD_GET_SET(ptq_calibrator, nvinfer1::IInt8Calibrator*);
 
   std::vector<Input> inputs;
+  GraphInputs graph_inputs;
   nvinfer1::IInt8Calibrator* ptq_calibrator = nullptr;
   std::set<DataType> enabled_precisions = {};
   bool sparse_weights = false;

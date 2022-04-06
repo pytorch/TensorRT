@@ -40,6 +40,8 @@ struct Input : torch::CustomClassHolder {
 
 // Add to spec
 struct GraphInputs {
+  GraphInputs(std::vector<ir::Input> inputs);
+  GraphInputs(torch::jit::IValue& input_signature);
   torch::jit::IValue input_signature;  // nested Input, full input spec
   std::vector<Input> inputs;  // flattend Input
   std::vector<std::vector<Input>> collection_inputs; // only support two layer nesting, e.g. ((a, b), [c, d], e)
