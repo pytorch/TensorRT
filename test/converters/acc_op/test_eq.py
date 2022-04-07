@@ -127,6 +127,21 @@ class TestEqOperatorConstantConverter(AccTestCase):
         ]
         self.run_test(Eq(), inputs, expected_ops={acc_ops.eq}, test_implicit_batch_dim = False)
 
+class TestConstInputConverter(AccTestCase):
+    def test_eq(self):
+        class Eq(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, x):
+                return  x.shape[0] == 4
+
+        input = torch.randn(3,4)
+        inputs = [
+            input,
+        ]
+        self.run_test(Eq(), inputs, expected_ops={acc_ops.eq}, test_implicit_batch_dim = False)
+
 
 if __name__ == '__main__':
     run_tests()

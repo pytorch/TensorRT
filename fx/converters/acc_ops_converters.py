@@ -1237,6 +1237,87 @@ def acc_ops_minimum(
     )
 
 
+
+@tensorrt_converter(acc_ops.logical_not)
+def acc_ops_logical_not(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    input_val = kwargs["input"]
+    operation_type = trt.UnaryOperation.NOT
+    # cast to bool type
+    if input_val.dtype in (trt.float32, trt.float16, trt.int32):
+        input_val = type_cast(network, target, f"{name}_input", input_val, trt.bool)
+    return add_unary_layer(network, input_val, operation_type, target, name)
+
+
+@tensorrt_converter(acc_ops.logical_and, no_implicit_batch_dim=True)
+@tensorrt_converter(acc_ops.bitwise_and, no_implicit_batch_dim=True)
+def acc_ops_logical_and(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    if network.has_implicit_batch_dimension:
+        raise RuntimeError("The `logical_and` function should be called with explicit batch dimension.")
+
+    input_t = kwargs["input"]
+    other_t =  kwargs["other"]
+    # we only support both inputs are bool type
+    if target == acc_ops.bitwise_and:
+        def check_is_bool(input_t):
+            if isinstance(input_t, TRTTensor):
+                assert input_t.dtype == trt.bool, "We currently do not support input is non-bool"
+            elif isinstance(input_t, torch.Tensor):
+                assert input_t.dtype == torch.bool, "We currently do not support input is non-bool"
+            else:
+                assert isinstance(input_t. bool), "We currently do not support input is non-bool"
+
+        check_is_bool(input_t)
+        check_is_bool(other_t)
+
+    input_t = get_trt_tensor(network, input_t, f"{name}_input_t")
+    other_t = get_trt_tensor(network, other_t, f"{name}_other_t")
+
+    if input_t.dtype != trt.bool:
+        input_t = type_cast(network, target, f"{name}_input", input_t, trt.bool)
+    if other_t.dtype != trt.bool:
+        other_t = type_cast(network, target, f"{name}_other", other_t, trt.bool)
+    return add_binary_elementwise_layer(
+        network, input_t, other_t, trt.ElementWiseOperation.AND, target, name
+    )
+
+
+@tensorrt_converter(acc_ops.ne, no_implicit_batch_dim=True)
+def acc_ops_ne(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    if network.has_implicit_batch_dimension:
+        raise RuntimeError("The `ne` function should be called with explicit batch dimension.")
+
+    input_t = kwargs["input"]
+    other_t =  kwargs["other"]
+
+    input_t = get_trt_tensor(network, input_t, f"{name}_input_t")
+    other_t = get_trt_tensor(network, other_t, f"{name}_other_t")
+
+    input_t, other_t = dtype_uniform(network, target, name, input_t, other_t)
+    eq_t = add_binary_elementwise_layer(
+        network, input_t, other_t, trt.ElementWiseOperation.EQUAL, target, name
+    )
+
+    return add_unary_layer(network, eq_t, trt.UnaryOperation.NOT, target, name)
+
+
 @tensorrt_converter(acc_ops.eq, no_implicit_batch_dim=True)
 def acc_ops_eq(
     network: TRTNetwork,
@@ -1250,14 +1331,11 @@ def acc_ops_eq(
 
     input_t = kwargs["input"]
     other_t =  kwargs["other"]
-    if isinstance(other_t, (torch.Tensor, bool)):
-        if isinstance(other_t, bool):
-            other_t = int(other_t)
-        elif other_t.dtype == torch.bool:
-            other_t = other_t.to(torch.int32)
-    other_t = get_trt_tensor(network, other_t, f"{name}_other_t")
-    input_t, other_t = dtype_uniform(network, target, name, input_t, other_t)
 
+    input_t = get_trt_tensor(network, input_t, f"{name}_input_t")
+    other_t = get_trt_tensor(network, other_t, f"{name}_other_t")
+
+    input_t, other_t = dtype_uniform(network, target, name, input_t, other_t)
     return add_binary_elementwise_layer(
         network, input_t, other_t, trt.ElementWiseOperation.EQUAL, target, name
     )
@@ -1276,12 +1354,10 @@ def acc_ops_gt(
 
     input_t = kwargs["input"]
     other_t =  kwargs["other"]
-    if isinstance(other_t, (torch.Tensor, bool)):
-        if isinstance(other_t, bool):
-            other_t = int(other_t)
-        elif other_t.dtype == torch.bool:
-            other_t = other_t.to(torch.int32)
+
+    input_t = get_trt_tensor(network, input_t, f"{name}_input_t")
     other_t = get_trt_tensor(network, other_t, f"{name}_other_t")
+
     input_t, other_t = dtype_uniform(network, target, name, input_t, other_t)
     return add_binary_elementwise_layer(
         network, input_t, other_t, trt.ElementWiseOperation.GREATER, target, name
@@ -1301,14 +1377,11 @@ def acc_ops_lt(
 
     input_t = kwargs["input"]
     other_t =  kwargs["other"]
-    if isinstance(other_t, (torch.Tensor, bool)):
-        if isinstance(other_t, bool):
-            other_t = int(other_t)
-        elif other_t.dtype == torch.bool:
-            other_t = other_t.to(torch.int32)
-    other_t = get_trt_tensor(network, other_t, f"{name}_other_t")
-    input_t, other_t = dtype_uniform(network, target, name, input_t, other_t)
 
+    input_t = get_trt_tensor(network, input_t, f"{name}_input_t")
+    other_t = get_trt_tensor(network, other_t, f"{name}_other_t")
+
+    input_t, other_t = dtype_uniform(network, target, name, input_t, other_t)
     return add_binary_elementwise_layer(
         network, input_t, other_t, trt.ElementWiseOperation.LESS, target, name
     )

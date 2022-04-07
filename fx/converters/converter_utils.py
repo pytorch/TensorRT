@@ -8,7 +8,16 @@ import numpy as np
 import tensorrt as trt
 import torch
 from torch.fx.node import Target, Argument
-from fx2trt_oss.fx.types import *  # noqa: F403
+from fx2trt_oss.fx.types import (
+    TRTNetwork,
+    TRTTensor,
+    TRTLayer,
+    TRTPluginFieldCollection,
+    TRTPlugin,
+    TRTDataType,
+    TRTElementWiseOp,
+    Shape
+)
 from fx2trt_oss.fx.utils import torch_dtype_from_trt
 
 
@@ -223,6 +232,15 @@ def get_trt_tensor(
     Returns:
         A TensorRT ITensor that represents the given value.
     """
+    # TRT can not add constant for bool type. We do a work around to 1) cast it to int and 2)cast to bool later
+    # This is useful for logical operations which require input to be bool type
+    if isinstance(input_val, bool):
+        input_val = int(input_val)
+    if isinstance(input_val, torch.Tensor) and input_val.dtype == torch.bool:
+        input_val = input_val.to(torch.int32)
+    if isinstance(input_val, torch.Tensor) and input_val.dtype == torch.int64:
+        input_val = input_val.to(torch.int32)
+
     if isinstance(input_val, (torch.Tensor, int, float)):
         return create_constant(network, input_val, name, dtype)
     elif not isinstance(input_val, TRTTensor):
@@ -439,6 +457,8 @@ def add_unary_layer(
         )
     layer = network.add_unary(input_val, operation_type)
     set_layer_name(layer, target, name)
+    output = layer.get_output(0)
+    output.name = output.name + "_" + target.__name__
     return layer.get_output(0)
 
 
@@ -672,7 +692,7 @@ def get_python_op_from_trt_elementwise_op(trt_op: TRTElementWiseOp) -> Callable[
     else:
         raise RuntimeError(f"{trt_op} is not supported yet!")
 
-def dtype_uniform(network, target, name, input, other):
+def dtype_uniform(network: TRTNetwork, target: Target, name: str, input: TRTTensor, other: TRTTensor):
     table = {trt.bool:0, trt.int32:1, trt.float16:2, trt.float32:3}
     input_dtype = input.dtype
     other_dtype = other.dtype
@@ -697,3 +717,12 @@ def dtype_uniform(network, target, name, input, other):
         set_layer_name(layer_o, target, f"{name}_other_dtype_change")
         other = layer_o.get_output(0)
     return input, other
+
+def type_cast(network: TRTNetwork, target: Target, name: str, input: TRTTensor, cast_type: TRTDataType):
+    """
+    This function helps to cast the input type to cast_type
+    """
+    layer_i = network.add_identity(input)
+    layer_i.set_output_type(0, cast_type)
+    set_layer_name(layer_i, target, f"{name}_dtype_change")
+    return layer_i.get_output(0)

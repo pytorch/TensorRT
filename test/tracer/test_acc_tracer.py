@@ -2369,5 +2369,8 @@ class AccTracerTest(unittest.TestCase):
                 acc_ops.gather,
                 acc_ops.index_select,
                 acc_ops.interpolate,
+                acc_ops.logical_and,
+                acc_ops.logical_not,
+                acc_ops.ne
             },
         )

@@ -1211,13 +1211,23 @@ def min_dim_reduce(*, input, dim=None, keepdim=False):
 def minimum(*, input, other):
     return torch.minimum(input=input, other=other)
 
+
+@register_acc_op_properties(AccOpProperty.pointwise)
+@register_acc_op_mapping(op_and_target=("call_function", operator.ne))
+@register_acc_op_mapping(op_and_target=("call_function", torch.ne))
+@register_acc_op_mapping(op_and_target=("call_method", "ne"))
+@register_acc_op
+def ne(*, input, other):
+    return operator.ne(input, other)
+
+
 @register_acc_op_properties(AccOpProperty.pointwise)
 @register_acc_op_mapping(op_and_target=("call_function", operator.eq))
 @register_acc_op_mapping(op_and_target=("call_function", torch.eq))
 @register_acc_op_mapping(op_and_target=("call_method", "eq"))
 @register_acc_op
 def eq(*, input, other):
-    return torch.eq(input=input, other=other)
+    return operator.eq(input, other)
 
 
 @register_acc_op_properties(AccOpProperty.pointwise)
@@ -1226,7 +1236,7 @@ def eq(*, input, other):
 @register_acc_op_mapping(op_and_target=("call_method", "gt"))
 @register_acc_op
 def gt(*, input, other):
-    return torch.gt(input=input, other=other)
+    return operator.gt(input, other)
 
 
 @register_acc_op_properties(AccOpProperty.pointwise)
@@ -1235,7 +1245,24 @@ def gt(*, input, other):
 @register_acc_op_mapping(op_and_target=("call_method", "lt"))
 @register_acc_op
 def lt(*, input, other):
-    return torch.lt(input=input, other=other)
+    return operator.lt(input, other)
+
+
+@register_acc_op_properties(AccOpProperty.pointwise)
+@register_acc_op_mapping(op_and_target=("call_function", operator.and_))
+@register_acc_op_mapping(op_and_target=("call_method", "bitwise_and"))
+@register_acc_op_mapping(op_and_target=("call_function", torch.bitwise_and))
+def bitwise_and(*, input, other):
+    return operator.and_(input, other)
+
+
+@register_acc_op_properties(AccOpProperty.pointwise)
+@register_acc_op_mapping(op_and_target=("call_function", torch.logical_and))
+@register_acc_op_mapping(op_and_target=("call_method", "logical_and"))
+@register_acc_op
+def logical_and(*, input, other):
+    return torch.logical_and(input=input, other=other)
+
 
 @register_acc_op_properties(AccOpProperty.pointwise)
 @register_acc_op_mapping(op_and_target=("call_function", operator.or_))
@@ -1244,6 +1271,15 @@ def lt(*, input, other):
 @register_acc_op
 def logical_or(*, input, other):
     return torch.logical_or(input=input, other=other)
+
+
+@register_acc_op_properties(AccOpProperty.pointwise, AccOpProperty.unary)
+@register_acc_op_mapping(op_and_target=("call_function", torch.logical_not))
+@register_acc_op_mapping(op_and_target=("call_method", "logical_not"))
+@register_acc_op
+def logical_not(*, input):
+    return torch.logical_not(input=input)
+
 
 @register_acc_op_properties(AccOpProperty.pointwise)
 @register_acc_op_mapping(op_and_target=("call_function", operator.xor))

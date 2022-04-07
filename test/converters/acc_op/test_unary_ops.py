@@ -43,5 +43,27 @@ class TestUnaryOpConverters(AccTestCase):
         inputs = [torch.randn(2, 2, 3)]
         self.run_test(m, inputs, expected_ops={expected_op})
 
+
+class TestUnaryOpNotConverters(AccTestCase):
+    @parameterized.expand([
+        ("not_bool", torch.logical_not, acc_ops.logical_not, torch.bool),
+        ("not_float", torch.logical_not, acc_ops.logical_not, torch.float),
+        ("not_int", torch.logical_not, acc_ops.logical_not, torch.int),
+    ])
+    def test_unary_ops(self, name, orig_op: Callable, expected_op, input_dtype):
+        class TestModule(nn.Module):
+            def __init__(self, orig_op):
+                super().__init__()
+                self.orig_op = orig_op
+
+            def forward(self, x):
+                x = self.orig_op(x)
+                return self.orig_op(x)
+
+        m = TestModule(orig_op)
+        inputs = [torch.randn(2, 2, 3).to(input_dtype)]
+        self.run_test(m, inputs, expected_ops={expected_op}, test_implicit_batch_dim=False)
+
+
 if __name__ == '__main__':
     run_tests()
