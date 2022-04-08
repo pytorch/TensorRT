@@ -1,15 +1,15 @@
 #include "core/conversion/conversion.h"
+#include <ATen/core/operator_name.h>
 #include <torch/torch.h>
 #include <sstream>
+#include "c10/util/intrusive_ptr.h"
 #include "core/conversion/conversionctx/ConversionCtx.h"
+#include "core/conversion/converters/converter_util.h"
 #include "core/conversion/converters/converters.h"
 #include "core/conversion/evaluators/evaluators.h"
+#include "core/conversion/tensorcontainer/TensorContainer.h"
 #include "core/conversion/var/Var.h"
 #include "core/util/prelude.h"
-#include <ATen/core/operator_name.h>
-#include "c10/util/intrusive_ptr.h"
-#include "core/conversion/converters/converter_util.h"
-#include "core/conversion/tensorcontainer/TensorContainer.h"
 #include "core/util/trt_util.h"
 
 namespace torch_tensorrt {
@@ -489,10 +489,10 @@ std::unordered_map<c10::OperatorName, std::string> GetUnsupportedOpsInBlock(cons
   std::unordered_map<c10::OperatorName, std::string> unsupported_ops;
   for (const auto n : b->nodes()) {
     auto schema = n->maybeSchema();
-    // Some ops like torch::jit::prim::Loop, torch::jit::prim::If, torch::jit::prim::DictConstruct don't have a schema but they are supported.
-    // torch::jit::prim::DictConstruct is supported via fallback only
+    // Some ops like torch::jit::prim::Loop, torch::jit::prim::If, torch::jit::prim::DictConstruct don't have a schema
+    // but they are supported. torch::jit::prim::DictConstruct is supported via fallback only
     if (!OpSupported(n)) {
-      if (schema){
+      if (schema) {
         std::stringstream ss;
         ss << *schema;
         unsupported_ops[schema->operator_name()] = ss.str();
