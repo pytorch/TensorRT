@@ -539,7 +539,6 @@ std::set<std::string> ConvertableOpsInBlock(const torch::jit::Block* b) {
 
 bool VerifyConverterSupportForBlock(const torch::jit::Block* b, bool suppress_errors) {
   auto unsupported_ops = GetUnsupportedOpsInBlock(b);
-  LOG_DEBUG("======unsupported_ops size ===========: " << unsupported_ops.size());
   if (unsupported_ops.size() != 0) {
     std::stringstream unsupported_msg;
     unsupported_msg
