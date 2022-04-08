@@ -157,13 +157,9 @@ Input::Input(std::vector<int64_t> shape, DataType dtype, TensorFormat format) {
   this->opt_shape = shape;
   this->min_shape = shape;
   this->max_shape = shape;
-  LOG_DEBUG("===== CONST 1");
   this->shape = shape;
   this->dtype = dtype;
   this->format = format;
-  if(dtype == DataType::kBool && format == TensorFormat::kChannelsLast){
-    TORCHTRT_THROW_ERROR("Input datatype (Bool) is not currently supported with Tensorformat NHWC (kChannelsLast)");
-  }
   this->input_is_dynamic = false;
 }
 
@@ -178,15 +174,11 @@ Input::Input(c10::IntArrayRef shape, TensorFormat format) {
 }
 
 Input::Input(c10::IntArrayRef shape, DataType dtype, TensorFormat format) {
-  LOG_DEBUG("===== CONST 2");
   this->opt_shape = torch_tensorrt::core::util::toVec(shape);
   this->min_shape = torch_tensorrt::core::util::toVec(shape);
   this->max_shape = torch_tensorrt::core::util::toVec(shape);
   this->shape = torch_tensorrt::core::util::toVec(shape);
   this->dtype = dtype;
-  if(dtype == DataType::kBool && format == TensorFormat::kChannelsLast){
-    TORCHTRT_THROW_ERROR("Input datatype (Bool) is not currently supported with Tensorformat NHWC (kChannelsLast)");
-  }
   this->format = format;
   this->input_is_dynamic = false;
 }
@@ -199,7 +191,6 @@ Input::Input(
   this->opt_shape = opt_shape;
   this->min_shape = min_shape;
   this->max_shape = max_shape;
-  LOG_DEBUG("===== CONST 3");
   this->shape = torch_tensorrt::core::util::toVec(
       torch_tensorrt::core::ir::Input(this->min_shape, this->opt_shape, this->max_shape).input_shape);
   this->dtype = DataType::kUnknown;
@@ -213,16 +204,12 @@ Input::Input(
     std::vector<int64_t> max_shape,
     DataType dtype,
     TensorFormat format) {
-  LOG_DEBUG("===== CONST 4");
   this->opt_shape = opt_shape;
   this->min_shape = min_shape;
   this->max_shape = max_shape;
   this->shape = torch_tensorrt::core::util::toVec(
       torch_tensorrt::core::ir::Input(this->min_shape, this->opt_shape, this->max_shape).input_shape);
   this->dtype = dtype;
-  if(dtype == DataType::kBool && format == TensorFormat::kChannelsLast){
-    TORCHTRT_THROW_ERROR("Input datatype (Bool) is not currently supported with Tensorformat NHWC (kChannelsLast)");
-  }
   this->format = format;
   this->input_is_dynamic = true;
 }
@@ -250,9 +237,6 @@ Input::Input(
   this->shape = torch_tensorrt::core::util::toVec(
       torch_tensorrt::core::ir::Input(this->min_shape, this->opt_shape, this->max_shape).input_shape);
   this->dtype = dtype;
-  if(dtype == DataType::kBool && format == TensorFormat::kChannelsLast){
-    TORCHTRT_THROW_ERROR("Input datatype (Bool) is not currently supported with Tensorformat NHWC (kChannelsLast)");
-  }
   this->format = format;
   this->input_is_dynamic = true;
 }
@@ -263,9 +247,6 @@ Input::Input(at::Tensor tensor) {
   this->max_shape = tensor.sizes().vec();
   this->shape = tensor.sizes().vec();
   this->dtype = tensor.scalar_type();
-  if(dtype == DataType::kBool && format == TensorFormat::kChannelsLast){
-    TORCHTRT_THROW_ERROR("Input datatype (Bool) is not currently supported with Tensorformat NHWC (kChannelsLast)");
-  }
   TORCHTRT_ASSERT(
       tensor.is_contiguous(at::MemoryFormat::ChannelsLast) || tensor.is_contiguous(at::MemoryFormat::Contiguous),
       "Tensor does not have a supported contiguous memory format, supported formats are contiguous or channel_last");
@@ -282,9 +263,6 @@ Input::Input(at::Tensor tensor) {
 /* ==========================================*/
 
 torch_tensorrt::core::ir::Input to_internal_input(Input& i) {
-  if(i.dtype == DataType::kBool && i.format == TensorFormat::kChannelsLast){
-    TORCHTRT_THROW_ERROR("Input datatype (Bool) is not currently supported with Tensorformat NHWC (kChannelsLast)");
-  }
   return torch_tensorrt::core::ir::Input(
       i.min_shape,
       i.opt_shape,
