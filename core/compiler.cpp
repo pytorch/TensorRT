@@ -344,9 +344,10 @@ void MapInputsAndDetermineDTypes(
             ss << "- Disable partial compilation by setting require_full_compilation to True";
             auto warn_str = ss.str();
             LOG_WARNING(warn_str);
-            // Overwrite type map with user settings
-            first_use_type_map[in] = {util::TRTDataTypeToScalarType(cfg.convert_info.inputs.find(in)->second.dtype)};
           }
+          // Overwrite type map with user settings
+          // We use this map for partitiioning since we need c10::ScalarTypes not nvinfer::DataTypes
+          first_use_type_map[in] = {util::TRTDataTypeToScalarType(cfg.convert_info.inputs.find(in)->second.dtype)};
         }
       } else {
         // The user defined the type so no changes are necessary
@@ -417,18 +418,16 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
       auto first_use_types = ir::get_block_first_calc_dtypes_opt(g->block());
 
       MapInputsAndDetermineDTypes(cfg, g, static_params, first_use_types);
-
+      auto isBlockConvertible = conversion::VerifyConverterSupportForBlock(g->block(), true);
       if (cfg.partition_info.enabled &&
           (cfg.lower_info.forced_fallback_modules.size() == 0 &&
-           cfg.partition_info.forced_fallback_operators.size() == 0 &&
-           conversion::VerifyConverterSupportForBlock(g->block(), true))) {
+           cfg.partition_info.forced_fallback_operators.size() == 0 && isBlockConvertible)) {
         LOG_INFO("Skipping partitioning since model is fully supported");
       }
 
       if (cfg.partition_info.enabled &&
           !(cfg.lower_info.forced_fallback_modules.size() == 0 &&
-            cfg.partition_info.forced_fallback_operators.size() == 0 &&
-            conversion::VerifyConverterSupportForBlock(g->block(), true))) {
+            cfg.partition_info.forced_fallback_operators.size() == 0 && isBlockConvertible)) {
         auto input_ivalues_map = partitioning::generateRandomInputs(cfg.convert_info.inputs, first_use_types);
         auto graph_and_mapping = ConstructFallbackGraph(new_mod, g->block(), input_ivalues_map, cfg, static_params);
         new_g = graph_and_mapping.first;

@@ -728,3 +728,71 @@ TEST(Evaluators, RangeLengthNegEvaluatesCorrectly) {
 
   ASSERT_TRUE(jit_results[0] == trt_results[0]);
 }
+
+TEST(Evaluators, PowIntEvaluatesCorrectly) {
+  const auto graph = R"IR(
+      graph():
+        %1 : int = prim::Constant[value=9]()
+        %2 : int = prim::Constant[value=4]()
+        %3 : float = aten::pow(%1, %2)
+        return (%3))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto jit_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {});
+  auto trt_results = torch_tensorrt::tests::util::EvaluateGraph(g->block(), {});
+
+  ASSERT_TRUE(jit_results[0] == trt_results[0]);
+}
+
+TEST(Evaluators, PowFloatEvaluatesCorrectly) {
+  const auto graph = R"IR(
+      graph():
+        %1 : float = prim::Constant[value=9.5]()
+        %2 : float = prim::Constant[value=4.5]()
+        %3 : float = aten::pow(%1, %2)
+        return (%3))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto jit_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {});
+  auto trt_results = torch_tensorrt::tests::util::EvaluateGraph(g->block(), {});
+
+  ASSERT_TRUE(jit_results[0] == trt_results[0]);
+}
+
+TEST(Evaluators, PowIntFloatEvaluatesCorrectly) {
+  const auto graph = R"IR(
+      graph():
+        %1 : int = prim::Constant[value=9]()
+        %2 : float = prim::Constant[value=4.5]()
+        %3 : float = aten::pow(%1, %2)
+        return (%3))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto jit_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {});
+  auto trt_results = torch_tensorrt::tests::util::EvaluateGraph(g->block(), {});
+
+  ASSERT_TRUE(jit_results[0] == trt_results[0]);
+}
+
+TEST(Evaluators, PowFloatIntEvaluatesCorrectly) {
+  const auto graph = R"IR(
+      graph():
+        %1 : float = prim::Constant[value=9.5]()
+        %2 : int = prim::Constant[value=4]()
+        %3 : float = aten::pow(%1, %2)
+        return (%3))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto jit_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {});
+  auto trt_results = torch_tensorrt::tests::util::EvaluateGraph(g->block(), {});
+
+  ASSERT_TRUE(jit_results[0] == trt_results[0]);
+}

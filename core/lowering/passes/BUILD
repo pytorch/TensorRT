@@ -18,6 +18,7 @@ cc_library(
         "op_aliasing.cpp",
         "reduce_to.cpp",
         "reduce_gelu.cpp",
+        "reduce_remainder.cpp",
         "remove_bn_dim_check.cpp",
         "remove_contiguous.cpp",
         "view_to_reshape.cpp",
