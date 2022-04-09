@@ -55,6 +55,10 @@ lowering_test(
 )
 
 lowering_test(
+    name = "test_remove_unnecessary_casts",
+)
+
+lowering_test(
     name = "test_view_to_reshape_pass",
 )
 
@@ -85,6 +89,7 @@ test_suite(
         ":test_remove_detach_pass",
         ":test_view_to_reshape_pass",
         ":test_remove_dropout_pass",
+        ":test_remove_unnecessary_casts",
         ":test_reduce_to_pass",
         ":test_reduce_remainder",
         ":test_reduce_gelu",
