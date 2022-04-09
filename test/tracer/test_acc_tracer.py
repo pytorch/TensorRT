@@ -2371,6 +2371,7 @@ class AccTracerTest(unittest.TestCase):
                 acc_ops.interpolate,
                 acc_ops.logical_and,
                 acc_ops.logical_not,
-                acc_ops.ne
+                acc_ops.ne,
+                acc_ops.device,
             },
         )

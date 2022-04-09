@@ -14,6 +14,7 @@ from fx2trt_oss.fx.converter_registry import tensorrt_converter
 from fx2trt_oss.fx.types import *  # noqa: F403
 from fx2trt_oss.fx.utils import (
     torch_dtype_from_trt,
+    torch_dtype_to_trt,
     get_dynamic_dims,
 )
 from torch.fx.immutable_collections import immutable_list
@@ -1236,6 +1237,34 @@ def acc_ops_minimum(
         network, kwargs["input"], kwargs["other"], trt.ElementWiseOperation.MIN, target, name
     )
 
+
+@tensorrt_converter(acc_ops.device)
+def acc_ops_device(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    # TRT always assume the device is cuda not cpu
+    return torch.device("cuda")
+
+@tensorrt_converter(acc_ops.to_dtype)
+def acc_ops_to_dtype(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    input_val = kwargs["input"]
+    input_dtype = kwargs["acc_out_ty"].dtype
+    input_t = get_trt_tensor(network, input_val, f"{name}_input_t")
+
+    if input_dtype:
+        input_dtype = torch_dtype_to_trt(input_dtype)
+        input_t = type_cast(network, target, f"{name}_input", input_t, input_dtype)
+    return input_t
 
 
 @tensorrt_converter(acc_ops.logical_not)

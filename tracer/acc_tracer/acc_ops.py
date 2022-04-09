@@ -184,6 +184,10 @@ def sign(*, input):
 def size(*, input):
     return input.size()
 
+@register_acc_op_properties(AccOpProperty.unary)
+@register_acc_op
+def device(*, input):
+    return input.device
 
 @register_custom_acc_mapper_fn(
     op_and_target=("call_function", getattr),
@@ -203,10 +207,15 @@ def custom_getattr_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
         input_obj.meta["type"] == torch.Tensor
     ), f"Expected torch.Tensor type for {input_obj.meta['type']}"
     assert (
-        attr_name == "shape"
+        attr_name == "shape" or attr_name == "device"
     ), f"Only supporting shape getattr for now, not {attr_name}"
+    if attr_name == "shape":
+        func = size
+    elif attr_name == "device":
+        func = device
+
     with node.graph.inserting_before(node):
-        size_node = node.graph.call_function(size, kwargs={"input": input_obj})
+        size_node = node.graph.call_function(func, kwargs={"input": input_obj})
         size_node.meta = node.meta.copy()
         return size_node
 
@@ -1993,9 +2002,9 @@ def custom_tensor_reshape_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.
 
 @register_acc_op_properties(AccOpProperty.pointwise, AccOpProperty.unary)
 @register_acc_op
-def to_dtype(input, acc_out_ty=None):
+def to_dtype(input, acc_out_ty=None, device=None):
     assert acc_out_ty is not None
-    return input.to(dtype=acc_out_ty.dtype)
+    return input.to(dtype=acc_out_ty.dtype, device=device)
 
 
 @register_custom_acc_mapper_fn(
@@ -2003,19 +2012,42 @@ def to_dtype(input, acc_out_ty=None):
     arg_replacement_tuples=[
         ("input", "input"),
         ("dtype", "dtype"),
+        ("device", "device", this_arg_is_optional),
+
     ],
 )
 def custom_tensor_to_mapper(node: torch.fx.Node, _: nn.Module):
-    dest_dtype = node.kwargs["dtype"]
+    dest = node.kwargs["dtype"]
     mem_format = node.kwargs.get("memory_format")
-    device = node.kwargs.get("device")
-    assert dest_dtype is not None
+    dest_other = node.kwargs.get("device")
+    assert dest is not None
     assert mem_format is None or mem_format == torch.preserve_format
-    assert device is None
+
+    dest_dtype = dest_device=None
+    if isinstance(dest, torch.fx.node.Node):
+        meta_type = dest.meta["type"]
+        #consider the device is gpu only, meta info is limited to give clear device type
+        if dest.meta["type"] == torch.device:
+            dest_device = dest
+        else:
+            # Due to the limitation of FX, we can not support to(torch.Tensor) since meta only contains 'type': <class 'torch.Tensor'>
+            raise RuntimeError(f"We currently do not support to({meta_type})")
+    elif isinstance(dest, torch.device):
+        # only device is set, dtype=None
+        if dest_other is None:
+            dest_device = dest
+        # device and dtype are both set
+        else:
+            dest_dtype = dest_other
+            dest_device = dest
+    # only dtype is set
+    else:
+        dest_dtype = dest
 
     new_kwargs = {
         "input": node.kwargs["input"],
         "acc_out_ty": acc_utils.build_raw_tensor_meta(dtype=dest_dtype),
+        "device": dest_device,
     }
 
     with node.graph.inserting_before(node):
