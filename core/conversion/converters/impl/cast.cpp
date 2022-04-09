@@ -26,6 +26,23 @@ auto cast_registrations TORCHTRT_UNUSED =
                return true;
              }})
         .pattern(
+            {"aten::to.device(Tensor(a) self, Device device, int dtype, bool non_blocking=False, bool copy=False, int? memory_format=None) -> (Tensor(a))",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               // what this function does is basically the same with the previous one, however, we cannot lower this
+               // signature to previous one because this will incur the device issues when we run Torchscript module in
+               // later shape analysis phase of fallback
+               auto self = args[0].ITensorOrFreeze(ctx);
+               auto output_dtype = args[2].unwrapToScalar().to<int64_t>();
+
+               auto trt_dtype = util::ScalarTypeToTRTDataType(static_cast<at::ScalarType>(output_dtype));
+
+               auto casted_itensor = castITensor(ctx, self, trt_dtype);
+               auto output = ctx->AssociateValueAndTensor(n->outputs()[0], casted_itensor);
+               LOG_DEBUG("[aten::to.device] Output tensor shape: " << output->getDimensions());
+
+               return true;
+             }})
+        .pattern(
             {"aten::to.other(Tensor self, Tensor other, bool non_blocking=False, bool copy=False, int? memory_format=None) -> (Tensor)",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                auto self = args[0].ITensorOrFreeze(ctx);
