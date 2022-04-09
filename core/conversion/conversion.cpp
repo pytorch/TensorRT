@@ -1,15 +1,15 @@
 #include "core/conversion/conversion.h"
+#include <ATen/core/operator_name.h>
 #include <torch/torch.h>
 #include <sstream>
+#include "c10/util/intrusive_ptr.h"
 #include "core/conversion/conversionctx/ConversionCtx.h"
+#include "core/conversion/converters/converter_util.h"
 #include "core/conversion/converters/converters.h"
 #include "core/conversion/evaluators/evaluators.h"
+#include "core/conversion/tensorcontainer/TensorContainer.h"
 #include "core/conversion/var/Var.h"
 #include "core/util/prelude.h"
-
-#include "c10/util/intrusive_ptr.h"
-#include "core/conversion/converters/converter_util.h"
-#include "core/conversion/tensorcontainer/TensorContainer.h"
 #include "core/util/trt_util.h"
 
 namespace torch_tensorrt {
@@ -496,15 +496,23 @@ std::string ConvertBlockToEngine(
 std::unordered_map<c10::OperatorName, std::string> GetUnsupportedOpsInBlock(const torch::jit::Block* b) {
   std::unordered_map<c10::OperatorName, std::string> unsupported_ops;
   for (const auto n : b->nodes()) {
-    if (n->kind() != torch::jit::prim::Loop && n->kind() != torch::jit::prim::If && !OpSupported(n)) {
-      auto schema = n->maybeSchema();
-      TORCHTRT_CHECK(
-          schema,
-          "Unable to get schema for Node " << util::node_info(n) << " (conversion.VerifyCoverterSupportForBlock)");
-      std::stringstream ss;
-      ss << *schema;
-      unsupported_ops[schema->operator_name()] = ss.str();
+    auto schema = n->maybeSchema();
+    // Some ops like torch::jit::prim::Loop, torch::jit::prim::If, torch::jit::prim::DictConstruct don't have a schema
+    // but they are supported. torch::jit::prim::DictConstruct is supported via fallback only
+    if (!OpSupported(n)) {
+      if (schema) {
+        std::stringstream ss;
+        ss << *schema;
+        unsupported_ops[schema->operator_name()] = ss.str();
+      } else {
+        std::stringstream ss;
+        ss << util::node_info(n);
+        // operator.overload is a filler name just to call the constructor.
+        c10::OperatorName op(ss.str(), "operator.overload");
+        unsupported_ops[op] = ss.str();
+      }
     }
+
     for (const auto sub_b : n->blocks()) {
       auto sub_b_unsupported_ops = GetUnsupportedOpsInBlock(sub_b);
       unsupported_ops.insert(sub_b_unsupported_ops.begin(), sub_b_unsupported_ops.end());
@@ -539,7 +547,6 @@ std::set<std::string> ConvertableOpsInBlock(const torch::jit::Block* b) {
 
 bool VerifyConverterSupportForBlock(const torch::jit::Block* b, bool suppress_errors) {
   auto unsupported_ops = GetUnsupportedOpsInBlock(b);
-
   if (unsupported_ops.size() != 0) {
     std::stringstream unsupported_msg;
     unsupported_msg
