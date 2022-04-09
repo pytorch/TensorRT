@@ -1,4 +1,4 @@
 -f https://download.pytorch.org/whl/torch_stable.html
-#torch==1.10.0+cu113
+#torch==1.11.0+cu113
 timm==v0.4.12
 transformers==4.17.0
