@@ -240,7 +240,6 @@ ext_modules = [
         include_dirs=[
             dir_path + "torch_tensorrt/csrc", dir_path + "torch_tensorrt/include",
             dir_path + "/../bazel-TRTorch/external/tensorrt/include",
-            dir_path + "/../bazel-Torch-TensorRT-Preview/external/tensorrt/include",
             dir_path + "/../bazel-Torch-TensorRT/external/tensorrt/include", dir_path + "/../"
         ],
         extra_compile_args=[
