@@ -427,10 +427,18 @@ void ConvertBlockToNetDef(
                                               << " and node outputs size: " << n->outputs().size() << " must match.");
             for (size_t i = 0; i < eval_list->elements().size(); i++) {
               auto eval_output = eval_list.get()->elements()[i];
-              LOG_DEBUG(
-                  ctx->logger,
-                  "Found the evaluated value(s) to be " << eval_output << " for node: " << util::node_info(n));
-              ctx->AssociateValueAndIValue(n->output(i), eval_output);
+              if (eval_output.isCustomClass()) {
+                auto container = eval_output.toCustomClass<TensorContainer>();
+                auto tensor = container->tensor();
+                LOG_DEBUG(
+                    ctx->logger, "Found the evaluated value(s) to be an ITensor of shape: " << tensor->getDimensions());
+                ctx->AssociateValueAndTensor(n->output(i), tensor);
+              } else {
+                LOG_DEBUG(
+                    ctx->logger,
+                    "Found the evaluated value(s) to be " << eval_output << " for node: " << util::node_info(n));
+                ctx->AssociateValueAndIValue(n->output(i), eval_output);
+              }
             }
           } else {
             TORCHTRT_THROW_ERROR("Unsupported return type for evaluated node");
