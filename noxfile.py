@@ -18,7 +18,7 @@ def install_deps(session):
 
 def download_models(session, use_host_env=False):
     print("Downloading test models")
-    session.install('timm')
+    session.install("-r", os.path.join(TOP_DIR, "tests", "modules", "requirements.txt"))
     print(TOP_DIR)
     session.chdir(os.path.join(TOP_DIR, "tests", "modules"))
     if use_host_env:

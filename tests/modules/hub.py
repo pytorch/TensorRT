@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
 import timm
+from transformers import BertModel, BertTokenizer, BertConfig
 
 torch.hub._validate_not_a_forked_repo = lambda a, b, c: True
 
@@ -189,3 +190,30 @@ class FallbackIf(torch.nn.Module):
 conditional_model = FallbackIf().eval().cuda()
 conditional_script_model = torch.jit.script(conditional_model)
 torch.jit.save(conditional_script_model, "conditional_scripted.jit.pt")
+
+enc = BertTokenizer.from_pretrained("bert-base-uncased")
+text = "[CLS] Who was Jim Henson ? [SEP] Jim Henson was a puppeteer [SEP]"
+tokenized_text = enc.tokenize(text)
+masked_index = 8
+tokenized_text[masked_index] = "[MASK]"
+indexed_tokens = enc.convert_tokens_to_ids(tokenized_text)
+segments_ids = [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1]
+tokens_tensor = torch.tensor([indexed_tokens])
+segments_tensors = torch.tensor([segments_ids])
+dummy_input = [tokens_tensor, segments_tensors]
+
+config = BertConfig(
+    vocab_size_or_config_json_file=32000,
+    hidden_size=768,
+    num_hidden_layers=12,
+    num_attention_heads=12,
+    intermediate_size=3072,
+    torchscript=True,
+)
+
+model = BertModel(config)
+model.eval()
+model = BertModel.from_pretrained("bert-base-uncased", torchscript=True)
+
+traced_model = torch.jit.trace(model, [tokens_tensor, segments_tensors])
+torch.jit.save(traced_model, "bert_base_uncased_traced.jit.pt")

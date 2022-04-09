@@ -40,6 +40,13 @@ bool valid_dtype_format_combo(nvinfer1::DataType dtype, nvinfer1::TensorFormat f
         default:
           return false;
       }
+    case nvinfer1::DataType::kBOOL: // Supports Linear (NCHW)
+      switch (format) {
+        case nvinfer1::TensorFormat::kLINEAR:
+          return true;
+        default:
+          return false;
+      }
     default:
       return false;
   }
@@ -48,7 +55,7 @@ bool valid_dtype_format_combo(nvinfer1::DataType dtype, nvinfer1::TensorFormat f
 bool valid_input_dtype(nvinfer1::DataType dtype) {
   switch (dtype) {
     case nvinfer1::DataType::kBOOL:
-      return false;
+      return true;
     case nvinfer1::DataType::kFLOAT:
       return true;
     case nvinfer1::DataType::kHALF:

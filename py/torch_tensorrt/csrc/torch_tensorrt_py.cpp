@@ -185,7 +185,7 @@ PYBIND11_MODULE(_C, m) {
       .value("float16", DataType::kHalf, "16 bit floating point number")
       .value("int8", DataType::kChar, "8 bit integer number")
       .value("int32", DataType::kInt32, "32 bit integer number")
-      .value("bool", DataType::kChar, "Boolean value")
+      .value("bool", DataType::kBool, "Boolean value")
       .value("unknown", DataType::kUnknown, "Unknown data type")
       .export_values();
 
