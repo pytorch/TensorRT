@@ -231,11 +231,11 @@ std::unordered_map<torch::jit::Value*, usage_info> getInputUsageCounts(
   return usage_counts;
 }
 
-std::unordered_map<size_t, std::list<SegmentedBlock>::iterator>
-getIdxtoIterMap(std::list<SegmentedBlock> &segmented_blocks_list) {
+std::unordered_map<size_t, std::list<SegmentedBlock>::iterator> getIdxtoIterMap(
+    std::list<SegmentedBlock>& segmented_blocks_list) {
   std::unordered_map<size_t, std::list<SegmentedBlock>::iterator> idx_to_iter;
   auto iter = segmented_blocks_list.begin();
-  for (int i = 0; i < segmented_blocks_list.size(); ++i, ++iter) {
+  for (uint64_t i = 0; i < segmented_blocks_list.size(); ++i, ++iter) {
     idx_to_iter[i] = iter;
   }
   return idx_to_iter;
@@ -283,9 +283,10 @@ void resolveNonTensorInputBlocks(PartitionedGraph& segmented_blocks) {
 }
 
 void resolveTensorListInputBlocks(PartitionedGraph& segmented_blocks) {
-  // usage_counts is a map with key as non-tensor/tensorlist inputs and value as the idx of segmented block which produces/contains it.
-  auto usage_counts = getInputUsageCounts(
-      segmented_blocks, [](torch::jit::Value* input) -> bool { return isTensorList(input); });
+  // usage_counts is a map with key as non-tensor/tensorlist inputs and value as the idx of segmented block which
+  // produces/contains it.
+  auto usage_counts =
+      getInputUsageCounts(segmented_blocks, [](torch::jit::Value* input) -> bool { return isTensorList(input); });
 
   // Get idx of the segblock to its iterator mapping
   std::list<SegmentedBlock> segmented_blocks_list(segmented_blocks.cbegin(), segmented_blocks.cend());
@@ -293,12 +294,13 @@ void resolveTensorListInputBlocks(PartitionedGraph& segmented_blocks) {
 
   std::unordered_set<int> updated_segments;
   // we need to re-segment TensorRT segments whose inputs are TensorLists
-  for (auto &use : usage_counts) {
+  for (auto& use : usage_counts) {
     auto use_info = use.second;
     // For a particular tensorlist input, traverse through all ids of segmented blocks whose target is TensorRT
     for (auto i : use_info.tensorrt_use_id) {
       if (!updated_segments.count(i)) {
-        // tensorlistinput_to_segblock is a mapping from {tensorlist input : segmented block which produced this tensorlist input}
+        // tensorlistinput_to_segblock is a mapping from {tensorlist input : segmented block which produced this
+        // tensorlist input}
         std::unordered_map<torch::jit::Value*, SegmentedBlock> tensorlistinput_to_segblock;
         for (auto input : segmented_blocks[i].raw_inputs()) {
           if (isTensorList(input)) {
@@ -308,18 +310,20 @@ void resolveTensorListInputBlocks(PartitionedGraph& segmented_blocks) {
 
         // For each tensorlist input in tensorlistinput_to_segblock, get the node which actually uses this input.
         // Once we retrieve the node, we remove it from the current TensorRT segmented_blocks[i]. This node should be
-        // added to block that generated/produced (can be obtained via produce_id) this tensorlist input in the first place.
+        // added to block that generated/produced (can be obtained via produce_id) this tensorlist input in the first
+        // place.
         auto seg_blocks = segmentBlocksWithTensorListInputs(segmented_blocks[i], tensorlistinput_to_segblock);
         auto append_blocks = seg_blocks.first;
         auto trt_block = seg_blocks.second;
-        // Remove the current TensorRT seg_block and replace it with new TRT block (non empty) which has the node that uses tensorlist input removed.
+        // Remove the current TensorRT seg_block and replace it with new TRT block (non empty) which has the node that
+        // uses tensorlist input removed.
         auto next_iter = segmented_blocks_list.erase(idx_to_iter[i]);
         if (trt_block.raw_nodes().size() > 0) {
           segmented_blocks_list.insert(next_iter, trt_block);
         }
 
         // append blocks' nodes to the producer seg_block
-        for (auto append_block: append_blocks) {
+        for (auto append_block : append_blocks) {
           auto input = append_block.first; // corresponds to the tensorlist input
           auto block = append_block.second;
           // append nodes to segmented_blocks_list
