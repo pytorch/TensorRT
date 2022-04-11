@@ -184,10 +184,19 @@ def sign(*, input):
 def size(*, input):
     return input.size()
 
+
 @register_acc_op_properties(AccOpProperty.unary)
 @register_acc_op
 def device(*, input):
     return input.device
+
+
+@register_acc_op_properties(AccOpProperty.unary)
+@register_acc_op_mapping(op_and_target=("call_function", torch.numel))
+@register_acc_op
+def numel(*, input):
+    return torch.numel(input)
+
 
 @register_custom_acc_mapper_fn(
     op_and_target=("call_function", getattr),

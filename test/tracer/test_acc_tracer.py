@@ -1746,6 +1746,36 @@ class AccTracerTest(unittest.TestCase):
     def test_pow(self):
         self._make_acc_op_function_test(acc_ops.pow, torch.pow, exponent=2)
 
+    def test_numel(self):
+        class TestModule(nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, a):
+                return torch.numel(a)
+
+        m = TestModule()
+        a = torch.randn(2, 1, 4)
+        traced = acc_tracer.trace(m, [a])
+
+        ph_a = numel = None
+        for node in traced.graph.nodes:
+            if node.op == "placeholder":
+                self.assertTrue(node.target == "a")
+                ph_a = node
+            elif node.op == "call_function" and node.target == acc_ops.numel:
+                numel = node
+                self.assertTrue(numel.kwargs["input"] is ph_a)
+            elif node.op == "output":
+                self.assertEqual(node.args[0], numel)
+            else:
+                self.fail(f"Unexpected node: {node.format_node()}")
+
+
+        ref = m(a)
+        res = traced(a)
+        self.assertEqual(ref, res)
+
     def test_size(self):
         class TestModule(nn.Module):
             def __init__(self):
@@ -2373,5 +2403,6 @@ class AccTracerTest(unittest.TestCase):
                 acc_ops.logical_not,
                 acc_ops.ne,
                 acc_ops.device,
+                acc_ops.numel,
             },
         )

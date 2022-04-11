@@ -513,6 +513,33 @@ def acc_ops_size(
     return layer.get_output(0)
 
 
+@tensorrt_converter(acc_ops.numel)
+def acc_ops_numel(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    input_val = kwargs["input"]
+
+    if not isinstance(input_val, TRTTensor):
+        raise RuntimeError(
+            f"size received input {input_val} that is not part "
+            "of the TensorRT region!"
+        )
+
+    if has_dynamic_shape(input_val.shape):
+        raise RuntimeError(
+            f"numel does not support dynamic shapes."
+        )
+
+    numel = np.prod(input_val.shape)
+    layer = network.add_constant((1,), trt.Weights(np.array(numel, dtype=np.float32)))
+    set_layer_name(layer, target, name)
+    return layer.get_output(0)
+
+
 @tensorrt_converter(acc_ops.batch_norm)
 def acc_ops_batch_norm(
     network: TRTNetwork,
