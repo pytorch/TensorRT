@@ -3,6 +3,7 @@ from unittest import TestCase
 import functools
 import fx2trt_oss.fx.observer as ob
 from test_observer import set_observer_callback_rethrow, execution_verifier
+from fx2trt_oss.fx.passes.lower_basic_pass import fuse_permute_linear
 
 
 class ObserverGPUTests(TestCase):
@@ -47,8 +48,8 @@ class ObserverGPUTests(TestCase):
                 `verify_execution` so if this function is not executed, the
                 test fails.
                 """
-                assert ctx.callable is lower.fuse_permute_linear.orig_func
+                assert ctx.callable is fuse_permute_linear.orig_func
 
             # Register the observer callback and do the lowering
-            with lower.fuse_permute_linear.observers.post.add(observe_fuse_permute_linear_post):
+            with fuse_permute_linear.observers.post.add(observe_fuse_permute_linear_post):
                 lowerer(mod, inp)

@@ -15,7 +15,7 @@ from fx2trt_oss.fx import (
     InputTensorSpec,
     TRTModule,
 )
-from fx2trt_oss.fx.lower import run_const_fold
+from fx2trt_oss.fx.passes.lower_basic_pass import run_const_fold
 from fx2trt_oss.fx.utils import LowerPrecision
 from fx2trt_oss.tracer.acc_tracer import acc_ops
 from torch.ao.quantization import default_qconfig

@@ -10,8 +10,6 @@ import torch
 import torch.fx as fx
 import torch.nn as nn
 from fx2trt_oss.fx.observer import Observer
-from fx2trt_oss.tracer.acc_tracer import acc_ops
-from torch.fx.experimental.const_fold import split_const_subgraphs
 from torch.fx.passes.splitter_base import SplitResult
 
 from .fx2trt import (
@@ -22,7 +20,7 @@ from .input_tensor_spec import (
     InputTensorSpec,
 )
 from .passes.pass_utils import chain_passes, PassFunc
-from .passes.lower_basic_pass import fuse_permute_matmul,fuse_permute_linear
+from .passes.lower_pass_manager_builder import LowerPassManagerBuilder, LowerPassContext
 from .passes.remove_duplicate_output_args import (
     remove_duplicate_output_args,
 )
@@ -36,6 +34,7 @@ from .trt_module import (
 from .utils import LowerPrecision
 from fx2trt_oss.fx.passes.pass_utils import validate_inference, decorate_method
 
+from fx2trt_oss.fx.lower_setting import LowerSetting
 
 logger = logging.getLogger(__name__)
 
@@ -118,95 +117,6 @@ def lower_to_trt(
     )
     lowerer = Lowerer.create(lower_setting=lower_setting)
     return lowerer(module, input)
-
-
-@dc.dataclass
-class LowerSetting:
-    """
-    Basic configuration for lowering stack.
-
-    Args:
-    max_batch_size: The maximum batch size which can be used at execution time,
-    and also the batch size for which the ICudaEngine will be optimized.
-
-    input_specs: Specs for inputs to engine, can either be a single size or a
-    range defined by Min, Optimal, Max sizes.
-
-    explicit_batch_dimension: Use explicit batch dimension during lowering.
-
-    explicit_precision: Use explicit precision during lowering.
-
-    lower_precision: lower precision dtype during lowering.
-
-    max_workspace_size: The maximum workspace size. The maximum GPU temporary
-    memory which the TensorRT engine can use at execution time.
-
-    strict_type_constraints: Require TensorRT engine to strictly follow data type
-    setting at execution time.
-
-    customized_fuse_pass: List of custmozied pass to apply during lowering process.
-
-    lower_basic_fuse_pass: Enable basic pass fuse duirng lowering, i.e. fuse multiple operations
-    as (a->b->c->d)=>(e). Current basic fuse patterns are:
-    permute->linear
-    permute->matmul
-
-    verbose_log: Enable TensorRT engine verbose log mode.
-
-    algo_selector: Enable TensorRT algorithm selector at execution time.
-
-    timing_cache_prefix: TensorRT timing cache file path. TensorRT engine will use timing
-    cache file at execution time if valid timing cache file is provided.
-
-    save_timing_cache: Save updated timing cache data into timing cache file if the timing
-    cache file is provided.
-
-    ast_rewriter_allow_list (Optional[Set[nn.Module]]): Optional allow list of
-    modules that need AST rewriting. This is aiming to eliminate input variable involve in
-    exception checking control flow.
-
-    leaf_module_list (Optional[Set[nn.Module]]): Optional leaf module list where
-    modules will not be traced into.
-
-    cuda_graph_batch_size (int): Cuda graph batch size, default to be -1.
-
-    verbose_profile (bool): verbosity of profiler, default to False
-    """
-    max_batch_size: int = 2048
-    input_specs: List[InputTensorSpec] = dc.field(default_factory=list)
-    explicit_batch_dimension: bool = True
-    explicit_precision: bool = False
-    lower_precision: LowerPrecision = LowerPrecision.FP32
-    max_workspace_size: int = 1 << 30
-    strict_type_constraints: bool = False
-    customized_fuse_pass: Sequence = ()
-    lower_basic_fuse_pass: Sequence = (fuse_permute_matmul,fuse_permute_linear)
-    verbose_log: bool = False
-    algo_selector = None
-    timing_cache_prefix: str = ""
-    save_timing_cache: bool = False
-    ast_rewriter_allow_list: Optional[Set[Type[nn.Module]]] = None
-    leaf_module_list: Optional[Set[Type[nn.Module]]] = None
-    cuda_graph_batch_size: int = -1
-    verbose_profile: bool = False
-
-
-def run_const_fold(traced_mod: torch.fx.GraphModule) -> torch.fx.GraphModule:
-    # Now we do constant folding on traced module. We want to skip pattern like
-    # weights -> quant -> dequant -> op during constant folding when the model is
-    # a quantized int8 model.
-    def skip_folding_quant_dequant(node: torch.fx.Node):
-        if node.target != acc_ops.quantize_per_tensor:
-            return False
-        # If quantize_per_node -> dequantize, then skip folding.
-        for user in node.users:
-            if user.target == acc_ops.dequantize:
-                return True
-        return False
-
-    const_split_mod = split_const_subgraphs(traced_mod, skip_folding_quant_dequant)
-    const_split_mod.run_folding()
-    return const_split_mod
 
 
 def default_split_function(model: fx.GraphModule, inputs: Input, lower_setting: LowerSetting, min_acc_module_size: int = 10) -> SplitResult:
@@ -351,16 +261,11 @@ class Lowerer:
             module.half()
             inputs = tuple(x.half() if x.dtype == torch.float32 else x for x in inputs)
 
-        # Ensure ast_rewrite is done for input module before const_fold.
-        tracer = chain_passes(self.trace_func, *self.lower_setting.customized_fuse_pass)
-        traced_mod = tracer(module, inputs)  # type: ignore[misc]
-
-        # Run const folding.
-        traced_mod = run_const_fold(traced_mod)
-
-        # Retrace here to eliminate no-op introduced by const folding and map new introduced
-        # nodes to acc op nodes.
-        traced_mod = tracer(traced_mod, inputs)  # type: ignore[misc]
+        pm = LowerPassManagerBuilder(LowerPassContext(
+            input=inputs,
+            lower_setting=self.lower_setting,
+            trace_func=self.trace_func)).build_lower_pipeline()
+        traced_mod = pm(module)
         FUSE_PASSES_POST_OBSERVER.observe(traced_mod, inputs)
 
         # Run split.
