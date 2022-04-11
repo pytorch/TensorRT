@@ -28,7 +28,9 @@ def chain_passes(*passes: PassFunc) -> PassFunc:
     return parent_pass
 
 
-def validate_inference(rtol=None, atol=None):
+# (TODO(shirongwu): Add exception notification for fblearner flow when available, notify oncall
+# on pass that failed accuracy check.
+def validate_inference(rtol=None, atol=None, suppress_accuracy_check_failure=False):
     def _validate_inference(pass_: PassFunc) -> PassFunc:
         """
         Wraps a pass function to validate that its inference results before and
@@ -52,9 +54,13 @@ def validate_inference(rtol=None, atol=None):
                     kwargs["rtol"] = rtol
                 if atol:
                     kwargs["atol"] = atol
-                assert torch.allclose(
-                    x, y, **kwargs
-                ), f"pass {pass_} failed correctness check due to output {kk}"
+                accuracy_check = torch.allclose(x, y, **kwargs)
+                if not accuracy_check:
+                    if suppress_accuracy_check_failure:
+                        _LOGGER.error(f"pass {pass_} failed correctness check due to output {kk}, escape current pass.")
+                        return module
+                    else:
+                        raise RuntimeError(f"pass {pass_} failed correctness check due to output {kk}")
             return processed_module
 
         return pass_with_validation
