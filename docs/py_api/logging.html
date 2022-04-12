@@ -703,6 +703,112 @@
           </dl>
          </dd>
         </dl>
+        <dl class="py class">
+         <dt class="sig sig-object py" id="torch_tensorrt.logging.debug">
+          <em class="property">
+           <span class="pre">
+            class
+           </span>
+           <span class="w">
+           </span>
+          </em>
+          <span class="sig-prename descclassname">
+           <span class="pre">
+            torch_tensorrt.logging.
+           </span>
+          </span>
+          <span class="sig-name descname">
+           <span class="pre">
+            debug
+           </span>
+          </span>
+          <a class="headerlink" href="#torch_tensorrt.logging.debug" title="Permalink to this definition">
+           ¶
+          </a>
+         </dt>
+         <dd>
+          <p>
+           Bases:
+           <code class="xref py py-class docutils literal notranslate">
+            <span class="pre">
+             object
+            </span>
+           </code>
+          </p>
+          <p>
+           Context-manager to display full debug information through the logger
+          </p>
+          <p>
+           Example:
+          </p>
+          <dl class="simple">
+           <dt>
+            with torch_tensorrt.logging.debug():
+           </dt>
+           <dd>
+            <p>
+             model_trt = torch_tensorrt.compile(model,
+             <a href="#id1">
+              <span class="problematic" id="id2">
+               **
+              </span>
+             </a>
+             spec)
+            </p>
+           </dd>
+          </dl>
+         </dd>
+        </dl>
+        <dl class="py class">
+         <dt class="sig sig-object py" id="torch_tensorrt.logging.errors">
+          <em class="property">
+           <span class="pre">
+            class
+           </span>
+           <span class="w">
+           </span>
+          </em>
+          <span class="sig-prename descclassname">
+           <span class="pre">
+            torch_tensorrt.logging.
+           </span>
+          </span>
+          <span class="sig-name descname">
+           <span class="pre">
+            errors
+           </span>
+          </span>
+          <a class="headerlink" href="#torch_tensorrt.logging.errors" title="Permalink to this definition">
+           ¶
+          </a>
+         </dt>
+         <dd>
+          <p>
+           Bases:
+           <code class="xref py py-class docutils literal notranslate">
+            <span class="pre">
+             object
+            </span>
+           </code>
+          </p>
+          <p>
+           Context-manager to limit displayed log messages to just errors and above
+          </p>
+          <p>
+           Example:
+          </p>
+          <dl class="simple">
+           <dt>
+            with torch_tensorrt.logging.errors():
+           </dt>
+           <dd>
+            <p>
+             outputs = model_torchtrt(inputs)
+            </p>
+           </dd>
+          </dl>
+         </dd>
+        </dl>
         <dl class="py function">
          <dt class="sig sig-object py" id="torch_tensorrt.logging.get_is_colored_output_on">
           <span class="sig-prename descclassname">
@@ -870,6 +976,169 @@
              <a class="reference internal" href="#torch_tensorrt.logging.Level" title="torch_tensorrt.logging.Level">
               torch_tensorrt.logging.Level
              </a>
+            </p>
+           </dd>
+          </dl>
+         </dd>
+        </dl>
+        <dl class="py class">
+         <dt class="sig sig-object py" id="torch_tensorrt.logging.graphs">
+          <em class="property">
+           <span class="pre">
+            class
+           </span>
+           <span class="w">
+           </span>
+          </em>
+          <span class="sig-prename descclassname">
+           <span class="pre">
+            torch_tensorrt.logging.
+           </span>
+          </span>
+          <span class="sig-name descname">
+           <span class="pre">
+            graphs
+           </span>
+          </span>
+          <a class="headerlink" href="#torch_tensorrt.logging.graphs" title="Permalink to this definition">
+           ¶
+          </a>
+         </dt>
+         <dd>
+          <p>
+           Bases:
+           <code class="xref py py-class docutils literal notranslate">
+            <span class="pre">
+             object
+            </span>
+           </code>
+          </p>
+          <p>
+           Context-manager to display the results of intermediate lowering passes
+as well as full debug information through the logger
+          </p>
+          <p>
+           Example:
+          </p>
+          <dl class="simple">
+           <dt>
+            with torch_tensorrt.logging.graphs():
+           </dt>
+           <dd>
+            <p>
+             model_trt = torch_tensorrt.compile(model,
+             <a href="#id3">
+              <span class="problematic" id="id4">
+               **
+              </span>
+             </a>
+             spec)
+            </p>
+           </dd>
+          </dl>
+         </dd>
+        </dl>
+        <dl class="py class">
+         <dt class="sig sig-object py" id="torch_tensorrt.logging.info">
+          <em class="property">
+           <span class="pre">
+            class
+           </span>
+           <span class="w">
+           </span>
+          </em>
+          <span class="sig-prename descclassname">
+           <span class="pre">
+            torch_tensorrt.logging.
+           </span>
+          </span>
+          <span class="sig-name descname">
+           <span class="pre">
+            info
+           </span>
+          </span>
+          <a class="headerlink" href="#torch_tensorrt.logging.info" title="Permalink to this definition">
+           ¶
+          </a>
+         </dt>
+         <dd>
+          <p>
+           Bases:
+           <code class="xref py py-class docutils literal notranslate">
+            <span class="pre">
+             object
+            </span>
+           </code>
+          </p>
+          <p>
+           Context-manager to display all info and greater severity messages
+          </p>
+          <p>
+           Example:
+          </p>
+          <dl class="simple">
+           <dt>
+            with torch_tensorrt.logging.info():
+           </dt>
+           <dd>
+            <p>
+             model_trt = torch_tensorrt.compile(model,
+             <a href="#id5">
+              <span class="problematic" id="id6">
+               **
+              </span>
+             </a>
+             spec)
+            </p>
+           </dd>
+          </dl>
+         </dd>
+        </dl>
+        <dl class="py class">
+         <dt class="sig sig-object py" id="torch_tensorrt.logging.internal_errors">
+          <em class="property">
+           <span class="pre">
+            class
+           </span>
+           <span class="w">
+           </span>
+          </em>
+          <span class="sig-prename descclassname">
+           <span class="pre">
+            torch_tensorrt.logging.
+           </span>
+          </span>
+          <span class="sig-name descname">
+           <span class="pre">
+            internal_errors
+           </span>
+          </span>
+          <a class="headerlink" href="#torch_tensorrt.logging.internal_errors" title="Permalink to this definition">
+           ¶
+          </a>
+         </dt>
+         <dd>
+          <p>
+           Bases:
+           <code class="xref py py-class docutils literal notranslate">
+            <span class="pre">
+             object
+            </span>
+           </code>
+          </p>
+          <p>
+           Context-manager to limit displayed log messages to just internal errors
+          </p>
+          <p>
+           Example:
+          </p>
+          <dl class="simple">
+           <dt>
+            with torch_tensorrt.logging.internal_errors():
+           </dt>
+           <dd>
+            <p>
+             outputs = model_torchtrt(inputs)
             </p>
            </dd>
           </dl>
@@ -1174,6 +1443,62 @@ will only get printed out if Level &gt; reportable_log_level
               </em>
              </a>
              ) – The enum representing the level required to print
+            </p>
+           </dd>
+          </dl>
+         </dd>
+        </dl>
+        <dl class="py class">
+         <dt class="sig sig-object py" id="torch_tensorrt.logging.warnings">
+          <em class="property">
+           <span class="pre">
+            class
+           </span>
+           <span class="w">
+           </span>
+          </em>
+          <span class="sig-prename descclassname">
+           <span class="pre">
+            torch_tensorrt.logging.
+           </span>
+          </span>
+          <span class="sig-name descname">
+           <span class="pre">
+            warnings
+           </span>
+          </span>
+          <a class="headerlink" href="#torch_tensorrt.logging.warnings" title="Permalink to this definition">
+           ¶
+          </a>
+         </dt>
+         <dd>
+          <p>
+           Bases:
+           <code class="xref py py-class docutils literal notranslate">
+            <span class="pre">
+             object
+            </span>
+           </code>
+          </p>
+          <p>
+           Context-manager to limit displayed log messages to just warnings and above
+          </p>
+          <p>
+           Example:
+          </p>
+          <dl class="simple">
+           <dt>
+            with torch_tensorrt.logging.warnings():
+           </dt>
+           <dd>
+            <p>
+             model_trt = torch_tensorrt.compile(model,
+             <a href="#id7">
+              <span class="problematic" id="id8">
+               **
+              </span>
+             </a>
+             spec)
             </p>
            </dd>
           </dl>

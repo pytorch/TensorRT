@@ -483,28 +483,28 @@
 <span class="cp">#ifndef DOXYGEN_SHOULD_SKIP_THIS</span>
 <span class="k">namespace</span><span class="w"> </span><span class="nn">torch</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
 <span class="k">namespace</span><span class="w"> </span><span class="nn">jit</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="k">struct</span> <span class="nc">Graph</span><span class="p">;</span><span class="w"></span>
-<span class="k">struct</span> <span class="nc">Module</span><span class="p">;</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">Graph</span><span class="p">;</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">Module</span><span class="p">;</span><span class="w"></span>
 <span class="p">}</span><span class="w"> </span><span class="c1">// namespace jit</span>
 <span class="p">}</span><span class="w"> </span><span class="c1">// namespace torch</span>
 
 <span class="k">namespace</span><span class="w"> </span><span class="nn">c10</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="k">enum</span> <span class="k">class</span><span class="w"> </span><span class="nc">DeviceType</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="kt">int8_t</span><span class="p">;</span><span class="w"></span>
-<span class="k">enum</span> <span class="k">class</span><span class="w"> </span><span class="nc">ScalarType</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="kt">int8_t</span><span class="p">;</span><span class="w"></span>
+<span class="k">enum</span><span class="w"> </span><span class="k">class</span><span class="w"> </span><span class="nc">DeviceType</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="kt">int8_t</span><span class="p">;</span><span class="w"></span>
+<span class="k">enum</span><span class="w"> </span><span class="k">class</span><span class="w"> </span><span class="nc">ScalarType</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="kt">int8_t</span><span class="p">;</span><span class="w"></span>
 <span class="k">template</span><span class="w"> </span><span class="o">&lt;</span><span class="k">class</span><span class="o">&gt;</span><span class="w"></span>
-<span class="k">class</span> <span class="nc">ArrayRef</span><span class="p">;</span><span class="w"></span>
+<span class="k">class</span><span class="w"> </span><span class="nc">ArrayRef</span><span class="p">;</span><span class="w"></span>
 <span class="p">}</span><span class="w"> </span><span class="c1">// namespace c10</span>
 
 <span class="k">namespace</span><span class="w"> </span><span class="nn">nvinfer1</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="k">class</span> <span class="nc">IInt8Calibrator</span><span class="p">;</span><span class="w"></span>
+<span class="k">class</span><span class="w"> </span><span class="nc">IInt8Calibrator</span><span class="p">;</span><span class="w"></span>
 <span class="p">}</span><span class="w"></span>
 <span class="cp">#endif </span><span class="c1">// DOXYGEN_SHOULD_SKIP_THIS</span>
 
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">"torch_tensorrt/macros.h"</span><span class="cp"></span>
 <span class="k">namespace</span><span class="w"> </span><span class="nn">torch_tensorrt</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="k">class</span> <span class="nc">TORCHTRT_API</span><span class="w"> </span><span class="n">DataType</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="k">class</span><span class="w"> </span><span class="nc">TORCHTRT_API</span><span class="w"> </span><span class="n">DataType</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
 <span class="w"> </span><span class="k">public</span><span class="o">:</span><span class="w"></span>
-<span class="w">  </span><span class="k">enum</span> <span class="nc">Value</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="kt">int8_t</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="k">enum</span><span class="w"> </span><span class="nc">Value</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="kt">int8_t</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
 <span class="w">    </span><span class="n">kFloat</span><span class="p">,</span><span class="w"></span>
 <span class="w">    </span><span class="n">kHalf</span><span class="p">,</span><span class="w"></span>
 <span class="w">    </span><span class="n">kChar</span><span class="p">,</span><span class="w"></span>
@@ -538,10 +538,10 @@
 <span class="w">  </span><span class="n">Value</span><span class="w"> </span><span class="n">value</span><span class="p">;</span><span class="w"></span>
 <span class="p">};</span><span class="w"></span>
 
-<span class="k">struct</span> <span class="nc">Device</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="w">  </span><span class="k">class</span> <span class="nc">DeviceType</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">Device</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="k">class</span><span class="w"> </span><span class="nc">DeviceType</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
 <span class="w">   </span><span class="k">public</span><span class="o">:</span><span class="w"></span>
-<span class="w">    </span><span class="k">enum</span> <span class="nc">Value</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="kt">int8_t</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="k">enum</span><span class="w"> </span><span class="nc">Value</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="kt">int8_t</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
 <span class="w">      </span><span class="n">kGPU</span><span class="p">,</span><span class="w"></span>
 <span class="w">      </span><span class="n">kDLA</span><span class="p">,</span><span class="w"></span>
 <span class="w">    </span><span class="p">};</span><span class="w"></span>
@@ -581,15 +581,15 @@
 <span class="w">  </span><span class="n">Device</span><span class="p">()</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">device_type</span><span class="p">(</span><span class="n">DeviceType</span><span class="o">::</span><span class="n">kGPU</span><span class="p">),</span><span class="w"> </span><span class="n">gpu_id</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span><span class="w"> </span><span class="n">dla_core</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span><span class="w"> </span><span class="n">allow_gpu_fallback</span><span class="p">(</span><span class="nb">false</span><span class="p">)</span><span class="w"> </span><span class="p">{}</span><span class="w"></span>
 <span class="p">};</span><span class="w"></span>
 
-<span class="k">enum</span> <span class="k">class</span><span class="w"> </span><span class="nc">EngineCapability</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="kt">int8_t</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="k">enum</span><span class="w"> </span><span class="k">class</span><span class="w"> </span><span class="nc">EngineCapability</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="kt">int8_t</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
 <span class="w">  </span><span class="n">kSTANDARD</span><span class="p">,</span><span class="w"></span>
 <span class="w">  </span><span class="n">kSAFETY</span><span class="p">,</span><span class="w"></span>
 <span class="w">  </span><span class="n">kDLA_STANDALONE</span><span class="p">,</span><span class="w"></span>
 <span class="p">};</span><span class="w"></span>
 
-<span class="k">class</span> <span class="nc">TORCHTRT_API</span><span class="w"> </span><span class="n">TensorFormat</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="k">class</span><span class="w"> </span><span class="nc">TORCHTRT_API</span><span class="w"> </span><span class="n">TensorFormat</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
 <span class="w"> </span><span class="k">public</span><span class="o">:</span><span class="w"></span>
-<span class="w">  </span><span class="k">enum</span> <span class="nc">Value</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="kt">int8_t</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="k">enum</span><span class="w"> </span><span class="nc">Value</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="kt">int8_t</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
 <span class="w">    </span><span class="n">kContiguous</span><span class="p">,</span><span class="w"></span>
 <span class="w">    </span><span class="n">kChannelsLast</span><span class="p">,</span><span class="w"></span>
 <span class="w">    </span><span class="n">kUnknown</span><span class="p">,</span><span class="w"></span>
@@ -620,7 +620,7 @@
 <span class="w">  </span><span class="n">Value</span><span class="w"> </span><span class="n">value</span><span class="p">;</span><span class="w"></span>
 <span class="p">};</span><span class="w"></span>
 
-<span class="k">struct</span> <span class="nc">TORCHTRT_API</span><span class="w"> </span><span class="n">Input</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">TORCHTRT_API</span><span class="w"> </span><span class="n">Input</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">min_shape</span><span class="p">;</span><span class="w"></span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">opt_shape</span><span class="p">;</span><span class="w"></span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">max_shape</span><span class="p">;</span><span class="w"></span>
@@ -676,7 +676,7 @@
 <span class="n">TORCHTRT_API</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="n">set_device</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">gpu_id</span><span class="p">);</span><span class="w"></span>
 
 <span class="k">namespace</span><span class="w"> </span><span class="nn">torchscript</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
-<span class="k">struct</span> <span class="nc">TORCHTRT_API</span><span class="w"> </span><span class="n">CompileSpec</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">TORCHTRT_API</span><span class="w"> </span><span class="n">CompileSpec</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
 <span class="w">  </span><span class="n">CompileSpec</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">fixed_sizes</span><span class="p">);</span><span class="w"></span>
 
 <span class="w">  </span><span class="n">CompileSpec</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">c10</span><span class="o">::</span><span class="n">ArrayRef</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="n">fixed_sizes</span><span class="p">);</span><span class="w"></span>
