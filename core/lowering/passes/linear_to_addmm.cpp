@@ -35,7 +35,6 @@ void replaceLinearWithBiasNonePattern(std::shared_ptr<torch::jit::Graph> graph) 
       } else {
         torch::jit::WithInsertPoint guard(*it);
         std::shared_ptr<torch::jit::Graph> d_graph = toGraphFunction(decompose_funcs.get_function("linear")).graph();
-        ;
         torch::jit::Value* new_output = insertGraph(*it->owningGraph(), *d_graph, it->inputs()).at(0);
         new_output->setType(it->output()->type());
         it->output()->replaceAllUsesWith(new_output);
