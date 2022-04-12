@@ -12,8 +12,8 @@ void ReduceGelu(std::shared_ptr<torch::jit::Graph>& graph) {
             %out : Tensor = aten::gelu(%x)
             return (%out))IR";
 
-  // This gelu_approximate_pattern schema exists in 21.11, 21.12, 22.01 containers of pytorch. These container versions use
-  // an unmerged PR in pytorch : https://github.com/pytorch/pytorch/pull/61439. We reduce this to regular Gelu.
+  // This gelu_approximate_pattern schema exists in 21.11, 21.12, 22.01 containers of pytorch. These container versions
+  // use an unmerged PR in pytorch : https://github.com/pytorch/pytorch/pull/61439. We reduce this to regular Gelu.
   std::string gelu_approximate_pattern = R"IR(
         graph(%x : Tensor, %approx):
             %out : Tensor = aten::gelu(%x, %approx)
@@ -64,7 +64,8 @@ void ReduceGelu(std::shared_ptr<torch::jit::Graph>& graph) {
   map_gelu_to_pointwise_ops.runOnGraph(graph);
 
   torch::jit::SubgraphRewriter map_gelu_approximate_to_pointwise_ops;
-  map_gelu_approximate_to_pointwise_ops.RegisterRewritePattern(gelu_approximate_pattern, gelu_reduce_multi_input_pattern);
+  map_gelu_approximate_to_pointwise_ops.RegisterRewritePattern(
+      gelu_approximate_pattern, gelu_reduce_multi_input_pattern);
   map_gelu_approximate_to_pointwise_ops.runOnGraph(graph);
 
   LOG_GRAPH("Post lowering of [aten::gelu] -> " << *graph);
