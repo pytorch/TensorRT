@@ -85,7 +85,6 @@ def _ensure_proper_output_use(user: fx.Node, target_node: fx.Node) -> int:
 
     returns the index into the subnet output tuple
     """
-    _LOGGER.info(f"Checking user node: {user.format_node()}")
     assert (
         user.op == "call_function"
         and user.target == operator.getitem

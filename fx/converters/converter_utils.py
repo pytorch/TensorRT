@@ -726,3 +726,7 @@ def type_cast(network: TRTNetwork, target: Target, name: str, input: TRTTensor, 
     layer_i.set_output_type(0, cast_type)
     set_layer_name(layer_i, target, f"{name}_dtype_change")
     return layer_i.get_output(0)
+
+def trt_dtype_to_torch_dtype(trt_dtype):
+    table = {trt.bool:torch.bool, trt.int32:torch.int32, trt.float16:torch.float16, trt.float32:torch.float32}
+    return table[trt_dtype]

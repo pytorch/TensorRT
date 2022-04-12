@@ -2837,7 +2837,7 @@ def acc_ops_cumsum(
     iterator = loop.add_iterator(input_val, dim, False)
     data = iterator.get_output(0)
     new_dims = tuple(data.shape)
-    zero_tensor = torch.zeros(new_dims, dtype=torch.float32)
+    zero_tensor = torch.zeros(new_dims, dtype=trt_dtype_to_torch_dtype(input_val.dtype))
     zero_tensor = network.add_constant(zero_tensor.shape, to_numpy(zero_tensor)).get_output(0)
 
     running_sum = loop.add_recurrence(zero_tensor)
