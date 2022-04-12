@@ -13,7 +13,7 @@ at::Tensor createTensorFromList(
     const torch::jit::IValue& dtype,
     const torch::jit::IValue& device);
 
-at::Tensor scalar_to_tensor_util(const at::Scalar& s, const at::Device device = at::kCPU);
+at::Tensor scalar_to_tensor(const at::Scalar& s, const at::Device device = at::kCPU);
 
 } // namespace evaluators
 } // namespace conversion

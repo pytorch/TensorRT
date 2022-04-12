@@ -119,13 +119,14 @@ void checkSequenceSize(int64_t n, int64_t dim, int64_t seq_size) {
   }
 }
 
-at::Tensor scalar_to_tensor_util(const at::Scalar& s, const at::Device device = at::kCPU) {
+// TODO: Conditionally enable truncation based on user setting
+at::Tensor scalar_to_tensor(const at::Scalar& s, const at::Device device = at::kCPU) {
   // This function is basically same with the one in
   // https://github.com/pytorch/pytorch/blob/master/aten/src/ATen/ScalarOps.h, what different here is that Int and Float
   // won't be upgraded to kDouble or kLong since we don't support these 2 types in conversion
   if (device == at::kCPU) {
     if (s.isFloatingPoint()) {
-      LOG_WARNING("Unable to process input type of at::kDouble, truncate type to at::kInt in scalar_to_tensor_util ");
+      LOG_WARNING("Unable to process input type of at::kDouble, truncate type to at::kFloat in scalar_to_tensor_util ");
       return at::detail::scalar_tensor_static(s, at::kFloat, at::kCPU);
     } else if (s.isComplex()) {
       return at::detail::scalar_tensor_static(s, at::kComplexDouble, at::kCPU);
@@ -138,7 +139,7 @@ at::Tensor scalar_to_tensor_util(const at::Scalar& s, const at::Device device = 
     }
   }
   if (s.isFloatingPoint()) {
-    LOG_WARNING("Unable to process input type of at::kDouble, truncate type to at::kInt in scalar_to_tensor_util ");
+    LOG_WARNING("Unable to process input type of at::kDouble, truncate type to at::kFloat in scalar_to_tensor_util ");
     return at::scalar_tensor(s, at::device(device).dtype(at::kFloat));
   } else if (s.isBoolean()) {
     return at::scalar_tensor(s, at::device(device).dtype(at::kBool));
