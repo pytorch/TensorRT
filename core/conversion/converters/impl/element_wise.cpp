@@ -484,8 +484,13 @@ auto element_wise_registrations TORCHTRT_UNUSED =
         .pattern({"aten::ne.Scalar(Tensor self, Scalar other) -> (Tensor)",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                     auto self = args[0].ITensorOrFreeze(ctx);
-                    auto scalar = args[1].unwrapToScalar().to<float>();
-                    auto scalar_tensor = tensor_to_const(ctx, torch::tensor({scalar}));
+                    auto scalar = args[1].unwrapToScalar();
+                    nvinfer1::ITensor* scalar_tensor;
+                    if (self->getType() == nvinfer1::DataType::kFLOAT || self->getType() == nvinfer1::DataType::kHALF) {
+                      scalar_tensor = tensor_to_const(ctx, torch::tensor({scalar.to<float>()}));
+                    } else {
+                      scalar_tensor = tensor_to_const(ctx, torch::tensor({scalar.to<int>()}));
+                    }
                     auto equal = add_elementwise(
                         ctx,
                         nvinfer1::ElementWiseOperation::kEQUAL,
