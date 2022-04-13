@@ -6,11 +6,12 @@ import torch
 import torchvision
 from fx2trt_oss.fx.lower import lower_to_trt
 from fx2trt_oss.fx.utils import LowerPrecision
-
+import torchdynamo
+from torchdynamo.optimizations import backends
 
 """
-The purpose of this example is to demostrate the onverall flow of lowering a PyTorch model
-to TensorRT conveniently with lower.py.
+The purpose of this example is to demostrate the lowering flow to TRT and Torchdynamo
+To install Torchdynamo, download and run command `python setup.py develop`(https://github.com/facebookresearch/torchdynamo)
 """
 
 
@@ -38,8 +39,8 @@ class Configuration:
     # Whether to apply TRT lowering to the model before benchmarking
     trt: bool = False
 
-    # Whether to apply engine holder to the lowered model
-    jit: bool = False
+    # Whether to apply torchdynamo
+    torchdynamo: bool = False
 
     # Whether to enable FP16 mode for TRT lowering
     fp16: bool = False
@@ -103,12 +104,15 @@ def benchmark(
     conf = Configuration(batch_iter=batch_iter, batch_size=batch_size)
 
     configurations = [
-        # Baseline
-        replace(conf, name="CUDA Eager", trt=False),
+
         # FP32
-        replace(conf, name="TRT FP32 Eager", trt=True, jit=False, fp16=False, accuracy_rtol=1e-3),
+        replace(conf, name="TRT FP32 Eager", trt=True, torchdynamo=False, fp16=False, accuracy_rtol=1e-3),
+        # torchdynamo fp16
+        replace(conf, name="TRT FP16 Eager", trt=False, torchdynamo=True, fp16=True, accuracy_rtol=1e-2),
         # FP16
-        replace(conf, name="TRT FP16 Eager", trt=True, jit=False, fp16=True, accuracy_rtol=1e-2),
+        replace(conf, name="torchdynamo-TRT FP32 Eager", trt=False, torchdynamo=True, fp16=False, accuracy_rtol=1e-2),
+        # torchdynamo fp16
+        replace(conf, name="torchdynamo-TRT FP16 Eager", trt=False, torchdynamo=True, fp16=True, accuracy_rtol=1e-2),
     ]
 
     results = [
@@ -163,10 +167,8 @@ def run_configuration_benchmark(
         module = module.half()
         input = [i.half() for i in input]
 
-    if not conf.trt:
-        # Run eager mode benchmark
-        time = benchmark_torch_function(conf.batch_iter, lambda: module(*input))
-    elif not conf.jit:
+
+    if conf.trt:
         # Run lowering eager mode benchmark
         lowered_module = lower_to_trt(
             module,
@@ -174,9 +176,17 @@ def run_configuration_benchmark(
             max_batch_size=conf.batch_size,
             lower_precision=LowerPrecision.FP16 if conf.fp16 else LowerPrecision.FP32,
         )
+
         time = benchmark_torch_function(conf.batch_iter, lambda: lowered_module(*input))
+    elif conf.torchdynamo:
+        if conf.fp16:
+            optimize_ctx = torchdynamo.optimize(backends.fx2trt_compiler_fp16)
+        else:
+            optimize_ctx = torchdynamo.optimize(backends.fx2trt_compiler)
+        with optimize_ctx:
+            time = benchmark_torch_function(conf.batch_iter, module, *input)
     else:
-        print("Lowering with JIT is not available!", "red")
+        print("Lowering mode is not available!", "red")
 
     result = Result(
         module=module, input=input, conf=conf, time_sec=time
@@ -185,6 +195,6 @@ def run_configuration_benchmark(
 
 
 if __name__ == "__main__":
-    test_model = torchvision.models.resnet101()
-    input = [torch.cuda.FloatTensor(1024, 3, 224, 224)]  # type: ignore[attr-defined]
-    benchmark(test_model, input, 100, 1024)
+    test_model = torchvision.models.resnet18()
+    input = [torch.cuda.FloatTensor(64, 3, 224, 224)]  # type: ignore[attr-defined]
+    benchmark(test_model, input, 100, 64)
