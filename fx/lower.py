@@ -1,6 +1,6 @@
 import dataclasses as dc
 import logging
-from typing import Callable, List, Any, Sequence, Type, Set, Optional, Tuple, NamedTuple
+from typing import Callable, Any, Sequence
 
 import fx2trt_oss.tracer.acc_tracer.acc_tracer as acc_tracer
 
@@ -9,7 +9,7 @@ import tensorrt as trt
 import torch
 import torch.fx as fx
 import torch.nn as nn
-from fx2trt_oss.fx.observer import Observer
+
 from torch.fx.passes.splitter_base import SplitResult
 
 from .fx2trt import (
@@ -21,9 +21,6 @@ from .input_tensor_spec import (
 )
 from .passes.pass_utils import chain_passes, PassFunc
 from .passes.lower_pass_manager_builder import LowerPassManagerBuilder, LowerPassContext
-from .passes.remove_duplicate_output_args import (
-    remove_duplicate_output_args,
-)
 from .tools.timing_cache_utils import (
     TimingCacheManager,
 )
@@ -39,39 +36,6 @@ from fx2trt_oss.fx.lower_setting import LowerSetting
 logger = logging.getLogger(__name__)
 
 Input = Sequence[Any]
-
-# ----------------------------------------------------------------------
-# OBSERVERS
-# ----------------------------------------------------------------------
-# List of observers. We can subscribe to them by calling its `add(callback)`
-# function from anywhere in code:
-#
-# >>> from fx2trt_oss.fx.lower import FUSE_PASSES_POST_OBSERVER
-# >>> with FUSE_PASSES_POST_OBSERVER.add(print_module_and_input):
-# >>>     # print_module_and_input will be called right after the fuse passes
-# >>>     lower(module, sample_input)
-
-# Observer for the model after the fuse passes.
-FUSE_PASSES_POST_OBSERVER: Observer[
-    Callable[[nn.Module, Input], None]
-] = Observer("FUSE_PASSES_POST_OBSERVER")
-
-# Observer for the TRT split submodules before lowering
-LOWER_SPLIT_PRE_OBSERVER: Observer[
-    Callable[[str, nn.Module, Input], None]
-] = Observer("LOWER_SPLIT_PRE_OBSERVER")
-
-# Observer for the TRT split submodules after lowering
-LOWER_SPLIT_POST_OBSERVER: Observer[
-    Callable[[str, nn.Module, Input], None]
-] = Observer("LOWER_SPLIT_POST_OBSERVER")
-# ----------------------------------------------------------------------
-
-
-class PassContext(NamedTuple):
-    input: Input
-    lower_setting: "LowerSetting"
-    module_name: str = ""
 
 
 def lower_to_trt(
@@ -117,16 +81,6 @@ def lower_to_trt(
     )
     lowerer = Lowerer.create(lower_setting=lower_setting)
     return lowerer(module, input)
-
-
-def default_split_function(model: fx.GraphModule, inputs: Input, lower_setting: LowerSetting, min_acc_module_size: int = 10) -> SplitResult:
-    splitter_setting = TRTSplitterSetting()
-    splitter_setting.use_implicit_batch_dim = not lower_setting.explicit_batch_dimension
-    # TODO: avoid hardcode here by introducing another flag in lowering setting.
-    splitter_setting.min_acc_module_size = min_acc_module_size
-    splitter = TRTSplitter(model, inputs, settings=splitter_setting)
-    splitter.node_support_preview()
-    return splitter.generate_split_results()
 
 
 @dc.dataclass
@@ -194,6 +148,41 @@ class LowerTrtInterpreter:
         return interp_result
 
 
+def default_split_function(model: fx.GraphModule, inputs: Input, lower_setting: LowerSetting, min_acc_module_size: int = 10) -> SplitResult:
+    splitter_setting = TRTSplitterSetting()
+    splitter_setting.use_implicit_batch_dim = not lower_setting.explicit_batch_dimension
+    # TODO: avoid hardcode here by introducing another flag in lowering setting.
+    splitter_setting.min_acc_module_size = min_acc_module_size
+    splitter = TRTSplitter(model, inputs, settings=splitter_setting)
+    splitter.node_support_preview()
+    return splitter.generate_split_results()
+
+
+def create_lower_trt_interpreter(lower_setting: LowerSetting) -> LowerTrtInterpreter:
+    return LowerTrtInterpreter.create(lower_setting)
+
+
+def default_lower_pass(
+    create_trt_interpreter: Callable[[LowerSetting], LowerTrtInterpreter],
+) -> PassFunc:
+
+    def lower_pass(mod: nn.Module, input: Input, lower_setting: LowerSetting, module_name: str) -> nn.Module:
+        """
+        Create a module transformation pass which lowers an `fx.GraphModule` into a
+        `TRTModule`
+        """
+        interpreter = create_trt_interpreter(lower_setting)
+        interp_res: TRTInterpreterResult = interpreter(mod, input, module_name)
+        trt_module = TRTModule(
+            engine=interp_res.engine,
+            input_names=interp_res.input_names,
+            output_names=interp_res.output_names,
+            cuda_graph_batch_size=lower_setting.cuda_graph_batch_size,
+        )
+        return trt_module
+    return lower_pass
+
+
 @dc.dataclass(frozen=True)
 class Lowerer:
     """Lowers a module using fx2trt.
@@ -214,8 +203,6 @@ class Lowerer:
         4. Wraps the executable TRT engine into `TRTModule`, which is an `nn.Module`.
         5. The converted submodule is then set back onto the top-level module
 
-    # TODO: @kefeilu: also incorporates a validator to do inference (and optionally)
-    # result comparison along the way.
 
     Attributes:
         trace_func: fx trace function for TRT conversion.
@@ -227,8 +214,9 @@ class Lowerer:
 
     trace_func: Callable[[nn.Module, Input], fx.GraphModule]
     split_func: Callable[[fx.GraphModule, Input, LowerSetting], SplitResult]
-    lower_pass: PassFunc
+    lower_func: PassFunc
     lower_setting: LowerSetting
+
 
     @classmethod
     def create(
@@ -244,7 +232,7 @@ class Lowerer:
                 ast_rewriter_allow_list=lower_setting.ast_rewriter_allow_list,
                 leaf_module_list=lower_setting.leaf_module_list),  # type: ignore[arg-type]
             split_func=default_split_function,
-            lower_pass=create_lower_pass(create_lower_trt_interpreter),
+            lower_func=default_lower_pass(create_lower_trt_interpreter),
             lower_setting=lower_setting,
         )
 
@@ -264,53 +252,11 @@ class Lowerer:
         pm = LowerPassManagerBuilder(LowerPassContext(
             input=inputs,
             lower_setting=self.lower_setting,
-            trace_func=self.trace_func)).build_lower_pipeline()
-        traced_mod = pm(module)
-        FUSE_PASSES_POST_OBSERVER.observe(traced_mod, inputs)
+            trace_func=self.trace_func,
+            split_func=self.split_func,
+            lower_func=self.lower_func,
+            ),
+        ).build_lower_pipeline()
+        lower_result = pm(module)
 
-        # Run split.
-        split_result = self.split_func(traced_mod, inputs, self.lower_setting)  # type: ignore[misc,operator]
-
-        # TesnorRT doesn't like duplicate outputs. Run this pass to eliminate such case.
-        remove_duplicate_output_args(split_result.split_module, split_result.submodule_inputs.keys())
-
-        for submod_name, submod_inputs in split_result.submodule_inputs.items():
-            submod = getattr(split_result.split_module, submod_name)
-
-            LOWER_SPLIT_PRE_OBSERVER.observe(submod_name, submod, submod_inputs)
-
-            # We only lower acc submodules.
-            if not submod_name.startswith(split_result.non_acc_submodule_prefix):
-                lowered_module, ctx = self.lower_pass(
-                    submod,
-                    PassContext(submod_inputs, self.lower_setting, submod_name),
-                )
-                setattr(split_result.split_module, submod_name, lowered_module)
-                LOWER_SPLIT_POST_OBSERVER.observe(submod_name, lowered_module, ctx.input)
-
-        return split_result.split_module
-
-
-def create_lower_pass(
-    create_trt_interpreter: Callable[[PassContext], LowerTrtInterpreter],
-) -> PassFunc:
-
-    def lower_pass(mod: nn.Module, ctx: PassContext) -> Tuple[nn.Module, PassContext]:
-        """
-        Create a module transformation pass which lowers an `fx.GraphModule` into a
-        `TRTModule`
-        """
-        interpreter = create_trt_interpreter(ctx)
-        interp_res: TRTInterpreterResult = interpreter(mod, ctx.input, ctx.module_name)
-        trt_module = TRTModule(
-            engine=interp_res.engine,
-            input_names=interp_res.input_names,
-            output_names=interp_res.output_names,
-            cuda_graph_batch_size=ctx.lower_setting.cuda_graph_batch_size,
-        )
-        return trt_module, ctx
-    return lower_pass
-
-
-def create_lower_trt_interpreter(ctx: PassContext) -> LowerTrtInterpreter:
-    return LowerTrtInterpreter.create(ctx.lower_setting)
+        return lower_result
