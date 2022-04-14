@@ -1905,6 +1905,12 @@ def expand(*, input, sizes):
 def masked_fill(*, input, mask, value):
     return input.masked_fill(mask, value)
 
+@register_acc_op_mapping(op_and_target=("call_function", torch.where))
+@register_acc_op
+def where(*, condition, x, y):
+    return torch.where(condition, x, y)
+
+
 @register_acc_op_properties(AccOpProperty.unary)
 @register_acc_op
 def slice_tensor(*, input, dim, start, stop, step):

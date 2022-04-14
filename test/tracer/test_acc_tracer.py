@@ -2291,6 +2291,47 @@ class AccTracerTest(unittest.TestCase):
             else:
                 self.fail(f"Unexpected node: {node.format_node()}")
 
+
+    def test_where(self):
+        class TestModule(nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, a, b, c):
+                return torch.where(a, b, c)
+
+        m = TestModule()
+        x = torch.randn(3, 2)
+        y = torch.ones(3, 2)
+        cond = x > 0
+        traced = acc_tracer.trace(m, [cond, x, y])
+
+        ph_a = where = None
+        ph_b = None
+        ph_c = None
+        for node in traced.graph.nodes:
+            if node.op == "placeholder":
+                if node.target == "a":
+                    ph_a = node
+                elif node.target == "b":
+                    ph_b = node
+                elif node.target == "c":
+                    ph_c = node
+            elif node.op == "call_function" and node.target == acc_ops.where:
+                where = node
+                self.assertTrue(where.kwargs["condition"] is ph_a)
+                self.assertTrue(where.kwargs["x"] is ph_b)
+                self.assertTrue(where.kwargs["y"] is ph_c)
+            elif node.op == "output":
+                self.assertEqual(node.args[0], where)
+            else:
+                self.fail(f"Unexpected node: {node.format_node()}")
+
+
+        ref = m(cond, x, y)
+        res = traced(cond,x,y)
+        self.assertTrue(torch.equal(ref, res))
+
     def test_all_acc_ops_registered(self):
         self.assertEqual(
             acc_normalizer._acc_ops,
@@ -2404,5 +2445,6 @@ class AccTracerTest(unittest.TestCase):
                 acc_ops.ne,
                 acc_ops.device,
                 acc_ops.numel,
+                acc_ops.where,
             },
         )

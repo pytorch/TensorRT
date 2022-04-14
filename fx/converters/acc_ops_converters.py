@@ -2120,6 +2120,76 @@ def acc_ops_expand_tensor(
     return layer.get_output(0)
 
 
+@tensorrt_converter(acc_ops.where)
+def acc_ops_where(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+
+    condition_t = kwargs["condition"]
+    x_t = kwargs["x"]
+    y_t = kwargs["y"]
+
+    if type(x_t) != TRTTensor:
+        assert type(x_t) is torch.Tensor, f"value {x_t} is not torch.Tensor!"
+
+    if type(y_t) != TRTTensor:
+        assert type(y_t) is torch.Tensor, f"value {y_t} is not torch.Tensor!"
+
+    # get output shape
+
+    x_shape = list(x_t.shape)
+    y_shape = list(y_t.shape)
+    condition_shape = list(condition_t.shape)
+    output_shape = list(torch.broadcast_shapes(condition_shape, x_shape, y_shape))
+
+    # expand shape
+    if type(condition_t) != TRTTensor:
+        assert condition_t.dtype == torch.bool, "condition dtype is not bool"
+        if condition_shape != output_shape:
+            condition_t.expand(output_shape)
+        condition_t = condition_t.to(torch.int32)
+        condition_const = get_trt_tensor(network, condition_t, f"{name}_condition")
+        condition_layer = network.add_identity(condition_const)
+        condition_layer.set_output_type(0, trt.bool)
+        set_layer_name(condition_layer, target, f"{name}_condition")
+        condition_val = condition_layer.get_output(0)
+    else:
+        assert condition_t.dtype == trt.bool, "mask dtype is not bool!"
+        if condition_shape != output_shape:
+            condition_val = acc_ops_expand_tensor(network, target, None, {"input": condition_t, "sizes": output_shape}, name=f"{name}_expand")
+        else:
+            condition_val = condition_t
+
+    if type(x_t) != TRTTensor :
+        if x_shape != output_shape:
+            x_t.expand(output_shape)
+        x_val = get_trt_tensor(network, x_t, f"{name}_x")
+    else :
+        x_val = x_t
+        if x_shape != output_shape:
+            x_val = acc_ops_expand_tensor(network, target, None, {"input": x_val, "sizes": output_shape}, name=f"{name}_x_expand")
+
+    if type(y_t) != TRTTensor :
+        if y_shape != output_shape:
+            y_t.expand(output_shape)
+        y_val = get_trt_tensor(network, y_t, f"{name}_y")
+    else :
+        y_val = y_t
+        if y_shape != output_shape:
+            y_val = acc_ops_expand_tensor(network, target, None, {"input": y_val, "sizes": output_shape}, name=f"{name}_y_expand")
+
+    select_layer = network.add_select(condition_val, x_val, y_val)
+
+    set_layer_name(select_layer, target, f"{name}_select")
+
+    return select_layer.get_output(0)
+
+
+
 @tensorrt_converter(acc_ops.masked_fill, no_implicit_batch_dim=True)
 def acc_ops_masked_fill_tensor(
     network: TRTNetwork,
