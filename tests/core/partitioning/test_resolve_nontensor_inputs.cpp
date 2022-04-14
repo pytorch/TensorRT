@@ -255,5 +255,5 @@ TEST(Partitioning, ConvertForTensorListInputsInFallbackCorrectly) {
   torch::jit::script::Module new_mod = torch_tensorrt::core::CompileGraph(mod, cfg);
   auto fallback_g = new_mod.get_method("forward").graph();
   int count = count_trt_engines(fallback_g);
-  ASSERT_TRUE(count == 2);
+  ASSERT_TRUE(count == 1);
 }
