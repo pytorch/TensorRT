@@ -419,6 +419,15 @@ bool checkLoopEvaluatable(torch::jit::Node* n) {
   return compile_to_trt;
 }
 
+bool is_collection(torch::jit::Node* n) {
+  for (auto out: n->outputs()) {
+    if(out->type()->kind() == torch::jit::TypeKind::TupleType || out->type()->kind() == torch::jit::TypeKind::ListType) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool should_run_in_trt(torch::jit::Node* n, const std::unordered_set<std::string>& torch_ops) {
   // If the op is not supported by the conversion phase it should run in PyTorch
   if (!conversion::OpSupported(n)) {
@@ -459,18 +468,19 @@ PartitionedGraph segment_graph(torch::jit::Block* block, const PartitionInfo& pa
       partition_info.forced_fallback_operators.begin(), partition_info.forced_fallback_operators.end());
 
   auto nodes = block->nodes();
+  auto reverse_nodes = nodes.reverse(); // merge from output side to input side
   PartitionedGraph segmented_blocks;
 
   // segment the nodes
   std::vector<torch::jit::Node*> in_prog_trt_blk_nodes, in_prog_pyt_blk_nodes;
-  for (const auto n : nodes) {
+  for (const auto n : reverse_nodes) {
     // Skip constant nodes as they are resources for both kinds of modules
     if (n->kind() == torch::jit::prim::Constant) {
       continue;
     }
-
-    if (should_run_in_trt(n, forced_fallback_ops)) {
-      in_prog_trt_blk_nodes.push_back(n);
+    // the outputs of trt subgraph shouldn't be collections
+    if (should_run_in_trt(n, forced_fallback_ops) && !(in_prog_trt_blk_nodes.size() == 0 && is_collection(n))) {
+      in_prog_trt_blk_nodes.insert(in_prog_trt_blk_nodes.begin(), n);
 
       // If there is an active PyTorch block and we have passed the threshold for a valid TRT
       // block then segment and reset the active PyTorch block
@@ -505,14 +515,14 @@ PartitionedGraph segment_graph(torch::jit::Block* block, const PartitionInfo& pa
           finalize_block(segmented_blocks, SegmentedBlock::kTorch, in_prog_pyt_blk_nodes);
         }
         if (checkLoopEvaluatable(n)) {
-          in_prog_trt_blk_nodes.push_back(n);
+          in_prog_trt_blk_nodes.insert(in_prog_trt_blk_nodes.begin(), n);
         } else {
           auto loop_node = std::vector<torch::jit::Node*>{n};
           finalize_block(segmented_blocks, SegmentedBlock::kTorch, loop_node);
         }
         continue;
       }
-      in_prog_pyt_blk_nodes.push_back(n);
+      in_prog_pyt_blk_nodes.insert(in_prog_pyt_blk_nodes.begin(), n);
     }
   }
 
@@ -527,7 +537,7 @@ PartitionedGraph segment_graph(torch::jit::Block* block, const PartitionInfo& pa
         in_prog_pyt_blk_nodes.end(), in_prog_trt_blk_nodes.begin(), in_prog_trt_blk_nodes.end());
     finalize_block(segmented_blocks, SegmentedBlock::kTorch, in_prog_pyt_blk_nodes);
   }
-
+  std::reverse(segmented_blocks.begin(), segmented_blocks.end());
   return segmented_blocks;
 }
 

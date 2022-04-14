@@ -280,7 +280,6 @@ TEST(CppAPITests, TestCollectionListInputOutput) {
 
   // Need to skip the conversion of __getitem__ and ListConstruct
   compile_settings.torch_executed_ops.push_back("aten::__getitem__");
-  compile_settings.torch_executed_ops.push_back("prim::ListConstruct");
 
   // // FP16 execution
   compile_settings.enabled_precisions = {torch::kHalf};
@@ -351,7 +350,6 @@ TEST(CppAPITests, TestCollectionComplexModel) {
 
   // Need to skip the conversion of __getitem__ and ListConstruct
   compile_settings.torch_executed_ops.push_back("aten::__getitem__");
-  compile_settings.torch_executed_ops.push_back("prim::ListConstruct");
 
   // // FP16 execution
   compile_settings.enabled_precisions = {torch::kHalf};
