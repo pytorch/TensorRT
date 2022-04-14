@@ -20,7 +20,10 @@ namespace conversion {
 bool isNodeConversionIgnored(const torch::jit::Node* n);
 
 bool OpSupported(const torch::jit::Node* n) {
-  return evaluators::shouldEvalAtConversionTime(n) || converters::node_is_convertable(n);
+  return evaluators::shouldEvalAtConversionTime(n)
+    || converters::node_is_convertable(n)
+    || n->kind() == torch::jit::prim::Loop
+    || n->kind() == torch::jit::prim::If;
 }
 
 c10::optional<torch::jit::IValue> EvaluateNode(ConversionCtx* ctx, const torch::jit::Node* n, int level, int limit) {
