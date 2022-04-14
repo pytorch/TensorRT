@@ -555,6 +555,15 @@ std::set<std::string> ConvertableOpsInBlock(const torch::jit::Block* b) {
   return convertable_ops;
 }
 
+bool OutputIsCollection(const torch::jit::Block* b) {
+  for (auto out: b->outputs()) {
+    if(out->type()->kind() == torch::jit::TypeKind::TupleType || out->type()->kind() == torch::jit::TypeKind::ListType) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool VerifyConverterSupportForBlock(const torch::jit::Block* b, bool suppress_errors) {
   auto unsupported_ops = GetUnsupportedOpsInBlock(b);
   if (unsupported_ops.size() != 0) {
