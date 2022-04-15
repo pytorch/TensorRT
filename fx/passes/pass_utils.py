@@ -43,7 +43,7 @@ def validate_inference(rtol=None, atol=None, suppress_accuracy_check_failure=Fal
         ) -> fx.GraphModule:
             res0 = module(*input)
             processed_module = pass_(module, input)
-            res1 = module(*input)
+            res1 = processed_module(*input)
 
             tensor_res_0 = _collect_tensors(res0)
             tensor_res_1 = _collect_tensors(res1)
@@ -58,7 +58,7 @@ def validate_inference(rtol=None, atol=None, suppress_accuracy_check_failure=Fal
                 if not accuracy_check:
                     if suppress_accuracy_check_failure:
                         _LOGGER.error(f"pass {pass_} failed correctness check due to output {kk}, escape current pass.")
-                        return module
+                        return processed_module
                     else:
                         raise RuntimeError(f"pass {pass_} failed correctness check due to output {kk}")
             return processed_module

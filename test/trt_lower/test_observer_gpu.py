@@ -24,8 +24,9 @@ class ObserverGPUTests(TestCase):
             def forward(self, x, y):
                 return x + y
 
-        mod = Model()
+        mod = Model().cuda()
         inp = [torch.rand(1, 10), torch.rand(1, 10)]
+        inp = [i.cuda() for i in inp]
         mod(*inp)
 
         with execution_verifier() as verify_execution:
