@@ -17,7 +17,6 @@ def compile(module: torch.jit.ScriptModule,
             enabled_precisions=set(),
             refit=False,
             debug=False,
-            strict_types=False,
             capability=_enums.EngineCapability.default,
             num_min_timing_iters=2,
             num_avg_timing_iters=1,
@@ -65,7 +64,6 @@ def compile(module: torch.jit.ScriptModule,
         enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
         refit (bool): Enable refitting
         debug (bool): Enable debuggable engine
-        strict_types (bool): Kernels should strictly run in a particular operating precision. Enabled precision should only have one type in the set
         capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
         num_min_timing_iters (int): Number of minimization timing iterations used to select kernels
         num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
@@ -98,7 +96,6 @@ def compile(module: torch.jit.ScriptModule,
         "enabled_precisions": enabled_precisions,  # Enabling FP16 kernels
         "refit": refit,  # enable refit
         "debug": debug,  # enable debuggable engine
-        "strict_types": strict_types,  # kernels should strictly run in operating precision
         "capability": capability,  # Restrict kernel selection to safe gpu kernels or safe dla kernels
         "num_min_timing_iters": num_min_timing_iters,  # Number of minimization timing iterations used to select kernels
         "num_avg_timing_iters": num_avg_timing_iters,  # Number of averaging timing iterations used to select kernels
@@ -127,7 +124,6 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule,
                                  enabled_precisions=set(),
                                  refit=False,
                                  debug=False,
-                                 strict_types=False,
                                  capability=_enums.EngineCapability.default,
                                  num_min_timing_iters=2,
                                  num_avg_timing_iters=1,
@@ -169,7 +165,6 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule,
         enabled_precision (Set(Union(torch.dtype, torch_tensorrt.dtype))): The set of datatypes that TensorRT can use when selecting kernels
         refit (bool): Enable refitting
         debug (bool): Enable debuggable engine
-        strict_types (bool): Kernels should strictly run in a particular operating precision. Enabled precision should only have one type in the set
         capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
         num_min_timing_iters (int): Number of minimization timing iterations used to select kernels
         num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
@@ -193,7 +188,6 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule,
         "enabled_precisions": enabled_precisions,  # Enabling FP16 kernels
         "refit": refit,  # enable refit
         "debug": debug,  # enable debuggable engine
-        "strict_types": strict_types,  # kernels should strictly run in operating precision
         "capability": capability,  # Restrict kernel selection to safe gpu kernels or safe dla kernels
         "num_min_timing_iters": num_min_timing_iters,  # Number of minimization timing iterations used to select kernels
         "num_avg_timing_iters": num_avg_timing_iters,  # Number of averaging timing iterations used to select kernels

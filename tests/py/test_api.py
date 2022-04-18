@@ -323,6 +323,50 @@ class TestLoggingAPIs(unittest.TestCase):
         color = torchtrt.logging.get_is_colored_output_on()
         self.assertTrue(color)
 
+    def test_context_managers(self):
+        base_lvl = torchtrt.logging.get_reportable_log_level()
+        with torchtrt.logging.internal_errors():
+            lvl = torchtrt.logging.get_reportable_log_level()
+            self.assertEqual(torchtrt.logging.Level.InternalError, lvl)
+
+        lvl = torchtrt.logging.get_reportable_log_level()
+        self.assertEqual(base_lvl, lvl)
+
+        with torchtrt.logging.errors():
+            lvl = torchtrt.logging.get_reportable_log_level()
+            self.assertEqual(torchtrt.logging.Level.Error, lvl)
+
+        lvl = torchtrt.logging.get_reportable_log_level()
+        self.assertEqual(base_lvl, lvl)
+
+        with torchtrt.logging.warnings():
+            lvl = torchtrt.logging.get_reportable_log_level()
+            self.assertEqual(torchtrt.logging.Level.Warning, lvl)
+
+        lvl = torchtrt.logging.get_reportable_log_level()
+        self.assertEqual(base_lvl, lvl)
+
+        with torchtrt.logging.info():
+            lvl = torchtrt.logging.get_reportable_log_level()
+            self.assertEqual(torchtrt.logging.Level.Info, lvl)
+
+        lvl = torchtrt.logging.get_reportable_log_level()
+        self.assertEqual(base_lvl, lvl)
+
+        with torchtrt.logging.debug():
+            lvl = torchtrt.logging.get_reportable_log_level()
+            self.assertEqual(torchtrt.logging.Level.Debug, lvl)
+
+        lvl = torchtrt.logging.get_reportable_log_level()
+        self.assertEqual(base_lvl, lvl)
+
+        with torchtrt.logging.graphs():
+            lvl = torchtrt.logging.get_reportable_log_level()
+            self.assertEqual(torchtrt.logging.Level.Graph, lvl)
+
+        lvl = torchtrt.logging.get_reportable_log_level()
+        self.assertEqual(base_lvl, lvl)
+
 
 class TestDevice(unittest.TestCase):
 

@@ -900,7 +900,7 @@ div.rendered_html tbody tr:hover {
         </div>
        </div>
        <p>
-        <img alt="a5028a2a79114f16bbffa92458f6372c" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
+        <img alt="ee37518a53f542bea667f29fa813e562" src="https://developer.download.nvidia.com/tesla/notebook_assets/nv_logo_torch_trt_ssd_notebook.png"/>
        </p>
        <section id="Object-Detection-with-Torch-TensorRT-(SSD)">
         <h1 id="notebooks-ssd-object-detection-demo--page-root">
@@ -918,20 +918,16 @@ div.rendered_html tbody tr:hover {
           </a>
          </h2>
          <p>
-          In PyTorch 1.0, TorchScript was introduced as a method to separate your PyTorch model from Python, make it portable and optimizable.
+          In the practice of developing machine learning models, there are few tools as approachable as PyTorch for developing and experimenting in designing machine learning models. The power of PyTorch comes from its deep integration into Python, its flexibility and its approach to automatic differentiation and execution (eager execution). However, when moving from research into production, the requirements change and we may no longer want that deep Python integration and we want optimization to get the
+best performance we can on our deployment platform. In PyTorch 1.0, TorchScript was introduced as a method to separate your PyTorch model from Python, make it portable and optimizable. TorchScript uses PyTorch’s JIT compiler to transform your normal PyTorch code which gets interpreted by the Python interpreter to an intermediate representation (IR) which can have optimizations run on it and at runtime can get interpreted by the PyTorch JIT interpreter. For PyTorch this has opened up a whole new
+world of possibilities, including deployment in other languages like C++. It also introduces a structured graph based format that we can use to do down to the kernel level optimization of models for inference.
          </p>
          <p>
-          Torch-TensorRT is a compiler that uses TensorRT (NVIDIA’s Deep Learning Optimization SDK and Runtime) to optimize TorchScript code. It compiles standard TorchScript modules into ones that internally run with TensorRT optimizations.
+          When deploying on NVIDIA GPUs TensorRT, NVIDIA’s Deep Learning Optimization SDK and Runtime is able to take models from any major framework and specifically tune them to perform better on specific target hardware in the NVIDIA family be it an A100, TITAN V, Jetson Xavier or NVIDIA’s Deep Learning Accelerator. TensorRT performs a couple sets of optimizations to achieve this. TensorRT fuses layers and tensors in the model graph, it then uses a large kernel library to select implementations that
+perform best on the target GPU. TensorRT also has strong support for reduced operating precision execution which allows users to leverage the Tensor Cores on Volta and newer GPUs as well as reducing memory and computation footprints on device.
          </p>
          <p>
-          TensorRT can take models from any major framework and specifically tune them to perform better on specific target hardware in the NVIDIA family, and Torch-TensorRT enables us to continue to remain in the PyTorch ecosystem whilst doing so. This allows us to leverage the great features in PyTorch, including module composability, its flexible tensor implementation, data loaders and more. Torch-TensorRT is available to use with both PyTorch and LibTorch.
-         </p>
-         <p>
-          To get more background information on this, we suggest the
-          <strong>
-           lenet-getting-started
-          </strong>
-          notebook as a primer for getting started with Torch-TensorRT.
+          Torch-TensorRT is a compiler that uses TensorRT to optimize TorchScript code, compiling standard TorchScript modules into ones that internally run with TensorRT optimizations. This enables you to continue to remain in the PyTorch ecosystem, using all the great features PyTorch has such as module composability, its flexible tensor implementation, data loaders and more. Torch-TensorRT is available to use with both PyTorch and LibTorch.
          </p>
          <section id="Learning-objectives">
           <h3 id="Learning-objectives">
@@ -1044,93 +1040,100 @@ div.rendered_html tbody tr:hover {
 Looking in indexes: https://pypi.org/simple, https://pypi.ngc.nvidia.com
 Collecting scikit-image==0.19.1
   Downloading scikit_image-0.19.1-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (13.8 MB)
-     |████████████████████████████████| 13.8 MB 7.9 MB/s eta 0:00:01
-Collecting PyWavelets&gt;=1.1.1
-  Downloading PyWavelets-1.2.0-cp38-cp38-manylinux_2_5_x86_64.manylinux1_x86_64.whl (6.3 MB)
-     |████████████████████████████████| 6.3 MB 4.5 MB/s eta 0:00:01
-Requirement already satisfied: packaging&gt;=20.0 in /opt/conda/lib/python3.8/site-packages (from scikit-image==0.19.1) (21.3)
-Requirement already satisfied: pillow!=7.1.0,!=7.1.1,!=8.3.0,&gt;=6.1.0 in /opt/conda/lib/python3.8/site-packages (from scikit-image==0.19.1) (8.2.0)
-Collecting networkx&gt;=2.2
-  Downloading networkx-2.6.3-py3-none-any.whl (1.9 MB)
-     |████████████████████████████████| 1.9 MB 102.4 MB/s eta 0:00:01
-Requirement already satisfied: numpy&gt;=1.17.0 in /opt/conda/lib/python3.8/site-packages (from scikit-image==0.19.1) (1.21.4)
+     |████████████████████████████████| 13.8 MB 8.8 MB/s eta 0:00:01
+Requirement already satisfied: networkx&gt;=2.2 in /opt/conda/lib/python3.8/site-packages (from scikit-image==0.19.1) (2.6.3)
 Collecting tifffile&gt;=2019.7.26
-  Downloading tifffile-2021.11.2-py3-none-any.whl (178 kB)
-     |████████████████████████████████| 178 kB 138.3 MB/s eta 0:00:01
+  Downloading tifffile-2022.3.16-py3-none-any.whl (179 kB)
+     |████████████████████████████████| 179 kB 110.1 MB/s eta 0:00:01
+Requirement already satisfied: packaging&gt;=20.0 in /opt/conda/lib/python3.8/site-packages (from scikit-image==0.19.1) (21.3)
 Requirement already satisfied: scipy&gt;=1.4.1 in /opt/conda/lib/python3.8/site-packages (from scikit-image==0.19.1) (1.6.3)
+Requirement already satisfied: numpy&gt;=1.17.0 in /opt/conda/lib/python3.8/site-packages (from scikit-image==0.19.1) (1.22.2)
 Collecting imageio&gt;=2.4.1
-  Downloading imageio-2.13.5-py3-none-any.whl (3.3 MB)
-     |████████████████████████████████| 3.3 MB 126.0 MB/s eta 0:00:01
-Collecting pillow!=7.1.0,!=7.1.1,!=8.3.0,&gt;=6.1.0
-  Downloading Pillow-9.0.0-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (4.3 MB)
-     |████████████████████████████████| 4.3 MB 65.4 MB/s eta 0:00:01
-Requirement already satisfied: pyparsing!=3.0.5,&gt;=2.0.2 in /opt/conda/lib/python3.8/site-packages (from packaging&gt;=20.0-&gt;scikit-image==0.19.1) (3.0.6)
-Installing collected packages: pillow, tifffile, PyWavelets, networkx, imageio, scikit-image
-  Attempting uninstall: pillow
-    Found existing installation: Pillow 8.2.0
-    Uninstalling Pillow-8.2.0:
-      Successfully uninstalled Pillow-8.2.0
-  Attempting uninstall: networkx
-    Found existing installation: networkx 2.0
-    Uninstalling networkx-2.0:
-      Successfully uninstalled networkx-2.0
-Successfully installed PyWavelets-1.2.0 imageio-2.13.5 networkx-2.6.3 pillow-9.0.0 scikit-image-0.19.1 tifffile-2021.11.2
+  Downloading imageio-2.16.1-py3-none-any.whl (3.3 MB)
+     |████████████████████████████████| 3.3 MB 42.3 MB/s eta 0:00:01
+Requirement already satisfied: pillow!=7.1.0,!=7.1.1,!=8.3.0,&gt;=6.1.0 in /opt/conda/lib/python3.8/site-packages (from scikit-image==0.19.1) (9.0.0)
+Collecting PyWavelets&gt;=1.1.1
+  Downloading PyWavelets-1.3.0-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (6.9 MB)
+     |████████████████████████████████| 6.9 MB 61.3 MB/s eta 0:00:01
+Requirement already satisfied: pyparsing!=3.0.5,&gt;=2.0.2 in /opt/conda/lib/python3.8/site-packages (from packaging&gt;=20.0-&gt;scikit-image==0.19.1) (3.0.7)
+Installing collected packages: tifffile, PyWavelets, imageio, scikit-image
+Successfully installed PyWavelets-1.3.0 imageio-2.16.1 scikit-image-0.19.1 tifffile-2022.3.16
 <span class="ansi-yellow-fg">WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv</span>
 Looking in indexes: https://pypi.org/simple, https://pypi.ngc.nvidia.com
-Requirement already satisfied: ipywidgets in /opt/conda/lib/python3.8/site-packages (7.6.5)
-Requirement already satisfied: ipykernel&gt;=4.5.1 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (6.6.0)
-Requirement already satisfied: ipython&gt;=4.0.0 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (7.30.0)
-Requirement already satisfied: jupyterlab-widgets&gt;=1.0.0 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (1.0.2)
-Requirement already satisfied: traitlets&gt;=4.3.1 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (5.1.1)
-Requirement already satisfied: widgetsnbextension~=3.5.0 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (3.5.2)
+Collecting ipywidgets
+  Downloading ipywidgets-7.7.0-py2.py3-none-any.whl (123 kB)
+     |████████████████████████████████| 123 kB 12.1 MB/s eta 0:00:01
+Requirement already satisfied: ipykernel&gt;=4.5.1 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (6.9.0)
+Collecting jupyterlab-widgets&gt;=1.0.0
+  Downloading jupyterlab_widgets-1.1.0-py3-none-any.whl (245 kB)
+     |████████████████████████████████| 245 kB 60.6 MB/s eta 0:00:01
 Requirement already satisfied: nbformat&gt;=4.2.0 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (5.1.3)
 Requirement already satisfied: ipython-genutils~=0.2.0 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (0.2.0)
-Requirement already satisfied: jupyter-client&lt;8.0 in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets) (7.1.0)
-Requirement already satisfied: matplotlib-inline&lt;0.2.0,&gt;=0.1.0 in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets) (0.1.3)
+Requirement already satisfied: ipython&gt;=4.0.0 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (8.0.1)
+Requirement already satisfied: traitlets&gt;=4.3.1 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (5.1.1)
+Collecting widgetsnbextension~=3.6.0
+  Downloading widgetsnbextension-3.6.0-py2.py3-none-any.whl (1.6 MB)
+     |████████████████████████████████| 1.6 MB 35.2 MB/s eta 0:00:01
+Requirement already satisfied: nest-asyncio in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets) (1.5.4)
+Requirement already satisfied: jupyter-client&lt;8.0 in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets) (7.1.2)
 Requirement already satisfied: tornado&lt;7.0,&gt;=4.2 in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets) (6.1)
+Requirement already satisfied: matplotlib-inline&lt;0.2.0,&gt;=0.1.0 in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets) (0.1.3)
 Requirement already satisfied: debugpy&lt;2.0,&gt;=1.0.0 in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets) (1.5.1)
-Requirement already satisfied: setuptools&gt;=18.5 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (59.4.0)
-Requirement already satisfied: prompt-toolkit!=3.0.0,!=3.0.1,&lt;3.1.0,&gt;=2.0.0 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (3.0.22)
-Requirement already satisfied: pygments in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (2.10.0)
+Requirement already satisfied: stack-data in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (0.1.4)
+Requirement already satisfied: prompt-toolkit!=3.0.0,!=3.0.1,&lt;3.1.0,&gt;=2.0.0 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (3.0.26)
 Requirement already satisfied: pickleshare in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (0.7.5)
+Requirement already satisfied: pygments in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (2.11.2)
 Requirement already satisfied: pexpect&gt;4.3 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (4.8.0)
-Requirement already satisfied: jedi&gt;=0.16 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (0.18.1)
+Requirement already satisfied: decorator in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (5.1.1)
 Requirement already satisfied: backcall in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (0.2.0)
-Requirement already satisfied: decorator in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (5.1.0)
+Requirement already satisfied: black in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (22.1.0)
+Requirement already satisfied: setuptools&gt;=18.5 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (59.5.0)
+Requirement already satisfied: jedi&gt;=0.16 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (0.18.1)
 Requirement already satisfied: parso&lt;0.9.0,&gt;=0.8.0 in /opt/conda/lib/python3.8/site-packages (from jedi&gt;=0.16-&gt;ipython&gt;=4.0.0-&gt;ipywidgets) (0.8.3)
-Requirement already satisfied: python-dateutil&gt;=2.1 in /opt/conda/lib/python3.8/site-packages (from jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (2.8.2)
 Requirement already satisfied: entrypoints in /opt/conda/lib/python3.8/site-packages (from jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (0.3)
-Requirement already satisfied: nest-asyncio&gt;=1.5 in /opt/conda/lib/python3.8/site-packages (from jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (1.5.4)
 Requirement already satisfied: pyzmq&gt;=13 in /opt/conda/lib/python3.8/site-packages (from jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (22.3.0)
 Requirement already satisfied: jupyter-core&gt;=4.6.0 in /opt/conda/lib/python3.8/site-packages (from jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (4.9.1)
-Requirement already satisfied: jsonschema!=2.5.0,&gt;=2.4 in /opt/conda/lib/python3.8/site-packages (from nbformat&gt;=4.2.0-&gt;ipywidgets) (4.2.1)
-Requirement already satisfied: pyrsistent!=0.17.0,!=0.17.1,!=0.17.2,&gt;=0.14.0 in /opt/conda/lib/python3.8/site-packages (from jsonschema!=2.5.0,&gt;=2.4-&gt;nbformat&gt;=4.2.0-&gt;ipywidgets) (0.18.0)
-Requirement already satisfied: attrs&gt;=17.4.0 in /opt/conda/lib/python3.8/site-packages (from jsonschema!=2.5.0,&gt;=2.4-&gt;nbformat&gt;=4.2.0-&gt;ipywidgets) (21.2.0)
+Requirement already satisfied: python-dateutil&gt;=2.1 in /opt/conda/lib/python3.8/site-packages (from jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (2.8.2)
+Requirement already satisfied: jsonschema!=2.5.0,&gt;=2.4 in /opt/conda/lib/python3.8/site-packages (from nbformat&gt;=4.2.0-&gt;ipywidgets) (4.4.0)
+Requirement already satisfied: attrs&gt;=17.4.0 in /opt/conda/lib/python3.8/site-packages (from jsonschema!=2.5.0,&gt;=2.4-&gt;nbformat&gt;=4.2.0-&gt;ipywidgets) (21.4.0)
+Requirement already satisfied: pyrsistent!=0.17.0,!=0.17.1,!=0.17.2,&gt;=0.14.0 in /opt/conda/lib/python3.8/site-packages (from jsonschema!=2.5.0,&gt;=2.4-&gt;nbformat&gt;=4.2.0-&gt;ipywidgets) (0.18.1)
 Requirement already satisfied: importlib-resources&gt;=1.4.0 in /opt/conda/lib/python3.8/site-packages (from jsonschema!=2.5.0,&gt;=2.4-&gt;nbformat&gt;=4.2.0-&gt;ipywidgets) (5.4.0)
-Requirement already satisfied: zipp&gt;=3.1.0 in /opt/conda/lib/python3.8/site-packages (from importlib-resources&gt;=1.4.0-&gt;jsonschema!=2.5.0,&gt;=2.4-&gt;nbformat&gt;=4.2.0-&gt;ipywidgets) (3.6.0)
+Requirement already satisfied: zipp&gt;=3.1.0 in /opt/conda/lib/python3.8/site-packages (from importlib-resources&gt;=1.4.0-&gt;jsonschema!=2.5.0,&gt;=2.4-&gt;nbformat&gt;=4.2.0-&gt;ipywidgets) (3.7.0)
 Requirement already satisfied: ptyprocess&gt;=0.5 in /opt/conda/lib/python3.8/site-packages (from pexpect&gt;4.3-&gt;ipython&gt;=4.0.0-&gt;ipywidgets) (0.7.0)
 Requirement already satisfied: wcwidth in /opt/conda/lib/python3.8/site-packages (from prompt-toolkit!=3.0.0,!=3.0.1,&lt;3.1.0,&gt;=2.0.0-&gt;ipython&gt;=4.0.0-&gt;ipywidgets) (0.2.5)
 Requirement already satisfied: six&gt;=1.5 in /opt/conda/lib/python3.8/site-packages (from python-dateutil&gt;=2.1-&gt;jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (1.16.0)
-Requirement already satisfied: notebook&gt;=4.4.1 in /opt/conda/lib/python3.8/site-packages (from widgetsnbextension~=3.5.0-&gt;ipywidgets) (6.4.1)
-Requirement already satisfied: jinja2 in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (3.0.3)
-Requirement already satisfied: nbconvert in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (6.3.0)
-Requirement already satisfied: argon2-cffi in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (21.1.0)
-Requirement already satisfied: Send2Trash&gt;=1.5.0 in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (1.8.0)
-Requirement already satisfied: terminado&gt;=0.8.3 in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.12.1)
-Requirement already satisfied: prometheus-client in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.12.0)
-Requirement already satisfied: cffi&gt;=1.0.0 in /opt/conda/lib/python3.8/site-packages (from argon2-cffi-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (1.15.0)
-Requirement already satisfied: pycparser in /opt/conda/lib/python3.8/site-packages (from cffi&gt;=1.0.0-&gt;argon2-cffi-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (2.21)
-Requirement already satisfied: MarkupSafe&gt;=2.0 in /opt/conda/lib/python3.8/site-packages (from jinja2-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (2.0.1)
-Requirement already satisfied: defusedxml in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.7.1)
-Requirement already satisfied: testpath in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.5.0)
-Requirement already satisfied: mistune&lt;2,&gt;=0.8.1 in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.8.4)
-Requirement already satisfied: nbclient&lt;0.6.0,&gt;=0.5.0 in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.5.9)
-Requirement already satisfied: bleach in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (4.1.0)
-Requirement already satisfied: jupyterlab-pygments in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.1.2)
-Requirement already satisfied: pandocfilters&gt;=1.4.1 in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (1.5.0)
-Requirement already satisfied: packaging in /opt/conda/lib/python3.8/site-packages (from bleach-&gt;nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (21.3)
-Requirement already satisfied: webencodings in /opt/conda/lib/python3.8/site-packages (from bleach-&gt;nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (0.5.1)
-Requirement already satisfied: pyparsing!=3.0.5,&gt;=2.0.2 in /opt/conda/lib/python3.8/site-packages (from packaging-&gt;bleach-&gt;nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.5.0-&gt;ipywidgets) (3.0.6)
+Requirement already satisfied: notebook&gt;=4.4.1 in /opt/conda/lib/python3.8/site-packages (from widgetsnbextension~=3.6.0-&gt;ipywidgets) (6.4.1)
+Requirement already satisfied: terminado&gt;=0.8.3 in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (0.13.1)
+Requirement already satisfied: Send2Trash&gt;=1.5.0 in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (1.8.0)
+Requirement already satisfied: prometheus-client in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (0.13.1)
+Requirement already satisfied: jinja2 in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (3.0.3)
+Requirement already satisfied: nbconvert in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (6.4.2)
+Requirement already satisfied: argon2-cffi in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (21.3.0)
+Requirement already satisfied: argon2-cffi-bindings in /opt/conda/lib/python3.8/site-packages (from argon2-cffi-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (21.2.0)
+Requirement already satisfied: cffi&gt;=1.0.1 in /opt/conda/lib/python3.8/site-packages (from argon2-cffi-bindings-&gt;argon2-cffi-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (1.15.0)
+Requirement already satisfied: pycparser in /opt/conda/lib/python3.8/site-packages (from cffi&gt;=1.0.1-&gt;argon2-cffi-bindings-&gt;argon2-cffi-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (2.21)
+Requirement already satisfied: pathspec&gt;=0.9.0 in /opt/conda/lib/python3.8/site-packages (from black-&gt;ipython&gt;=4.0.0-&gt;ipywidgets) (0.9.0)
+Requirement already satisfied: tomli&gt;=1.1.0 in /opt/conda/lib/python3.8/site-packages (from black-&gt;ipython&gt;=4.0.0-&gt;ipywidgets) (2.0.1)
+Requirement already satisfied: mypy-extensions&gt;=0.4.3 in /opt/conda/lib/python3.8/site-packages (from black-&gt;ipython&gt;=4.0.0-&gt;ipywidgets) (0.4.3)
+Requirement already satisfied: click&gt;=8.0.0 in /opt/conda/lib/python3.8/site-packages (from black-&gt;ipython&gt;=4.0.0-&gt;ipywidgets) (8.0.3)
+Requirement already satisfied: platformdirs&gt;=2 in /opt/conda/lib/python3.8/site-packages (from black-&gt;ipython&gt;=4.0.0-&gt;ipywidgets) (2.4.1)
+Requirement already satisfied: typing-extensions&gt;=3.10.0.0 in /opt/conda/lib/python3.8/site-packages (from black-&gt;ipython&gt;=4.0.0-&gt;ipywidgets) (4.0.1)
+Requirement already satisfied: MarkupSafe&gt;=2.0 in /opt/conda/lib/python3.8/site-packages (from jinja2-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (2.0.1)
+Requirement already satisfied: defusedxml in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (0.7.1)
+Requirement already satisfied: mistune&lt;2,&gt;=0.8.1 in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (0.8.4)
+Requirement already satisfied: nbclient&lt;0.6.0,&gt;=0.5.0 in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (0.5.11)
+Requirement already satisfied: testpath in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (0.5.0)
+Requirement already satisfied: jupyterlab-pygments in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (0.1.2)
+Requirement already satisfied: bleach in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (4.1.0)
+Requirement already satisfied: pandocfilters&gt;=1.4.1 in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (1.5.0)
+Requirement already satisfied: webencodings in /opt/conda/lib/python3.8/site-packages (from bleach-&gt;nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (0.5.1)
+Requirement already satisfied: packaging in /opt/conda/lib/python3.8/site-packages (from bleach-&gt;nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (21.3)
+Requirement already satisfied: pyparsing!=3.0.5,&gt;=2.0.2 in /opt/conda/lib/python3.8/site-packages (from packaging-&gt;bleach-&gt;nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (3.0.7)
+Requirement already satisfied: executing in /opt/conda/lib/python3.8/site-packages (from stack-data-&gt;ipython&gt;=4.0.0-&gt;ipywidgets) (0.8.2)
+Requirement already satisfied: pure-eval in /opt/conda/lib/python3.8/site-packages (from stack-data-&gt;ipython&gt;=4.0.0-&gt;ipywidgets) (0.2.2)
+Requirement already satisfied: asttokens in /opt/conda/lib/python3.8/site-packages (from stack-data-&gt;ipython&gt;=4.0.0-&gt;ipywidgets) (2.0.5)
+Installing collected packages: widgetsnbextension, jupyterlab-widgets, ipywidgets
+Successfully installed ipywidgets-7.7.0 jupyterlab-widgets-1.1.0 widgetsnbextension-3.6.0
 <span class="ansi-yellow-fg">WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv</span>
 </pre>
            </div>
@@ -1264,7 +1267,7 @@ torch.hub.list('NVIDIA/DeepLearningExamples:torchhub')
            <div class="output_area stderr docutils container">
             <div class="highlight">
              <pre>
-Using cache found in /root/.cache/torch/hub/NVIDIA_DeepLearningExamples_torchhub
+Downloading: "https://github.com/NVIDIA/DeepLearningExamples/archive/torchhub.zip" to /root/.cache/torch/hub/torchhub.zip
 /root/.cache/torch/hub/NVIDIA_DeepLearningExamples_torchhub/PyTorch/Classification/ConvNets/image_classification/models/efficientnet.py:17: UserWarning: pytorch_quantization module not found, quantization will not be available
   warnings.warn(
 </pre>
@@ -1317,13 +1320,34 @@ ssd300 = torch.hub.load('NVIDIA/DeepLearningExamples:torchhub', 'nvidia_ssd', mo
             </div>
            </div>
           </div>
-          <div class="nboutput nblast docutils container">
+          <div class="nboutput docutils container">
            <div class="prompt empty docutils container">
            </div>
            <div class="output_area stderr docutils container">
             <div class="highlight">
              <pre>
 Using cache found in /root/.cache/torch/hub/NVIDIA_DeepLearningExamples_torchhub
+Downloading: "https://download.pytorch.org/models/resnet50-0676ba61.pth" to /root/.cache/torch/hub/checkpoints/resnet50-0676ba61.pth
+</pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <script type="application/vnd.jupyter.widget-view+json">
+             {"model_id": "1c7cf3e1635d4a2b9c8731b7fc9ce724", "version_major": 2, "version_minor": 0}
+            </script>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area stderr docutils container">
+            <div class="highlight">
+             <pre>
+Downloading checkpoint from https://api.ngc.nvidia.com/v2/models/nvidia/ssd_pyt_ckpt_amp/versions/20.06.0/files/nvidia_ssdpyt_amp_200703.pt
 </pre>
             </div>
            </div>
@@ -1379,13 +1403,25 @@ classes_to_labels = utils.get_coco_object_dictionary()
             </div>
            </div>
           </div>
-          <div class="nboutput nblast docutils container">
+          <div class="nboutput docutils container">
            <div class="prompt empty docutils container">
            </div>
            <div class="output_area stderr docutils container">
             <div class="highlight">
              <pre>
 Using cache found in /root/.cache/torch/hub/NVIDIA_DeepLearningExamples_torchhub
+</pre>
+            </div>
+           </div>
+          </div>
+          <div class="nboutput nblast docutils container">
+           <div class="prompt empty docutils container">
+           </div>
+           <div class="output_area docutils container">
+            <div class="highlight">
+             <pre>
+Downloading COCO annotations.
+Downloading finished.
 </pre>
             </div>
            </div>
@@ -1581,20 +1617,20 @@ benchmark(model, input_shape=(128, 3, 300, 300), nruns=100)
              <pre>
 Warm up ...
 Start timing ...
-Iteration 10/100, avg batch time 272.90 ms
-Iteration 20/100, avg batch time 273.00 ms
-Iteration 30/100, avg batch time 273.21 ms
-Iteration 40/100, avg batch time 273.29 ms
-Iteration 50/100, avg batch time 273.34 ms
-Iteration 60/100, avg batch time 273.47 ms
-Iteration 70/100, avg batch time 273.57 ms
-Iteration 80/100, avg batch time 273.66 ms
-Iteration 90/100, avg batch time 273.75 ms
-Iteration 100/100, avg batch time 273.87 ms
+Iteration 10/100, avg batch time 165.38 ms
+Iteration 20/100, avg batch time 165.99 ms
+Iteration 30/100, avg batch time 166.04 ms
+Iteration 40/100, avg batch time 166.32 ms
+Iteration 50/100, avg batch time 166.49 ms
+Iteration 60/100, avg batch time 166.74 ms
+Iteration 70/100, avg batch time 166.88 ms
+Iteration 80/100, avg batch time 167.05 ms
+Iteration 90/100, avg batch time 167.18 ms
+Iteration 100/100, avg batch time 167.31 ms
 Input shape: torch.Size([128, 3, 300, 300])
 Output location prediction size: torch.Size([128, 4, 8732])
 Output label prediction size: torch.Size([128, 81, 8732])
-Average batch time: 273.87 ms
+Average batch time: 167.31 ms
 </pre>
             </div>
            </div>
@@ -1681,20 +1717,20 @@ benchmark(traced_model, input_shape=(128, 3, 300, 300), nruns=100)
              <pre>
 Warm up ...
 Start timing ...
-Iteration 10/100, avg batch time 275.54 ms
-Iteration 20/100, avg batch time 275.62 ms
-Iteration 30/100, avg batch time 275.73 ms
-Iteration 40/100, avg batch time 275.79 ms
-Iteration 50/100, avg batch time 275.89 ms
-Iteration 60/100, avg batch time 275.95 ms
-Iteration 70/100, avg batch time 276.01 ms
-Iteration 80/100, avg batch time 276.09 ms
-Iteration 90/100, avg batch time 276.17 ms
-Iteration 100/100, avg batch time 276.22 ms
+Iteration 10/100, avg batch time 165.53 ms
+Iteration 20/100, avg batch time 166.19 ms
+Iteration 30/100, avg batch time 166.12 ms
+Iteration 40/100, avg batch time 166.16 ms
+Iteration 50/100, avg batch time 166.24 ms
+Iteration 60/100, avg batch time 166.33 ms
+Iteration 70/100, avg batch time 166.43 ms
+Iteration 80/100, avg batch time 166.44 ms
+Iteration 90/100, avg batch time 166.53 ms
+Iteration 100/100, avg batch time 166.59 ms
 Input shape: torch.Size([128, 3, 300, 300])
 Output location prediction size: torch.Size([128, 4, 8732])
 Output label prediction size: torch.Size([128, 81, 8732])
-Average batch time: 276.22 ms
+Average batch time: 166.59 ms
 </pre>
             </div>
            </div>
@@ -1717,11 +1753,11 @@ Average batch time: 276.22 ms
 
 # The compiled module will have precision as specified by "op_precision".
 # Here, it will have FP16 precision.
-trt_model = torch_tensorrt.compile(traced_model, **{
-    "inputs": [torch_tensorrt.Input((3, 3, 300, 300), dtype=torch.half)],
-    "enabled_precisions": {torch.half}, # Run with FP16
-    "workspace_size": 1 &lt;&lt; 20
-})
+trt_model = torch_tensorrt.compile(traced_model,
+    inputs= [torch_tensorrt.Input((3, 3, 300, 300), dtype=torch.half)],
+    enabled_precisions= {torch.half}, # Run with FP16
+    workspace_size= 1 &lt;&lt; 20
+)
 </pre>
             </div>
            </div>
@@ -1848,11 +1884,11 @@ plot_results(best_results_per_input_trt)
 <span></span>batch_size = 128
 
 # Recompiling with batch_size we use for evaluating performance
-trt_model = torch_tensorrt.compile(traced_model, **{
-    "inputs": [torch_tensorrt.Input((batch_size, 3, 300, 300), dtype=torch.half)],
-    "enabled_precisions": {torch.half}, # Run with FP16
-    "workspace_size": 1 &lt;&lt; 20
-})
+trt_model = torch_tensorrt.compile(traced_model,
+    inputs = [torch_tensorrt.Input((batch_size, 3, 300, 300), dtype=torch.half)],
+    enabled_precisions= {torch.half}, # Run with FP16
+    workspace_size= 1 &lt;&lt; 20
+)
 
 benchmark(trt_model, input_shape=(batch_size, 3, 300, 300), dtype='fp16', nruns=100)
 </pre>
@@ -1891,20 +1927,20 @@ WARNING: [Torch-TensorRT] - There may be undefined behavior using dynamic shape 
             <pre>
 Warm up ...
 Start timing ...
-Iteration 10/100, avg batch time 67.45 ms
-Iteration 20/100, avg batch time 67.47 ms
-Iteration 30/100, avg batch time 67.51 ms
-Iteration 40/100, avg batch time 67.52 ms
-Iteration 50/100, avg batch time 67.52 ms
-Iteration 60/100, avg batch time 67.52 ms
-Iteration 70/100, avg batch time 67.53 ms
-Iteration 80/100, avg batch time 67.52 ms
-Iteration 90/100, avg batch time 67.54 ms
-Iteration 100/100, avg batch time 67.53 ms
+Iteration 10/100, avg batch time 45.88 ms
+Iteration 20/100, avg batch time 46.20 ms
+Iteration 30/100, avg batch time 46.10 ms
+Iteration 40/100, avg batch time 46.19 ms
+Iteration 50/100, avg batch time 46.15 ms
+Iteration 60/100, avg batch time 46.17 ms
+Iteration 70/100, avg batch time 46.19 ms
+Iteration 80/100, avg batch time 46.20 ms
+Iteration 90/100, avg batch time 46.22 ms
+Iteration 100/100, avg batch time 46.21 ms
 Input shape: torch.Size([128, 3, 300, 300])
 Output location prediction size: torch.Size([128, 4, 8732])
 Output label prediction size: torch.Size([128, 81, 8732])
-Average batch time: 67.53 ms
+Average batch time: 46.21 ms
 </pre>
            </div>
           </div>

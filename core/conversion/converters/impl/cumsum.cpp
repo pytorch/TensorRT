@@ -48,7 +48,8 @@ auto cumsum_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pat
        auto data = iterator->getOutput(0);
        auto newDims = data->getDimensions();
 
-       torch::Tensor zeroValue = at::full(util::toVec(newDims), 0, torch::kFloat32);
+       torch::Tensor zeroValue =
+           at::full(util::toVec(newDims), 0, torch_tensorrt::core::util::TRTDataTypeToScalarType(in->getType()));
        auto zeroTensor = tensor_to_const(ctx, zeroValue);
        auto runningSum = loop->addRecurrence(*zeroTensor);
        auto runningSumTensor = runningSum->getOutput(0);

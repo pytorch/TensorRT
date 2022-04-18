@@ -18,7 +18,7 @@ def install_deps(session):
 
 def download_models(session, use_host_env=False):
     print("Downloading test models")
-    session.install('timm')
+    session.install("-r", os.path.join(TOP_DIR, "tests", "modules", "requirements.txt"))
     print(TOP_DIR)
     session.chdir(os.path.join(TOP_DIR, "tests", "modules"))
     if use_host_env:
@@ -322,3 +322,8 @@ def l2_multi_gpu_tests(session):
 def l2_multi_gpu_tests_host_deps(session):
     """Makes sure that Torch-TensorRT can operate on multi-gpu systems using host dependencies"""
     run_l2_multi_gpu_tests(session, use_host_env=True)
+
+@nox.session(python=["3"], reuse_venv=True)
+def download_test_models(session):
+    """Grab all the models needed for testing"""
+    download_models(session, use_host_env=True)
