@@ -26,6 +26,7 @@ def download_models(session, use_host_env=False):
     if use_host_env:
         session.run_always('python', 'hub.py', env={'PYTHONPATH': PYT_PATH})
     else:
+        session.install("-r", os.path.join(TOP_DIR, "py", "requirements.txt"))
         session.run_always('python', 'hub.py')
 
 def install_torch_trt(session):
@@ -328,4 +329,9 @@ def l2_multi_gpu_tests_host_deps(session):
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def download_test_models(session):
     """Grab all the models needed for testing"""
+    download_models(session, use_host_env=False)
+
+@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
+def download_test_models_host_deps(session):
+    """Grab all the models needed for testing using host dependencies"""
     download_models(session, use_host_env=True)
