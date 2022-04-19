@@ -59,12 +59,17 @@ def acc_ops_conv1d(
         bias = bias[None]
     weight = kwargs["weight"]
 
-    if network.has_explicit_precision:
+    if network.has_explicit_precision or isinstance(weight, TRTTensor):
         weight = get_trt_tensor(network, weight, f"{name}_weight")
+        # Expand 1d weight with unsqueeze for calculation
+        unsqueeze_weight_layer = network.add_shuffle(input=weight)
+        unsqueeze_weight_layer.reshape_dims = tuple([*weight.shape, 1])
+        set_layer_name(unsqueeze_layer, target, name+"_unsqueeze_weight")
+        weiht = unsqueeze_weight_layer.get_output(0)
         weight_shape = tuple(kwargs["weight"].shape)  # type: ignore[union-attr]
         # will need to use uninitialized weight and set it later to support
         # ITensor weights
-        dummy_weight = trt.Weights()
+        dummy_weight = trt.Weights(weight_shape)
         layer = network.add_convolution_nd(
             input=input_val,
             num_output_maps=weight.shape[0],
@@ -90,10 +95,12 @@ def acc_ops_conv1d(
         )
     padding = kwargs["padding"]
     padding = padding + (0,)
+    stride = extend_attr_to_tuple(kwargs["stride"], 1)
+    dilation = extend_attr_to_tuple(kwargs["dilation"], 1)
     set_layer_name(layer, target, name)
-    layer.stride_nd = kwargs["stride"]
+    layer.stride_nd = stride
     layer.padding_nd = padding
-    layer.dilation_nd = kwargs["dilation"]
+    layer.dilation_nd = dilation
     if kwargs["groups"] is not None:
         layer.num_groups = kwargs["groups"]
 

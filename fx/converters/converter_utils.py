@@ -234,6 +234,8 @@ def get_trt_tensor(
     """
     # TRT can not add constant for bool type. We do a work around to 1) cast it to int and 2)cast to bool later
     # This is useful for logical operations which require input to be bool type
+    if isinstance(input_val, np.ndarray):
+        input_val = torch.from_numpy(input_val)
     if isinstance(input_val, bool):
         input_val = int(input_val)
     if isinstance(input_val, torch.Tensor) and input_val.dtype == torch.bool:

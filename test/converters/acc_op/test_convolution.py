@@ -37,7 +37,7 @@ class TestConvolutionConverter(AccTestCase):
                 return self.conv(x)
 
         inputs = [torch.randn(1, 3, 32)]
-        self.run_test(TestModule(), inputs, expected_ops={acc_ops.conv1d})
+        self.run_test(TestModule(), inputs, expected_ops={acc_ops.conv1d}, test_explicit_precision=True)
 
 
     @parameterized.expand(
