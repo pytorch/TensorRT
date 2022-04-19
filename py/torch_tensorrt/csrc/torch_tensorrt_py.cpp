@@ -178,11 +178,10 @@ PYBIND11_MODULE(_C, m) {
       .def_readwrite("dtype", &Input::dtype)
       .def_readwrite("format", &Input::format);
 
-  py::class_<GraphInputs>(m, "GraphInputs")
+  py::class_<InputSignature>(m, "InputSignature")
       .def(py::init<>())
-      .def("__str__", &torch_tensorrt::pyapi::GraphInputs::to_str)
-      .def_readwrite("input_signature", &GraphInputs::input_signature)
-      .def_readwrite("inputs", &GraphInputs::inputs);
+      .def("__str__", &InputSignature::to_str)
+      .def_readwrite("_signature_ivalue", &InputSignature::signature_ivalue);
 
   py::enum_<DataType>(m, "dtype", "Enum to specifiy operating precision for engine execution")
       .value("float", DataType::kFloat, "32 bit floating point number")
@@ -298,7 +297,7 @@ PYBIND11_MODULE(_C, m) {
       .def("__str__", &torch_tensorrt::pyapi::CompileSpec::stringify)
       .def("_get_calibrator_handle", &CompileSpec::getPTQCalibratorHandle, "[Internal] gets a handle from a calibrator")
       .def_readwrite("inputs", &CompileSpec::inputs)
-      .def_readwrite("graph_inputs", &CompileSpec::graph_inputs)
+      .def_readwrite("input_signature", &CompileSpec::input_signature)
       .def_readwrite("enabled_precisions", &CompileSpec::enabled_precisions)
       .def_readwrite("ptq_calibrator", &CompileSpec::ptq_calibrator)
       .def_readwrite("refit", &CompileSpec::refit)

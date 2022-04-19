@@ -104,8 +104,9 @@ std::string Input::to_str() {
   return ss.str();
 }
 
-std::string GraphInputs::to_str() {
+std::string InputSignature::to_str() {
   std::stringstream ss;
+  ss << signature_ivalue;
   return ss.str();
 }
 
@@ -217,16 +218,16 @@ void to_internal_input_signature(torch::jit::IValue input_ivalue, torch::jit::IV
 }
 
 core::CompileSpec init_compile_spec(CompileSpec external) {
-  if (external.graph_inputs.inputs.size() > 0) {
+  if (external.inputs.size() > 0) {
     std::vector<core::ir::Input> internal_inputs;
-    for (auto i : external.graph_inputs.inputs) {
+    for (auto i : external.inputs) {
       internal_inputs.push_back(i.toInternalInput());
     }
     core::CompileSpec internal(internal_inputs);
     return internal;
   } else {
     torch::jit::IValue converted_input_signature;
-    to_internal_input_signature(external.graph_inputs.input_signature, converted_input_signature);
+    to_internal_input_signature(external.input_signature.signature_ivalue, converted_input_signature);
     core::CompileSpec internal(converted_input_signature);
     return internal;
   }
@@ -276,16 +277,20 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
 std::string CompileSpec::stringify() {
   std::stringstream ss;
   ss << "TensorRT Compile Spec: {" << std::endl;
-  ss << "    \"Inputs\": [" << std::endl;
-  for (auto i : inputs) {
-    ss << i.to_str();
+  if (inputs.size() > 0) {
+    ss << "    \"Inputs\": [" << std::endl;
+    for (auto i : inputs) {
+      ss << i.to_str();
+    }
+    ss << "    ]" << std::endl;
+  } else {
+    ss << "    \"Input Signature\": " << input_signature.to_str() << std::endl;
   }
-  ss << "    ]" << std::endl;
-  ss << "    \"Enabled Precision\": [" << std::endl;
+  ss << "    \"Enabled Precision\": [";
   for (auto p : enabled_precisions) {
-    ss << to_str(p);
+    ss << to_str(p) << ", " ;
   }
-  ss << "    ]" << std::endl;
+  ss << "]" << std::endl;
   ss << "    \"TF32 Disabled\": " << disable_tf32 << std::endl;
   ss << "    \"Sparsity\": " << sparse_weights << std::endl;
   ss << "    \"Refit\": " << refit << std::endl;

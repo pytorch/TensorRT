@@ -11,6 +11,7 @@ from types import FunctionType
 
 def compile(module: torch.jit.ScriptModule,
             inputs=[],
+            input_signature=None,
             device=Device._current_device(),
             disable_tf32=False,
             sparse_weights=False,
@@ -90,6 +91,7 @@ def compile(module: torch.jit.ScriptModule,
 
     spec = {
         "inputs": inputs,
+        "input_signature": input_signature,
         "device": device,
         "disable_tf32": disable_tf32,  # Force FP32 layers to use traditional as FP32 format
         "sparse_weights": sparse_weights,  #Enable sparsity for convolution and fully connected layers.

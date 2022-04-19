@@ -1,6 +1,7 @@
 from distutils.command.clean import clean
 import nox
 import os
+import sys
 
 # Use system installed Python packages
 PYT_PATH='/opt/conda/lib/python3.8/site-packages' if not 'PYT_PATH' in os.environ else os.environ["PYT_PATH"]
@@ -11,7 +12,7 @@ TOP_DIR=os.path.dirname(os.path.realpath(__file__)) if not 'TOP_DIR' in os.envir
 
 SUPPORTED_PYTHON_VERSIONS=["3.7", "3.8", "3.9", "3.10"]
 
-nox.options.sessions = ["l0_api_tests-3.7"]
+nox.options.sessions = ["l0_api_tests-" + "{}.{}".format(sys.version_info.major, sys.version_info.minor)]
 
 def install_deps(session):
     print("Installing deps")
@@ -130,8 +131,9 @@ def run_base_tests(session, use_host_env=False):
     print("Running basic tests")
     session.chdir(os.path.join(TOP_DIR, 'tests/py'))
     tests = [
-        "test_api.py",
-        "test_to_backend_api.py"
+        #"test_api.py",
+        #"test_to_backend_api.py",
+        "test_collections.py"
     ]
     for test in tests:
         if use_host_env:

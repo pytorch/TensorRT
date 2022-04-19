@@ -220,9 +220,9 @@ traced_model = torch.jit.trace(model, [tokens_tensor, segments_tensors])
 torch.jit.save(traced_model, "bert_base_uncased_traced.jit.pt")
 
 # Collection input/output models
-class Normal(nn.Module):
+class StandardTensorInput(nn.Module):
     def __init__(self):
-        super(Normal, self).__init__()
+        super(StandardTensorInput, self).__init__()
 
     def forward(self, x, y):
         r = x + y
@@ -280,10 +280,10 @@ class ComplexModel(nn.Module):
         r = (tuple_out[1], list_out[0])
         return r
 
-normal_model = Normal()
+normal_model = StandardTensorInput()
 normal_model_ts = torch.jit.script(normal_model)
 normal_model_ts.to("cuda").eval()
-torch.jit.save(normal_model_ts, "normal_model.jit.pt")
+torch.jit.save(normal_model_ts, "standard_tensor_input.jit.pt")
 
 tuple_input = TupleInput()
 tuple_input_ts = torch.jit.script(tuple_input)

@@ -6,9 +6,9 @@
 #include "torch_tensorrt/torch_tensorrt.h"
 
 
-TEST(CppAPITests, TestCollectionNormalInput) {
+TEST(CppAPITests, TestCollectionStandardTensorInput) {
 
-  std::string path = "tests/modules/normal_model.jit.pt";
+  std::string path = "tests/modules/standard_tensor_input.jit.pt";
   torch::Tensor in0 = torch::randn({1, 3, 512, 512}, torch::kCUDA).to(torch::kHalf);
   std::vector<at::Tensor> inputs;
   inputs.push_back(in0);
@@ -23,7 +23,7 @@ TEST(CppAPITests, TestCollectionNormalInput) {
   }
   mod.eval();
   mod.to(torch::kCUDA);
-  
+
 
   std::vector<torch::jit::IValue> inputs_;
 
@@ -117,7 +117,7 @@ TEST(CppAPITests, TestCollectionListInput) {
   }
   mod.eval();
   mod.to(torch::kCUDA);
-  
+
 
   std::vector<torch::jit::IValue> inputs_;
 
@@ -238,7 +238,7 @@ TEST(CppAPITests, TestCollectionListInputOutput) {
   }
   mod.eval();
   mod.to(torch::kCUDA);
-  
+
 
   std::vector<torch::jit::IValue> inputs_;
 
@@ -287,7 +287,7 @@ TEST(CppAPITests, TestCollectionListInputOutput) {
   auto trt_mod = torch_tensorrt::torchscript::compile(mod, compile_settings);
   LOG_DEBUG("Finish compile");
   auto trt_out = trt_mod.forward(complex_inputs);
-  
+
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(out.toList().vec()[0].toTensor(), trt_out.toList().vec()[0].toTensor(), 1e-5));
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(out.toList().vec()[1].toTensor(), trt_out.toList().vec()[1].toTensor(), 1e-5));
 }
@@ -309,7 +309,7 @@ TEST(CppAPITests, TestCollectionComplexModel) {
   }
   mod.eval();
   mod.to(torch::kCUDA);
-  
+
 
   std::vector<torch::jit::IValue> inputs_;
 
@@ -357,7 +357,7 @@ TEST(CppAPITests, TestCollectionComplexModel) {
   auto trt_mod = torch_tensorrt::torchscript::compile(mod, compile_settings);
   LOG_DEBUG("Finish compile");
   auto trt_out = trt_mod.forward(complex_inputs);
-  
+
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(out.toTuple()->elements()[0].toTensor(), trt_out.toTuple()->elements()[0].toTensor(), 1e-5));
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(out.toTuple()->elements()[1].toTensor(), trt_out.toTuple()->elements()[1].toTensor(), 1e-5));
 }
