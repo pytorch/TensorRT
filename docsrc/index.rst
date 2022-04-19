@@ -53,7 +53,8 @@ Getting Started
    _notebooks/Resnet50-example
    _notebooks/ssd-object-detection-demo
    _notebooks/vgg-qat
-   _notebooks/EfficientNet-example 
+   _notebooks/EfficientNet-example
+   _notebooks/dynamic-shapes
 
 
 Python API Documenation
@@ -62,7 +63,6 @@ Python API Documenation
 * :ref:`torch_tensorrt_logging_py`
 * :ref:`torch_tensorrt_ptq_py`
 * :ref:`torch_tensorrt_ts_py`
-
 
 .. toctree::
    :caption: Python API Documenation
