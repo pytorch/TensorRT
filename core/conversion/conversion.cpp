@@ -138,7 +138,10 @@ void AddLayer(ConversionCtx* ctx, const torch::jit::Node* n) {
 void AddInputs(
     ConversionCtx* ctx,
     c10::ArrayRef<const torch::jit::Value*> inputs,
-    std::unordered_map<const torch::jit::Value*, ir::Input>& input_specs) {
+    ConversionInfo& conversion_info) {
+  std::unordered_map<const torch::jit::Value*, ir::Input>& input_specs = conversion_info.inputs;
+  std::unordered_map<const torch::jit::Value*, std::vector<ir::Input>> collection_input_spec = conversion_info.collection_input_spec_map;
+  
   std::vector<const torch::jit::Value*> input_tensors;
   for (auto in : inputs) {
     // Disregarding inputs that are not tensors
@@ -166,9 +169,15 @@ void AddInputs(
   for (auto input : input_tensors) {
     const torch::jit::Value* in = input;
     TORCHTRT_CHECK(
-        input_specs.find(in) != input_specs.end(),
+        input_specs.find(in) != input_specs.end() || collection_input_spec.find(in) != collection_input_spec.end(),
         "Cannot find an input spec associated with input: " << in->debugName());
-    ir::Input& spec = input_specs.find(in)->second;
+    ir::Input spec;
+    if (input_specs.find(in) != input_specs.end()) {
+        spec = input_specs.find(in)->second;
+    } else {
+      spec = collection_input_spec.find(in)->second[0]; // assume input is tensor
+    }
+    // ir::Input& spec = input_specs.find(in)->second;
 
     std::string name = std::string("input_") + std::to_string(ctx->num_inputs);
     LOG_INFO(
@@ -188,6 +197,7 @@ void AddInputs(
       ctx->input_is_dynamic = true;
     }
 
+    // mapping torch Value to tensorrt iTensor
     ctx->value_tensor_map[in] = trt_in;
     ctx->num_inputs += 1;
   }
@@ -408,7 +418,7 @@ void ConvertBlockToNetDef(
 
   auto inputs = b->inputs();
   AddParamsToCtxValueMap(ctx, static_params);
-  AddInputs(ctx, inputs, build_info.inputs);
+  AddInputs(ctx, inputs, build_info);
 
   auto nodes = b->nodes();
 
@@ -547,6 +557,15 @@ std::set<std::string> ConvertableOpsInBlock(const torch::jit::Block* b) {
     }
   }
   return convertable_ops;
+}
+
+bool OutputIsCollection(const torch::jit::Block* b) {
+  for (auto out: b->outputs()) {
+    if(out->type()->kind() == torch::jit::TypeKind::TupleType || out->type()->kind() == torch::jit::TypeKind::ListType) {
+      return true;
+    }
+  }
+  return false;
 }
 
 bool VerifyConverterSupportForBlock(const torch::jit::Block* b, bool suppress_errors) {

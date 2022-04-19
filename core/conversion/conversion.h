@@ -13,6 +13,7 @@ namespace conversion {
 
 struct ConversionInfo {
   ir::InputSpecMap inputs;
+  ir::CollectionInputSpecMap collection_input_spec_map;
   BuilderSettings engine_settings;
 };
 
@@ -24,6 +25,8 @@ std::string ConvertBlockToEngine(
     ir::StaticParams& static_params);
 
 bool OpSupported(const torch::jit::Node* n);
+
+bool OutputIsCollection(const torch::jit::Block* b);
 
 bool VerifyConverterSupportForBlock(const torch::jit::Block* b, bool suppress_errors = false);
 

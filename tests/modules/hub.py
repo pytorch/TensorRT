@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import torchvision.models as models
 import timm
 from transformers import BertModel, BertTokenizer, BertConfig
+from typing import Tuple, List, Dict
 
 torch.hub._validate_not_a_forked_repo = lambda a, b, c: True
 
@@ -217,3 +218,94 @@ model = BertModel.from_pretrained("bert-base-uncased", torchscript=True)
 
 traced_model = torch.jit.trace(model, [tokens_tensor, segments_tensors])
 torch.jit.save(traced_model, "bert_base_uncased_traced.jit.pt")
+
+# Collection input/output models
+class Normal(nn.Module):
+    def __init__(self):
+        super(Normal, self).__init__()
+
+    def forward(self, x, y):
+        r = x + y
+        return r
+
+class TupleInput(nn.Module):
+    def __init__(self):
+        super(TupleInput, self).__init__()
+
+    def forward(self, z: Tuple[torch.Tensor, torch.Tensor]):
+        r = z[0] + z[1]
+        return r
+
+class ListInput(nn.Module):
+    def __init__(self):
+        super(ListInput, self).__init__()
+
+    def forward(self, z: List[torch.Tensor]):
+        r = z[0] + z[1]
+        return r
+
+class TupleInputOutput(nn.Module):
+    def __init__(self):
+        super(TupleInputOutput, self).__init__()
+
+    def forward(self, z: Tuple[torch.Tensor, torch.Tensor]):
+        r1 = z[0] + z[1]
+        r2 = z[0] - z[1]
+        r = (r1, r2)
+        return r
+
+class ListInputOutput(nn.Module):
+    def __init__(self):
+        super(ListInputOutput, self).__init__()
+
+    def forward(self, z: List[torch.Tensor]):
+        r1 = z[0] + z[1]
+        r2 = z[0] - z[1]
+        r = [r1, r2]
+        return r
+
+class ComplexModel(nn.Module):
+    def __init__(self):
+        super(ComplexModel, self).__init__()
+        self.list_model = ListInputOutput()
+        self.tuple_model = TupleInputOutput()
+
+    def forward(self, z: List[torch.Tensor]):
+        r1 = z[0] + z[1]
+        r2 = z[0] - z[1]
+        r3 = (r1, r2)
+        r4 = [r2, r1]
+        tuple_out = self.tuple_model(r3)
+        list_out = self.list_model(r4)
+        r = (tuple_out[1], list_out[0])
+        return r
+
+normal_model = Normal()
+normal_model_ts = torch.jit.script(normal_model)
+normal_model_ts.to("cuda").eval()
+torch.jit.save(normal_model_ts, "normal_model.jit.pt")
+
+tuple_input = TupleInput()
+tuple_input_ts = torch.jit.script(tuple_input)
+tuple_input_ts.to("cuda").eval()
+torch.jit.save(tuple_input_ts, "tuple_input.jit.pt")
+
+list_input = ListInput()
+list_input_ts = torch.jit.script(list_input)
+list_input_ts.to("cuda").eval()
+torch.jit.save(list_input_ts, "list_input.jit.pt")
+
+tuple_input = TupleInputOutput()
+tuple_input_ts = torch.jit.script(tuple_input)
+tuple_input_ts.to("cuda").eval()
+torch.jit.save(tuple_input_ts, "tuple_input_output.jit.pt")
+
+list_input = ListInputOutput()
+list_input_ts = torch.jit.script(list_input)
+list_input_ts.to("cuda").eval()
+torch.jit.save(list_input_ts, "list_input_output.jit.pt")
+
+complex_model = ComplexModel()
+complex_model_ts = torch.jit.script(complex_model)
+complex_model_ts.to("cuda").eval()
+torch.jit.save(complex_model_ts, "complex_model.jit.pt")

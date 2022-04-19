@@ -23,6 +23,13 @@ void RegisterTRTCompileSpec() {
   ADD_FIELD_GET_SET_REGISTRATION(TRTInputRangeTSRegistration, torch_tensorrt::pyapi::Input, input_is_dynamic);
   ADD_FIELD_GET_SET_REGISTRATION(TRTInputRangeTSRegistration, torch_tensorrt::pyapi::Input, explicit_set_dtype);
 
+  static auto TORCHTRT_UNUSED TRTGraphInpuTSRegistration =
+      torch::class_<torch_tensorrt::pyapi::GraphInputs>("tensorrt", "_GraphInputs")
+          .def(torch::init<>())
+          .def("__str__", &torch_tensorrt::pyapi::GraphInputs::to_str);
+
+  ADD_FIELD_GET_SET_REGISTRATION(TRTInputRangeTSRegistration, torch_tensorrt::pyapi::GraphInputs, input_signature);
+
   static auto TORCHTRT_UNUSED TRTDeviceTSRegistration =
       torch::class_<torch_tensorrt::pyapi::Device>("tensorrt", "_Device")
           .def(torch::init<>())

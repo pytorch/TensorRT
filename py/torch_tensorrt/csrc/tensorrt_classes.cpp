@@ -104,6 +104,11 @@ std::string Input::to_str() {
   return ss.str();
 }
 
+std::string GraphInputs::to_str() {
+  std::stringstream ss;
+  return ss.str();
+}
+
 std::string to_str(DeviceType value) {
   switch (value) {
     case DeviceType::kDLA:
@@ -184,13 +189,51 @@ std::string TorchFallback::to_str() {
   return ss.str();
 }
 
-core::CompileSpec CompileSpec::toInternalCompileSpec() {
-  std::vector<core::ir::Input> internal_inputs;
-  for (auto i : inputs) {
-    internal_inputs.push_back(i.toInternalInput());
-  }
+void to_internal_input_signature(torch::jit::IValue input_ivalue, torch::jit::IValue& converted_ivalue) {
+    if (input_ivalue.isTuple()) {
+      auto input_tuple = input_ivalue.toTuple();
+      std::vector<torch::jit::IValue> converted_elements;
+      for (auto item: input_tuple->elements()) {
+        torch::jit::IValue converted_item;
+        to_internal_input_signature(item, converted_item);
+        converted_elements.push_back(converted_item);
+        auto tuple_ptr = c10::ivalue::Tuple::create(converted_elements);
+        converted_ivalue = torch::jit::IValue(tuple_ptr);
+      }
+    } else if(input_ivalue.isList()) {
+      auto input_list = input_ivalue.toList().vec();
+      c10::TypePtr type = input_list[0].type();
+      auto converted_elements = c10::impl::GenericList(type);
+      for (auto item: input_list) {
+        torch::jit::IValue converted_item;
+        to_internal_input_signature(item, converted_item);
+        converted_elements.push_back(converted_item);
+      }
+      converted_ivalue = torch::jit::IValue(converted_elements);
+    } else if(input_ivalue.isCustomClass()) {
+      core::ir::Input cur_input = (*(input_ivalue.toCustomClass<Input>())).toInternalInput();
+      converted_ivalue = torch::jit::IValue(std::move(c10::make_intrusive<core::ir::Input>(cur_input)));
+    }
+}
 
-  auto info = core::CompileSpec(internal_inputs);
+core::CompileSpec init_compile_spec(CompileSpec external) {
+  if (external.graph_inputs.inputs.size() > 0) {
+    std::vector<core::ir::Input> internal_inputs;
+    for (auto i : external.graph_inputs.inputs) {
+      internal_inputs.push_back(i.toInternalInput());
+    }
+    core::CompileSpec internal(internal_inputs);
+    return internal;
+  } else {
+    torch::jit::IValue converted_input_signature;
+    to_internal_input_signature(external.graph_inputs.input_signature, converted_input_signature);
+    core::CompileSpec internal(converted_input_signature);
+    return internal;
+  }
+}
+
+core::CompileSpec CompileSpec::toInternalCompileSpec() {
+  core::CompileSpec info = init_compile_spec(*this);
 
   for (auto p : enabled_precisions) {
     info.convert_info.engine_settings.enabled_precisions.insert(toTRTDataType(p));

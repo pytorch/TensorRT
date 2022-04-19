@@ -52,4 +52,7 @@ void set_device(const int gpu_id) {
   // Want to export a much simpler (non CUDA header dependent) API
   torch_tensorrt::core::set_device(gpu_id);
 }
+
+static auto tensorrt_input_container =
+    torch::class_<Input>("_torch_tensorrt", "Input").def(torch::init<>());
 } // namespace torch_tensorrt

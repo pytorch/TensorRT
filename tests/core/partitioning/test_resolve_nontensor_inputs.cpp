@@ -116,11 +116,11 @@ TEST(Partitioning, ResolveNonTensorInputsCorrectly) {
   inputs.push_back(torch_tensorrt::core::ir::Input({16, 3, 3, 3}));
   inputs.push_back(torch_tensorrt::core::ir::Input({16}));
 
-  std::unordered_map<const torch::jit::Value*, torch_tensorrt::core::ir::Input> inputs_map;
-  std::unordered_map<const torch::jit::Value*, c10::optional<at::ScalarType>> input_types;
+  std::unordered_map<const torch::jit::Value*, std::vector<torch_tensorrt::core::ir::Input>> inputs_map;
+  std::unordered_map<const torch::jit::Value*, std::vector<c10::optional<at::ScalarType>>> input_types;
   for (size_t i = 0; i < g->inputs().size(); ++i) {
-    inputs_map.insert({g->inputs()[i], inputs[i]});
-    input_types.insert({g->inputs()[i], {at::kFloat}});
+    inputs_map.insert({g->inputs()[i], {inputs[i]}});
+    input_types.insert({g->inputs()[i], {{at::kFloat}}});
   }
   auto input_ivalues_map = torch_tensorrt::core::partitioning::generateRandomInputs(inputs_map, input_types);
   std::vector<torch_tensorrt::core::partitioning::SegmentedBlock> segmented_blocks =
@@ -174,11 +174,11 @@ TEST(Partitioning, ResolveTensorListInputsInTrtCorrectly) {
   inputs.push_back(torch_tensorrt::core::ir::Input({16, 6, 3, 3}));
   inputs.push_back(torch_tensorrt::core::ir::Input({16}));
 
-  std::unordered_map<const torch::jit::Value*, torch_tensorrt::core::ir::Input> inputs_map;
-  std::unordered_map<const torch::jit::Value*, c10::optional<at::ScalarType>> input_types;
+  std::unordered_map<const torch::jit::Value*, std::vector<torch_tensorrt::core::ir::Input>> inputs_map;
+  std::unordered_map<const torch::jit::Value*, std::vector<c10::optional<at::ScalarType>>> input_types;
   for (size_t i = 0; i < g->inputs().size(); ++i) {
-    inputs_map.insert({g->inputs()[i], inputs[i]});
-    input_types.insert({g->inputs()[i], {at::kFloat}});
+    inputs_map.insert({g->inputs()[i], {inputs[i]}});
+    input_types.insert({g->inputs()[i], {{at::kFloat}}});
   }
   auto input_ivalues_map = torch_tensorrt::core::partitioning::generateRandomInputs(inputs_map, input_types);
   std::vector<torch_tensorrt::core::partitioning::SegmentedBlock> segmented_blocks =
@@ -255,5 +255,5 @@ TEST(Partitioning, ConvertForTensorListInputsInFallbackCorrectly) {
   torch::jit::script::Module new_mod = torch_tensorrt::core::CompileGraph(mod, cfg);
   auto fallback_g = new_mod.get_method("forward").graph();
   int count = count_trt_engines(fallback_g);
-  ASSERT_TRUE(count == 2);
+  ASSERT_TRUE(count == 1);
 }

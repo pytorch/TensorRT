@@ -5,7 +5,7 @@ import torch_tensorrt._C.ts as _ts_C
 from torch_tensorrt import _enums
 from torch_tensorrt._Input import Input
 from torch_tensorrt._Device import Device
-
+from typing import Tuple, List, Dict
 import warnings
 
 
@@ -156,6 +156,24 @@ def _parse_torch_fallback(fallback_info: Dict[str, Any]) -> _ts_C.TorchFallback:
 
     return info
 
+def _parse_collection_input(input_signature: Any) -> _C.GraphInputs.input_signature:
+    if isinstance(input_signature, tuple):
+        input_list = []
+        for item in input_signature:
+           input = _parse_collection_input(item)
+           input_list.append(input)
+        return tuple(input_list)
+    elif isinstance(input_signature, list):
+        input_list = []
+        for item in input_signature:
+           input = _parse_collection_input(item)
+        input_list.append(input)
+        return input_list
+    elif isinstance(input_signature, Input) or isinstance(input_signature, torch.Tensor):
+        input = Input._from_tensor(input_signature) if isinstance(input_signature, torch.Tensor) else input_signature
+        return input._to_internal()
+    else:
+        raise KeyError("Invalid Input spec")
 
 def _parse_compile_spec(compile_spec: Dict[str, Any]) -> _ts_C.CompileSpec:
     info = _ts_C.CompileSpec()
@@ -165,14 +183,19 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> _ts_C.CompileSpec:
         )
 
     if "inputs" in compile_spec:
-        if not all([isinstance(i, torch.Tensor) or isinstance(i, Input) for i in compile_spec["inputs"]]):
-            raise KeyError("Input specs should be either torch_tensorrt.Input or torch.Tensor, found types: {}".format(
-                [type(i) for i in compile_spec["inputs"]]))
+        # if not all([isinstance(i, torch.Tensor) or isinstance(i, Input) for i in compile_spec["inputs"]]):
+        #     raise KeyError("Input specs should be either torch_tensorrt.Input or torch.Tensor, found types: {}".format(
+        #         [type(i) for i in compile_spec["inputs"]]))
 
-        inputs = [Input._from_tensor(i) if isinstance(i, torch.Tensor) else i for i in compile_spec["inputs"]]
-        info.inputs = [i._to_internal() for i in inputs]
+        if isinstance(compile_spec["inputs"], list) and all([isinstance(i, torch.Tensor) or isinstance(i, Input) for i in compile_spec["inputs"]]):
+            inputs = [Input._from_tensor(i) if isinstance(i, torch.Tensor) else i for i in compile_spec["inputs"]]
+            # from python Input to torch_tensorrt::pyapi::Input
+            # info.inputs = [i._to_internal() for i in inputs]
+            info.graph_inputs.inputs = [i._to_internal() for i in inputs]
+        else:
+            info.graph_inputs.input_signature = _parse_collection_input(compile_spec["inputs"])
 
-    assert (len(info.inputs) > 0), "Require at least one input definition to compile model"
+    assert (len(info.graph_inputs.inputs) > 0), "Require at least one input definition to compile model"
 
     if "enabled_precisions" in compile_spec:
         info.enabled_precisions = _parse_enabled_precisions(compile_spec["enabled_precisions"])
