@@ -52,6 +52,7 @@ Getting Started
    _notebooks/CitriNet-example
    _notebooks/dynamic-shapes
    _notebooks/EfficientNet-example
+   _notebooks/Hugging-Face-BERT
    _notebooks/lenet-getting-started
    _notebooks/Resnet50-example
    _notebooks/ssd-object-detection-demo
