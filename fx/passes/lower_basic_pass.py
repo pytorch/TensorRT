@@ -197,6 +197,10 @@ else:
     def trt_transposed_matmul_converter(network, target, args, kwargs, name):
         lhs, rhs, lhs_transposed, rhs_transposed = args
 
+        if isinstance(lhs, torch.nn.Parameter):
+            lhs = get_trt_tensor(network, lhs, f"{name}_lhs")
+        if isinstance(rhs, torch.nn.Parameter):
+            rhs = get_trt_tensor(network, rhs, f"{name}_rhs")
         layer = network.add_matrix_multiply(
             lhs,
             trt.MatrixOperation.TRANSPOSE if lhs_transposed else trt.MatrixOperation.NONE,
