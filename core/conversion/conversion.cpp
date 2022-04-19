@@ -23,6 +23,10 @@ bool OpSupported(const torch::jit::Node* n) {
   return evaluators::shouldEvalAtConversionTime(n) || converters::node_is_convertable(n);
 }
 
+bool SpecialCaseSupport(const torch::jit::Node* n) {
+  return n->kind() == torch::jit::prim::Loop || n->kind() == torch::jit::prim::If;
+}
+
 c10::optional<torch::jit::IValue> EvaluateNode(ConversionCtx* ctx, const torch::jit::Node* n, int level, int limit) {
   // Check to see if you can just go through and eval all of these AOT (saves
   // the recursion) Also probably a better way to deal with the two error cases;
@@ -499,7 +503,7 @@ std::unordered_map<c10::OperatorName, std::string> GetUnsupportedOpsInBlock(cons
     auto schema = n->maybeSchema();
     // Some ops like torch::jit::prim::Loop, torch::jit::prim::If, torch::jit::prim::DictConstruct don't have a schema
     // but they are supported. torch::jit::prim::DictConstruct is supported via fallback only
-    if (!OpSupported(n)) {
+    if (!OpSupported(n) && !SpecialCaseSupport(n)) {
       if (schema) {
         std::stringstream ss;
         ss << *schema;
