@@ -29,12 +29,14 @@ jobs:
   Authorization:
     name: Authorization
     runs-on: blossom 
+    env:
+      AUTHORIZED_USERS: ${{ secrets.AUTHORIZED_USERS }}
     outputs:
       args: ${{ env.args }}
       
     # This job only runs for pull request comments
     if: |
-         contains( ${{ secrets.AUTHORIZED_USERS }}, format('{0},', github.actor)) &&
+         contains( ${{ env.AUTHORIZED_USERS }}, format('{0},', github.actor)) &&
          github.event.comment.body == '/nvidia-ci'
     steps:
       - name: Check if comment is issued by authorized person
