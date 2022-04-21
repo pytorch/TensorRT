@@ -65,6 +65,7 @@ class TestAccuracy(ModelTestCase):
             "inputs": [torchtrt.Input([1, 3, 32, 32])],
             "enabled_precisions": {torch.float, torch.int8},
             "calibrator": self.calibrator,
+            "truncate_long_and_double": True,
             "device": {
                 "device_type": torchtrt.DeviceType.GPU,
                 "gpu_id": 0,
