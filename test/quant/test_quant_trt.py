@@ -19,7 +19,7 @@ from fx2trt_oss.fx.passes.lower_basic_pass import run_const_fold
 from fx2trt_oss.fx.utils import LowerPrecision
 from fx2trt_oss.tracer.acc_tracer import acc_ops
 from torch.ao.quantization import default_qconfig
-from torch.ao.quantization.fx.backend_config.observation_type import ObservationType
+from torch.ao.quantization.backend_config.observation_type import ObservationType
 from torch.ao.quantization.fx.match_utils import (
     MatchAllNode,
 )
@@ -353,7 +353,7 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
     """
     def setUp(self):
         super().setUp()
-        self.qconfig = torch.ao.quantization.QConfig(
+        self.trt_qconfig = torch.ao.quantization.QConfig(
             activation=torch.ao.quantization.observer.HistogramObserver.with_args(
                 qscheme=torch.per_tensor_symmetric, dtype=torch.qint8
             ),
@@ -389,7 +389,7 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
         else:
             m = m.eval()
             prepare = prepare_fx
-        prepared = prepare(m, {"": self.qconfig}, backend_config_dict=self.trt_backend_config_dict)
+        prepared = prepare(m, {"": self.trt_qconfig}, backend_config_dict=self.trt_backend_config_dict)
         self.checkGraphModuleNodes(prepared, expected_node_occurrence=no_prepare)
         # calibration
         prepared(*inputs)
@@ -497,7 +497,7 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
                 return x
 
         m = M().eval()
-        m = prepare_fx(m, {"": default_qconfig})
+        m = prepare_fx(m, {"": self.trt_qconfig}, backend_config_dict=self.trt_backend_config_dict)
         m = convert_fx(
             m, is_reference=True, backend_config_dict=self.trt_backend_config_dict)
         expected_occurrence = {
@@ -506,6 +506,7 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
             ns.call_module(torch.nn.quantized._reference.Linear): 1,
             ns.call_module(torch.nn.quantized._reference.Conv2d): 1,
         }
+        print(m)
         self.checkGraphModuleNodes(
             m,
             expected_node_occurrence=expected_occurrence)
@@ -549,7 +550,7 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
 
         m = M().eval()
         prepared = prepare_fx(
-            m, {"": self.qconfig}, backend_config_dict=self.trt_backend_config_dict)
+            m, {"": self.trt_qconfig}, backend_config_dict=self.trt_backend_config_dict)
         self.assertTrue(len(dict(prepared.named_children())) == 1)
         quantized = convert_fx(
             prepared, is_reference=True, backend_config_dict=self.trt_backend_config_dict)
@@ -572,7 +573,7 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
 
         m = M().eval()
         prepared = prepare_fx(
-            m, {"": self.qconfig}, backend_config_dict=self.trt_backend_config_dict)
+            m, {"": self.trt_qconfig}, backend_config_dict=self.trt_backend_config_dict)
         node_occurrence = {
             # weight
             ns.call_module(torch.ao.quantization.MinMaxObserver): 1,
@@ -590,6 +591,7 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
         }
         self.checkGraphModuleNodes(quantized, expected_node_occurrence=node_occurrence)
 
+    @unittest.skip("This is not supported yet, we can enable the test after it's supported")
     def test_conv_add(self):
         class M(torch.nn.Module):
             def __init__(self):
@@ -610,12 +612,22 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
             "output_dtype": torch.qint8
         }
 
+        def conv_add_root_node_getter(pattern):
+            (_, conv, _) = pattern
+            return conv
+
+        def conv_add_extra_inputs_getter(pattern):
+            _, _, extra_input = pattern
+            return [extra_input]
+
         conv_add_config = {
             "pattern": (operator.add, torch.nn.Conv2d, MatchAllNode),
             "observation_type": ObservationType.OUTPUT_USE_DIFFERENT_OBSERVER_AS_INPUT,
             "dtype_configs": [
                 weighted_op_qint8_dtype_config,
             ],
+            "root_node_getter": conv_add_root_node_getter,
+            "extra_inputs_getter": conv_add_extra_inputs_getter,
             "root_module": torch.nn.Conv2d,
             "reference_quantized_module_for_root": torch.nn.quantized._reference.Conv2d,
         }
@@ -623,7 +635,8 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
         m = M().eval()
         modified_backend_config_dict = copy.deepcopy(self.trt_backend_config_dict)
         modified_backend_config_dict["configs"].insert(0, conv_add_config)
-        m = prepare_fx(m, {"": self.qconfig}, backend_config_dict=modified_backend_config_dict)
+        m = prepare_fx(m, {"": self.trt_qconfig}, backend_config_dict=modified_backend_config_dict)
+        print(m)
         node_occurrence = {
             ns.call_module(torch.ao.quantization.HistogramObserver): 3,
         }
@@ -655,7 +668,7 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
                 y = self.conv(x)
                 return self.standalone(x, y)
 
-        from torch.ao.quantization.fx.backend_config.observation_type import ObservationType
+        from torch.ao.quantization.backend_config.observation_type import ObservationType
         weighted_op_quint8_dtype_config = {
             # optional, input activation dtype
             # TODO: change back to torch.qint8 after input_quantized_idxs and output_quantized_idxs
@@ -699,7 +712,7 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
         prepare_custom_config_dict = {
             "standalone_module_name": [("standalone", None, {"input_quantized_idxs": [0, 1]}, None)]
         }
-        # TODO: use self.qconfig after input_quantized_idxs and output_quantized_idxs
+        # TODO: use self.trt_qconfig after input_quantized_idxs and output_quantized_idxs
         # are more flexible
         qconfig = torch.ao.quantization.QConfig(
             activation=torch.ao.quantization.observer.HistogramObserver.with_args(
@@ -754,7 +767,7 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
         model = LinearModule().eval()
         inputs = [torch.rand(8, 5)]
 
-        prepared = prepare_fx(model, {"": self.qconfig}, backend_config_dict=self.trt_backend_config_dict)
+        prepared = prepare_fx(model, {"": self.trt_qconfig}, backend_config_dict=self.trt_backend_config_dict)
         quantized = convert_fx(
             prepared, is_reference=True, backend_config_dict=self.trt_backend_config_dict)
 
