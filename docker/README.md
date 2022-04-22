@@ -10,7 +10,7 @@ https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.
 
 ```
 # Build:
-docker build --build-arg BASE={PyTorch Base Container Version} -f docker/Dockerfile -t torch_tensorrt1.0:latest .
+DOCKER_BUILDKIT=1 docker build --build-arg BASE={PyTorch Base Container Version} -f docker/Dockerfile -t torch_tensorrt1.0:latest .
 
 # Run:
 docker run --gpus all -it \
