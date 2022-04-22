@@ -40,20 +40,6 @@ LOWER_SPLIT_POST_OBSERVER: Observer[
 ] = Observer("LOWER_SPLIT_POST_OBSERVER")
 # ----------------------------------------------------------------------
 
-class LowerPassContext(NamedTuple):
-    """
-    Args:
-    input: module input
-
-    lower_setting: lower setting
-
-    trace_func: desired graph trace function for lowering
-    """
-    input: Input
-    lower_setting: "LowerSetting"
-    trace_func: Callable
-    split_func: Callable
-    lower_func: Callable
 
 def wrapper(fn: Callable, input) -> Callable:
     @wraps(fn)
@@ -66,14 +52,26 @@ def wrapper(fn: Callable, input) -> Callable:
 
 class LowerPassManagerBuilder:
     """
-    Build PassManager for lowering
+    Build PassManager for lowering.
+
+     Attributes:
+        lower_setting: Setting that will be used during process of lowering, see lower_setting.py for the details.
+        _trace_func: fx trace function for TRT conversion.
+        _split_func: the fx2trt split function.
+        _lower_func: function to create and run `TRTInterpreter` to convert `fx.GraphModule`
+            into a TensorRT engine.
+
     """
-    def __init__(self, lower_pass_context:LowerPassContext):
-        self._build_context = lower_pass_context
+    def __init__(self, lower_setting: LowerSetting, trace_func: Callable, split_func: Callable, lower_func: Callable):
+        self.lower_setting = lower_setting
+        self._trace_func = trace_func
+        self._split_func = split_func
+        self._lower_func = lower_func
+
 
     def _const_fold_pass(self) -> PassManager:
         passes = [
-            wrapper(self._build_context.trace_func, self._build_context.input),
+            wrapper(self._trace_func, self._input),
             run_const_fold,
         ]
         return PassManager.build_from_passlist(passes)
@@ -81,19 +79,19 @@ class LowerPassManagerBuilder:
 
     def graph_optimization_pass(self) -> PassManager:
         passes = [
-            wrapper(self._build_context.trace_func, self._build_context.input),
+            wrapper(self._trace_func, self._input),
         ]
-        for p in self._build_context.lower_setting.customized_fuse_pass:
-            passes.append(wrapper(p, self._build_context.input))
-        for p in self._build_context.lower_setting.lower_basic_fuse_pass:
-            passes.append(wrapper(p, self._build_context.input))
-        passes.append(inplace_wrapper(partial(FUSE_PASSES_POST_OBSERVER.observe, self._build_context.input)))
+        for p in self.lower_setting.customized_fuse_pass.passes:
+            passes.append(wrapper(p, self._input))
+        for p in self.lower_setting.lower_basic_fuse_pass.passes:
+            passes.append(wrapper(p, self._input))
+        passes.append(inplace_wrapper(partial(FUSE_PASSES_POST_OBSERVER.observe, self._input)))
 
         return PassManager.build_from_passlist(passes)
 
 
     def _split_pass(self) -> PassManager:
-        passes = [partial(self._build_context.split_func, inputs=self._build_context.input, lower_setting=self._build_context.lower_setting)]
+        passes = [partial(self._split_func, inputs=self._input, lower_setting=self.lower_setting)]
         passes.append(inplace_wrapper(
                 lambda split_result: remove_duplicate_output_args(
                     split_result.split_module,
@@ -112,7 +110,7 @@ class LowerPassManagerBuilder:
 
                 # Only acc submodules will be lowered.
                 if not submod_name.startswith(split_result.non_acc_submodule_prefix):
-                    lowered_module = self._build_context.lower_func(submod, submod_inputs, self._build_context.lower_setting, submod_name)
+                    lowered_module = self._lower_func(submod, submod_inputs, self.lower_setting, submod_name)
                     setattr(split_result.split_module, submod_name, lowered_module)
                     LOWER_SPLIT_POST_OBSERVER.observe(submod_name, lowered_module, submod_inputs)
 
@@ -120,7 +118,8 @@ class LowerPassManagerBuilder:
         return PassManager.build_from_passlist([lower_func])
 
 
-    def build_lower_pipeline(self) -> PassManager:
+    def build_lower_pipeline(self, input: Input) -> PassManager:
+        self._input = input
         passes = []
 
         passes.append(self._const_fold_pass())

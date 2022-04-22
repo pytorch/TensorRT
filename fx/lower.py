@@ -20,7 +20,7 @@ from .input_tensor_spec import (
     InputTensorSpec,
 )
 from .passes.pass_utils import chain_passes, PassFunc
-from .passes.lower_pass_manager_builder import LowerPassManagerBuilder, LowerPassContext
+from .passes.lower_pass_manager_builder import LowerPassManagerBuilder
 from .tools.timing_cache_utils import (
     TimingCacheManager,
 )
@@ -102,9 +102,6 @@ class LowerTrtInterpreter:
             else InputTensorSpec.from_tensors(input)
         )
 
-        if self.lower_setting.lower_basic_fuse_pass:
-            lower_pass = chain_passes(*self.lower_setting.lower_basic_fuse_pass)
-            lower_pass(mod, input)
 
         # Prepare algorithm selector and timing_cache for TRTInterpreter
         algo_selector = None
@@ -148,11 +145,10 @@ class LowerTrtInterpreter:
         return interp_result
 
 
-def default_split_function(model: fx.GraphModule, inputs: Input, lower_setting: LowerSetting, min_acc_module_size: int = 10) -> SplitResult:
+def default_split_function(model: fx.GraphModule, inputs: Input, lower_setting: LowerSetting) -> SplitResult:
     splitter_setting = TRTSplitterSetting()
     splitter_setting.use_implicit_batch_dim = not lower_setting.explicit_batch_dimension
-    # TODO: avoid hardcode here by introducing another flag in lowering setting.
-    splitter_setting.min_acc_module_size = min_acc_module_size
+    splitter_setting.min_acc_module_size = lower_setting.min_acc_module_size
     splitter = TRTSplitter(model, inputs, settings=splitter_setting)
     splitter.node_support_preview()
     return splitter.generate_split_results()
@@ -203,37 +199,30 @@ class Lowerer:
         4. Wraps the executable TRT engine into `TRTModule`, which is an `nn.Module`.
         5. The converted submodule is then set back onto the top-level module
 
-
-    Attributes:
-        trace_func: fx trace function for TRT conversion.
-        split_func: the fx2trt split function.
-        trt_interpret: function to create and run `TRTInterpreter` to convert `fx.GraphModule`
-            into a TensorRT engine.
-        lower_setting: see above LowerSetting class for the details.
     """
 
-    trace_func: Callable[[nn.Module, Input], fx.GraphModule]
-    split_func: Callable[[fx.GraphModule, Input, LowerSetting], SplitResult]
-    lower_func: PassFunc
-    lower_setting: LowerSetting
-
+    lower_pass_manager_builder: LowerPassManagerBuilder
 
     @classmethod
     def create(
         cls,
         lower_setting: LowerSetting,
+        interpreter_builder: Callable = create_lower_trt_interpreter
     ) -> "Lowerer":
         """Instantiate a `Lowerer` instance."""
 
         return cls(
-            trace_func=lambda module, inputs: acc_tracer.trace(
-                module,
-                inputs,  # type: ignore[arg-type]
-                ast_rewriter_allow_list=lower_setting.ast_rewriter_allow_list,
-                leaf_module_list=lower_setting.leaf_module_list),  # type: ignore[arg-type]
-            split_func=default_split_function,
-            lower_func=default_lower_pass(create_lower_trt_interpreter),
-            lower_setting=lower_setting,
+            lower_pass_manager_builder=
+                LowerPassManagerBuilder(
+                    lower_setting=lower_setting,
+                    trace_func=lambda module, inputs: acc_tracer.trace(
+                        module,
+                        inputs,  # type: ignore[arg-type]
+                        ast_rewriter_allow_list=lower_setting.ast_rewriter_allow_list,
+                        leaf_module_list=lower_setting.leaf_module_list),
+                    split_func=default_split_function,
+                    lower_func=default_lower_pass(interpreter_builder),
+                )
         )
 
 
@@ -245,18 +234,11 @@ class Lowerer:
     ) -> nn.Module:
         module.eval()
 
-        if self.lower_setting.lower_precision == LowerPrecision.FP16:
+        if self.lower_pass_manager_builder.lower_setting.lower_precision == LowerPrecision.FP16:
             module.half()
             inputs = tuple(x.half() if x.dtype == torch.float32 else x for x in inputs)
+        pm = self.lower_pass_manager_builder.build_lower_pipeline(inputs)
 
-        pm = LowerPassManagerBuilder(LowerPassContext(
-            input=inputs,
-            lower_setting=self.lower_setting,
-            trace_func=self.trace_func,
-            split_func=self.split_func,
-            lower_func=self.lower_func,
-            ),
-        ).build_lower_pipeline()
         lower_result = pm(module)
 
         return lower_result

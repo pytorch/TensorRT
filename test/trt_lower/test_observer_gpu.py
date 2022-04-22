@@ -15,7 +15,7 @@ class ObserverGPUTests(TestCase):
         lowering.
         """
         from dataclasses import replace
-        from fx2trt_oss.fx.lower import default_split_function
+        from fx2trt_oss.fx.lower_setting import LowerSetting
         import fx2trt_oss.fx.lower as lower
         import torch
         import torch.nn as nn
@@ -31,16 +31,7 @@ class ObserverGPUTests(TestCase):
 
         with execution_verifier() as verify_execution:
 
-            lowerer = lower.Lowerer.create(lower_setting=lower.LowerSetting())
-            # Update `lowerer.split_func` to make sure the test model is split
-            # onto the trt partition:
-            lowerer = replace(
-                lowerer,
-                split_func=functools.partial(
-                    default_split_function,
-                    min_acc_module_size=0
-                )
-            )
+            lowerer = lower.Lowerer.create(lower_setting=LowerSetting(min_acc_module_size=0))
 
             @verify_execution
             def observe_fuse_permute_linear_post(ctx: ob.ObserveContext):

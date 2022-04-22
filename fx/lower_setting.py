@@ -4,6 +4,7 @@ from fx2trt_oss.fx.utils import LowerPrecision
 import dataclasses as dc
 from torch import nn
 from fx2trt_oss.fx.passes.lower_basic_pass import fuse_permute_linear, fuse_permute_matmul
+from torch.fx.passes.pass_manager import PassManager
 
 
 @dc.dataclass
@@ -56,7 +57,9 @@ class LowerSetting:
 
     cuda_graph_batch_size (int): Cuda graph batch size, default to be -1.
 
-    verbose_profile (bool): verbosity of profiler, default to False
+    verbose_profile (bool): verbosity of profiler, default to False.
+
+    min_acc_module_size(int): minimal number of nodes for an accelerate submodule.
     """
     max_batch_size: int = 2048
     input_specs: List[InputTensorSpec] = dc.field(default_factory=list)
@@ -65,8 +68,8 @@ class LowerSetting:
     lower_precision: LowerPrecision = LowerPrecision.FP32
     max_workspace_size: int = 1 << 30
     strict_type_constraints: bool = False
-    customized_fuse_pass: Sequence = ()
-    lower_basic_fuse_pass: Sequence = (fuse_permute_matmul,fuse_permute_linear)
+    customized_fuse_pass: PassManager = PassManager.build_from_passlist([])
+    lower_basic_fuse_pass: PassManager = PassManager.build_from_passlist([fuse_permute_matmul,fuse_permute_linear])
     verbose_log: bool = False
     algo_selector = None
     timing_cache_prefix: str = ""
@@ -75,3 +78,4 @@ class LowerSetting:
     leaf_module_list: Optional[Set[Type[nn.Module]]] = None
     cuda_graph_batch_size: int = -1
     verbose_profile: bool = False
+    min_acc_module_size: int = 10
