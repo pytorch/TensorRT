@@ -15,26 +15,32 @@ namespace converters {
 namespace impl {
 namespace {
 
-bool add_split(ConversionCtx* ctx, const torch::jit::Node* n, args& args, bool split_list) {
+bool add_split(ConversionCtx* ctx, const torch::jit::Node* n, args& args, bool split_list, bool unbind) {
   auto in = args[0].ITensor();
-  auto axis = args[2].unwrapToInt();
-  auto inDimSize = in->getDimensions().d[axis];
-  auto numOutputs = 1, numRemainder = 0;
+  auto numOutputs = 1, numRemainder = 0, axis = 0;
   std::vector<int64_t> sizes;
 
-  if (split_list) {
-    sizes = args[1].unwrapToIntList().vec();
-    numOutputs = sizes.size();
+  if (unbind) {
+    axis = args[1].unwrapToInt();
+    numOutputs = in->getDimensions().d[axis];
+    sizes.insert(sizes.end(), numOutputs, 1);
   } else {
-    auto split_size = args[1].unwrapToInt();
-    numOutputs = inDimSize / split_size;
-    numRemainder = inDimSize % split_size;
-    for (int64_t i = 0; i < numOutputs; i++) {
-      sizes.push_back(split_size);
-    }
-    if (numRemainder) {
-      numOutputs += 1;
-      sizes.push_back(numRemainder);
+    axis = args[2].unwrapToInt();
+    auto inDimSize = in->getDimensions().d[axis];
+    if (split_list) {
+      sizes = args[1].unwrapToIntList().vec();
+      numOutputs = sizes.size();
+    } else {
+      auto split_size = args[1].unwrapToInt();
+      numOutputs = inDimSize / split_size;
+      numRemainder = inDimSize % split_size;
+      for (int64_t i = 0; i < numOutputs; i++) {
+        sizes.push_back(split_size);
+      }
+      if (numRemainder) {
+        numOutputs += 1;
+        sizes.push_back(numRemainder);
+      }
     }
   }
 
@@ -340,19 +346,25 @@ auto select_registrations TORCHTRT_UNUSED =
              }})
         .pattern({"aten::split(Tensor self, int[] split_sizes, int dim=0) -> (Tensor[])",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    add_split(ctx, n, args, true);
+                    add_split(ctx, n, args, true, false);
                     LOG_DEBUG("Converted split op into a list of IValues");
                     return true;
                   }})
         .pattern({"aten::split.Tensor(Tensor(a) self, int split_size, int dim=0) -> (Tensor[])",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    add_split(ctx, n, args, false);
+                    add_split(ctx, n, args, false, false);
                     LOG_DEBUG("Converted split op into a list of IValues");
                     return true;
                   }})
         .pattern({"aten::split_with_sizes(Tensor(a) self, int[] split_sizes, int dim=0) -> (Tensor[])",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    add_split(ctx, n, args, true);
+                    add_split(ctx, n, args, true, false);
+                    LOG_DEBUG("Converted split op into a list of IValues");
+                    return true;
+                  }})
+        .pattern({"aten::unbind.int(Tensor(a -> *) self, int dim=0) -> (Tensor[])",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    add_split(ctx, n, args, false, true);
                     LOG_DEBUG("Converted split op into a list of IValues");
                     return true;
                   }})
