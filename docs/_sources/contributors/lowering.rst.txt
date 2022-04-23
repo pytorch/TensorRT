@@ -134,7 +134,7 @@ Removes _all_ tuples and raises an error if some cannot be removed, this is used
 Module Fallback
 *****************
 
-    `Torch-TensorRT/core/lowering/passes/module_fallback.cpp <https://github.com/nvidia/Torch-TensorRT/blob/master/core/lowering/passes/module_fallback.cpp>`_
+    `Torch-TensorRT/core/lowering/passes/module_fallback.cpp <https://github.com/nvidia/Torch-TensorRT/blob/master/core/lowering/passes/module_fallback.cpp>`
 
 Module fallback consists of two lowering passes that must be run as a pair. The first pass is run before freezing to place delimiters in the graph around modules
 that should run in PyTorch. The second pass marks nodes between these delimiters after freezing to signify they should run in PyTorch.

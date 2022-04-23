@@ -19,7 +19,7 @@ inputs and assemble an array of resources to pass to the converter. Inputs can b
 
 *  The input is an output of a node that has already been converted
 
-   *  In this case the ITensor of the output has added to the ``value_tensor_map``.
+   *  In this case the ITensor of the output has added to the to the ``value_tensor_map``,
       The conversion stage will add the ITensor to the list of args for the converter
 
 *  The input is from a node that produces a static value
@@ -32,7 +32,6 @@ inputs and assemble an array of resources to pass to the converter. Inputs can b
       static value has been evaluated
 
 *  The input is from a node that has not been converted
-
    *  Torch-TensorRT will error out here
 
 Node Evaluation

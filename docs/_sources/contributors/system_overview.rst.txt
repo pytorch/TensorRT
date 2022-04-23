@@ -23,7 +23,7 @@ The repository is structured into:
 The C++ API is unstable and subject to change until the library matures, though most work is done under the hood in the core.
 
 The core has a couple major parts: The top level compiler interface which coordinates ingesting a module, lowering,
-converting and generating a new module and returning it back to the user. There are the three main phases of the
+converting and generating a new module and returning it back to the user. The there are the three main phases of the
 compiler, the lowering phase, the conversion phase, and the execution phase.
 
 .. include:: phases.rst
