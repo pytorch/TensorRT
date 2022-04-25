@@ -44,6 +44,7 @@ jobs:
     name: Authorization
     runs-on: blossom 
     env:
+      OPERATION: 'Get-AUTH'
       AUTHORIZED_USERS: ${{ secrets.AUTHORIZED_USERS }}
     outputs:
       args: ${{ env.args }}
