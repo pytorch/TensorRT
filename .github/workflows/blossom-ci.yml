@@ -26,21 +26,21 @@ on:
             description: 'argument'     
             required: false
 jobs:
-  Get-Authorization:
-    runs-on: ubuntu-latest
-    outputs:
-      AUTHORIZED: ${{ steps.check-authorization.outputs.defined }}
-    steps:
-      - id: check-authorization
-        env:
-          AUTHORIZED_USERS: ${{ secrets.AUTHORIZED_USERS }}
-        if: |
-          contains( ${{ env.AUTHORIZED_USERS }}, format('{0},', github.actor)) &&
-          github.event.comment.body == '/nvidia-ci'
-        run: echo "::set-output name=defined::true"
+#   Get-Authorization:
+#     runs-on: ubuntu-latest
+#     outputs:
+#       AUTHORIZED: ${{ steps.check-authorization.outputs.defined }}
+#     steps:
+#       - id: check-authorization
+#         env:
+#           AUTHORIZED_USERS: ${{ secrets.AUTHORIZED_USERS }}
+#         if: |
+#           contains( ${{ env.AUTHORIZED_USERS }}, format('{0},', github.actor)) &&
+#           github.event.comment.body == '/nvidia-ci'
+#         run: echo "::set-output name=defined::true"
         
   Authorization:
-    needs: [Get-Authorization]
+#     needs: [Get-Authorization]
     name: Authorization
     runs-on: blossom 
     env:
@@ -49,7 +49,10 @@ jobs:
       args: ${{ env.args }}
       
     # This job only runs for pull request comments
-    if: needs.Get-Authorization.outputs.check-authorization == 'true'
+    if: |
+      contains( ${{ env.AUTHORIZED_USERS }}, format('{0},', github.actor)) &&
+      github.event.comment.body == '/nvidia-ci'
+# if: needs.Get-Authorization.outputs.check-authorization == 'true'
     steps:
       - name: Check if comment is issued by authorized person
         run: blossom-ci
