@@ -48,14 +48,16 @@ jobs:
     outputs:
       args: ${{ env.args }}
     
+    if: contains('narendasan,', format('{0},', github.actor))
+    
     steps:
       - name: Authorize Blossom launch
+        run: blossom-ci
         env:
           OPERATION: 'AUTH'
           REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO_KEY_DATA: ${{ secrets.BLOSSOM_KEY }}
-        #if: needs.Check-Authorization.outputs.authorized == 'true'
-        run: blossom-ci
+
         
   Vulnerability-Scan:
     name: Vulnerability scan
