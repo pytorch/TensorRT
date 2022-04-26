@@ -25,28 +25,40 @@ on:
           args:
             description: 'argument'     
             required: false
-jobs:       
-  Authorization:
-    name: Authorization
+jobs:
+  Check-Authorization:
+    runs-on: ubuntu-latest
+    outputs:
+      AUTHORIZED: ${{ steps.check-authorization.outputs.authorized }}
+    steps:
+      - id: check-authorization
+        name: Check if commentor is allowed to launch NVIDIA CI
+        env:
+          AUTHORIZED_USERS: ${{ secrets.AUTHORIZED_USERS }}
+        if: |
+          contains(${{env.AUTHORIZED_USERS }}, format('{0},', github.actor)) &&
+          github.event.comment.body == '/nvidia-ci'
+        run: echo "::set-output name=authorized=true"
+    
+    
+  Authorize-Blossom:
     runs-on: blossom
+    needs: [Check-Authorization]
     outputs:
       args: ${{ env.args }}
     
     steps:
-      - name: Check if comment is issued by authorized person
+      - name: Authorize Blossom launch
         env:
           OPERATION: 'AUTH'
-          AUTHORIZED_USERS: ${{ secrets.AUTHORIZED_USERS }}
           REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO_KEY_DATA: ${{ secrets.BLOSSOM_KEY }}
-        if: |
-          contains( ${{ env.AUTHORIZED_USERS }}, format('{0},', github.actor)) && 
-          github.event.comment.body == '/nvidia-ci'
+        if: needs.Check-Authorization.outputs.authorized == 'true'
         run: blossom-ci
         
-  Vulnerability-scan:
+  Vulnerability-Scan:
     name: Vulnerability scan
-    needs: [Authorization]
+    needs: [Authorize-Blossom]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -66,12 +78,12 @@ jobs:
           args2: ${{ fromJson(needs.Authorization.outputs.args).args2 }}
           args3: ${{ fromJson(needs.Authorization.outputs.args).args3 }}
           
-  Job-trigger:
-    name: Start ci job
-    needs: [Vulnerability-scan]
+  Launch-NVIDIA-CI:
+    name: Start ci job on Blossom
+    needs: [Vulnerability-Scan]
     runs-on: blossom
     steps:
-      - name: Start ci job
+      - name: Launch CI
         run: blossom-ci
         env:
           OPERATION: 'START-CI-JOB'
