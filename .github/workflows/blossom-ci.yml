@@ -54,8 +54,8 @@ jobs:
           OPERATION: 'AUTH'
           REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO_KEY_DATA: ${{ secrets.BLOSSOM_KEY }}
-        if: needs.Check-Authorization.outputs.authorized == 'true'
-        run: blossom-ci && printenv
+        #if: needs.Check-Authorization.outputs.authorized == 'true'
+        run: blossom-ci
         
   Vulnerability-Scan:
     name: Vulnerability scan
