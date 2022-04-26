@@ -54,6 +54,11 @@ def validate_inference(rtol=None, atol=None, suppress_accuracy_check_failure=Fal
                     kwargs["rtol"] = rtol
                 if atol:
                     kwargs["atol"] = atol
+                # If tensors are on different devices, make sure to compare
+                # their copies that are on the same device.
+                if x.get_device() != y.get_device():
+                    x = x.cpu()
+                    y = y.cpu()
                 accuracy_check = torch.allclose(x, y, **kwargs)
                 if not accuracy_check:
                     if suppress_accuracy_check_failure:
