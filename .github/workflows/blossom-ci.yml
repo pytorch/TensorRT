@@ -31,21 +31,18 @@ jobs:
     runs-on: blossom
     outputs:
       args: ${{ env.args }}
-    env:
-      AUTHORIZED_USERS: ${{ secrets.AUTHORIZED_USERS }}
-      
-    # This job only runs for pull request comments
-    if: |
-         contains( ${{ env.AUTHORIZED_USERS }}, format('{0},', github.actor)) && 
-         github.event.comment.body == '/nvidia-ci'
     
     steps:
       - name: Check if comment is issued by authorized person
-        run: blossom-ci
         env:
           OPERATION: 'AUTH'
+          AUTHORIZED_USERS: ${{ secrets.AUTHORIZED_USERS }}
           REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO_KEY_DATA: ${{ secrets.BLOSSOM_KEY }}
+        if: |
+          contains( ${{ env.AUTHORIZED_USERS }}, format('{0},', github.actor)) && 
+          github.event.comment.body == '/nvidia-ci'
+        run: blossom-ci
         
   Vulnerability-scan:
     name: Vulnerability scan
