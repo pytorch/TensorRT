@@ -42,7 +42,7 @@ jobs:
     
     
   Authorize-Blossom:
-    name: Authorize Blossom launch
+    name: Authorize NVIDIA CI launch
     runs-on: blossom
     needs: [Check-Authorization]
     outputs:
@@ -56,6 +56,8 @@ jobs:
           REPO_KEY_DATA: ${{ secrets.BLOSSOM_KEY }}
         if: needs.Check-Authorization.outputs.authorized == 'true'
         run: blossom-ci
+      - name: test
+        run: echo ${{ env.args }}
         
   Vulnerability-Scan:
     name: Vulnerability scan
@@ -80,7 +82,7 @@ jobs:
           args3: ${{ fromJson(needs.Authorize-Blossom.outputs.args).args3 }}
           
   Launch-NVIDIA-CI:
-    name: Start ci job on Blossom
+    name: Start ci job on NVIDIA CI
     needs: [Vulnerability-Scan]
     runs-on: blossom
     steps:
@@ -93,6 +95,7 @@ jobs:
               
   Upload-Log:
     name: Upload log
+    needs: [Launch-NVIDIA-CI]
     runs-on: blossom
     if : github.event_name == 'workflow_dispatch'
     steps:
