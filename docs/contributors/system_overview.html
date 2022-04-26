@@ -617,7 +617,7 @@ version so there may be compilation errors if you try to use an older compiler.
         </p>
         <p>
          The core has a couple major parts: The top level compiler interface which coordinates ingesting a module, lowering,
-converting and generating a new module and returning it back to the user. The there are the three main phases of the
+converting and generating a new module and returning it back to the user. There are the three main phases of the
 compiler, the lowering phase, the conversion phase, and the execution phase.
         </p>
         <section id="compiler-phases">
@@ -657,17 +657,15 @@ TensorRT.
            </a>
           </h3>
           <p>
-           :ref:
-           <a href="#id2">
-            <span class="problematic" id="id3">
-             `
+           <a class="reference internal" href="partitioning.html#partitioning">
+            <span class="std std-ref">
+             Partitioning Phase
             </span>
            </a>
-           partitioning
           </p>
           <p>
-           The phase is optional and enabled by the user. It instructs the compiler to seperate nodes into ones that should run in PyTorch and ones that should run in TensorRT.
-Criteria for seperation include: Lack of a converter, operator is explicitly set to run in PyTorch by the user or the node has a flag which tells partitioning to
+           The phase is optional and enabled by the user. It instructs the compiler to separate nodes into ones that should run in PyTorch and ones that should run in TensorRT.
+Criteria for separation include: Lack of a converter, operator is explicitly set to run in PyTorch by the user or the node has a flag which tells partitioning to
 run in PyTorch by the module fallback passes.
           </p>
          </section>
