@@ -105,7 +105,7 @@ DeviceList get_available_device_list() {
 // SM Compute capability <Compute Capability, Device Name> map
 const std::unordered_map<std::string, std::string>& get_dla_supported_SMs() {
   // Xavier SM Compute Capability
-  static std::unordered_map<std::string, std::string> dla_supported_SM = {{"7.2", "Xavier"}};
+  static std::unordered_map<std::string, std::string> dla_supported_SM = {{"7.2", "Xavier"}, {"8.7", "Orin"}};
   return dla_supported_SM;
 }
 
