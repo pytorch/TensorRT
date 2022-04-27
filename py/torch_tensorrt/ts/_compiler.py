@@ -207,6 +207,11 @@ def embed_engine_in_new_module(serialized_engine: bytes, device=Device._current_
 
         forward(Tensor[]) -> Tensor[]
 
+    TensorRT bindings must have names with the following format:
+      - [symbol].[index in input / output array]
+      ex.
+      - [x.0, x.1, x.2] -> [y.0]
+
     Module can be save with engine embedded with torch.jit.save and moved / loaded according to torch_tensorrt portability rules
 
     Arguments:
