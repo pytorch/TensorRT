@@ -27,14 +27,14 @@ on:
             required: false
 jobs:
   Authorization:
-    name: Authorization
+    name: Check Authorization to Launch NVIDIA CI
     runs-on: blossom 
     outputs:
       args: ${{ env.args }}
       
     # This job only runs for pull request comments
     if: |
-         contains( 'andi4191,', format('{0},', github.actor)) && 
+         contains( 'andi4191, narendasan, peri044, bowang007,', format('{0},', github.actor)) && 
          github.event.comment.body == '/blossom-ci'
     steps:
       - name: Check if comment is issued by authorized person
@@ -67,7 +67,7 @@ jobs:
           args3: ${{ fromJson(needs.Authorization.outputs.args).args3 }}
           
   Job-trigger:
-    name: Start ci job
+    name: Start NVIDIA CI pipelines
     needs: [Vulnerability-scan]
     runs-on: blossom
     steps:
