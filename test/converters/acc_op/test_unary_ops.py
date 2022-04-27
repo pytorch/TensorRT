@@ -64,6 +64,15 @@ class TestUnaryOpNotConverters(AccTestCase):
         inputs = [torch.randn(2, 2, 3).to(input_dtype)]
         self.run_test(m, inputs, expected_ops={expected_op}, test_implicit_batch_dim=False)
 
+class TestUnaryRSQRTConverters(AccTestCase):
+    def test_unary_ops(self):
+        class TestModule(nn.Module):
+            def forward(self, x):
+                return torch.rsqrt(x)
+
+        m = TestModule()
+        inputs = [torch.randn(2, 2, 3)]
+        self.run_test(m, inputs, expected_ops={acc_ops.sqrt, acc_ops.reciprocal})
 
 if __name__ == '__main__':
     run_tests()

@@ -1,0 +1,67 @@
+import torch
+import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
+from torch.testing._internal.common_fx2trt import AccTestCase
+from torch.testing._internal.common_utils import run_tests
+from fx2trt_oss.fx.utils import LowerPrecision
+
+class TestTypeAsConverter(AccTestCase):
+    def test_device_fp32(self):
+        class Type_as(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.a = torch.randn(2,2)
+            def forward(self, x):
+                b = self.a.type_as(x)
+                return b
+
+                # self.a = self.a.type_as(x) # error is throw
+                # return self.a
+        input = torch.randn(2,2).cuda()
+        inputs = [
+            input,
+        ]
+        self.run_test(Type_as(), inputs, expected_ops={acc_ops.to_dtype, acc_ops.device, acc_ops.dtype}, test_implicit_batch_dim = False)
+
+    def test_device_fp16(self):
+        class Type_as(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.a = torch.randn(2,2)
+            def forward(self, x):
+                return self.a.type_as(x)
+
+        input = torch.randn(2,2).half().cuda()
+        inputs = [
+            input,
+        ]
+        self.run_test(Type_as(), inputs, expected_ops={acc_ops.to_dtype, acc_ops.device, acc_ops.dtype}, test_implicit_batch_dim = False, precision=LowerPrecision.FP16)
+
+    def test_device_fp32_tensor(self):
+        class Type_as(torch.nn.Module):
+            def forward(self, input, other):
+                return other.type_as(input)
+
+        input = torch.randn(2,2).cuda()
+        other = torch.randn(2,2)
+        inputs = [
+            input,
+            other,
+        ]
+        self.run_test(Type_as(), inputs, expected_ops={acc_ops.to_dtype, acc_ops.device, acc_ops.dtype})
+
+    def test_device_fp16_tensor(self):
+        class Type_as(torch.nn.Module):
+            def forward(self, input, other):
+                return other.type_as(input)
+
+        input = torch.randn(2,2).half().cuda()
+        other = torch.randn(2,2)
+        inputs = [
+            input,
+            other,
+        ]
+        self.run_test(Type_as(), inputs, expected_ops={acc_ops.to_dtype, acc_ops.device, acc_ops.dtype}, precision=LowerPrecision.FP16)
+
+
+if __name__ == '__main__':
+    run_tests()

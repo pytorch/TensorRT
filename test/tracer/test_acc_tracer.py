@@ -1701,6 +1701,12 @@ class AccTracerTest(unittest.TestCase):
     def test_torch_mul(self):
         self._make_acc_op_function_test(acc_ops.mul, lambda x: torch.mul(x, 7))
 
+    def test_torch_isinf(self):
+        self._make_acc_op_function_test(acc_ops.isinf, torch.isinf)
+
+    def test_torch_any(self):
+        self._make_acc_op_function_test(acc_ops.any, torch.any)
+
     def test_div(self):
         self._make_acc_op_function_test(acc_ops.div, lambda x: torch.div(x, 2))
         self._make_acc_op_function_test(acc_ops.div, lambda x: x / 2)
@@ -2332,6 +2338,7 @@ class AccTracerTest(unittest.TestCase):
         res = traced(cond,x,y)
         self.assertTrue(torch.equal(ref, res))
 
+
     def test_all_acc_ops_registered(self):
         self.assertEqual(
             acc_normalizer._acc_ops,
@@ -2446,5 +2453,8 @@ class AccTracerTest(unittest.TestCase):
                 acc_ops.device,
                 acc_ops.numel,
                 acc_ops.where,
+                acc_ops.dtype,
+                acc_ops.isinf,
+                acc_ops.any,
             },
         )

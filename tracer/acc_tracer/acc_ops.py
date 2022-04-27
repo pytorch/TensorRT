@@ -179,6 +179,37 @@ def sign(*, input):
     return torch.sign(input)
 
 
+@register_custom_acc_mapper_fn(
+    op_and_target=("call_method", "type_as"),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("tensor", "tensor"),
+    ],
+)
+def custom_type_as_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
+    input_obj = node.kwargs['input']
+    other_obj = node.kwargs['tensor']
+    with node.graph.inserting_before(node):
+        dtype_node = node.graph.call_function(dtype, kwargs={"input": other_obj})
+        dtype_node.meta["type"] = torch.dtype
+        device_node = node.graph.call_function(device, kwargs={"input": other_obj})
+        device_node.meta["type"] = torch.device
+
+        new_kwargs = {
+            "input": input_obj,
+            "acc_out_ty": acc_utils.build_raw_tensor_meta(dtype=dtype_node),
+            "device": device_node,
+        }
+        new_node = node.graph.call_function(to_dtype, kwargs=new_kwargs)
+        new_node.meta = node.meta
+        return new_node
+
+
+@register_acc_op_properties(AccOpProperty.unary)
+@register_acc_op
+def dtype(*, input):
+    return input.dtype
+
 @register_acc_op_properties(AccOpProperty.unary)
 @register_acc_op
 def size(*, input):
@@ -216,13 +247,14 @@ def custom_getattr_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
         input_obj.meta["type"] == torch.Tensor
     ), f"Expected torch.Tensor type for {input_obj.meta['type']}"
     assert (
-        attr_name == "shape" or attr_name == "device"
-    ), f"Only supporting shape getattr for now, not {attr_name}"
+        attr_name == "shape" or attr_name == "device" or attr_name == "dtype"
+    ), f"Only supporting shape, device and dtype getattr for now, not {attr_name}"
     if attr_name == "shape":
         func = size
     elif attr_name == "device":
         func = device
-
+    elif attr_name == "dtype":
+        func = dtype
     with node.graph.inserting_before(node):
         size_node = node.graph.call_function(func, kwargs={"input": input_obj})
         size_node.meta = node.meta.copy()
@@ -856,6 +888,7 @@ def trunc_div(*, input, other):
 
 @register_acc_op_properties(AccOpProperty.pointwise)
 @register_acc_op_mapping(op_and_target=("call_function", torch.pow))
+@register_acc_op_mapping(op_and_target=("call_method", "pow"))
 @register_acc_op
 def pow(*, input, exponent):
     return torch.pow(input, exponent)
@@ -1308,6 +1341,44 @@ def logical_xor(*, input, other):
     return torch.logical_xor(input=input, other=other)
 
 
+@register_acc_op_properties(AccOpProperty.pointwise, AccOpProperty.unary)
+@register_acc_op_mapping(op_and_target=("call_function", torch.isinf))
+@register_acc_op
+def isinf(*, input):
+    return torch.isinf(input=input)
+
+
+@register_acc_op_properties(AccOpProperty.unary)
+@register_acc_op
+def any(*, input, dim=None, keepdim=False):
+    if dim is not None:
+        return torch.any(input, dim, keepdim=keepdim)
+    else:
+        return torch.any(input)
+
+@register_custom_acc_mapper_fn(
+    op_and_target=("call_function", torch.any),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("dim", "dim", this_arg_is_optional),
+        ("keepdim", "keepdim", this_arg_is_optional),
+    ],
+)
+@register_custom_acc_mapper_fn(
+    op_and_target=("call_method", "any"),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("dim", "dim", this_arg_is_optional),
+        ("keepdim", "keepdim", this_arg_is_optional),
+    ],
+)
+def any_mapper(node: torch.fx.Node, mod: torch.fx.GraphModule) -> torch.fx.Node:
+    with node.graph.inserting_before(node):
+        new_node = node.graph.call_function(any, kwargs=node.kwargs)
+        new_node.meta = node.meta.copy()
+        return new_node
+
+
 @register_acc_op_properties(AccOpProperty.pointwise)
 @register_acc_op_mapping(op_and_target=("call_function", torch.fmod))
 @register_acc_op_mapping(op_and_target=("call_method", "fmod"))
@@ -1394,6 +1465,35 @@ def sqrt(*, input):
 def reciprocal(*, input):
     return torch.reciprocal(input=input)
 
+
+@register_custom_acc_mapper_fn(
+    op_and_target=("call_method", "rsqrt"),
+    arg_replacement_tuples=[
+        ("input", "input"),
+    ],
+)
+@register_custom_acc_mapper_fn(
+    op_and_target=("call_function", torch.rsqrt),
+    arg_replacement_tuples=[
+        ("input", "input"),
+    ],
+)
+def rsqrt_mapper(node: torch.fx.Node, mod: torch.fx.GraphModule) -> torch.fx.Node:
+    input_node = node.kwargs["input"]
+    with node.graph.inserting_before(node):
+        new_kwargs = {
+            "input": input_node,
+        }
+        sqrt_node = node.graph.call_function(sqrt, kwargs=new_kwargs)
+        sqrt_node.meta["type"] = torch.Tensor
+        new_kwargs = {
+            "input": sqrt_node,
+        }
+        rec_node = node.graph.call_function(reciprocal, kwargs=new_kwargs)
+        rec_node.meta["type"] = torch.Tensor
+        output_node = rec_node
+        output_node.meta = node.meta.copy()
+        return output_node
 
 @register_acc_op_properties(AccOpProperty.pointwise, AccOpProperty.unary)
 @register_acc_op_mapping(op_and_target=("call_function", torch.abs))
@@ -2015,6 +2115,57 @@ def custom_tensor_reshape_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.
         return new_node
 
 
+@register_custom_acc_mapper_fn(
+    op_and_target=("call_method", "half"),
+    arg_replacement_tuples=[
+        ("input", "input"),
+    ],
+)
+def custom_half_mapper(node: torch.fx.Node, _: nn.Module):
+    with node.graph.inserting_before(node):
+        new_kwargs = {
+            "input": node.kwargs["input"],
+            "acc_out_ty": acc_utils.build_raw_tensor_meta(dtype=torch.float16),
+        }
+        new_node = node.graph.call_function(to_dtype, kwargs=new_kwargs)
+        new_node.meta = node.meta
+        return new_node
+
+
+@register_custom_acc_mapper_fn(
+    op_and_target=("call_method", "int"),
+    arg_replacement_tuples=[
+        ("input", "input"),
+    ],
+)
+def custom_int_mapper(node: torch.fx.Node, _: nn.Module):
+    with node.graph.inserting_before(node):
+        new_kwargs = {
+            "input": node.kwargs["input"],
+            "acc_out_ty": acc_utils.build_raw_tensor_meta(dtype=torch.int),
+        }
+        new_node = node.graph.call_function(to_dtype, kwargs=new_kwargs)
+        new_node.meta = node.meta
+        return new_node
+
+
+@register_custom_acc_mapper_fn(
+    op_and_target=("call_method", "float"),
+    arg_replacement_tuples=[
+        ("input", "input"),
+    ],
+)
+def custom_float_mapper(node: torch.fx.Node, _: nn.Module):
+    with node.graph.inserting_before(node):
+        new_kwargs = {
+            "input": node.kwargs["input"],
+            "acc_out_ty": acc_utils.build_raw_tensor_meta(dtype=torch.float),
+        }
+        new_node = node.graph.call_function(to_dtype, kwargs=new_kwargs)
+        new_node.meta = node.meta
+        return new_node
+
+
 @register_acc_op_properties(AccOpProperty.pointwise, AccOpProperty.unary)
 @register_acc_op
 def to_dtype(input, acc_out_ty=None, device=None):
@@ -2044,8 +2195,25 @@ def custom_tensor_to_mapper(node: torch.fx.Node, _: nn.Module):
         #consider the device is gpu only, meta info is limited to give clear device type
         if dest.meta["type"] == torch.device:
             dest_device = dest
+        elif dest.meta["type"] == torch.dtype:
+            dest_dtype = dest
+        elif dest.meta["type"] == torch.Tensor:
+            input_obj = node.kwargs['input']
+            other_obj = dest
+            with node.graph.inserting_before(node):
+                dtype_node = node.graph.call_function(dtype, kwargs={"input": other_obj})
+                dtype_node.meta["type"] = torch.dtype
+                device_node = node.graph.call_function(device, kwargs={"input": other_obj})
+                device_node.meta["type"] = torch.device
+                new_kwargs = {
+                    "input": input_obj,
+                    "acc_out_ty": acc_utils.build_raw_tensor_meta(dtype=dtype_node),
+                    "device": device_node,
+                }
+                new_node = node.graph.call_function(to_dtype, kwargs=new_kwargs)
+                new_node.meta = node.meta
+                return new_node
         else:
-            # Due to the limitation of FX, we can not support to(torch.Tensor) since meta only contains 'type': <class 'torch.Tensor'>
             raise RuntimeError(f"We currently do not support to({meta_type})")
     elif isinstance(dest, torch.device):
         # only device is set, dtype=None

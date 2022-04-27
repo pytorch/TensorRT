@@ -417,7 +417,7 @@ def add_binary_elementwise_layer(
     layer = network.add_elementwise(lhs_val, rhs_val, op_type)
     set_layer_name(layer, target, name)
     output = layer.get_output(0)
-    output.name = output.name + "_" + name
+    output.name = output.name + "_" + target.__name__
     return output
 
 

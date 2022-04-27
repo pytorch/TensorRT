@@ -1272,6 +1272,18 @@ def acc_ops_minimum(
     )
 
 
+@tensorrt_converter(acc_ops.dtype)
+def acc_ops_dtype(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    input_val = kwargs["input"]
+    return input_val.dtype
+
+
 @tensorrt_converter(acc_ops.device)
 def acc_ops_device(
     network: TRTNetwork,
@@ -1294,9 +1306,9 @@ def acc_ops_to_dtype(
     input_val = kwargs["input"]
     input_dtype = kwargs["acc_out_ty"].dtype
     input_t = get_trt_tensor(network, input_val, f"{name}_input_t")
-
     if input_dtype:
-        input_dtype = torch_dtype_to_trt(input_dtype)
+        if isinstance(input_dtype, torch.dtype):
+            input_dtype = torch_dtype_to_trt(input_dtype)
         input_t = type_cast(network, target, f"{name}_input", input_t, input_dtype)
     return input_t
 
@@ -1516,6 +1528,75 @@ def acc_ops_logical_xor(
     return add_binary_elementwise_layer(
         network, input_t, other_t, trt.ElementWiseOperation.XOR, target, name
     )
+
+
+@tensorrt_converter(acc_ops.isinf)
+def acc_ops_isinf(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    input_t = kwargs["input"]
+    if not isinstance(input_t, TRTTensor):
+        raise RuntimeError(
+            f"isinf received input {input_t} that is not part "
+            "of the TensorRT region!"
+        )
+    inf_t = torch.ones(tuple(input_t.shape))
+    inf_t = inf_t * float('inf')
+    inf_t = get_trt_tensor(network, inf_t, f"{name}_inf_t")
+
+    ninf_t = torch.ones(tuple(input_t.shape))
+    ninf_t = ninf_t * float('-inf')
+    ninf_t = get_trt_tensor(network, ninf_t, f"{name}_ninf_t")
+
+    kwargs_new = {"input": input_t, "other": inf_t}
+    inf_output = acc_ops_eq(network, target, None, kwargs_new, name+"_compare_inf")
+    kwargs_new = {"input": input_t, "other": ninf_t}
+    ninf_output = acc_ops_eq(network, target, None, kwargs_new, name+"_compare_ninf")
+    kwargs_new = {"input": inf_output, "other": ninf_output}
+    output = acc_ops_logical_or(network, target, None, kwargs_new, name+"_compare")
+    return output
+
+
+@tensorrt_converter(acc_ops.any)
+def acc_ops_any(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    input_t = kwargs["input"]
+    if not isinstance(input_t, TRTTensor):
+        raise RuntimeError(
+            f"isinf received input {input_t} that is not part "
+            "of the TensorRT region!"
+        )
+
+    if input_t.dtype in (trt.float32, trt.float16, trt.int32):
+        comp_t = torch.zeros(tuple([*input_t.shape])).to(torch_dtype_from_trt(input_t.dtype))
+        comp_t = get_trt_tensor(network, comp_t, f"{name}_comp_t")
+        kwargs_new = {"input": input_t, "other": comp_t}
+        eq_output = acc_ops_eq(network, target, None, kwargs_new, name+"_eq")
+        kwargs_new = {"input": eq_output}
+        not_output = acc_ops_logical_not(network, target, None, kwargs_new, name+"_not")
+    else:
+        not_output = input_t
+    # cast bool result to int
+    int_output = type_cast(network, target, f"{name}_cast_int", not_output, trt.int32)
+    # sum
+    if "dim" in kwargs:
+        kwargs_new = {"input": int_output, "dim": kwargs["dim"], "keepdim": False if "keepdim" not in kwargs else kwargs["keepdim"] }
+    else:
+        kwargs_new = {"input": int_output}
+    sum_output = acc_ops_sum(network, target, None, kwargs_new, name+"_sum")
+    # cast int to bool
+    output = type_cast(network, target, f"{name}_cast_bool", sum_output, trt.bool)
+    output.name = output.name+"_any"
+    return output
 
 @tensorrt_converter(acc_ops.fmod)
 def acc_ops_fmod(
