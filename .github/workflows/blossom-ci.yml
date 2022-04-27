@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION.
+# Copyright (c) 2020-2021, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,67 +26,52 @@ on:
             description: 'argument'     
             required: false
 jobs:
-  Check-Authorization:
-    runs-on: ubuntu-latest
-    outputs:
-      AUTHORIZED: ${{ steps.check-authorization.outputs.authorized }}
-    steps:
-      - id: check-authorization
-        name: Check if commentor is allowed to launch NVIDIA CI
-        env:
-          AUTHORIZED_USERS: ${{ secrets.AUTHORIZED_USERS }}
-        if: |
-          contains(${{env.AUTHORIZED_USERS }}, format('{0},', github.actor)) &&
-          github.event.comment.body == '/nvidia-ci'
-        run: echo "::set-output name=authorized=true"
-    
-    
-  Authorize-Blossom:
-    name: Authorize NVIDIA CI launch
-    runs-on: blossom
-    needs: [Check-Authorization]
+  Authorization:
+    name: Authorization
+    runs-on: blossom 
     outputs:
       args: ${{ env.args }}
-    
-    if: contains('narendasan,', format('{0},', github.actor))
-    
+      
+    # This job only runs for pull request comments
+    if: |
+         contains( 'narendasan,', format('{0},', github.actor)) && 
+         github.event.comment.body == '/blossom-ci'  
     steps:
-      - name: Authorize Blossom launch
+      - name: Check if comment is issued by authorized person
         run: blossom-ci
         env:
           OPERATION: 'AUTH'
           REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO_KEY_DATA: ${{ secrets.BLOSSOM_KEY }}
-
         
-  Vulnerability-Scan:
+  Vulnerability-scan:
     name: Vulnerability scan
-    needs: [Authorize-Blossom]
+    needs: [Authorization]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
         with:
-          repository: ${{ fromJson(needs.Authorize-Blossom.outputs.args).repo }}
-          ref: ${{ fromJson(needs.Authorize-Blossom.outputs.args).ref }}
+          repository: ${{ fromJson(needs.Authorization.outputs.args).repo }}
+          ref: ${{ fromJson(needs.Authorization.outputs.args).ref }}
           lfs: 'true'
-
+          
       - name: Run blossom action
         uses: NVIDIA/blossom-action@main
         env:
           REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO_KEY_DATA: ${{ secrets.BLOSSOM_KEY }}
         with:
-          args1: ${{ fromJson(needs.Authorize-Blossom.outputs.args).args1 }}
-          args2: ${{ fromJson(needs.Authorize-Blossom.outputs.args).args2 }}
-          args3: ${{ fromJson(needs.Authorize-Blossom.outputs.args).args3 }}
+          args1: ${{ fromJson(needs.Authorization.outputs.args).args1 }}
+          args2: ${{ fromJson(needs.Authorization.outputs.args).args2 }}
+          args3: ${{ fromJson(needs.Authorization.outputs.args).args3 }}
           
-  Launch-NVIDIA-CI:
-    name: Start CI job on NVIDIA CI
-    needs: [Vulnerability-Scan]
+  Job-trigger:
+    name: Start ci job
+    needs: [Vulnerability-scan]
     runs-on: blossom
     steps:
-      - name: Launch CI
+      - name: Start ci job
         run: blossom-ci
         env:
           OPERATION: 'START-CI-JOB'
@@ -95,7 +80,6 @@ jobs:
               
   Upload-Log:
     name: Upload log
-    needs: [Launch-NVIDIA-CI]
     runs-on: blossom
     if : github.event_name == 'workflow_dispatch'
     steps:
@@ -105,3 +89,4 @@ jobs:
           OPERATION: 'POST-PROCESSING'
           CI_SERVER: ${{ secrets.CI_SERVER }}
           REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
