@@ -27,7 +27,7 @@ on:
             required: false
 jobs:
   Authorization:
-    name: Check Authorization to Launch NVIDIA CI
+    name: Authorization
     runs-on: blossom 
     outputs:
       args: ${{ env.args }}
@@ -35,7 +35,7 @@ jobs:
     # This job only runs for pull request comments
     if: |
          contains( 'andi4191, narendasan, peri044, bowang007,', format('{0},', github.actor)) && 
-         github.event.comment.body == '/blossom-ci'
+         github.event.comment.body == '/blossom-ci'  
     steps:
       - name: Check if comment is issued by authorized person
         run: blossom-ci
@@ -55,6 +55,19 @@ jobs:
           repository: ${{ fromJson(needs.Authorization.outputs.args).repo }}
           ref: ${{ fromJson(needs.Authorization.outputs.args).ref }}
           lfs: 'true'
+      
+      # repo specific steps 
+      #- name: Setup java
+      #  uses: actions/setup-java@v1
+      #  with:
+      #    java-version: 1.8
+      
+      # add blackduck properties https://synopsys.atlassian.net/wiki/spaces/INTDOCS/pages/631308372/Methods+for+Configuring+Analysis#Using-a-configuration-file
+      #- name: Setup blackduck properties
+      #  run: |
+      #       PROJECTS=$(mvn -am dependency:tree | grep maven-dependency-plugin | awk '{ out="com.nvidia:"$(NF-1);print out }' | grep rapids | xargs | sed -e 's/ /,/g')
+      #       echo detect.maven.build.command="-pl=$PROJECTS -am" >> application.properties
+      #       echo detect.maven.included.scopes=compile >> application.properties
           
       - name: Run blossom action
         uses: NVIDIA/blossom-action@main
@@ -67,7 +80,7 @@ jobs:
           args3: ${{ fromJson(needs.Authorization.outputs.args).args3 }}
           
   Job-trigger:
-    name: Start NVIDIA CI pipelines
+    name: Start ci job
     needs: [Vulnerability-scan]
     runs-on: blossom
     steps:
@@ -89,4 +102,3 @@ jobs:
           OPERATION: 'POST-PROCESSING'
           CI_SERVER: ${{ secrets.CI_SERVER }}
           REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
