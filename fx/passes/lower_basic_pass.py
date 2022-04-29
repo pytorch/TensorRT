@@ -10,6 +10,7 @@ from fx2trt_oss.fx.observer import observable
 from fx2trt_oss.fx.passes.pass_utils import log_before_after, validate_inference
 from typing import Any
 from torch.fx.experimental.const_fold import split_const_subgraphs
+import operator
 
 # Create an alias for module input type to avoid littering pyre-ignore for Any
 # throughout the file.
@@ -228,3 +229,119 @@ else:
         return add_binary_elementwise_layer(
             network, layer.get_output(0), bias, trt.ElementWiseOperation.SUM, target, f"{name}_add"
         )
+
+def slice_list(sli: slice, dim: int, size: int):
+        slice_all = slice(None, None, None)
+        if size == 1:
+            return [sli]
+        elif size == 2:
+            if dim == 0:
+                return [sli, slice_all]
+            elif dim == 1:
+                return [slice_all, sli]
+        elif size == 3:
+            if dim == 0:
+                return [sli, slice_all, slice_all]
+            elif dim == 1:
+                return [slice_all, sli, slice_all]
+            elif dim == 2:
+                return [slice_all, slice_all, sli]
+        elif size == 4:
+            if dim == 0:
+                return [sli, slice_all, slice_all, slice_all]
+            elif dim == 1:
+                return [slice_all, sli, slice_all, slice_all]
+            elif dim == 2:
+                return [slice_all, slice_all, sli, slice_all]
+            elif dim == 3:
+                return [slice_all, slice_all, slice_all, sli]
+
+def split_across(gm: torch.fx.GraphModule, sli: slice, input_node: torch.fx.Node, dim: int, size: int):
+    start_node = end_node = mid_node = None
+    if sli.start is None and sli.stop is None:
+        return (start_node, input_node, end_node)
+    if sli.start is not None and sli.start > 0:
+        st_sli = slice(0, sli.start, None)
+        slice_list_gen = slice_list(st_sli, dim, size)
+        start_node = gm.graph.call_function(operator.getitem, args=(input_node, slice_list_gen))
+    if sli.stop is not None:
+        end_sli = slice(sli.stop, None, None)
+        slice_list_gen = slice_list(end_sli, dim, size)
+        end_node = gm.graph.call_function(operator.getitem, args=(input_node, slice_list_gen))
+    if dim != size-1:
+        mid_sli = slice(sli.start, sli.stop, None)
+        slice_list_gen = slice_list(mid_sli, dim, size)
+        mid_node = gm.graph.call_function(operator.getitem, args=(input_node, slice_list_gen))
+    return (start_node, mid_node, end_node)
+
+def list_gen(start_node: torch.fx.Node, end_node: torch.fx.Node, input_node: torch.fx.Node, gm: torch.fx.GraphModule, dim: int):
+    if start_node:
+        if end_node:
+            concat_list = [start_node, input_node, end_node]
+        else:
+            concat_list = [start_node, input_node]
+    else:
+        if end_node:
+            concat_list = [input_node, end_node]
+        else:
+            concat_list = [input_node]
+    if len(concat_list) > 1:
+        concat_node = gm.graph.call_function(torch.cat, args=(concat_list, dim))
+    else:
+        concat_node = concat_list[0]
+    return concat_node
+
+def transform_setitem(gm: torch.fx.GraphModule, input: Input):
+    """
+    Setitem is not tracable in fx and acc tracer but is available in dynamo trace. This pass works for dynamo trace only.
+    The implementation decompose the setitem into a few getitem op and assembly together again through concat.
+    The major reason is that TRT does not support in-place copy and memory reference.
+    """
+    map_replace = {}
+    for node in gm.graph.nodes:
+        if node.target == operator.setitem:
+            input_node = node.args[0]
+            sli = node.args[1]
+            inp = node.args[2]
+
+            if type(sli) is not tuple:
+                sli = [sli]
+            dimension = len(sli)
+            with gm.graph.inserting_before(node):
+                if dimension == 1:
+                    start_node_0, _, end_node_0 = split_across(gm, sli[0], input_node, dim=0, size=1)
+                    concat_node_0 = list_gen(start_node_0, end_node_0, inp, gm, 0)
+                elif dimension == 2:
+                    start_node_0, mid_node_0, end_node_0 = split_across(gm, sli[0], input_node, dim=0, size=2)
+                    start_node_1, _, end_node_1 = split_across(gm, sli[1], mid_node_0, dim=1, size=2)
+                    concat_node_1 = list_gen(start_node_1, end_node_1, inp, gm, 1)
+                    concat_node_0 = list_gen(start_node_0, end_node_0, concat_node_1, gm, 0)
+                elif dimension == 3:
+                    start_node_0, mid_node_0, end_node_0 = split_across(gm, sli[0], input_node, dim=0, size=3)
+                    start_node_1, mid_node_1, end_node_1 = split_across(gm, sli[1], mid_node_0, dim=1, size=3)
+                    start_node_2, _, end_node_2 = split_across(gm, sli[2], mid_node_1, dim=2, size=3)
+                    concat_node_2 = list_gen(start_node_2, end_node_2, inp, gm, 2)
+                    concat_node_1 = list_gen(start_node_1, end_node_1, concat_node_2, gm, 1)
+                    concat_node_0 = list_gen(start_node_0, end_node_0, concat_node_1, gm, 0)
+                elif dimension == 4:
+                    start_node_0, mid_node_0, end_node_0 = split_across(gm, sli[0], input_node, dim=0, size=4)
+                    start_node_1, mid_node_1, end_node_1 = split_across(gm, sli[1], mid_node_0, dim=1, size=4)
+                    start_node_2, mid_node_2, end_node_2 = split_across(gm, sli[2], mid_node_1, dim=2, size=4)
+                    start_node_3, _, end_node_3 = split_across(gm, sli[3], mid_node_2, dim=3, size=4)
+                    concat_node_3 = list_gen(start_node_3, end_node_3, inp, gm, 3)
+                    concat_node_2 = list_gen(start_node_2, end_node_2, concat_node_3, gm, 2)
+                    concat_node_1 = list_gen(start_node_1, end_node_1, concat_node_2, gm, 1)
+                    concat_node_0 = list_gen(start_node_0, end_node_0, concat_node_1, gm, 0)
+                else:
+                    warnings.warn(f"setitem does not support dimension={dimension}")
+                    continue
+                node.replace_all_uses_with(concat_node_0)
+                map_replace[input_node] = concat_node_0
+        else:
+            for old_node in map_replace:
+                node.replace_input_with(old_node, map_replace[old_node])
+
+    gm.graph.eliminate_dead_code()
+    gm.graph.lint()
+    gm.recompile()
+    return gm
