@@ -36,9 +36,9 @@ def install_torch_trt(session):
     print("Installing latest torch-tensorrt build")
     session.chdir(os.path.join(TOP_DIR, "py"))
     if USE_CXX11:
-	session.run("python", "setup.py", "develop", "--use-cxx11-abi")
+        session.run('python', 'setup.py', 'develop', '--use-cxx11-abi')
     else:
-	session.run("python", "setup.py", "develop")
+        session.run("python", "setup.py", "develop")
 
 def download_datasets(session):
     print("Downloading dataset to path", os.path.join(TOP_DIR, 'examples/int8/training/vgg16'))
