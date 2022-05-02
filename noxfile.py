@@ -27,6 +27,7 @@ def download_models(session, use_host_env=False):
     if use_host_env:
         session.run_always('python', 'hub.py', env={'PYTHONPATH': PYT_PATH})
     else:
+        session.install("-r", os.path.join(TOP_DIR, "py", "requirements.txt"))
         session.run_always('python', 'hub.py')
 
 def install_torch_trt(session):
