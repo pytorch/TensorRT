@@ -350,6 +350,11 @@
                  </nav>
                 </li>
                 <li class="md-nav__item">
+                 <a class="md-nav__link" href="#Benchmarking-with-Torch-TRT-(without-dynamic-shapes)">
+                  Benchmarking with Torch-TRT (without dynamic shapes)
+                 </a>
+                </li>
+                <li class="md-nav__item">
                  <a class="md-nav__link" href="#Working-with-Dynamic-shapes-in-Torch-TRT">
                   Working with Dynamic shapes in Torch TRT
                  </a>
@@ -535,6 +540,11 @@
                 </li>
                </ul>
               </nav>
+             </li>
+             <li class="md-nav__item">
+              <a class="md-nav__link" href="#Benchmarking-with-Torch-TRT-(without-dynamic-shapes)">
+               Benchmarking with Torch-TRT (without dynamic shapes)
+              </a>
              </li>
              <li class="md-nav__item">
               <a class="md-nav__link" href="#Working-with-Dynamic-shapes-in-Torch-TRT">
@@ -895,7 +905,7 @@ the JIT runtime seamlessly. After compilation using the optimized graph should f
          <div class="output_area docutils container">
           <div class="highlight">
            <pre>
-Wed Apr  6 20:07:17 2022
+Mon May  2 20:40:30 2022
 +-----------------------------------------------------------------------------+
 | NVIDIA-SMI 470.57.02    Driver Version: 470.57.02    CUDA Version: 11.6     |
 |-------------------------------+----------------------+----------------------+
@@ -904,7 +914,7 @@ Wed Apr  6 20:07:17 2022
 |                               |                      |               MIG M. |
 |===============================+======================+======================|
 |   0  NVIDIA Graphics...  On   | 00000000:01:00.0 Off |                    0 |
-| 39%   61C    P0   107W / 200W |      0MiB / 47681MiB |      0%      Default |
+| 41%   51C    P0    62W / 200W |      0MiB / 47681MiB |      0%      Default |
 |                               |                      |             Disabled |
 +-------------------------------+----------------------+----------------------+
 
@@ -917,67 +927,68 @@ Wed Apr  6 20:07:17 2022
 +-----------------------------------------------------------------------------+
 Looking in indexes: https://pypi.org/simple, https://pypi.ngc.nvidia.com
 Requirement already satisfied: ipywidgets in /opt/conda/lib/python3.8/site-packages (7.7.0)
-Requirement already satisfied: ipython-genutils~=0.2.0 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (0.2.0)
-Requirement already satisfied: nbformat&gt;=4.2.0 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (5.2.0)
-Requirement already satisfied: jupyterlab-widgets&gt;=1.0.0 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (1.1.0)
 Requirement already satisfied: traitlets&gt;=4.3.1 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (5.1.1)
+Requirement already satisfied: nbformat&gt;=4.2.0 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (5.3.0)
+Requirement already satisfied: ipykernel&gt;=4.5.1 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (6.13.0)
+Requirement already satisfied: ipython-genutils~=0.2.0 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (0.2.0)
 Requirement already satisfied: widgetsnbextension~=3.6.0 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (3.6.0)
-Requirement already satisfied: ipykernel&gt;=4.5.1 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (6.9.2)
-Requirement already satisfied: ipython&gt;=4.0.0 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (8.1.1)
+Requirement already satisfied: ipython&gt;=4.0.0 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (8.2.0)
+Requirement already satisfied: jupyterlab-widgets&gt;=1.0.0 in /opt/conda/lib/python3.8/site-packages (from ipywidgets) (1.1.0)
 Requirement already satisfied: psutil in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets) (5.9.0)
-Requirement already satisfied: matplotlib-inline&lt;0.2.0,&gt;=0.1.0 in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets) (0.1.3)
-Requirement already satisfied: debugpy&lt;2.0,&gt;=1.0.0 in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets) (1.5.1)
-Requirement already satisfied: tornado&lt;7.0,&gt;=4.2 in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets) (6.1)
-Requirement already satisfied: nest-asyncio in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets) (1.5.4)
-Requirement already satisfied: jupyter-client&lt;8.0 in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets) (7.1.2)
-Requirement already satisfied: pygments&gt;=2.4.0 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (2.11.2)
-Requirement already satisfied: backcall in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (0.2.0)
-Requirement already satisfied: stack-data in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (0.2.0)
+Requirement already satisfied: tornado&gt;=6.1 in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets) (6.1)
+Requirement already satisfied: packaging in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets) (21.3)
+Requirement already satisfied: nest-asyncio in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets) (1.5.5)
+Requirement already satisfied: matplotlib-inline&gt;=0.1 in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets) (0.1.3)
+Requirement already satisfied: jupyter-client&gt;=6.1.12 in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets) (7.2.2)
+Requirement already satisfied: debugpy&gt;=1.0 in /opt/conda/lib/python3.8/site-packages (from ipykernel&gt;=4.5.1-&gt;ipywidgets) (1.6.0)
 Requirement already satisfied: decorator in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (5.1.1)
 Requirement already satisfied: setuptools&gt;=18.5 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (59.5.0)
-Requirement already satisfied: jedi&gt;=0.16 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (0.18.1)
-Requirement already satisfied: pexpect&gt;4.3 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (4.8.0)
 Requirement already satisfied: pickleshare in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (0.7.5)
-Requirement already satisfied: prompt-toolkit!=3.0.0,!=3.0.1,&lt;3.1.0,&gt;=2.0.0 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (3.0.27)
+Requirement already satisfied: backcall in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (0.2.0)
+Requirement already satisfied: stack-data in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (0.2.0)
+Requirement already satisfied: pexpect&gt;4.3 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (4.8.0)
+Requirement already satisfied: jedi&gt;=0.16 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (0.18.1)
+Requirement already satisfied: prompt-toolkit!=3.0.0,!=3.0.1,&lt;3.1.0,&gt;=2.0.0 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (3.0.29)
+Requirement already satisfied: pygments&gt;=2.4.0 in /opt/conda/lib/python3.8/site-packages (from ipython&gt;=4.0.0-&gt;ipywidgets) (2.11.2)
 Requirement already satisfied: parso&lt;0.9.0,&gt;=0.8.0 in /opt/conda/lib/python3.8/site-packages (from jedi&gt;=0.16-&gt;ipython&gt;=4.0.0-&gt;ipywidgets) (0.8.3)
-Requirement already satisfied: python-dateutil&gt;=2.1 in /opt/conda/lib/python3.8/site-packages (from jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (2.8.2)
-Requirement already satisfied: entrypoints in /opt/conda/lib/python3.8/site-packages (from jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (0.4)
-Requirement already satisfied: pyzmq&gt;=13 in /opt/conda/lib/python3.8/site-packages (from jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (22.3.0)
-Requirement already satisfied: jupyter-core&gt;=4.6.0 in /opt/conda/lib/python3.8/site-packages (from jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (4.9.2)
-Requirement already satisfied: jsonschema!=2.5.0,&gt;=2.4 in /opt/conda/lib/python3.8/site-packages (from nbformat&gt;=4.2.0-&gt;ipywidgets) (4.4.0)
-Requirement already satisfied: pyrsistent!=0.17.0,!=0.17.1,!=0.17.2,&gt;=0.14.0 in /opt/conda/lib/python3.8/site-packages (from jsonschema!=2.5.0,&gt;=2.4-&gt;nbformat&gt;=4.2.0-&gt;ipywidgets) (0.18.1)
-Requirement already satisfied: attrs&gt;=17.4.0 in /opt/conda/lib/python3.8/site-packages (from jsonschema!=2.5.0,&gt;=2.4-&gt;nbformat&gt;=4.2.0-&gt;ipywidgets) (21.4.0)
-Requirement already satisfied: importlib-resources&gt;=1.4.0 in /opt/conda/lib/python3.8/site-packages (from jsonschema!=2.5.0,&gt;=2.4-&gt;nbformat&gt;=4.2.0-&gt;ipywidgets) (5.4.0)
-Requirement already satisfied: zipp&gt;=3.1.0 in /opt/conda/lib/python3.8/site-packages (from importlib-resources&gt;=1.4.0-&gt;jsonschema!=2.5.0,&gt;=2.4-&gt;nbformat&gt;=4.2.0-&gt;ipywidgets) (3.7.0)
+Requirement already satisfied: pyzmq&gt;=22.3 in /opt/conda/lib/python3.8/site-packages (from jupyter-client&gt;=6.1.12-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (22.3.0)
+Requirement already satisfied: entrypoints in /opt/conda/lib/python3.8/site-packages (from jupyter-client&gt;=6.1.12-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (0.4)
+Requirement already satisfied: python-dateutil&gt;=2.8.2 in /opt/conda/lib/python3.8/site-packages (from jupyter-client&gt;=6.1.12-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (2.8.2)
+Requirement already satisfied: jupyter-core&gt;=4.9.2 in /opt/conda/lib/python3.8/site-packages (from jupyter-client&gt;=6.1.12-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (4.9.2)
+Requirement already satisfied: jsonschema&gt;=2.6 in /opt/conda/lib/python3.8/site-packages (from nbformat&gt;=4.2.0-&gt;ipywidgets) (4.4.0)
+Requirement already satisfied: fastjsonschema in /opt/conda/lib/python3.8/site-packages (from nbformat&gt;=4.2.0-&gt;ipywidgets) (2.15.3)
+Requirement already satisfied: pyrsistent!=0.17.0,!=0.17.1,!=0.17.2,&gt;=0.14.0 in /opt/conda/lib/python3.8/site-packages (from jsonschema&gt;=2.6-&gt;nbformat&gt;=4.2.0-&gt;ipywidgets) (0.18.1)
+Requirement already satisfied: attrs&gt;=17.4.0 in /opt/conda/lib/python3.8/site-packages (from jsonschema&gt;=2.6-&gt;nbformat&gt;=4.2.0-&gt;ipywidgets) (21.4.0)
+Requirement already satisfied: importlib-resources&gt;=1.4.0 in /opt/conda/lib/python3.8/site-packages (from jsonschema&gt;=2.6-&gt;nbformat&gt;=4.2.0-&gt;ipywidgets) (5.7.0)
+Requirement already satisfied: zipp&gt;=3.1.0 in /opt/conda/lib/python3.8/site-packages (from importlib-resources&gt;=1.4.0-&gt;jsonschema&gt;=2.6-&gt;nbformat&gt;=4.2.0-&gt;ipywidgets) (3.8.0)
 Requirement already satisfied: ptyprocess&gt;=0.5 in /opt/conda/lib/python3.8/site-packages (from pexpect&gt;4.3-&gt;ipython&gt;=4.0.0-&gt;ipywidgets) (0.7.0)
 Requirement already satisfied: wcwidth in /opt/conda/lib/python3.8/site-packages (from prompt-toolkit!=3.0.0,!=3.0.1,&lt;3.1.0,&gt;=2.0.0-&gt;ipython&gt;=4.0.0-&gt;ipywidgets) (0.2.5)
-Requirement already satisfied: six&gt;=1.5 in /opt/conda/lib/python3.8/site-packages (from python-dateutil&gt;=2.1-&gt;jupyter-client&lt;8.0-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (1.16.0)
+Requirement already satisfied: six&gt;=1.5 in /opt/conda/lib/python3.8/site-packages (from python-dateutil&gt;=2.8.2-&gt;jupyter-client&gt;=6.1.12-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (1.16.0)
 Requirement already satisfied: notebook&gt;=4.4.1 in /opt/conda/lib/python3.8/site-packages (from widgetsnbextension~=3.6.0-&gt;ipywidgets) (6.4.1)
-Requirement already satisfied: terminado&gt;=0.8.3 in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (0.13.3)
+Requirement already satisfied: jinja2 in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (3.1.1)
+Requirement already satisfied: prometheus-client in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (0.14.1)
 Requirement already satisfied: Send2Trash&gt;=1.5.0 in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (1.8.0)
-Requirement already satisfied: jinja2 in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (3.0.3)
-Requirement already satisfied: nbconvert in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (6.4.4)
-Requirement already satisfied: prometheus-client in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (0.13.1)
 Requirement already satisfied: argon2-cffi in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (21.3.0)
+Requirement already satisfied: nbconvert in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (6.5.0)
+Requirement already satisfied: terminado&gt;=0.8.3 in /opt/conda/lib/python3.8/site-packages (from notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (0.13.3)
 Requirement already satisfied: argon2-cffi-bindings in /opt/conda/lib/python3.8/site-packages (from argon2-cffi-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (21.2.0)
 Requirement already satisfied: cffi&gt;=1.0.1 in /opt/conda/lib/python3.8/site-packages (from argon2-cffi-bindings-&gt;argon2-cffi-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (1.15.0)
 Requirement already satisfied: pycparser in /opt/conda/lib/python3.8/site-packages (from cffi&gt;=1.0.1-&gt;argon2-cffi-bindings-&gt;argon2-cffi-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (2.21)
 Requirement already satisfied: MarkupSafe&gt;=2.0 in /opt/conda/lib/python3.8/site-packages (from jinja2-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (2.1.1)
 Requirement already satisfied: defusedxml in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (0.7.1)
-Requirement already satisfied: pandocfilters&gt;=1.4.1 in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (1.5.0)
-Requirement already satisfied: beautifulsoup4 in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (4.10.0)
+Requirement already satisfied: jupyterlab-pygments in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (0.2.2)
 Requirement already satisfied: mistune&lt;2,&gt;=0.8.1 in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (0.8.4)
-Requirement already satisfied: testpath in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (0.6.0)
-Requirement already satisfied: jupyterlab-pygments in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (0.1.2)
-Requirement already satisfied: nbclient&lt;0.6.0,&gt;=0.5.0 in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (0.5.13)
-Requirement already satisfied: bleach in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (4.1.0)
+Requirement already satisfied: nbclient&gt;=0.5.0 in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (0.6.0)
+Requirement already satisfied: bleach in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (5.0.0)
+Requirement already satisfied: tinycss2 in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (1.1.1)
+Requirement already satisfied: pandocfilters&gt;=1.4.1 in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (1.5.0)
+Requirement already satisfied: beautifulsoup4 in /opt/conda/lib/python3.8/site-packages (from nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (4.11.1)
 Requirement already satisfied: soupsieve&gt;1.2 in /opt/conda/lib/python3.8/site-packages (from beautifulsoup4-&gt;nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (2.3.1)
 Requirement already satisfied: webencodings in /opt/conda/lib/python3.8/site-packages (from bleach-&gt;nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (0.5.1)
-Requirement already satisfied: packaging in /opt/conda/lib/python3.8/site-packages (from bleach-&gt;nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (21.3)
-Requirement already satisfied: pyparsing!=3.0.5,&gt;=2.0.2 in /opt/conda/lib/python3.8/site-packages (from packaging-&gt;bleach-&gt;nbconvert-&gt;notebook&gt;=4.4.1-&gt;widgetsnbextension~=3.6.0-&gt;ipywidgets) (3.0.7)
-Requirement already satisfied: executing in /opt/conda/lib/python3.8/site-packages (from stack-data-&gt;ipython&gt;=4.0.0-&gt;ipywidgets) (0.8.3)
-Requirement already satisfied: pure-eval in /opt/conda/lib/python3.8/site-packages (from stack-data-&gt;ipython&gt;=4.0.0-&gt;ipywidgets) (0.2.2)
+Requirement already satisfied: pyparsing!=3.0.5,&gt;=2.0.2 in /opt/conda/lib/python3.8/site-packages (from packaging-&gt;ipykernel&gt;=4.5.1-&gt;ipywidgets) (3.0.8)
 Requirement already satisfied: asttokens in /opt/conda/lib/python3.8/site-packages (from stack-data-&gt;ipython&gt;=4.0.0-&gt;ipywidgets) (2.0.5)
+Requirement already satisfied: pure-eval in /opt/conda/lib/python3.8/site-packages (from stack-data-&gt;ipython&gt;=4.0.0-&gt;ipywidgets) (0.2.2)
+Requirement already satisfied: executing in /opt/conda/lib/python3.8/site-packages (from stack-data-&gt;ipython&gt;=4.0.0-&gt;ipywidgets) (0.8.3)
 <span class="ansi-yellow-fg">WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv</span>
 </pre>
           </div>
@@ -1028,18 +1039,18 @@ Requirement already satisfied: asttokens in /opt/conda/lib/python3.8/site-packag
            <div class="output_area docutils container">
             <div class="highlight">
              <pre>
---2022-04-06 20:07:20--  https://d17fnq9dkz9hgj.cloudfront.net/breed-uploads/2018/08/siberian-husky-detail.jpg?bust=1535566590&amp;width=630
-Resolving d17fnq9dkz9hgj.cloudfront.net (d17fnq9dkz9hgj.cloudfront.net)... 18.65.227.127, 18.65.227.223, 18.65.227.99, ...
-Connecting to d17fnq9dkz9hgj.cloudfront.net (d17fnq9dkz9hgj.cloudfront.net)|18.65.227.127|:443... connected.
+--2022-05-02 20:40:33--  https://d17fnq9dkz9hgj.cloudfront.net/breed-uploads/2018/08/siberian-husky-detail.jpg?bust=1535566590&amp;width=630
+Resolving d17fnq9dkz9hgj.cloudfront.net (d17fnq9dkz9hgj.cloudfront.net)... 18.65.227.37, 18.65.227.99, 18.65.227.223, ...
+Connecting to d17fnq9dkz9hgj.cloudfront.net (d17fnq9dkz9hgj.cloudfront.net)|18.65.227.37|:443... connected.
 HTTP request sent, awaiting response... 200 OK
 Length: 24112 (24K) [image/jpeg]
 Saving to: ‘./data/img0.JPG’
 
-./data/img0.JPG     100%[===================&gt;]  23.55K  --.-KB/s    in 0.001s
+./data/img0.JPG     100%[===================&gt;]  23.55K  --.-KB/s    in 0.005s
 
-2022-04-06 20:07:20 (16.8 MB/s) - ‘./data/img0.JPG’ saved [24112/24112]
+2022-05-02 20:40:33 (4.69 MB/s) - ‘./data/img0.JPG’ saved [24112/24112]
 
---2022-04-06 20:07:21--  https://www.hakaimagazine.com/wp-content/uploads/header-gulf-birds.jpg
+--2022-05-02 20:40:34--  https://www.hakaimagazine.com/wp-content/uploads/header-gulf-birds.jpg
 Resolving www.hakaimagazine.com (www.hakaimagazine.com)... 164.92.73.117
 Connecting to www.hakaimagazine.com (www.hakaimagazine.com)|164.92.73.117|:443... connected.
 HTTP request sent, awaiting response... 200 OK
@@ -1048,40 +1059,40 @@ Saving to: ‘./data/img1.JPG’
 
 ./data/img1.JPG     100%[===================&gt;] 442.11K  --.-KB/s    in 0.02s
 
-2022-04-06 20:07:21 (26.1 MB/s) - ‘./data/img1.JPG’ saved [452718/452718]
+2022-05-02 20:40:34 (26.2 MB/s) - ‘./data/img1.JPG’ saved [452718/452718]
 
---2022-04-06 20:07:21--  https://www.artis.nl/media/filer_public_thumbnails/filer_public/00/f1/00f1b6db-fbed-4fef-9ab0-84e944ff11f8/chimpansee_amber_r_1920x1080.jpg__1920x1080_q85_subject_location-923%2C365_subsampling-2.jpg
+--2022-05-02 20:40:34--  https://www.artis.nl/media/filer_public_thumbnails/filer_public/00/f1/00f1b6db-fbed-4fef-9ab0-84e944ff11f8/chimpansee_amber_r_1920x1080.jpg__1920x1080_q85_subject_location-923%2C365_subsampling-2.jpg
 Resolving www.artis.nl (www.artis.nl)... 94.75.225.20
 Connecting to www.artis.nl (www.artis.nl)|94.75.225.20|:443... connected.
 HTTP request sent, awaiting response... 200 OK
 Length: 361413 (353K) [image/jpeg]
 Saving to: ‘./data/img2.JPG’
 
-./data/img2.JPG     100%[===================&gt;] 352.94K   599KB/s    in 0.6s
+./data/img2.JPG     100%[===================&gt;] 352.94K   608KB/s    in 0.6s
 
-2022-04-06 20:07:24 (599 KB/s) - ‘./data/img2.JPG’ saved [361413/361413]
+2022-05-02 20:40:36 (608 KB/s) - ‘./data/img2.JPG’ saved [361413/361413]
 
---2022-04-06 20:07:24--  https://www.familyhandyman.com/wp-content/uploads/2018/09/How-to-Avoid-Snakes-Slithering-Up-Your-Toilet-shutterstock_780480850.jpg
+--2022-05-02 20:40:37--  https://www.familyhandyman.com/wp-content/uploads/2018/09/How-to-Avoid-Snakes-Slithering-Up-Your-Toilet-shutterstock_780480850.jpg
 Resolving www.familyhandyman.com (www.familyhandyman.com)... 104.18.201.107, 104.18.202.107, 2606:4700::6812:c96b, ...
 Connecting to www.familyhandyman.com (www.familyhandyman.com)|104.18.201.107|:443... connected.
 HTTP request sent, awaiting response... 200 OK
-Length: 94328 (92K) [image/jpeg]
+Length: 90994 (89K) [image/jpeg]
 Saving to: ‘./data/img3.JPG’
 
-./data/img3.JPG     100%[===================&gt;]  92.12K  --.-KB/s    in 0.06s
+./data/img3.JPG     100%[===================&gt;]  88.86K  --.-KB/s    in 0.006s
 
-2022-04-06 20:07:25 (1.41 MB/s) - ‘./data/img3.JPG’ saved [94328/94328]
+2022-05-02 20:40:37 (15.4 MB/s) - ‘./data/img3.JPG’ saved [90994/90994]
 
---2022-04-06 20:07:25--  https://s3.amazonaws.com/deep-learning-models/image-models/imagenet_class_index.json
-Resolving s3.amazonaws.com (s3.amazonaws.com)... 52.216.184.85
-Connecting to s3.amazonaws.com (s3.amazonaws.com)|52.216.184.85|:443... connected.
+--2022-05-02 20:40:37--  https://s3.amazonaws.com/deep-learning-models/image-models/imagenet_class_index.json
+Resolving s3.amazonaws.com (s3.amazonaws.com)... 52.217.33.238
+Connecting to s3.amazonaws.com (s3.amazonaws.com)|52.217.33.238|:443... connected.
 HTTP request sent, awaiting response... 200 OK
 Length: 35363 (35K) [application/octet-stream]
 Saving to: ‘./data/imagenet_class_index.json’
 
 ./data/imagenet_cla 100%[===================&gt;]  34.53K  --.-KB/s    in 0.07s
 
-2022-04-06 20:07:26 (489 KB/s) - ‘./data/imagenet_class_index.json’ saved [35363/35363]
+2022-05-02 20:40:38 (489 KB/s) - ‘./data/imagenet_class_index.json’ saved [35363/35363]
 
 </pre>
             </div>
@@ -1480,10 +1491,10 @@ def benchmark(model, input_shape=(1024, 1, 224, 224), dtype='fp32', nwarmup=50, 
            <div class="output_area docutils container">
             <div class="highlight">
              <pre>
-./data/img0.JPG - Predicted: ['n02110185', 'Siberian_husky'], Probablility: 0.4976217448711395
-./data/img1.JPG - Predicted: ['n01820546', 'lorikeet'], Probablility: 0.6437858939170837
-./data/img2.JPG - Predicted: ['n02481823', 'chimpanzee'], Probablility: 0.9899615049362183
-./data/img3.JPG - Predicted: ['n01749939', 'green_mamba'], Probablility: 0.39501574635505676
+./data/img0.JPG - Predicted: ['n02110185', 'Siberian_husky'], Probablility: 0.49788108468055725
+./data/img1.JPG - Predicted: ['n01820546', 'lorikeet'], Probablility: 0.6442285180091858
+./data/img2.JPG - Predicted: ['n02481823', 'chimpanzee'], Probablility: 0.9899841547012329
+./data/img3.JPG - Predicted: ['n01749939', 'green_mamba'], Probablility: 0.45675724744796753
 </pre>
             </div>
            </div>
@@ -1510,7 +1521,7 @@ def benchmark(model, input_shape=(1024, 1, 224, 224), dtype='fp32', nwarmup=50, 
              <pre>
 <span></span># Model benchmark without Torch-TensorRT
 model = resnet50_model.eval().to("cuda")
-benchmark(model, input_shape=(8, 3, 224, 224), nruns=100)
+benchmark(model, input_shape=(16, 3, 224, 224), nruns=100)
 </pre>
             </div>
            </div>
@@ -1523,37 +1534,127 @@ benchmark(model, input_shape=(8, 3, 224, 224), nruns=100)
              <pre>
 Warm up ...
 Start timing ...
-Iteration 10/100, ave batch time 5.96 ms
-Images processed per second= 1341
-Iteration 20/100, ave batch time 6.04 ms
-Images processed per second= 1324
-Iteration 30/100, ave batch time 6.02 ms
-Images processed per second= 1328
-Iteration 40/100, ave batch time 6.03 ms
-Images processed per second= 1327
-Iteration 50/100, ave batch time 6.01 ms
-Images processed per second= 1330
-Iteration 60/100, ave batch time 6.02 ms
-Images processed per second= 1328
-Iteration 70/100, ave batch time 6.01 ms
-Images processed per second= 1330
-Iteration 80/100, ave batch time 6.02 ms
-Images processed per second= 1328
-Iteration 90/100, ave batch time 6.01 ms
-Images processed per second= 1330
-Iteration 100/100, ave batch time 6.02 ms
-Images processed per second= 1329
-Input shape: torch.Size([8, 3, 224, 224])
-Output features size: torch.Size([8, 1000])
-Average batch time: 6.02 ms
+Iteration 10/100, ave batch time 10.01 ms
+Images processed per second= 1598
+Iteration 20/100, ave batch time 10.01 ms
+Images processed per second= 1598
+Iteration 30/100, ave batch time 10.21 ms
+Images processed per second= 1566
+Iteration 40/100, ave batch time 10.33 ms
+Images processed per second= 1549
+Iteration 50/100, ave batch time 10.31 ms
+Images processed per second= 1552
+Iteration 60/100, ave batch time 10.25 ms
+Images processed per second= 1560
+Iteration 70/100, ave batch time 10.20 ms
+Images processed per second= 1568
+Iteration 80/100, ave batch time 10.18 ms
+Images processed per second= 1572
+Iteration 90/100, ave batch time 10.16 ms
+Images processed per second= 1574
+Iteration 100/100, ave batch time 10.15 ms
+Images processed per second= 1575
+Input shape: torch.Size([16, 3, 224, 224])
+Output features size: torch.Size([16, 1000])
+Average batch time: 10.15 ms
 </pre>
             </div>
            </div>
           </div>
-          <p>
-           With the baseline ready, we can proceed to the section working discussing dynamic shapes!
-          </p>
          </section>
+        </section>
+        <hr class="docutils"/>
+        <section id="Benchmarking-with-Torch-TRT-(without-dynamic-shapes)">
+         <h2 id="Benchmarking-with-Torch-TRT-(without-dynamic-shapes)">
+          Benchmarking with Torch-TRT (without dynamic shapes)
+          <a class="headerlink" href="#Benchmarking-with-Torch-TRT-(without-dynamic-shapes)" title="Permalink to this headline">
+           ¶
+          </a>
+         </h2>
+         <div class="nbinput docutils container">
+          <div class="prompt highlight-none notranslate">
+           <div class="highlight">
+            <pre><span></span>[9]:
+</pre>
+           </div>
+          </div>
+          <div class="input_area highlight-ipython3 notranslate">
+           <div class="highlight">
+            <pre>
+<span></span>import torch_tensorrt
+
+trt_model_without_ds = torch_tensorrt.compile(model, inputs = [torch_tensorrt.Input((32, 3, 224, 224), dtype=torch.float32)],
+    enabled_precisions = torch.float32, # Run with FP32
+    workspace_size = 1 &lt;&lt; 33
+)
+</pre>
+           </div>
+          </div>
+         </div>
+         <div class="nboutput nblast docutils container">
+          <div class="prompt empty docutils container">
+          </div>
+          <div class="output_area stderr docutils container">
+           <div class="highlight">
+            <pre>
+WARNING: [Torch-TensorRT] - Dilation not used in Max pooling converter
+</pre>
+           </div>
+          </div>
+         </div>
+         <div class="nbinput docutils container">
+          <div class="prompt highlight-none notranslate">
+           <div class="highlight">
+            <pre><span></span>[10]:
+</pre>
+           </div>
+          </div>
+          <div class="input_area highlight-ipython3 notranslate">
+           <div class="highlight">
+            <pre>
+<span></span>benchmark(trt_model_without_ds, input_shape=(32, 3, 224, 224), nruns=100)
+</pre>
+           </div>
+          </div>
+         </div>
+         <div class="nboutput nblast docutils container">
+          <div class="prompt empty docutils container">
+          </div>
+          <div class="output_area docutils container">
+           <div class="highlight">
+            <pre>
+Warm up ...
+Start timing ...
+Iteration 10/100, ave batch time 6.10 ms
+Images processed per second= 5242
+Iteration 20/100, ave batch time 6.12 ms
+Images processed per second= 5231
+Iteration 30/100, ave batch time 6.14 ms
+Images processed per second= 5215
+Iteration 40/100, ave batch time 6.14 ms
+Images processed per second= 5207
+Iteration 50/100, ave batch time 6.15 ms
+Images processed per second= 5202
+Iteration 60/100, ave batch time 6.28 ms
+Images processed per second= 5094
+Iteration 70/100, ave batch time 6.26 ms
+Images processed per second= 5110
+Iteration 80/100, ave batch time 6.25 ms
+Images processed per second= 5118
+Iteration 90/100, ave batch time 6.25 ms
+Images processed per second= 5115
+Iteration 100/100, ave batch time 6.40 ms
+Images processed per second= 5002
+Input shape: torch.Size([32, 3, 224, 224])
+Output features size: torch.Size([32, 1000])
+Average batch time: 6.40 ms
+</pre>
+           </div>
+          </div>
+         </div>
+         <p>
+          With the baseline ready, we can proceed to the section working discussing dynamic shapes!
+         </p>
         </section>
         <hr class="docutils"/>
         <section id="Working-with-Dynamic-shapes-in-Torch-TRT">
@@ -1600,18 +1701,16 @@ Average batch time: 6.02 ms
          <div class="nbinput docutils container">
           <div class="prompt highlight-none notranslate">
            <div class="highlight">
-            <pre><span></span>[9]:
+            <pre><span></span>[11]:
 </pre>
            </div>
           </div>
           <div class="input_area highlight-ipython3 notranslate">
            <div class="highlight">
             <pre>
-<span></span>import torch_tensorrt
-
-# The compiled module will have precision as specified by "op_precision".
+<span></span># The compiled module will have precision as specified by "op_precision".
 # Here, it will have FP32 precision.
-trt_model_fp32 = torch_tensorrt.compile(model, inputs = [torch_tensorrt.Input(
+trt_model_with_ds = torch_tensorrt.compile(model, inputs = [torch_tensorrt.Input(
         min_shape=(16, 3, 224, 224),
         opt_shape=(32, 3, 224, 224),
         max_shape=(64, 3, 224, 224),
@@ -1637,106 +1736,6 @@ WARNING: [Torch-TensorRT] - Dilation not used in Max pooling converter
          <div class="nbinput docutils container">
           <div class="prompt highlight-none notranslate">
            <div class="highlight">
-            <pre><span></span>[10]:
-</pre>
-           </div>
-          </div>
-          <div class="input_area highlight-ipython3 notranslate">
-           <div class="highlight">
-            <pre>
-<span></span>benchmark(model, input_shape=(4, 3, 224, 224), nruns=100)
-</pre>
-           </div>
-          </div>
-         </div>
-         <div class="nboutput nblast docutils container">
-          <div class="prompt empty docutils container">
-          </div>
-          <div class="output_area docutils container">
-           <div class="highlight">
-            <pre>
-Warm up ...
-Start timing ...
-Iteration 10/100, ave batch time 5.65 ms
-Images processed per second= 707
-Iteration 20/100, ave batch time 5.65 ms
-Images processed per second= 708
-Iteration 30/100, ave batch time 5.64 ms
-Images processed per second= 708
-Iteration 40/100, ave batch time 5.66 ms
-Images processed per second= 706
-Iteration 50/100, ave batch time 5.70 ms
-Images processed per second= 702
-Iteration 60/100, ave batch time 5.69 ms
-Images processed per second= 702
-Iteration 70/100, ave batch time 5.68 ms
-Images processed per second= 704
-Iteration 80/100, ave batch time 5.69 ms
-Images processed per second= 702
-Iteration 90/100, ave batch time 5.70 ms
-Images processed per second= 702
-Iteration 100/100, ave batch time 5.69 ms
-Images processed per second= 702
-Input shape: torch.Size([4, 3, 224, 224])
-Output features size: torch.Size([4, 1000])
-Average batch time: 5.69 ms
-</pre>
-           </div>
-          </div>
-         </div>
-         <div class="nbinput docutils container">
-          <div class="prompt highlight-none notranslate">
-           <div class="highlight">
-            <pre><span></span>[11]:
-</pre>
-           </div>
-          </div>
-          <div class="input_area highlight-ipython3 notranslate">
-           <div class="highlight">
-            <pre>
-<span></span>benchmark(model, input_shape=(8, 3, 224, 224), nruns=100)
-</pre>
-           </div>
-          </div>
-         </div>
-         <div class="nboutput nblast docutils container">
-          <div class="prompt empty docutils container">
-          </div>
-          <div class="output_area docutils container">
-           <div class="highlight">
-            <pre>
-Warm up ...
-Start timing ...
-Iteration 10/100, ave batch time 6.00 ms
-Images processed per second= 1332
-Iteration 20/100, ave batch time 6.00 ms
-Images processed per second= 1333
-Iteration 30/100, ave batch time 6.00 ms
-Images processed per second= 1332
-Iteration 40/100, ave batch time 6.05 ms
-Images processed per second= 1322
-Iteration 50/100, ave batch time 6.04 ms
-Images processed per second= 1323
-Iteration 60/100, ave batch time 6.04 ms
-Images processed per second= 1324
-Iteration 70/100, ave batch time 6.04 ms
-Images processed per second= 1324
-Iteration 80/100, ave batch time 6.04 ms
-Images processed per second= 1323
-Iteration 90/100, ave batch time 6.04 ms
-Images processed per second= 1323
-Iteration 100/100, ave batch time 6.04 ms
-Images processed per second= 1324
-Input shape: torch.Size([8, 3, 224, 224])
-Output features size: torch.Size([8, 1000])
-Average batch time: 6.04 ms
-</pre>
-           </div>
-          </div>
-         </div>
-         <div class="nbinput docutils container">
-          <div class="prompt highlight-none notranslate">
-           <div class="highlight">
             <pre><span></span>[12]:
 </pre>
            </div>
@@ -1744,7 +1743,7 @@ Average batch time: 6.04 ms
           <div class="input_area highlight-ipython3 notranslate">
            <div class="highlight">
             <pre>
-<span></span>benchmark(model, input_shape=(16, 3, 224, 224), nruns=100)
+<span></span>benchmark(trt_model_with_ds, input_shape=(16, 3, 224, 224), nruns=100)
 </pre>
            </div>
           </div>
@@ -1757,29 +1756,29 @@ Average batch time: 6.04 ms
             <pre>
 Warm up ...
 Start timing ...
-Iteration 10/100, ave batch time 7.47 ms
-Images processed per second= 2141
-Iteration 20/100, ave batch time 7.46 ms
-Images processed per second= 2143
-Iteration 30/100, ave batch time 7.47 ms
-Images processed per second= 2142
-Iteration 40/100, ave batch time 7.46 ms
-Images processed per second= 2143
-Iteration 50/100, ave batch time 7.50 ms
-Images processed per second= 2134
-Iteration 60/100, ave batch time 7.53 ms
-Images processed per second= 2125
-Iteration 70/100, ave batch time 7.57 ms
-Images processed per second= 2114
-Iteration 80/100, ave batch time 7.56 ms
-Images processed per second= 2117
-Iteration 90/100, ave batch time 7.55 ms
-Images processed per second= 2120
-Iteration 100/100, ave batch time 7.54 ms
-Images processed per second= 2123
+Iteration 10/100, ave batch time 3.88 ms
+Images processed per second= 4122
+Iteration 20/100, ave batch time 3.89 ms
+Images processed per second= 4116
+Iteration 30/100, ave batch time 3.88 ms
+Images processed per second= 4123
+Iteration 40/100, ave batch time 3.86 ms
+Images processed per second= 4142
+Iteration 50/100, ave batch time 3.85 ms
+Images processed per second= 4156
+Iteration 60/100, ave batch time 3.84 ms
+Images processed per second= 4166
+Iteration 70/100, ave batch time 3.84 ms
+Images processed per second= 4170
+Iteration 80/100, ave batch time 3.83 ms
+Images processed per second= 4172
+Iteration 90/100, ave batch time 3.83 ms
+Images processed per second= 4176
+Iteration 100/100, ave batch time 3.83 ms
+Images processed per second= 4178
 Input shape: torch.Size([16, 3, 224, 224])
 Output features size: torch.Size([16, 1000])
-Average batch time: 7.54 ms
+Average batch time: 3.83 ms
 </pre>
            </div>
           </div>
@@ -1794,7 +1793,7 @@ Average batch time: 7.54 ms
           <div class="input_area highlight-ipython3 notranslate">
            <div class="highlight">
             <pre>
-<span></span>benchmark(model, input_shape=(32, 3, 224, 224), nruns=100)
+<span></span>benchmark(trt_model_with_ds, input_shape=(32, 3, 224, 224), nruns=100)
 </pre>
            </div>
           </div>
@@ -1807,29 +1806,79 @@ Average batch time: 7.54 ms
             <pre>
 Warm up ...
 Start timing ...
-Iteration 10/100, ave batch time 13.62 ms
-Images processed per second= 2349
-Iteration 20/100, ave batch time 13.80 ms
-Images processed per second= 2319
-Iteration 30/100, ave batch time 13.48 ms
-Images processed per second= 2373
-Iteration 40/100, ave batch time 13.30 ms
-Images processed per second= 2405
-Iteration 50/100, ave batch time 13.20 ms
-Images processed per second= 2423
-Iteration 60/100, ave batch time 13.14 ms
-Images processed per second= 2435
-Iteration 70/100, ave batch time 13.10 ms
-Images processed per second= 2443
-Iteration 80/100, ave batch time 13.06 ms
-Images processed per second= 2450
-Iteration 90/100, ave batch time 13.07 ms
-Images processed per second= 2448
-Iteration 100/100, ave batch time 13.09 ms
-Images processed per second= 2444
+Iteration 10/100, ave batch time 6.71 ms
+Images processed per second= 4767
+Iteration 20/100, ave batch time 6.48 ms
+Images processed per second= 4935
+Iteration 30/100, ave batch time 6.39 ms
+Images processed per second= 5005
+Iteration 40/100, ave batch time 6.38 ms
+Images processed per second= 5014
+Iteration 50/100, ave batch time 6.38 ms
+Images processed per second= 5016
+Iteration 60/100, ave batch time 6.37 ms
+Images processed per second= 5020
+Iteration 70/100, ave batch time 6.37 ms
+Images processed per second= 5024
+Iteration 80/100, ave batch time 6.37 ms
+Images processed per second= 5027
+Iteration 90/100, ave batch time 6.37 ms
+Images processed per second= 5026
+Iteration 100/100, ave batch time 6.38 ms
+Images processed per second= 5018
 Input shape: torch.Size([32, 3, 224, 224])
 Output features size: torch.Size([32, 1000])
-Average batch time: 13.09 ms
+Average batch time: 6.38 ms
+</pre>
+           </div>
+          </div>
+         </div>
+         <div class="nbinput docutils container">
+          <div class="prompt highlight-none notranslate">
+           <div class="highlight">
+            <pre><span></span>[14]:
+</pre>
+           </div>
+          </div>
+          <div class="input_area highlight-ipython3 notranslate">
+           <div class="highlight">
+            <pre>
+<span></span>benchmark(trt_model_with_ds, input_shape=(64, 3, 224, 224), nruns=100)
+</pre>
+           </div>
+          </div>
+         </div>
+         <div class="nboutput nblast docutils container">
+          <div class="prompt empty docutils container">
+          </div>
+          <div class="output_area docutils container">
+           <div class="highlight">
+            <pre>
+Warm up ...
+Start timing ...
+Iteration 10/100, ave batch time 12.31 ms
+Images processed per second= 5197
+Iteration 20/100, ave batch time 12.42 ms
+Images processed per second= 5153
+Iteration 30/100, ave batch time 12.85 ms
+Images processed per second= 4980
+Iteration 40/100, ave batch time 12.71 ms
+Images processed per second= 5033
+Iteration 50/100, ave batch time 12.67 ms
+Images processed per second= 5052
+Iteration 60/100, ave batch time 12.63 ms
+Images processed per second= 5067
+Iteration 70/100, ave batch time 12.58 ms
+Images processed per second= 5088
+Iteration 80/100, ave batch time 12.56 ms
+Images processed per second= 5096
+Iteration 90/100, ave batch time 12.55 ms
+Images processed per second= 5100
+Iteration 100/100, ave batch time 12.57 ms
+Images processed per second= 5091
+Input shape: torch.Size([64, 3, 224, 224])
+Output features size: torch.Size([64, 1000])
+Average batch time: 12.57 ms
 </pre>
            </div>
           </div>
