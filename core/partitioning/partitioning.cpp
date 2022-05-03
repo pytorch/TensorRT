@@ -57,7 +57,7 @@ bool containNonTensorOutputs(torch::jit::Node* n) {
   return false;
 }
 
-std::vector<torch::jit::Node*> getDependencyNodes(std::vector<torch::jit::Value*>& vals) {
+std::vector<torch::jit::Node*> getDependencyNodes(const std::vector<torch::jit::Value*>& vals) {
   // use bfs to get the DAG dependency nodes for input value
   std::queue<torch::jit::Value*, std::deque<torch::jit::Value*>> q(
       std::deque<torch::jit::Value*>(vals.begin(), vals.end()));
@@ -137,7 +137,7 @@ std::pair<std::unordered_map<torch::jit::Value*, SegmentedBlock>, SegmentedBlock
   return std::pair<std::unordered_map<torch::jit::Value*, SegmentedBlock>, SegmentedBlock>(append_blocks, trt_block);
 }
 
-PartitionedGraph segmentBlocksWithSpecifiedInputs(SegmentedBlock& seg_block, std::vector<torch::jit::Value*> inputs_to_resolve){
+PartitionedGraph segmentBlocksWithSpecifiedInputs(SegmentedBlock& seg_block, const std::vector<torch::jit::Value*> &inputs_to_resolve){
   std::vector<torch::jit::Node*> dependency_nodes = getDependencyNodes(inputs_to_resolve);
   PartitionedGraph new_seg_blocks;
   // if current block is kTorch or current block is TensorRT and all dependent nodes are also supported, merge the
