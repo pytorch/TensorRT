@@ -261,7 +261,7 @@ def acc_ops_pad_with_padding_layer(
     input_val = kwargs["input"]
     pad = cast(Sequence[int], kwargs["pad"])
     mode = kwargs["mode"]
-    value = kwargs["value"]
+    value = kwargs["value"] if kwargs["value"] is not None else 0
     rank = len(input_val.shape)  # type: ignore[union-attr]
 
     if not isinstance(input_val, TRTTensor):
@@ -311,7 +311,7 @@ def acc_ops_pad_with_slice_layer(
     input_val = kwargs["input"]
     pad = cast(Sequence[int], kwargs["pad"])
     mode = kwargs["mode"]
-    value = kwargs["value"]
+    value = kwargs["value"] if kwargs["value"] is not None else 0
     rank = len(input_val.shape)  # type: ignore[union-attr]
 
     if not isinstance(input_val, TRTTensor):
