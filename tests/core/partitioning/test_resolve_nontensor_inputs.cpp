@@ -293,33 +293,68 @@ TEST(Partitioning, ResolveOnlyNeccessaryNonTensorInputs) {
   false_const_val->setType(c10::BoolType::get());
   torch::jit::IValue neg_one(-1);
   auto neg_one_const_val = g->insertConstant(neg_one);
-  auto dict_node = g->createDict(ins_key_val->type(), x->type(),  torch::jit::ArrayRef<torch::jit::Value*>(), torch::jit::ArrayRef<torch::jit::Value*>());
+  auto dict_node = g->createDict(
+      ins_key_val->type(),
+      x->type(),
+      torch::jit::ArrayRef<torch::jit::Value*>(),
+      torch::jit::ArrayRef<torch::jit::Value*>());
   g->insertNode(dict_node);
-  auto set_node = g->create(torch::jit::Symbol::fromQualString("aten::_set_item"), torch::jit::ArrayRef<torch::jit::Value*>{dict_node->output(), ins_key_val, x}, 0);
+  auto set_node = g->create(
+      torch::jit::Symbol::fromQualString("aten::_set_item"),
+      torch::jit::ArrayRef<torch::jit::Value*>{dict_node->output(), ins_key_val, x},
+      0);
   g->insertNode(set_node);
-  auto get_node = g->create(torch::jit::Symbol::fromQualString("aten::__getitem__"), torch::jit::ArrayRef<torch::jit::Value*>{dict_node->output(), ins_key_val}, 1);
+  auto get_node = g->create(
+      torch::jit::Symbol::fromQualString("aten::__getitem__"),
+      torch::jit::ArrayRef<torch::jit::Value*>{dict_node->output(), ins_key_val},
+      1);
   g->insertNode(get_node);
-  auto lt_node = g->create(torch::jit::Symbol::fromQualString("aten::lt"), torch::jit::ArrayRef<torch::jit::Value*>{get_node->output(), y}, 1);
+  auto lt_node = g->create(
+      torch::jit::Symbol::fromQualString("aten::lt"),
+      torch::jit::ArrayRef<torch::jit::Value*>{get_node->output(), y},
+      1);
   g->insertNode(lt_node);
-  auto list_node = g->createList(at::OptionalType::create(lt_node->output()->type()), torch::jit::ArrayRef<torch::jit::Value*>{lt_node->output()});
+  auto list_node = g->createList(
+      at::OptionalType::create(lt_node->output()->type()), torch::jit::ArrayRef<torch::jit::Value*>{lt_node->output()});
   g->insertNode(list_node);
-  auto dtype_node = g->create(torch::jit::Symbol::fromQualString("prim::dtype"), torch::jit::ArrayRef<torch::jit::Value*>{get_node->output()}, 1);
+  auto dtype_node = g->create(
+      torch::jit::Symbol::fromQualString("prim::dtype"),
+      torch::jit::ArrayRef<torch::jit::Value*>{get_node->output()},
+      1);
   dtype_node->output()->setType(neg_one_const_val->type());
   g->insertNode(dtype_node);
-  auto device_node = g->create(torch::jit::Symbol::fromQualString("prim::device"), torch::jit::ArrayRef<torch::jit::Value*>{get_node->output()}, 1);
+  auto device_node = g->create(
+      torch::jit::Symbol::fromQualString("prim::device"),
+      torch::jit::ArrayRef<torch::jit::Value*>{get_node->output()},
+      1);
   device_node->output()->setType(c10::DeviceObjType::get());
   g->insertNode(device_node);
-  auto tensor_node = g->create(torch::jit::Symbol::fromQualString("aten::tensor"), torch::jit::ArrayRef<torch::jit::Value*>{neg_one_const_val, dtype_node->output(), device_node->output(), false_const_val}, 1);
+  auto tensor_node = g->create(
+      torch::jit::Symbol::fromQualString("aten::tensor"),
+      torch::jit::ArrayRef<torch::jit::Value*>{
+          neg_one_const_val, dtype_node->output(), device_node->output(), false_const_val},
+      1);
   g->insertNode(tensor_node);
-  auto index_put_node = g->create(torch::jit::Symbol::fromQualString("aten::index_put_"), 
-    torch::jit::ArrayRef<torch::jit::Value*>{get_node->output(), list_node->output(), tensor_node->output(), false_const_val}, 1);
+  auto index_put_node = g->create(
+      torch::jit::Symbol::fromQualString("aten::index_put_"),
+      torch::jit::ArrayRef<torch::jit::Value*>{
+          get_node->output(), list_node->output(), tensor_node->output(), false_const_val},
+      1);
   g->insertNode(index_put_node);
-  auto out_set_node = g->create(torch::jit::Symbol::fromQualString("aten::_set_item"), 
-    torch::jit::ArrayRef<torch::jit::Value*>{dict_node->output(), outs_key_val, get_node->output()}, 0);
+  auto out_set_node = g->create(
+      torch::jit::Symbol::fromQualString("aten::_set_item"),
+      torch::jit::ArrayRef<torch::jit::Value*>{dict_node->output(), outs_key_val, get_node->output()},
+      0);
   g->insertNode(out_set_node);
-  auto get_ins_node = g->create(torch::jit::Symbol::fromQualString("aten::__getitem__"), torch::jit::ArrayRef<torch::jit::Value*>{dict_node->output(), ins_key_val}, 1);
+  auto get_ins_node = g->create(
+      torch::jit::Symbol::fromQualString("aten::__getitem__"),
+      torch::jit::ArrayRef<torch::jit::Value*>{dict_node->output(), ins_key_val},
+      1);
   g->insertNode(get_ins_node);
-  auto get_outs_node = g->create(torch::jit::Symbol::fromQualString("aten::__getitem__"), torch::jit::ArrayRef<torch::jit::Value*>{dict_node->output(), outs_key_val}, 1);
+  auto get_outs_node = g->create(
+      torch::jit::Symbol::fromQualString("aten::__getitem__"),
+      torch::jit::ArrayRef<torch::jit::Value*>{dict_node->output(), outs_key_val},
+      1);
   g->insertNode(get_outs_node);
   g->registerOutput(get_ins_node->output());
   g->registerOutput(get_outs_node->output());
@@ -337,10 +372,9 @@ TEST(Partitioning, ResolveOnlyNeccessaryNonTensorInputs) {
     input_types.insert({g->inputs()[i], {at::kFloat}});
   }
   auto input_ivalues_map = torch_tensorrt::core::partitioning::generateRandomInputs(inputs_map, input_types);
-  auto segmented_blocks =
-      torch_tensorrt::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info);
+  auto segmented_blocks = torch_tensorrt::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info);
 
-    int torch_block_cnt = 0, trt_block_cnt = 0;
+  int torch_block_cnt = 0, trt_block_cnt = 0;
   for (const auto& segmented_block : segmented_blocks) {
     if (segmented_block.target() == torch_tensorrt::core::partitioning::SegmentedBlock::kTensorRT) {
       ++trt_block_cnt;
@@ -353,12 +387,12 @@ TEST(Partitioning, ResolveOnlyNeccessaryNonTensorInputs) {
       bool input_dict = false;
       auto dict_type = dict_node->output()->type();
       for (auto in : segmented_block.raw_inputs()) {
-        if(in->type()->isSubtypeOf(dict_type)){
+        if (in->type()->isSubtypeOf(dict_type)) {
           input_dict = true;
         }
       }
       for (auto out : segmented_block.raw_outputs()) {
-        if(out->type()->isSubtypeOf(dict_type)){
+        if (out->type()->isSubtypeOf(dict_type)) {
           output_dict = true;
         }
       }
