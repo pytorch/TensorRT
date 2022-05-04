@@ -4,8 +4,29 @@ import torch.nn.functional as F
 import torchvision.models as models
 import timm
 from transformers import BertModel, BertTokenizer, BertConfig
+import os
+import sys
 
 torch.hub._validate_not_a_forked_repo = lambda a, b, c: True
+
+torch_version = torch.__version__
+snapshot_file = 'model_snapshot.txt'
+skip_download = False
+
+# If model repository already setup
+if os.path.exists(snapshot_file):
+    with open(snapshot_file, 'r') as f:
+        model_version = f.read()
+        if model_version == torch_version:
+            skip_download = True
+
+# In case of existing model repository, skip the download
+if skip_download:
+    print('Skipping re-download of model repository')
+    sys.exit()
+else:
+    with open(snapshot_file, 'w') as f:
+        f.write(torch_version)
 
 models = {
     "alexnet": {
