@@ -86,6 +86,8 @@ void getSegmentsOutputByRunning(
       jit_inputs_ivalues.push_back(ivalues_maps[input].toScalar());
     } else if (input->type()->kind() == torch::jit::TypeKind::DictType) {
       jit_inputs_ivalues.push_back(ivalues_maps[input].toGenericDict());
+    } else if (input->type()->kind() == torch::jit::TypeKind::DeviceObjType) {
+      jit_inputs_ivalues.push_back(ivalues_maps[input].toDevice());
     } else {
       TORCHTRT_THROW_ERROR(
           "Expected to find type " << input->type()->str() << " for value " << input->debugName()
