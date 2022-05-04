@@ -17,8 +17,7 @@ from torch.fx.passes.tools_common import get_acc_ops_name
 
 
 def create_trt_operator_support(use_implicit_batch_dim=True) -> ops.OperatorSupportBase:
-    """Creates an `OperatorSupportBase` instance used for TRT splitting purpose.
-    """
+    """Creates an `OperatorSupportBase` instance used for TRT splitting purpose."""
     # Create an `OperatorSupport` that declares a node supported if it
     # finds a registered TRT converter.
     support_dict: Dict[str, None] = {}
@@ -28,9 +27,7 @@ def create_trt_operator_support(use_implicit_batch_dim=True) -> ops.OperatorSupp
                 support_dict[get_acc_ops_name(k)] = None
         elif k not in NO_EXPLICIT_BATCH_DIM_SUPPORT.keys():
             support_dict[get_acc_ops_name(k)] = None
-    supported_if_converter_registered = ops.OperatorSupport(
-        support_dict=support_dict
-    )
+    supported_if_converter_registered = ops.OperatorSupport(support_dict=support_dict)
 
     return ops.chain(
         # 1. Node is not supported if it has args with int64 dtype:
@@ -47,7 +44,7 @@ class TRTSplitterSetting(splitter_base._SplitterSettingBase):
         # Determines what batch mode we'll use for lowering.
         # During split, we'll split out the operators that
         # don't support the batch dim.
-        self.use_implicit_batch_dim : bool = True
+        self.use_implicit_batch_dim: bool = True
 
 
 class TRTSplitter(splitter_base._SplitterBase):
@@ -61,13 +58,19 @@ class TRTSplitter(splitter_base._SplitterBase):
         if not settings:
             settings = TRTSplitterSetting()
         if not operator_support:
-            operator_support = create_trt_operator_support(settings.use_implicit_batch_dim)
-        super().__init__(module, sample_input, operator_support, settings, non_acc_submodule_name="_run_on_gpu_")
+            operator_support = create_trt_operator_support(
+                settings.use_implicit_batch_dim
+            )
+        super().__init__(
+            module,
+            sample_input,
+            operator_support,
+            settings,
+            non_acc_submodule_name="_run_on_gpu_",
+        )
 
     def _lower_model_to_backend(
-        self,
-        mod: torch.fx.GraphModule,
-        inputs: Iterable[torch.Tensor]
+        self, mod: torch.fx.GraphModule, inputs: Iterable[torch.Tensor]
     ):
         """
         Lower a GraphModule `mod` to TensorRT with `inputs`.
@@ -76,7 +79,11 @@ class TRTSplitter(splitter_base._SplitterBase):
         # based on feeds model's actual status
         interp = TRTInterpreter(mod, InputTensorSpec.from_tensors(inputs))
         interpreter_result = interp.run(*inputs)
-        return TRTModule(interpreter_result.engine, interpreter_result.input_names, interpreter_result.output_names)
+        return TRTModule(
+            interpreter_result.engine,
+            interpreter_result.input_names,
+            interpreter_result.output_names,
+        )
 
     def _find_culprit(self, mod: torch.fx.GraphModule, inputs: Tensors):
         """

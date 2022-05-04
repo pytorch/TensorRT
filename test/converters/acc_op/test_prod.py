@@ -1,20 +1,57 @@
-import torch
 import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
-from torch.testing._internal.common_fx2trt import AccTestCase
+import torch
 from parameterized import parameterized
+from torch.testing._internal.common_fx2trt import AccTestCase
 from torch.testing._internal.common_utils import run_tests
 
 # NOTE torch.prod will only accept one dim unlike other reduce ops which accept tuples
 
+
 class TestProdConverter(AccTestCase):
     @parameterized.expand(
         [
-            (f"{acc_ops.prod.__name__}_dim0_keepdim", 0, True, torch.prod, acc_ops.prod),
-            (f"{acc_ops.prod.__name__}_dim0_no_keepdim", 0, False, torch.prod, acc_ops.prod),
-            (f"{acc_ops.prod.__name__}_dim1_keepdim", 1, True, torch.prod, acc_ops.prod),
-            (f"{acc_ops.prod.__name__}_dim1_no_keepdim", 1, False, torch.prod, acc_ops.prod),
-            (f"{acc_ops.prod.__name__}_dim1_keepdim", 2, True, torch.prod, acc_ops.prod),
-            (f"{acc_ops.prod.__name__}_dim1_no_keepdim", 2, False, torch.prod, acc_ops.prod),
+            (
+                f"{acc_ops.prod.__name__}_dim0_keepdim",
+                0,
+                True,
+                torch.prod,
+                acc_ops.prod,
+            ),
+            (
+                f"{acc_ops.prod.__name__}_dim0_no_keepdim",
+                0,
+                False,
+                torch.prod,
+                acc_ops.prod,
+            ),
+            (
+                f"{acc_ops.prod.__name__}_dim1_keepdim",
+                1,
+                True,
+                torch.prod,
+                acc_ops.prod,
+            ),
+            (
+                f"{acc_ops.prod.__name__}_dim1_no_keepdim",
+                1,
+                False,
+                torch.prod,
+                acc_ops.prod,
+            ),
+            (
+                f"{acc_ops.prod.__name__}_dim1_keepdim",
+                2,
+                True,
+                torch.prod,
+                acc_ops.prod,
+            ),
+            (
+                f"{acc_ops.prod.__name__}_dim1_no_keepdim",
+                2,
+                False,
+                torch.prod,
+                acc_ops.prod,
+            ),
         ]
     )
     def test_prod(self, test_name, dim, keepdim, op, expected_acc_op):
@@ -36,9 +73,7 @@ class TestProdConverter(AccTestCase):
         )
 
     @parameterized.expand(
-        [
-            (f"{acc_ops.prod.__name__}_no_dim_no_keepdim", torch.prod, acc_ops.prod)
-        ]
+        [(f"{acc_ops.prod.__name__}_no_dim_no_keepdim", torch.prod, acc_ops.prod)]
     )
     def test_prod_all_dims(
         self,
@@ -58,5 +93,6 @@ class TestProdConverter(AccTestCase):
             test_implicit_batch_dim=False,
         )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run_tests()

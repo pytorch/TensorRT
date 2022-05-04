@@ -1,5 +1,7 @@
-from torch import fx
 from typing import Any
+
+from torch import fx
+
 
 class TensorProp(fx.Interpreter):
     """
@@ -9,6 +11,7 @@ class TensorProp(fx.Interpreter):
     This is useful to debug some of lowering pass issue where we want to check a specific
     tensor value. Note that output value can be tuple(Tensor) as well as Tensor.
     """
+
     def __init__(self, module: fx.GraphModule):
         super().__init__(module)
         self.tensor_map = {}

@@ -1,8 +1,8 @@
-import torch
 import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
+import torch
 import torch.nn as nn
-from torch.testing._internal.common_fx2trt import AccTestCase
 from parameterized import parameterized
+from torch.testing._internal.common_fx2trt import AccTestCase
 from torch.testing._internal.common_utils import run_tests
 
 
@@ -20,9 +20,10 @@ class TestMaskedFill(AccTestCase):
             def __init__(self, input_shape):
                 super().__init__()
                 self.mask = torch.zeros(input_shape)
-                self.mask[0,0] = 1
+                self.mask[0, 0] = 1
                 self.mask = self.mask.to(torch.bool)
                 self.value = value
+
             def forward(self, x):
                 return x.masked_fill(self.mask, self.value)
 
@@ -31,15 +32,15 @@ class TestMaskedFill(AccTestCase):
             MaskedFill(input_shape),
             inputs,
             expected_ops={acc_ops.masked_fill},
-            test_implicit_batch_dim = False
+            test_implicit_batch_dim=False,
         )
 
     @parameterized.expand(
         [
-            ("same_dims", (2, 3), (2,3), 5),
-             ("expand_first_dims", (2, 3), (1,3), 5),
-             ("expand_second_dims", (2, 3), (2,1), 5),
-             ("expand_third_dims", (2, 3, 4), (2, 3, 1), 5),
+            ("same_dims", (2, 3), (2, 3), 5),
+            ("expand_first_dims", (2, 3), (1, 3), 5),
+            ("expand_second_dims", (2, 3), (2, 1), 5),
+            ("expand_third_dims", (2, 3, 4), (2, 3, 1), 5),
         ]
     )
     def test_masked_fill_expand(self, _, input_shape, mask_shape, value):
@@ -47,11 +48,12 @@ class TestMaskedFill(AccTestCase):
             def __init__(self, input_shape):
                 super().__init__()
                 self.value = value
+
             def forward(self, x, mask_input):
                 return x.masked_fill(mask_input, self.value)
 
         mask_input = torch.zeros(*mask_shape)
-        index = (0)*len(mask_shape)
+        index = (0) * len(mask_shape)
         mask_input[index] = 1
         mask_input = mask_input.to(torch.bool)
         inputs = [torch.ones(*input_shape), mask_input]
@@ -59,8 +61,9 @@ class TestMaskedFill(AccTestCase):
             MaskedFill(input_shape),
             inputs,
             expected_ops={acc_ops.masked_fill},
-            test_implicit_batch_dim = False
+            test_implicit_batch_dim=False,
         )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run_tests()

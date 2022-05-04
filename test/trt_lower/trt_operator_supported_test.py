@@ -3,8 +3,8 @@
 import fx2trt_oss.tracer.acc_tracer.acc_ops  # noqa: F401
 import torch
 import torch.fx
-from fx2trt_oss.fx.tools.trt_splitter import create_trt_operator_support
 import torch.nn as nn
+from fx2trt_oss.fx.tools.trt_splitter import create_trt_operator_support
 from fx2trt_oss.tracer.acc_tracer import acc_ops, acc_tracer
 from torch.testing._internal.common_utils import TestCase, run_tests
 
@@ -27,7 +27,6 @@ class TestTRTOperatorSupport(TestCase):
         for node in traced_mod.graph.nodes:
             self.assertTrue(op_support.is_node_supported(mod, node))
 
-
     def test_unsupport_node_explicit_batch_dim(self):
         class TestModule(nn.Module):
             def forward(self, x):
@@ -43,7 +42,6 @@ class TestTRTOperatorSupport(TestCase):
                 self.assertTrue(op_support.is_node_supported(mod, node))
             elif node.target == acc_ops.split:
                 self.assertFalse(op_support.is_node_supported(mod, node))
-
 
     def test_unsupport_node_implicit_batch_dim(self):
         class TestModule(nn.Module):
@@ -77,5 +75,6 @@ class TestTRTOperatorSupport(TestCase):
             if node.target == acc_ops.quantize_per_tensor:
                 self.assertTrue(op_support.is_node_supported(mod, node))
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run_tests()

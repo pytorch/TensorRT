@@ -1,17 +1,17 @@
-import torch
 import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
-from torch.testing._internal.common_fx2trt import AccTestCase
+import torch
 from parameterized import parameterized
+from torch.testing._internal.common_fx2trt import AccTestCase
 from torch.testing._internal.common_utils import run_tests
 
 reduce_ops = [(torch.sum, acc_ops.sum), (torch.mean, acc_ops.mean)]
+
 
 class TestReduceConverter(AccTestCase):
     @parameterized.expand(
         case
         for op, acc_op in reduce_ops
-        for case in
-        [
+        for case in [
             (f"{acc_op.__name__}_single_dim_no_keepdim", 1, False, op, acc_op),
             (f"{acc_op.__name__}_single_dim_keepdim", 1, True, op, acc_op),
             (f"{acc_op.__name__}_two_dim_no_keepdim", (1, 2), False, op, acc_op),
@@ -24,7 +24,13 @@ class TestReduceConverter(AccTestCase):
             (f"{acc_op.__name__}_neg_single_dim_keepdim", -1, True, op, acc_op),
             (f"{acc_op.__name__}_neg_two_dim_no_keepdim", (-1, -2), False, op, acc_op),
             (f"{acc_op.__name__}_neg_two_dim_keepdim", (-1, -2), True, op, acc_op),
-            (f"{acc_op.__name__}_neg_pos_two_dim_no_keepdim", (-1, 1), False, op, acc_op),
+            (
+                f"{acc_op.__name__}_neg_pos_two_dim_no_keepdim",
+                (-1, 1),
+                False,
+                op,
+                acc_op,
+            ),
             (f"{acc_op.__name__}_neg_pos_two_dim_keepdim", (-1, 1), True, op, acc_op),
         ]
     )
@@ -48,7 +54,8 @@ class TestReduceConverter(AccTestCase):
 
     @parameterized.expand(
         [
-            (f"{acc_op.__name__}_no_dim_no_keepdim", op, acc_op) for op, acc_op in reduce_ops
+            (f"{acc_op.__name__}_no_dim_no_keepdim", op, acc_op)
+            for op, acc_op in reduce_ops
         ]
     )
     def test_reduce_all_dims(
@@ -69,5 +76,6 @@ class TestReduceConverter(AccTestCase):
             test_implicit_batch_dim=False,
         )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run_tests()

@@ -1,16 +1,16 @@
-import torch
 import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
-from torch.testing._internal.common_fx2trt import AccTestCase, InputTensorSpec
+import torch
 from parameterized import parameterized
+from torch.testing._internal.common_fx2trt import AccTestCase, InputTensorSpec
 from torch.testing._internal.common_utils import run_tests
 
 
 class TestLinearConverter(AccTestCase):
     @parameterized.expand(
         [
-            ("default", [1,512]),
-            ("matrix", [32,512]),
-            ("no_bias", [1,512], False),
+            ("default", [1, 512]),
+            ("matrix", [32, 512]),
+            ("no_bias", [1, 512], False),
         ]
     )
     def test_linear(
@@ -52,5 +52,6 @@ class TestLinearConverter(AccTestCase):
             expected_ops={acc_ops.linear},
         )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run_tests()

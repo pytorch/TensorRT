@@ -1,10 +1,10 @@
 from typing import Callable
 
-import torch
 import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
+import torch
 import torch.nn as nn
-from torch.testing._internal.common_fx2trt import AccTestCase, InputTensorSpec
 from parameterized import parameterized
+from torch.testing._internal.common_fx2trt import AccTestCase, InputTensorSpec
 from torch.testing._internal.common_utils import run_tests
 
 NEED_TEST_BOTH_CONSTANTS_CASE = True
@@ -14,13 +14,25 @@ elementwise_ops = [
     ((lambda x, y: x - y), acc_ops.sub, NEED_TEST_BOTH_CONSTANTS_CASE),
     ((lambda x, y: x / y), acc_ops.div, NEED_TEST_BOTH_CONSTANTS_CASE),
     ((lambda x, y: x // y), acc_ops.floor_div, NEED_TEST_BOTH_CONSTANTS_CASE),
-    ((lambda x, y: torch.div(x, y, rounding_mode="trunc")), acc_ops.trunc_div, not NEED_TEST_BOTH_CONSTANTS_CASE),
-    ((lambda x, y: torch.div(x, y, rounding_mode="floor")), acc_ops.floor_div, NEED_TEST_BOTH_CONSTANTS_CASE),
+    (
+        (lambda x, y: torch.div(x, y, rounding_mode="trunc")),
+        acc_ops.trunc_div,
+        not NEED_TEST_BOTH_CONSTANTS_CASE,
+    ),
+    (
+        (lambda x, y: torch.div(x, y, rounding_mode="floor")),
+        acc_ops.floor_div,
+        NEED_TEST_BOTH_CONSTANTS_CASE,
+    ),
     ((lambda x, y: torch.div(x, y)), acc_ops.div, NEED_TEST_BOTH_CONSTANTS_CASE),
     ((lambda x, y: torch.fmod(x, y)), acc_ops.fmod, not NEED_TEST_BOTH_CONSTANTS_CASE),
     # torch.floor_divide rounds result toward zero, rather than -Inf.
     # https://github.com/pytorch/pytorch/issues/43874
-    ((lambda x, y: torch.floor_divide(x, y)), acc_ops.trunc_div, not NEED_TEST_BOTH_CONSTANTS_CASE),
+    (
+        (lambda x, y: torch.floor_divide(x, y)),
+        acc_ops.trunc_div,
+        not NEED_TEST_BOTH_CONSTANTS_CASE,
+    ),
     ((lambda x, y: x * y), acc_ops.mul, NEED_TEST_BOTH_CONSTANTS_CASE),
     (torch.pow, acc_ops.pow, not NEED_TEST_BOTH_CONSTANTS_CASE),
 ]
@@ -43,7 +55,9 @@ class TestBinaryOpConverters(AccTestCase):
         self.run_test(m, inputs, expected_ops={expected_op})
 
     @parameterized.expand([(op[1].__name__, op[0], op[1]) for op in elementwise_ops])
-    def test_elementwise_ops_with_one_constant(self, name, orig_op: Callable, expected_op):
+    def test_elementwise_ops_with_one_constant(
+        self, name, orig_op: Callable, expected_op
+    ):
         class TestModule(nn.Module):
             def __init__(self, orig_op):
                 super().__init__()
@@ -58,8 +72,12 @@ class TestBinaryOpConverters(AccTestCase):
         inputs = [torch.randn(2, 2)]
         self.run_test(m, inputs, expected_ops={expected_op})
 
-    @parameterized.expand([(op[1].__name__, op[0], op[1]) for op in elementwise_ops if op[2]])
-    def test_elementwise_op_with_both_constants(self, name, orig_op: Callable, expected_op):
+    @parameterized.expand(
+        [(op[1].__name__, op[0], op[1]) for op in elementwise_ops if op[2]]
+    )
+    def test_elementwise_op_with_both_constants(
+        self, name, orig_op: Callable, expected_op
+    ):
         class TestModule(nn.Module):
             def __init__(self, orig_op):
                 super().__init__()
@@ -74,7 +92,6 @@ class TestBinaryOpConverters(AccTestCase):
         m = TestModule(orig_op)
         inputs = [torch.randn(2, 2)]
         self.run_test(m, inputs, expected_ops={expected_op})
-
 
     @parameterized.expand(
         [
@@ -139,8 +156,14 @@ class TestBinaryOpConverters(AccTestCase):
 
         m = TestModule(orig_op)
         inputs = [torch.randn(10)]
-        self.run_test(m, inputs, expected_ops={acc_ops.add}, test_explicit_batch_dim=False, test_implicit_batch_dim=True)
+        self.run_test(
+            m,
+            inputs,
+            expected_ops={acc_ops.add},
+            test_explicit_batch_dim=False,
+            test_implicit_batch_dim=True,
+        )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     run_tests()

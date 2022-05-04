@@ -1,4 +1,5 @@
 import functools
+from contextlib import contextmanager
 from typing import Set, Any, Callable, Dict, Optional, Tuple
 
 import torch
@@ -8,7 +9,6 @@ from torch._C import _disabled_torch_function_impl
 from torch.fx import GraphModule, Tracer
 from torch.fx.experimental.normalize import NormalizeArgs
 from torch.fx.passes.shape_prop import _extract_tensor_metadata
-from contextlib import contextmanager
 
 DEFAULT_LEAF_MODULE_LIST = {}
 
@@ -41,7 +41,9 @@ def build_outputs(func, args, kwargs, proxy_out):
             return e
 
     if isinstance(real_out, tuple):
-        return tuple([wrap_with_proxy(e, proxy_out[idx]) for idx, e in enumerate(real_out)])
+        return tuple(
+            [wrap_with_proxy(e, proxy_out[idx]) for idx, e in enumerate(real_out)]
+        )
     elif isinstance(real_out, list):
         return [wrap_with_proxy(e, proxy_out[idx]) for idx, e in enumerate(real_out)]
     elif isinstance(real_out, torch.Tensor):
@@ -68,7 +70,7 @@ class DispatchTensor(torch.Tensor):
 
     def __init__(self, elem, proxy):
         self.proxy = proxy
-        proxy.node.meta['tensor_meta'] = _extract_tensor_metadata(self)
+        proxy.node.meta["tensor_meta"] = _extract_tensor_metadata(self)
 
     def __repr__(self):
         return f"DispatchTensor({torch.Tensor._make_subclass(torch.Tensor, self)})"
@@ -92,12 +94,19 @@ class DispatchTracer(Tracer):
         1. this tracer allows specifying leaf module and will preserve it as a call module node
            in the graph.
     """
+
     def __init__(self, leaf_module_list: Optional[Set[str]] = None):
         super().__init__()
-        self.leaf_module_list = (leaf_module_list or set()).union(DEFAULT_LEAF_MODULE_LIST)
+        self.leaf_module_list = (leaf_module_list or set()).union(
+            DEFAULT_LEAF_MODULE_LIST
+        )
 
     def call_module(
-        self, m: torch.nn.Module, forward: Callable[..., Any], args: Tuple[Any, ...], kwargs: Dict[str, Any]
+        self,
+        m: torch.nn.Module,
+        forward: Callable[..., Any],
+        args: Tuple[Any, ...],
+        kwargs: Dict[str, Any],
     ) -> Any:
         if self.is_leaf_module(m):
             i = 0
@@ -109,7 +118,9 @@ class DispatchTracer(Tracer):
             setattr(self.root, qualname, m)
             proxy_args = pytree.tree_map(unwrap_proxy, args)
             proxy_kwargs = pytree.tree_map(unwrap_proxy, kwargs)
-            proxy_out = self.create_proxy("call_module", qualname, proxy_args, proxy_kwargs)
+            proxy_out = self.create_proxy(
+                "call_module", qualname, proxy_args, proxy_kwargs
+            )
             return build_outputs(forward, args, kwargs, proxy_out)
         return forward(*args, **kwargs)
 
@@ -151,7 +162,9 @@ def dispatch_trace(
     leaf_module_list: Optional[Set[str]] = None,
     concrete_args=None,
 ) -> GraphModule:
-    name = root.__class__.__name__ if isinstance(root, torch.nn.Module) else root.__name__
+    name = (
+        root.__class__.__name__ if isinstance(root, torch.nn.Module) else root.__name__
+    )
     tracer = DispatchTracer(leaf_module_list)
     graph = tracer.trace(root, concrete_args=concrete_args)
     gm = GraphModule(tracer.root, graph, name)
@@ -176,7 +189,9 @@ def wrap_key(f, inps):
         out = f(*tree_args)
         flat_outs, out_spec = pytree.tree_flatten(out)
         for idx in range(len(flat_outs)):
-            if isinstance(flat_outs[idx], torch.Tensor) and isinstance(flat_outs[idx], DispatchTensor):
+            if isinstance(flat_outs[idx], torch.Tensor) and isinstance(
+                flat_outs[idx], DispatchTensor
+            ):
                 flat_outs[idx] = flat_outs[idx].proxy
         return pytree.tree_unflatten(flat_outs, out_spec)
 
@@ -187,7 +202,11 @@ def make_fx(f, leaf_module_list: Optional[Set[str]] = None):
     @functools.wraps(f)
     def wrapped(*args):
         phs = pytree.tree_map(lambda x: fx.PH, args)
-        t = dispatch_trace(wrap_key(f, args), concrete_args=tuple(phs), leaf_module_list=leaf_module_list)
+        t = dispatch_trace(
+            wrap_key(f, args),
+            concrete_args=tuple(phs),
+            leaf_module_list=leaf_module_list,
+        )
         return t
 
     return wrapped

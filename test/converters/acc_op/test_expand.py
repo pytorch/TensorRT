@@ -1,8 +1,8 @@
-import torch
 import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
+import torch
 import torch.nn as nn
-from torch.testing._internal.common_fx2trt import AccTestCase
 from parameterized import parameterized
+from torch.testing._internal.common_fx2trt import AccTestCase
 from torch.testing._internal.common_utils import run_tests
 
 
@@ -27,5 +27,6 @@ class TestExpandConverter(AccTestCase):
             expected_ops={acc_ops.expand},
         )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run_tests()

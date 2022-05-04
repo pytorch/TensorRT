@@ -8,7 +8,9 @@ from .utils import torch_dtype_from_trt
 
 
 class TRTModule(torch.nn.Module):
-    def __init__(self, engine=None, input_names=None, output_names=None, cuda_graph_batch_size=-1):
+    def __init__(
+        self, engine=None, input_names=None, output_names=None, cuda_graph_batch_size=-1
+    ):
         super(TRTModule, self).__init__()
         self._register_state_dict_hook(TRTModule._on_state_dict)
         self.engine = engine
@@ -42,7 +44,11 @@ class TRTModule(torch.nn.Module):
                 self.hidden_output_binding_indices_in_order.append(i)
                 self.hidden_output_names.append(self.engine.get_binding_name(i))
 
-        assert self.engine.num_bindings == (len(self.input_names) + len(self.output_names) + len(self.hidden_output_names))
+        assert self.engine.num_bindings == (
+            len(self.input_names)
+            + len(self.output_names)
+            + len(self.hidden_output_names)
+        )
 
         self.input_dtypes: Sequence[torch.dtype] = [
             torch_dtype_from_trt(self.engine.get_binding_dtype(idx))
@@ -57,7 +63,9 @@ class TRTModule(torch.nn.Module):
             for idx in self.output_binding_indices_in_order
         ]
         self.output_shapes = [
-            tuple(self.engine.get_binding_shape(idx)) if self.engine.has_implicit_batch_dimension else tuple()
+            tuple(self.engine.get_binding_shape(idx))
+            if self.engine.has_implicit_batch_dimension
+            else tuple()
             for idx in self.output_binding_indices_in_order
         ]
         self.hidden_output_dtypes: Sequence[torch.dtype] = [
@@ -65,10 +73,11 @@ class TRTModule(torch.nn.Module):
             for idx in self.hidden_output_binding_indices_in_order
         ]
         self.hidden_output_shapes = [
-            tuple(self.engine.get_binding_shape(idx)) if self.engine.has_implicit_batch_dimension else tuple()
+            tuple(self.engine.get_binding_shape(idx))
+            if self.engine.has_implicit_batch_dimension
+            else tuple()
             for idx in self.hidden_output_binding_indices_in_order
         ]
-
 
     def _check_initialized(self):
         if not self.initialized:
@@ -104,7 +113,7 @@ class TRTModule(torch.nn.Module):
     def __getstate__(self):
         state = self.__dict__.copy()
         state["engine"] = bytearray(self.engine.serialize())
-        state.pop('context', None)
+        state.pop("context", None)
         return state
 
     def __setstate__(self, state):
@@ -128,7 +137,9 @@ class TRTModule(torch.nn.Module):
                 batch_size = inputs[0].shape[0]
                 contiguous_inputs: List[torch.Tensor] = [i.contiguous() for i in inputs]
                 bindings: List[Any] = [None] * (
-                    len(self.input_names) + len(self.output_names) + len(self.hidden_output_names)
+                    len(self.input_names)
+                    + len(self.output_names)
+                    + len(self.hidden_output_names)
                 )
 
                 for i, input_name in enumerate(self.input_names):
@@ -147,10 +158,10 @@ class TRTModule(torch.nn.Module):
                             idx, tuple(contiguous_inputs[i].shape)
                         )
                     else:
-                        assert (
-                            inputs[i].size()[1:] == self.input_shapes[i]
-                        ), f"Shape mismatch for {i}th input({input_name}). " \
-                           f"Expect {self.input_shapes[i]}, got {inputs[i].size()[1:]}."
+                        assert inputs[i].size()[1:] == self.input_shapes[i], (
+                            f"Shape mismatch for {i}th input({input_name}). "
+                            f"Expect {self.input_shapes[i]}, got {inputs[i].size()[1:]}."
+                        )
 
             with torch.autograd.profiler.record_function("TRTModule:ProcessOutputs"):
                 # create output tensors
@@ -198,7 +209,7 @@ class TRTModule(torch.nn.Module):
 
             return tuple(outputs)
 
-    def enable_profiling(self, profiler: "trt.IProfiler"=None):
+    def enable_profiling(self, profiler: "trt.IProfiler" = None):
         """
         Enable TensorRT profiling. After calling this function, TensorRT will report
         time spent on each layer in stdout for each forward run.
@@ -220,7 +231,7 @@ class TRTModule(torch.nn.Module):
 
     def get_layer_info(self) -> str:
         """
-        Get layer info of the engine. Only support for TRT > 8.2. 
+        Get layer info of the engine. Only support for TRT > 8.2.
         """
         inspector = self.engine.create_engine_inspector()
         return inspector.get_engine_information(trt.LayerInformationFormat.JSON)

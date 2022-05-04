@@ -12,7 +12,7 @@ def tensorrt_converter(
     key: Target,
     no_implicit_batch_dim: bool = False,
     no_explicit_batch_dim: bool = False,
-    enabled: bool = True
+    enabled: bool = True,
 ) -> Callable[[Any], Any]:
     def register_converter(converter):
         CONVERTERS[key] = converter

@@ -3,12 +3,12 @@
 import unittest
 from typing import Callable, List
 
-import numpy as np
-import torch
 import fx2trt_oss.tracer.acc_tracer.acc_normalizer as acc_normalizer
 import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
 import fx2trt_oss.tracer.acc_tracer.acc_tracer as acc_tracer
 import fx2trt_oss.tracer.acc_tracer.acc_utils as acc_utils
+import numpy as np
+import torch
 import torch.nn as nn
 import torchvision
 from parameterized import parameterized, param
@@ -66,6 +66,7 @@ class AccTracerTest(unittest.TestCase):
 
             def forward(self, a: torch.Tensor) -> torch.Tensor:
                 return self._torch_op(a, *self._args, **self._kwargs)
+
         m = TestModule(torch_op, args, kwargs)
         m.eval()
         a = torch.randn(*input_shape)
@@ -1777,7 +1778,6 @@ class AccTracerTest(unittest.TestCase):
             else:
                 self.fail(f"Unexpected node: {node.format_node()}")
 
-
         ref = m(a)
         res = traced(a)
         self.assertEqual(ref, res)
@@ -2248,10 +2248,10 @@ class AccTracerTest(unittest.TestCase):
                 self.assertEqual(str(node.target), "a")
                 ph = node
             elif node.op == "call_function" and node.target == acc_ops.index_select:
-                    self.assertTrue(node.kwargs["input"] == ph)
-                    self.assertTrue(node.kwargs["index"] == index)
-                    self.assertTrue(node.kwargs["dim"] == dim)
-                    index_select = node
+                self.assertTrue(node.kwargs["input"] == ph)
+                self.assertTrue(node.kwargs["index"] == index)
+                self.assertTrue(node.kwargs["dim"] == dim)
+                index_select = node
             elif node.op == "output":
                 self.assertEqual(index_select, node.args[0])
             elif node.op == "get_attr":
@@ -2284,10 +2284,10 @@ class AccTracerTest(unittest.TestCase):
                 self.assertEqual(str(node.target), "a")
                 ph = node
             elif node.op == "call_function" and node.target == acc_ops.gather:
-                    self.assertTrue(node.kwargs["input"] == ph)
-                    self.assertTrue(node.kwargs["index"] == index)
-                    self.assertTrue(node.kwargs["dim"] == dim)
-                    gather = node
+                self.assertTrue(node.kwargs["input"] == ph)
+                self.assertTrue(node.kwargs["index"] == index)
+                self.assertTrue(node.kwargs["dim"] == dim)
+                gather = node
             elif node.op == "output":
                 self.assertEqual(gather, node.args[0])
             elif node.op == "get_attr":
@@ -2296,7 +2296,6 @@ class AccTracerTest(unittest.TestCase):
                 index = node
             else:
                 self.fail(f"Unexpected node: {node.format_node()}")
-
 
     def test_where(self):
         class TestModule(nn.Module):
@@ -2333,11 +2332,9 @@ class AccTracerTest(unittest.TestCase):
             else:
                 self.fail(f"Unexpected node: {node.format_node()}")
 
-
         ref = m(cond, x, y)
-        res = traced(cond,x,y)
+        res = traced(cond, x, y)
         self.assertTrue(torch.equal(ref, res))
-
 
     def test_all_acc_ops_registered(self):
         self.assertEqual(

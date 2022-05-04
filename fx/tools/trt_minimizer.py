@@ -17,7 +17,11 @@ def lower_mod_default(
         mod, InputTensorSpec.from_tensors(inputs), explicit_batch_dimension=True
     )
     interpreter_result = interp.run(max_batch_size=batch_size)
-    res_mod = TRTModule(interpreter_result.engine, interpreter_result.input_names, interpreter_result.output_names)
+    res_mod = TRTModule(
+        interpreter_result.engine,
+        interpreter_result.input_names,
+        interpreter_result.output_names,
+    )
     return res_mod
 
 
@@ -35,7 +39,9 @@ class TensorRTMinimizer(net_min_base._MinimizerBase):
         compare_fn: Callable[[Any, Any, Any], Tuple[float, bool]],
         settings: TensorRTMinizerSetting = TensorRTMinizerSetting(),
         max_batch_size: Any = 2048,
-        lower_fn: Callable[[torch.fx.GraphModule, Tensors, Any], TRTModule] = lower_mod_default,
+        lower_fn: Callable[
+            [torch.fx.GraphModule, Tensors, Any], TRTModule
+        ] = lower_mod_default,
     ):
         self.lower_fn = lower_fn
         self.max_batch_size = max_batch_size

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 
+import dataclasses as dc
+import logging
 import operator
 import typing as t
-import logging
+
 import torch.fx as fx
-import dataclasses as dc
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -15,13 +16,12 @@ RemoveDuplicateOutputArgsFunc = t.Callable[
         fx.GraphModule,
         t.Collection[str],
     ],
-    t.Mapping[str, "RemoveDuplicateResult"]
+    t.Mapping[str, "RemoveDuplicateResult"],
 ]
 
 
 def remove_duplicate_output_args(
-    top_level: fx.GraphModule,
-    target_subnets: t.Collection[str]
+    top_level: fx.GraphModule, target_subnets: t.Collection[str]
 ) -> t.Mapping[str, "RemoveDuplicateResult"]:
     """Removes duplicate output args.
 
@@ -99,8 +99,9 @@ def _ensure_proper_output_use(user: fx.Node, target_node: fx.Node) -> int:
 
 def _remove_duplicate_output_args(gm: fx.GraphModule) -> RemoveDuplicateResult:
     output_nodes = [n for n in gm.graph.nodes if n.op == "output"]
-    assert len(output_nodes) == 1, \
-           f"Expecting exactly one `output` node, but got {len(output_nodes)}"
+    assert (
+        len(output_nodes) == 1
+    ), f"Expecting exactly one `output` node, but got {len(output_nodes)}"
 
     changed = False
     # arg node name to its index in the new output args tuple
@@ -122,8 +123,7 @@ def _remove_duplicate_output_args(gm: fx.GraphModule) -> RemoveDuplicateResult:
     replacement_map: t.List[int] = list(range(len(args)))
     args_new = []
     for idx, a in enumerate(args):
-        assert isinstance(a, fx.Node), \
-               f"Expecting fx.Node instance, but got: {type(a)}"
+        assert isinstance(a, fx.Node), f"Expecting fx.Node instance, but got: {type(a)}"
 
         if a.name not in name_to_idx:
             args_new.append(a)

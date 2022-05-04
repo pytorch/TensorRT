@@ -1,5 +1,5 @@
-import torch
 import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
+import torch
 from parameterized import parameterized
 from torch.testing._internal.common_fx2trt import AccTestCase, InputTensorSpec
 from torch.testing._internal.common_utils import run_tests
@@ -48,5 +48,6 @@ class TestAdaptiveAvgPoolConverter(AccTestCase):
             TestModule(), input_specs, expected_ops={acc_ops.adaptive_avg_pool2d}
         )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run_tests()

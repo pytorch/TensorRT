@@ -66,9 +66,7 @@ class InputTensorSpec(NamedTuple):
 
     @classmethod
     def from_tensors_with_dynamic_batch_size(
-        cls,
-        tensors: Sequence[torch.Tensor],
-        batch_size_range: Tuple[int, int, int]
+        cls, tensors: Sequence[torch.Tensor], batch_size_range: Tuple[int, int, int]
     ) -> List["InputTensorSpec"]:
         """
         Produce a list of InputTenosrSpec named tuples which would contain
@@ -90,13 +88,15 @@ class InputTensorSpec(NamedTuple):
         batch_size = tensors[0].size(0)
 
         for i, tensor in enumerate(tensors):
-            assert (
-                batch_size == tensor.size(0)
+            assert batch_size == tensor.size(
+                0
             ), f"The {i}th tensor (shape: {tensor.shape}) doesn't have the correct batch size: {batch_size}."
             shape = list(tensor.shape)
             shape[0] = -1
             shape_ranges: List[ShapeRange] = [tuple(tuple([bs] + shape[1:]) for bs in batch_size_range)]  # type: ignore[list-item]
-            input_specs.append(cls(tuple(shape), tensor.dtype, tensor.device, shape_ranges))
+            input_specs.append(
+                cls(tuple(shape), tensor.dtype, tensor.device, shape_ranges)
+            )
 
         return input_specs
 

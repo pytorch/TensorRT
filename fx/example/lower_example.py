@@ -106,13 +106,28 @@ def benchmark(
         # Baseline
         replace(conf, name="CUDA Eager", trt=False),
         # FP32
-        replace(conf, name="TRT FP32 Eager", trt=True, jit=False, fp16=False, accuracy_rtol=1e-3),
+        replace(
+            conf,
+            name="TRT FP32 Eager",
+            trt=True,
+            jit=False,
+            fp16=False,
+            accuracy_rtol=1e-3,
+        ),
         # FP16
-        replace(conf, name="TRT FP16 Eager", trt=True, jit=False, fp16=True, accuracy_rtol=1e-2),
+        replace(
+            conf,
+            name="TRT FP16 Eager",
+            trt=True,
+            jit=False,
+            fp16=True,
+            accuracy_rtol=1e-2,
+        ),
     ]
 
     results = [
-        run_configuration_benchmark(deepcopy(model), inputs, conf_) for conf_ in configurations
+        run_configuration_benchmark(deepcopy(model), inputs, conf_)
+        for conf_ in configurations
     ]
 
     for res in results:
@@ -178,9 +193,7 @@ def run_configuration_benchmark(
     else:
         print("Lowering with JIT is not available!", "red")
 
-    result = Result(
-        module=module, input=input, conf=conf, time_sec=time
-    )
+    result = Result(module=module, input=input, conf=conf, time_sec=time)
     return result
 
 

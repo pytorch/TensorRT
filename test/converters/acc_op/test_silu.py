@@ -1,7 +1,7 @@
-from torch.testing._internal.common_fx2trt import InputTensorSpec, AccTestCase
-from torch import nn
 import torch
 from fx2trt_oss.tracer.acc_tracer import acc_ops
+from torch import nn
+from torch.testing._internal.common_fx2trt import InputTensorSpec, AccTestCase
 from torch.testing._internal.common_utils import run_tests
 
 
@@ -30,5 +30,6 @@ class TestSilu(AccTestCase):
             Silu(), input_specs, expected_ops={acc_ops.sigmoid, acc_ops.mul}
         )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run_tests()

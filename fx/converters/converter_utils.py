@@ -7,7 +7,6 @@ import numpy as np
 # @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch
-from torch.fx.node import Target, Argument
 from fx2trt_oss.fx.types import (
     TRTNetwork,
     TRTTensor,
@@ -16,16 +15,17 @@ from fx2trt_oss.fx.types import (
     TRTPlugin,
     TRTDataType,
     TRTElementWiseOp,
-    Shape
+    Shape,
 )
 from fx2trt_oss.fx.utils import torch_dtype_from_trt
+from torch.fx.node import Target, Argument
 
 
 def get_trt_plugin(
     plugin_name: str,
     field_collection: List[TRTPluginFieldCollection],
     version: str,
-    plugin_namespace: str = ""
+    plugin_namespace: str = "",
 ) -> TRTPlugin:
     """
     Get a TensorRT plugin based on the given parameters.
@@ -41,9 +41,13 @@ def get_trt_plugin(
         A TensorRT plugin that can be added to TensorRT network as Plugin layer.
     """
     plugin_registry = trt.get_plugin_registry()
-    plugin_creator = plugin_registry.get_plugin_creator(plugin_name, version, plugin_namespace)
+    plugin_creator = plugin_registry.get_plugin_creator(
+        plugin_name, version, plugin_namespace
+    )
     assert plugin_creator, f"Unabled to find plugin creator with name {plugin_name}"
-    plugin = plugin_creator.create_plugin(name=plugin_name, field_collection=field_collection)
+    plugin = plugin_creator.create_plugin(
+        name=plugin_name, field_collection=field_collection
+    )
 
     assert plugin is not None, f"Plugin: {plugin_name} could not be fetched"
     return plugin
@@ -123,7 +127,9 @@ def to_numpy(tensor: Optional[torch.Tensor]) -> Optional[np.ndarray]:
     if tensor is None:
         return tensor
 
-    assert isinstance(tensor, torch.Tensor), f"to_numpy can only be called on None or a torch.Tensor, got: {tensor}"
+    assert isinstance(
+        tensor, torch.Tensor
+    ), f"to_numpy can only be called on None or a torch.Tensor, got: {tensor}"
     if tensor.is_quantized:
         tensor = tensor.dequantize()
 
@@ -211,10 +217,7 @@ def create_constant(
 
 
 def get_trt_tensor(
-    network: TRTNetwork,
-    input_val: Any,
-    name: str,
-    dtype: Optional[torch.dtype] = None
+    network: TRTNetwork, input_val: Any, name: str, dtype: Optional[torch.dtype] = None
 ) -> TRTTensor:
     """
     Given a value of random type, we try to convert it to a TensorRT ITensor.
@@ -305,7 +308,7 @@ def broadcast(
     b: TRTTensor,
     a_name: str,
     b_name: str,
-    preset_diff: int = 0
+    preset_diff: int = 0,
 ) -> Tuple[TRTTensor, TRTTensor]:
     """
     Broadcast two TensorRT tensors to the same number of dimensions by
@@ -345,7 +348,7 @@ def add_binary_elementwise_layer(
     rhs_val: Union[int, float, TRTTensor, torch.Tensor],
     op_type: trt.ElementWiseOperation,
     target: Target,
-    name: str
+    name: str,
 ) -> TRTTensor:
     """
     This function adds a TensorRT elementwise layer. We allow both operands to be
@@ -383,8 +386,10 @@ def add_binary_elementwise_layer(
         is_rhs_trt_tensor = True
 
     if not is_lhs_trt_tensor and not is_rhs_trt_tensor:
-        warnings.warn(f"Both operands of the binary elementwise op {name} "
-                      "are constant. In this case, please consider constant fold the model first.")
+        warnings.warn(
+            f"Both operands of the binary elementwise op {name} "
+            "are constant. In this case, please consider constant fold the model first."
+        )
         return get_python_op_from_trt_elementwise_op(op_type)(lhs_val, rhs_val)
 
     # When lhs is scalar, and rhs has shape [1,], then currently the assert
@@ -407,9 +412,13 @@ def add_binary_elementwise_layer(
     # Check the limitation in the doc string.
     if network.has_implicit_batch_dimension:
         if is_lhs_trt_tensor and not is_rhs_trt_tensor:
-            assert len(lhs_val.shape) >= len(rhs_val.shape), f"{lhs_val.shape} >= {rhs_val.shape}"
+            assert len(lhs_val.shape) >= len(
+                rhs_val.shape
+            ), f"{lhs_val.shape} >= {rhs_val.shape}"
         elif not is_lhs_trt_tensor and is_rhs_trt_tensor:
-            assert len(rhs_val.shape) >= len(lhs_val.shape), f"{rhs_val.shape} >= {lhs_val.shape}"
+            assert len(rhs_val.shape) >= len(
+                lhs_val.shape
+            ), f"{rhs_val.shape} >= {lhs_val.shape}"
 
     lhs_val, rhs_val = broadcast(
         network, lhs_val, rhs_val, f"{name}_lhs", f"{name}_rhs"
@@ -585,7 +594,12 @@ def mark_as_int8_layer(layer, dynamic_range):
     Set the precision of a layer to int8 as well as the type of its first output.
     Also set the dynamic range of its first output.
     """
-    if layer.type not in {trt.LayerType.SHUFFLE, trt.LayerType.CONCATENATION, trt.LayerType.CONSTANT, trt.LayerType.SHAPE}:
+    if layer.type not in {
+        trt.LayerType.SHUFFLE,
+        trt.LayerType.CONCATENATION,
+        trt.LayerType.CONSTANT,
+        trt.LayerType.SHAPE,
+    }:
         layer.precision = trt.int8
 
     for i in range(layer.num_outputs):
@@ -606,10 +620,7 @@ def get_inputs_from_args_and_kwargs(args, kwargs, input_names):
 
 
 def sign(
-    network: TRTNetwork,
-    input_val: TRTTensor,
-    target: Target,
-    name: str
+    network: TRTNetwork, input_val: TRTTensor, target: Target, name: str
 ) -> TRTTensor:
     """
     Sign is calculated as below:
@@ -628,23 +639,47 @@ def sign(
     Returns:
         A TensorRT tensor represent the result of sign operator.
     """
-    input_exp_output = add_unary_layer(network, input_val, trt.UnaryOperation.EXP, target, f"{name}_prod_exp")
-    input_abs_output = add_unary_layer(network, input_val, trt.UnaryOperation.ABS, target, f"{name}_prod_abs")
-    input_abs_exp_output = add_unary_layer(network, input_abs_output, trt.UnaryOperation.EXP, target, f"{name}_prod_abs_exp")
-    floor_div_output = add_binary_elementwise_layer(network, input_exp_output, input_abs_exp_output,
-                                                    trt.ElementWiseOperation.FLOOR_DIV, target, f"{name}_exp_floor_div")
-    double_floor_div_output = add_binary_elementwise_layer(network, floor_div_output, 2,
-                                                           trt.ElementWiseOperation.PROD, target, f"{name}_floor_div*2")
-    return add_binary_elementwise_layer(network, double_floor_div_output, 1,
-                                        trt.ElementWiseOperation.SUB, target, f"{name}_sign")
+    input_exp_output = add_unary_layer(
+        network, input_val, trt.UnaryOperation.EXP, target, f"{name}_prod_exp"
+    )
+    input_abs_output = add_unary_layer(
+        network, input_val, trt.UnaryOperation.ABS, target, f"{name}_prod_abs"
+    )
+    input_abs_exp_output = add_unary_layer(
+        network,
+        input_abs_output,
+        trt.UnaryOperation.EXP,
+        target,
+        f"{name}_prod_abs_exp",
+    )
+    floor_div_output = add_binary_elementwise_layer(
+        network,
+        input_exp_output,
+        input_abs_exp_output,
+        trt.ElementWiseOperation.FLOOR_DIV,
+        target,
+        f"{name}_exp_floor_div",
+    )
+    double_floor_div_output = add_binary_elementwise_layer(
+        network,
+        floor_div_output,
+        2,
+        trt.ElementWiseOperation.PROD,
+        target,
+        f"{name}_floor_div*2",
+    )
+    return add_binary_elementwise_layer(
+        network,
+        double_floor_div_output,
+        1,
+        trt.ElementWiseOperation.SUB,
+        target,
+        f"{name}_sign",
+    )
 
 
 def trunc_div(
-    input: TRTTensor,
-    other: TRTTensor,
-    network: TRTNetwork,
-    target: Target,
-    name: str
+    input: TRTTensor, other: TRTTensor, network: TRTNetwork, target: Target, name: str
 ) -> TRTTensor:
     """
     Perform trunc divide on Tensor, result of divide will be round toward zero.
@@ -661,26 +696,48 @@ def trunc_div(
     Returns:
         A TensorRT tensor represent the result of trunc divide.
     """
-    prod_output = add_binary_elementwise_layer(network, input, other, trt.ElementWiseOperation.PROD, target, f"{name}_prod")
+    prod_output = add_binary_elementwise_layer(
+        network, input, other, trt.ElementWiseOperation.PROD, target, f"{name}_prod"
+    )
     sign_output = sign(network, prod_output, target, name)
 
     # Convert constant input into ITensor for UnaryOperation
     if not isinstance(input, trt.tensorrt.ITensor):
         input = get_trt_tensor(network, input, f"{name}_input")
     if not isinstance(other, trt.tensorrt.ITensor):
-        other = get_trt_tensor(network, other, f"{name}_other", dtype=torch_dtype_from_trt(input.dtype))
+        other = get_trt_tensor(
+            network, other, f"{name}_other", dtype=torch_dtype_from_trt(input.dtype)
+        )
 
-    abs_input_output = add_unary_layer(network, input, trt.UnaryOperation.ABS, target, f"{name}_abs_input")
-    abs_other_output = add_unary_layer(network, other, trt.UnaryOperation.ABS, target, f"{name}_abs_other")
-    abs_floor_output = add_binary_elementwise_layer(network, abs_input_output, abs_other_output,
-                                                    trt.ElementWiseOperation.FLOOR_DIV, target, f"{name}_floor_div")
-    output = add_binary_elementwise_layer(network, abs_floor_output, sign_output,
-                                          trt.ElementWiseOperation.PROD, target, f"{name}_output")
+    abs_input_output = add_unary_layer(
+        network, input, trt.UnaryOperation.ABS, target, f"{name}_abs_input"
+    )
+    abs_other_output = add_unary_layer(
+        network, other, trt.UnaryOperation.ABS, target, f"{name}_abs_other"
+    )
+    abs_floor_output = add_binary_elementwise_layer(
+        network,
+        abs_input_output,
+        abs_other_output,
+        trt.ElementWiseOperation.FLOOR_DIV,
+        target,
+        f"{name}_floor_div",
+    )
+    output = add_binary_elementwise_layer(
+        network,
+        abs_floor_output,
+        sign_output,
+        trt.ElementWiseOperation.PROD,
+        target,
+        f"{name}_output",
+    )
 
     return output
 
 
-def get_python_op_from_trt_elementwise_op(trt_op: TRTElementWiseOp) -> Callable[[Any, Any], Any]:
+def get_python_op_from_trt_elementwise_op(
+    trt_op: TRTElementWiseOp,
+) -> Callable[[Any, Any], Any]:
     if trt_op == trt.ElementWiseOperation.SUM:
         return operator.add
     elif trt_op == trt.ElementWiseOperation.PROD:
@@ -694,8 +751,11 @@ def get_python_op_from_trt_elementwise_op(trt_op: TRTElementWiseOp) -> Callable[
     else:
         raise RuntimeError(f"{trt_op} is not supported yet!")
 
-def dtype_uniform(network: TRTNetwork, target: Target, name: str, input: TRTTensor, other: TRTTensor):
-    table = {trt.bool:0, trt.int32:1, trt.float16:2, trt.float32:3}
+
+def dtype_uniform(
+    network: TRTNetwork, target: Target, name: str, input: TRTTensor, other: TRTTensor
+):
+    table = {trt.bool: 0, trt.int32: 1, trt.float16: 2, trt.float32: 3}
     input_dtype = input.dtype
     other_dtype = other.dtype
     if table[input_dtype] > table[other_dtype]:
@@ -720,7 +780,14 @@ def dtype_uniform(network: TRTNetwork, target: Target, name: str, input: TRTTens
         other = layer_o.get_output(0)
     return input, other
 
-def type_cast(network: TRTNetwork, target: Target, name: str, input: TRTTensor, cast_type: TRTDataType):
+
+def type_cast(
+    network: TRTNetwork,
+    target: Target,
+    name: str,
+    input: TRTTensor,
+    cast_type: TRTDataType,
+):
     """
     This function helps to cast the input type to cast_type
     """
@@ -729,6 +796,12 @@ def type_cast(network: TRTNetwork, target: Target, name: str, input: TRTTensor, 
     set_layer_name(layer_i, target, f"{name}_dtype_change")
     return layer_i.get_output(0)
 
+
 def trt_dtype_to_torch_dtype(trt_dtype):
-    table = {trt.bool:torch.bool, trt.int32:torch.int32, trt.float16:torch.float16, trt.float32:torch.float32}
+    table = {
+        trt.bool: torch.bool,
+        trt.int32: torch.int32,
+        trt.float16: torch.float16,
+        trt.float32: torch.float32,
+    }
     return table[trt_dtype]

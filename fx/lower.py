@@ -9,7 +9,8 @@ import tensorrt as trt
 import torch
 import torch.fx as fx
 import torch.nn as nn
-
+from fx2trt_oss.fx.lower_setting import LowerSetting
+from fx2trt_oss.fx.passes.pass_utils import validate_inference, decorate_method
 from torch.fx.passes.splitter_base import SplitResult
 
 from .fx2trt import (
@@ -19,8 +20,8 @@ from .fx2trt import (
 from .input_tensor_spec import (
     InputTensorSpec,
 )
-from .passes.pass_utils import chain_passes, PassFunc
 from .passes.lower_pass_manager_builder import LowerPassManagerBuilder
+from .passes.pass_utils import chain_passes, PassFunc
 from .tools.timing_cache_utils import (
     TimingCacheManager,
 )
@@ -29,9 +30,6 @@ from .trt_module import (
     TRTModule,
 )
 from .utils import LowerPrecision
-from fx2trt_oss.fx.passes.pass_utils import validate_inference, decorate_method
-
-from fx2trt_oss.fx.lower_setting import LowerSetting
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +100,6 @@ class LowerTrtInterpreter:
             else InputTensorSpec.from_tensors(input)
         )
 
-
         # Prepare algorithm selector and timing_cache for TRTInterpreter
         algo_selector = None
         if self.lower_setting.algo_selector:
@@ -145,7 +142,9 @@ class LowerTrtInterpreter:
         return interp_result
 
 
-def default_split_function(model: fx.GraphModule, inputs: Input, lower_setting: LowerSetting) -> SplitResult:
+def default_split_function(
+    model: fx.GraphModule, inputs: Input, lower_setting: LowerSetting
+) -> SplitResult:
     splitter_setting = TRTSplitterSetting()
     splitter_setting.use_implicit_batch_dim = not lower_setting.explicit_batch_dimension
     splitter_setting.min_acc_module_size = lower_setting.min_acc_module_size
@@ -161,8 +160,9 @@ def create_lower_trt_interpreter(lower_setting: LowerSetting) -> LowerTrtInterpr
 def default_lower_pass(
     create_trt_interpreter: Callable[[LowerSetting], LowerTrtInterpreter],
 ) -> PassFunc:
-
-    def lower_pass(mod: nn.Module, input: Input, lower_setting: LowerSetting, module_name: str) -> nn.Module:
+    def lower_pass(
+        mod: nn.Module, input: Input, lower_setting: LowerSetting, module_name: str
+    ) -> nn.Module:
         """
         Create a module transformation pass which lowers an `fx.GraphModule` into a
         `TRTModule`
@@ -176,6 +176,7 @@ def default_lower_pass(
             cuda_graph_batch_size=lower_setting.cuda_graph_batch_size,
         )
         return trt_module
+
     return lower_pass
 
 
@@ -207,24 +208,23 @@ class Lowerer:
     def create(
         cls,
         lower_setting: LowerSetting,
-        interpreter_builder: Callable = create_lower_trt_interpreter
+        interpreter_builder: Callable = create_lower_trt_interpreter,
     ) -> "Lowerer":
         """Instantiate a `Lowerer` instance."""
 
         return cls(
-            lower_pass_manager_builder=
-                LowerPassManagerBuilder(
-                    lower_setting=lower_setting,
-                    trace_func=lambda module, inputs: acc_tracer.trace(
-                        module,
-                        inputs,  # type: ignore[arg-type]
-                        ast_rewriter_allow_list=lower_setting.ast_rewriter_allow_list,
-                        leaf_module_list=lower_setting.leaf_module_list),
-                    split_func=default_split_function,
-                    lower_func=default_lower_pass(interpreter_builder),
-                )
+            lower_pass_manager_builder=LowerPassManagerBuilder(
+                lower_setting=lower_setting,
+                trace_func=lambda module, inputs: acc_tracer.trace(
+                    module,
+                    inputs,  # type: ignore[arg-type]
+                    ast_rewriter_allow_list=lower_setting.ast_rewriter_allow_list,
+                    leaf_module_list=lower_setting.leaf_module_list,
+                ),
+                split_func=default_split_function,
+                lower_func=default_lower_pass(interpreter_builder),
+            )
         )
-
 
     @decorate_method(validate_inference(atol=1e-1, rtol=1e-1))
     def __call__(
@@ -234,7 +234,10 @@ class Lowerer:
     ) -> nn.Module:
         module.eval()
 
-        if self.lower_pass_manager_builder.lower_setting.lower_precision == LowerPrecision.FP16:
+        if (
+            self.lower_pass_manager_builder.lower_setting.lower_precision
+            == LowerPrecision.FP16
+        ):
             module.half()
             inputs = tuple(x.half() if x.dtype == torch.float32 else x for x in inputs)
         pm = self.lower_pass_manager_builder.build_lower_pipeline(inputs)

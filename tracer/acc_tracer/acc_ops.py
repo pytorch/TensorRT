@@ -83,7 +83,14 @@ def squeeze(*, input, dim=None):
 @register_acc_op_mapping(op_and_target=("call_function", nn.functional.embedding))
 @register_acc_op
 def embedding(
-    *, input, weight, padding_idx, max_norm, norm_type, scale_grad_by_freq, sparse
+    *,
+    input,
+    weight,
+    padding_idx,
+    max_norm,
+    norm_type,
+    scale_grad_by_freq,
+    sparse,
 ):
     return torch.nn.functional.embedding(**locals())
 
@@ -91,7 +98,14 @@ def embedding(
 @register_acc_op_mapping(op_and_target=("call_function", nn.functional.max_pool1d))
 @register_acc_op
 def max_pool1d(
-    *, input, kernel_size, stride, padding, dilation, ceil_mode, return_indices
+    *,
+    input,
+    kernel_size,
+    stride,
+    padding,
+    dilation,
+    ceil_mode,
+    return_indices,
 ):
     return nn.functional.max_pool1d(
         input=input,
@@ -107,7 +121,14 @@ def max_pool1d(
 @register_acc_op_mapping(op_and_target=("call_function", nn.functional.max_pool2d))
 @register_acc_op
 def max_pool2d(
-    *, input, kernel_size, stride, padding, dilation, ceil_mode, return_indices
+    *,
+    input,
+    kernel_size,
+    stride,
+    padding,
+    dilation,
+    ceil_mode,
+    return_indices,
 ):
     return nn.functional.max_pool2d(
         input=input,
@@ -187,8 +208,8 @@ def sign(*, input):
     ],
 )
 def custom_type_as_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
-    input_obj = node.kwargs['input']
-    other_obj = node.kwargs['tensor']
+    input_obj = node.kwargs["input"]
+    other_obj = node.kwargs["tensor"]
     with node.graph.inserting_before(node):
         dtype_node = node.graph.call_function(dtype, kwargs={"input": other_obj})
         dtype_node.meta["type"] = torch.dtype
@@ -209,6 +230,7 @@ def custom_type_as_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
 @register_acc_op
 def dtype(*, input):
     return input.dtype
+
 
 @register_acc_op_properties(AccOpProperty.unary)
 @register_acc_op
@@ -313,6 +335,7 @@ def unsqueeze(*, input, dim):
 @register_acc_op
 def tile(*, input, dims):
     return torch.tile(input=input, dims=dims)
+
 
 @register_custom_acc_mapper_fn(
     op_and_target=("call_method", "repeat"),
@@ -450,7 +473,7 @@ def contiguous(*, input):
         ("dim", "dim"),
         ("dtype", "dtype", this_arg_is_optional),
     ],
-    )
+)
 @register_acc_op
 def softmax(*, input, dim, dtype=None):
     """
@@ -566,6 +589,7 @@ def square_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
         )
         new_node.meta = node.meta.copy()
         return new_node
+
 
 @register_acc_op_mapping(
     op_and_target=("call_function", operator.matmul),
@@ -1067,6 +1091,7 @@ def mean(*, input, dim=None, keepdim=False, dtype=None):
 def mean_mapper(node, mod):
     return reduce_op_mapper(node, mod, mean)
 
+
 @register_custom_acc_mapper_fn(
     op_and_target=("call_method", "std"),
     arg_replacement_tuples=[
@@ -1097,7 +1122,9 @@ def std_mapper(node, mod):
     dim = node.kwargs.get("dim")
     keepdim = node.kwargs.get("keepdim")
     # assert unbiased is False or unbiased is None, "We currently do not support `std` with unbiased=True where n-1 is used"
-    assert dim is not None and keepdim is not None, "We currently do not support `std` with dim=None and keepdim=None"
+    assert (
+        dim is not None and keepdim is not None
+    ), "We currently do not support `std` with dim=None and keepdim=None"
 
     with node.graph.inserting_before(node):
         # mean(X)
@@ -1356,6 +1383,7 @@ def any(*, input, dim=None, keepdim=False):
     else:
         return torch.any(input)
 
+
 @register_custom_acc_mapper_fn(
     op_and_target=("call_function", torch.any),
     arg_replacement_tuples=[
@@ -1495,6 +1523,7 @@ def rsqrt_mapper(node: torch.fx.Node, mod: torch.fx.GraphModule) -> torch.fx.Nod
         output_node.meta = node.meta.copy()
         return output_node
 
+
 @register_acc_op_properties(AccOpProperty.pointwise, AccOpProperty.unary)
 @register_acc_op_mapping(op_and_target=("call_function", torch.abs))
 @register_acc_op
@@ -1601,9 +1630,21 @@ def conv3d(*, input, weight, bias, stride, padding, dilation, groups):
     )
 
 
-@register_acc_op_mapping(op_and_target=("call_function", torch.nn.functional.conv_transpose2d))
+@register_acc_op_mapping(
+    op_and_target=("call_function", torch.nn.functional.conv_transpose2d)
+)
 @register_acc_op
-def conv_transpose2d(*, input, weight, bias, stride, padding, output_padding, groups, dilation):
+def conv_transpose2d(
+    *,
+    input,
+    weight,
+    bias,
+    stride,
+    padding,
+    output_padding,
+    groups,
+    dilation,
+):
     return nn.functional.conv_transpose2d(
         input=input,
         weight=weight,
@@ -1616,9 +1657,21 @@ def conv_transpose2d(*, input, weight, bias, stride, padding, output_padding, gr
     )
 
 
-@register_acc_op_mapping(op_and_target=("call_function", torch.nn.functional.conv_transpose3d))
+@register_acc_op_mapping(
+    op_and_target=("call_function", torch.nn.functional.conv_transpose3d)
+)
 @register_acc_op
-def conv_transpose3d(*, input, weight, bias, stride, padding, output_padding, groups, dilation):
+def conv_transpose3d(
+    *,
+    input,
+    weight,
+    bias,
+    stride,
+    padding,
+    output_padding,
+    groups,
+    dilation,
+):
     return nn.functional.conv_transpose3d(
         input=input,
         weight=weight,
@@ -1634,7 +1687,15 @@ def conv_transpose3d(*, input, weight, bias, stride, padding, output_padding, gr
 @register_acc_op_mapping(op_and_target=("call_function", nn.functional.batch_norm))
 @register_acc_op
 def batch_norm(
-    *, input, running_mean, running_var, weight, bias, training, momentum, eps
+    *,
+    input,
+    running_mean,
+    running_var,
+    weight,
+    bias,
+    training,
+    momentum,
+    eps,
 ):
     return nn.functional.batch_norm(
         input=input,
@@ -1829,7 +1890,14 @@ def tuple_construct(*, tensors):
 )
 @register_acc_op
 def quantized_batch_norm2d(
-    *, input, running_mean, running_var, weight, bias, eps, acc_out_ty
+    *,
+    input,
+    running_mean,
+    running_var,
+    weight,
+    bias,
+    eps,
+    acc_out_ty,
 ):
     qparams = acc_out_ty.qparams
     return torch.ops.quantized.batch_norm2d(
@@ -1983,7 +2051,7 @@ def nan_to_num(*, input, nan=0.0, posinf=None, neginf=None):
 @register_acc_op_properties(AccOpProperty.unary)
 @register_acc_op_mapping(
     op_and_target=("call_method", "expand"),
-     arg_replacement_tuples=[
+    arg_replacement_tuples=[
         ("input", "input"),
         ("*", "sizes"),
     ],
@@ -1995,7 +2063,7 @@ def expand(*, input, sizes):
 
 @register_acc_op_mapping(
     op_and_target=("call_method", "masked_fill"),
-     arg_replacement_tuples=[
+    arg_replacement_tuples=[
         ("input", "input"),
         ("mask", "mask"),
         ("value", "value"),
@@ -2004,6 +2072,7 @@ def expand(*, input, sizes):
 @register_acc_op
 def masked_fill(*, input, mask, value):
     return input.masked_fill(mask, value)
+
 
 @register_acc_op_mapping(op_and_target=("call_function", torch.where))
 @register_acc_op
@@ -2179,7 +2248,6 @@ def to_dtype(input, acc_out_ty=None, device=None):
         ("input", "input"),
         ("dtype", "dtype"),
         ("device", "device", this_arg_is_optional),
-
     ],
 )
 def custom_tensor_to_mapper(node: torch.fx.Node, _: nn.Module):
@@ -2189,21 +2257,25 @@ def custom_tensor_to_mapper(node: torch.fx.Node, _: nn.Module):
     assert dest is not None
     assert mem_format is None or mem_format == torch.preserve_format
 
-    dest_dtype = dest_device=None
+    dest_dtype = dest_device = None
     if isinstance(dest, torch.fx.node.Node):
         meta_type = dest.meta["type"]
-        #consider the device is gpu only, meta info is limited to give clear device type
+        # consider the device is gpu only, meta info is limited to give clear device type
         if dest.meta["type"] == torch.device:
             dest_device = dest
         elif dest.meta["type"] == torch.dtype:
             dest_dtype = dest
         elif dest.meta["type"] == torch.Tensor:
-            input_obj = node.kwargs['input']
+            input_obj = node.kwargs["input"]
             other_obj = dest
             with node.graph.inserting_before(node):
-                dtype_node = node.graph.call_function(dtype, kwargs={"input": other_obj})
+                dtype_node = node.graph.call_function(
+                    dtype, kwargs={"input": other_obj}
+                )
                 dtype_node.meta["type"] = torch.dtype
-                device_node = node.graph.call_function(device, kwargs={"input": other_obj})
+                device_node = node.graph.call_function(
+                    device, kwargs={"input": other_obj}
+                )
                 device_node.meta["type"] = torch.device
                 new_kwargs = {
                     "input": input_obj,
@@ -2472,7 +2544,8 @@ def chunk(*, input, chunks, dim=0):
     return torch.chunk(input=input, chunks=chunks, dim=dim)
 
 
-@register_acc_op_mapping(op_and_target=("call_function", torch.gather),
+@register_acc_op_mapping(
+    op_and_target=("call_function", torch.gather),
     arg_replacement_tuples=[
         ("input", "input"),
         ("dim", "dim"),
@@ -2498,7 +2571,7 @@ def index_select(*, input, dim, index):
     arg_replacement_tuples=[
         ("input", "input"),
         ("other", "other"),
-    ]
+    ],
 )
 def expand_as_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
     """
@@ -2515,9 +2588,11 @@ def expand_as_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
         )
         expand_node.meta = node.meta.copy()
         return expand_node
+
+
 @register_acc_op_mapping(
     op_and_target=("call_function", torch.nn.functional.interpolate),
-     arg_replacement_tuples=[
+    arg_replacement_tuples=[
         ("input", "input"),
         ("size", "size", this_arg_is_optional),
         ("scale_factor", "scale_factor", this_arg_is_optional),
@@ -2526,5 +2601,18 @@ def expand_as_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
     ],
 )
 @register_acc_op
-def interpolate(*, input, size=None, scale_factor=None, mode='nearest', align_corners=None):
-    return torch.nn.functional.interpolate(input=input, size=size, scale_factor=scale_factor, mode=mode, align_corners=align_corners)
+def interpolate(
+    *,
+    input,
+    size=None,
+    scale_factor=None,
+    mode="nearest",
+    align_corners=None,
+):
+    return torch.nn.functional.interpolate(
+        input=input,
+        size=size,
+        scale_factor=scale_factor,
+        mode=mode,
+        align_corners=align_corners,
+    )

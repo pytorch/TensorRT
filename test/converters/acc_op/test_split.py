@@ -1,8 +1,8 @@
-import torch
 import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
+import torch
 import torch.nn as nn
-from torch.testing._internal.common_fx2trt import AccTestCase
 from parameterized import parameterized
+from torch.testing._internal.common_fx2trt import AccTestCase
 from torch.testing._internal.common_utils import run_tests
 
 
@@ -48,5 +48,6 @@ class TestSplitConverter(AccTestCase):
             test_explicit_batch_dim=False,
         )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run_tests()

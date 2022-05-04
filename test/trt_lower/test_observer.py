@@ -1,10 +1,11 @@
 # Owner(s): ["oncall: gpu_enablement"]
-import typing as t
-from unittest import TestCase
 import functools
+import typing as t
 from contextlib import contextmanager
-from fx2trt_oss.fx.observer import observable
+from unittest import TestCase
+
 import fx2trt_oss.fx.observer as ob
+from fx2trt_oss.fx.observer import observable
 
 
 def set_observer_callback_rethrow(fn):
@@ -12,6 +13,7 @@ def set_observer_callback_rethrow(fn):
     Specify that observer callback exceptions should be re-thrown (default
     behavior is to swallow) Re-throw is only for test purpose.
     """
+
     @functools.wraps(fn)
     def fn_(*args, **kwargs):
         try:
@@ -19,17 +21,16 @@ def set_observer_callback_rethrow(fn):
             return fn(*args, **kwargs)
         finally:
             ob.RETHROW_CALLBACK_EXCEPTION = False
+
     return fn_
 
 
 class ObserverTests(TestCase):
-
     @set_observer_callback_rethrow
     def test_basics(self):
-
         @observable()
         def foo(x, y, z):
-            return x+y+z
+            return x + y + z
 
         with execution_verifier() as verify_execution:
 
@@ -46,13 +47,11 @@ class ObserverTests(TestCase):
                 print(f"calling log: {ctx}")
                 assert ctx.callable is foo.orig_func
                 assert ctx.args == (1, 2)
-                assert ctx.kwargs == {"z":3}
+                assert ctx.kwargs == {"z": 3}
                 assert ctx.return_value == 6
 
-            with \
-                    foo.observers.pre.add(log_pre), \
-                    foo.observers.post.add(log_post):
-                foo(1,2,z=3)
+            with foo.observers.pre.add(log_pre), foo.observers.post.add(log_post):
+                foo(1, 2, z=3)
 
         with execution_verifier() as verify_execution:
 
@@ -66,7 +65,7 @@ class ObserverTests(TestCase):
 
             foo.observers.pre.add(log_pre)
             foo.observers.post.add(log_post)
-            foo(1,2,3)
+            foo(1, 2, 3)
 
         with execution_verifier() as verify_execution:
 
@@ -86,7 +85,7 @@ class ObserverTests(TestCase):
     def test_observer_callbacks_should_not_throw(self):
         @observable()
         def foo(x, y, z):
-            return x+y+z
+            return x + y + z
 
         with execution_verifier() as verify_execution:
 
@@ -96,18 +95,21 @@ class ObserverTests(TestCase):
                 raise CallbackError("TEST CALLBACK EXCEPTION")
 
             with foo.observers.pre.add(log_pre):
-                foo(1,2,3)
+                foo(1, 2, 3)
 
 
 @contextmanager
 def execution_verifier():
     _is_called: t.Dict[callable, bool] = {}
+
     def verify_executed(fn):
         _is_called[fn] = False
+
         @functools.wraps(fn)
         def fn_(*args, **kwargs):
             _is_called[fn] = True
             return fn(*args, **kwargs)
+
         return fn_
 
     try:

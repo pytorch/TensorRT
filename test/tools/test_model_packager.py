@@ -3,8 +3,8 @@ import unittest
 
 import torch
 import torch.fx
-from torch import nn
 from fx2trt_oss.fx.tools.model_packager import ModelPackager, generate_standalone_repro
+from torch import nn
 from torch.package import PackageImporter
 
 
@@ -14,7 +14,11 @@ class TestModel(nn.Module):
         self.a = torch.nn.Module()
         self.b = torch.nn.Module()
         self.a.weights = torch.nn.Parameter(torch.randn(1, 2))
-        self.b.weights = torch.nn.Parameter(torch.randn(1,))
+        self.b.weights = torch.nn.Parameter(
+            torch.randn(
+                1,
+            )
+        )
 
     def forward(self, x):
         return x + self.a.weights + self.b.weights
@@ -32,7 +36,6 @@ class ModelPackagerTest(unittest.TestCase):
         exec(string_io.read())
         exported_model = locals()["ExportedModule"]()
         _ = exported_model(*inputs)
-
 
     def test_package_model(self):
         model = torch.fx.symbolic_trace(TestModel().eval())

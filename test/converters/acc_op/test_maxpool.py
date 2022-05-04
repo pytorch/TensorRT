@@ -1,7 +1,7 @@
-import torch
 import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
-from torch.testing._internal.common_fx2trt import AccTestCase, InputTensorSpec
+import torch
 from parameterized import parameterized, param
+from torch.testing._internal.common_fx2trt import AccTestCase, InputTensorSpec
 from torch.testing._internal.common_utils import run_tests
 
 
@@ -16,7 +16,8 @@ class TestMaxPoolConverter(AccTestCase):
             param("ceil_mode", 1, ceil_mode=True),
         ]
     )
-    def test_max_pool1d(self,
+    def test_max_pool1d(
+        self,
         test_name,
         kernel_size,
         stride=1,
@@ -35,8 +36,12 @@ class TestMaxPoolConverter(AccTestCase):
                 return self.max_pool(x)
 
         inputs = [torch.randn(1, 3, 224)]
-        self.run_test(TestModule(), inputs, expected_ops={acc_ops.max_pool1d}, test_explicit_batch_dim=False,)
-
+        self.run_test(
+            TestModule(),
+            inputs,
+            expected_ops={acc_ops.max_pool1d},
+            test_explicit_batch_dim=False,
+        )
 
     @parameterized.expand(
         [
@@ -96,7 +101,8 @@ class TestMaxPoolConverter(AccTestCase):
             param("stride", 2, stride=()),
         ]
     )
-    def test_stride_none_max_pool1d(self,
+    def test_stride_none_max_pool1d(
+        self,
         test_name,
         kernel_size,
         stride=None,
@@ -110,12 +116,21 @@ class TestMaxPoolConverter(AccTestCase):
 
             def forward(self, x):
                 return torch.nn.functional.max_pool1d(
-                    x, kernel_size, stride=stride, padding=padding, ceil_mode=ceil_mode, dilation=dilation
+                    x,
+                    kernel_size,
+                    stride=stride,
+                    padding=padding,
+                    ceil_mode=ceil_mode,
+                    dilation=dilation,
                 )
 
         inputs = [torch.randn(1, 3, 224)]
-        self.run_test(TestModule(), inputs, expected_ops={acc_ops.max_pool1d}, test_explicit_batch_dim=False,)
-
+        self.run_test(
+            TestModule(),
+            inputs,
+            expected_ops={acc_ops.max_pool1d},
+            test_explicit_batch_dim=False,
+        )
 
     @parameterized.expand(
         [
@@ -136,12 +151,13 @@ class TestMaxPoolConverter(AccTestCase):
                 super().__init__()
 
             def forward(self, x):
-                return  torch.nn.functional.max_pool2d(
+                return torch.nn.functional.max_pool2d(
                     x, kernel_size, stride=stride, padding=padding, ceil_mode=ceil_mode
                 )
 
         inputs = [torch.randn(1, 3, 224, 224)]
         self.run_test(TestModule(), inputs, expected_ops={acc_ops.max_pool2d})
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run_tests()

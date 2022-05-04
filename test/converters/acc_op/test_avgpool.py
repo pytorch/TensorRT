@@ -1,5 +1,5 @@
-import torch
 import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
+import torch
 from parameterized import parameterized, param
 from torch.testing._internal.common_fx2trt import AccTestCase
 from torch.testing._internal.common_utils import run_tests
@@ -24,17 +24,13 @@ class TestAvgPoolConverter(AccTestCase):
         stride=1,
         padding=0,
         ceil_mode=False,
-        count_include_pad=True
+        count_include_pad=True,
     ):
         class TestModule(torch.nn.Module):
             def __init__(self):
                 super().__init__()
                 self.avg_pool = torch.nn.AvgPool1d(
-                    kernel_size,
-                    stride,
-                    padding,
-                    ceil_mode,
-                    count_include_pad
+                    kernel_size, stride, padding, ceil_mode, count_include_pad
                 )
 
             def forward(self, x):
@@ -95,7 +91,7 @@ class TestAvgPoolConverter(AccTestCase):
         stride=None,
         padding=0,
         ceil_mode=False,
-        count_include_pad=True
+        count_include_pad=True,
     ):
         class TestModule(torch.nn.Module):
             def __init__(self):
@@ -133,6 +129,7 @@ class TestAvgPoolConverter(AccTestCase):
         class TestModule(torch.nn.Module):
             def __init__(self):
                 super().__init__()
+
             def forward(self, x):
                 return torch.nn.functional.avg_pool2d(
                     x,
@@ -147,5 +144,6 @@ class TestAvgPoolConverter(AccTestCase):
         inputs = [torch.randn(1, 3, 224, 224)]
         self.run_test(TestModule(), inputs, expected_ops={acc_ops.avg_pool2d})
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run_tests()

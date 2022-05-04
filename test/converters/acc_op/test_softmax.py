@@ -1,19 +1,14 @@
-import torch
 import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
+import torch
 import torch.nn as nn
-from torch.testing._internal.common_fx2trt import AccTestCase, InputTensorSpec
 from parameterized import parameterized
+from torch.testing._internal.common_fx2trt import AccTestCase, InputTensorSpec
 from torch.testing._internal.common_utils import run_tests
 
 
 class TestSoftmaxConverter(AccTestCase):
     @parameterized.expand(
-        [
-            ("none_dim", None),
-            ("basic", 1),
-            ("batch_dim", 0),
-            ("negative_dim", -2)
-        ]
+        [("none_dim", None), ("basic", 1), ("batch_dim", 0), ("negative_dim", -2)]
     )
     def test_softmax(self, _, dim):
         class Softmax(nn.Module):
@@ -64,5 +59,6 @@ class TestSoftmaxConverter(AccTestCase):
             test_explicit_batch_dim=False,
         )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run_tests()

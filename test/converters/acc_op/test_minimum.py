@@ -1,5 +1,5 @@
-import torch
 import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
+import torch
 from torch.testing._internal.common_fx2trt import AccTestCase
 from torch.testing._internal.common_utils import run_tests
 
@@ -29,5 +29,6 @@ class TestMinimumMethodConverter(AccTestCase):
         ]
         self.run_test(Minimum(), inputs, expected_ops={acc_ops.minimum})
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run_tests()

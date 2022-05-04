@@ -2,8 +2,8 @@
 
 import torch
 import torch.fx
-from torch.testing._internal.common_fx2trt import VanillaTestCase
 from parameterized import parameterized, param
+from torch.testing._internal.common_fx2trt import VanillaTestCase
 from torch.testing._internal.common_utils import run_tests
 
 
@@ -107,5 +107,6 @@ class TestConvolutionConverter(VanillaTestCase):
         inputs = [torch.randn(1, 3, 32, 32, 32)]
         self.run_test(TestModule(), inputs, expected_ops={torch.nn.modules.conv.Conv3d})
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run_tests()

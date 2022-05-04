@@ -1,10 +1,11 @@
-import torch
-import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
-import torch.nn as nn
-from torch.testing._internal.common_fx2trt import AccTestCase
-from parameterized import param, parameterized
 import unittest
+
+import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
 import tensorrt as trt
+import torch
+import torch.nn as nn
+from parameterized import param, parameterized
+from torch.testing._internal.common_fx2trt import AccTestCase
 from torch.testing._internal.common_utils import run_tests
 
 
@@ -27,13 +28,12 @@ class TestPadConverter(AccTestCase):
             expected_ops={acc_ops.pad},
         )
 
-
     @parameterized.expand(
         [
             param("value", pad=(2, 0, 0, 1), value=1),
         ]
     )
-    def test_pad_fail(self, _, pad, mode='constant', value=0):
+    def test_pad_fail(self, _, pad, mode="constant", value=0):
         class Pad(nn.Module):
             def forward(self, x):
                 return torch.nn.functional.pad(x, pad, mode, value)
@@ -44,7 +44,6 @@ class TestPadConverter(AccTestCase):
             inputs,
             expect_error=RuntimeError,
         )
-
 
     @parameterized.expand(
         [
@@ -67,5 +66,6 @@ class TestPadConverter(AccTestCase):
             expected_ops={acc_ops.pad},
         )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run_tests()

@@ -1,6 +1,7 @@
+from typing import Any
+
 import torch
 from torch import fx
-from typing import Any
 
 
 class NodeProfiler(fx.Interpreter):
@@ -34,7 +35,9 @@ class NodeProfiler(fx.Interpreter):
         end_event.record()
         torch.cuda.synchronize()
 
-        self.execution_time[f"{n.name}"] = start_event.elapsed_time(end_event) / self.iter
+        self.execution_time[f"{n.name}"] = (
+            start_event.elapsed_time(end_event) / self.iter
+        )
         self.node_map[n.name] = n
         return result
 

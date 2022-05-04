@@ -2,8 +2,8 @@
 
 import logging
 
-import torch.fx as fx
 import fx2trt_oss.fx.passes.remove_duplicate_output_args as dedup
+import torch.fx as fx
 import torch.nn as nn
 from torch.testing._internal.common_utils import TestCase, run_tests
 
@@ -68,5 +68,6 @@ graph():
             ttop_a_graph_expected == ttop_a_graph_actual
         ), f"Unexpected ttop.a graph: {ttop_a_graph_actual}"
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run_tests()

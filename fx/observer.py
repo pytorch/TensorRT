@@ -1,9 +1,9 @@
-import typing as t
-import traceback
-import logging
-import functools
-from contextvars import ContextVar
 import contextlib
+import functools
+import logging
+import traceback
+import typing as t
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 
 
@@ -14,7 +14,9 @@ _LOGGER = logging.getLogger(__name__)
 # variable on the observer instance, however, contextvars document advice
 # against creating context variables not at module-global level.
 # https://docs.python.org/3/library/contextvars.html#contextvars.ContextVar
-_CALLBACKS: ContextVar[t.Dict["Observer", t.List[t.Callable]]] = ContextVar("_CALLBACKS", default=None)
+_CALLBACKS: ContextVar[t.Dict["Observer", t.List[t.Callable]]] = ContextVar(
+    "_CALLBACKS", default=None
+)
 
 TObserverCallback = t.TypeVar("TObserverCallback", bound=t.Callable[..., t.Any])
 
@@ -35,6 +37,7 @@ class Observer(t.Generic[TObserverCallback]):
     >>>     ...
 
     """
+
     name: str = ""
     # Ensure each Observer instance is considered a distinct key when stored in
     # the `_CALLBACKS` dictionary.
@@ -58,11 +61,14 @@ class Observer(t.Generic[TObserverCallback]):
                     # extra cautious here. I don't want it to throw and affect
                     # business logic.
                     pass
+
         return _add()
 
     def observe(self, *args, **kwargs) -> None:
         for callback in self._get_callbacks():
-            with _log_error("Error calling observer callback", rethrow=RETHROW_CALLBACK_EXCEPTION):
+            with _log_error(
+                "Error calling observer callback", rethrow=RETHROW_CALLBACK_EXCEPTION
+            ):
                 callback(*args, **kwargs)
 
     def _get_callbacks(self) -> t.List[t.Callable]:
@@ -96,6 +102,7 @@ class ObserveContext:
             when observing the callable after its invocation (via
             `CallableObservers.post`)
     """
+
     callable: t.Callable
     args: t.List[t.Any]
     kwargs: t.Mapping[str, t.Any]
@@ -123,9 +130,11 @@ def observable():
     >>>     # print out "called func_to_observe with (1,2)
     >>> # here it won't print
     """
+
     def decorator(observed_func: callable) -> ObservedCallable:
         wrapped_func = _make_observable(orig_func=observed_func)
         return functools.wraps(observed_func)(wrapped_func)
+
     return decorator
 
 
@@ -139,6 +148,7 @@ class ObservedCallable:
     """
     Interface for an observed callable
     """
+
     observers: CallableObservers
     orig_func: callable
 
@@ -164,7 +174,9 @@ def _make_observable(orig_func: t.Callable) -> ObservedCallable:
             return_value = orig_func(*args, **kwargs)
             return return_value
         finally:
-            observers.post.observe(ObserveContext(orig_func, args, kwargs, return_value))
+            observers.post.observe(
+                ObserveContext(orig_func, args, kwargs, return_value)
+            )
 
     observed_func.orig_func = orig_func
     observed_func.observers = observers

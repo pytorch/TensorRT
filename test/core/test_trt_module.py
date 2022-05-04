@@ -56,5 +56,6 @@ class TestTRTModule(TestCase):
             new_trt_mod(inputs[0].cuda()).cpu(), ref_output, rtol=1e-04, atol=1e-04
         )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run_tests()

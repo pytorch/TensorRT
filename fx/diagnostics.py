@@ -16,10 +16,14 @@ TWrite = t.Union[str, bytes]
 WriteObj = t.Union[TWrite, t.Callable[[], TWrite]]
 
 _CURRENT_WRITER: ContextVar["DiagnosticsWriter"] = ContextVar("_CURRENT_WRITER")
-_CURRENT_COLLECTOR: ContextVar["DiagnosticsCollector"] = ContextVar("_CURRENT_COLLECTOR")
+_CURRENT_COLLECTOR: ContextVar["DiagnosticsCollector"] = ContextVar(
+    "_CURRENT_COLLECTOR"
+)
 # Allows a collector to indicate subsequent collections should be suppressed to
 # avoid duplicate collections.
-_SUBSEQUENT_COLLECT_SUPPRESSED_BY: ContextVar[object] = ContextVar("_SUBSEQUENT_COLLECT_SUPPRESSED_BY")
+_SUBSEQUENT_COLLECT_SUPPRESSED_BY: ContextVar[object] = ContextVar(
+    "_SUBSEQUENT_COLLECT_SUPPRESSED_BY"
+)
 # Indicates current execution context is within a context manager by
 # `collect_when`. Only when it's set do we actually write diagnostics.
 _IS_IN_COLLECT_CONTEXT: ContextVar[bool] = ContextVar("_IS_IN_COLLECT_CONTEXT")
@@ -30,10 +34,13 @@ _LOGGER = logging.getLogger(__name__)
 class CollectionConditionContext:
     exception: t.Optional[Exception]
 
+
 CollectionCondition = t.Callable[[CollectionConditionContext], bool]
 
 
-def collect_when(condition: "CollectionCondition", supress_subsequent_collect: bool = True):
+def collect_when(
+    condition: "CollectionCondition", supress_subsequent_collect: bool = True
+):
     """See `DiagnosticsCollector.collect_when`"""
     return get_current_collector().collect_when(condition, supress_subsequent_collect)
 
@@ -124,15 +131,11 @@ class DiagnosticsWriter:
 class CollectionConditions:
     @classmethod
     def any(cls, *conditions: "CollectionCondition") -> "CollectionCondition":
-        return lambda ctx: any(
-            cond(ctx) for cond in conditions
-        )
+        return lambda ctx: any(cond(ctx) for cond in conditions)
 
     @classmethod
     def all(cls, *conditions: "CollectionCondition") -> "CollectionCondition":
-        return lambda ctx: all(
-            cond(ctx) for cond in conditions
-        )
+        return lambda ctx: all(cond(ctx) for cond in conditions)
 
     @classmethod
     def not_(cls, condition: "CollectionCondition") -> "CollectionCondition":
@@ -155,7 +158,9 @@ class CollectionConditions:
         return lambda ctx: ctx.exception is not None
 
     @classmethod
-    def when_called_by_function(cls, func_name: str, match_prefix: bool = False) -> "CollectionCondition":
+    def when_called_by_function(
+        cls, func_name: str, match_prefix: bool = False
+    ) -> "CollectionCondition":
         def _when_called_by_function(ctx: CollectionConditionContext) -> bool:
             frames = inspect.stack()
             for frame in frames:
@@ -166,6 +171,7 @@ class CollectionConditions:
                     if frame[3] == func_name:
                         return True
             return False
+
         return _when_called_by_function
 
     @classmethod
@@ -177,7 +183,9 @@ class CollectionConditions:
 
 class DiagnosticsCollector:
     @contextlib.contextmanager
-    def collect_when(self, condition: "CollectionCondition", supress_subsequent_collect: bool = True):
+    def collect_when(
+        self, condition: "CollectionCondition", supress_subsequent_collect: bool = True
+    ):
         """
         Context manager to collect diagnostics when the enclosed code completes
         and *any* of the given condition is met.
@@ -239,9 +247,7 @@ class DiagnosticsCollector:
 
     @classmethod
     def _test_condition(
-        cls,
-        cond: CollectionCondition,
-        ctx: CollectionConditionContext
+        cls, cond: CollectionCondition, ctx: CollectionConditionContext
     ) -> bool:
         try:
             return cond(ctx)

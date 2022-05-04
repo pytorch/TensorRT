@@ -1,11 +1,11 @@
 # type: ignore[]
 
+import fx2trt_oss.tracer.acc_tracer.acc_tracer as acc_tracer
 import torch
 import torch.fx
 import torch.nn as nn
-import fx2trt_oss.tracer.acc_tracer.acc_tracer as acc_tracer
-from fx2trt_oss.fx.tools.trt_splitter import TRTSplitter
 from fx2trt_oss.fx import TRTInterpreter, InputTensorSpec, TRTModule
+from fx2trt_oss.fx.tools.trt_splitter import TRTSplitter
 
 
 # The purpose of this example is to demonstrate the overall flow of lowering a PyTorch
@@ -19,6 +19,7 @@ from fx2trt_oss.fx import TRTInterpreter, InputTensorSpec, TRTModule
 #
 # If we know the model is fully supported by fx2trt then we can skip the splitter.
 
+
 class Model(nn.Module):
     def __init__(self):
         super().__init__()
@@ -30,6 +31,7 @@ class Model(nn.Module):
         x = self.relu(x)
         x = torch.linalg.norm(x, ord=2, dim=1)
         return x
+
 
 inputs = [torch.randn(1, 10)]
 model = Model().eval()
@@ -104,14 +106,16 @@ lowered_model_output = split_mod(*cuda_inputs)
 # Make sure the results match
 model.cuda()
 regular_model_output = model(*cuda_inputs)
-torch.testing.assert_close(lowered_model_output, regular_model_output.to(torch.float16), atol=3e-3, rtol=1e-2)
+torch.testing.assert_close(
+    lowered_model_output, regular_model_output.to(torch.float16), atol=3e-3, rtol=1e-2
+)
 
 # We can utilize the trt profiler to print out the time spend on each layer.
 trt_mod.enable_profiling()
 trt_mod(*cuda_inputs)
-'''
+"""
 Reformatting CopyNode for Input Tensor 0 to LayerType.FULLY_CONNECTED_acc_ops.linear_linear_1: 0.027392ms
 LayerType.FULLY_CONNECTED_acc_ops.linear_linear_1: 0.023072ms
 PWN(ActivationType.RELU_acc_ops.relu_relu_1): 0.008928ms
-'''
+"""
 trt_mod.disable_profiling()

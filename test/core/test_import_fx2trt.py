@@ -13,5 +13,6 @@ class MainTests(TestCase):
     def test_1(self):
         pass
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run_tests()

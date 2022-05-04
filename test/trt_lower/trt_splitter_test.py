@@ -9,8 +9,8 @@ import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
 import torch.fx.passes.operator_support as op_support
 import torch.fx.passes.shape_prop as shape_prop
 from fx2trt_oss.fx.tools.trt_splitter import TRTSplitter
-from torch.fx.passes import splitter_base
 from fx2trt_oss.tracer.acc_tracer import acc_tracer
+from torch.fx.passes import splitter_base
 from torch.testing._internal.common_utils import TestCase, run_tests
 
 
@@ -20,7 +20,9 @@ ACC_SUBMODULE_PREFIX = "_run_on_acc_"
 
 # Check if the split result has expected number of ACC submodule. If not, raise runtime error;
 def verify_split_model(
-    mod: torch.fx.GraphModule, acc_submodule_keyword: str = ACC_SUBMODULE_PREFIX, expected_number: int = 1,
+    mod: torch.fx.GraphModule,
+    acc_submodule_keyword: str = ACC_SUBMODULE_PREFIX,
+    expected_number: int = 1,
 ) -> None:
     acc_submodule_num = 0
     for name, _ in mod.named_children():
@@ -31,6 +33,7 @@ def verify_split_model(
         raise RuntimeError(ERROR_MSG_NO_ACC_MODULE)
     elif acc_submodule_num > expected_number:
         raise RuntimeError(ERROR_MSG_MULTI_ACC_MODULES)
+
 
 def find_inputs(module):
     return [n for n in module.graph.nodes if n.op == "placeholder"]
@@ -174,18 +177,14 @@ class TestSplit(TestCase):
             def is_node_supported(self, submodules, node):
                 return True
 
-        splitter = TRTSplitter(
-            mod, (torch.randn(2, 3),), CustomOpSupport()
-        )
+        splitter = TRTSplitter(mod, (torch.randn(2, 3),), CustomOpSupport())
 
         def test_splitter(splitter):
             st_split = splitter()
             try:
                 verify_split_model(st_split)
             except RuntimeError as err:
-                self.assertEqual(
-                    str(err), ERROR_MSG_NO_ACC_MODULE
-                )
+                self.assertEqual(str(err), ERROR_MSG_NO_ACC_MODULE)
             self.assertEqual(splitter.module.__dict__.keys(), st_split.__dict__.keys())
 
         test_splitter(splitter)
@@ -203,9 +202,7 @@ class TestSplit(TestCase):
             def is_node_supported(self, submodules, node):
                 return True
 
-        splitter = TRTSplitter(
-            mod, (torch.randn(2, 3),), CustomOpSupport()
-        )
+        splitter = TRTSplitter(mod, (torch.randn(2, 3),), CustomOpSupport())
 
         def test_splitter(splitter):
             st_split = splitter()
@@ -263,7 +260,9 @@ class TestSplit(TestCase):
             def forward(self, x):
                 return self.relu_module(x) + self.sin_module(x)
 
-        mod = acc_tracer.trace(TestModule3(ReluModule(), SinModule()), [torch.randn(2, 3)])
+        mod = acc_tracer.trace(
+            TestModule3(ReluModule(), SinModule()), [torch.randn(2, 3)]
+        )
 
         # Making sin(x) run on ACC
         splitter = TRTSplitter(
@@ -334,9 +333,7 @@ class TestSplit(TestCase):
             try:
                 verify_split_model(st_split)
             except RuntimeError as err:
-                self.assertEqual(
-                    str(err), ERROR_MSG_MULTI_ACC_MODULES
-                )
+                self.assertEqual(str(err), ERROR_MSG_MULTI_ACC_MODULES)
             [arg] = find_inputs(st_split)
 
             # First subgraph calculates b = sin(a) on CPU
@@ -410,9 +407,7 @@ class TestSplit(TestCase):
             try:
                 verify_split_model(st_split)
             except RuntimeError as err:
-                self.assertEqual(
-                    str(err), ERROR_MSG_NO_ACC_MODULE
-                )
+                self.assertEqual(str(err), ERROR_MSG_NO_ACC_MODULE)
             modules = list(st_split.named_modules())
             # Main module and a submodule
             assert len(modules) == 2
@@ -496,15 +491,11 @@ class TestSplit(TestCase):
             try:
                 verify_split_model(split_module, "acc_")
             except RuntimeError as err:
-                self.assertEqual(
-                    str(err), ERROR_MSG_MULTI_ACC_MODULES
-                )
+                self.assertEqual(str(err), ERROR_MSG_MULTI_ACC_MODULES)
             try:
                 verify_split_model(split_module)
             except RuntimeError as err:
-                self.assertEqual(
-                    str(err), ERROR_MSG_NO_ACC_MODULE
-                )
+                self.assertEqual(str(err), ERROR_MSG_NO_ACC_MODULE)
 
             module_names = [name for name, _ in split_module.named_modules()]
             # Main module, 2 cpu submodules and 3 acc submodule
@@ -521,9 +512,7 @@ class TestSplit(TestCase):
             try:
                 verify_split_model(extend_module, "acc_")
             except RuntimeError as err:
-                self.assertEqual(
-                    str(err), ERROR_MSG_MULTI_ACC_MODULES
-                )
+                self.assertEqual(str(err), ERROR_MSG_MULTI_ACC_MODULES)
 
             # 1 Placeholder, 1 Adds and 1 Output
             assert len(extend_module.acc_0.graph.nodes) == 3
@@ -536,9 +525,7 @@ class TestSplit(TestCase):
             try:
                 verify_split_model(extend_module, "acc_")
             except RuntimeError as err:
-                self.assertEqual(
-                    str(err), ERROR_MSG_MULTI_ACC_MODULES
-                )
+                self.assertEqual(str(err), ERROR_MSG_MULTI_ACC_MODULES)
 
             assert len(extend_module.acc_2.graph.nodes) == 9
             # 2 Placeholder, 1 Adds and 1 Output
@@ -579,9 +566,7 @@ class TestSplit(TestCase):
             try:
                 verify_split_model(module_split)
             except RuntimeError as err:
-                self.assertEqual(
-                    str(err), ERROR_MSG_NO_ACC_MODULE
-                )
+                self.assertEqual(str(err), ERROR_MSG_NO_ACC_MODULE)
 
             output = find_output(module_split)
             # Second argument of the output should be get_attr.
@@ -631,9 +616,7 @@ class TestSplit(TestCase):
             try:
                 verify_split_model(module_split)
             except RuntimeError as err:
-                self.assertEqual(
-                    str(err), ERROR_MSG_NO_ACC_MODULE
-                )
+                self.assertEqual(str(err), ERROR_MSG_NO_ACC_MODULE)
 
             # Check if modules are equivalent.
             result_original = module_original()
@@ -803,9 +786,7 @@ class TestSplitNonTensorEdges(TestCase):
             try:
                 verify_split_model(module_fx_split)
             except RuntimeError as err:
-                self.assertEqual(
-                    str(err), ERROR_MSG_MULTI_ACC_MODULES
-                )
+                self.assertEqual(str(err), ERROR_MSG_MULTI_ACC_MODULES)
 
             self.assertEqual(
                 {acc_ops.relu}, find_call_targets(module_fx_split._run_on_acc_0)
@@ -873,7 +854,10 @@ class TestSplitNonTensorEdges(TestCase):
     def test_split_non_tensor_edges_3(self):
         test_data = torch.randn(2, 3)
 
-        module_nn = acc_tracer.trace(self.TestModule(), (test_data,),)
+        module_nn = acc_tracer.trace(
+            self.TestModule(),
+            (test_data,),
+        )
 
         # Making 'a', 'c', 'd' and 'e' run on ACC
         splitter = TRTSplitter(
@@ -894,9 +878,7 @@ class TestSplitNonTensorEdges(TestCase):
             try:
                 verify_split_model(module_fx_split)
             except RuntimeError as err:
-                self.assertEqual(
-                    str(err), ERROR_MSG_MULTI_ACC_MODULES
-                )
+                self.assertEqual(str(err), ERROR_MSG_MULTI_ACC_MODULES)
 
             self.assertEqual(
                 {acc_ops.relu, acc_ops.cos},
@@ -922,7 +904,10 @@ class TestSplitNonTensorEdges(TestCase):
     def test_split_non_tensor_edges_4(self):
         test_data = torch.randn(2, 3)
 
-        module_nn = acc_tracer.trace(self.TestModule(), (test_data,),)
+        module_nn = acc_tracer.trace(
+            self.TestModule(),
+            (test_data,),
+        )
 
         # Making 'a', 'c', 'd' and 'e' run on ACC with limit on ACC
         # subgraph size
@@ -1082,7 +1067,6 @@ class TestAccFusionsFinder(TestCase):
         fusion_map = fusions_finder()
         self.assertEqual(len(fusion_map), 0)
 
-
     def test_start_with_acc_module_(self):
         """
            sin     relu     cos     sigmoid     tanh
@@ -1132,9 +1116,7 @@ class TestAccFusionsFinder(TestCase):
             try:
                 verify_split_model(st_split)
             except RuntimeError as err:
-                self.assertEqual(
-                    str(err), ERROR_MSG_NO_ACC_MODULE
-                )
+                self.assertEqual(str(err), ERROR_MSG_NO_ACC_MODULE)
             modules = list(st_split.named_modules())
             # Main module and a submodule
             assert len(modules) == 3
@@ -1148,5 +1130,6 @@ class TestAccFusionsFinder(TestCase):
 def op_support_with_support_dict(support_dict: dict) -> op_support.OperatorSupportBase:
     return op_support.OperatorSupport(support_dict)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run_tests()

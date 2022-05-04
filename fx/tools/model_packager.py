@@ -1,9 +1,9 @@
-import torch
-
-from torch.package import PackageExporter
-from typing import Sequence, BinaryIO, TextIO, Union
 from pathlib import Path
+from typing import Sequence, BinaryIO, TextIO, Union
+
+import torch
 from torch.fx.passes.split_utils import getattr_recursive
+from torch.package import PackageExporter
 
 """
 A tool to package acc submodule as a torch package. The packaged model can be loaded
@@ -36,7 +36,9 @@ def flatten_model(model: torch.fx.GraphModule) -> torch.fx.GraphModule:
     return model
 
 
-def generate_standalone_repro(model: torch.fx.GraphModule, output: Union[str, Path, TextIO], prelude: str="") -> None:
+def generate_standalone_repro(
+    model: torch.fx.GraphModule, output: Union[str, Path, TextIO], prelude: str = ""
+) -> None:
     """
     Generate a standalone python file for the model where weights are randomized
     and the model flattened.
@@ -44,7 +46,7 @@ def generate_standalone_repro(model: torch.fx.GraphModule, output: Union[str, Pa
     """
     model = flatten_model(model)
 
-    INDENT= "    "
+    INDENT = "    "
     lines = [
         "",
         "import torch",
@@ -59,13 +61,22 @@ def generate_standalone_repro(model: torch.fx.GraphModule, output: Union[str, Pa
         shape = ", ".join([str(i) for i in v.shape])
         rand_func = "randn" if torch.is_floating_point(v) else "randint"
         int_range = "" if torch.is_floating_point(v) else "0, 5, "
-        lines.append(f"{INDENT * 2}self.{k} = nn.Parameter(torch.{rand_func}({int_range}{shape}, dtype={v.dtype}))")
+        lines.append(
+            f"{INDENT * 2}self.{k} = nn.Parameter(torch.{rand_func}({int_range}{shape}, dtype={v.dtype}))"
+        )
     code = str(model.code)
 
     def dump(f):
         f.write(prelude)
         f.write("\n".join(lines))
-        f.write("\n".join([INDENT + line.replace("self._holder.", "self.") for line in code.split("\n")]))
+        f.write(
+            "\n".join(
+                [
+                    INDENT + line.replace("self._holder.", "self.")
+                    for line in code.split("\n")
+                ]
+            )
+        )
         f.write("\n")
 
     if isinstance(output, (Path, str)):
@@ -88,11 +99,14 @@ class ModelPackager:
 
     @classmethod
     def set_mocked_modules(cls, pe: PackageExporter):
-        pe.mock("**", exclude=[
-            "fx2trt_oss.tracer.acc_tracer.acc_ops",
-            "fx2trt_oss.tracer.acc_tracer.acc_normalizer",
-            "fx2trt_oss.tracer.acc_tracer.acc_op_properties",
-        ])
+        pe.mock(
+            "**",
+            exclude=[
+                "fx2trt_oss.tracer.acc_tracer.acc_ops",
+                "fx2trt_oss.tracer.acc_tracer.acc_normalizer",
+                "fx2trt_oss.tracer.acc_tracer.acc_op_properties",
+            ],
+        )
 
     @classmethod
     def package_model(

@@ -1,8 +1,9 @@
-import tensorrt as trt
+import json
 import operator
 from typing import Optional, Mapping, List
+
+import tensorrt as trt
 import torch
-import json
 from fx2trt_oss.fx import TRTModule
 
 
@@ -14,7 +15,9 @@ class SortedTRTProfiler(trt.IProfiler):
     def report_layer_time(self, layer_name: str, ms: int) -> None:
         self.layers[layer_name] = ms
 
-    def print_sorted_profile(self, additional_info: Optional[Mapping[str, str]]) -> None:
+    def print_sorted_profile(
+        self, additional_info: Optional[Mapping[str, str]]
+    ) -> None:
         additional_info = {} if additional_info is None else additional_info
         for k, v in sorted(self.layers.items(), key=operator.itemgetter(1)):
             additional_str = additional_info.get(k, "")

@@ -1,12 +1,12 @@
 # Owner(s): ["oncall: gpu_enablement"]
 
-import torch
 import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
-from torch.testing._internal.common_fx2trt import AccTestCase
+import torch
 from fx2trt_oss.fx.passes.lower_basic_pass import (
     fuse_permute_linear,
     trt_transposed_linear,
 )
+from torch.testing._internal.common_fx2trt import AccTestCase
 from torch.testing._internal.common_utils import run_tests
 
 
@@ -76,5 +76,6 @@ class TestFusePermuteLinear(AccTestCase):
             apply_passes=[fuse_permute_linear],
         )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run_tests()

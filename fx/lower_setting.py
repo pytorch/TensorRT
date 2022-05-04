@@ -1,9 +1,13 @@
-from typing import Type, Set, Optional, Sequence, List
-from fx2trt_oss.fx import InputTensorSpec
-from fx2trt_oss.fx.utils import LowerPrecision
 import dataclasses as dc
+from typing import Type, Set, Optional, Sequence, List
+
+from fx2trt_oss.fx import InputTensorSpec
+from fx2trt_oss.fx.passes.lower_basic_pass import (
+    fuse_permute_linear,
+    fuse_permute_matmul,
+)
+from fx2trt_oss.fx.utils import LowerPrecision
 from torch import nn
-from fx2trt_oss.fx.passes.lower_basic_pass import fuse_permute_linear, fuse_permute_matmul
 from torch.fx.passes.pass_manager import PassManager
 
 
@@ -61,6 +65,7 @@ class LowerSetting:
 
     min_acc_module_size(int): minimal number of nodes for an accelerate submodule.
     """
+
     max_batch_size: int = 2048
     input_specs: List[InputTensorSpec] = dc.field(default_factory=list)
     explicit_batch_dimension: bool = True
@@ -69,7 +74,9 @@ class LowerSetting:
     max_workspace_size: int = 1 << 30
     strict_type_constraints: bool = False
     customized_fuse_pass: PassManager = PassManager.build_from_passlist([])
-    lower_basic_fuse_pass: PassManager = PassManager.build_from_passlist([fuse_permute_matmul,fuse_permute_linear])
+    lower_basic_fuse_pass: PassManager = PassManager.build_from_passlist(
+        [fuse_permute_matmul, fuse_permute_linear]
+    )
     verbose_log: bool = False
     algo_selector = None
     timing_cache_prefix: str = ""

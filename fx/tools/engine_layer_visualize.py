@@ -53,7 +53,9 @@ class LayerInfo(NamedTuple):
         )[0]
 
         if kernel_name != "Constant":
-            inputs = re.findall("[, ]*(.+?)\\[([Half|Float|Int8]+\\(\\d[,\\d]*\\))\\]", inputs)
+            inputs = re.findall(
+                "[, ]*(.+?)\\[([Half|Float|Int8]+\\(\\d[,\\d]*\\))\\]", inputs
+            )
             for input_name, input_type in inputs:
                 input_names.append(input_name)
                 input_types.append(input_type)
@@ -195,7 +197,9 @@ if args.log_file != "":
             layer_name2node[layer.layer_name] = node
 
         for layer in layers:
-            build_edge(layer, dot_graph, reformat_layers, output_name2node, layer_name2node)
+            build_edge(
+                layer, dot_graph, reformat_layers, output_name2node, layer_name2node
+            )
 
         dot_graph.write_raw(f"EngineLayers_{i}.dot")
         i += 1

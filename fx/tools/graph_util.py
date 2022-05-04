@@ -1,7 +1,9 @@
 import graphviz  # type: ignore[import]
 
+
 def get_layer_name_type(layer):
     return "\n".join(f"{i}" for i in [layer.name, layer.type])
+
 
 def trt_network_to_dot_graph(network):
     dot = graphviz.Digraph(comment="Network")
@@ -33,7 +35,11 @@ def trt_network_to_dot_graph(network):
                     input_j = layer_b.get_input(j)
 
                     if output_i == input_j:
-                        dot.edge(get_layer_name_type(layer_a), get_layer_name_type(layer_b), label=str(input_j.shape))
+                        dot.edge(
+                            get_layer_name_type(layer_a),
+                            get_layer_name_type(layer_b),
+                            label=str(input_j.shape),
+                        )
 
     # add input->layer edges
     for i in range(network.num_inputs):
@@ -46,7 +52,11 @@ def trt_network_to_dot_graph(network):
                 input_j = layer_b.get_input(j)
 
                 if input_i == input_j:
-                    dot.edge(input_i.name, get_layer_name_type(layer_b), label=str(input_j.shape))
+                    dot.edge(
+                        input_i.name,
+                        get_layer_name_type(layer_b),
+                        label=str(input_j.shape),
+                    )
 
     # add layer->output edges
     for i in range(network.num_outputs):
@@ -59,6 +69,10 @@ def trt_network_to_dot_graph(network):
                 input_j = layer_b.get_output(j)
 
                 if input_i == input_j:
-                    dot.edge(get_layer_name_type(layer_b), input_i.name, label=str(input_j.shape))
+                    dot.edge(
+                        get_layer_name_type(layer_b),
+                        input_i.name,
+                        label=str(input_j.shape),
+                    )
 
     return dot

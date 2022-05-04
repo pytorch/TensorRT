@@ -3,10 +3,10 @@ from copy import deepcopy
 from dataclasses import replace, field, dataclass
 
 import torch
+import torchdynamo
 import torchvision
 from fx2trt_oss.fx.lower import lower_to_trt
 from fx2trt_oss.fx.utils import LowerPrecision
-import torchdynamo
 from torchdynamo.optimizations import backends
 
 """
@@ -104,19 +104,47 @@ def benchmark(
     conf = Configuration(batch_iter=batch_iter, batch_size=batch_size)
 
     configurations = [
-
         # FP32
-        replace(conf, name="TRT FP32 Eager", trt=True, torchdynamo=False, fp16=False, accuracy_rtol=1e-3),
+        replace(
+            conf,
+            name="TRT FP32 Eager",
+            trt=True,
+            torchdynamo=False,
+            fp16=False,
+            accuracy_rtol=1e-3,
+        ),
         # torchdynamo fp16
-        replace(conf, name="TRT FP16 Eager", trt=False, torchdynamo=True, fp16=True, accuracy_rtol=1e-2),
+        replace(
+            conf,
+            name="TRT FP16 Eager",
+            trt=False,
+            torchdynamo=True,
+            fp16=True,
+            accuracy_rtol=1e-2,
+        ),
         # FP16
-        replace(conf, name="torchdynamo-TRT FP32 Eager", trt=False, torchdynamo=True, fp16=False, accuracy_rtol=1e-2),
+        replace(
+            conf,
+            name="torchdynamo-TRT FP32 Eager",
+            trt=False,
+            torchdynamo=True,
+            fp16=False,
+            accuracy_rtol=1e-2,
+        ),
         # torchdynamo fp16
-        replace(conf, name="torchdynamo-TRT FP16 Eager", trt=False, torchdynamo=True, fp16=True, accuracy_rtol=1e-2),
+        replace(
+            conf,
+            name="torchdynamo-TRT FP16 Eager",
+            trt=False,
+            torchdynamo=True,
+            fp16=True,
+            accuracy_rtol=1e-2,
+        ),
     ]
 
     results = [
-        run_configuration_benchmark(deepcopy(model), inputs, conf_) for conf_ in configurations
+        run_configuration_benchmark(deepcopy(model), inputs, conf_)
+        for conf_ in configurations
     ]
 
     for res in results:
@@ -167,7 +195,6 @@ def run_configuration_benchmark(
         module = module.half()
         input = [i.half() for i in input]
 
-
     if conf.trt:
         # Run lowering eager mode benchmark
         lowered_module = lower_to_trt(
@@ -188,9 +215,7 @@ def run_configuration_benchmark(
     else:
         print("Lowering mode is not available!", "red")
 
-    result = Result(
-        module=module, input=input, conf=conf, time_sec=time
-    )
+    result = Result(module=module, input=input, conf=conf, time_sec=time)
     return result
 
 

@@ -1,13 +1,13 @@
 import warnings
 from typing import List, NamedTuple, Any, Optional, Sequence, Dict, Callable
 
-from fx2trt_oss.fx.observer import Observer
 import numpy
 
 # @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch
 import torch.fx
+from fx2trt_oss.fx.observer import Observer
 from torch.fx.node import _get_qualified_name
 from torch.fx.passes.shape_prop import TensorMetadata
 
@@ -15,7 +15,9 @@ from .converter_registry import CONVERTERS
 from .input_tensor_spec import InputTensorSpec
 from .utils import torch_dtype_to_trt, get_dynamic_dims, LowerPrecision
 
-TRT_INTERPRETER_CALL_PRE_OBSERVER: Observer[Callable[[torch.fx.GraphModule], None]] = Observer("TRT_INTERPRETER_CALL_PRE_OBSERVER")
+TRT_INTERPRETER_CALL_PRE_OBSERVER: Observer[
+    Callable[[torch.fx.GraphModule], None]
+] = Observer("TRT_INTERPRETER_CALL_PRE_OBSERVER")
 
 
 class TRTInterpreterResult(NamedTuple):
@@ -67,7 +69,9 @@ class TRTInterpreter(torch.fx.Interpreter):
         self._cur_node_name: Optional[str] = None
         self._input_names: List[str] = []
         self._output_names: List[str] = []
-        self._itensor_to_tensor_meta: Dict[trt.tensorrt.ITensor, TensorMetadata] = dict()
+        self._itensor_to_tensor_meta: Dict[
+            trt.tensorrt.ITensor, TensorMetadata
+        ] = dict()
 
     def validate_input_specs(self):
         for shape, dtpe, _, shape_ranges, has_batch_dim in self.input_specs:
@@ -158,12 +162,20 @@ class TRTInterpreter(torch.fx.Interpreter):
 
         # For float outputs, we set their dtype to fp16 only if lower_precision == LowerPrecision.FP16 and
         # force_fp32_output=False.
-        self.output_fp16 = not force_fp32_output and lower_precision == LowerPrecision.FP16
+        self.output_fp16 = (
+            not force_fp32_output and lower_precision == LowerPrecision.FP16
+        )
 
-        if lower_precision == LowerPrecision.INT8 and not self.builder.platform_has_fast_int8:
+        if (
+            lower_precision == LowerPrecision.INT8
+            and not self.builder.platform_has_fast_int8
+        ):
             raise RuntimeError("Current platform doesn't support fast native int8!")
 
-        if lower_precision == LowerPrecision.FP16 and not self.builder.platform_has_fast_fp16:
+        if (
+            lower_precision == LowerPrecision.FP16
+            and not self.builder.platform_has_fast_fp16
+        ):
             warnings.warn("Current platform doesn't support fast native fp16!")
 
         self.input_specs_iter = 0
@@ -182,9 +194,11 @@ class TRTInterpreter(torch.fx.Interpreter):
         builder_config.set_timing_cache(cache, False)
 
         if trt.__version__ >= "8.2":
-            builder_config.profiling_verbosity = profiling_verbosity \
-                if profiling_verbosity else \
-                trt.ProfilingVerbosity.LAYER_NAMES_ONLY
+            builder_config.profiling_verbosity = (
+                profiling_verbosity
+                if profiling_verbosity
+                else trt.ProfilingVerbosity.LAYER_NAMES_ONLY
+            )
         if lower_precision == LowerPrecision.FP16:
             builder_config.set_flag(trt.BuilderFlag.FP16)
 
@@ -208,10 +222,15 @@ class TRTInterpreter(torch.fx.Interpreter):
         engine = self.builder.build_engine(self.network, builder_config)
         assert engine
 
-        serialized_cache = bytearray(cache.serialize()) \
-            if builder_config.get_timing_cache() else bytearray()
+        serialized_cache = (
+            bytearray(cache.serialize())
+            if builder_config.get_timing_cache()
+            else bytearray()
+        )
 
-        return TRTInterpreterResult(engine, self._input_names, self._output_names, serialized_cache)
+        return TRTInterpreterResult(
+            engine, self._input_names, self._output_names, serialized_cache
+        )
 
     def run_node(self, n):
         self._cur_node_name = str(n)
@@ -297,7 +316,21 @@ class TRTInterpreter(torch.fx.Interpreter):
             raise RuntimeError("TensorRT requires all outputs to be Tensor!")
 
         for i, output in enumerate(outputs):
-            if any(op_name in output.name.split("_") for op_name in ("eq", "gt", "lt", "or", "xor", "and", "not", "ne", "isinf", "any")):
+            if any(
+                op_name in output.name.split("_")
+                for op_name in (
+                    "eq",
+                    "gt",
+                    "lt",
+                    "or",
+                    "xor",
+                    "and",
+                    "not",
+                    "ne",
+                    "isinf",
+                    "any",
+                )
+            ):
                 output_bool = True
             else:
                 output_bool = False

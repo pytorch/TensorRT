@@ -1,9 +1,9 @@
-from torch.testing._internal.common_fx2trt import InputTensorSpec, AccTestCase
-from torch import nn
-from fx2trt_oss.tracer.acc_tracer import acc_ops
 import torch
-from torch.testing._internal.common_utils import run_tests
+from fx2trt_oss.tracer.acc_tracer import acc_ops
 from parameterized import parameterized
+from torch import nn
+from torch.testing._internal.common_fx2trt import InputTensorSpec, AccTestCase
+from torch.testing._internal.common_utils import run_tests
 
 
 class TestHardSigmoid(AccTestCase):
@@ -38,5 +38,6 @@ class TestHardSigmoid(AccTestCase):
             Hardsigmoid(), input_specs, expected_ops={acc_ops.hardsigmoid}
         )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run_tests()

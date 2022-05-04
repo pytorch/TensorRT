@@ -1,11 +1,12 @@
 # Owner(s): ["oncall: gpu_enablement"]
-from typing import Union
-from unittest import TestCase
 import functools
 import glob
 import os
 import shutil
 import tempfile
+from typing import Union
+from unittest import TestCase
+
 import fx2trt_oss.fx.diagnostics as diag
 
 
@@ -21,15 +22,14 @@ def reset_diag(fn):
             diag._CURRENT_COLLECTOR.reset(tok1)
             diag._CURRENT_WRITER.reset(tok2)
             diag._SUBSEQUENT_COLLECT_SUPPRESSED_BY.reset(tok3)
+
     return reset
 
 
 class Fx2trtDiagnosticsTest(TestCase):
     @reset_diag
     def test_diagnostics(self):
-        collector = diag.ZipDiagnosticsCollector(
-            writer=diag.get_current_writer()
-        )
+        collector = diag.ZipDiagnosticsCollector(writer=diag.get_current_writer())
 
         diag.set_current_collector(collector)
 
@@ -42,6 +42,7 @@ class Fx2trtDiagnosticsTest(TestCase):
 
                 def boom() -> str:
                     raise AssertionError("Error generating diagnostics.")
+
                 diag.write("eee", boom)
 
                 diag.write("zzz", "done")
@@ -64,13 +65,13 @@ class Fx2trtDiagnosticsTest(TestCase):
 
     @reset_diag
     def test_condition_func_name(self):
-        collector = diag.ZipDiagnosticsCollector(
-            writer=diag.get_current_writer()
-        )
+        collector = diag.ZipDiagnosticsCollector(writer=diag.get_current_writer())
         diag.set_current_collector(collector)
 
         with diag.collect_when(
-            diag.CollectionConditions.when_called_by_function(self.test_condition_func_name.__name__)
+            diag.CollectionConditions.when_called_by_function(
+                self.test_condition_func_name.__name__
+            )
         ):
             diag.write("aaa", "hello")
 
@@ -83,9 +84,7 @@ class Fx2trtDiagnosticsTest(TestCase):
 
     @reset_diag
     def test_write_without_collect(self):
-        collector = diag.ZipDiagnosticsCollector(
-            writer=diag.get_current_writer()
-        )
+        collector = diag.ZipDiagnosticsCollector(writer=diag.get_current_writer())
         diag.set_current_collector(collector)
         diag.write("aaa", "hello")
         root_dir = diag.get_current_writer().root_dir()
@@ -95,7 +94,9 @@ class Fx2trtDiagnosticsTest(TestCase):
     def test_conditions(self):
 
         _test_cond(
-            diag.CollectionConditions.when_called_by_function(self.test_conditions.__name__),
+            diag.CollectionConditions.when_called_by_function(
+                self.test_conditions.__name__
+            ),
             should_collect=True,
         )
 
@@ -149,9 +150,7 @@ def _test_cond(
     cond: diag.CollectionCondition,
     should_collect: bool,
 ) -> None:
-    collector = diag.ZipDiagnosticsCollector(
-        writer=diag.get_current_writer()
-    )
+    collector = diag.ZipDiagnosticsCollector(writer=diag.get_current_writer())
     diag.set_current_collector(collector)
 
     with diag.collect_when(cond):
@@ -191,6 +190,7 @@ def _check_file(dir: str, fn: str, content: Union[str, bytes]):
 
 class _UserDefinedError(Exception):
     pass
+
 
 class _CheckFileDoesNotExist(AssertionError):
     pass

@@ -1,9 +1,10 @@
-from typing import List, Any, Callable
-from torch import nn, fx
 import logging
-import torch
 import tempfile
 from functools import wraps
+from typing import List, Any, Callable
+
+import torch
+from torch import nn, fx
 from torch.fx.passes.shape_prop import ShapeProp
 
 # Create an alias for module input type to avoid littering pyre-ignore for Any
@@ -12,6 +13,7 @@ Input = Any
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 PassFunc = Callable[[fx.GraphModule, Input], fx.GraphModule]
+
 
 def chain_passes(*passes: PassFunc) -> PassFunc:
     """
@@ -62,10 +64,14 @@ def validate_inference(rtol=None, atol=None, suppress_accuracy_check_failure=Fal
                 accuracy_check = torch.allclose(x, y, **kwargs)
                 if not accuracy_check:
                     if suppress_accuracy_check_failure:
-                        _LOGGER.error(f"pass {pass_} failed correctness check due to output {kk}, escape current pass.")
+                        _LOGGER.error(
+                            f"pass {pass_} failed correctness check due to output {kk}, escape current pass."
+                        )
                         return processed_module
                     else:
-                        raise RuntimeError(f"pass {pass_} failed correctness check due to output {kk}")
+                        raise RuntimeError(
+                            f"pass {pass_} failed correctness check due to output {kk}"
+                        )
             return processed_module
 
         return pass_with_validation
@@ -74,13 +80,15 @@ def validate_inference(rtol=None, atol=None, suppress_accuracy_check_failure=Fal
 
 
 Decorator = Callable[[Callable], Callable]
-def decorate_method(dec_for_function: Decorator) -> Decorator:
 
+
+def decorate_method(dec_for_function: Decorator) -> Decorator:
     def dec_for_method(unbounded_method) -> Callable:
         def decorated_unbounded_method(self, *args, **kwargs):
             @dec_for_function
             def bounded_method(*args, **kwargs):
                 return unbounded_method(self, *args, **kwargs)
+
             return bounded_method(*args, **kwargs)
 
         return decorated_unbounded_method

@@ -23,5 +23,6 @@ class TestAddConverter(VanillaTestCase):
         inputs = [torch.randn(1, 1)]
         self.run_test(add, inputs, expected_ops={torch.add})
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run_tests()

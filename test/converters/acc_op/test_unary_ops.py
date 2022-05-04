@@ -1,10 +1,10 @@
 from typing import Callable
 
-import torch
 import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
+import torch
 import torch.nn as nn
-from torch.testing._internal.common_fx2trt import AccTestCase
 from parameterized import parameterized
+from torch.testing._internal.common_fx2trt import AccTestCase
 from torch.testing._internal.common_utils import run_tests
 
 unary_ops = [
@@ -45,11 +45,13 @@ class TestUnaryOpConverters(AccTestCase):
 
 
 class TestUnaryOpNotConverters(AccTestCase):
-    @parameterized.expand([
-        ("not_bool", torch.logical_not, acc_ops.logical_not, torch.bool),
-        ("not_float", torch.logical_not, acc_ops.logical_not, torch.float),
-        ("not_int", torch.logical_not, acc_ops.logical_not, torch.int),
-    ])
+    @parameterized.expand(
+        [
+            ("not_bool", torch.logical_not, acc_ops.logical_not, torch.bool),
+            ("not_float", torch.logical_not, acc_ops.logical_not, torch.float),
+            ("not_int", torch.logical_not, acc_ops.logical_not, torch.int),
+        ]
+    )
     def test_unary_ops(self, name, orig_op: Callable, expected_op, input_dtype):
         class TestModule(nn.Module):
             def __init__(self, orig_op):
@@ -62,7 +64,10 @@ class TestUnaryOpNotConverters(AccTestCase):
 
         m = TestModule(orig_op)
         inputs = [torch.randn(2, 2, 3).to(input_dtype)]
-        self.run_test(m, inputs, expected_ops={expected_op}, test_implicit_batch_dim=False)
+        self.run_test(
+            m, inputs, expected_ops={expected_op}, test_implicit_batch_dim=False
+        )
+
 
 class TestUnaryRSQRTConverters(AccTestCase):
     def test_unary_ops(self):
@@ -74,5 +79,6 @@ class TestUnaryRSQRTConverters(AccTestCase):
         inputs = [torch.randn(2, 2, 3)]
         self.run_test(m, inputs, expected_ops={acc_ops.sqrt, acc_ops.reciprocal})
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     run_tests()
