@@ -16,6 +16,7 @@ class TestPyTorchToTRTEngine(ModelTestCase):
     def test_pt_to_trt(self):
         compile_spec = {
             "inputs": [torchtrt.Input(self.input.shape)],
+            "truncate_long_and_double": True,
             "device": {
                 "device_type": torchtrt.DeviceType.GPU,
                 "gpu_id": 0,
