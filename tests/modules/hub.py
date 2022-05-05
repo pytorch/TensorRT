@@ -217,78 +217,76 @@ class ModelManifest:
         
         self.manifest.update({n : [traced_filename, script_filename]})
 
-def export_model(model, model_name, version_matches):
-    if version_matches and os.path.exists(model_name):
-        print("Skipping model {}".format(model_name))
-    else:
-        print("Saving model {}".format(model_name))
-        torch.jit.save(model, model_name)
-
-
-def generate_custom_models(manifest, matches = False):
+def generate_custom_models(manifest, version_matches = False):
     # Pool
-    model = Pool().eval().cuda()
-    x = torch.ones([1, 3, 10, 10]).cuda()
-
-    trace_model = torch.jit.trace(model, x)
     traced_pool_name = "pooling_traced.jit.pt"
-    export_model(trace_model, traced_pool_name, matches)
+    if not (version_matches and os.path.exists(traced_pool_name)):
+        model = Pool().eval().cuda()
+        x = torch.ones([1, 3, 10, 10]).cuda()
+
+        trace_model = torch.jit.trace(model, x)
+        torch.jit.save(trace_model, traced_pool_name)
     manifest.update({"torchtrt_pooling": [traced_pool_name]})
 
     # Module fallback
-    module_fallback_model = ModuleFallbackMain().eval().cuda()
-    module_fallback_script_model = torch.jit.script(module_fallback_model)
     scripted_module_fallback_name = "module_fallback_scripted.jit.pt"
-    export_model(module_fallback_script_model, scripted_module_fallback_name, matches)
+    if not (version_matches and os.path.exists(scripted_module_fallback_name)):
+        module_fallback_model = ModuleFallbackMain().eval().cuda()
+        module_fallback_script_model = torch.jit.script(module_fallback_model)
+        torch.jit.save(module_fallback_script_model, scripted_module_fallback_name)
     manifest.update({"torchtrt_module_fallback": [scripted_module_fallback_name]})
 
     # Loop Fallback
-    loop_fallback_eval_model = LoopFallbackEval().eval().cuda()
-    loop_fallback_eval_script_model = torch.jit.script(loop_fallback_eval_model)
     scripted_loop_fallback_name = "loop_fallback_eval_scripted.jit.pt"
-    export_model(loop_fallback_eval_script_model, scripted_loop_fallback_name, matches)
+    if not (version_matches and os.path.exists(scripted_loop_fallback_name)):
+        loop_fallback_eval_model = LoopFallbackEval().eval().cuda()
+        loop_fallback_eval_script_model = torch.jit.script(loop_fallback_eval_model)
+        torch.jit.save(loop_fallback_eval_script_model, scripted_loop_fallback_name)
 
-    loop_fallback_no_eval_model = LoopFallbackNoEval().eval().cuda()
-    loop_fallback_no_eval_script_model = torch.jit.script(loop_fallback_no_eval_model)
     scripted_loop_fallback_no_eval_name = "loop_fallback_no_eval_scripted.jit.pt"
-    export_model(loop_fallback_no_eval_script_model, scripted_loop_fallback_no_eval_name, matches)
+    if not (version_matches and os.path.exists(scripted_loop_fallback_name)):
+        loop_fallback_no_eval_model = LoopFallbackNoEval().eval().cuda()
+        loop_fallback_no_eval_script_model = torch.jit.script(loop_fallback_no_eval_model)
+        torch.jit.save(loop_fallback_no_eval_script_model, scripted_loop_fallback_no_eval_name)
     manifest.update({"torchtrt_loop_fallback_no_eval": [scripted_loop_fallback_name, scripted_loop_fallback_no_eval_name]})
 
     # Conditional
-    conditional_model = FallbackIf().eval().cuda()
-    conditional_script_model = torch.jit.script(conditional_model)
     scripted_conditional_name = "conditional_scripted.jit.pt"
-    export_model(conditional_script_model, scripted_conditional_name, matches)
+    if not (version_matches and os.path.exists(scripted_conditional_name)):
+        conditional_model = FallbackIf().eval().cuda()
+        conditional_script_model = torch.jit.script(conditional_model)
+        torch.jit.save(conditional_script_model, scripted_conditional_name)
     manifest.update({"torchtrt_conditional": [scripted_conditional_name]})
 
     # BERT model
-    enc = BertTokenizer.from_pretrained("bert-base-uncased")
-    text = "[CLS] Who was Jim Henson ? [SEP] Jim Henson was a puppeteer [SEP]"
-    tokenized_text = enc.tokenize(text)
-    masked_index = 8
-    tokenized_text[masked_index] = "[MASK]"
-    indexed_tokens = enc.convert_tokens_to_ids(tokenized_text)
-    segments_ids = [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1]
-    tokens_tensor = torch.tensor([indexed_tokens])
-    segments_tensors = torch.tensor([segments_ids])
-    dummy_input = [tokens_tensor, segments_tensors]
-
-    config = BertConfig(
-        vocab_size_or_config_json_file=32000,
-        hidden_size=768,
-        num_hidden_layers=12,
-        num_attention_heads=12,
-        intermediate_size=3072,
-        torchscript=True,
-    )
-
-    model = BertModel(config)
-    model.eval()
-    model = BertModel.from_pretrained("bert-base-uncased", torchscript=True)
-
     traced_bert_uncased_name = "bert_case_uncased_traced.jit.pt"
-    traced_model = torch.jit.trace(model, [tokens_tensor, segments_tensors])
-    export_model(traced_model, traced_bert_uncased_name, matches)
+    if not (version_matches and os.path.exists(traced_bert_uncased_name)):
+        enc = BertTokenizer.from_pretrained("bert-base-uncased")
+        text = "[CLS] Who was Jim Henson ? [SEP] Jim Henson was a puppeteer [SEP]"
+        tokenized_text = enc.tokenize(text)
+        masked_index = 8
+        tokenized_text[masked_index] = "[MASK]"
+        indexed_tokens = enc.convert_tokens_to_ids(tokenized_text)
+        segments_ids = [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1]
+        tokens_tensor = torch.tensor([indexed_tokens])
+        segments_tensors = torch.tensor([segments_ids])
+        dummy_input = [tokens_tensor, segments_tensors]
+
+        config = BertConfig(
+            vocab_size_or_config_json_file=32000,
+            hidden_size=768,
+            num_hidden_layers=12,
+            num_attention_heads=12,
+            intermediate_size=3072,
+            torchscript=True,
+        )
+
+        model = BertModel(config)
+        model.eval()
+        model = BertModel.from_pretrained("bert-base-uncased", torchscript=True)
+
+        traced_model = torch.jit.trace(model, [tokens_tensor, segments_tensors])
+        torch.jit.save(traced_model, traced_bert_uncased_name)
     manifest.update({"torchtrt_bert_case_uncased" : [traced_bert_uncased_name]})
 
 
