@@ -57,4 +57,4 @@ examples/int8/qat/qat
 examples/int8/training/vgg16/data/*
 examples/int8/datasets/data/*
 env/**/*
-model_snapshot.txt
+model_manifest.json

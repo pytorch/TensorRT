@@ -5,28 +5,14 @@ import torchvision.models as models
 import timm
 from transformers import BertModel, BertTokenizer, BertConfig
 import os
-import sys
+import json
 
 torch.hub._validate_not_a_forked_repo = lambda a, b, c: True
 
 torch_version = torch.__version__
-snapshot_file = 'model_snapshot.txt'
-skip_download = False
 
-# If model repository already setup
-if os.path.exists(snapshot_file):
-    with open(snapshot_file, 'r') as f:
-        model_version = f.read()
-        if model_version == torch_version:
-            skip_download = True
-
-# In case of existing model repository, skip the download
-if skip_download:
-    print('Skipping re-download of model repository')
-    sys.exit()
-else:
-    with open(snapshot_file, 'w') as f:
-        f.write(torch_version)
+# Downloads all model files again if manifest file is not present
+MANIFEST_FILE = 'model_manifest.json'
 
 models = {
     "alexnet": {
@@ -92,18 +78,6 @@ models = {
     }
 }
 
-# Download sample models
-for n, m in models.items():
-    print("Downloading {}".format(n))
-    m["model"] = m["model"].eval().cuda()
-    x = torch.ones((1, 3, 300, 300)).cuda()
-    if m["path"] == "both" or m["path"] == "trace":
-        trace_model = torch.jit.trace(m["model"], [x])
-        torch.jit.save(trace_model, n + '_traced.jit.pt')
-    if m["path"] == "both" or m["path"] == "script":
-        script_model = torch.jit.script(m["model"])
-        torch.jit.save(script_model, n + '_scripted.jit.pt')
-
 
 # Sample Pool Model (for testing plugin serialization)
 class Pool(nn.Module):
@@ -113,14 +87,6 @@ class Pool(nn.Module):
 
     def forward(self, x):
         return F.adaptive_avg_pool2d(x, (5, 5))
-
-
-model = Pool().eval().cuda()
-x = torch.ones([1, 3, 10, 10]).cuda()
-
-trace_model = torch.jit.trace(model, x)
-torch.jit.save(trace_model, "pooling_traced.jit.pt")
-
 
 # Sample Nested Module (for module-level fallback testing)
 class ModuleFallbackSub(nn.Module):
@@ -133,7 +99,6 @@ class ModuleFallbackSub(nn.Module):
     def forward(self, x):
         return self.relu(self.conv(x))
 
-
 class ModuleFallbackMain(nn.Module):
 
     def __init__(self):
@@ -144,12 +109,6 @@ class ModuleFallbackMain(nn.Module):
 
     def forward(self, x):
         return self.relu(self.conv(self.layer1(x)))
-
-
-module_fallback_model = ModuleFallbackMain().eval().cuda()
-module_fallback_script_model = torch.jit.script(module_fallback_model)
-torch.jit.save(module_fallback_script_model, "module_fallback_scripted.jit.pt")
-
 
 # Sample Looping Modules (for loop fallback testing)
 class LoopFallbackEval(nn.Module):
@@ -163,7 +122,6 @@ class LoopFallbackEval(nn.Module):
             add_list = torch.cat((add_list, torch.tensor([x.shape[1]]).to(x.device)), 0)
         return x + add_list
 
-
 class LoopFallbackNoEval(nn.Module):
 
     def __init__(self):
@@ -173,15 +131,6 @@ class LoopFallbackNoEval(nn.Module):
         for _ in range(x.shape[1]):
             x = x + torch.ones_like(x)
         return x
-
-
-loop_fallback_eval_model = LoopFallbackEval().eval().cuda()
-loop_fallback_eval_script_model = torch.jit.script(loop_fallback_eval_model)
-torch.jit.save(loop_fallback_eval_script_model, "loop_fallback_eval_scripted.jit.pt")
-loop_fallback_no_eval_model = LoopFallbackNoEval().eval().cuda()
-loop_fallback_no_eval_script_model = torch.jit.script(loop_fallback_no_eval_model)
-torch.jit.save(loop_fallback_no_eval_script_model, "loop_fallback_no_eval_scripted.jit.pt")
-
 
 # Sample Conditional Model (for testing partitioning and fallback in conditionals)
 class FallbackIf(torch.nn.Module):
@@ -207,34 +156,152 @@ class FallbackIf(torch.nn.Module):
         x = self.conv1(x)
         return x
 
+class ModelManifest:
+    def __init__(self):
+        self.version_matches = False
+        if not os.path.exists(MANIFEST_FILE) or os.stat(MANIFEST_FILE).st_size == 0:
+            self.manifest = {}
+            self.manifest.update({'version' : torch_version})
+        else:
+            with open(MANIFEST_FILE, 'r') as f:
+                self.manifest = json.load(f)
+                if self.manifest['version'] == torch_version:
+                    self.version_matches = True
+                else:
+                    print("Torch version: {} mismatches with manifest's version: {}. Re-downloading all models".format(torch_version, self.manifest['version']))
+                    self.manifest["version"] = torch_version
+        
 
-conditional_model = FallbackIf().eval().cuda()
-conditional_script_model = torch.jit.script(conditional_model)
-torch.jit.save(conditional_script_model, "conditional_scripted.jit.pt")
+    def download(self, models):
+        if self.version_matches:
+            for n, m in models.items():
+                scripted_filename = n + "_scripted.jit.pt"
+                traced_filename = n + "_traced.jit.pt"
+                if (m["path"] == "both" and os.path.exists(scripted_filename) and os.path.exists(traced_filename)) or \
+                (m["path"] == "script" and os.path.exists(scripted_filename)) or \
+                (m["path"] == "trace" and os.path.exists(traced_filename)):
+                    print("Skipping {} ".format(n))
+                    continue
+                self.get(n, m)
+        else:
+            for n, m in models.items():
+                self.get(n, m)
 
-enc = BertTokenizer.from_pretrained("bert-base-uncased")
-text = "[CLS] Who was Jim Henson ? [SEP] Jim Henson was a puppeteer [SEP]"
-tokenized_text = enc.tokenize(text)
-masked_index = 8
-tokenized_text[masked_index] = "[MASK]"
-indexed_tokens = enc.convert_tokens_to_ids(tokenized_text)
-segments_ids = [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1]
-tokens_tensor = torch.tensor([indexed_tokens])
-segments_tensors = torch.tensor([segments_ids])
-dummy_input = [tokens_tensor, segments_tensors]
+    def write(self, manifest_record):
+        with open(MANIFEST_FILE, 'r+') as f:
+            data = f.read()
+            f.seek(0)
+            record = json.dumps(manifest_record)
+            f.write(record)
+            f.truncate()
+    
+    def get_manifest(self):
+        return self.manifest
+    
+    def if_version_matches(self):
+        return self.version_matches
+    
+    def get(self, n, m):
+        print("Downloading {}".format(n))
+        m["model"] = m["model"].eval().cuda()
+        traced_filename = n + '_traced.jit.pt'
+        script_filename = n + '_scripted.jit.pt'
 
-config = BertConfig(
-    vocab_size_or_config_json_file=32000,
-    hidden_size=768,
-    num_hidden_layers=12,
-    num_attention_heads=12,
-    intermediate_size=3072,
-    torchscript=True,
-)
+        x = torch.ones((1, 3, 300, 300)).cuda()
+        if m["path"] == "both" or m["path"] == "trace":
+            trace_model = torch.jit.trace(m["model"], [x])
+            torch.jit.save(trace_model, traced_filename)
+        if m["path"] == "both" or m["path"] == "script":
+            script_model = torch.jit.script(m["model"])
+            torch.jit.save(script_model, script_filename)
+        
+        self.manifest.update({n : [traced_filename, script_filename]})
 
-model = BertModel(config)
-model.eval()
-model = BertModel.from_pretrained("bert-base-uncased", torchscript=True)
+def export_model(model, model_name, version_matches):
+    if version_matches and os.path.exists(model_name):
+        print("Skipping model {}".format(model_name))
+    else:
+        print("Saving model {}".format(model_name))
+        torch.jit.save(model, model_name)
 
-traced_model = torch.jit.trace(model, [tokens_tensor, segments_tensors])
-torch.jit.save(traced_model, "bert_base_uncased_traced.jit.pt")
+
+def generate_custom_models(manifest, matches = False):
+    # Pool
+    model = Pool().eval().cuda()
+    x = torch.ones([1, 3, 10, 10]).cuda()
+
+    trace_model = torch.jit.trace(model, x)
+    traced_pool_name = "pooling_traced.jit.pt"
+    export_model(trace_model, traced_pool_name, matches)
+    manifest.update({"torchtrt_pooling": [traced_pool_name]})
+
+    # Module fallback
+    module_fallback_model = ModuleFallbackMain().eval().cuda()
+    module_fallback_script_model = torch.jit.script(module_fallback_model)
+    scripted_module_fallback_name = "module_fallback_scripted.jit.pt"
+    export_model(module_fallback_script_model, scripted_module_fallback_name, matches)
+    manifest.update({"torchtrt_module_fallback": [scripted_module_fallback_name]})
+
+    # Loop Fallback
+    loop_fallback_eval_model = LoopFallbackEval().eval().cuda()
+    loop_fallback_eval_script_model = torch.jit.script(loop_fallback_eval_model)
+    scripted_loop_fallback_name = "loop_fallback_eval_scripted.jit.pt"
+    export_model(loop_fallback_eval_script_model, scripted_loop_fallback_name, matches)
+
+    loop_fallback_no_eval_model = LoopFallbackNoEval().eval().cuda()
+    loop_fallback_no_eval_script_model = torch.jit.script(loop_fallback_no_eval_model)
+    scripted_loop_fallback_no_eval_name = "loop_fallback_no_eval_scripted.jit.pt"
+    export_model(loop_fallback_no_eval_script_model, scripted_loop_fallback_no_eval_name, matches)
+    manifest.update({"torchtrt_loop_fallback_no_eval": [scripted_loop_fallback_name, scripted_loop_fallback_no_eval_name]})
+
+    # Conditional
+    conditional_model = FallbackIf().eval().cuda()
+    conditional_script_model = torch.jit.script(conditional_model)
+    scripted_conditional_name = "conditional_scripted.jit.pt"
+    export_model(conditional_script_model, scripted_conditional_name, matches)
+    manifest.update({"torchtrt_conditional": [scripted_conditional_name]})
+
+    # BERT model
+    enc = BertTokenizer.from_pretrained("bert-base-uncased")
+    text = "[CLS] Who was Jim Henson ? [SEP] Jim Henson was a puppeteer [SEP]"
+    tokenized_text = enc.tokenize(text)
+    masked_index = 8
+    tokenized_text[masked_index] = "[MASK]"
+    indexed_tokens = enc.convert_tokens_to_ids(tokenized_text)
+    segments_ids = [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1]
+    tokens_tensor = torch.tensor([indexed_tokens])
+    segments_tensors = torch.tensor([segments_ids])
+    dummy_input = [tokens_tensor, segments_tensors]
+
+    config = BertConfig(
+        vocab_size_or_config_json_file=32000,
+        hidden_size=768,
+        num_hidden_layers=12,
+        num_attention_heads=12,
+        intermediate_size=3072,
+        torchscript=True,
+    )
+
+    model = BertModel(config)
+    model.eval()
+    model = BertModel.from_pretrained("bert-base-uncased", torchscript=True)
+
+    traced_bert_uncased_name = "bert_case_uncased_traced.jit.pt"
+    traced_model = torch.jit.trace(model, [tokens_tensor, segments_tensors])
+    export_model(traced_model, traced_bert_uncased_name, matches)
+    manifest.update({"torchtrt_bert_case_uncased" : [traced_bert_uncased_name]})
+
+
+manifest = ModelManifest()
+
+# Download the models
+manifest.download(models)
+
+# Manifest generated from the model repository
+manifest_record = manifest.get_manifest()
+
+# Save model
+generate_custom_models(manifest_record, manifest.if_version_matches())
+
+# Update the manifest file
+manifest.write(manifest_record)
