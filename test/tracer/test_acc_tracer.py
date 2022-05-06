@@ -2336,6 +2336,43 @@ class AccTracerTest(unittest.TestCase):
         res = traced(cond, x, y)
         self.assertTrue(torch.equal(ref, res))
 
+    @parameterized.expand(
+        [
+            ("sections divisible", 2, 0),
+            ("sections indivisible", 3, 0),
+            ("indices list", [1, 3], 0),
+            ("indices tuple", (1, 3), 0),
+            ("indices tensor", torch.tensor([1, 3]), 0),
+            ("indices tensor dim1", torch.tensor([1, 3]), 1),
+            ("indices tensor dim2", torch.tensor([1, 3]), 2),
+            ("indices tensor long dim2", torch.tensor([1, 3, 5, 7]), 2),
+        ]
+    )
+    def test_tensor_split(self, _, indices_or_sections, dim):
+        """
+        Test that the tracer works for torch.tensor_split with indices and sections
+        """
+
+        class TestModule(nn.Module):
+            def __init__(self, indices_or_sections, dim):
+                super().__init__()
+                self._indices_or_sections = indices_or_sections
+                self._dim = dim
+
+            def forward(self, a):
+                return torch.tensor_split(a, self._indices_or_sections, self._dim)
+
+        m = TestModule(indices_or_sections, dim)
+        a = torch.randn(4, 8, 16)
+        traced = acc_tracer.trace(m, [a])
+
+        results = traced(a)
+        references = m(a)
+        for res, ref in zip(results, references):
+            self.assertTrue(
+                torch.equal(ref, res), f"Tensors at don't match {ref=} {res=}"
+            )
+
     def test_all_acc_ops_registered(self):
         self.assertEqual(
             acc_normalizer._acc_ops,
@@ -2453,5 +2490,6 @@ class AccTracerTest(unittest.TestCase):
                 acc_ops.dtype,
                 acc_ops.isinf,
                 acc_ops.any,
+                acc_ops.tensor_split,
             },
         )

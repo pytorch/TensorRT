@@ -3,7 +3,7 @@ import operator
 import warnings
 
 import torch  # isort:skip
-from typing import Sequence, List, cast
+from typing import Iterable, Sequence, List, cast
 
 import fx2trt_oss.tracer.acc_tracer.acc_utils as acc_utils
 import torch.nn as nn
@@ -2616,3 +2616,39 @@ def interpolate(
         mode=mode,
         align_corners=align_corners,
     )
+
+
+@register_acc_op_mapping(
+    op_and_target=("call_function", torch.tensor_split),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        (("tensor_indices_or_sections", "sections", "indices"), "indices_or_sections"),
+        ("dim", "dim", this_arg_is_optional),
+    ],
+)
+@register_acc_op_mapping(
+    op_and_target=("call_method", "tensor_split"),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        (("tensor_indices_or_sections", "sections", "indices"), "indices_or_sections"),
+        ("dim", "dim", this_arg_is_optional),
+    ],
+)
+@register_acc_op
+def tensor_split(*, input, indices_or_sections, dim=0):
+    # Need to de-coalesce the indices_or_sections because tensor_split accepts
+    # one of three kwarg signatures:
+    #  * (Tensor input, Tensor tensor_indices_or_sections, int dim)
+    #  * (Tensor input, int sections, int dim)
+    #  * (Tensor input, tuple of ints indices, int dim)
+    if isinstance(indices_or_sections, torch.Tensor):
+        indices_or_sections = indices_or_sections.tolist()
+    if isinstance(indices_or_sections, int):
+        return torch.tensor_split(input, sections=indices_or_sections, dim=dim)
+    elif isinstance(indices_or_sections, Iterable):
+        return torch.tensor_split(input, indices=tuple(indices_or_sections), dim=dim)
+    else:
+        raise RuntimeError(
+            f"Expected int, Iterable or Tensor for "
+            f"indices_or_sections arg, got: {type(indices_or_sections)}"
+        )
