@@ -88,6 +88,7 @@ class Pool(nn.Module):
     def forward(self, x):
         return F.adaptive_avg_pool2d(x, (5, 5))
 
+
 # Sample Nested Module (for module-level fallback testing)
 class ModuleFallbackSub(nn.Module):
 
@@ -99,6 +100,7 @@ class ModuleFallbackSub(nn.Module):
     def forward(self, x):
         return self.relu(self.conv(x))
 
+
 class ModuleFallbackMain(nn.Module):
 
     def __init__(self):
@@ -109,6 +111,7 @@ class ModuleFallbackMain(nn.Module):
 
     def forward(self, x):
         return self.relu(self.conv(self.layer1(x)))
+
 
 # Sample Looping Modules (for loop fallback testing)
 class LoopFallbackEval(nn.Module):
@@ -122,6 +125,7 @@ class LoopFallbackEval(nn.Module):
             add_list = torch.cat((add_list, torch.tensor([x.shape[1]]).to(x.device)), 0)
         return x + add_list
 
+
 class LoopFallbackNoEval(nn.Module):
 
     def __init__(self):
@@ -131,6 +135,7 @@ class LoopFallbackNoEval(nn.Module):
         for _ in range(x.shape[1]):
             x = x + torch.ones_like(x)
         return x
+
 
 # Sample Conditional Model (for testing partitioning and fallback in conditionals)
 class FallbackIf(torch.nn.Module):
@@ -156,21 +161,23 @@ class FallbackIf(torch.nn.Module):
         x = self.conv1(x)
         return x
 
+
 class ModelManifest:
+
     def __init__(self):
         self.version_matches = False
         if not os.path.exists(MANIFEST_FILE) or os.stat(MANIFEST_FILE).st_size == 0:
             self.manifest = {}
-            self.manifest.update({'version' : torch_version})
+            self.manifest.update({'version': torch_version})
         else:
             with open(MANIFEST_FILE, 'r') as f:
                 self.manifest = json.load(f)
                 if self.manifest['version'] == torch_version:
                     self.version_matches = True
                 else:
-                    print("Torch version: {} mismatches with manifest's version: {}. Re-downloading all models".format(torch_version, self.manifest['version']))
+                    print("Torch version: {} mismatches with manifest's version: {}. Re-downloading all models".format(
+                        torch_version, self.manifest['version']))
                     self.manifest["version"] = torch_version
-        
 
     def download(self, models):
         if self.version_matches:
@@ -194,13 +201,13 @@ class ModelManifest:
             record = json.dumps(manifest_record)
             f.write(record)
             f.truncate()
-    
+
     def get_manifest(self):
         return self.manifest
-    
+
     def if_version_matches(self):
         return self.version_matches
-    
+
     def get(self, n, m):
         print("Downloading {}".format(n))
         m["model"] = m["model"].eval().cuda()
@@ -214,10 +221,11 @@ class ModelManifest:
         if m["path"] == "both" or m["path"] == "script":
             script_model = torch.jit.script(m["model"])
             torch.jit.save(script_model, script_filename)
-        
-        self.manifest.update({n : [traced_filename, script_filename]})
 
-def generate_custom_models(manifest, version_matches = False):
+        self.manifest.update({n: [traced_filename, script_filename]})
+
+
+def generate_custom_models(manifest, version_matches=False):
     # Pool
     traced_pool_name = "pooling_traced.jit.pt"
     if not (version_matches and os.path.exists(traced_pool_name)):
@@ -248,7 +256,8 @@ def generate_custom_models(manifest, version_matches = False):
         loop_fallback_no_eval_model = LoopFallbackNoEval().eval().cuda()
         loop_fallback_no_eval_script_model = torch.jit.script(loop_fallback_no_eval_model)
         torch.jit.save(loop_fallback_no_eval_script_model, scripted_loop_fallback_no_eval_name)
-    manifest.update({"torchtrt_loop_fallback_no_eval": [scripted_loop_fallback_name, scripted_loop_fallback_no_eval_name]})
+    manifest.update(
+        {"torchtrt_loop_fallback_no_eval": [scripted_loop_fallback_name, scripted_loop_fallback_no_eval_name]})
 
     # Conditional
     scripted_conditional_name = "conditional_scripted.jit.pt"
@@ -287,7 +296,7 @@ def generate_custom_models(manifest, version_matches = False):
 
         traced_model = torch.jit.trace(model, [tokens_tensor, segments_tensors])
         torch.jit.save(traced_model, traced_bert_uncased_name)
-    manifest.update({"torchtrt_bert_case_uncased" : [traced_bert_uncased_name]})
+    manifest.update({"torchtrt_bert_case_uncased": [traced_bert_uncased_name]})
 
 
 manifest = ModelManifest()
