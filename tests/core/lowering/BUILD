@@ -31,6 +31,10 @@ lowering_test(
 )
 
 lowering_test(
+    name = "test_exception_elimination_pass",
+)
+
+lowering_test(
     name = "test_remove_contiguous_pass",
 )
 
@@ -82,6 +86,7 @@ test_suite(
     name = "lowering_tests",
     tests = [
         ":test_conv1d_pass",
+        ":test_exception_elimination_pass",
         ":test_linear_to_addmm",
         ":test_module_fallback_passes",
         ":test_operator_aliasing_pass",
