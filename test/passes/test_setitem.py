@@ -32,6 +32,55 @@ class TestTransformSetitem(AccTestCase):
         with optimize_ctx:
             m(*inputs)
 
+    def test_setitem1d_c2(self):
+        class TestModule(torch.nn.Module):
+            def forward(self, x, y):
+                y[:-1] = x
+                y[1:] = x
+                return y
+
+        inputs = [torch.randn(2), torch.randn(3)]
+        m = TestModule()
+
+        inputs = [i.cuda() for i in inputs]
+        m.cuda()
+
+        def transform_fx(gm, example_inputs):
+            gm = transform_setitem(gm, example_inputs)
+            return gm
+
+        optimize_ctx = torchdynamo.optimize(
+            transform_fx,
+            nopython=True,
+        )
+
+        with optimize_ctx:
+            m(*inputs)
+
+    def test_setitem1d_c3(self):
+        class TestModule(torch.nn.Module):
+            def forward(self, x, y):
+                y[1] = x
+                return y
+
+        inputs = [torch.randn(2), torch.randn(3)]
+        m = TestModule()
+
+        inputs = [i.cuda() for i in inputs]
+        m.cuda()
+
+        def transform_fx(gm, example_inputs):
+            gm = transform_setitem(gm, example_inputs)
+            return gm
+
+        optimize_ctx = torchdynamo.optimize(
+            transform_fx,
+            nopython=True,
+        )
+
+        with optimize_ctx:
+            m(*inputs)
+
     @parameterized.expand(
         [
             ("c1", (4, 2), (4, 5), 0, 2),
@@ -77,6 +126,37 @@ class TestTransformSetitem(AccTestCase):
 
             def forward(self, x, y):
                 y[y_start:y_end, :] = x
+                return y
+
+        inputs = [torch.randn(x_shape), torch.randn(y_shape)]
+        m = TestModule()
+
+        inputs = [i.cuda() for i in inputs]
+        m.cuda()
+
+        def transform_fx(gm, example_inputs):
+            gm = transform_setitem(gm, example_inputs)
+            return gm
+
+        optimize_ctx = torchdynamo.optimize(
+            transform_fx,
+            nopython=True,
+        )
+        with optimize_ctx:
+            m(*inputs)
+
+    @parameterized.expand(
+        [
+            ("c1", (4, 2), (4, 2), 0, 1),
+        ]
+    )
+    def test_setitem2d_1v_ex2(self, name, x_shape, y_shape, y_start, y_end):
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, x, y):
+                y[:, y_start:y_end] = x[:, 0]
                 return y
 
         inputs = [torch.randn(x_shape), torch.randn(y_shape)]
@@ -429,17 +509,17 @@ class TestTransformSetitem(AccTestCase):
         with optimize_ctx:
             m(*inputs)
 
-    ## test with torchdynamo
+    # test with torchdynamo
     def test_setitem1d_trt(self):
         class TestModule(torch.nn.Module):
             def __init__(self):
                 super().__init__()
 
             def forward(self, x, y):
-                y[0:2] = x
+                y[1] = x
                 return y
 
-        inputs = [torch.randn(2), torch.randn(3)]
+        inputs = [torch.randn(1), torch.randn(3)]
         m = TestModule()
 
         inputs = [i.cuda() for i in inputs]

@@ -1,3 +1,5 @@
+import copy
+import operator
 import operator
 import warnings
 from typing import Any
@@ -348,13 +350,32 @@ def transform_setitem(gm: torch.fx.GraphModule, input: Input):
     """
     map_replace = {}
     for node in gm.graph.nodes:
+        for old_node in map_replace:
+            node.replace_input_with(old_node, map_replace[old_node])
+
         if node.target == operator.setitem:
             input_node = node.args[0]
             sli = node.args[1]
             inp = node.args[2]
 
+            inp_flag = False
+            if inp.target == operator.getitem:
+                new_args = list(copy.deepcopy(inp.args[1]))
+                for ind, val in enumerate(new_args):
+                    if type(val) == int:
+                        inp_flag = True
+                        new_args[ind] = slice(val, val + 1, None)
+                if inp_flag:
+                    with gm.graph.inserting_before(inp):
+                        new_node = gm.graph.call_function(
+                            operator.getitem, args=(inp.args[0], new_args)
+                        )
+                        inp.replace_all_uses_with(new_node)
+                    inp = new_node
+
             if type(sli) is not tuple:
                 sli = [sli]
+            sli = [slice(x, x + 1, None) if type(x) == int else x for x in sli]
             dimension = len(sli)
             with gm.graph.inserting_before(node):
                 if dimension == 1:
@@ -418,9 +439,6 @@ def transform_setitem(gm: torch.fx.GraphModule, input: Input):
                     continue
                 node.replace_all_uses_with(concat_node_0)
                 map_replace[input_node] = concat_node_0
-        else:
-            for old_node in map_replace:
-                node.replace_input_with(old_node, map_replace[old_node])
 
     gm.graph.eliminate_dead_code()
     gm.graph.lint()
