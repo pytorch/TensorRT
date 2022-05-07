@@ -60,13 +60,15 @@ TRTEngine::TRTEngine(std::string mod_name, std::string serialized_engine, CudaDe
 
   for (int64_t x = 0; x < cuda_engine->getNbBindings(); x++) {
     std::string bind_name = cuda_engine->getBindingName(x);
+    LOG_DEBUG("Binding name: " << bind_name);
     auto delim = bind_name.find(".");
     if (delim == std::string::npos) {
       delim = bind_name.find("_");
       TORCHTRT_CHECK(
           delim != std::string::npos,
-          "Unable to determine binding index for input " << bind_name
-                                                         << "\nEnsure module was compile with Torch-TensorRT.ts");
+          "Unable to determine binding index for input "
+              << bind_name
+              << "\nEnsure module was compiled with Torch-TensorRT.ts or follows Torch-TensorRT Runtime conventions");
     }
 
     std::string idx_s = bind_name.substr(delim + 1);
@@ -108,8 +110,8 @@ std::string TRTEngine::to_str() const {
   ss << "  Outputs: [" << std::endl;
   for (uint64_t o = 0; o < num_io.second; o++) {
     ss << "    id: " << o << std::endl;
-    ss << "    shape: " << exec_ctx->getBindingDimensions(o) << std::endl;
-    ss << "    dtype: " << util::TRTDataTypeToScalarType(exec_ctx->getEngine().getBindingDataType(o)) << std::endl;
+    ss << "      shape: " << exec_ctx->getBindingDimensions(o) << std::endl;
+    ss << "      dtype: " << util::TRTDataTypeToScalarType(exec_ctx->getEngine().getBindingDataType(o)) << std::endl;
   }
   ss << "  ]" << std::endl;
   ss << "  Device: " << device_info << std::endl;
