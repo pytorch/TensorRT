@@ -1851,6 +1851,24 @@ Registers the forward method to execute the TensorRT engine with the function si
              </p>
             </div>
            </blockquote>
+           <dl>
+            <dt>
+             TensorRT bindings must have names with the following format:
+            </dt>
+            <dd>
+             <ul class="simple">
+              <li>
+               <p>
+                [symbol].[index in input / output array]
+               </p>
+              </li>
+             </ul>
+             <p>
+              ex.
+- [x.0, x.1, x.2] -&gt; [y.0]
+             </p>
+            </dd>
+           </dl>
            <p>
             Module can be save with engine embedded with torch.jit.save and moved / loaded according to torch_tensorrt portability rules
            </p>
@@ -2066,7 +2084,7 @@ Registers the forward method to execute the TensorRT engine with the function si
               at
              </span>
              <span class="pre">
-              0x7f97985ef6f0&gt;
+              0x7fdeab7877b0&gt;
              </span>
             </span>
            </span>
