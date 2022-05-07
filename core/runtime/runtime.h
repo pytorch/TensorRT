@@ -59,6 +59,8 @@ struct TRTEngine : torch::CustomClassHolder {
   TRTEngine(std::vector<std::string> serialized_info);
   TRTEngine(std::string mod_name, std::string serialized_engine, CudaDevice cuda_device);
   TRTEngine& operator=(const TRTEngine& other);
+  std::string to_str() const;
+  friend std::ostream& operator<<(std::ostream& os, const TRTEngine& engine);
   // TODO: Implement a call method
   // c10::List<at::Tensor> Run(c10::List<at::Tensor> inputs);
 };

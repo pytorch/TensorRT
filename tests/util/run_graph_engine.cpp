@@ -21,7 +21,7 @@ std::vector<core::ir::Input> toInputs(std::vector<at::Tensor> ten) {
   for (auto i : ten) {
     a.push_back(core::ir::Input(core::util::toVec(i.sizes())));
   }
-  return std::move(a);
+  return a;
 }
 
 std::vector<core::ir::Input> toInputsDynamic(std::vector<at::Tensor> ten, bool dynamic_batch) {
@@ -49,7 +49,7 @@ std::vector<core::ir::Input> toInputsDynamic(std::vector<at::Tensor> ten, bool d
     }
   }
 
-  return std::move(a);
+  return a;
 }
 
 std::vector<at::Tensor> RunEngine(std::string& eng, std::vector<at::Tensor> inputs) {
