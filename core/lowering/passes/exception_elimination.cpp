@@ -44,10 +44,10 @@ struct ExceptionOrPassPatternElimination {
     bool arm1_starts_with_exception = (*arm1_start)->kind() == prim::RaiseException;
     bool arm2_starts_with_exception = (*arm2_start)->kind() == prim::RaiseException;
 
-    if (!arm1_starts_with_exception && !arm2_starts_with_exception) {
+    //if (!arm1_starts_with_exception && !arm2_starts_with_exception) {
       // Neither arm matches the pattern
-      return false;
-    }
+   //   return false;
+    //}
 
     /// Check if this Node hosts a pattern like so:
     ///  = prim::If(%5958)
@@ -57,14 +57,12 @@ struct ExceptionOrPassPatternElimination {
     ///   block1():
     ///    -> ()
     if (arm1_starts_with_exception) {
-      if ((*(++arm1_start))->kind() != prim::Return) {
+      if ((*(++arm1_start))->kind() == prim::Return) {
         // Make sure that block0 is solely just the exception and the return
-        return false;
-      }
-
-      if ((*(arm2_start))->kind() != prim::Return) {
-        // Make sure that block1 is solely the return
-        return false;
+        if ((*(arm2_start))->kind() == prim::Return) {
+          // Make sure that block1 is solely the return
+          return true;
+        }
       }
     }
 
@@ -76,25 +74,23 @@ struct ExceptionOrPassPatternElimination {
     ///     = prim::RaiseException(%45)
     ///    -> ()
     if (arm2_starts_with_exception) {
-      if ((*(++arm2_start))->kind() != prim::Return) {
+      if ((*(++arm2_start))->kind() == prim::Return) {
         // Make sure that block1 is solely just the exception and the return
-        return false;
-      }
-
-      if ((*(arm1_start))->kind() != prim::Return) {
-        // Make sure that block0 is solely the return
-        return false;
+        if ((*(arm1_start))->kind() == prim::Return) {
+          // Make sure that block0 is solely the return
+          return true;
+        }
       }
     }
 
-    return true;
+    return false;
   }
 
   void findExceptionOrPassNodes(Block* b) {
     for (auto it = b->nodes().begin(); it != b->nodes().end(); it++) {
       auto n = *it;
       if (n->kind() == prim::If && isExceptionOrPassNode(n)) {
-        LOG_GRAPH("Found that node " << *n << "  is an exception or pass node (EliminateChecks)" << std::endl);
+        LOG_ERROR("Found that node " << *n << "  is an exception or pass node (EliminateChecks)" << std::endl);
         it.destroyCurrent();
       }
     }
@@ -107,6 +103,9 @@ struct ExceptionOrPassPatternElimination {
 void EliminateExceptionOrPassPattern(std::shared_ptr<Graph> graph) {
   ExceptionOrPassPatternElimination eppe(std::move(graph));
   eppe.run();
+  if (graph) {
+    LOG_ERROR("Post Eliminate Exception or Pass Patterns: " << *graph);
+  }
 }
 
 } // namespace passes
