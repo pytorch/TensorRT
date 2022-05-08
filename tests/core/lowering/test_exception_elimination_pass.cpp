@@ -44,7 +44,7 @@ TEST(LoweringPasses, EliminateExceptionOrPassPattern_Block0) {
   auto if_block0 = if_node->addBlock();
   auto exception_node = g->create(torch::jit::prim::RaiseException, {except_val, none_const_val}, 0);
   if_block0->appendNode(exception_node);
-  auto if_block1 = if_node->addBlock();
+  /*auto if_block1 =*/ if_node->addBlock();
   g->insertNode(if_node);
   auto cat_node = g->create(torch::jit::aten::cat, {list_node->output(), zero_const_val});
   g->insertNode(cat_node);
@@ -97,7 +97,7 @@ TEST(LoweringPasses, EliminateExceptionOrPassPattern_Block1) {
   bool_node->output()->setType(torch::jit::BoolType::get());
   g->insertNode(bool_node);
   auto if_node = g->create(torch::jit::prim::If, {bool_node->output()}, 0);
-  auto if_block0 = if_node->addBlock();
+  /*auto if_block0 = */if_node->addBlock();
   auto if_block1 = if_node->addBlock();
   auto exception_node = g->create(torch::jit::prim::RaiseException, {except_val, none_const_val}, 0);
   if_block1->appendNode(exception_node);
@@ -154,7 +154,7 @@ TEST(LoweringPasses, EliminateExceptionOrPassPattern_Negative) {
   auto if_block0 = if_node->addBlock();
   auto append_node = g->create(torch::jit::aten::append, {list_node->output(), y});
   if_block0->appendNode(append_node);
-  auto if_block1 = if_node->addBlock();
+  /*auto if_block1 = */if_node->addBlock();
   g->insertNode(if_node);
   auto cat_node = g->create(torch::jit::aten::cat, {list_node->output(), zero_const_val});
   g->insertNode(cat_node);
