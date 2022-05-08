@@ -44,9 +44,9 @@ struct ExceptionOrPassPatternElimination {
     bool arm1_starts_with_exception = (*arm1_start)->kind() == prim::RaiseException;
     bool arm2_starts_with_exception = (*arm2_start)->kind() == prim::RaiseException;
 
-    //if (!arm1_starts_with_exception && !arm2_starts_with_exception) {
-      // Neither arm matches the pattern
-   //   return false;
+    // if (!arm1_starts_with_exception && !arm2_starts_with_exception) {
+    // Neither arm matches the pattern
+    //   return false;
     //}
 
     /// Check if this Node hosts a pattern like so:
