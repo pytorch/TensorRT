@@ -44,9 +44,9 @@ struct ExceptionOrPassPatternElimination {
     bool arm1_starts_with_exception = (*arm1_start)->kind() == prim::RaiseException;
     bool arm2_starts_with_exception = (*arm2_start)->kind() == prim::RaiseException;
 
-    //if (!arm1_starts_with_exception && !arm2_starts_with_exception) {
-      // Neither arm matches the pattern
-   //   return false;
+    // if (!arm1_starts_with_exception && !arm2_starts_with_exception) {
+    // Neither arm matches the pattern
+    //   return false;
     //}
 
     /// Check if this Node hosts a pattern like so:
@@ -90,7 +90,7 @@ struct ExceptionOrPassPatternElimination {
     for (auto it = b->nodes().begin(); it != b->nodes().end(); it++) {
       auto n = *it;
       if (n->kind() == prim::If && isExceptionOrPassNode(n)) {
-        LOG_ERROR("Found that node " << *n << "  is an exception or pass node (EliminateChecks)" << std::endl);
+        LOG_GRAPH("Found that node " << *n << "  is an exception or pass node (EliminateChecks)" << std::endl);
         it.destroyCurrent();
       }
     }
@@ -104,7 +104,7 @@ void EliminateExceptionOrPassPattern(std::shared_ptr<Graph> graph) {
   ExceptionOrPassPatternElimination eppe(std::move(graph));
   eppe.run();
   if (graph) {
-    LOG_ERROR("Post Eliminate Exception or Pass Patterns: " << *graph);
+    LOG_GRAPH("Post Eliminate Exception or Pass Patterns: " << *graph);
   }
 }
 

@@ -353,11 +353,9 @@ auto aten_registrations TORCHTRT_UNUSED =
                         return {};
                       }
                     },
-                    EvalOptions().validSchemas({
-                      "aten::add.int(int a, int b) -> (int)",
-                      "aten::add.float(float a, float b) -> (float)",
-                      "aten::add.str(str a, str b) -> (str)"
-                    })})
+                    EvalOptions().validSchemas({"aten::add.int(int a, int b) -> (int)",
+                                                "aten::add.float(float a, float b) -> (float)",
+                                                "aten::add.str(str a, str b) -> (str)"})})
         .evaluator({c10::Symbol::fromQualString("aten::add_"),
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                       if (args.at(n->input(0)).IValue()->isList()) {
