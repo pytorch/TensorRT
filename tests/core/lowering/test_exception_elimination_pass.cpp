@@ -42,7 +42,7 @@ TEST(LoweringPasses, EliminateExceptionOrPassPattern_Block0) {
   g->insertNode(bool_node);
   auto if_node = g->create(torch::jit::prim::If, {bool_node->output()}, 0);
   auto if_block0 = if_node->addBlock();
-  auto exception_node = g->create(torch::jit::prim::RaiseException, {except_val}, 0);
+  auto exception_node = g->create(torch::jit::prim::RaiseException, {except_val, none_const_val}, 0);
   if_block0->appendNode(exception_node);
   auto if_block1 = if_node->addBlock();
   g->insertNode(if_node);
@@ -50,7 +50,9 @@ TEST(LoweringPasses, EliminateExceptionOrPassPattern_Block0) {
   g->insertNode(cat_node);
   g->registerOutput(cat_node->output());
 
+  std::cout << "Source Graph: " << *g << std::endl;
   torch_tensorrt::core::lowering::passes::EliminateExceptionOrPassPattern(g);
+  std::cout << "Modified Graph: " << *g << std::endl;
   for (auto node : g->nodes()) {
     EXPECT_NE(node, if_node);
   }
@@ -97,14 +99,16 @@ TEST(LoweringPasses, EliminateExceptionOrPassPattern_Block1) {
   auto if_node = g->create(torch::jit::prim::If, {bool_node->output()}, 0);
   auto if_block0 = if_node->addBlock();
   auto if_block1 = if_node->addBlock();
-  auto exception_node = g->create(torch::jit::prim::RaiseException, {except_val}, 0);
+  auto exception_node = g->create(torch::jit::prim::RaiseException, {except_val, none_const_val}, 0);
   if_block1->appendNode(exception_node);
   g->insertNode(if_node);
   auto cat_node = g->create(torch::jit::aten::cat, {list_node->output(), zero_const_val});
   g->insertNode(cat_node);
   g->registerOutput(cat_node->output());
 
+  std::cout << "Source Graph: " << *g << std::endl;
   torch_tensorrt::core::lowering::passes::EliminateExceptionOrPassPattern(g);
+  std::cout << "Modified Graph: " << *g << std::endl;
   for (auto node : g->nodes()) {
     EXPECT_NE(node, if_node);
   }
