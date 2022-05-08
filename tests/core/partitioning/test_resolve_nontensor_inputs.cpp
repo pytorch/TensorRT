@@ -257,3 +257,147 @@ TEST(Partitioning, ConvertForTensorListInputsInFallbackCorrectly) {
   int count = count_trt_engines(fallback_g);
   ASSERT_TRUE(count == 2);
 }
+
+TEST(Partitioning, ResolveOnlyNeccessaryNonTensorInputs) {
+  /* parseIR does not support "= aten::_set_item" so we will build this graph manually
+    const auto graph = R"IR(
+    graph(%x : Tensor,
+      %y : Tensor):
+    %2 : str = prim::Constant[value="INS"]()
+    %3 : str = prim::Constant[value="OUTS"]()
+    %4 : bool = prim::Constant[value=0]()
+    %5 : int = prim::Constant[value=-1]()
+    %6 : Dict(str, Tensor) = prim::DictConstruct()
+     = aten::_set_item(%6, %2, %x)
+    %7 : Tensor = aten::__getitem__(%6, %2)
+    %8 : Tensor = aten::lt(%7, %y)
+    %9 : Tensor?[] = prim::ListConstruct(%8)
+    %10 : int = prim::dtype(%7)
+    %11 : Device = prim::device(%7)
+    %12 : Tensor = aten::tensor(%5, %10, %11, %4)
+    %13 : Tensor = aten::index_put_(%7, %9, %12, %4)
+     = aten::_set_item(%6, %3, %7)
+    %14 : Tensor = aten::__getitem__(%6, %2)
+    %15 : Tensor = aten::__getitem__(%6, %3)
+    return (%14, %15))IR";
+  */
+  auto g = std::make_shared<torch::jit::Graph>();
+  auto x = g->insertInput(0, "x");
+  auto y = g->insertInput(1, "y");
+  torch::jit::IValue ins_key("INS");
+  auto ins_key_val = g->insertConstant(ins_key);
+  torch::jit::IValue outs_key("OUTS");
+  auto outs_key_val = g->insertConstant(outs_key);
+  torch::jit::IValue zero(0);
+  auto false_const_val = g->insertConstant(zero);
+  false_const_val->setType(c10::BoolType::get());
+  torch::jit::IValue neg_one(-1);
+  auto neg_one_const_val = g->insertConstant(neg_one);
+  auto dict_node = g->createDict(
+      ins_key_val->type(),
+      x->type(),
+      torch::jit::ArrayRef<torch::jit::Value*>(),
+      torch::jit::ArrayRef<torch::jit::Value*>());
+  g->insertNode(dict_node);
+  auto set_node = g->create(
+      torch::jit::Symbol::fromQualString("aten::_set_item"),
+      torch::jit::ArrayRef<torch::jit::Value*>{dict_node->output(), ins_key_val, x},
+      0);
+  g->insertNode(set_node);
+  auto get_node = g->create(
+      torch::jit::Symbol::fromQualString("aten::__getitem__"),
+      torch::jit::ArrayRef<torch::jit::Value*>{dict_node->output(), ins_key_val},
+      1);
+  g->insertNode(get_node);
+  auto lt_node = g->create(
+      torch::jit::Symbol::fromQualString("aten::lt"),
+      torch::jit::ArrayRef<torch::jit::Value*>{get_node->output(), y},
+      1);
+  g->insertNode(lt_node);
+  auto list_node = g->createList(
+      at::OptionalType::create(lt_node->output()->type()), torch::jit::ArrayRef<torch::jit::Value*>{lt_node->output()});
+  g->insertNode(list_node);
+  auto dtype_node = g->create(
+      torch::jit::Symbol::fromQualString("prim::dtype"),
+      torch::jit::ArrayRef<torch::jit::Value*>{get_node->output()},
+      1);
+  dtype_node->output()->setType(neg_one_const_val->type());
+  g->insertNode(dtype_node);
+  auto device_node = g->create(
+      torch::jit::Symbol::fromQualString("prim::device"),
+      torch::jit::ArrayRef<torch::jit::Value*>{get_node->output()},
+      1);
+  device_node->output()->setType(c10::DeviceObjType::get());
+  g->insertNode(device_node);
+  auto tensor_node = g->create(
+      torch::jit::Symbol::fromQualString("aten::tensor"),
+      torch::jit::ArrayRef<torch::jit::Value*>{
+          neg_one_const_val, dtype_node->output(), device_node->output(), false_const_val},
+      1);
+  g->insertNode(tensor_node);
+  auto index_put_node = g->create(
+      torch::jit::Symbol::fromQualString("aten::index_put_"),
+      torch::jit::ArrayRef<torch::jit::Value*>{
+          get_node->output(), list_node->output(), tensor_node->output(), false_const_val},
+      1);
+  g->insertNode(index_put_node);
+  auto out_set_node = g->create(
+      torch::jit::Symbol::fromQualString("aten::_set_item"),
+      torch::jit::ArrayRef<torch::jit::Value*>{dict_node->output(), outs_key_val, get_node->output()},
+      0);
+  g->insertNode(out_set_node);
+  auto get_ins_node = g->create(
+      torch::jit::Symbol::fromQualString("aten::__getitem__"),
+      torch::jit::ArrayRef<torch::jit::Value*>{dict_node->output(), ins_key_val},
+      1);
+  g->insertNode(get_ins_node);
+  auto get_outs_node = g->create(
+      torch::jit::Symbol::fromQualString("aten::__getitem__"),
+      torch::jit::ArrayRef<torch::jit::Value*>{dict_node->output(), outs_key_val},
+      1);
+  g->insertNode(get_outs_node);
+  g->registerOutput(get_ins_node->output());
+  g->registerOutput(get_outs_node->output());
+
+  torch_tensorrt::core::partitioning::PartitionInfo partition_info;
+  partition_info.enabled = true;
+  std::vector<torch_tensorrt::core::ir::Input> inputs;
+  inputs.push_back(torch_tensorrt::core::ir::Input({4, 4}));
+  inputs.push_back(torch_tensorrt::core::ir::Input({4, 4}));
+
+  std::unordered_map<const torch::jit::Value*, torch_tensorrt::core::ir::Input> inputs_map;
+  std::unordered_map<const torch::jit::Value*, c10::optional<at::ScalarType>> input_types;
+  for (size_t i = 0; i < g->inputs().size(); ++i) {
+    inputs_map.insert({g->inputs()[i], inputs[i]});
+    input_types.insert({g->inputs()[i], {at::kFloat}});
+  }
+  auto input_ivalues_map = torch_tensorrt::core::partitioning::generateRandomInputs(inputs_map, input_types);
+  auto segmented_blocks = torch_tensorrt::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info);
+
+  int torch_block_cnt = 0, trt_block_cnt = 0;
+  for (const auto& segmented_block : segmented_blocks) {
+    if (segmented_block.target() == torch_tensorrt::core::partitioning::SegmentedBlock::kTensorRT) {
+      ++trt_block_cnt;
+      ASSERT_TRUE(checkSegmentedBlockInputType(segmented_block, [](torch::jit::TypePtr type_ptr) {
+        return type_ptr->isSubtypeOf(torch::jit::TensorType::get());
+      }));
+    } else {
+      ++torch_block_cnt;
+      bool output_dict = false;
+      bool input_dict = false;
+      auto dict_type = dict_node->output()->type();
+      for (auto in : segmented_block.raw_inputs()) {
+        if (in->type()->isSubtypeOf(dict_type)) {
+          input_dict = true;
+        }
+      }
+      for (auto out : segmented_block.raw_outputs()) {
+        if (out->type()->isSubtypeOf(dict_type)) {
+          output_dict = true;
+        }
+      }
+      EXPECT_TRUE(output_dict ^ input_dict);
+    }
+  }
+  ASSERT_TRUE(trt_block_cnt == 1 && torch_block_cnt == 2);
+}
