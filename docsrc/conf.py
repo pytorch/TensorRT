@@ -119,6 +119,7 @@ html_theme_options = {
     'master_doc': True,
     "version_info": {
         "master": "https://nvidia.github.io/Torch-TensorRT/",
+        "v1.1.0": "https://nvidia.github.io/Torch-TensorRT/v1.1.0/",
         "v1.0.0": "https://nvidia.github.io/Torch-TensorRT/v1.0.0/",
         "v0.4.1": "https://nvidia.github.io/Torch-TensorRT/v0.4.1/",
         "v0.4.0": "https://nvidia.github.io/Torch-TensorRT/v0.4.0/",
