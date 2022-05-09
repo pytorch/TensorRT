@@ -120,10 +120,6 @@ std::vector<at::Tensor> execute_engine(std::vector<at::Tensor> inputs, c10::intr
   return outputs;
 }
 
-TORCH_LIBRARY(tensorrt, m) {
-  m.def("execute_engine", execute_engine);
-}
-
 } // namespace runtime
 } // namespace core
 } // namespace torch_tensorrt
