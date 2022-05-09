@@ -152,6 +152,9 @@
        <a href="https://nvidia.github.io/Torch-TensorRT/" title="master">
         master
        </a>
+       <a href="https://nvidia.github.io/Torch-TensorRT/v1.1.0/" title="v1.1.0">
+        v1.1.0
+       </a>
        <a href="https://nvidia.github.io/Torch-TensorRT/v1.0.0/" title="v1.0.0">
         v1.0.0
        </a>
@@ -563,7 +566,22 @@
           </li>
           <li>
            <p>
+            aten::adaptive_avg_pool3d(Tensor self, int[3] output_size) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::adaptive_max_pool1d(Tensor self, int[2] output_size) -&gt; (Tensor, Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
             aten::adaptive_max_pool2d(Tensor self, int[2] output_size) -&gt; (Tensor, Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::adaptive_max_pool3d(Tensor self, int[3] output_size) -&gt; (Tensor, Tensor)
            </p>
           </li>
           <li>
@@ -579,8 +597,8 @@
           <li>
            <p>
             aten::
-            <a href="#id33">
-             <span class="problematic" id="id34">
+            <a href="#id37">
+             <span class="problematic" id="id38">
               add_
              </span>
             </a>
@@ -701,9 +719,20 @@
           </li>
           <li>
            <p>
+            aten::div.Tensor_mode(Tensor self, Tensor other,
+            <a href="#id5">
+             <span class="problematic" id="id6">
+              *
+             </span>
+            </a>
+            , str? rounding_mode) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
             aten::
-            <a href="#id35">
-             <span class="problematic" id="id36">
+            <a href="#id39">
+             <span class="problematic" id="id40">
               div_
              </span>
             </a>
@@ -713,8 +742,8 @@
           <li>
            <p>
             aten::
-            <a href="#id37">
-             <span class="problematic" id="id38">
+            <a href="#id41">
+             <span class="problematic" id="id42">
               div_
              </span>
             </a>
@@ -754,8 +783,8 @@
           <li>
            <p>
             aten::expand(Tensor(a) self, int[] size,
-            <a href="#id5">
-             <span class="problematic" id="id6">
+            <a href="#id7">
+             <span class="problematic" id="id8">
               *
              </span>
             </a>
@@ -809,11 +838,6 @@
           </li>
           <li>
            <p>
-            aten::gelu(Tensor self) -&gt; (Tensor)
-           </p>
-          </li>
-          <li>
-           <p>
             aten::gru_cell(Tensor input, Tensor hx, Tensor w_ih, Tensor w_hh, Tensor? b_ih=None, Tensor? b_hh=None) -&gt; (Tensor)
            </p>
           </li>
@@ -835,6 +859,11 @@
           <li>
            <p>
             aten::hardtanh_(Tensor(a!) self, Scalar min_val=-1, Scalar max_val=1) -&gt; (Tensor(a!))
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::index.Tensor(Tensor self, Tensor?[] indices) -&gt; (Tensor)
            </p>
           </li>
           <li>
@@ -909,6 +938,11 @@
           </li>
           <li>
            <p>
+            aten::max.dim(Tensor self, int dim, bool keepdim=False) -&gt; (Tensor values, Tensor indices)
+           </p>
+          </li>
+          <li>
+           <p>
             aten::max.other(Tensor self, Tensor other) -&gt; (Tensor)
            </p>
           </li>
@@ -930,8 +964,8 @@
           <li>
            <p>
             aten::mean(Tensor self,
-            <a href="#id7">
-             <span class="problematic" id="id8">
+            <a href="#id9">
+             <span class="problematic" id="id10">
               *
              </span>
             </a>
@@ -941,8 +975,8 @@
           <li>
            <p>
             aten::mean.dim(Tensor self, int[] dim, bool keepdim=False,
-            <a href="#id9">
-             <span class="problematic" id="id10">
+            <a href="#id11">
+             <span class="problematic" id="id12">
               *
              </span>
             </a>
@@ -972,8 +1006,8 @@
           <li>
            <p>
             aten::
-            <a href="#id39">
-             <span class="problematic" id="id40">
+            <a href="#id43">
+             <span class="problematic" id="id44">
               mul_
              </span>
             </a>
@@ -1038,17 +1072,6 @@
           <li>
            <p>
             aten::prod(Tensor self,
-            <a href="#id11">
-             <span class="problematic" id="id12">
-              *
-             </span>
-            </a>
-            , int? dtype=None) -&gt; (Tensor)
-           </p>
-          </li>
-          <li>
-           <p>
-            aten::prod.dim_int(Tensor self, int dim, bool keepdim=False,
             <a href="#id13">
              <span class="problematic" id="id14">
               *
@@ -1059,7 +1082,28 @@
           </li>
           <li>
            <p>
+            aten::prod.dim_int(Tensor self, int dim, bool keepdim=False,
+            <a href="#id15">
+             <span class="problematic" id="id16">
+              *
+             </span>
+            </a>
+            , int? dtype=None) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
             aten::reciprocal(Tensor self) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::reflection_pad1d(Tensor self, int[2] padding) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::reflection_pad2d(Tensor self, int[4] padding) -&gt; (Tensor)
            </p>
           </li>
           <li>
@@ -1095,6 +1139,11 @@
           <li>
            <p>
             aten::reshape(Tensor self, int[] shape) -&gt; (Tensor)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::roll(Tensor self, int[1] shifts, int[1] dims=[]) -&gt; (Tensor)
            </p>
           </li>
           <li>
@@ -1185,14 +1234,14 @@
           <li>
            <p>
             aten::
-            <a href="#id41">
-             <span class="problematic" id="id42">
+            <a href="#id45">
+             <span class="problematic" id="id46">
               sub_
              </span>
             </a>
             .Tensor(Tensor(a!) self, Tensor other,
-            <a href="#id15">
-             <span class="problematic" id="id16">
+            <a href="#id17">
+             <span class="problematic" id="id18">
               *
              </span>
             </a>
@@ -1202,8 +1251,8 @@
           <li>
            <p>
             aten::sum(Tensor self,
-            <a href="#id17">
-             <span class="problematic" id="id18">
+            <a href="#id19">
+             <span class="problematic" id="id20">
               *
              </span>
             </a>
@@ -1213,8 +1262,8 @@
           <li>
            <p>
             aten::sum.dim_IntList(Tensor self, int[1] dim, bool keepdim=False,
-            <a href="#id19">
-             <span class="problematic" id="id20">
+            <a href="#id21">
+             <span class="problematic" id="id22">
               *
              </span>
             </a>
@@ -1243,6 +1292,11 @@
           </li>
           <li>
            <p>
+            aten::to.device(Tensor(a) self, Device device, int dtype, bool non_blocking=False, bool copy=False, int? memory_format=None) -&gt; (Tensor(a))
+           </p>
+          </li>
+          <li>
+           <p>
             aten::to.dtype(Tensor self, int dtype, bool non_blocking=False, bool copy=False, int? memory_format=None) -&gt; (Tensor)
            </p>
           </li>
@@ -1264,6 +1318,17 @@
           <li>
            <p>
             aten::transpose.int(Tensor(a) self, int dim0, int dim1) -&gt; (Tensor(a))
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::unbind.int(Tensor(a -&gt;
+            <a href="#id23">
+             <span class="problematic" id="id24">
+              *
+             </span>
+            </a>
+            ) self, int dim=0) -&gt; (Tensor[])
            </p>
           </li>
           <li>
@@ -1433,6 +1498,11 @@
           </li>
           <li>
            <p>
+            aten::__range_length(int lo, int hi, int step) -&gt; int
+           </p>
+          </li>
+          <li>
+           <p>
             aten::__round_to_zero_floordiv(int a, int b) -&gt; (int)
            </p>
           </li>
@@ -1453,9 +1523,14 @@
           </li>
           <li>
            <p>
+            aten::add.str(str a, str b) -&gt; (str)
+           </p>
+          </li>
+          <li>
+           <p>
             aten::
-            <a href="#id43">
-             <span class="problematic" id="id44">
+            <a href="#id47">
+             <span class="problematic" id="id48">
               add_
              </span>
             </a>
@@ -1465,8 +1540,8 @@
           <li>
            <p>
             aten::append.t(t[](a!) self, t(c -&gt;
-            <a href="#id21">
-             <span class="problematic" id="id22">
+            <a href="#id25">
+             <span class="problematic" id="id26">
               *
              </span>
             </a>
@@ -1477,8 +1552,8 @@
            <dl class="simple">
             <dt>
              aten::arange(Scalar end,
-             <a href="#id23">
-              <span class="problematic" id="id24">
+             <a href="#id27">
+              <span class="problematic" id="id28">
                *
               </span>
              </a>
@@ -1495,8 +1570,8 @@
            <dl class="simple">
             <dt>
              aten::arange.start(Scalar start, Scalar end,
-             <a href="#id25">
-              <span class="problematic" id="id26">
+             <a href="#id29">
+              <span class="problematic" id="id30">
                *
               </span>
              </a>
@@ -1513,8 +1588,8 @@
            <dl class="simple">
             <dt>
              aten::arange.start_step(Scalar start, Scalar end, Scalar step,
-             <a href="#id27">
-              <span class="problematic" id="id28">
+             <a href="#id31">
+              <span class="problematic" id="id32">
                *
               </span>
              </a>
@@ -1530,8 +1605,8 @@
           <li>
            <p>
             aten::clone(Tensor self,
-            <a href="#id29">
-             <span class="problematic" id="id30">
+            <a href="#id33">
+             <span class="problematic" id="id34">
               *
              </span>
             </a>
@@ -1590,6 +1665,11 @@
           </li>
           <li>
            <p>
+            aten::extend.t(t[](a!) self, t[] other) -&gt; ()
+           </p>
+          </li>
+          <li>
+           <p>
             aten::floor.float(float a) -&gt; (int)
            </p>
           </li>
@@ -1606,6 +1686,11 @@
           <li>
            <p>
             aten::floordiv.int(int a, int b) -&gt; (int)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::format(str self, …) -&gt; (str)
            </p>
           </li>
           <li>
@@ -1765,6 +1850,26 @@
           </li>
           <li>
            <p>
+            aten::pow.float(float a, float b) -&gt; (float)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::pow.float_int(float a, int b) -&gt; (float)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::pow.int(int a, int b) -&gt; (float)
+           </p>
+          </li>
+          <li>
+           <p>
+            aten::pow.int_float(int a, float b) -&gt; (float)
+           </p>
+          </li>
+          <li>
+           <p>
             aten::size(Tensor self) -&gt; (int[])
            </p>
           </li>
@@ -1801,8 +1906,8 @@
           <li>
            <p>
             aten::tensor(t[] data,
-            <a href="#id31">
-             <span class="problematic" id="id32">
+            <a href="#id35">
+             <span class="problematic" id="id36">
               *
              </span>
             </a>
