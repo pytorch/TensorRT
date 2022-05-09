@@ -30,7 +30,7 @@ jobs:
         run: echo "::set-output name=sha::$(git rev-parse --short HEAD)"
       - name: Build Python Package
         run: |
-          cp docker/WORKSPACE.docs WORKSPACE
+          cp docker/WORKSPACE.docker WORKSPACE
           cd py
           python3 setup.py install
       - name: Generate New Docs
