@@ -14,6 +14,7 @@ namespace runtime {
 
 using EngineID = int64_t;
 const std::string ABI_VERSION = "3";
+typedef enum { ABI_TARGET_IDX = 0, NAME_IDX, DEVICE_IDX, ENGINE_IDX } SerializedInfoIndex;
 
 struct CudaDevice {
   int64_t id; // CUDA device id
@@ -37,9 +38,6 @@ CudaDevice get_current_device();
 
 c10::optional<CudaDevice> get_most_compatible_device(const CudaDevice& target_device);
 std::vector<CudaDevice> find_compatible_devices(const CudaDevice& target_device);
-
-std::string serialize_device(CudaDevice& cuda_device);
-CudaDevice deserialize_device(std::string device_info);
 
 struct TRTEngine : torch::CustomClassHolder {
   // Each engine needs it's own runtime object

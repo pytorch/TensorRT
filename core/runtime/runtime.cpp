@@ -86,14 +86,6 @@ CudaDevice get_current_device() {
   return CudaDevice(device_id, nvinfer1::DeviceType::kGPU);
 }
 
-std::string serialize_device(CudaDevice& cuda_device) {
-  return cuda_device.serialize();
-}
-
-CudaDevice deserialize_device(std::string device_info) {
-  return CudaDevice(device_info);
-}
-
 namespace {
 static DeviceList cuda_device_list;
 }

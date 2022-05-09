@@ -12,8 +12,9 @@ cc_library(
     srcs = [
         "CudaDevice.cpp",
         "DeviceList.cpp",
+        "execute_engine.cpp",
         "TRTEngine.cpp",
-        "register_trt_op.cpp",
+        "register_jit_hooks.cpp",
         "runtime.cpp"
     ],
     hdrs = [
