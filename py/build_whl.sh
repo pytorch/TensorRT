@@ -25,7 +25,7 @@ build_py39() {
     #auditwheel repair --plat manylinux2014_x86_64
 }
 
-build_py10() {
+build_py310() {
     /opt/python/cp310-cp310/bin/python -m pip install -r requirements.txt
     /opt/python/cp310-cp310/bin/python setup.py bdist_wheel --release
     #auditwheel repair --plat manylinux2014_x86_64
