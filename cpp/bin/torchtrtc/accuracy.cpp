@@ -19,12 +19,13 @@ bool check_rtol(const at::Tensor& diff, const std::vector<at::Tensor> inputs, fl
   return diff.abs().max().item<float>() <= threshold * maxValue;
 }
 
-bool almost_equal(const at::Tensor& a, const at::Tensor& b, float threshold, float atol, float rtol) {
+bool almost_equal(const at::Tensor& a, const at::Tensor& b, float atol, float rtol) {
   auto a_float = a.toType(at::kFloat);
   auto b_float = b.toType(at::kFloat);
 
   auto diff = a_float - b_float;
-  auto result = diff.abs().max().item<float>() - (atol + rtol * b.abs().max().item<float>());
+  auto result = diff.abs().max().item<float>();
+  auto threshold = atol + (rtol * b.abs().max().item<float>());
 
   std::cout << "Max Difference: " << result << std::endl;
   std::cout << "Acceptable Threshold: " << threshold << std::endl;
