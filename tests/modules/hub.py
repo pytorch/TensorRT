@@ -97,7 +97,7 @@ models = {
         "path": "script"
     },
     "bert-base-uncased": {
-        "model": "bert-base-uncased",
+        "model": cm.BertModule(),
         "path": "trace"
     }
 }
@@ -109,34 +109,7 @@ def get(n, m, manifest):
     script_filename = n + '_scripted.jit.pt'
     x = torch.ones((1, 3, 300, 300)).cuda()
     if n == "bert-base-uncased":
-        # Prepare input for BERT case
-        def prepare_bert_input():
-            enc = BertTokenizer.from_pretrained("bert-base-uncased")
-            text = "[CLS] Who was Jim Henson ? [SEP] Jim Henson was a puppeteer [SEP]"
-            tokenized_text = enc.tokenize(text)
-            masked_index = 8
-            tokenized_text[masked_index] = "[MASK]"
-            indexed_tokens = enc.convert_tokens_to_ids(tokenized_text)
-            segments_ids = [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1]
-            tokens_tensor = torch.tensor([indexed_tokens])
-            segments_tensors = torch.tensor([segments_ids])
-            return [tokens_tensor, segments_tensors]
-
-        x = prepare_bert_input()
-        name = m["model"]
-
-        config = BertConfig(
-                        vocab_size_or_config_json_file=32000,
-                        hidden_size=768,
-                        num_hidden_layers=12,
-                        num_attention_heads=12,
-                        intermediate_size=3072,
-                        torchscript=True,
-                        )
-        m["model"] = BertModel(config)
-        m["model"].eval()
-        m["model"] = BertModel.from_pretrained(name, torchscript=True)
-        traced_model = torch.jit.trace(m["model"], x)
+        traced_model = m["model"]
         torch.jit.save(traced_model, traced_filename)
         manifest.update({n : [traced_filename]})
     else:
@@ -182,6 +155,8 @@ def main():
     # Check if Manifest file exists or is empty
     if not os.path.exists(MANIFEST_FILE) or os.stat(MANIFEST_FILE).st_size == 0:
         manifest = {"version": torch_version}
+
+        # Creating an empty manifest file for overwriting post setup
         os.system('touch {}'.format(MANIFEST_FILE))
     else:
         manifest_exists = True
@@ -191,12 +166,13 @@ def main():
             manifest = json.load(f)
             if manifest['version'] == torch_version:
                 version_matches = True
-                # Overwrite the manifest version as current torch version
-                manifest['version'] = torch_version
             else:
                 print("Torch version: {} mismatches \
                 with manifest's version: {}. Re-downloading \
                 all models".format(torch_version, manifest['version']))
+
+                # Overwrite the manifest version as current torch version
+                manifest['version'] = torch_version
 
     download_models(version_matches, manifest)
 
