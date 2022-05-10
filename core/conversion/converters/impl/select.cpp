@@ -352,7 +352,7 @@ auto select_registrations TORCHTRT_UNUSED =
                   }})
         .pattern({"aten::split.sizes(Tensor(a -> *) self, int[] split_size, int dim=0) -> (Tensor[])",
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    add_split(ctx, n, args, true);
+                    add_split(ctx, n, args, true, false);
                     LOG_DEBUG("Converted split op into a list of IValues");
                     return true;
                   }})
