@@ -792,8 +792,8 @@ Signed-off-by: Naren Dasan <naren@narendasan.com>
 Signed-off-by: Naren Dasan <narens@nvidia.com>
 
 
-# 1.1.0 (2022-05-09)
 
+# 1.1.0 (2022-05-10)
 
 ### Bug Fixes
 
@@ -855,13 +855,11 @@ Signed-off-by: Naren Dasan <narens@nvidia.com>
 
 * **//core/conversion:** Better tooling for debugging ([c5c5c47](https://github.com/NVIDIA/TRTorch/commit/c5c5c47))
 * **//core/conversion/evaluators:** aten::pow support ([c4fdfcb](https://github.com/NVIDIA/TRTorch/commit/c4fdfcb))
+* **//docker:** New base container to let master build in container ([446bf18](https://github.com/NVIDIA/TRTorch/commit/446bf18))
 * **//py:** Context managers to quickly switch logging level ([12e470f](https://github.com/NVIDIA/TRTorch/commit/12e470f))
-* **//tests:** Adding BERT to the test suite ([7996a10](https://github.com/NVIDIA/TRTorch/commit/7996a10))
-* **aten::__range_length:** Adding range length evaluator ([11c4608](https://github.com/NVIDIA/TRTorch/commit/11c4608))
-* **aten::add:** adding string concat evaluator ([65dbf90](https://github.com/NVIDIA/TRTorch/commit/65dbf90))
 * Add converter files for reflection pad 1d and 2d ([406d860](https://github.com/NVIDIA/TRTorch/commit/406d860))
-* Add converter files for torch::max ([569bcde](https://github.com/NVIDIA/TRTorch/commit/569bcde))
 * Add converter files for torch::max ([f628aca](https://github.com/NVIDIA/TRTorch/commit/f628aca))
+* Add converter files for torch::max ([569bcde](https://github.com/NVIDIA/TRTorch/commit/569bcde))
 * Add converter files for torch::max ([dd7a44e](https://github.com/NVIDIA/TRTorch/commit/dd7a44e))
 * Add converter for reflection pad 1d and 2d operation ([2484a43](https://github.com/NVIDIA/TRTorch/commit/2484a43))
 * Added comprehensive perf benchmark script ([a8016ff](https://github.com/NVIDIA/TRTorch/commit/a8016ff))
@@ -880,11 +878,14 @@ Signed-off-by: Naren Dasan <narens@nvidia.com>
 * support aten::div.Tensor_mode ([bb3046a](https://github.com/NVIDIA/TRTorch/commit/bb3046a))
 * support aten::extend evaluator ([33c523d](https://github.com/NVIDIA/TRTorch/commit/33c523d))
 * support aten::format evaluator ([3a33d33](https://github.com/NVIDIA/TRTorch/commit/3a33d33))
+* Update Pytorch version to 1.11 ([c009a1f](https://github.com/NVIDIA/TRTorch/commit/c009a1f))
+* Upgrade TensorRT to 8.2.4.2 ([f1f151b](https://github.com/NVIDIA/TRTorch/commit/f1f151b))
+* **//tests:** Adding BERT to the test suite ([7996a10](https://github.com/NVIDIA/TRTorch/commit/7996a10))
+* **aten::__range_length:** Adding range length evaluator ([11c4608](https://github.com/NVIDIA/TRTorch/commit/11c4608))
+* **aten::add:** adding string concat evaluator ([65dbf90](https://github.com/NVIDIA/TRTorch/commit/65dbf90))
 * **aten::Int:** Adding a new pass to remove single use ([46ac757](https://github.com/NVIDIA/TRTorch/commit/46ac757))
 * **aten::Int:** Lowers out aten::Int ([908340f](https://github.com/NVIDIA/TRTorch/commit/908340f))
 * **core//conversion:** Implement converter for torch unbind ([268a49b](https://github.com/NVIDIA/TRTorch/commit/268a49b))
-* Update Pytorch version to 1.11 ([c009a1f](https://github.com/NVIDIA/TRTorch/commit/c009a1f))
-* Upgrade TensorRT to 8.2.4.2 ([f1f151b](https://github.com/NVIDIA/TRTorch/commit/f1f151b))
 
 
 ### BREAKING CHANGES
