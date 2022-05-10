@@ -44,7 +44,6 @@ RUN rm -rf /opt/pytorch/torch_tensorrt
 # copy source repo
 COPY . /workspace/torch_tensorrt
 COPY --from=torch-tensorrt-builder  /workspace/torch_tensorrt/src/py/dist/ .
-#RUN conda init bash
 
 RUN pip3 install ipywidgets --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host=files.pythonhosted.org
 RUN jupyter nbextension enable --py widgetsnbextension
