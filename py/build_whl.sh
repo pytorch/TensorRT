@@ -7,12 +7,6 @@ cd /workspace/Torch-TensorRT/py
 export CXX=g++
 export CUDA_HOME=/usr/local/cuda-11.3
 
-build_py36() {
-    /opt/python/cp36-cp36m/bin/python -m pip install -r requirements.txt
-    /opt/python/cp36-cp36m/bin/python setup.py bdist_wheel --release
-    #auditwheel repair --plat manylinux2014_x86_64
-}
-
 build_py37() {
     /opt/python/cp37-cp37m/bin/python -m pip install -r requirements.txt
     /opt/python/cp37-cp37m/bin/python setup.py bdist_wheel --release
@@ -31,7 +25,13 @@ build_py39() {
     #auditwheel repair --plat manylinux2014_x86_64
 }
 
-build_py36
+build_py10() {
+    /opt/python/cp310-cp310/bin/python -m pip install -r requirements.txt
+    /opt/python/cp310-cp310/bin/python setup.py bdist_wheel --release
+    #auditwheel repair --plat manylinux2014_x86_64
+}
+
 build_py37
 build_py38
 build_py39
+build_py310
