@@ -2752,9 +2752,15 @@ def acc_ops_getitem(
     if not isinstance(input_val, TRTTensor):
         return operator.getitem(input_val, slices)  # type: ignore[arg-type]
 
-    assert not has_dynamic_shape(
-        input_val.shape
-    ), "Currently we don't support slicing tensor if it has dynamic shape."
+    if not isinstance(slices, tuple) and not isinstance(slices, list):
+        slices = (slices,)
+
+    dynamic_shape = get_dynamic_dims(input_val.shape)
+    if dynamic_shape:
+        for i, s in zip(input_val.shape, slices):
+            assert i > 0 or (
+                s in [slice(None, None, None), slice(0, None, None), Ellipsis]
+            ), "We don't support slicing tensor on dynamic shape. "
 
     def num_slice_types(slices):
         """
@@ -2775,9 +2781,6 @@ def acc_ops_getitem(
         stop = get_positive_dim(py_slice.stop, dim_size) if py_slice.stop else dim_size
         size = math.ceil((stop - start) * 1.0 / stride)
         return start, size, stride
-
-    if not isinstance(slices, tuple) and not isinstance(slices, list):
-        slices = (slices,)
 
     if network.has_implicit_batch_dimension:
         # Raise an error if it's trying to subscript batch dimension unless it's
@@ -2831,12 +2834,17 @@ def acc_ops_getitem(
         stride.append(1)
         i += 1
 
+    if dynamic_shape:
+        size = get_shape_with_dynamic_shape(network, size, input_val, target, name)
+
     layer = network.add_slice(
         input=input_val,
         start=start,
-        shape=size,
+        shape=[] if dynamic_shape else size,
         stride=stride,
     )
+    if dynamic_shape:
+        layer.set_input(2, size)
     set_layer_name(layer, target, name)
 
     # Add shuffle layer to insert dimensions for 'None' and remove dimensions for 'int'.
@@ -3212,15 +3220,15 @@ def acc_ops_chunk(
             "of the TensorRT region!"
         )
 
+    dynamic_shape = has_dynamic_shape(input_val.shape)
     if network.has_implicit_batch_dimension:
         input_dim_size += 1
         dim = get_positive_dim(dim, input_dim_size)
         assert dim != 0, "Can't chunk on batch dim when it's implicit!"
         dim -= 1
     else:
-        assert not has_dynamic_shape(
-            input_val.shape
-        ), "We currently don't support dynamic shape for chunk."
+        if dynamic_shape:
+            assert input_val.shape[dim] != -1, "Can't chunk on dynamic shape dimension!"
         dim = get_positive_dim(dim, input_dim_size)
 
     if chunks > input_val.shape[dim]:
@@ -3243,8 +3251,16 @@ def acc_ops_chunk(
     for i in range(chunks):
         shape = list(input_val.shape)
         shape[dim] = min(split_size, max_offset - offset)
+        if dynamic_shape:
+            shape = get_shape_with_dynamic_shape(
+                network, shape, input_val, target, f"{name}_{i}"
+            )
         start[dim] = offset
-        layer = network.add_slice(input_val, start=start, shape=shape, stride=stride)
+        layer = network.add_slice(
+            input_val, start=start, shape=[] if dynamic_shape else shape, stride=stride
+        )
+        if dynamic_shape:
+            layer.set_input(2, shape)
         offset += split_size
         set_layer_name(layer, target, f"{name}_{i}")
         output.append(layer.get_output(0))
