@@ -37,6 +37,10 @@ class TestGetitemConverter(AccTestCase):
                 "none",
                 (slice(None, None, None), None, slice(1, -1, 3), 1),
             ),
+            (
+                "slice_zero_slice",
+                (slice(None, None, None), slice(None, None, None), slice(0, 0, None)),
+            ),
         ]
     )
     def test_getitem(self, _, idx):

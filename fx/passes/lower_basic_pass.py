@@ -1,6 +1,5 @@
 import copy
 import operator
-import operator
 import warnings
 from typing import Any
 
@@ -297,7 +296,7 @@ def split_across(
     start_node = end_node = mid_node = None
     if sli.start is None and sli.stop is None:
         return (start_node, input_node, end_node)
-    if sli.start is not None and sli.start > 0:
+    if sli.start is not None:
         st_sli = slice(0, sli.start, None)
         slice_list_gen = slice_list(st_sli, dim, size)
         start_node = gm.graph.call_function(
@@ -364,7 +363,11 @@ def transform_setitem(gm: torch.fx.GraphModule, input: Input):
                 for ind, val in enumerate(new_args):
                     if type(val) == int:
                         inp_flag = True
-                        new_args[ind] = slice(val, val + 1, None)
+                        if val == -1:
+                            new_args[ind] = slice(-1, None, None)
+                        else:
+                            new_args[ind] = slice(val, val + 1, None)
+
                 if inp_flag:
                     with gm.graph.inserting_before(inp):
                         new_node = gm.graph.call_function(
@@ -375,7 +378,18 @@ def transform_setitem(gm: torch.fx.GraphModule, input: Input):
 
             if type(sli) is not tuple:
                 sli = [sli]
-            sli = [slice(x, x + 1, None) if type(x) == int else x for x in sli]
+
+            tmp_sli = []
+            for x in sli:
+                if type(x) == int:
+                    if x == -1:
+                        tmp_sli.append(slice(-1, None, None))
+                    else:
+                        tmp_sli.append(slice(x, x + 1, None))
+                else:
+                    tmp_sli.append(x)
+            sli = tmp_sli
+
             dimension = len(sli)
             with gm.graph.inserting_before(node):
                 if dimension == 1:

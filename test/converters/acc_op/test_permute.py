@@ -13,6 +13,20 @@ class TestPermuteConverter(AccTestCase):
             ("negative", [0, -1, -2]),
         ]
     )
+    def test_permute_list(self, _, permutation):
+        class Permute(nn.Module):
+            def forward(self, x):
+                return x.permute(permutation)
+
+        inputs = [torch.randn(1, 3, 2)]
+        self.run_test(Permute(), inputs, expected_ops={acc_ops.permute})
+
+    @parameterized.expand(
+        [
+            ("positive", [0, 2, 1]),
+            ("negative", [0, -1, -2]),
+        ]
+    )
     def test_permute(self, _, permutation):
         class Permute(nn.Module):
             def forward(self, x):

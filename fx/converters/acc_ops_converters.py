@@ -332,10 +332,12 @@ def acc_ops_pad_with_slice_layer(
             f"Trying to pad last {len(pad) / 2} dimension but the input only has {rank} dimension."
         )
 
-    if value != 0:
-        raise RuntimeError(
-            f"Currently we only support padding value of 0, got {value}."
-        )
+    # cast value to TRTensor
+    dt = torch_dtype_from_trt(input_val.dtype)
+    value = 0 if value == None else value
+    value_const = get_trt_tensor(
+        network, torch.tensor([value], dtype=dt), f"{name}_value"
+    )
 
     input_shape = input_val.shape
     pre_start = tuple(i - 1 for i in input_shape)
@@ -352,6 +354,7 @@ def acc_ops_pad_with_slice_layer(
         pre_shape,
         pre_stride,
     )
+    layer.set_input(4, value_const)
     layer.mode = trt.SliceMode.FILL
     set_layer_name(layer, target, f"pre_{name}")
     half_pad_output = layer.get_output(0)
@@ -360,6 +363,7 @@ def acc_ops_pad_with_slice_layer(
     mid_start = tuple(i - 1 for i in shape)
     mid_stride = [-1] * len(shape)
     layer = network.add_slice(half_pad_output, mid_start, shape, mid_stride)
+    layer.set_input(4, value_const)
     layer.mode = trt.SliceMode.FILL
     set_layer_name(layer, target, f"transpose_{name}")
     transpose_output = layer.get_output(0)
@@ -373,6 +377,7 @@ def acc_ops_pad_with_slice_layer(
     post_stride = tuple([1] * len(shape))
 
     layer = network.add_slice(transpose_output, post_start, post_shape, post_stride)
+    layer.set_input(4, value_const)
     layer.mode = trt.SliceMode.FILL
     set_layer_name(layer, target, f"post_{name}")
     return layer.get_output(0)
@@ -2776,9 +2781,15 @@ def acc_ops_getitem(
         """
         Convert python slice to TensorRT slice layer parameters.
         """
-        start = get_positive_dim(py_slice.start, dim_size) if py_slice.start else 0
-        stride = py_slice.step if py_slice.step else 1
-        stop = get_positive_dim(py_slice.stop, dim_size) if py_slice.stop else dim_size
+        start = (
+            get_positive_dim(py_slice.start, dim_size) if py_slice.start != None else 0
+        )
+        stride = py_slice.step if py_slice.step != None else 1
+        stop = (
+            get_positive_dim(py_slice.stop, dim_size)
+            if py_slice.stop != None
+            else dim_size
+        )
         size = math.ceil((stop - start) * 1.0 / stride)
         return start, size, stride
 
@@ -2989,9 +3000,11 @@ def acc_ops_permute(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
     ranks = len(input_val.shape) + (1 if network.has_implicit_batch_dimension else 0)  # type: ignore[union-attr]
-    permutation = [
-        get_positive_dim(i, ranks) for i in cast(Sequence[int], kwargs["permutation"])
-    ]
+    if len(kwargs["permutation"]) == 1:
+        index = kwargs["permutation"][0]
+    else:
+        index = kwargs["permutation"]
+    permutation = [get_positive_dim(i, ranks) for i in cast(Sequence[int], index)]
 
     if not isinstance(input_val, TRTTensor):
         raise RuntimeError(

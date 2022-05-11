@@ -12,6 +12,26 @@ from torch.testing._internal.common_utils import run_tests
 class TestPadConverter(AccTestCase):
     @parameterized.expand(
         [
+            ("1d", (1, 2), 9),
+            ("2d", (2, 0, 0, 1), 10),
+        ]
+    )
+    def test_pad_value(self, _, pad, value):
+        class Pad(nn.Module):
+            def forward(self, x):
+                return torch.nn.functional.pad(x, pad, value=value)
+
+        inputs = [torch.randn(1, 2, 3, 4)]
+        self.run_test(
+            Pad(),
+            inputs,
+            expected_ops={acc_ops.pad},
+            # enable value will not work with implicit batch
+            test_implicit_batch_dim=False,
+        )
+
+    @parameterized.expand(
+        [
             ("1d", (1, 2)),
             ("2d", (2, 0, 0, 1)),
         ]
@@ -26,23 +46,8 @@ class TestPadConverter(AccTestCase):
             Pad(),
             inputs,
             expected_ops={acc_ops.pad},
-        )
-
-    @parameterized.expand(
-        [
-            param("value", pad=(2, 0, 0, 1), value=1),
-        ]
-    )
-    def test_pad_fail(self, _, pad, mode="constant", value=0):
-        class Pad(nn.Module):
-            def forward(self, x):
-                return torch.nn.functional.pad(x, pad, mode, value)
-
-        inputs = [torch.randn(1, 2, 3, 4)]
-        self.run_test_with_assert_error(
-            Pad(),
-            inputs,
-            expect_error=RuntimeError,
+            # enable value will not work with implicit batch
+            test_implicit_batch_dim=False,
         )
 
     @parameterized.expand(
@@ -64,6 +69,8 @@ class TestPadConverter(AccTestCase):
             Pad(),
             inputs,
             expected_ops={acc_ops.pad},
+            # enable value will not work with implicit batch
+            test_implicit_batch_dim=False,
         )
 
 
