@@ -3,6 +3,7 @@ import torch.nn as nn
 from transformers import BertModel, BertTokenizer, BertConfig
 import torch.nn.functional as F
 
+
 # Sample Pool Model (for testing plugin serialization)
 class Pool(nn.Module):
 
@@ -98,16 +99,15 @@ def BertModule():
     tokens_tensor = torch.tensor([indexed_tokens])
     segments_tensors = torch.tensor([segments_ids])
     config = BertConfig(
-                vocab_size_or_config_json_file=32000,
-                hidden_size=768,
-                num_hidden_layers=12,
-                num_attention_heads=12,
-                intermediate_size=3072,
-                torchscript=True,
-                )
+        vocab_size_or_config_json_file=32000,
+        hidden_size=768,
+        num_hidden_layers=12,
+        num_attention_heads=12,
+        intermediate_size=3072,
+        torchscript=True,
+    )
     model = BertModel(config)
     model.eval()
     model = BertModel.from_pretrained(model_name, torchscript=True)
     traced_model = torch.jit.trace(model, [tokens_tensor, segments_tensors])
     return traced_model
-

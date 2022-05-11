@@ -111,23 +111,24 @@ def get(n, m, manifest):
     if n == "bert-base-uncased":
         traced_model = m["model"]
         torch.jit.save(traced_model, traced_filename)
-        manifest.update({n : [traced_filename]})
+        manifest.update({n: [traced_filename]})
     else:
         m["model"] = m["model"].eval().cuda()
         if m["path"] == "both" or m["path"] == "trace":
             trace_model = torch.jit.trace(m["model"], [x])
             torch.jit.save(trace_model, traced_filename)
-            manifest.update({n : [traced_filename]})
+            manifest.update({n: [traced_filename]})
         if m["path"] == "both" or m["path"] == "script":
             script_model = torch.jit.script(m["model"])
             torch.jit.save(script_model, script_filename)
             if n in manifest.keys():
                 files = list(manifest[n]) if type(manifest[n]) != list else manifest[n]
                 files.append(script_filename)
-                manifest.update({n : files})
+                manifest.update({n: files})
             else:
                 manifest.update({n: [script_filename]})
     return manifest
+
 
 def download_models(version_matches, manifest):
     # Download all models if torch version is different than model version
@@ -142,8 +143,8 @@ def download_models(version_matches, manifest):
             if (m["path"] == "both" and os.path.exists(scripted_filename) and os.path.exists(traced_filename)) or \
                (m["path"] == "script" and os.path.exists(scripted_filename)) or \
                (m["path"] == "trace" and os.path.exists(traced_filename)):
-                   print("Skipping {} ".format(n))
-                   continue
+                print("Skipping {} ".format(n))
+                continue
             manifest = get(n, m, manifest)
 
 
@@ -183,5 +184,6 @@ def main():
         record = json.dumps(manifest)
         f.write(record)
         f.truncate()
+
 
 main()
