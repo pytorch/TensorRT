@@ -10,6 +10,9 @@ PYT_PATH='/opt/conda/lib/python3.8/site-packages' if not 'PYT_PATH' in os.enviro
 # TOP_DIR
 TOP_DIR=os.path.dirname(os.path.realpath(__file__)) if not 'TOP_DIR' in os.environ else os.environ["TOP_DIR"]
 
+# Set the USE_CXX11=1 to use cxx11_abi
+USE_CXX11=0 if not 'USE_CXX11' in os.environ else os.environ["USE_CXX11"]
+
 SUPPORTED_PYTHON_VERSIONS=["3.7", "3.8", "3.9", "3.10"]
 
 nox.options.sessions = ["l0_api_tests-" + "{}.{}".format(sys.version_info.major, sys.version_info.minor)]
@@ -33,7 +36,10 @@ def download_models(session, use_host_env=False):
 def install_torch_trt(session):
     print("Installing latest torch-tensorrt build")
     session.chdir(os.path.join(TOP_DIR, "py"))
-    session.run("python", "setup.py", "develop")
+    if USE_CXX11:
+        session.run('python', 'setup.py', 'develop', '--use-cxx11-abi')
+    else:
+        session.run("python", "setup.py", "develop")
 
 def download_datasets(session):
     print("Downloading dataset to path", os.path.join(TOP_DIR, 'examples/int8/training/vgg16'))
