@@ -452,6 +452,21 @@ def add_binary_elementwise_layer(
         )
         return get_python_op_from_trt_elementwise_op(op_type)(lhs_val, rhs_val)
 
+    # If the following conditions are true:
+    #  1. the network has implicit batch dimension,
+    #  2. one operand has shape [] (real shape is [batch_size]),
+    #  3. another operand is a scalar,
+    # then the result should also have shape [] (real shape is [batch_size]).
+    #
+    # In such case, we need to convert the scalar operand to tensor, because
+    # this way the shape will become [1], and then will be properly squeezed
+    # into [], meaning that the result will have shape [], which is what we
+    # expect.
+    if is_lhs_trt_tensor and isinstance(rhs_val, (float, int)):
+        rhs_val = torch.tensor([rhs_val], dtype=dtype)
+    if is_rhs_trt_tensor and isinstance(lhs_val, (float, int)):
+        lhs_val = torch.tensor([lhs_val], dtype=dtype)
+
     # When lhs is scalar, and rhs has shape [1,], then currently the assert
     # will fail because lhs shape has fewer dimensions than rhs shape.  This
     # happens when using implicit batch dimension, when we removed the 1st
