@@ -2361,7 +2361,7 @@ def acc_ops_slice_tensor(
 
     ranks = len(input_val.shape) + (1 if network.has_implicit_batch_dimension else 0)
     dim = get_positive_dim(cast(int, kwargs["dim"]), ranks)
-
+    dynamic_shape = has_dynamic_shape(input_val.shape)
     if network.has_implicit_batch_dimension:
         if dim == 0:
             raise RuntimeError(
@@ -2369,9 +2369,9 @@ def acc_ops_slice_tensor(
             )
         dim = dim - 1
     else:
-        raise RuntimeError(
-            "We don't support slice_tensor with explicit batch dimension yet!"
-        )
+        if dynamic_shape:
+            # Check whether slice target dim is dynamic shape dim
+            assert input_val.shape[dim] != -1, "Can't chunk on dynamic shape dimension!"
 
     start_int = cast(int, kwargs["start"])
     stop_int = cast(int, kwargs["stop"])
@@ -2383,7 +2383,18 @@ def acc_ops_slice_tensor(
     output_shape = list(input_val.shape)
     output_shape[dim] = (stop_int - start_int) // step_int
 
-    layer = network.add_slice(input_val, start=start, shape=output_shape, stride=stride)
+    if dynamic_shape > 0:
+        output_shape = get_shape_with_dynamic_shape(
+            network, output_shape, input_val, target, name
+        )
+    layer = network.add_slice(
+        input_val,
+        start=start,
+        shape=[] if dynamic_shape else output_shape,
+        stride=stride,
+    )
+    if dynamic_shape:
+        layer.set_input(2, output_shape)
     set_layer_name(layer, target, name)
     return layer.get_output(0)
 
@@ -2584,11 +2595,14 @@ def acc_ops_split(
         )
 
     dim = cast(int, kwargs["dim"])
+    dynamic_shape = has_dynamic_shape(input_val.shape)
     if network.has_implicit_batch_dimension:
         assert dim != 0, "Can't split on batch dim when it's implicit!"
         dim -= 1
     else:
-        raise RuntimeError("We don't support split with explicit batch dimension yet!")
+        if dynamic_shape > 0:
+            # Check whether slice target dim is dynamic shape dim
+            assert input_val.shape[dim] != -1, "Can't chunk on dynamic shape dimension!"
 
     split_size = cast(int, kwargs["split_size"])
     start = [0] * len(input_val.shape)
@@ -2607,7 +2621,15 @@ def acc_ops_split(
         shape = list(input_val.shape)
         shape[dim] = min(split_size, cast(int, max_offset - offset))
         start[dim] = offset
-        layer = network.add_slice(input_val, start=start, shape=shape, stride=stride)
+        if dynamic_shape:
+            shape = get_shape_with_dynamic_shape(
+                network, shape, input_val, target, f"{name}_shape_{i}"
+            )
+        layer = network.add_slice(
+            input_val, start=start, shape=[] if dynamic_shape else shape, stride=stride
+        )
+        if dynamic_shape:
+            layer.set_input(2, shape)
         offset += split_size
         set_layer_name(layer, target, f"{name}_{i}")
         output.append(layer.get_output(0))
@@ -2761,7 +2783,7 @@ def acc_ops_getitem(
         slices = (slices,)
 
     dynamic_shape = get_dynamic_dims(input_val.shape)
-    if dynamic_shape:
+    if len(dynamic_shape) > 0:
         for i, s in zip(input_val.shape, slices):
             assert i > 0 or (
                 s in [slice(None, None, None), slice(0, None, None), Ellipsis]
