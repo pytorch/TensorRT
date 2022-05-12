@@ -10,6 +10,7 @@ from typing import Sequence, Dict, Optional, Any, Type, Tuple, Set
 
 import fx2trt_oss.tracer.acc_tracer.acc_normalizer as acc_normalizer
 import fx2trt_oss.tracer.acc_tracer.acc_ops  # noqa: F401
+import fx2trt_oss.tracer.acc_tracer.acc_shape_prop as acc_shape_prop
 import fx2trt_oss.tracer.acc_tracer.acc_utils as acc_utils
 import torch
 import torch.jit as jit
@@ -384,6 +385,19 @@ def _replace_tensor_meta_with_rank(gm: torch.fx.GraphModule):
             del node.meta["tensor_meta"]
 
 
+def rewriter_base_trace(mod, ast_rewriter_allow_list, leaf_module_list):
+    rewritten_graph, rewritten_mod = AccRewritingTracer().trace(
+        mod,
+        ast_rewriter_allow_list=ast_rewriter_allow_list,
+        leaf_module_list=leaf_module_list,
+    )
+
+    assert isinstance(rewritten_mod, nn.Module)
+    # Note: use the rewritten_mod here as the root. This is necessary because
+    # RewrittenModule includes a new module for the ConditionalExceptionWrapper.
+    return torch.fx.GraphModule(rewritten_mod, rewritten_graph)
+
+
 def trace(
     mod: nn.Module,
     sample_inputs: Sequence[Any],
@@ -443,18 +457,10 @@ def trace(
         )
         mod.eval()
 
-    # Rewrite the module to make it symbolic traceable, and then trace it.
-    rewritten_graph, rewritten_mod = AccRewritingTracer().trace(
-        mod,
-        ast_rewriter_allow_list=ast_rewriter_allow_list,
-        leaf_module_list=leaf_module_list,
-    )
-
-    assert isinstance(rewritten_mod, nn.Module)
     assert isinstance(sample_inputs, (list, tuple))
-    # Note: use the rewritten_mod here as the root. This is necessary because
-    # RewrittenModule includes a new module for the ConditionalExceptionWrapper.
-    traced = torch.fx.GraphModule(rewritten_mod, rewritten_graph)
+
+    # Rewrite the module to make it symbolic traceable, and then trace it.
+    traced = rewriter_base_trace(mod, ast_rewriter_allow_list, leaf_module_list)
 
     # Now remove all assertions and exceptions if requested.
     if remove_assertions:
@@ -467,7 +473,7 @@ def trace(
     traced.graph.eliminate_dead_code()
 
     # Run shape prop to add node.meta["type"] to nodes, needed for NormalizeArgs.
-    shape_prop.ShapeProp(traced).propagate(*sample_inputs)
+    acc_shape_prop.AccShapeProp(traced).propagate(*sample_inputs)
     # Swap out tensor_meta for tensor_rank, because we don't actually want to rely on
     # tensor_meta yet for normalization/lowering, though rank shouldn't change.
     _replace_tensor_meta_with_rank(traced)
@@ -483,6 +489,6 @@ def trace(
     traced.recompile()
 
     # Run shape prop to again to populate tensor_meta after normalize.
-    shape_prop.ShapeProp(traced).propagate(*sample_inputs)
+    acc_shape_prop.AccShapeProp(traced).propagate(*sample_inputs)
 
     return traced

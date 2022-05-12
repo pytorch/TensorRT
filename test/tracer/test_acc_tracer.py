@@ -1947,7 +1947,8 @@ class AccTracerTest(unittest.TestCase):
 
         torch.testing.assert_allclose(m(input), traced(input))
 
-    def test_addmm(self):
+    @parameterized.expand([(torch.float,), (torch.float16,)])
+    def test_addmm(self, dtype):
         class TestModule(torch.nn.Module):
             def forward(
                 self, input: torch.Tensor, a: torch.Tensor, b: torch.Tensor
@@ -1955,7 +1956,11 @@ class AccTracerTest(unittest.TestCase):
                 return torch.addmm(input, a, b)
 
         m = TestModule()
-        input, a, b = torch.randn(2, 2), torch.randn(2, 2), torch.randn(2, 2)
+        input, a, b = (
+            torch.randn(2, 2, dtype=dtype),
+            torch.randn(2, 2, dtype=dtype),
+            torch.randn(2, 2, dtype=dtype),
+        )
         traced = acc_tracer.trace(m, [input, a, b])
 
         ph_in = ph_a = ph_b = mm = add = None
@@ -1983,7 +1988,11 @@ class AccTracerTest(unittest.TestCase):
             else:
                 self.fail(f"Unexpected node: {node.format_node()}")
 
-        self.assertTrue(torch.equal(m(input, a, b), traced(input, a, b)))
+        for node in [ph_in, ph_a, ph_b, mm, add]:
+            self.assertEqual(acc_utils.get_tensor_meta(node).dtype, dtype)
+
+        if dtype == torch.float:
+            self.assertTrue(torch.equal(m(input, a, b), traced(input, a, b)))
 
     def test_gelu(self):
         return self._make_acc_op_function_test(acc_ops.gelu, torch.nn.functional.gelu)

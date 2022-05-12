@@ -189,3 +189,14 @@ def map_tensor_metadata(a: Any, fn: Callable):
         a, list
     ), f"Only supporting tuple/list/TensorMetadata, but found {type(a)}"
     return immutable_list(map_tensor_metadata(elem, fn) for elem in a)
+
+
+def get_tensor_meta(node: torch.fx.Node) -> TensorMetadata:
+    tensor_meta = node.meta.get("tensor_meta")
+
+    if not tensor_meta:
+        raise RuntimeError(
+            f"Node has no tensor metadata associated with it! "
+            f"Check that shape propagation has run. {node.format_node()}"
+        )
+    return tensor_meta
