@@ -570,7 +570,7 @@ PartitionedGraph segment_graph(torch::jit::Block* block, const PartitionInfo& pa
     finalize_block(segmented_blocks, SegmentedBlock::kTensorRT, in_prog_trt_blk_nodes);
   }
 
-  if (!in_prog_pyt_blk_nodes.empty()) {
+  if (!in_prog_pyt_blk_nodes.empty() || !in_prog_trt_blk_nodes.empty()) {
     in_prog_pyt_blk_nodes.insert(
         in_prog_pyt_blk_nodes.end(), in_prog_trt_blk_nodes.begin(), in_prog_trt_blk_nodes.end());
     finalize_block(segmented_blocks, SegmentedBlock::kTorch, in_prog_pyt_blk_nodes);
