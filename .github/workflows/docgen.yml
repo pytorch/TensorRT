@@ -12,7 +12,7 @@ jobs:
   build-docs:
     runs-on: ubuntu-18.04
     container:
-      image: ghcr.io/nvidia/torch-tensorrt/docgen:latest
+      image: docker.pkg.github.com/pytorch/tensorrt/docgen:1.1.0
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
