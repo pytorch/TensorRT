@@ -11,3 +11,4 @@ Function Documentation
 
 
 .. doxygenfunction:: torch_tensorrt::set_device(const int)
+   :project: Torch-TensorRT

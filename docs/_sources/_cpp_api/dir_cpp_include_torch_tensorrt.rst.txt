@@ -1,8 +1,8 @@
 .. _dir_cpp_include_torch_tensorrt:
 
 
-Directory tensorrt
-==================
+Directory torch_tensorrt
+========================
 
 
 |exhale_lsh| :ref:`Parent directory <dir_cpp_include>` (``cpp/include``)
