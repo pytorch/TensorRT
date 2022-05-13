@@ -36,7 +36,7 @@ class TorchTRTLogger : public nvinfer1::ILogger {
  private:
   std::string prefix_;
   LogLevel reportable_severity_;
-  bool color_;
+  bool color_ = true;
 };
 
 TorchTRTLogger& get_logger();

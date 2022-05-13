@@ -130,6 +130,7 @@ ConversionCtx::~ConversionCtx() {
 }
 
 nvinfer1::ITensor* ConversionCtx::AssociateValueAndTensor(const torch::jit::Value* value, nvinfer1::ITensor* tensor) {
+  LOG_GRAPH(this->logger, "Setting ITensor (" << tensor->getName() << ") name to :" << value->debugName());
   tensor->setName(value->debugName().c_str());
   this->value_tensor_map[value] = tensor;
   return tensor;
@@ -165,6 +166,7 @@ bool ConversionCtx::CheckLayerAddition(const torch::jit::Node* n) {
       auto iter_iv = this->evaluated_value_map.find(out);
       if (iter_iv == this->evaluated_value_map.end()) {
         LOG_WARNING(
+            this->logger,
             "Node "
             << util::node_info(n) << " output: " << out->debugName()
             << " does not have a coresponding value or tensor, may potentially indicate a defective evaluator or converter");
