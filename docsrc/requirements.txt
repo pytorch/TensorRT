@@ -1,6 +1,6 @@
-sphinx==4.3.0
-breathe==4.31.0
-exhale==0.2.3
-sphinx-material==0.0.35
-nbsphinx==0.8.7
+sphinx==4.5.0
+breathe==4.33.1
+exhale==0.3.1
+-e git+https://github.com/pytorch/pytorch_sphinx_theme.git#egg=pytorch_sphinx_theme
+nbsphinx==0.8.8
 docutils==0.17.1
