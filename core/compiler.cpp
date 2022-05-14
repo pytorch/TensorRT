@@ -198,7 +198,7 @@ void AddIfBlockToGraph(
 
     auto env = [&](torch::jit::Value* v) { return util::getOrAddInputForValue(v, new_g, block_graph_to_new_g); };
     new_if_block->cloneFrom(cur_block_graph->block(), env);
-    if (cur_block_graph->inputs()[0]->type()->str().find("__torch__") != std::string::npos) {
+    if (cur_block_graph->inputs().size() && cur_block_graph->inputs()[0]->type()->str().find("__torch__") != std::string::npos) {
       if (new_g->inputs()[0]->type()->str().find("__torch__") == std::string::npos) {
         auto self = new_g->insertInput(0, "self_1");
         self->setType(cur_block_graph->inputs()[0]->type());
@@ -293,7 +293,7 @@ GraphAndMapping ConstructFallbackGraph(
     // Set the output as the produced tuple
     new_g->registerOutput(return_tuple_node->outputs()[0]);
   } else {
-    if (old_to_new_g.count(block->outputs()[0])) {
+    if (block->outputs().size() && old_to_new_g.count(block->outputs()[0])) {
       new_g->registerOutput(old_to_new_g[block->outputs()[0]]);
     }
   }

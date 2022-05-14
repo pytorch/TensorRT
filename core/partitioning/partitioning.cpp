@@ -145,6 +145,36 @@ void getDirtyNodes(
   }
 }
 
+void find_all_fallback_nodes(std::unordered_map<torch::jit::Node*, int> &fallback_nodes) {
+  std::queue<torch::jit::Node*> q;
+  for (auto &node : fallback_nodes) {
+    q.push(node.first);
+  }
+
+  std::unordered_set<torch::jit::Node*> visited_nodes;
+  while (!q.empty()) {
+    auto cur_node = q.front();
+    q.pop();
+    // for every node that produces this fallback node's NonTensor input, they should fallback too
+    for (auto input : cur_node->inputs()) {
+      if (!isTensor(input) && fallback_nodes.insert({input->node(), 4}).second) {
+        q.push(input->node());
+      }
+    }
+    // for every node that consumes this fallback node's NonTensor output, they should fallback too
+    for (auto output : cur_node->outputs()) {
+      if (!isTensor(output)) {
+        for (auto use : output->uses()) {
+          auto node = use.user;
+          if (fallback_nodes.insert({node, 4}).second) {
+            q.push(node);
+          }
+        }
+      }
+    }
+  }
+}
+
 std::pair<std::unordered_map<torch::jit::Value*, SegmentedBlock>, SegmentedBlock> segmentBlocksWithTensorListInputs(
     SegmentedBlock& seg_block,
     const std::unordered_map<torch::jit::Value*, SegmentedBlock>& tensorlist_inputs) {
@@ -491,6 +521,24 @@ bool should_run_in_trt(torch::jit::Node* n, const std::unordered_set<std::string
   return true;
 }
 
+bool check_node_fallback(torch::jit::Node* n, const std::unordered_map<torch::jit::Node*, int>& fallback_nodes) {
+  if (fallback_nodes.count(n)) {
+    if (fallback_nodes.at(n) == 0) {
+      LOG_GRAPH("Node not supported by conversion: " << util::node_info(n));
+    } else if (fallback_nodes.at(n) == 1) {
+      LOG_GRAPH("Node explicitly set to run in torch: " << util::node_info(n));
+    } else if (fallback_nodes.at(n) == 2) {
+      LOG_GRAPH("Node is within a module set to run in torch: " << util::node_info(n));
+    } else {
+      LOG_GRAPH("Node fallback to Torch because the NonTensor dependencies with other fallback nodes: " << util::node_info(n));
+    }
+    return false;
+  }
+
+  LOG_GRAPH("Node is going to run in TensorRT: " << util::node_info(n));
+  return true;
+}
+
 void finalize_block(
     PartitionedGraph& g,
     SegmentedBlock::SegmentedBlockTarget kind,
@@ -501,12 +549,52 @@ void finalize_block(
   LOG_DEBUG(g.back());
 }
 
+
+// use this function to get all initial fallback nodes (nodes that are unsupported or forced fallback)
+// we use a map to indicate the reason why it's fallback to torch
+std::unordered_map<torch::jit::Node*, int> get_fallback_nodes(torch::jit::Block* block, const std::unordered_set<std::string>& forced_fallback_ops) {
+  std::unordered_map<torch::jit::Node*, int> fallback_nodes;
+  auto nodes = block->nodes();
+  for (const auto n : nodes) {
+    if (n->kind() == torch::jit::prim::Constant) {
+      continue;
+    }
+
+  // If the op is not supported by the conversion phase it should run in PyTorch
+  if (!conversion::OpSupported(n)) {
+    fallback_nodes.insert({n, 0});
+  }
+
+  // If the user specifies the op to run in Torch it should run in PyTorch
+  if (forced_fallback_ops.find(n->kind().toQualString()) != forced_fallback_ops.end()) {
+    fallback_nodes.insert({n, 1});
+  }
+
+  // If the user specifies the module containing this op to run in torch it should run in PyTorch
+  const auto to_compile_sym = c10::Symbol::attr("to_compile");
+  if (n->hasAttribute(to_compile_sym) && n->i(to_compile_sym) == (int64_t) false) {
+    fallback_nodes.insert({n, 2});
+  }
+
+  }
+  return fallback_nodes;
+}
+
 PartitionedGraph segment_graph(torch::jit::Block* block, const PartitionInfo& partition_info) {
   auto min_block_size = partition_info.min_block_size;
   std::unordered_set<std::string> forced_fallback_ops(
       partition_info.forced_fallback_operators.begin(), partition_info.forced_fallback_operators.end());
 
+// get the initial fallback nodes (nodes that are unsupported or forced fallback) 
+  auto fallback_nodes = get_fallback_nodes(block, forced_fallback_ops);
+
+// For fallback nodes, if it consumes any NonTensor inputs or TensorList inputs, then the node that produces this input should also fallback
+// Similarly, if it produces any NonTensor outputs or TensorList outputs, then the node that produces this input should also fallback
+// TODO: don't need to fallback the TensorList related nodes once the collection feature is supported
+  find_all_fallback_nodes(fallback_nodes);
+
   auto nodes = block->nodes();
+
   PartitionedGraph segmented_blocks;
 
   // segment the nodes
@@ -517,7 +605,7 @@ PartitionedGraph segment_graph(torch::jit::Block* block, const PartitionInfo& pa
       continue;
     }
 
-    if (should_run_in_trt(n, forced_fallback_ops)) {
+    if (check_node_fallback(n, fallback_nodes)) {
       in_prog_trt_blk_nodes.push_back(n);
 
       // If there is an active PyTorch block and we have passed the threshold for a valid TRT
@@ -570,7 +658,7 @@ PartitionedGraph segment_graph(torch::jit::Block* block, const PartitionInfo& pa
     finalize_block(segmented_blocks, SegmentedBlock::kTensorRT, in_prog_trt_blk_nodes);
   }
 
-  if (!in_prog_pyt_blk_nodes.empty()) {
+  if (!in_prog_pyt_blk_nodes.empty() || !in_prog_trt_blk_nodes.empty()) {
     in_prog_pyt_blk_nodes.insert(
         in_prog_pyt_blk_nodes.end(), in_prog_trt_blk_nodes.begin(), in_prog_trt_blk_nodes.end());
     finalize_block(segmented_blocks, SegmentedBlock::kTorch, in_prog_pyt_blk_nodes);
@@ -589,7 +677,7 @@ PartitionedGraph Partition(
   PartitionedGraph segmented_blocks = segment_graph(block, partition_info);
 
   // resolve nonTensor inputs/outputs
-  resolveNonTensorInputs(segmented_blocks);
+  // resolveNonTensorInputs(segmented_blocks);
 
   // register input/output torch::jit::Value for segmented graphs
   LOG_DEBUG("Registering input/output torch::jit::Value for segmented graphs");
