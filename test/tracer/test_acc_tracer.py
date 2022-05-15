@@ -11,7 +11,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torchvision
-from parameterized import parameterized, param
+from parameterized import param, parameterized
 
 torch.manual_seed(0)
 

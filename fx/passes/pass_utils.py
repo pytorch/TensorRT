@@ -1,10 +1,10 @@
 import logging
 import tempfile
 from functools import wraps
-from typing import List, Any, Callable
+from typing import Any, Callable, List
 
 import torch
-from torch import nn, fx
+from torch import fx, nn
 from torch.fx.passes.shape_prop import ShapeProp
 
 # Create an alias for module input type to avoid littering pyre-ignore for Any

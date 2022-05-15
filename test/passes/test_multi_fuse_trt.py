@@ -4,8 +4,8 @@ import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
 import torch
 from fx2trt_oss.fx.passes.lower_basic_pass import (
     fuse_permute_linear,
-    trt_transposed_linear,
     fuse_permute_matmul,
+    trt_transposed_linear,
     trt_transposed_matmul,
 )
 from parameterized import parameterized

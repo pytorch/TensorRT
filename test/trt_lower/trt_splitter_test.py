@@ -11,7 +11,7 @@ import torch.fx.passes.shape_prop as shape_prop
 from fx2trt_oss.fx.tools.trt_splitter import TRTSplitter
 from fx2trt_oss.tracer.acc_tracer import acc_tracer
 from torch.fx.passes import splitter_base
-from torch.testing._internal.common_utils import TestCase, run_tests
+from torch.testing._internal.common_utils import run_tests, TestCase
 
 
 ERROR_MSG_NO_ACC_MODULE = "FX split failed: Did not find any ACC submodule!"

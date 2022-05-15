@@ -4,7 +4,7 @@ from unittest import TestCase
 
 import fx2trt_oss.fx.observer as ob
 from fx2trt_oss.fx.passes.lower_basic_pass import fuse_permute_linear
-from test_observer import set_observer_callback_rethrow, execution_verifier
+from test_observer import execution_verifier, set_observer_callback_rethrow
 
 
 class ObserverGPUTests(TestCase):

@@ -6,7 +6,7 @@ import unittest
 import fx2trt_oss.tracer.acc_tracer.acc_shape_prop as acc_shape_prop
 import fx2trt_oss.tracer.acc_tracer.acc_tracer as acc_tracer
 import torch
-from parameterized import parameterized, param
+from parameterized import param, parameterized
 
 torch.manual_seed(0)
 

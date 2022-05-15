@@ -2,7 +2,7 @@ import inspect
 import json
 import os
 import re
-from typing import Any, Tuple, Callable, Union, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import torch
 import torch.fx
@@ -10,9 +10,7 @@ from torch.fx.graph_module import GraphModule
 from torch.fx.immutable_collections import immutable_list
 from torch.fx.node import _get_qualified_name
 from torch.fx.passes import graph_drawer
-from torch.fx.passes.graph_manipulation import (
-    serialize_module,
-)
+from torch.fx.passes.graph_manipulation import serialize_module
 from torch.fx.passes.shape_prop import TensorMetadata
 
 

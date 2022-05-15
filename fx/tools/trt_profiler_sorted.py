@@ -1,6 +1,6 @@
 import json
 import operator
-from typing import Optional, Mapping, List
+from typing import List, Mapping, Optional
 
 import tensorrt as trt
 import torch

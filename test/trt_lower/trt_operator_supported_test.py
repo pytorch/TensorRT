@@ -6,7 +6,7 @@ import torch.fx
 import torch.nn as nn
 from fx2trt_oss.fx.tools.trt_splitter import create_trt_operator_support
 from fx2trt_oss.tracer.acc_tracer import acc_ops, acc_tracer
-from torch.testing._internal.common_utils import TestCase, run_tests
+from torch.testing._internal.common_utils import run_tests, TestCase
 
 
 class TestTRTOperatorSupport(TestCase):

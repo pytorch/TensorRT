@@ -1,4 +1,4 @@
-from typing import List, NamedTuple, Iterable, Tuple, Sequence
+from typing import Iterable, List, NamedTuple, Sequence, Tuple
 
 import torch
 

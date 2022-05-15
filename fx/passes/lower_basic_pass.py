@@ -8,9 +8,7 @@ import torch
 import torch.fx
 from fx2trt_oss.fx.observer import observable
 from fx2trt_oss.fx.passes.pass_utils import log_before_after, validate_inference
-from fx2trt_oss.tracer.acc_tracer.acc_utils import (
-    get_attr,
-)
+from fx2trt_oss.tracer.acc_tracer.acc_utils import get_attr
 from torch.fx.experimental.const_fold import split_const_subgraphs
 
 # Create an alias for module input type to avoid littering pyre-ignore for Any
@@ -202,9 +200,9 @@ try:
     import tensorrt as trt
     from fx2trt_oss.fx.converter_registry import tensorrt_converter
     from fx2trt_oss.fx.converters.converter_utils import (
-        get_trt_tensor,
         add_binary_elementwise_layer,
         broadcast,
+        get_trt_tensor,
         set_layer_name,
     )
 except Exception as e:

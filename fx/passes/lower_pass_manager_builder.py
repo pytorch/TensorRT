@@ -1,5 +1,5 @@
 from functools import partial, wraps
-from typing import Callable, Any, Sequence, NamedTuple
+from typing import Any, Callable, NamedTuple, Sequence
 
 import torch
 from fx2trt_oss.fx.lower_setting import LowerSetting
@@ -8,7 +8,7 @@ from fx2trt_oss.fx.passes.remove_duplicate_output_args import (
     remove_duplicate_output_args,
 )
 from torch import nn
-from torch.fx.passes.pass_manager import PassManager, inplace_wrapper
+from torch.fx.passes.pass_manager import inplace_wrapper, PassManager
 from torch.fx.passes.shape_prop import ShapeProp
 from torch.fx.passes.splitter_base import SplitResult
 

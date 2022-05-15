@@ -1,6 +1,6 @@
 import dataclasses as dc
 import logging
-from typing import Callable, Any, Sequence
+from typing import Any, Callable, Sequence
 
 import fx2trt_oss.tracer.acc_tracer.acc_tracer as acc_tracer
 
@@ -10,25 +10,16 @@ import torch
 import torch.fx as fx
 import torch.nn as nn
 from fx2trt_oss.fx.lower_setting import LowerSetting
-from fx2trt_oss.fx.passes.pass_utils import validate_inference, decorate_method
+from fx2trt_oss.fx.passes.pass_utils import decorate_method, validate_inference
 from torch.fx.passes.splitter_base import SplitResult
 
-from .fx2trt import (
-    TRTInterpreter,
-    TRTInterpreterResult,
-)
-from .input_tensor_spec import (
-    InputTensorSpec,
-)
+from .fx2trt import TRTInterpreter, TRTInterpreterResult
+from .input_tensor_spec import InputTensorSpec
 from .passes.lower_pass_manager_builder import LowerPassManagerBuilder
 from .passes.pass_utils import chain_passes, PassFunc
-from .tools.timing_cache_utils import (
-    TimingCacheManager,
-)
+from .tools.timing_cache_utils import TimingCacheManager
 from .tools.trt_splitter import TRTSplitter, TRTSplitterSetting
-from .trt_module import (
-    TRTModule,
-)
+from .trt_module import TRTModule
 from .utils import LowerPrecision
 
 logger = logging.getLogger(__name__)

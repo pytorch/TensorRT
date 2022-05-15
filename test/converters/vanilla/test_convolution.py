@@ -2,7 +2,7 @@
 
 import torch
 import torch.fx
-from parameterized import parameterized, param
+from parameterized import param, parameterized
 from torch.testing._internal.common_fx2trt import VanillaTestCase
 from torch.testing._internal.common_utils import run_tests
 

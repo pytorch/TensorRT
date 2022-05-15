@@ -10,28 +10,22 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.quantized._reference as nnqr
-from fx2trt_oss.fx import (
-    TRTInterpreter,
-    InputTensorSpec,
-    TRTModule,
-)
+from fx2trt_oss.fx import InputTensorSpec, TRTInterpreter, TRTModule
 from fx2trt_oss.fx.passes.lower_basic_pass import run_const_fold
 from fx2trt_oss.fx.utils import LowerPrecision
 from fx2trt_oss.tracer.acc_tracer import acc_ops
 from torch.ao.quantization import default_qconfig
 from torch.ao.quantization.backend_config.observation_type import ObservationType
-from torch.ao.quantization.fx.match_utils import (
-    MatchAllNode,
-)
+from torch.ao.quantization.fx.match_utils import MatchAllNode
 from torch.ao.quantization.quantize_fx import (
     convert_fx,
+    get_tensorrt_backend_config_dict,
     prepare_fx,
     prepare_qat_fx,
-    get_tensorrt_backend_config_dict,
 )
 from torch.testing._internal.common_cuda import TEST_CUDA
-from torch.testing._internal.common_quantization import NodeSpec as ns
 from torch.testing._internal.common_quantization import (
+    NodeSpec as ns,
     QuantizationTestCase,
 )
 from torch.testing._internal.common_utils import run_tests

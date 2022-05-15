@@ -1,4 +1,4 @@
-from typing import List, Any, Sequence
+from typing import Any, List, Sequence
 
 # @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt

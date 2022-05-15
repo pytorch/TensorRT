@@ -3,7 +3,7 @@ import operator
 import warnings
 
 import torch  # isort:skip
-from typing import Iterable, Sequence, List, cast
+from typing import cast, Iterable, List, Sequence
 
 import fx2trt_oss.tracer.acc_tracer.acc_utils as acc_utils
 import torch.nn as nn

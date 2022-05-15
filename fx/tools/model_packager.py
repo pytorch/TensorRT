@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Sequence, BinaryIO, TextIO, Union
+from typing import BinaryIO, Sequence, TextIO, Union
 
 import torch
 from torch.fx.passes.split_utils import getattr_recursive

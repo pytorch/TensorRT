@@ -1,6 +1,6 @@
 import inspect
 import re
-from typing import NamedTuple, Optional, Callable, Dict, List, Tuple, Union, Any, Set
+from typing import Any, Callable, Dict, List, NamedTuple, Optional, Set, Tuple, Union
 
 import fx2trt_oss.tracer.acc_tracer.acc_utils as acc_utils
 import torch

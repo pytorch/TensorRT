@@ -3,10 +3,7 @@ import tensorrt as trt
 import torch
 from fx2trt_oss.fx.converter_registry import tensorrt_converter
 
-from .converter_utils import (
-    mark_as_int8_layer,
-    extend_mod_attr_to_tuple,
-)
+from .converter_utils import extend_mod_attr_to_tuple, mark_as_int8_layer
 
 
 @tensorrt_converter(torch.nn.modules.pooling.AdaptiveAvgPool2d)

@@ -2,7 +2,7 @@
 import math
 import operator
 import warnings
-from typing import Dict, Tuple, Sequence, cast, Optional, Union
+from typing import cast, Dict, Optional, Sequence, Tuple, Union
 
 import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
 import numpy as np
@@ -13,12 +13,12 @@ import torch
 from fx2trt_oss.fx.converter_registry import tensorrt_converter
 from fx2trt_oss.fx.types import *  # noqa: F403
 from fx2trt_oss.fx.utils import (
+    get_dynamic_dims,
     torch_dtype_from_trt,
     torch_dtype_to_trt,
-    get_dynamic_dims,
 )
 from torch.fx.immutable_collections import immutable_list
-from torch.fx.node import Target, Argument
+from torch.fx.node import Argument, Target
 
 from .converter_utils import *  # noqa: F403
 

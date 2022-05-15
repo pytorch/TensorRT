@@ -1,5 +1,5 @@
 import warnings
-from typing import List, NamedTuple, Any, Optional, Sequence, Dict, Callable
+from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence
 
 import numpy
 
@@ -13,7 +13,7 @@ from torch.fx.passes.shape_prop import TensorMetadata
 
 from .converter_registry import CONVERTERS
 from .input_tensor_spec import InputTensorSpec
-from .utils import torch_dtype_to_trt, get_dynamic_dims, LowerPrecision
+from .utils import get_dynamic_dims, LowerPrecision, torch_dtype_to_trt
 
 TRT_INTERPRETER_CALL_PRE_OBSERVER: Observer[
     Callable[[torch.fx.GraphModule], None]

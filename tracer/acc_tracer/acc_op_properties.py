@@ -1,5 +1,5 @@
 from collections import defaultdict
-from enum import Flag, auto
+from enum import auto, Flag
 from typing import Callable, DefaultDict, Set
 
 import torch

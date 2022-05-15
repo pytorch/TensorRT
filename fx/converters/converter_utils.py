@@ -1,6 +1,6 @@
 import operator
 import warnings
-from typing import Any, Tuple, Sequence, Union, List, Optional, Dict, Callable
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 
@@ -8,17 +8,17 @@ import numpy as np
 import tensorrt as trt
 import torch
 from fx2trt_oss.fx.types import (
-    TRTNetwork,
-    TRTTensor,
-    TRTLayer,
-    TRTPluginFieldCollection,
-    TRTPlugin,
+    Shape,
     TRTDataType,
     TRTElementWiseOp,
-    Shape,
+    TRTLayer,
+    TRTNetwork,
+    TRTPlugin,
+    TRTPluginFieldCollection,
+    TRTTensor,
 )
 from fx2trt_oss.fx.utils import torch_dtype_from_trt
-from torch.fx.node import Target, Argument
+from torch.fx.node import Argument, Target
 
 
 def get_trt_plugin(

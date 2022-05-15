@@ -1,6 +1,6 @@
 import typing as t
 from copy import deepcopy
-from dataclasses import replace, field, dataclass
+from dataclasses import dataclass, field, replace
 
 import torch
 import torchvision

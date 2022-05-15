@@ -4,7 +4,7 @@ import fx2trt_oss.tracer.acc_tracer.acc_tracer as acc_tracer
 import torch
 import torch.fx
 import torch.nn as nn
-from fx2trt_oss.fx import TRTInterpreter, InputTensorSpec, TRTModule
+from fx2trt_oss.fx import InputTensorSpec, TRTInterpreter, TRTModule
 from fx2trt_oss.fx.tools.trt_splitter import TRTSplitter
 
 

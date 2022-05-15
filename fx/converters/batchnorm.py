@@ -5,11 +5,7 @@ import tensorrt as trt
 import torch
 from fx2trt_oss.fx.converter_registry import tensorrt_converter
 
-from .converter_utils import (
-    mark_as_int8_layer,
-    to_numpy,
-    get_dyn_range,
-)
+from .converter_utils import get_dyn_range, mark_as_int8_layer, to_numpy
 
 
 def common_batchnorm(network, mod, input_val, layer_name, is_quantized):

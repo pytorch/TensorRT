@@ -6,7 +6,7 @@ import logging
 import textwrap
 import warnings
 from types import FunctionType
-from typing import Sequence, Dict, Optional, Any, Type, Tuple, Set
+from typing import Any, Dict, Optional, Sequence, Set, Tuple, Type
 
 import fx2trt_oss.tracer.acc_tracer.acc_normalizer as acc_normalizer
 import fx2trt_oss.tracer.acc_tracer.acc_ops  # noqa: F401

@@ -1,5 +1,5 @@
 import dataclasses as dc
-from typing import Type, Set, Optional, Sequence, List
+from typing import List, Optional, Sequence, Set, Type
 
 from fx2trt_oss.fx import InputTensorSpec
 from fx2trt_oss.fx.passes.lower_basic_pass import (

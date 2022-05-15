@@ -1,12 +1,8 @@
-from typing import Tuple, Callable, Any
+from typing import Any, Callable, Tuple
 
 import torch
 import torch.fx.passes.net_min_base as net_min_base
-from fx2trt_oss.fx import (
-    TRTModule,
-    TRTInterpreter,
-    InputTensorSpec,
-)
+from fx2trt_oss.fx import InputTensorSpec, TRTInterpreter, TRTModule
 from torch.fx.passes.tools_common import Tensors
 
 

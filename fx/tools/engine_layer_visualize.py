@@ -1,6 +1,6 @@
 import argparse
 import re
-from typing import NamedTuple, List, Optional, Dict, Any, Tuple
+from typing import Any, Dict, List, NamedTuple, Optional, Tuple
 
 import pydot
 

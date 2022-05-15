@@ -6,9 +6,9 @@ import fx2trt_oss.tracer.acc_tracer.acc_tracer as acc_tracer
 import tensorrt as trt
 import torch.fx
 import torchvision.models as models
-from fx2trt_oss.fx import TRTInterpreter, InputTensorSpec, TRTModule
+from fx2trt_oss.fx import InputTensorSpec, TRTInterpreter, TRTModule
 from fx2trt_oss.fx.utils import LowerPrecision
-from torch.ao.quantization.quantize_fx import prepare_fx, convert_fx
+from torch.ao.quantization.quantize_fx import convert_fx, prepare_fx
 from torch.fx.experimental.normalize import NormalizeArgs
 from torch.fx.passes import shape_prop
 

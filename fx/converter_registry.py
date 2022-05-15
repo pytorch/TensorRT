@@ -1,4 +1,4 @@
-from typing import Callable, Dict, Any
+from typing import Any, Callable, Dict
 
 from torch.fx.node import Target
 
