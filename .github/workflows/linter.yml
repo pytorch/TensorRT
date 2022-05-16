@@ -33,6 +33,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Run image
         run: |
+          docker pull docker.pkg.github.com/pytorch/tensorrt/docgen:latest
           docker run -it -d --name cpplinter -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GITHUB_WORKSPACE:/workspace -v $GITHUB_EVENT_PATH:/GITHUB_EVENT.json -w /workspace  docker.pkg.github.com/pytorch/tensorrt/docgen:latest
           docker exec cpplinter bash -c "cp /workspace/docker/WORKSPACE.docker /workspace/WORKSPACE"
         env:
@@ -70,6 +71,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Run image
         run: |
+          docker pull docker.pkg.github.com/pytorch/tensorrt/docgen:latest
           docker run -it -d --name pylinter -e GITHUB_TOKEN=$GITHUB_TOKEN -v $GITHUB_WORKSPACE:/workspace -v $GITHUB_EVENT_PATH:/GITHUB_EVENT.json -w /workspace  docker.pkg.github.com/pytorch/tensorrt/docgen:latest
           docker exec pylinter bash -c "cp /workspace/docker/WORKSPACE.docker /workspace/WORKSPACE"
         env:
