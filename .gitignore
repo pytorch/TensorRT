@@ -61,3 +61,4 @@ bazel-Torch-TensorRT-Preview
 docsrc/src/
 bazel-TensorRT
 bazel-tensorrt
+playground
