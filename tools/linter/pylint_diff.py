@@ -31,7 +31,6 @@ if __name__ == "__main__":
 
     STYLE_CONF_PATH = BAZEL_ROOT + "/.style.yapf"
     USER = pwd.getpwuid(os.getuid())[0]
-    subprocess.run(["useradd", USER])
     projects = utils.CHECK_PROJECTS(sys.argv[1:])
     if "//..." in projects:
         projects = [p.replace(BAZEL_ROOT, "/")[:-1] for p in glob.glob(BAZEL_ROOT + '/*/')]
