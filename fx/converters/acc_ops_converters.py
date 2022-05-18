@@ -2578,7 +2578,7 @@ def acc_ops_masked_fill_tensor(
     return layer.get_output(0)
 
 
-@tensorrt_converter(acc_ops.split, no_explicit_batch_dim=True)
+@tensorrt_converter(acc_ops.split)
 def acc_ops_split(
     network: TRTNetwork,
     target: Target,

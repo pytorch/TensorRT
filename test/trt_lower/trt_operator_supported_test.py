@@ -31,7 +31,7 @@ class TestTRTOperatorSupport(TestCase):
         class TestModule(nn.Module):
             def forward(self, x):
                 y = torch.add(input=x, other=x)
-                return torch.split(y, 2)
+                return torch.max_pool1d(y, 1)
 
         mod = TestModule()
         traced_mod = acc_tracer.trace(mod, [torch.randn(5, 2)])
