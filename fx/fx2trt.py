@@ -1,4 +1,6 @@
+import logging
 import warnings
+from datetime import datetime
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Sequence
 
 import numpy
@@ -14,6 +16,10 @@ from torch.fx.passes.shape_prop import TensorMetadata
 from .converter_registry import CONVERTERS
 from .input_tensor_spec import InputTensorSpec
 from .utils import get_dynamic_dims, LowerPrecision, torch_dtype_to_trt
+
+
+_LOGGER: logging.Logger = logging.getLogger(__name__)
+
 
 TRT_INTERPRETER_CALL_PRE_OBSERVER: Observer[
     Callable[[torch.fx.GraphModule], None]
@@ -179,7 +185,12 @@ class TRTInterpreter(torch.fx.Interpreter):
             warnings.warn("Current platform doesn't support fast native fp16!")
 
         self.input_specs_iter = 0
+        run_module_start_time = datetime.now()
         super().run()
+        _LOGGER.info(
+            f"Run Module elapsed time: {datetime.now() - run_module_start_time}"
+        )
+        build_engine_start_time = datetime.now()
 
         self.builder.max_batch_size = max_batch_size
         builder_config = self.builder.create_builder_config()
@@ -226,6 +237,9 @@ class TRTInterpreter(torch.fx.Interpreter):
             bytearray(cache.serialize())
             if builder_config.get_timing_cache()
             else bytearray()
+        )
+        _LOGGER.info(
+            f"Build TRT engine elapsed time: {datetime.now() - build_engine_start_time}"
         )
 
         return TRTInterpreterResult(
