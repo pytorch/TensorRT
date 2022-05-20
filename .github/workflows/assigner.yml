@@ -6,7 +6,10 @@
 # https://github.com/actions/labeler/blob/master/README.md
 
 name: Issue Assigner
-on: [label]
+on:
+  issues:
+    types:
+      - labeled
 
 jobs:
   assign:
