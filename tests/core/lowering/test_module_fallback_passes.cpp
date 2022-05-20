@@ -18,7 +18,8 @@ TEST(Lowering, NotateModuleForFallbackWorksCorrectly) {
   }
 
   std::unordered_set<std::string> mods_to_mark;
-  mods_to_mark.insert("ModuleFallbackSub");
+  mods_to_mark.insert("custom_models.ModuleFallbackSub");
+
 
   torch_tensorrt::core::lowering::passes::NotateModuleForFallback(mod, "", "forward", mods_to_mark);
 
@@ -58,7 +59,7 @@ TEST(Lowering, MarkNodesForFallbackWorksCorrectly) {
   }
 
   std::unordered_set<std::string> mods_to_mark;
-  mods_to_mark.insert("ModuleFallbackSub");
+  mods_to_mark.insert("custom_models.ModuleFallbackSub");
 
   torch_tensorrt::core::lowering::passes::NotateModuleForFallback(mod, "", "forward", mods_to_mark);
   auto mod_ = torch::jit::freeze_module(mod);
