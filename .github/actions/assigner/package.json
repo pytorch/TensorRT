@@ -1,0 +1,32 @@
+{
+  "name": "assigner",
+  "version": "1.0.0",
+  "description": "An action to automatically assign triagers and reviewers",
+  "main": "lib/main.js",
+  "scripts": {
+    "start": "tsc && ncc build lib/main.js && node dist/index.js",
+    "build": "tsc && ncc build lib/main.js",
+    "format": "prettier --write \"**/*.ts\"",
+    "format-check": "prettier --check \"**/*.ts\"",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "actions",
+    "label",
+    "assign"
+  ],
+  "author": "NVIDIA",
+  "license": "BSD3",
+  "dependencies": {
+    "@actions/core": "^1.8.2",
+    "@actions/github": "^5.0.3",
+    "fs": "^0.0.1-security",
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^17.0.35",
+    "@vercel/ncc": "^0.33.3",
+    "prettier": "^2.6.2",
+    "typescript": "^4.6.4"
+  }
+}
