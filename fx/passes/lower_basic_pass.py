@@ -356,7 +356,7 @@ def transform_setitem(gm: torch.fx.GraphModule, input: Input):
             inp = node.args[2]
 
             inp_flag = False
-            if inp.target == operator.getitem:
+            if type(inp) == torch.fx.node.Node and inp.target == operator.getitem:
                 new_args = list(copy.deepcopy(inp.args[1]))
                 for ind, val in enumerate(new_args):
                     if type(val) == int:

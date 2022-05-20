@@ -14,6 +14,14 @@ class TestCatConverter(AccTestCase):
         inputs = [torch.randn(1, 2, 3), torch.randn(1, 1, 3), torch.randn(1, 3, 3)]
         self.run_test(Cat(), inputs, expected_ops={acc_ops.cat})
 
+    def test_cat_neg(self):
+        class Cat(nn.Module):
+            def forward(self, x, y, z):
+                return torch.cat((x, y, z), -1)
+
+        inputs = [torch.randn(1, 2, 3), torch.randn(1, 2, 3), torch.randn(1, 2, 2)]
+        self.run_test(Cat(), inputs, expected_ops={acc_ops.cat})
+
     def test_cat_with_dynamic_shape(self):
         class Cat(nn.Module):
             def forward(self, x, y):

@@ -2483,7 +2483,10 @@ def acc_ops_where(
 
     if type(x_t) != TRTTensor:
         if x_shape != output_shape:
-            x_t.expand(output_shape)
+            # special case where 1 element in x_t
+            if len(x_t.shape) == 0:
+                x_t = x_t.unsqueeze(0)
+            x_t = x_t.expand(output_shape)
         x_val = get_trt_tensor(network, x_t, f"{name}_x")
     else:
         x_val = x_t
@@ -2498,7 +2501,10 @@ def acc_ops_where(
 
     if type(y_t) != TRTTensor:
         if y_shape != output_shape:
-            y_t.expand(output_shape)
+            # special case where 1 element in y_t
+            if len(y_t.shape) == 0:
+                y_t = y_t.unsqueeze(0)
+            y_t = y_t.expand(output_shape)
         y_val = get_trt_tensor(network, y_t, f"{name}_y")
     else:
         y_val = y_t
@@ -2912,16 +2918,20 @@ def acc_ops_cat(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     tensors = kwargs["tensors"]
+    dim = kwargs["dim"]
 
     if any(not isinstance(t, TRTTensor) for t in tensors):  # type: ignore[union-attr]
         raise RuntimeError(
             f"cat received inputs {tensors} that is not part " "of the TensorRT region!"
         )
-
     layer = network.add_concatenation(inputs=tensors)
-    layer.axis = cast(int, kwargs["dim"]) - (
-        1 if network.has_implicit_batch_dimension else 0
-    )
+    if dim < 0:
+        if network.has_implicit_batch_dimension:
+            dim = len(tensors[0].shape) + 1 + dim
+        else:
+            dim = len(tensors[0].shape) + dim
+
+    layer.axis = dim - (1 if network.has_implicit_batch_dimension else 0)
     set_layer_name(layer, target, name)
     return layer.get_output(0)
 
@@ -3477,3 +3487,129 @@ def acc_ops_interpolate(
 
     set_layer_name(layer, target, name)
     return layer.get_output(0)
+
+
+@tensorrt_converter(acc_ops.new_ones)
+def acc_ops_new_ones(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    input_val = kwargs["input"]
+    size_val = kwargs["size"]
+    dtype_val = kwargs.get("dtype")
+    if dtype_val is None:
+        dtype_val = input_val.dtype
+        dtype_val = torch_dtype_from_trt(dtype_val)
+
+    device_val = kwargs.get("device")
+    assert (
+        device_val == "cuda" or device_val == None
+    ), f"device is not `cuda` but {device_val}"
+
+    weight = torch.ones(size_val, dtype=dtype_val)
+    return get_trt_tensor(network, weight, f"{name}_weight")
+
+
+@tensorrt_converter(acc_ops.new_empty)
+def acc_ops_new_empty(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    input_val = kwargs["input"]
+    size_val = kwargs["size"]
+    dtype_val = kwargs.get("dtype")
+    if dtype_val is None:
+        dtype_val = input_val.dtype
+        dtype_val = torch_dtype_from_trt(dtype_val)
+
+    device_val = kwargs.get("device")
+    assert (
+        device_val == "cuda" or device_val == None
+    ), f"device is not `cuda` but {device_val}"
+
+    weight = torch.zeros(size_val, dtype=dtype_val)
+    return get_trt_tensor(network, weight, f"{name}_weight")
+
+
+@tensorrt_converter(acc_ops.einsum)
+def acc_ops_einsum(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    input_val = list(kwargs["operands"])
+    equation = kwargs["equation"]
+    assert type(equation) is str, "equation type is not str"
+    const_flag = False
+    for i, input_source in enumerate(input_val):
+        if type(input_source) == torch.Tensor:
+            # const change to TRTensor always output with dtype FLOAT even though stored memory is other type
+            # so we cast to float first. And we need other inputs to be the same float type
+            input_source = input_source.to(torch.float)
+            const_flag = True
+        input_val[i] = get_trt_tensor(network, input_source, name + f"_input_source{i}")
+
+    if const_flag:
+        for i, input_source in enumerate(input_val):
+            if input_source.dtype != trt.float32:
+                input_val[i] = type_cast(
+                    network, target, f"{name}_input_cast{i}", input_source, trt.float32
+                )
+    einsum_layer = network.add_einsum(inputs=input_val, equation=equation)
+    return einsum_layer.get_output(0)
+
+
+@tensorrt_converter(acc_ops.as_strided)
+def acc_ops_as_strided(
+    network: TRTNetwork,
+    target: Target,
+    args: Tuple[Argument, ...],
+    kwargs: Dict[str, Argument],
+    name: str,
+) -> Union[TRTTensor, Sequence[TRTTensor]]:
+    input_val = kwargs["input"]
+    size = kwargs["size"]
+    stride = kwargs["stride"]
+    offset = kwargs.get("storage_offset")
+    if offset == None:
+        offset = 0
+
+    # convert to 1d vector
+    new_kwargs = {}
+    new_kwargs["input"] = kwargs["input"]
+    new_kwargs["start_dim"] = 0
+    new_kwargs["end_dim"] = -1
+    flatten_output = acc_ops_flatten(network, target, [], new_kwargs, name + "_flatten")
+    # use gather to collect output from 1d flatten_output
+    rank = len(size)
+    assert len(size) == len(stride), "size and stride shapes are not the same"
+
+    def nested(rank, size, stride, current, dim, indices):
+        if dim == rank:
+            indices.append(current)
+            return
+        for i in range(size[dim]):
+            current = current + stride[dim] * i
+            nested(rank, size, stride, current, dim + 1, indices)
+            current = current - stride[dim] * i
+
+    indices = []
+    nested(rank, size, stride, 0, 0, indices)
+    indices = torch.tensor(indices, dtype=torch.int)
+    indices = indices + offset
+    indices_tensor = get_trt_tensor(network, indices, name + "_indices_tensor")
+    gather_layer = network.add_gather(flatten_output, indices_tensor, axis=0)
+    # resize the output to match size
+    shuffle_layer = network.add_shuffle(gather_layer.get_output(0))
+    set_layer_name(shuffle_layer, target, name + "_shuffle")
+    shuffle_layer.reshape_dims = tuple(size)
+
+    return shuffle_layer.get_output(0)

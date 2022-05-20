@@ -2500,5 +2500,9 @@ class AccTracerTest(unittest.TestCase):
                 acc_ops.isinf,
                 acc_ops.any,
                 acc_ops.tensor_split,
+                acc_ops.new_empty,
+                acc_ops.new_ones,
+                acc_ops.einsum,
+                acc_ops.as_strided,
             },
         )

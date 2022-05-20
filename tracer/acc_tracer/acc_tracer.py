@@ -471,6 +471,7 @@ def trace(
     # Cleanup any dead code from the original module as well as resulting dead
     # nodes after removing assertions and exceptions.
     traced.graph.eliminate_dead_code()
+    traced.recompile()
 
     # Run shape prop to add node.meta["type"] to nodes, needed for NormalizeArgs.
     acc_shape_prop.AccShapeProp(traced).propagate(*sample_inputs)

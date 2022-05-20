@@ -2063,6 +2063,14 @@ def expand(*, input, sizes):
 
 
 @register_acc_op_mapping(
+    op_and_target=("call_function", torch.masked_fill),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("mask", "mask"),
+        ("value", "value"),
+    ],
+)
+@register_acc_op_mapping(
     op_and_target=("call_method", "masked_fill"),
     arg_replacement_tuples=[
         ("input", "input"),
@@ -2653,3 +2661,72 @@ def tensor_split(*, input, indices_or_sections, dim=0):
             f"Expected int, Iterable or Tensor for "
             f"indices_or_sections arg, got: {type(indices_or_sections)}"
         )
+
+
+@register_acc_op_mapping(
+    op_and_target=("call_method", "new_ones"),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("size", "size"),
+        ("dtype", "dtype", this_arg_is_optional),
+        ("device", "device", this_arg_is_optional),
+        ("requires_grad", "requires_grad", this_arg_is_optional),
+    ],
+)
+@register_acc_op
+def new_ones(*, input, size, dtype=None, device=None, requires_grad=False):
+    assert requires_grad is False, f"requires_grad != False, it is {requires_grad}"
+    return input.new_ones(size, dtype=dtype, device=device)
+
+
+@register_acc_op_mapping(
+    op_and_target=("call_method", "new_empty"),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("size", "size"),
+        ("dtype", "dtype", this_arg_is_optional),
+        ("device", "device", this_arg_is_optional),
+        ("requires_grad", "requires_grad", this_arg_is_optional),
+    ],
+)
+@register_acc_op
+def new_empty(*, input, size, dtype=None, device=None, requires_grad=False):
+    assert requires_grad is False, f"requires_grad != False, it is {requires_grad}"
+    return input.new_empty(size, dtype=dtype, device=device)
+
+
+@register_acc_op_mapping(
+    op_and_target=("call_function", torch.einsum),
+    arg_replacement_tuples=[
+        ("equation", "equation"),
+        ("*", "operands"),
+    ],
+)
+@register_acc_op
+def einsum(*, equation, operands):
+    return torch.einsum(equation, *operands)
+
+
+@register_acc_op_mapping(
+    op_and_target=("call_function", torch.as_strided),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("size", "size"),
+        ("stride", "stride"),
+        ("storage_offset", "storage_offset", this_arg_is_optional),
+    ],
+)
+@register_acc_op_mapping(
+    op_and_target=("call_method", "as_strided"),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("size", "size"),
+        ("stride", "stride"),
+        ("storage_offset", "storage_offset", this_arg_is_optional),
+    ],
+)
+@register_acc_op
+def as_strided(*, input, size, stride, storage_offset=0):
+    return torch.as_strided(
+        input=input, size=size, stride=stride, storage_offset=storage_offset
+    )

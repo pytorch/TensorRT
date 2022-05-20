@@ -12,7 +12,7 @@ class TimingCacheManager:
         if not timing_cache_prefix and tc:
             timing_cache_prefix_name = tc
 
-        self.timing_cache_prefix_name = timing_cache_prefix
+        self.timing_cache_prefix_name = timing_cache_prefix_name
         self.save_timing_cache = save_timing_cache
 
     def get_file_full_name(self, name: str):
@@ -20,9 +20,12 @@ class TimingCacheManager:
 
     def get_timing_cache_trt(self, timing_cache_file: str) -> bytearray:
         timing_cache_file = self.get_file_full_name(timing_cache_file)
-        with open(timing_cache_file, "rb") as raw_cache:
-            cache_data = raw_cache.read()
-        return bytearray(cache_data)
+        try:
+            with open(timing_cache_file, "rb") as raw_cache:
+                cache_data = raw_cache.read()
+            return bytearray(cache_data)
+        except Exception:
+            return None
 
     def update_timing_cache(
         self, timing_cache_file: str, serilized_cache: bytearray
