@@ -50,7 +50,7 @@ async function main() {
     const token = core.getInput("repo-token", { required: true });
     const configPath = core.getInput("config-path", { required: true });
 
-    const issueNum = 1069; //getIssueNum();
+    const issueNum = getIssueNum();
     if (!issueNum) {
       console.log("Could not retrive issue number from context, exiting");
       return;

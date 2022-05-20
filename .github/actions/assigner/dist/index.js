@@ -56,18 +56,18 @@ async function addReviewers(ghClient, issueNum, reviewers) {
         owner: github.context.repo.owner,
         repo: github.context.repo.repo,
         pull_number: issueNum,
-        reviewers: reviewers
+        reviewers: reviewers,
     });
 }
 function readComponentOwners(configPath) {
-    const componentOwners = yaml.load(fs.readFileSync(configPath, 'utf8'));
+    const componentOwners = yaml.load(fs.readFileSync(configPath, "utf8"));
     return componentOwners;
 }
 async function main() {
     try {
-        const token = "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"; //core.getInput("repo-token", { required: true });
-        const configPath = "/home/naren/Developer/py/pytorch_org/tensorrt/.github/code-owners.yml"; //core.getInput("config-path", { required: true });
-        const issueNum = 1069; //getIssueNum();
+        const token = core.getInput("repo-token", { required: true });
+        const configPath = core.getInput("config-path", { required: true });
+        const issueNum = getIssueNum();
         if (!issueNum) {
             console.log("Could not retrive issue number from context, exiting");
             return;
@@ -104,7 +104,7 @@ async function main() {
                 console.log(assignees);
             }
         }
-        assignees = assignees.filter(i => { var _a; return i !== ((_a = issue.user) === null || _a === void 0 ? void 0 : _a.login); });
+        assignees = assignees.filter((i) => { var _a; return i !== ((_a = issue.user) === null || _a === void 0 ? void 0 : _a.login); });
         if (assignees.length > 0) {
             if (!issue.pull_request) {
                 core.debug(`Assigning ${assignees} to issue #${issueNum}`);
