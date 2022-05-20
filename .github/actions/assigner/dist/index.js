@@ -37,7 +37,13 @@ const fs = __importStar(__nccwpck_require__(7147));
 function getIssueNum() {
     const issue = github.context.payload.issue;
     if (!issue) {
-        return undefined;
+        const pr = github.context.payload.pull_request;
+        if (!pr) {
+            return undefined;
+        }
+        else {
+            return pr.number;
+        }
     }
     else {
         return issue.number;

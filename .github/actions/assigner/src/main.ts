@@ -8,7 +8,12 @@ type GHClient = ReturnType<typeof github.getOctokit>;
 function getIssueNum(): number | undefined {
   const issue = github.context.payload.issue;
   if (!issue) {
-    return undefined;
+    const pr = github.context.payload.pull_request;
+    if (!pr) {
+      return undefined;
+    } else {
+      return pr.number;
+    }
   } else {
     return issue.number;
   }
