@@ -1,0 +1,6 @@
+* text=auto
+.licenses/** -diff linguist-generated=true
+
+# don't diff machine generated files
+dist/index.js -diff
+package-lock.json -diff
