@@ -242,8 +242,7 @@ ext_modules = [
             dir_path + "/../bazel-TRTorch/external/tensorrt/include",
             dir_path + "/../bazel-Torch-TensorRT/external/tensorrt/include",
             dir_path + "/../bazel-TensorRT/external/tensorrt/include",
-            dir_path + "/../bazel-tensorrt/external/tensorrt/include",
-            dir_path + "/../"
+            dir_path + "/../bazel-tensorrt/external/tensorrt/include", dir_path + "/../"
         ],
         extra_compile_args=[
             "-Wno-deprecated",
