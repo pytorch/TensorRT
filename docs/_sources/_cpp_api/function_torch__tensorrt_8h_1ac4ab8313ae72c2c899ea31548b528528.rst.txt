@@ -11,3 +11,4 @@ Function Documentation
 
 
 .. doxygenfunction:: torch_tensorrt::get_build_info()
+   :project: Torch-TensorRT

@@ -11,3 +11,4 @@ Enum Documentation
 
 
 .. doxygenenum:: torch_tensorrt::EngineCapability
+   :project: Torch-TensorRT

@@ -11,3 +11,4 @@ Function Documentation
 
 
 .. doxygenfunction:: torch_tensorrt::logging::set_is_colored_output_on(bool)
+   :project: Torch-TensorRT

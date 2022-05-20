@@ -22,7 +22,7 @@ CXX11_ABI = False
 
 JETPACK_VERSION = None
 
-__version__ = '1.1.0a0'
+__version__ = '1.2.0a0'
 
 
 def get_git_revision_short_hash() -> str:
@@ -240,7 +240,10 @@ ext_modules = [
         include_dirs=[
             dir_path + "torch_tensorrt/csrc", dir_path + "torch_tensorrt/include",
             dir_path + "/../bazel-TRTorch/external/tensorrt/include",
-            dir_path + "/../bazel-Torch-TensorRT/external/tensorrt/include", dir_path + "/../"
+            dir_path + "/../bazel-Torch-TensorRT/external/tensorrt/include",
+            dir_path + "/../bazel-TensorRT/external/tensorrt/include",
+            dir_path + "/../bazel-tensorrt/external/tensorrt/include",
+            dir_path + "/../"
         ],
         extra_compile_args=[
             "-Wno-deprecated",

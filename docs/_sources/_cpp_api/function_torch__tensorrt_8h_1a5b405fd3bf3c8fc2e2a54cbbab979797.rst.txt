@@ -11,3 +11,4 @@ Function Documentation
 
 
 .. doxygenfunction:: torch_tensorrt::torchscript::check_method_operator_support(const torch::jit::Module&, std::string)
+   :project: Torch-TensorRT

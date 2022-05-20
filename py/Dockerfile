@@ -1,11 +1,10 @@
-FROM pytorch/manylinux-cuda113
+FROM pytorch/manylinux-builder:cuda11.3
 
 RUN yum install -y ninja-build
 
-RUN wget --no-check-certificate https://copr.fedorainfracloud.org/coprs/vbatts/bazel/repo/epel-7/vbatts-bazel-epel-7.repo \
-    && mv vbatts-bazel-epel-7.repo /etc/yum.repos.d/
-
-RUN yum install -y bazel4 --nogpgcheck
+RUN wget https://github.com/bazelbuild/bazelisk/releases/download/v1.11.0/bazelisk-linux-amd64 \
+    && mv bazelisk-linux-amd64 /usr/bin/bazel \
+    && chmod +x /usr/bin/bazel
 
 RUN mkdir /workspace
 

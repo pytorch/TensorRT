@@ -11,3 +11,4 @@ Function Documentation
 
 
 .. doxygenfunction:: torch_tensorrt::torchscript::embed_engine_in_new_module(const std::string&, Device)
+   :project: Torch-TensorRT

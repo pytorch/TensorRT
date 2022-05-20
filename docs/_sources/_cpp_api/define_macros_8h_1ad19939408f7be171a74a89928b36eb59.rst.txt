@@ -11,3 +11,4 @@ Define Documentation
 
 
 .. doxygendefine:: TORCHTRT_HIDDEN
+   :project: Torch-TensorRT

@@ -1,591 +1,356 @@
-<!DOCTYPE html>
-<html>
- <head>
-  <meta charset="utf-8"/>
-  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-  <meta content="Docutils 0.17.1: http://docutils.sourceforge.net/" name="generator"/>
-  <meta content="width=device-width,initial-scale=1" name="viewport"/>
-  <meta content="ie=edge" http-equiv="x-ua-compatible"/>
-  <meta content="Copy to clipboard" name="lang:clipboard.copy"/>
-  <meta content="Copied to clipboard" name="lang:clipboard.copied"/>
-  <meta content="en" name="lang:search.language"/>
-  <meta content="True" name="lang:search.pipeline.stopwords"/>
-  <meta content="True" name="lang:search.pipeline.trimmer"/>
-  <meta content="No matching documents" name="lang:search.result.none"/>
-  <meta content="1 matching document" name="lang:search.result.one"/>
-  <meta content="# matching documents" name="lang:search.result.other"/>
-  <meta content="[\s\-]+" name="lang:search.tokenizer"/>
-  <link crossorigin="" href="https://fonts.gstatic.com/" rel="preconnect"/>
-  <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,500,700|Roboto:300,400,400i,700&amp;display=fallback" rel="stylesheet"/>
-  <style>
-   body,
-      input {
-        font-family: "Roboto", "Helvetica Neue", Helvetica, Arial, sans-serif
-      }
 
-      code,
-      kbd,
-      pre {
-        font-family: "Roboto Mono", "Courier New", Courier, monospace
-      }
-  </style>
-  <link href="../_static/stylesheets/application.css" rel="stylesheet"/>
-  <link href="../_static/stylesheets/application-palette.css" rel="stylesheet"/>
-  <link href="../_static/stylesheets/application-fixes.css" rel="stylesheet"/>
-  <link href="../_static/fonts/material-icons.css" rel="stylesheet"/>
-  <meta content="84bd00" name="theme-color"/>
-  <script src="../_static/javascripts/modernizr.js">
-  </script>
-  <title>
-   Torch-TensorRT Getting Started - CitriNet — Torch-TensorRT master documentation
-  </title>
-  <link href="../_static/pygments.css" rel="stylesheet" type="text/css"/>
-  <link href="../_static/material.css" rel="stylesheet" type="text/css"/>
-  <link href="../_static/collapsible-lists/css/tree_view.css" rel="stylesheet" type="text/css"/>
-  <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js">
-  </script>
-  <script src="../_static/jquery.js">
-  </script>
-  <script src="../_static/underscore.js">
-  </script>
-  <script src="../_static/doctools.js">
-  </script>
-  <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js">
-  </script>
-  <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js">
-  </script>
-  <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js">
-  </script>
-  <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
-  </script>
-  <script>
-   window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}
-  </script>
-  <link href="../genindex.html" rel="index" title="Index"/>
-  <link href="../search.html" rel="search" title="Search"/>
-  <link href="dynamic-shapes.html" rel="next" title="Torch-TensorRT - Using Dynamic Shapes"/>
-  <link href="../tutorials/using_dla.html" rel="prev" title="DLA"/>
- </head>
- <body data-md-color-accent="light-green" data-md-color-primary="light-green" dir="ltr">
-  <svg class="md-svg">
-   <defs data-children-count="0">
-    <svg height="448" id="__github" viewbox="0 0 416 448" width="416" xmlns="http://www.w3.org/2000/svg">
-     <path d="M160 304q0 10-3.125 20.5t-10.75 19T128 352t-18.125-8.5-10.75-19T96 304t3.125-20.5 10.75-19T128 256t18.125 8.5 10.75 19T160 304zm160 0q0 10-3.125 20.5t-10.75 19T288 352t-18.125-8.5-10.75-19T256 304t3.125-20.5 10.75-19T288 256t18.125 8.5 10.75 19T320 304zm40 0q0-30-17.25-51T296 232q-10.25 0-48.75 5.25Q229.5 240 208 240t-39.25-2.75Q130.75 232 120 232q-29.5 0-46.75 21T56 304q0 22 8 38.375t20.25 25.75 30.5 15 35 7.375 37.25 1.75h42q20.5 0 37.25-1.75t35-7.375 30.5-15 20.25-25.75T360 304zm56-44q0 51.75-15.25 82.75-9.5 19.25-26.375 33.25t-35.25 21.5-42.5 11.875-42.875 5.5T212 416q-19.5 0-35.5-.75t-36.875-3.125-38.125-7.5-34.25-12.875T37 371.5t-21.5-28.75Q0 312 0 260q0-59.25 34-99-6.75-20.5-6.75-42.5 0-29 12.75-54.5 27 0 47.5 9.875t47.25 30.875Q171.5 96 212 96q37 0 70 8 26.25-20.5 46.75-30.25T376 64q12.75 25.5 12.75 54.5 0 21.75-6.75 42 34 40 34 99.5z" fill="currentColor">
-     </path>
-    </svg>
-   </defs>
-  </svg>
-  <input class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
-  <input class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
-  <label class="md-overlay" data-md-component="overlay" for="__drawer">
-  </label>
-  <a class="md-skip" href="#_notebooks/CitriNet-example" tabindex="1">
-   Skip to content
-  </a>
-  <header class="md-header" data-md-component="header">
-   <nav class="md-header-nav md-grid">
-    <div class="md-flex navheader">
-     <div class="md-flex__cell md-flex__cell--shrink">
-      <a class="md-header-nav__button md-logo" href="../index.html" title="Torch-TensorRT master documentation">
-       <i class="md-icon">
-        
-       </i>
-      </a>
-     </div>
-     <div class="md-flex__cell md-flex__cell--shrink">
-      <label class="md-icon md-icon--menu md-header-nav__button" for="__drawer">
-      </label>
-     </div>
-     <div class="md-flex__cell md-flex__cell--stretch">
-      <div class="md-flex__ellipsis md-header-nav__title" data-md-component="title">
-       <span class="md-header-nav__topic">
-        Torch-TensorRT
-       </span>
-       <span class="md-header-nav__topic">
-        Torch-TensorRT Getting Started - CitriNet
-       </span>
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Torch-TensorRT Getting Started - CitriNet &mdash; Torch-TensorRT master documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <!-- <link rel="stylesheet" href="../_static/pygments.css" type="text/css" /> -->
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/collapsible-lists/css/tree_view.css" type="text/css" />
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Torch-TensorRT - Using Dynamic Shapes" href="dynamic-shapes.html" />
+    <link rel="prev" title="DLA" href="../tutorials/using_dla.html" />
+  <!-- Google Analytics -->
+  
+  <!-- End Google Analytics -->
+  
+
+  
+  <script src="../_static/js/modernizr.min.js"></script>
+
+  <!-- Preload the theme fonts -->
+
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-book.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-medium.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/IBMPlexMono/IBMPlexMono-Medium.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-bold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/FreightSans/freight-sans-medium-italic.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="../_static/fonts/IBMPlexMono/IBMPlexMono-SemiBold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+
+<!-- Preload the katex fonts -->
+
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Math-Italic.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Main-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Main-Bold.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size1-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size4-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size2-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Size3-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/katex@0.10.0/dist/fonts/KaTeX_Caligraphic-Regular.woff2" as="font" type="font/woff2" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.15.2/css/all.css" integrity="sha384-vSIIfh2YWi9wW0r9iZe7RJPrKwp6bG+s9QZMoITbCckVJqGCCRhc+ccxNcdpHuYu" crossorigin="anonymous">
+</head>
+
+<div class="container-fluid header-holder tutorials-header" id="header-holder">
+  <div class="container">
+    <div class="header-container">
+      <a class="header-logo" href="https://pytorch.org/" aria-label="PyTorch"></a>
+
+      <div class="main-menu">
+        <ul>
+          <li>
+            <a href="https://pytorch.org/get-started">Get Started</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/ecosystem">Ecosystem</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/mobile">Mobile</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/blog/">Blog</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/tutorials">Tutorials</a>
+          </li>
+
+          <li>
+            <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="resource-option with-down-orange-arrow">
+                Docs
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/docs/stable/index.html">
+                  <span class="dropdown-title">PyTorch</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/audio/stable/index.html">
+                  <span class="dropdown-title">torchaudio</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/text/stable/index.html">
+                  <span class="dropdown-title">torchtext</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/vision/stable/index.html">
+                  <span class="dropdown-title">torchvision</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/torchrec">
+                  <span class="dropdown-title">TorchRec</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/data">
+                  <span class="dropdown-title">TorchData</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/serve/">
+                  <span class="dropdown-title">TorchServe</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/torchx/">
+                  <span class="dropdown-title">TorchX</span>
+                  <p></p>
+                </a>
+                <a class="doc-dropdown-option nav-dropdown-item" href="https://pytorch.org/xla">
+                  <span class="dropdown-title">PyTorch on XLA Devices</span>
+                  <p></p>
+                </a>
+            </div>
+          </li>
+
+          <li>
+            <div id="resourcesDropdownButton" data-toggle="resources-dropdown" class="resources-dropdown">
+              <a class="resource-option with-down-arrow">
+                Resources
+              </a>
+              <div class="resources-dropdown-menu">
+                <a class="nav-dropdown-item" href="https://pytorch.org/features">
+                  <span class="dropdown-title">About</span>
+                  <p>Learn about PyTorch’s features and capabilities</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/#community-module">
+                  <span class="dropdown-title">Community</span>
+                  <p>Join the PyTorch developer community to contribute, learn, and get your questions answered.</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/resources">
+                  <span class="dropdown-title">Developer Resources</span>
+                  <p>Find resources and get questions answered</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://discuss.pytorch.org/" target="_blank">
+                  <span class="dropdown-title">Forums</span>
+                  <p>A place to discuss PyTorch code, issues, install, research</p>
+                </a>
+                <a class="nav-dropdown-item" href="https://pytorch.org/hub">
+                  <span class="dropdown-title">Models (Beta)</span>
+                  <p>Discover, publish, and reuse pre-trained models</p>
+                </a>
+              </div>
+            </div>
+          </li>
+
+          <li>
+            <a href="https://github.com/pytorch/pytorch">GitHub</a>
+          </li>
+        </ul>
       </div>
-     </div>
-     <div class="md-flex__cell md-flex__cell--shrink">
-      <label class="md-icon md-icon--search md-header-nav__button" for="__search">
-      </label>
-      <div class="md-search" data-md-component="search" role="dialog">
-       <label class="md-search__overlay" for="__search">
-       </label>
-       <div class="md-search__inner" role="search">
-        <form action="../search.html" class="md-search__form" method="get" name="search">
-         <input autocapitalize="off" autocomplete="off" class="md-search__input" data-md-component="query" data-md-state="active" name="q" placeholder="Search" spellcheck="false" type="text"/>
-         <label class="md-icon md-search__icon" for="__search">
-         </label>
-         <button class="md-icon md-search__icon" data-md-component="reset" tabindex="-1" type="reset">
-          
-         </button>
-        </form>
-        <div class="md-search__output">
-         <div class="md-search__scrollwrap" data-md-scrollfix="">
-          <div class="md-search-result" data-md-component="result">
-           <div class="md-search-result__meta">
-            Type to start searching
-           </div>
-           <ol class="md-search-result__list">
-           </ol>
+
+      <a class="main-menu-open-button" href="#" data-behavior="open-mobile-menu"></a>
+    </div>
+  </div>
+</div>
+
+<body class="pytorch-body">
+
+   
+
+    
+
+    <div class="table-of-contents-link-wrapper">
+      <span>Table of Contents</span>
+      <a href="#" class="toggle-table-of-contents" data-behavior="toggle-table-of-contents"></a>
+    </div>
+
+    <nav data-toggle="wy-nav-shift" class="pytorch-left-menu" id="pytorch-left-menu">
+      <div class="pytorch-side-scroll">
+        <div class="pytorch-menu pytorch-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          <div class="pytorch-left-menu-search">
+            
+
+            
+              
+              
+                <div class="version">
+                  master (1.2.0a0+1b156fd)
+                </div>
+              
+            
+
+            
+
+
+  
+
+
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search Docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+            
           </div>
-         </div>
+
+          
+            
+            
+              
+            
+            
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/getting_started_with_cpp_api.html">Getting Started with C++</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/getting_started_with_python_api.html">Using Torch-TensorRT in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/creating_torchscript_module_in_python.html">Creating a TorchScript Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/creating_torchscript_module_in_python.html#working-with-torchscript-in-python">Working with TorchScript in Python</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">Saving TorchScript Module to Disk</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/ptq.html">Post Training Quantization (PTQ)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/torchtrtc.html">torchtrtc</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/use_from_pytorch.html">Using Torch-TensorRT Directly From PyTorch</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/runtime.html">Deploying Torch-TensorRT Programs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/using_dla.html">DLA</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Notebooks</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Torch-TensorRT Getting Started - CitriNet</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dynamic-shapes.html">Torch-TensorRT - Using Dynamic Shapes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="EfficientNet-example.html">Torch-TensorRT Getting Started - EfficientNet-B0</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Hugging-Face-BERT.html">Masked Language Modeling (MLM) with Hugging Face BERT Transformer</a></li>
+<li class="toctree-l1"><a class="reference internal" href="lenet-getting-started.html">Torch-TensorRT Getting Started - LeNet</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Resnet50-example.html">Torch-TensorRT Getting Started - ResNet 50</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ssd-object-detection-demo.html">Object Detection with Torch-TensorRT (SSD)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="vgg-qat.html">Deploying Quantization Aware Trained models in INT8 using Torch-TensorRT</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Python API Documenation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/torch_tensorrt.html">torch_tensorrt</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/logging.html">torch_tensorrt.logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/ptq.html">torch_tensorrt.ptq</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../py_api/ts.html">torch_tensorrt.ts</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">C++ API Documenation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/torch_tensort_cpp.html">Torch-TensorRT C++ API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt.html">Namespace torch_tensorrt</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__logging.html">Namespace torch_tensorrt::logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__torchscript.html">Namespace torch_tensorrt::torchscript</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_cpp_api/namespace_torch_tensorrt__ptq.html">Namespace torch_tensorrt::ptq</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Contributor Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../contributors/system_overview.html">System Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributors/writing_converters.html">Writing Converters</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributors/useful_links.html">Useful Links for Torch-TensorRT Development</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Indices</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../indices/supported_ops.html">Operators Supported</a></li>
+</ul>
+
+            
+          
         </div>
-       </div>
       </div>
-     </div>
-     <div class="md-flex__cell md-flex__cell--shrink">
-      <div class="md-header-nav__source">
-       <a class="md-source" data-md-source="github" href="https://github.com/nvidia/Torch-TensorRT/" title="Go to repository">
-        <div class="md-source__icon">
-         <svg height="28" viewbox="0 0 24 24" width="28" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-          <use height="24" width="24" xlink:href="#__github">
-          </use>
-         </svg>
-        </div>
-        <div class="md-source__repository">
-         Torch-TensorRT
-        </div>
-       </a>
-      </div>
-     </div>
-     <div class="md-flex__cell md-flex__cell--shrink dropdown">
-      <button class="dropdownbutton">
-       Versions
-      </button>
-      <div class="dropdown-content md-hero">
-       <a href="https://nvidia.github.io/Torch-TensorRT/" title="master">
-        master
-       </a>
-       <a href="https://nvidia.github.io/Torch-TensorRT/v1.1.0/" title="v1.1.0">
-        v1.1.0
-       </a>
-       <a href="https://nvidia.github.io/Torch-TensorRT/v1.0.0/" title="v1.0.0">
-        v1.0.0
-       </a>
-       <a href="https://nvidia.github.io/Torch-TensorRT/v0.4.1/" title="v0.4.1">
-        v0.4.1
-       </a>
-       <a href="https://nvidia.github.io/Torch-TensorRT/v0.4.0/" title="v0.4.0">
-        v0.4.0
-       </a>
-       <a href="https://nvidia.github.io/Torch-TensorRT/v0.3.0/" title="v0.3.0">
-        v0.3.0
-       </a>
-       <a href="https://nvidia.github.io/Torch-TensorRT/v0.2.0/" title="v0.2.0">
-        v0.2.0
-       </a>
-       <a href="https://nvidia.github.io/Torch-TensorRT/v0.1.0/" title="v0.1.0">
-        v0.1.0
-       </a>
-       <a href="https://nvidia.github.io/Torch-TensorRT/v0.0.3/" title="v0.0.3">
-        v0.0.3
-       </a>
-       <a href="https://nvidia.github.io/Torch-TensorRT/v0.0.2/" title="v0.0.2">
-        v0.0.2
-       </a>
-       <a href="https://nvidia.github.io/Torch-TensorRT/v0.0.1/" title="v0.0.1">
-        v0.0.1
-       </a>
-      </div>
-     </div>
-    </div>
-   </nav>
-  </header>
-  <div class="md-container">
-   <nav class="md-tabs" data-md-component="tabs">
-    <div class="md-tabs__inner md-grid">
-     <ul class="md-tabs__list">
-      <li class="md-tabs__item">
-       <a class="md-tabs__link" href="../index.html">
-        Torch-TensorRT master documentation
-       </a>
+    </nav>
+
+    <div class="pytorch-container">
+      <div class="pytorch-page-level-bar" id="pytorch-page-level-bar">
+        <div class="pytorch-breadcrumbs-wrapper">
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="pytorch-breadcrumbs">
+    
+      <li>
+        <a href="../index.html">
+          
+            Docs
+          
+        </a> &gt;
       </li>
-     </ul>
-    </div>
-   </nav>
-   <main class="md-main">
-    <div class="md-main__inner md-grid" data-md-component="container">
-     <div class="md-sidebar md-sidebar--primary" data-md-component="navigation">
-      <div class="md-sidebar__scrollwrap">
-       <div class="md-sidebar__inner">
-        <nav class="md-nav md-nav--primary" data-md-level="0">
-         <label class="md-nav__title md-nav__title--site" for="__drawer">
-          <a class="md-nav__button md-logo" href="../index.html" title="Torch-TensorRT master documentation">
-           <i class="md-icon">
-            
-           </i>
-          </a>
-          <a href="../index.html" title="Torch-TensorRT master documentation">
-           Torch-TensorRT
-          </a>
-         </label>
-         <div class="md-nav__source">
-          <a class="md-source" data-md-source="github" href="https://github.com/nvidia/Torch-TensorRT/" title="Go to repository">
-           <div class="md-source__icon">
-            <svg height="28" viewbox="0 0 24 24" width="28" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-             <use height="24" width="24" xlink:href="#__github">
-             </use>
-            </svg>
-           </div>
-           <div class="md-source__repository">
-            Torch-TensorRT
-           </div>
-          </a>
-         </div>
-         <ul class="md-nav__list">
-          <li class="md-nav__item">
-           <span class="md-nav__link caption">
-            <span class="caption-text">
-             Getting Started
-            </span>
-           </span>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../tutorials/installation.html">
-            Installation
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../tutorials/getting_started_with_cpp_api.html">
-            Getting Started with C++
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../tutorials/getting_started_with_python_api.html">
-            Using Torch-TensorRT in Python
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../tutorials/creating_torchscript_module_in_python.html">
-            Creating a TorchScript Module
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../tutorials/creating_torchscript_module_in_python.html#working-with-torchscript-in-python">
-            Working with TorchScript in Python
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../tutorials/creating_torchscript_module_in_python.html#saving-torchscript-module-to-disk">
-            Saving TorchScript Module to Disk
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../tutorials/ptq.html">
-            Post Training Quantization (PTQ)
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../tutorials/torchtrtc.html">
-            torchtrtc
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../tutorials/use_from_pytorch.html">
-            Using Torch-TensorRT Directly From PyTorch
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../tutorials/runtime.html">
-            Deploying Torch-TensorRT Programs
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../tutorials/using_dla.html">
-            DLA
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <span class="md-nav__link caption">
-            <span class="caption-text">
-             Notebooks
-            </span>
-           </span>
-          </li>
-          <li class="md-nav__item">
-           <input class="md-toggle md-nav__toggle" data-md-toggle="toc" id="__toc" type="checkbox"/>
-           <label class="md-nav__link md-nav__link--active" for="__toc">
-            Torch-TensorRT Getting Started - CitriNet
-           </label>
-           <a class="md-nav__link md-nav__link--active" href="#">
-            Torch-TensorRT Getting Started - CitriNet
-           </a>
-           <nav class="md-nav md-nav--secondary">
-            <label class="md-nav__title" for="__toc">
-             Contents
-            </label>
-            <ul class="md-nav__list" data-md-scrollfix="">
-             <li class="md-nav__item">
-              <a class="md-nav__link" href="#notebooks-citrinet-example--page-root">
-               Torch-TensorRT Getting Started - CitriNet
-              </a>
-              <nav class="md-nav">
-               <ul class="md-nav__list">
-                <li class="md-nav__item">
-                 <a class="md-nav__link" href="#Overview">
-                  Overview
-                 </a>
-                 <nav class="md-nav">
-                  <ul class="md-nav__list">
-                   <li class="md-nav__item">
-                    <a class="md-nav__link" href="#Learning-objectives">
-                     Learning objectives
-                    </a>
-                   </li>
-                  </ul>
-                 </nav>
-                </li>
-                <li class="md-nav__item">
-                 <a class="md-nav__link" href="#Content">
-                  Content
-                 </a>
-                 <nav class="md-nav">
-                  <ul class="md-nav__list">
-                   <li class="md-nav__item">
-                    <a class="md-nav__link" href="#Benchmark-utility">
-                     Benchmark utility
-                    </a>
-                   </li>
-                   <li class="md-nav__item">
-                    <a class="md-nav__link" href="#FP32-(single-precision)">
-                     FP32 (single precision)
-                    </a>
-                   </li>
-                   <li class="md-nav__item">
-                    <a class="md-nav__link" href="#FP16-(half-precision)">
-                     FP16 (half precision)
-                    </a>
-                   </li>
-                   <li class="md-nav__item">
-                    <a class="md-nav__link" href="#What’s-next">
-                     What’s next
-                    </a>
-                   </li>
-                  </ul>
-                 </nav>
-                </li>
-               </ul>
-              </nav>
-             </li>
-             <li class="md-nav__item">
-              <a class="md-nav__extra_link" href="../_sources/_notebooks/CitriNet-example.ipynb.txt">
-               Show Source
-              </a>
-             </li>
-            </ul>
-           </nav>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="dynamic-shapes.html">
-            Torch-TensorRT - Using Dynamic Shapes
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="EfficientNet-example.html">
-            Torch-TensorRT Getting Started - EfficientNet-B0
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="Hugging-Face-BERT.html">
-            Masked Language Modeling (MLM) with Hugging Face BERT Transformer
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="lenet-getting-started.html">
-            Torch-TensorRT Getting Started - LeNet
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="Resnet50-example.html">
-            Torch-TensorRT Getting Started - ResNet 50
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="ssd-object-detection-demo.html">
-            Object Detection with Torch-TensorRT (SSD)
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="vgg-qat.html">
-            Deploying Quantization Aware Trained models in INT8 using Torch-TensorRT
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <span class="md-nav__link caption">
-            <span class="caption-text">
-             Python API Documenation
-            </span>
-           </span>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/torch_tensorrt.html">
-            torch_tensorrt
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/logging.html">
-            torch_tensorrt.logging
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/ptq.html">
-            torch_tensorrt.ptq
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../py_api/ts.html">
-            torch_tensorrt.ts
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <span class="md-nav__link caption">
-            <span class="caption-text">
-             C++ API Documenation
-            </span>
-           </span>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../_cpp_api/torch_tensort_cpp.html">
-            Torch-TensorRT C++ API
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt.html">
-            Namespace torch_tensorrt
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt__logging.html">
-            Namespace torch_tensorrt::logging
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt__torchscript.html">
-            Namespace torch_tensorrt::torchscript
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../_cpp_api/namespace_torch_tensorrt__ptq.html">
-            Namespace torch_tensorrt::ptq
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <span class="md-nav__link caption">
-            <span class="caption-text">
-             Contributor Documentation
-            </span>
-           </span>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../contributors/system_overview.html">
-            System Overview
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../contributors/writing_converters.html">
-            Writing Converters
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../contributors/useful_links.html">
-            Useful Links for Torch-TensorRT Development
-           </a>
-          </li>
-          <li class="md-nav__item">
-           <span class="md-nav__link caption">
-            <span class="caption-text">
-             Indices
-            </span>
-           </span>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="../indices/supported_ops.html">
-            Operators Supported
-           </a>
-          </li>
-         </ul>
-        </nav>
-       </div>
+
+        
+      <li>Torch-TensorRT Getting Started - CitriNet</li>
+    
+    
+      <li class="pytorch-breadcrumbs-aside">
+        
+            
+            <a href="../_sources/_notebooks/CitriNet-example.ipynb.txt" rel="nofollow"><img src="../_static/images/view-page-source-icon.svg"></a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+</div>
+        </div>
+
+        <div class="pytorch-shortcuts-wrapper" id="pytorch-shortcuts-wrapper">
+          Shortcuts
+        </div>
       </div>
-     </div>
-     <div class="md-sidebar md-sidebar--secondary" data-md-component="toc">
-      <div class="md-sidebar__scrollwrap">
-       <div class="md-sidebar__inner">
-        <nav class="md-nav md-nav--secondary">
-         <label class="md-nav__title" for="__toc">
-          Contents
-         </label>
-         <ul class="md-nav__list" data-md-scrollfix="">
-          <li class="md-nav__item">
-           <a class="md-nav__link" href="#notebooks-citrinet-example--page-root">
-            Torch-TensorRT Getting Started - CitriNet
-           </a>
-           <nav class="md-nav">
-            <ul class="md-nav__list">
-             <li class="md-nav__item">
-              <a class="md-nav__link" href="#Overview">
-               Overview
-              </a>
-              <nav class="md-nav">
-               <ul class="md-nav__list">
-                <li class="md-nav__item">
-                 <a class="md-nav__link" href="#Learning-objectives">
-                  Learning objectives
-                 </a>
-                </li>
-               </ul>
-              </nav>
-             </li>
-             <li class="md-nav__item">
-              <a class="md-nav__link" href="#Content">
-               Content
-              </a>
-              <nav class="md-nav">
-               <ul class="md-nav__list">
-                <li class="md-nav__item">
-                 <a class="md-nav__link" href="#Benchmark-utility">
-                  Benchmark utility
-                 </a>
-                </li>
-                <li class="md-nav__item">
-                 <a class="md-nav__link" href="#FP32-(single-precision)">
-                  FP32 (single precision)
-                 </a>
-                </li>
-                <li class="md-nav__item">
-                 <a class="md-nav__link" href="#FP16-(half-precision)">
-                  FP16 (half precision)
-                 </a>
-                </li>
-                <li class="md-nav__item">
-                 <a class="md-nav__link" href="#What’s-next">
-                  What’s next
-                 </a>
-                </li>
-               </ul>
-              </nav>
-             </li>
-            </ul>
-           </nav>
-          </li>
-          <li class="md-nav__item">
-           <a class="md-nav__extra_link" href="../_sources/_notebooks/CitriNet-example.ipynb.txt">
-            Show Source
-           </a>
-          </li>
-          <li class="md-nav__item" id="searchbox">
-          </li>
-         </ul>
-        </nav>
-       </div>
-      </div>
-     </div>
-     <div class="md-content">
-      <article class="md-content__inner md-typeset" role="main">
-       <style>
-        /* CSS for nbsphinx extension */
+
+      <section data-toggle="wy-nav-shift" id="pytorch-content-wrap" class="pytorch-content-wrap">
+        <div class="pytorch-content-left">
+
+        
+          
+          <div class="rst-content">
+          
+            <div role="main" class="main-content" itemscope="itemscope" itemtype="http://schema.org/Article">
+             <article itemprop="articleBody" id="pytorch-article" class="pytorch-article">
+              
+  
+<style>
+/* CSS for nbsphinx extension */
 
 /* remove conflicting styling from Sphinx themes */
 div.nbinput.container div.prompt *,
@@ -793,7 +558,7 @@ div.nboutput.container div.output_area > div[class^='highlight']{
 }
 
 /* hide copybtn icon on prompts (needed for 'sphinx_copybutton') */
-.prompt a.copybtn {
+.prompt .copybtn {
     display: none;
 }
 
@@ -830,189 +595,75 @@ div.rendered_html tbody tr:nth-child(odd) {
 div.rendered_html tbody tr:hover {
   background: rgba(66, 165, 245, 0.2);
 }
-       </style>
-       <div class="nbinput nblast docutils container">
-        <div class="prompt highlight-none notranslate">
-         <div class="highlight">
-          <pre><span></span>[1]:
-</pre>
-         </div>
-        </div>
-        <div class="input_area highlight-ipython3 notranslate">
-         <div class="highlight">
-          <pre>
-<span></span># Copyright 2019 NVIDIA Corporation. All Rights Reserved.
+</style>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Copyright 2019 NVIDIA Corporation. All Rights Reserved.
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
+# Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
 #     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
+# distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-</pre>
-         </div>
-        </div>
-       </div>
-       <p>
-        <img alt="135c24db87214f2b815c09f7c85ae433" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png"/>
-       </p>
-       <section id="Torch-TensorRT-Getting-Started---CitriNet">
-        <h1 id="notebooks-citrinet-example--page-root">
-         Torch-TensorRT Getting Started - CitriNet
-         <a class="headerlink" href="#notebooks-citrinet-example--page-root" title="Permalink to this headline">
-          ¶
-         </a>
-        </h1>
-        <section id="Overview">
-         <h2 id="Overview">
-          Overview
-          <a class="headerlink" href="#Overview" title="Permalink to this headline">
-           ¶
-          </a>
-         </h2>
-         <p>
-          <a class="reference external" href="https://docs.nvidia.com/deeplearning/nemo/user-guide/docs/en/main/asr/models.html#citrinet">
-           Citrinet
-          </a>
-          is an acoustic model used for the speech to text recognition task. It is a version of
-          <a class="reference external" href="https://arxiv.org/pdf/1910.10261.pdf">
-           QuartzNet
-          </a>
-          that extends
-          <a class="reference external" href="https://arxiv.org/pdf/2005.03191.pdf">
-           ContextNet
-          </a>
-          , utilizing subword encoding (via Word Piece tokenization) and Squeeze-and-Excitation(SE) mechanism and are therefore smaller than QuartzNet models.
-         </p>
-         <p>
-          CitriNet models take in audio segments and transcribe them to letter, byte pair, or word piece sequences.
-         </p>
-         <p>
-          <img alt="alt" class="no-scaled-link" src="https://docs.nvidia.com/deeplearning/nemo/user-guide/docs/en/main/_images/jasper_vertical.png" style="width: 50%;"/>
-         </p>
-         <section id="Learning-objectives">
-          <h3 id="Learning-objectives">
-           Learning objectives
-           <a class="headerlink" href="#Learning-objectives" title="Permalink to this headline">
-            ¶
-           </a>
-          </h3>
-          <p>
-           This notebook demonstrates the steps for optimizing a pretrained CitriNet model with Torch-TensorRT, and running it to test the speedup obtained.
-          </p>
-         </section>
-        </section>
-        <section id="Content">
-         <h2 id="Content">
-          Content
-          <a class="headerlink" href="#Content" title="Permalink to this headline">
-           ¶
-          </a>
-         </h2>
-         <ol class="arabic simple">
-          <li>
-           <p>
-            <a class="reference external" href="#1">
-             Requirements
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference external" href="#2">
-             Download Citrinet model
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference external" href="#3">
-             Create Torch-TensorRT modules
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference external" href="#4">
-             Benchmark Torch-TensorRT models
-            </a>
-           </p>
-          </li>
-          <li>
-           <p>
-            <a class="reference external" href="#5">
-             Conclusion
-            </a>
-           </p>
-          </li>
-         </ol>
-         <p>
-          ## 1. Requirements
-         </p>
-         <p>
-          Follow the steps in
-          <a class="reference external" href="README.md">
-           README
-          </a>
-          to prepare a Docker container, within which you can run this notebook. This notebook assumes that you are within a Jupyter environment in a docker container with Torch-TensorRT installed, such as an NGC monthly release of
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            nvcr.io/nvidia/pytorch:&lt;yy.mm&gt;-py3
-           </span>
-          </code>
-          (where
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            yy
-           </span>
-          </code>
-          indicates the last two numbers of a calendar year, and
-          <code class="docutils literal notranslate">
-           <span class="pre">
-            mm
-           </span>
-          </code>
-          indicates the month in two-digit numerical form)
-         </p>
-         <p>
-          Now that you are in the docker, the next step is to install the required dependencies.
-         </p>
-         <div class="nbinput docutils container">
-          <div class="prompt highlight-none notranslate">
-           <div class="highlight">
-            <pre><span></span>[2]:
-</pre>
-           </div>
-          </div>
-          <div class="input_area highlight-ipython3 notranslate">
-           <div class="highlight">
-            <pre>
-<span></span># Install dependencies
+</pre></div>
+</div>
+</div>
+<p><img alt="49d5fa0c50be428da310092df3779360" src="http://developer.download.nvidia.com/compute/machine-learning/frameworks/nvidia_logo.png" /></p>
+<section id="Torch-TensorRT-Getting-Started---CitriNet">
+<h1>Torch-TensorRT Getting Started - CitriNet<a class="headerlink" href="#Torch-TensorRT-Getting-Started---CitriNet" title="Permalink to this headline">¶</a></h1>
+<section id="Overview">
+<h2>Overview<a class="headerlink" href="#Overview" title="Permalink to this headline">¶</a></h2>
+<p><a class="reference external" href="https://docs.nvidia.com/deeplearning/nemo/user-guide/docs/en/main/asr/models.html#citrinet">Citrinet</a> is an acoustic model used for the speech to text recognition task. It is a version of <a class="reference external" href="https://arxiv.org/pdf/1910.10261.pdf">QuartzNet</a> that extends <a class="reference external" href="https://arxiv.org/pdf/2005.03191.pdf">ContextNet</a>, utilizing subword encoding (via Word Piece tokenization) and Squeeze-and-Excitation(SE) mechanism and are therefore smaller than QuartzNet models.</p>
+<p>CitriNet models take in audio segments and transcribe them to letter, byte pair, or word piece sequences.</p>
+<p><img alt="alt" class="no-scaled-link" src="https://docs.nvidia.com/deeplearning/nemo/user-guide/docs/en/main/_images/jasper_vertical.png" style="width: 50%;" /></p>
+<section id="Learning-objectives">
+<h3>Learning objectives<a class="headerlink" href="#Learning-objectives" title="Permalink to this headline">¶</a></h3>
+<p>This notebook demonstrates the steps for optimizing a pretrained CitriNet model with Torch-TensorRT, and running it to test the speedup obtained.</p>
+</section>
+</section>
+<section id="Content">
+<h2>Content<a class="headerlink" href="#Content" title="Permalink to this headline">¶</a></h2>
+<ol class="arabic simple">
+<li><p><a class="reference external" href="#1">Requirements</a></p></li>
+<li><p><a class="reference external" href="#2">Download Citrinet model</a></p></li>
+<li><p><a class="reference external" href="#3">Create Torch-TensorRT modules</a></p></li>
+<li><p><a class="reference external" href="#4">Benchmark Torch-TensorRT models</a></p></li>
+<li><p><a class="reference external" href="#5">Conclusion</a></p></li>
+</ol>
+<p>## 1. Requirements</p>
+<p>Follow the steps in <a class="reference external" href="README.md">README</a> to prepare a Docker container, within which you can run this notebook. This notebook assumes that you are within a Jupyter environment in a docker container with Torch-TensorRT installed, such as an NGC monthly release of <code class="docutils literal notranslate"><span class="pre">nvcr.io/nvidia/pytorch:&lt;yy.mm&gt;-py3</span></code> (where <code class="docutils literal notranslate"><span class="pre">yy</span></code> indicates the last two numbers of a calendar year, and <code class="docutils literal notranslate"><span class="pre">mm</span></code> indicates the month in two-digit numerical form)</p>
+<p>Now that you are in the docker, the next step is to install the required dependencies.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Install dependencies
 !pip install wget
 !apt-get update &amp;&amp; DEBIAN_FRONTEND=noninteractive  apt-get install -y libsndfile1 ffmpeg
 !pip install Cython
 
 ## Install NeMo
 !pip install nemo_toolkit[all]==1.5.1
-</pre>
-           </div>
-          </div>
-         </div>
-         <div class="nboutput nblast docutils container">
-          <div class="prompt empty docutils container">
-          </div>
-          <div class="output_area docutils container">
-           <div class="highlight">
-            <pre>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
 Looking in indexes: https://pypi.org/simple, https://pypi.ngc.nvidia.com
 Requirement already satisfied: wget in /opt/conda/lib/python3.8/site-packages (3.2)
-<span class="ansi-yellow-fg">WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv</span>
+<span class="ansi-yellow-fg">WARNING: Running pip as the &#39;root&#39; user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv</span>
 Hit:1 http://security.ubuntu.com/ubuntu focal-security InRelease
 Hit:2 http://archive.ubuntu.com/ubuntu focal InRelease
 Hit:3 http://archive.ubuntu.com/ubuntu focal-updates InRelease
@@ -1026,7 +677,7 @@ ffmpeg is already the newest version (7:4.2.4-1ubuntu0.1).
 0 upgraded, 0 newly installed, 0 to remove and 22 not upgraded.
 Looking in indexes: https://pypi.org/simple, https://pypi.ngc.nvidia.com
 Requirement already satisfied: Cython in /opt/conda/lib/python3.8/site-packages (0.29.28)
-<span class="ansi-yellow-fg">WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv</span>
+<span class="ansi-yellow-fg">WARNING: Running pip as the &#39;root&#39; user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv</span>
 Looking in indexes: https://pypi.org/simple, https://pypi.ngc.nvidia.com
 Requirement already satisfied: nemo_toolkit[all]==1.5.1 in /opt/conda/lib/python3.8/site-packages (1.5.1)
 Requirement already satisfied: numpy&gt;=1.18.2 in /opt/conda/lib/python3.8/site-packages (from nemo_toolkit[all]==1.5.1) (1.22.3)
@@ -1258,77 +909,53 @@ Requirement already satisfied: docker-pycreds&gt;=0.4.0 in /opt/conda/lib/python
 Requirement already satisfied: promise&lt;3,&gt;=2.0 in /opt/conda/lib/python3.8/site-packages (from wandb-&gt;nemo_toolkit[all]==1.5.1) (2.3)
 Requirement already satisfied: gitdb&lt;5,&gt;=4.0.1 in /opt/conda/lib/python3.8/site-packages (from GitPython&gt;=1.0.0-&gt;wandb-&gt;nemo_toolkit[all]==1.5.1) (4.0.9)
 Requirement already satisfied: smmap&lt;6,&gt;=3.0.1 in /opt/conda/lib/python3.8/site-packages (from gitdb&lt;5,&gt;=4.0.1-&gt;GitPython&gt;=1.0.0-&gt;wandb-&gt;nemo_toolkit[all]==1.5.1) (5.0.0)
-<span class="ansi-yellow-fg">WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv</span>
-</pre>
-           </div>
-          </div>
-         </div>
-         <p>
-          ## 2. Download Citrinet model
-         </p>
-         <p>
-          Next, we download a pretrained Nemo Citrinet model and convert it to a Torchscript module:
-         </p>
-         <div class="nbinput nblast docutils container">
-          <div class="prompt highlight-none notranslate">
-           <div class="highlight">
-            <pre><span></span>[3]:
-</pre>
-           </div>
-          </div>
-          <div class="input_area highlight-ipython3 notranslate">
-           <div class="highlight">
-            <pre>
-<span></span>import nemo
+<span class="ansi-yellow-fg">WARNING: Running pip as the &#39;root&#39; user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv</span>
+</pre></div></div>
+</div>
+<p>## 2. Download Citrinet model</p>
+<p>Next, we download a pretrained Nemo Citrinet model and convert it to a Torchscript module:</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import nemo
 import torch
 
 import nemo.collections.asr as nemo_asr
 from nemo.core import typecheck
 typecheck.set_typecheck_enabled(False)
-</pre>
-           </div>
-          </div>
-         </div>
-         <div class="nbinput docutils container">
-          <div class="prompt highlight-none notranslate">
-           <div class="highlight">
-            <pre><span></span>[4]:
-</pre>
-           </div>
-          </div>
-          <div class="input_area highlight-ipython3 notranslate">
-           <div class="highlight">
-            <pre>
-<span></span>variant = 'stt_en_citrinet_256'
+</pre></div>
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>variant = &#39;stt_en_citrinet_256&#39;
 
-print(f"Downloading and saving {variant}...")
+print(f&quot;Downloading and saving {variant}...&quot;)
 asr_model = nemo_asr.models.EncDecCTCModelBPE.from_pretrained(model_name=variant)
-asr_model.export(f"{variant}.ts")
-</pre>
-           </div>
-          </div>
-         </div>
-         <div class="nboutput docutils container">
-          <div class="prompt empty docutils container">
-          </div>
-          <div class="output_area docutils container">
-           <div class="highlight">
-            <pre>
+asr_model.export(f&quot;{variant}.ts&quot;)
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
 Downloading and saving stt_en_citrinet_256...
 [NeMo I 2022-04-21 23:12:45 cloud:56] Found existing object /root/.cache/torch/NeMo/NeMo_1.5.1/stt_en_citrinet_256/91a9cc5850784b2065e8a0aa3d526fd9/stt_en_citrinet_256.nemo.
 [NeMo I 2022-04-21 23:12:45 cloud:62] Re-using file from: /root/.cache/torch/NeMo/NeMo_1.5.1/stt_en_citrinet_256/91a9cc5850784b2065e8a0aa3d526fd9/stt_en_citrinet_256.nemo
 [NeMo I 2022-04-21 23:12:45 common:728] Instantiating model from pre-trained checkpoint
 [NeMo I 2022-04-21 23:12:46 mixins:146] Tokenizer SentencePieceTokenizer initialized with 1024 tokens
-</pre>
-           </div>
-          </div>
-         </div>
-         <div class="nboutput docutils container">
-          <div class="prompt empty docutils container">
-          </div>
-          <div class="output_area stderr docutils container">
-           <div class="highlight">
-            <pre>
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
 [NeMo W 2022-04-21 23:12:47 modelPT:130] If you intend to do training or fine-tuning, please call the ModelPT.setup_training_data() method and provide a valid configuration file to setup the train data loader.
     Train config :
     manifest_filepath: null
@@ -1357,52 +984,40 @@ Downloading and saving stt_en_citrinet_256...
     shuffle: false
     use_start_end_token: false
 
-</pre>
-           </div>
-          </div>
-         </div>
-         <div class="nboutput docutils container">
-          <div class="prompt empty docutils container">
-          </div>
-          <div class="output_area docutils container">
-           <div class="highlight">
-            <pre>
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
 [NeMo I 2022-04-21 23:12:47 features:265] PADDING: 16
 [NeMo I 2022-04-21 23:12:47 features:282] STFT using torch
-</pre>
-           </div>
-          </div>
-         </div>
-         <div class="nboutput docutils container">
-          <div class="prompt empty docutils container">
-          </div>
-          <div class="output_area stderr docutils container">
-           <div class="highlight">
-            <pre>
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
 [NeMo W 2022-04-21 23:12:47 nemo_logging:349] /opt/conda/lib/python3.8/site-packages/nemo/collections/asr/parts/preprocessing/features.py:315: FutureWarning: Pass sr=16000, n_fft=512 as keyword args. From version 0.10 passing these as positional arguments will result in an error
       librosa.filters.mel(sample_rate, self.n_fft, n_mels=nfilt, fmin=lowfreq, fmax=highfreq), dtype=torch.float
 
-</pre>
-           </div>
-          </div>
-         </div>
-         <div class="nboutput docutils container">
-          <div class="prompt empty docutils container">
-          </div>
-          <div class="output_area docutils container">
-           <div class="highlight">
-            <pre>
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
 [NeMo I 2022-04-21 23:12:49 save_restore_connector:149] Model EncDecCTCModelBPE was successfully restored from /root/.cache/torch/NeMo/NeMo_1.5.1/stt_en_citrinet_256/91a9cc5850784b2065e8a0aa3d526fd9/stt_en_citrinet_256.nemo.
-</pre>
-           </div>
-          </div>
-         </div>
-         <div class="nboutput docutils container">
-          <div class="prompt empty docutils container">
-          </div>
-          <div class="output_area stderr docutils container">
-           <div class="highlight">
-            <pre>
+</pre></div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area stderr docutils container">
+<div class="highlight"><pre>
 [NeMo W 2022-04-21 23:12:49 export_utils:198] Swapped 0 modules
 [NeMo W 2022-04-21 23:12:49 conv_asr:73] Turned off 235 masked convolutions
 [NeMo W 2022-04-21 23:12:49 export_utils:198] Swapped 0 modules
@@ -1421,47 +1036,26 @@ Downloading and saving stt_en_citrinet_256...
 [NeMo W 2022-04-21 23:12:50 nemo_logging:349] /opt/conda/lib/python3.8/site-packages/torch/_jit_internal.py:669: LightningDeprecationWarning: `LightningModule.use_amp` was deprecated in v1.6 and will be removed in v1.8. Please use `Trainer.amp_backend`.
       item = getattr(mod, name)
 
-</pre>
-           </div>
-          </div>
-         </div>
-         <div class="nboutput nblast docutils container">
-          <div class="prompt highlight-none notranslate">
-           <div class="highlight">
-            <pre><span></span>[4]:
-</pre>
-           </div>
-          </div>
-          <div class="output_area docutils container">
-           <div class="highlight">
-            <pre>
-(['stt_en_citrinet_256.ts'],
- ['nemo.collections.asr.models.ctc_bpe_models.EncDecCTCModelBPE exported to ONNX'])
-</pre>
-           </div>
-          </div>
-         </div>
-         <section id="Benchmark-utility">
-          <h3 id="Benchmark-utility">
-           Benchmark utility
-           <a class="headerlink" href="#Benchmark-utility" title="Permalink to this headline">
-            ¶
-           </a>
-          </h3>
-          <p>
-           Let us define a helper benchmarking function, then benchmark the original Pytorch model.
-          </p>
-          <div class="nbinput docutils container">
-           <div class="prompt highlight-none notranslate">
-            <div class="highlight">
-             <pre><span></span>[5]:
-</pre>
-            </div>
-           </div>
-           <div class="input_area highlight-ipython3 notranslate">
-            <div class="highlight">
-             <pre>
-<span></span>from __future__ import print_function
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+</pre></div>
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+([&#39;stt_en_citrinet_256.ts&#39;],
+ [&#39;nemo.collections.asr.models.ctc_bpe_models.EncDecCTCModelBPE exported to ONNX&#39;])
+</pre></div></div>
+</div>
+<section id="Benchmark-utility">
+<h3>Benchmark utility<a class="headerlink" href="#Benchmark-utility" title="Permalink to this headline">¶</a></h3>
+<p>Let us define a helper benchmarking function, then benchmark the original Pytorch model.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>from __future__ import print_function
 from __future__ import absolute_import
 from __future__ import division
 
@@ -1474,13 +1068,13 @@ import torch.backends.cudnn as cudnn
 
 def benchmark(model, input_tensor, num_loops, model_name, batch_size):
     def timeGraph(model, input_tensor, num_loops):
-        print("Warm up ...")
+        print(&quot;Warm up ...&quot;)
         with torch.no_grad():
             for _ in range(20):
                 features = model(input_tensor)
 
         torch.cuda.synchronize()
-        print("Start timing ...")
+        print(&quot;Start timing ...&quot;)
         timings = []
         with torch.no_grad():
             for i in range(num_loops):
@@ -1489,7 +1083,7 @@ def benchmark(model, input_tensor, num_loops, model_name, batch_size):
                 torch.cuda.synchronize()
                 end_time = timeit.default_timer()
                 timings.append(end_time - start_time)
-                # print("Iteration {}: {:.6f} s".format(i, end_time - start_time))
+                # print(&quot;Iteration {}: {:.6f} s&quot;.format(i, end_time - start_time))
         return timings
     def printStats(graphName, timings, batch_size):
         times = np.array(timings)
@@ -1501,10 +1095,10 @@ def benchmark(model, input_tensor, num_loops, model_name, batch_size):
         time_std = np.std(times, ddof=0)
         speed_mean = np.mean(speeds)
         speed_med = np.median(speeds)
-        msg = ("\n%s =================================\n"
-                "batch size=%d, num iterations=%d\n"
-                "  Median samples/s: %.1f, mean: %.1f\n"
-                "  Median latency (s): %.6f, mean: %.6f, 99th_p: %.6f, std_dev: %.6f\n"
+        msg = (&quot;\n%s =================================\n&quot;
+                &quot;batch size=%d, num iterations=%d\n&quot;
+                &quot;  Median samples/s: %.1f, mean: %.1f\n&quot;
+                &quot;  Median latency (s): %.6f, mean: %.6f, 99th_p: %.6f, std_dev: %.6f\n&quot;
                 ) % (graphName,
                     batch_size, steps,
                     speed_med, speed_mean,
@@ -1513,19 +1107,19 @@ def benchmark(model, input_tensor, num_loops, model_name, batch_size):
     timings = timeGraph(model, input_tensor, num_loops)
     printStats(model_name, timings, batch_size)
 
-precisions_str = 'fp32' # Precision (default=fp32, fp16)
-variant = 'stt_en_citrinet_256' # Nemo Citrinet variant
+precisions_str = &#39;fp32&#39; # Precision (default=fp32, fp16)
+variant = &#39;stt_en_citrinet_256&#39; # Nemo Citrinet variant
 batch_sizes = [1, 8, 32, 128] # Batch sizes (default=1,8,32,128)
 trt = False # If True, infer with Torch-TensorRT engine. Else, infer with Pytorch model.
-precision = torch.float32 if precisions_str =='fp32' else torch.float16
+precision = torch.float32 if precisions_str ==&#39;fp32&#39; else torch.float16
 
 for batch_size in batch_sizes:
     if trt:
-        model_name = f"{variant}_bs{batch_size}_{precision}.torch-tensorrt"
+        model_name = f&quot;{variant}_bs{batch_size}_{precision}.torch-tensorrt&quot;
     else:
-        model_name = f"{variant}.ts"
+        model_name = f&quot;{variant}.ts&quot;
 
-    print(f"Loading model: {model_name}")
+    print(f&quot;Loading model: {model_name}&quot;)
     # Load traced model to CPU first
     model = torch.jit.load(model_name).cuda()
     cudnn.benchmark = True
@@ -1536,16 +1130,14 @@ for batch_size in batch_sizes:
 
     # Timing graph inference
     benchmark(model, input_tensor, 50, model_name, batch_size)
-</pre>
-            </div>
-           </div>
-          </div>
-          <div class="nboutput nblast docutils container">
-           <div class="prompt empty docutils container">
-           </div>
-           <div class="output_area docutils container">
-            <div class="highlight">
-             <pre>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
 Loading model: stt_en_citrinet_256.ts
 Warm up ...
 Start timing ...
@@ -1582,34 +1174,22 @@ batch size=128, num iterations=50
   Median samples/s: 594.1, mean: 594.1
   Median latency (s): 0.215434, mean: 0.215446, 99th_p: 0.215806, std_dev: 0.000116
 
-</pre>
-            </div>
-           </div>
-          </div>
-          <p>
-           Confirming the GPU we are using here:
-          </p>
-          <div class="nbinput docutils container">
-           <div class="prompt highlight-none notranslate">
-            <div class="highlight">
-             <pre><span></span>[6]:
-</pre>
-            </div>
-           </div>
-           <div class="input_area highlight-ipython3 notranslate">
-            <div class="highlight">
-             <pre>
-<span></span>!nvidia-smi
-</pre>
-            </div>
-           </div>
-          </div>
-          <div class="nboutput nblast docutils container">
-           <div class="prompt empty docutils container">
-           </div>
-           <div class="output_area docutils container">
-            <div class="highlight">
-             <pre>
+</pre></div></div>
+</div>
+<p>Confirming the GPU we are using here:</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>!nvidia-smi
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
 Thu Apr 21 23:13:32 2022
 +-----------------------------------------------------------------------------+
 | NVIDIA-SMI 510.47.03    Driver Version: 510.47.03    CUDA Version: 11.6     |
@@ -1637,58 +1217,44 @@ Thu Apr 21 23:13:32 2022
 |    1   N/A  N/A      3909      G                                      39MiB |
 |    1   N/A  N/A      4161      G                                      67MiB |
 +-----------------------------------------------------------------------------+
-</pre>
-            </div>
-           </div>
-          </div>
-          <p>
-           ## 3. Create Torch-TensorRT modules
-          </p>
-          <p>
-           In this step, we optimize the Citrinet Torchscript module with Torch-TensorRT with various precisions and batch sizes.
-          </p>
-          <div class="nbinput docutils container">
-           <div class="prompt highlight-none notranslate">
-            <div class="highlight">
-             <pre><span></span>[10]:
-</pre>
-            </div>
-           </div>
-           <div class="input_area highlight-ipython3 notranslate">
-            <div class="highlight">
-             <pre>
-<span></span>import torch
+</pre></div></div>
+</div>
+<p>## 3. Create Torch-TensorRT modules</p>
+<p>In this step, we optimize the Citrinet Torchscript module with Torch-TensorRT with various precisions and batch sizes.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import torch
 import torch.nn as nn
 import torch_tensorrt as torchtrt
 import argparse
 
-variant = "stt_en_citrinet_256"
+variant = &quot;stt_en_citrinet_256&quot;
 precisions = [torch.float, torch.half]
 batch_sizes = [1,8,32,128]
 
-model = torch.jit.load(f"{variant}.ts")
+model = torch.jit.load(f&quot;{variant}.ts&quot;)
 
 for precision in precisions:
     for batch_size in batch_sizes:
         compile_settings = {
-            "inputs": [torchtrt.Input(shape=[batch_size, 80, 1488])],
-            "enabled_precisions": {precision},
-            "workspace_size": 2000000000,
-            "truncate_long_and_double": True,
+            &quot;inputs&quot;: [torchtrt.Input(shape=[batch_size, 80, 1488])],
+            &quot;enabled_precisions&quot;: {precision},
+            &quot;workspace_size&quot;: 2000000000,
+            &quot;truncate_long_and_double&quot;: True,
         }
-        print(f"Generating Torchscript-TensorRT module for batchsize {batch_size} precision {precision}")
+        print(f&quot;Generating Torchscript-TensorRT module for batchsize {batch_size} precision {precision}&quot;)
         trt_ts_module = torchtrt.compile(model, **compile_settings)
-        torch.jit.save(trt_ts_module, f"{variant}_bs{batch_size}_{precision}.torch-tensorrt")
-</pre>
-            </div>
-           </div>
-          </div>
-          <div class="nboutput nblast docutils container">
-           <div class="prompt empty docutils container">
-           </div>
-           <div class="output_area docutils container">
-            <div class="highlight">
-             <pre>
+        torch.jit.save(trt_ts_module, f&quot;{variant}_bs{batch_size}_{precision}.torch-tensorrt&quot;)
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
 Generating Torchscript-TensorRT module for batchsize 1 precision torch.float32
 Generating Torchscript-TensorRT module for batchsize 8 precision torch.float32
 Generating Torchscript-TensorRT module for batchsize 32 precision torch.float32
@@ -1697,46 +1263,29 @@ Generating Torchscript-TensorRT module for batchsize 1 precision torch.float16
 Generating Torchscript-TensorRT module for batchsize 8 precision torch.float16
 Generating Torchscript-TensorRT module for batchsize 32 precision torch.float16
 Generating Torchscript-TensorRT module for batchsize 128 precision torch.float16
-</pre>
-            </div>
-           </div>
-          </div>
-          <p>
-           ## 4. Benchmark Torch-TensorRT models
-          </p>
-          <p>
-           Finally, we are ready to benchmark the Torch-TensorRT optimized Citrinet models.
-          </p>
-         </section>
-         <section id="FP32-(single-precision)">
-          <h3 id="FP32-(single-precision)">
-           FP32 (single precision)
-           <a class="headerlink" href="#FP32-(single-precision)" title="Permalink to this headline">
-            ¶
-           </a>
-          </h3>
-          <div class="nbinput docutils container">
-           <div class="prompt highlight-none notranslate">
-            <div class="highlight">
-             <pre><span></span>[13]:
-</pre>
-            </div>
-           </div>
-           <div class="input_area highlight-ipython3 notranslate">
-            <div class="highlight">
-             <pre>
-<span></span>precisions_str = 'fp32' # Precision (default=fp32, fp16)
+</pre></div></div>
+</div>
+<p>## 4. Benchmark Torch-TensorRT models</p>
+<p>Finally, we are ready to benchmark the Torch-TensorRT optimized Citrinet models.</p>
+</section>
+<section id="FP32-(single-precision)">
+<h3>FP32 (single precision)<a class="headerlink" href="#FP32-(single-precision)" title="Permalink to this headline">¶</a></h3>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[13]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>precisions_str = &#39;fp32&#39; # Precision (default=fp32, fp16)
 batch_sizes = [1, 8, 32, 128] # Batch sizes (default=1,8,32,128)
-precision = torch.float32 if precisions_str =='fp32' else torch.float16
+precision = torch.float32 if precisions_str ==&#39;fp32&#39; else torch.float16
 trt = True
 
 for batch_size in batch_sizes:
     if trt:
-        model_name = f"{variant}_bs{batch_size}_{precision}.torch-tensorrt"
+        model_name = f&quot;{variant}_bs{batch_size}_{precision}.torch-tensorrt&quot;
     else:
-        model_name = f"{variant}.ts"
+        model_name = f&quot;{variant}.ts&quot;
 
-    print(f"Loading model: {model_name}")
+    print(f&quot;Loading model: {model_name}&quot;)
     # Load traced model to CPU first
     model = torch.jit.load(model_name).cuda()
     cudnn.benchmark = True
@@ -1747,16 +1296,14 @@ for batch_size in batch_sizes:
 
     # Timing graph inference
     benchmark(model, input_tensor, 50, model_name, batch_size)
-</pre>
-            </div>
-           </div>
-          </div>
-          <div class="nboutput nblast docutils container">
-           <div class="prompt empty docutils container">
-           </div>
-           <div class="output_area docutils container">
-            <div class="highlight">
-             <pre>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
 Loading model: stt_en_citrinet_256_bs1_torch.float32.torch-tensorrt
 Warm up ...
 Start timing ...
@@ -1793,39 +1340,26 @@ batch size=128, num iterations=50
   Median samples/s: 1065.8, mean: 1069.4
   Median latency (s): 0.120097, mean: 0.119708, 99th_p: 0.121618, std_dev: 0.001260
 
-</pre>
-            </div>
-           </div>
-          </div>
-         </section>
-         <section id="FP16-(half-precision)">
-          <h3 id="FP16-(half-precision)">
-           FP16 (half precision)
-           <a class="headerlink" href="#FP16-(half-precision)" title="Permalink to this headline">
-            ¶
-           </a>
-          </h3>
-          <div class="nbinput docutils container">
-           <div class="prompt highlight-none notranslate">
-            <div class="highlight">
-             <pre><span></span>[14]:
-</pre>
-            </div>
-           </div>
-           <div class="input_area highlight-ipython3 notranslate">
-            <div class="highlight">
-             <pre>
-<span></span>precisions_str = 'fp16' # Precision (default=fp32, fp16)
+</pre></div></div>
+</div>
+</section>
+<section id="FP16-(half-precision)">
+<h3>FP16 (half precision)<a class="headerlink" href="#FP16-(half-precision)" title="Permalink to this headline">¶</a></h3>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>precisions_str = &#39;fp16&#39; # Precision (default=fp32, fp16)
 batch_sizes = [1, 8, 32, 128] # Batch sizes (default=1,8,32,128)
-precision = torch.float32 if precisions_str =='fp32' else torch.float16
+precision = torch.float32 if precisions_str ==&#39;fp32&#39; else torch.float16
 
 for batch_size in batch_sizes:
     if trt:
-        model_name = f"{variant}_bs{batch_size}_{precision}.torch-tensorrt"
+        model_name = f&quot;{variant}_bs{batch_size}_{precision}.torch-tensorrt&quot;
     else:
-        model_name = f"{variant}.ts"
+        model_name = f&quot;{variant}.ts&quot;
 
-    print(f"Loading model: {model_name}")
+    print(f&quot;Loading model: {model_name}&quot;)
     # Load traced model to CPU first
     model = torch.jit.load(model_name).cuda()
     cudnn.benchmark = True
@@ -1836,16 +1370,14 @@ for batch_size in batch_sizes:
 
     # Timing graph inference
     benchmark(model, input_tensor, 50, model_name, batch_size)
-</pre>
-            </div>
-           </div>
-          </div>
-          <div class="nboutput nblast docutils container">
-           <div class="prompt empty docutils container">
-           </div>
-           <div class="output_area docutils container">
-            <div class="highlight">
-             <pre>
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
 Loading model: stt_en_citrinet_256_bs1_torch.float16.torch-tensorrt
 Warm up ...
 Start timing ...
@@ -1882,119 +1414,328 @@ batch size=128, num iterations=50
   Median samples/s: 1792.0, mean: 1777.0
   Median latency (s): 0.071428, mean: 0.072057, 99th_p: 0.076796, std_dev: 0.001351
 
-</pre>
+</pre></div></div>
+</div>
+<p>## 5. Conclusion</p>
+<p>In this notebook, we have walked through the complete process of optimizing the Citrinet model with Torch-TensorRT. On an A100 GPU, with Torch-TensorRT, we observe a speedup of ~<strong>2.4X</strong> with FP32, and ~<strong>2.9X</strong> with FP16 at batchsize of 128.</p>
+</section>
+<section id="What’s-next">
+<h3>What’s next<a class="headerlink" href="#What’s-next" title="Permalink to this headline">¶</a></h3>
+<p>Now it’s time to try Torch-TensorRT on your own model. Fill out issues at <a class="reference external" href="https://github.com/NVIDIA/Torch-TensorRT">https://github.com/NVIDIA/Torch-TensorRT</a>. Your involvement will help future development of Torch-TensorRT.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>
+</pre></div>
+</div>
+</div>
+</section>
+</section>
+</section>
+
+
+             </article>
+             
             </div>
-           </div>
-          </div>
-          <p>
-           ## 5. Conclusion
-          </p>
-          <p>
-           In this notebook, we have walked through the complete process of optimizing the Citrinet model with Torch-TensorRT. On an A100 GPU, with Torch-TensorRT, we observe a speedup of ~
-           <strong>
-            2.4X
-           </strong>
-           with FP32, and ~
-           <strong>
-            2.9X
-           </strong>
-           with FP16 at batchsize of 128.
-          </p>
-         </section>
-         <section id="What’s-next">
-          <h3 id="What’s-next">
-           What’s next
-           <a class="headerlink" href="#What’s-next" title="Permalink to this headline">
-            ¶
-           </a>
-          </h3>
-          <p>
-           Now it’s time to try Torch-TensorRT on your own model. Fill out issues at
-           <a class="reference external" href="https://github.com/NVIDIA/Torch-TensorRT">
-            https://github.com/NVIDIA/Torch-TensorRT
-           </a>
-           . Your involvement will help future development of Torch-TensorRT.
-          </p>
-          <div class="nbinput nblast docutils container">
-           <div class="prompt highlight-none notranslate">
-            <div class="highlight">
-             <pre><span></span>[ ]:
-</pre>
-            </div>
-           </div>
-           <div class="input_area highlight-ipython3 notranslate">
-            <div class="highlight">
-             <pre>
-<span></span>
-</pre>
-            </div>
-           </div>
-          </div>
-         </section>
-        </section>
-       </section>
-      </article>
-     </div>
+            <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="dynamic-shapes.html" class="btn btn-neutral float-right" title="Torch-TensorRT - Using Dynamic Shapes" accesskey="n" rel="next">Next <img src="../_static/images/chevron-right-orange.svg" class="next-page"></a>
+      
+      
+        <a href="../tutorials/using_dla.html" class="btn btn-neutral" title="DLA" accesskey="p" rel="prev"><img src="../_static/images/chevron-right-orange.svg" class="previous-page"> Previous</a>
+      
     </div>
-   </main>
+  
+
+  
+
+    <hr>
+
+  
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2021, NVIDIA Corporation.
+
+    </p>
   </div>
-  <footer class="md-footer">
-   <div class="md-footer-nav">
-    <nav class="md-footer-nav__inner md-grid">
-     <a class="md-flex md-footer-nav__link md-footer-nav__link--prev" href="../tutorials/using_dla.html" rel="prev" title="DLA">
-      <div class="md-flex__cell md-flex__cell--shrink">
-       <i class="md-icon md-icon--arrow-back md-footer-nav__button">
-       </i>
+    
+      <div>
+        Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
       </div>
-      <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
-       <span class="md-flex__ellipsis">
-        <span class="md-footer-nav__direction">
-         Previous
-        </span>
-        DLA
-       </span>
-      </div>
-     </a>
-     <a class="md-flex md-footer-nav__link md-footer-nav__link--next" href="dynamic-shapes.html" rel="next" title="Torch-TensorRT - Using Dynamic Shapes">
-      <div class="md-flex__cell md-flex__cell--stretch md-footer-nav__title">
-       <span class="md-flex__ellipsis">
-        <span class="md-footer-nav__direction">
-         Next
-        </span>
-        Torch-TensorRT - Using Dynamic Shapes
-       </span>
-      </div>
-      <div class="md-flex__cell md-flex__cell--shrink">
-       <i class="md-icon md-icon--arrow-forward md-footer-nav__button">
-       </i>
-      </div>
-     </a>
-    </nav>
-   </div>
-   <div class="md-footer-meta md-typeset">
-    <div class="md-footer-meta__inner md-grid">
-     <div class="md-footer-copyright">
-      <div class="md-footer-copyright__highlight">
-       © Copyright 2021, NVIDIA Corporation.
-      </div>
-      Created using
-      <a href="http://www.sphinx-doc.org/">
-       Sphinx
-      </a>
-      4.3.0.
-             and
-      <a href="https://github.com/bashtage/sphinx-material/">
-       Material for
-              Sphinx
-      </a>
-     </div>
+     
+
+</footer>
+
+          </div>
+        </div>
+
+        <div class="pytorch-content-right" id="pytorch-content-right">
+          <div class="pytorch-right-menu" id="pytorch-right-menu">
+            <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
+              <ul>
+<li><a class="reference internal" href="#">Torch-TensorRT Getting Started - CitriNet</a><ul>
+<li><a class="reference internal" href="#Overview">Overview</a><ul>
+<li><a class="reference internal" href="#Learning-objectives">Learning objectives</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#Content">Content</a><ul>
+<li><a class="reference internal" href="#Benchmark-utility">Benchmark utility</a></li>
+<li><a class="reference internal" href="#FP32-(single-precision)">FP32 (single precision)</a></li>
+<li><a class="reference internal" href="#FP16-(half-precision)">FP16 (half precision)</a></li>
+<li><a class="reference internal" href="#What’s-next">What’s next</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
-   </div>
+
+  
+
+
+  
+
+     
+       <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+         <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+         <script src="../_static/jquery.js"></script>
+         <script src="../_static/underscore.js"></script>
+         <script src="../_static/doctools.js"></script>
+         <script src="../_static/collapsible-lists/js/CollapsibleLists.compressed.js"></script>
+         <script src="../_static/collapsible-lists/js/apply-collapsible-lists.js"></script>
+         <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+         <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+         <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+     
+
+  
+
+  <script type="text/javascript" src="../_static/js/vendor/popper.min.js"></script>
+  <script type="text/javascript" src="../_static/js/vendor/bootstrap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/list.js/1.5.0/list.min.js"></script>
+  <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+  <!-- Begin Footer -->
+
+  <div class="container-fluid docs-tutorials-resources" id="docs-tutorials-resources">
+    <div class="container">
+      <div class="row">
+        <div class="col-md-4 text-center">
+          <h2>Docs</h2>
+          <p>Access comprehensive developer documentation for PyTorch</p>
+          <a class="with-right-arrow" href="https://pytorch.org/docs/stable/index.html">View Docs</a>
+        </div>
+
+        <div class="col-md-4 text-center">
+          <h2>Tutorials</h2>
+          <p>Get in-depth tutorials for beginners and advanced developers</p>
+          <a class="with-right-arrow" href="https://pytorch.org/tutorials">View Tutorials</a>
+        </div>
+
+        <div class="col-md-4 text-center">
+          <h2>Resources</h2>
+          <p>Find development resources and get your questions answered</p>
+          <a class="with-right-arrow" href="https://pytorch.org/resources">View Resources</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer">
+    <div class="container footer-container">
+      <div class="footer-logo-wrapper">
+        <a href="https://pytorch.org/" class="footer-logo"></a>
+      </div>
+
+      <div class="footer-links-wrapper">
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title"><a href="https://pytorch.org/">PyTorch</a></li>
+            <li><a href="https://pytorch.org/get-started">Get Started</a></li>
+            <li><a href="https://pytorch.org/features">Features</a></li>
+            <li><a href="https://pytorch.org/ecosystem">Ecosystem</a></li>
+            <li><a href="https://pytorch.org/blog/">Blog</a></li>
+            <li><a href="https://github.com/pytorch/pytorch/blob/master/CONTRIBUTING.md">Contributing</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-links-col">
+          <ul>
+            <li class="list-title"><a href="https://pytorch.org/resources">Resources</a></li>
+            <li><a href="https://pytorch.org/tutorials">Tutorials</a></li>
+            <li><a href="https://pytorch.org/docs/stable/index.html">Docs</a></li>
+            <li><a href="https://discuss.pytorch.org" target="_blank">Discuss</a></li>
+            <li><a href="https://github.com/pytorch/pytorch/issues" target="_blank">Github Issues</a></li>
+            <li><a href="https://pytorch.org/assets/brand-guidelines/PyTorch-Brand-Guidelines.pdf" target="_blank">Brand Guidelines</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-links-col follow-us-col">
+          <ul>
+            <li class="list-title">Stay Connected</li>
+          </ul>
+
+          <div class="footer-social-icons">
+            <a href="https://www.facebook.com/pytorch" target="_blank" class="facebook"></a>
+            <a href="https://twitter.com/pytorch" target="_blank" class="twitter"></a>
+            <a href="https://www.youtube.com/pytorch" target="_blank" class="youtube"></a>
+          </div>
+        </div>
+      </div>
+    </div>
   </footer>
-  <script src="../_static/javascripts/application.js">
+
+  <div class="cookie-banner-wrapper">
+  <div class="container">
+    <p class="gdpr-notice">To analyze traffic and optimize your experience, we serve cookies on this site. By clicking or navigating, you agree to allow our usage of cookies. As the current maintainers of this site, Facebook’s Cookies Policy applies. Learn more, including about available controls: <a href="https://www.facebook.com/policies/cookies/">Cookies Policy</a>.</p>
+    <img class="close-button" src="../_static/images/pytorch-x.svg">
+  </div>
+</div>
+
+  <!-- End Footer -->
+
+  <!-- Begin Mobile Menu -->
+
+  <div class="mobile-main-menu">
+    <div class="container-fluid">
+      <div class="container">
+        <div class="mobile-main-menu-header-container">
+          <a class="header-logo" href="https://pytorch.org/" aria-label="PyTorch"></a>
+          <a class="main-menu-close-button" href="#" data-behavior="close-mobile-menu"></a>
+        </div>
+      </div>
+    </div>
+
+    <div class="mobile-main-menu-links-container">
+      <div class="main-menu">
+        <ul>
+          <li>
+            <a href="https://pytorch.org/get-started">Get Started</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/ecosystem">Ecosystem</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/mobile">Mobile</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/hub">PyTorch Hub</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/blog/">Blog</a>
+          </li>
+
+          <li>
+            <a href="https://pytorch.org/tutorials">Tutorials</a>
+          </li>
+
+          <li class="resources-mobile-menu-title">
+            Docs
+          </li>
+
+          <ul class="resources-mobile-menu-items">
+            <li>
+              <a href="https://pytorch.org/docs/stable/index.html">PyTorch</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/audio/stable/index.html">torchaudio</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/text/stable/index.html">torchtext</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/vision/stable/index.html">torchvision</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/serve/">TorchServe</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/torchx/">TorchX</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/xla">PyTorch on XLA Devices</a>
+            </li>
+          </ul>
+
+          <li class="resources-mobile-menu-title">
+            Resources
+          </li>
+
+          <ul class="resources-mobile-menu-items">
+            <li>
+              <a href="https://pytorch.org/resources">Developer Resources</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/features">About</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/hub">Models (Beta)</a>
+            </li>
+
+            <li>
+              <a href="https://pytorch.org/#community-module">Community</a>
+            </li>
+
+            <li>
+              <a href="https://discuss.pytorch.org/">Forums</a>
+            </li>
+          </ul>
+
+          <li>
+            <a href="https://github.com/pytorch/pytorch">Github</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- End Mobile Menu -->
+
+  <script type="text/javascript" src="../_static/js/vendor/anchor.min.js"></script>
+
+  <script type="text/javascript">
+    $(document).ready(function() {
+      mobileMenu.bind();
+      mobileTOC.bind();
+      pytorchAnchors.bind();
+      sideMenus.bind();
+      scrollToAnchor.bind();
+      highlightNavigation.bind();
+      mainMenuDropdown.bind();
+      filterTags.bind();
+
+      // Add class to links that have code blocks, since we cannot create links in code blocks
+      $("article.pytorch-article a span.pre").each(function(e) {
+        $(this).closest("a").addClass("has-code");
+      });
+    })
   </script>
-  <script>
-   app.initialize({version: "1.0.4", url: {base: ".."}})
-  </script>
- </body>
+</body>
 </html>

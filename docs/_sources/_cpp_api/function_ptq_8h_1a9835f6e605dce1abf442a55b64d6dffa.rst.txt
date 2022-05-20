@@ -11,3 +11,4 @@ Function Documentation
 
 
 .. doxygenfunction:: torch_tensorrt::ptq::make_int8_cache_calibrator(const std::string&)
+   :project: Torch-TensorRT

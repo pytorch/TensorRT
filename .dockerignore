@@ -61,3 +61,4 @@ examples/int8/training/vgg16/data/*
 examples/int8/datasets/data/*
 env/**/*
 *.ts
+.nox/**/*

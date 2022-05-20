@@ -21,6 +21,7 @@ Struct Documentation
 
 
 .. doxygenstruct:: torch_tensorrt::Device
+   :project: Torch-TensorRT
    :members:
    :protected-members:
    :undoc-members:
