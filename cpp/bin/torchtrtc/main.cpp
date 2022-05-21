@@ -446,8 +446,8 @@ int main(int argc, char** argv) {
           threshold_ss << "atol: " << atol_val << " rtol: " << rtol_val;
           torchtrt::logging::log(
               torchtrt::logging::Level::kWARNING,
-              std::string("Maximum numerical deviation for output exceeds tolerance thresholds (") + threshold_ss.str() +
-                  std::string(")"));
+              std::string("Maximum numerical deviation for output exceeds tolerance thresholds (") +
+                  threshold_ss.str() + std::string(")"));
         }
       }
     } else {

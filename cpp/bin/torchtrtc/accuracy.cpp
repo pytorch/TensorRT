@@ -27,12 +27,9 @@ bool almost_equal(const at::Tensor& a, const at::Tensor& b, float atol, float rt
   auto result = diff.abs().max().item<float>();
   auto threshold = atol + (rtol * b.abs().max().item<float>());
 
+  torchtrt::logging::log(torchtrt::logging::Level::kDEBUG, std::string("Max Difference: ") + std::to_string(result));
   torchtrt::logging::log(
-      torchtrt::logging::Level::kDEBUG,
-      std::string("Max Difference: ") + std::to_string(result));
-  torchtrt::logging::log(
-      torchtrt::logging::Level::kDEBUG,
-      std::string("Acceptable Threshold: ") + std::to_string(threshold));
+      torchtrt::logging::Level::kDEBUG, std::string("Acceptable Threshold: ") + std::to_string(threshold));
 
   return result <= threshold;
 }
