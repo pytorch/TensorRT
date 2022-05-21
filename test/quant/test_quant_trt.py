@@ -84,10 +84,14 @@ class TestConvertFxDoNotUse(QuantizationTestCase):
 
         # quantized input, quantized output
         m = M()
-        qconfig_dict = {"": torch.ao.quantization.default_qconfig}
         m.eval()
+        qconfig_dict = {"": torch.ao.quantization.default_qconfig}
+        example_inputs = (torch.rand(1, 1, 3, 3),)
         mp = torch.ao.quantization.quantize_fx.prepare_fx(
-            m, qconfig_dict, prepare_custom_config_dict=prepare_custom_config_dict
+            m,
+            qconfig_dict,
+            example_inputs,
+            prepare_custom_config_dict=prepare_custom_config_dict,
         )
         self.checkGraphModuleNodes(mp, expected_node_occurrence=prepare_count_check)
         mp(torch.randn(1, 1, 4, 4))
@@ -221,9 +225,16 @@ class TestConvertFxDoNotUse(QuantizationTestCase):
             original_m.standalone.conv.bias.detach()
         )
 
+        sm_example_inputs = (data,)
         prepare_config = {
             "standalone_module_name": [
-                ("standalone", None, interface_config, backend_config_dict)
+                (
+                    "standalone",
+                    None,
+                    sm_example_inputs,
+                    interface_config,
+                    backend_config_dict,
+                )
             ]
         }
 
@@ -231,10 +242,12 @@ class TestConvertFxDoNotUse(QuantizationTestCase):
         original_ref_m_copy = copy.deepcopy(original_ref_m)
 
         qconfig_dict = {"": qconfig}
+        example_inputs = (data,)
         # check prepared model
         m = prepare_fx(
             original_m_copy,
             qconfig_dict,
+            example_inputs,
             prepare_custom_config_dict=prepare_config,
             backend_config_dict=backend_config_dict,
         )
@@ -255,7 +268,10 @@ class TestConvertFxDoNotUse(QuantizationTestCase):
 
         # quantize the reference model
         ref_m = prepare_fx(
-            original_ref_m_copy, qconfig_dict, backend_config_dict=backend_config_dict
+            original_ref_m_copy,
+            qconfig_dict,
+            example_inputs,
+            backend_config_dict=backend_config_dict,
         )
         ref_m(data)
         ref_m = convert_fx(
@@ -410,8 +426,12 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
         else:
             m = m.eval()
             prepare = prepare_fx
+        example_inputs = tuple(inputs)
         prepared = prepare(
-            m, {"": self.trt_qconfig}, backend_config_dict=self.trt_backend_config_dict
+            m,
+            {"": self.trt_qconfig},
+            example_inputs,
+            backend_config_dict=self.trt_backend_config_dict,
         )
         self.checkGraphModuleNodes(prepared, expected_node_occurrence=no_prepare)
         # calibration
@@ -528,8 +548,12 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
                 return x
 
         m = M().eval()
+        example_inputs = (torch.rand(1, 3, 5, 5),)
         m = prepare_fx(
-            m, {"": self.trt_qconfig}, backend_config_dict=self.trt_backend_config_dict
+            m,
+            {"": self.trt_qconfig},
+            example_inputs,
+            backend_config_dict=self.trt_backend_config_dict,
         )
         m = convert_fx(
             m, is_reference=True, backend_config_dict=self.trt_backend_config_dict
@@ -558,9 +582,11 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
 
         m = LinearModule().eval()
         trt_unsupported_qconfig = default_qconfig
+        example_inputs = (torch.rand(1, 5),)
         prepared = prepare_fx(
             m,
             {"": trt_unsupported_qconfig},
+            example_inputs=example_inputs,
             backend_config_dict=self.trt_backend_config_dict,
         )
         # calibration
@@ -588,8 +614,12 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
                 return torch.cat([x, x], 1)
 
         m = M().eval()
+        example_inputs = (torch.rand(2, 2),)
         prepared = prepare_fx(
-            m, {"": self.trt_qconfig}, backend_config_dict=self.trt_backend_config_dict
+            m,
+            {"": self.trt_qconfig},
+            example_inputs,
+            backend_config_dict=self.trt_backend_config_dict,
         )
         self.assertTrue(len(dict(prepared.named_children())) == 1)
         quantized = convert_fx(
@@ -615,8 +645,12 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
                 return torch.addmm(self.bias, x, self.weight)
 
         m = M().eval()
+        example_inputs = (torch.rand(1, 5),)
         prepared = prepare_fx(
-            m, {"": self.trt_qconfig}, backend_config_dict=self.trt_backend_config_dict
+            m,
+            {"": self.trt_qconfig},
+            example_inputs,
+            backend_config_dict=self.trt_backend_config_dict,
         )
         node_occurrence = {
             # weight
@@ -684,8 +718,12 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
         m = M().eval()
         modified_backend_config_dict = copy.deepcopy(self.trt_backend_config_dict)
         modified_backend_config_dict["configs"].insert(0, conv_add_config)
+        example_inputs = (torch.rand(1, 3, 3, 3), torch.rand(1, 3, 1, 1))
         m = prepare_fx(
-            m, {"": self.trt_qconfig}, backend_config_dict=modified_backend_config_dict
+            m,
+            {"": self.trt_qconfig},
+            example_inputs,
+            backend_config_dict=modified_backend_config_dict,
         )
         print(m)
         node_occurrence = {
@@ -717,7 +755,7 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
                 self.conv = torch.nn.Conv2d(3, 3, 3)
                 self.standalone = Standalone()
 
-            def forward(self, x, y):
+            def forward(self, x):
                 y = self.conv(x)
                 return self.standalone(x, y)
 
@@ -765,9 +803,16 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
                 conv_config,
             ]
         }
+        sm_example_inputs = (torch.rand(1, 3, 3, 3), torch.rand(1, 3, 1, 1))
         prepare_custom_config_dict = {
             "standalone_module_name": [
-                ("standalone", None, {"input_quantized_idxs": [0, 1]}, None)
+                (
+                    "standalone",
+                    None,
+                    sm_example_inputs,
+                    {"input_quantized_idxs": [0, 1]},
+                    None,
+                )
             ]
         }
         # TODO: use self.trt_qconfig after input_quantized_idxs and output_quantized_idxs
@@ -778,9 +823,11 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
             ),
             weight=torch.ao.quantization.default_weight_observer,
         )
+        example_inputs = (torch.rand(1, 3, 5, 5),)
         m = prepare_fx(
             m,
             {"": qconfig},
+            example_inputs,
             prepare_custom_config_dict=prepare_custom_config_dict,
             backend_config_dict=backend_config_dict,
         )
@@ -829,10 +876,11 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
 
         model = LinearModule().eval()
         inputs = [torch.rand(8, 5)]
-
+        example_inputs = tuple(inputs)
         prepared = prepare_fx(
             model,
             {"": self.trt_qconfig},
+            example_inputs,
             backend_config_dict=self.trt_backend_config_dict,
         )
         quantized = convert_fx(
