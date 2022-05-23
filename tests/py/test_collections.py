@@ -33,7 +33,7 @@ class TestTupleInput(ModelTestCase):
             "device": torchtrt.Device("gpu:0"),
             "enabled_precisions": {torch.float},
             "require_full_compilation": False,
-            "min_block_size": 1
+            "min_block_size": 3
         }
 
         trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
@@ -51,7 +51,7 @@ class TestListInput(ModelTestCase):
             "device": torchtrt.Device("gpu:0"),
             "enabled_precisions": {torch.float},
             "require_full_compilation": False,
-            "min_block_size": 1
+            "min_block_size": 3
         }
 
         trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
@@ -69,7 +69,7 @@ class TestTupleInputOutput(ModelTestCase):
             "device": torchtrt.Device("gpu:0"),
             "enabled_precisions": {torch.float},
             "require_full_compilation": False,
-            "min_block_size": 1
+            "min_block_size": 3
         }
 
         trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
@@ -89,7 +89,7 @@ class TestListInputOutput(ModelTestCase):
             "device": torchtrt.Device("gpu:0"),
             "enabled_precisions": {torch.float},
             "require_full_compilation": False,
-            "min_block_size": 1
+            "min_block_size": 3
         }
 
         trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
@@ -110,7 +110,7 @@ class TestListInputTupleOutput(ModelTestCase):
             "device": torchtrt.Device("gpu:0"),
             "enabled_precisions": {torch.float},
             "require_full_compilation": False,
-            "min_block_size": 1
+            "min_block_size": 3
         }
 
         trt_mod = torchtrt.ts.compile(self.model, **compile_spec)

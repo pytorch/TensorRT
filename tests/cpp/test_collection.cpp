@@ -39,7 +39,7 @@ TEST(CppAPITests, TestCollectionStandardTensorInput) {
   input_range.push_back({in0.sizes(), torch::kF16});
   torch_tensorrt::ts::CompileSpec compile_settings(input_range);
   compile_settings.require_full_compilation = true;
-  compile_settings.min_block_size = 1;
+  compile_settings.min_block_size = 3;
 
   // // FP16 execution
   compile_settings.enabled_precisions = {torch::kHalf};
@@ -88,7 +88,7 @@ TEST(CppAPITests, TestCollectionTupleInput) {
 
   auto compile_settings = torch_tensorrt::ts::CompileSpec(complex_input_shape2);
   compile_settings.require_full_compilation = false;
-  compile_settings.min_block_size = 1;
+  compile_settings.min_block_size = 3;
 
   // // FP16 execution
   compile_settings.enabled_precisions = {torch::kHalf};
@@ -153,7 +153,7 @@ TEST(CppAPITests, TestCollectionListInput) {
 
   auto compile_settings = torch_tensorrt::ts::CompileSpec(complex_input_shape2);
   compile_settings.require_full_compilation = false;
-  compile_settings.min_block_size = 1;
+  compile_settings.min_block_size = 3;
   compile_settings.torch_executed_ops.push_back("aten::__getitem__");
 
   // // FP16 execution
@@ -206,7 +206,7 @@ TEST(CppAPITests, TestCollectionTupleInputOutput) {
 
   auto compile_settings = torch_tensorrt::ts::CompileSpec(complex_input_shape2);
   compile_settings.require_full_compilation = false;
-  compile_settings.min_block_size = 1;
+  compile_settings.min_block_size = 3;
 
   // compile_settings.torch_executed_ops.push_back("prim::TupleConstruct");
 
@@ -276,7 +276,7 @@ TEST(CppAPITests, TestCollectionListInputOutput) {
 
   auto compile_settings = torch_tensorrt::ts::CompileSpec(complex_input_shape2);
   compile_settings.require_full_compilation = false;
-  compile_settings.min_block_size = 1;
+  compile_settings.min_block_size = 3;
 
   // Need to skip the conversion of __getitem__ and ListConstruct
   compile_settings.torch_executed_ops.push_back("aten::__getitem__");
@@ -346,7 +346,7 @@ TEST(CppAPITests, TestCollectionComplexModel) {
 
   auto compile_settings = torch_tensorrt::ts::CompileSpec(complex_input_shape2);
   compile_settings.require_full_compilation = false;
-  compile_settings.min_block_size = 1;
+  compile_settings.min_block_size = 3;
 
   // Need to skip the conversion of __getitem__ and ListConstruct
   compile_settings.torch_executed_ops.push_back("aten::__getitem__");

@@ -500,7 +500,7 @@ PartitionedGraph segment_graph(torch::jit::Block* block, const PartitionInfo& pa
         LOG_DEBUG(
             "In progress TRT block does not meet minimum block size requirements, therefore folding into in progress PyTorch block");
         in_prog_pyt_blk_nodes.insert(
-            in_prog_pyt_blk_nodes.end(), in_prog_trt_blk_nodes.begin(), in_prog_trt_blk_nodes.end());
+            in_prog_pyt_blk_nodes.begin(), in_prog_trt_blk_nodes.begin(), in_prog_trt_blk_nodes.end());
       }
       in_prog_trt_blk_nodes.clear();
       // if there is a prim::If then this if node will be encapsulated in a SegmentedBlock
