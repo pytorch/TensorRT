@@ -11,3 +11,4 @@ Function Documentation
 
 
 .. doxygenfunction:: torch_tensorrt::torchscript::convert_method_to_trt_engine(const torch::jit::Module&, std::string, CompileSpec)
+   :project: Torch-TensorRT

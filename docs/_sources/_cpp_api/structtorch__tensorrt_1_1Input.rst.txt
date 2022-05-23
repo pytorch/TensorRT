@@ -11,6 +11,7 @@ Struct Documentation
 
 
 .. doxygenstruct:: torch_tensorrt::Input
+   :project: Torch-TensorRT
    :members:
    :protected-members:
    :undoc-members:

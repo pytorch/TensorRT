@@ -17,6 +17,7 @@ Class Documentation
 
 
 .. doxygenclass:: torch_tensorrt::Device::DeviceType
+   :project: Torch-TensorRT
    :members:
    :protected-members:
    :undoc-members:

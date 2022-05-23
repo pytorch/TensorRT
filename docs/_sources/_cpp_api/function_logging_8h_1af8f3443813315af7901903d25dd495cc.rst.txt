@@ -11,3 +11,4 @@ Function Documentation
 
 
 .. doxygenfunction:: torch_tensorrt::logging::set_logging_prefix(std::string)
+   :project: Torch-TensorRT

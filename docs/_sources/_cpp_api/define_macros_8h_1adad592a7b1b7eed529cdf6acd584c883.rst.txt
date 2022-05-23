@@ -11,3 +11,4 @@ Define Documentation
 
 
 .. doxygendefine:: TORCH_TENSORRT_VERSION
+   :project: Torch-TensorRT
