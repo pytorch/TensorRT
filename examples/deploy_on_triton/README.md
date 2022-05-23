@@ -1,6 +1,7 @@
 # Torch-TensorRT to Triton
 
-This README showcases how to deploy a simple ResNet model accelerated by using Torch-TensorRT on Triton Inference Server. For an in-depth explanation, refer to this [blog](https://TODO_add_blog_link). 
+This README showcases how to deploy a simple ResNet model accelerated by using Torch-TensorRT on Triton Inference Server.
+
 ## Step 1: Optimize your model with Torch-TensorRT
 
 If you are unfamiliar with Torch-TensorRT please refer this [video](https://www.youtube.com/watch?v=TU5BMU6iYZ0&ab_channel=NVIDIADeveloper). The first step in this pipeline is to accelerate your model. While using PyTorch as your framework of choice for training, you can either use TensorRT or Torch-TensorRT, depending on your model's operations.
