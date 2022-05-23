@@ -11,3 +11,4 @@ Function Documentation
 
 
 .. doxygenfunction:: torch_tensorrt::logging::get_reportable_log_level()
+   :project: Torch-TensorRT

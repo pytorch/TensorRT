@@ -21,7 +21,7 @@ InputSpecMap pair_input_vals_with_specs(std::vector<const torch::jit::Value*> va
 
   std::unordered_map<const torch::jit::Value*, core::ir::Input> a;
   for (size_t i = 0; i < vals.size(); i++) {
-    LOG_DEBUG("Paring " << i << ": " << vals[i]->debugName() << " : " << specs[i]);
+    LOG_DEBUG("Pairing " << i << ": " << vals[i]->debugName() << " : " << specs[i]);
     a.insert({vals[i], specs[i]});
   }
   return a;

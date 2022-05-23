@@ -11,6 +11,7 @@ Class Documentation
 
 
 .. doxygenclass:: torch_tensorrt::DataType
+   :project: Torch-TensorRT
    :members:
    :protected-members:
    :undoc-members:

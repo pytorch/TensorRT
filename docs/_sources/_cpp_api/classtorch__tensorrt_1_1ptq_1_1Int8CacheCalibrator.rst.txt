@@ -20,6 +20,7 @@ Class Documentation
 
 
 .. doxygenclass:: torch_tensorrt::ptq::Int8CacheCalibrator
+   :project: Torch-TensorRT
    :members:
    :protected-members:
    :undoc-members:

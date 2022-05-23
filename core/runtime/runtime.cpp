@@ -86,14 +86,6 @@ CudaDevice get_current_device() {
   return CudaDevice(device_id, nvinfer1::DeviceType::kGPU);
 }
 
-std::string serialize_device(CudaDevice& cuda_device) {
-  return cuda_device.serialize();
-}
-
-CudaDevice deserialize_device(std::string device_info) {
-  return CudaDevice(device_info);
-}
-
 namespace {
 static DeviceList cuda_device_list;
 }
@@ -105,7 +97,7 @@ DeviceList get_available_device_list() {
 // SM Compute capability <Compute Capability, Device Name> map
 const std::unordered_map<std::string, std::string>& get_dla_supported_SMs() {
   // Xavier SM Compute Capability
-  static std::unordered_map<std::string, std::string> dla_supported_SM = {{"7.2", "Xavier"}};
+  static std::unordered_map<std::string, std::string> dla_supported_SM = {{"7.2", "Xavier"}, {"8.7", "Orin"}};
   return dla_supported_SM;
 }
 

@@ -3,8 +3,21 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models as models
 import timm
+from transformers import BertModel, BertTokenizer, BertConfig
+import os
+import json
+import custom_models as cm
 
 torch.hub._validate_not_a_forked_repo = lambda a, b, c: True
+
+torch_version = torch.__version__
+
+# Detect case of no GPU before deserialization of models on GPU
+if not torch.cuda.is_available():
+    raise Exception("No GPU found. Please check if installed torch version is compatible with CUDA version")
+
+# Downloads all model files again if manifest file is not present
+MANIFEST_FILE = 'model_manifest.json'
 
 models = {
     "alexnet": {
@@ -27,7 +40,6 @@ models = {
         "model": models.inception_v3(pretrained=True),
         "path": "both"
     },
-    #"googlenet": models.googlenet(pretrained=True),
     "shufflenet": {
         "model": models.shufflenet_v2_x1_0(pretrained=True),
         "path": "both"
@@ -67,125 +79,111 @@ models = {
     "vit": {
         "model": timm.create_model('vit_base_patch16_224', pretrained=True),
         "path": "script"
+    },
+    "pool": {
+        "model": cm.Pool(),
+        "path": "trace"
+    },
+    "module_fallback": {
+        "model": cm.ModuleFallbackMain(),
+        "path": "script"
+    },
+    "loop_fallback": {
+        "model": cm.LoopFallbackEval(),
+        "path": "script"
+    },
+    "conditional": {
+        "model": cm.FallbackIf(),
+        "path": "script"
+    },
+    "bert-base-uncased": {
+        "model": cm.BertModule(),
+        "path": "trace"
     }
 }
 
-# Download sample models
-for n, m in models.items():
+
+def get(n, m, manifest):
     print("Downloading {}".format(n))
-    m["model"] = m["model"].eval().cuda()
+    traced_filename = n + '_traced.jit.pt'
+    script_filename = n + '_scripted.jit.pt'
     x = torch.ones((1, 3, 300, 300)).cuda()
-    if m["path"] == "both" or m["path"] == "trace":
-        trace_model = torch.jit.trace(m["model"], [x])
-        torch.jit.save(trace_model, n + '_traced.jit.pt')
-    if m["path"] == "both" or m["path"] == "script":
-        script_model = torch.jit.script(m["model"])
-        torch.jit.save(script_model, n + '_scripted.jit.pt')
+    if n == "bert-base-uncased":
+        traced_model = m["model"]
+        torch.jit.save(traced_model, traced_filename)
+        manifest.update({n: [traced_filename]})
+    else:
+        m["model"] = m["model"].eval().cuda()
+        if m["path"] == "both" or m["path"] == "trace":
+            trace_model = torch.jit.trace(m["model"], [x])
+            torch.jit.save(trace_model, traced_filename)
+            manifest.update({n: [traced_filename]})
+        if m["path"] == "both" or m["path"] == "script":
+            script_model = torch.jit.script(m["model"])
+            torch.jit.save(script_model, script_filename)
+            if n in manifest.keys():
+                files = list(manifest[n]) if type(manifest[n]) != list else manifest[n]
+                files.append(script_filename)
+                manifest.update({n: files})
+            else:
+                manifest.update({n: [script_filename]})
+    return manifest
 
 
-# Sample Pool Model (for testing plugin serialization)
-class Pool(nn.Module):
-
-    def __init__(self):
-        super(Pool, self).__init__()
-
-    def forward(self, x):
-        return F.adaptive_avg_pool2d(x, (5, 5))
-
-
-model = Pool().eval().cuda()
-x = torch.ones([1, 3, 10, 10]).cuda()
-
-trace_model = torch.jit.trace(model, x)
-torch.jit.save(trace_model, "pooling_traced.jit.pt")
-
-
-# Sample Nested Module (for module-level fallback testing)
-class ModuleFallbackSub(nn.Module):
-
-    def __init__(self):
-        super(ModuleFallbackSub, self).__init__()
-        self.conv = nn.Conv2d(1, 3, 3)
-        self.relu = nn.ReLU()
-
-    def forward(self, x):
-        return self.relu(self.conv(x))
+def download_models(version_matches, manifest):
+    # Download all models if torch version is different than model version
+    if not version_matches:
+        for n, m in models.items():
+            manifest = get(n, m, manifest)
+    else:
+        for n, m in models.items():
+            scripted_filename = n + "_scripted.jit.pt"
+            traced_filename = n + "_traced.jit.pt"
+            # Check if model file exists on disk
+            if (m["path"] == "both" and os.path.exists(scripted_filename) and os.path.exists(traced_filename)) or \
+               (m["path"] == "script" and os.path.exists(scripted_filename)) or \
+               (m["path"] == "trace" and os.path.exists(traced_filename)):
+                print("Skipping {} ".format(n))
+                continue
+            manifest = get(n, m, manifest)
 
 
-class ModuleFallbackMain(nn.Module):
+def main():
+    manifest = None
+    version_matches = False
+    manifest_exists = False
 
-    def __init__(self):
-        super(ModuleFallbackMain, self).__init__()
-        self.layer1 = ModuleFallbackSub()
-        self.conv = nn.Conv2d(3, 6, 3)
-        self.relu = nn.ReLU()
+    # Check if Manifest file exists or is empty
+    if not os.path.exists(MANIFEST_FILE) or os.stat(MANIFEST_FILE).st_size == 0:
+        manifest = {"version": torch_version}
 
-    def forward(self, x):
-        return self.relu(self.conv(self.layer1(x)))
+        # Creating an empty manifest file for overwriting post setup
+        os.system('touch {}'.format(MANIFEST_FILE))
+    else:
+        manifest_exists = True
 
+        # Load manifest if already exists
+        with open(MANIFEST_FILE, 'r') as f:
+            manifest = json.load(f)
+            if manifest['version'] == torch_version:
+                version_matches = True
+            else:
+                print("Torch version: {} mismatches \
+                with manifest's version: {}. Re-downloading \
+                all models".format(torch_version, manifest['version']))
 
-module_fallback_model = ModuleFallbackMain().eval().cuda()
-module_fallback_script_model = torch.jit.script(module_fallback_model)
-torch.jit.save(module_fallback_script_model, "module_fallback_scripted.jit.pt")
+                # Overwrite the manifest version as current torch version
+                manifest['version'] = torch_version
 
+    download_models(version_matches, manifest)
 
-# Sample Looping Modules (for loop fallback testing)
-class LoopFallbackEval(nn.Module):
-
-    def __init__(self):
-        super(LoopFallbackEval, self).__init__()
-
-    def forward(self, x):
-        add_list = torch.empty(0).to(x.device)
-        for i in range(x.shape[1]):
-            add_list = torch.cat((add_list, torch.tensor([x.shape[1]]).to(x.device)), 0)
-        return x + add_list
-
-
-class LoopFallbackNoEval(nn.Module):
-
-    def __init__(self):
-        super(LoopFallbackNoEval, self).__init__()
-
-    def forward(self, x):
-        for _ in range(x.shape[1]):
-            x = x + torch.ones_like(x)
-        return x
+    # Write updated manifest file to disk
+    with open(MANIFEST_FILE, 'r+') as f:
+        data = f.read()
+        f.seek(0)
+        record = json.dumps(manifest)
+        f.write(record)
+        f.truncate()
 
 
-loop_fallback_eval_model = LoopFallbackEval().eval().cuda()
-loop_fallback_eval_script_model = torch.jit.script(loop_fallback_eval_model)
-torch.jit.save(loop_fallback_eval_script_model, "loop_fallback_eval_scripted.jit.pt")
-loop_fallback_no_eval_model = LoopFallbackNoEval().eval().cuda()
-loop_fallback_no_eval_script_model = torch.jit.script(loop_fallback_no_eval_model)
-torch.jit.save(loop_fallback_no_eval_script_model, "loop_fallback_no_eval_scripted.jit.pt")
-
-
-# Sample Conditional Model (for testing partitioning and fallback in conditionals)
-class FallbackIf(torch.nn.Module):
-
-    def __init__(self):
-        super(FallbackIf, self).__init__()
-        self.relu1 = torch.nn.ReLU()
-        self.conv1 = torch.nn.Conv2d(3, 32, 3, 1, 1)
-        self.log_sig = torch.nn.LogSigmoid()
-        self.conv2 = torch.nn.Conv2d(32, 32, 3, 1, 1)
-        self.conv3 = torch.nn.Conv2d(32, 3, 3, 1, 1)
-
-    def forward(self, x):
-        x = self.relu1(x)
-        x_first = x[0][0][0][0].item()
-        if x_first > 0:
-            x = self.conv1(x)
-            x1 = self.log_sig(x)
-            x2 = self.conv2(x)
-            x = self.conv3(x1 + x2)
-        else:
-            x = self.log_sig(x)
-        x = self.conv1(x)
-        return x
-
-
-conditional_model = FallbackIf().eval().cuda()
-conditional_script_model = torch.jit.script(conditional_model)
-torch.jit.save(conditional_script_model, "conditional_scripted.jit.pt")
+main()

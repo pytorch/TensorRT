@@ -11,3 +11,4 @@ Enum Documentation
 
 
 .. doxygenenum:: torch_tensorrt::logging::Level
+   :project: Torch-TensorRT

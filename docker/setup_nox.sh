@@ -7,7 +7,7 @@ set -e
 post=${1:-""}
 
 # fetch bazel executable
-BAZEL_VERSION=4.2.1
+BAZEL_VERSION=5.1.1
 ARCH=$(uname -m)
 if [[ "$ARCH" == "aarch64" ]]; then ARCH="arm64"; fi
 wget -q https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-linux-${ARCH} -O /usr/bin/bazel

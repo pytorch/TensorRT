@@ -1,6 +1,7 @@
 from distutils.command.clean import clean
 import nox
 import os
+import sys
 
 # Use system installed Python packages
 PYT_PATH='/opt/conda/lib/python3.8/site-packages' if not 'PYT_PATH' in os.environ else os.environ["PYT_PATH"]
@@ -9,7 +10,12 @@ PYT_PATH='/opt/conda/lib/python3.8/site-packages' if not 'PYT_PATH' in os.enviro
 # TOP_DIR
 TOP_DIR=os.path.dirname(os.path.realpath(__file__)) if not 'TOP_DIR' in os.environ else os.environ["TOP_DIR"]
 
-nox.options.sessions = ["l0_api_tests-3"]
+# Set the USE_CXX11=1 to use cxx11_abi
+USE_CXX11=0 if not 'USE_CXX11' in os.environ else os.environ["USE_CXX11"]
+
+SUPPORTED_PYTHON_VERSIONS=["3.7", "3.8", "3.9", "3.10"]
+
+nox.options.sessions = ["l0_api_tests-" + "{}.{}".format(sys.version_info.major, sys.version_info.minor)]
 
 def install_deps(session):
     print("Installing deps")
@@ -18,18 +24,22 @@ def install_deps(session):
 
 def download_models(session, use_host_env=False):
     print("Downloading test models")
-    session.install('timm')
+    session.install("-r", os.path.join(TOP_DIR, "tests", "modules", "requirements.txt"))
     print(TOP_DIR)
     session.chdir(os.path.join(TOP_DIR, "tests", "modules"))
     if use_host_env:
         session.run_always('python', 'hub.py', env={'PYTHONPATH': PYT_PATH})
     else:
+        session.install("-r", os.path.join(TOP_DIR, "py", "requirements.txt"))
         session.run_always('python', 'hub.py')
 
 def install_torch_trt(session):
     print("Installing latest torch-tensorrt build")
     session.chdir(os.path.join(TOP_DIR, "py"))
-    session.run("python", "setup.py", "develop")
+    if USE_CXX11:
+        session.run('python', 'setup.py', 'develop', '--use-cxx11-abi')
+    else:
+        session.run("python", "setup.py", "develop")
 
 def download_datasets(session):
     print("Downloading dataset to path", os.path.join(TOP_DIR, 'examples/int8/training/vgg16'))
@@ -129,7 +139,7 @@ def run_base_tests(session, use_host_env=False):
     session.chdir(os.path.join(TOP_DIR, 'tests/py'))
     tests = [
         "test_api.py",
-        "test_to_backend_api.py"
+        "test_to_backend_api.py",
     ]
     for test in tests:
         if use_host_env:
@@ -268,62 +278,67 @@ def run_l2_multi_gpu_tests(session, use_host_env=False):
     run_multi_gpu_tests(session, use_host_env)
     cleanup(session)
 
-@nox.session(python=["3"], reuse_venv=True)
+@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def l0_api_tests(session):
     """When a developer needs to check correctness for a PR or something"""
     run_l0_api_tests(session, use_host_env=False)
 
-@nox.session(python=["3"], reuse_venv=True)
+@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def l0_api_tests_host_deps(session):
     """When a developer needs to check basic api functionality using host dependencies"""
     run_l0_api_tests(session, use_host_env=True)
 
-@nox.session(python=["3"], reuse_venv=True)
+@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def l0_dla_tests_host_deps(session):
     """When a developer needs to check basic api functionality using host dependencies"""
     run_l0_dla_tests(session, use_host_env=True)
 
-@nox.session(python=["3"], reuse_venv=True)
+@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def l1_accuracy_tests(session):
     """Checking accuracy performance on various usecases"""
     run_l1_accuracy_tests(session, use_host_env=False)
 
-@nox.session(python=["3"], reuse_venv=True)
+@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def l1_accuracy_tests_host_deps(session):
     """Checking accuracy performance on various usecases using host dependencies"""
     run_l1_accuracy_tests(session, use_host_env=True)
 
-@nox.session(python=["3"], reuse_venv=True)
+@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def l1_int8_accuracy_tests(session):
     """Checking accuracy performance on various usecases"""
     run_l1_int8_accuracy_tests(session, use_host_env=False)
 
-@nox.session(python=["3"], reuse_venv=True)
+@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def l1_int8_accuracy_tests_host_deps(session):
     """Checking accuracy performance on various usecases using host dependencies"""
     run_l1_int8_accuracy_tests(session, use_host_env=True)
 
-@nox.session(python=["3"], reuse_venv=True)
+@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def l2_trt_compatibility_tests(session):
     """Makes sure that TensorRT Python and Torch-TensorRT can work together"""
     run_l2_trt_compatibility_tests(session, use_host_env=False)
 
-@nox.session(python=["3"], reuse_venv=True)
+@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def l2_trt_compatibility_tests_host_deps(session):
     """Makes sure that TensorRT Python and Torch-TensorRT can work together using host dependencies"""
     run_l2_trt_compatibility_tests(session, use_host_env=True)
 
-@nox.session(python=["3"], reuse_venv=True)
+@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def l2_multi_gpu_tests(session):
     """Makes sure that Torch-TensorRT can operate on multi-gpu systems"""
     run_l2_multi_gpu_tests(session, use_host_env=False)
 
-@nox.session(python=["3"], reuse_venv=True)
+@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def l2_multi_gpu_tests_host_deps(session):
     """Makes sure that Torch-TensorRT can operate on multi-gpu systems using host dependencies"""
     run_l2_multi_gpu_tests(session, use_host_env=True)
 
-@nox.session(python=["3"], reuse_venv=True)
+@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def download_test_models(session):
     """Grab all the models needed for testing"""
+    download_models(session, use_host_env=False)
+
+@nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
+def download_test_models_host_deps(session):
+    """Grab all the models needed for testing using host dependencies"""
     download_models(session, use_host_env=True)

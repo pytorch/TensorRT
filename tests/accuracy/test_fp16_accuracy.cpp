@@ -25,8 +25,10 @@ TEST_P(AccuracyTests, FP16AccuracyIsClose) {
   }
   torch::Tensor jit_accuracy = (jit_correct / jit_total) * 100;
 
-  std::vector<std::vector<int64_t>> input_shape = {{32, 3, 32, 32}};
-  auto compile_spec = torch_tensorrt::ts::CompileSpec({input_shape});
+  std::vector<int64_t> input_shape = {32, 3, 32, 32};
+  auto input = torch_tensorrt::Input(input_shape);
+  input.dtype = torch::kF16;
+  auto compile_spec = torch_tensorrt::ts::CompileSpec({input});
   compile_spec.enabled_precisions.insert(torch::kF16);
 
   auto trt_mod = torch_tensorrt::ts::compile(mod, compile_spec);

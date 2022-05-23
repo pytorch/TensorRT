@@ -1,3 +1,4 @@
+#include <ATen/ATen.h>
 #include "ATen/InitialTensorOptions.h"
 #include "ATen/core/List.h"
 #include "ATen/core/functional.h"
@@ -115,6 +116,39 @@ void checkListInputType(const c10::TypePtr& elem_type, bool empty_list) {
 void checkSequenceSize(int64_t n, int64_t dim, int64_t seq_size) {
   if (seq_size != n) {
     TORCHTRT_THROW_ERROR("Expected sequence of length " << n << " at dim " << dim << " (got " << seq_size << ")");
+  }
+}
+
+// TODO: Conditionally enable truncation based on user setting
+at::Tensor scalar_to_tensor(const at::Scalar& s, const at::Device device = at::kCPU) {
+  // This function is basically same with the one in
+  // https://github.com/pytorch/pytorch/blob/master/aten/src/ATen/ScalarOps.h, what different here is that Int and Float
+  // won't be upgraded to kDouble or kLong since we don't support these 2 types in conversion
+  if (device == at::kCPU) {
+    if (s.isFloatingPoint()) {
+      LOG_WARNING("Unable to process input type of at::kDouble, truncate type to at::kFloat in scalar_to_tensor_util ");
+      return at::detail::scalar_tensor_static(s, at::kFloat, at::kCPU);
+    } else if (s.isComplex()) {
+      return at::detail::scalar_tensor_static(s, at::kComplexDouble, at::kCPU);
+    } else if (s.isBoolean()) {
+      return at::detail::scalar_tensor_static(s, at::kBool, at::kCPU);
+    } else {
+      AT_ASSERT(s.isIntegral(false));
+      LOG_WARNING("Unable to process input type of at::kLong, truncate type to at::kInt in scalar_to_tensor_util ");
+      return at::detail::scalar_tensor_static(s, at::kInt, at::kCPU);
+    }
+  }
+  if (s.isFloatingPoint()) {
+    LOG_WARNING("Unable to process input type of at::kDouble, truncate type to at::kFloat in scalar_to_tensor_util ");
+    return at::scalar_tensor(s, at::device(device).dtype(at::kFloat));
+  } else if (s.isBoolean()) {
+    return at::scalar_tensor(s, at::device(device).dtype(at::kBool));
+  } else if (s.isComplex()) {
+    return at::scalar_tensor(s, at::device(device).dtype(at::kComplexDouble));
+  } else {
+    AT_ASSERT(s.isIntegral(false));
+    LOG_WARNING("Unable to process input type of at::kLong, truncate type to at::kInt in scalar_to_tensor_util ");
+    return at::scalar_tensor(s, at::device(device).dtype(at::kInt));
   }
 }
 
@@ -238,7 +272,7 @@ at::Tensor createTensorFromList(
   /// Gets shape of tensor to be created
   auto sizes = compute_sizes(data);
   checkListInputType(elem_type, sizes.size() == 1 && sizes[0] == 0);
-  at::ScalarType initial_scalar_type = c10::scalarTypeFromJitType(elem_type);
+  at::ScalarType initial_scalar_type = c10::scalarTypeFromJitType(*elem_type);
   if (initial_scalar_type == at::ScalarType::Double) {
     initial_scalar_type = at::typeMetaToScalarType(c10::get_default_dtype());
   }

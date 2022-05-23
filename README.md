@@ -96,8 +96,8 @@ torch.jit.save(trt_ts_module, "trt_torchscript_module.ts") # save the TRT embedd
 | Platform            | Support                                          |
 | ------------------- | ------------------------------------------------ |
 | Linux AMD64 / GPU   | **Supported**                                    |
-| Linux aarch64 / GPU | **Native Compilation Supported on JetPack-4.4+** |
-| Linux aarch64 / DLA | **Native Compilation Supported on JetPack-4.4+** |
+| Linux aarch64 / GPU | **Native Compilation Supported on JetPack-4.4+ (use v1.0.0 for the time being)** |
+| Linux aarch64 / DLA | **Native Compilation Supported on JetPack-4.4+ (use v1.0.0 for the time being)** |
 | Windows / GPU       | **Unofficial Support**                           |
 | Linux ppc64le / GPU | -                                                |
 | NGC Containers      | **Included in PyTorch NGC Containers 21.11+**   |
@@ -110,11 +110,11 @@ torch.jit.save(trt_ts_module, "trt_torchscript_module.ts") # save the TRT embedd
 
 These are the following dependencies used to verify the testcases. Torch-TensorRT can work with other versions, but the tests are not guaranteed to pass.
 
-- Bazel 4.2.1
-- Libtorch 1.10.0 (built with CUDA 11.3)
-- CUDA 11.3 (10.2 on Jetson)
+- Bazel 5.1.1
+- Libtorch 1.11.0 (built with CUDA 11.3)
+- CUDA 11.3
 - cuDNN 8.2.1
-- TensorRT 8.2.4.2 (TensorRT 8.2.1 on Jetson)
+- TensorRT 8.2.4.2
 
 ## Prebuilt Binaries and Wheel files
 

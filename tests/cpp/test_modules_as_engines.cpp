@@ -4,8 +4,8 @@
 TEST_P(CppAPITests, ModuleAsEngineIsClose) {
   std::vector<at::Tensor> inputs;
   std::vector<torch::jit::IValue> inputs_ivalues;
-  for (auto in_shape : input_shapes) {
-    inputs.push_back(at::randint(5, in_shape, {at::kCUDA}));
+  for (uint64_t i = 0; i < input_shapes.size(); i++) {
+    inputs.push_back(at::randint(5, input_shapes[i], {at::kCUDA}).to(input_types[i]));
     inputs_ivalues.push_back(inputs[inputs.size() - 1].clone());
   }
 
@@ -21,8 +21,8 @@ TEST_P(CppAPITests, ModuleAsEngineIsClose) {
 TEST_P(CppAPITests, ModuleToEngineToModuleIsClose) {
   std::vector<at::Tensor> inputs;
   std::vector<torch::jit::IValue> inputs_ivalues;
-  for (auto in_shape : input_shapes) {
-    inputs.push_back(at::randint(5, in_shape, {at::kCUDA}));
+  for (uint64_t i = 0; i < input_shapes.size(); i++) {
+    inputs.push_back(at::randint(5, input_shapes[i], {at::kCUDA}).to(input_types[i]));
     inputs_ivalues.push_back(inputs[inputs.size() - 1].clone());
   }
 
@@ -57,13 +57,12 @@ INSTANTIATE_TEST_SUITE_P(
     ModuleAsEngineForwardIsCloseSuite,
     CppAPITests,
     testing::Values(
-        PathAndInSize({"tests/modules/resnet18_traced.jit.pt", {{1, 3, 224, 224}}, 2e-5}),
-        PathAndInSize({"tests/modules/resnet50_traced.jit.pt", {{1, 3, 224, 224}}, 2e-5}),
-        PathAndInSize({"tests/modules/mobilenet_v2_traced.jit.pt", {{1, 3, 224, 224}}, 2e-5}),
-        PathAndInSize({"tests/modules/resnet18_scripted.jit.pt", {{1, 3, 224, 224}}, 2e-5}),
-        PathAndInSize({"tests/modules/resnet50_scripted.jit.pt", {{1, 3, 224, 224}}, 2e-5}),
-        PathAndInSize({"tests/modules/mobilenet_v2_scripted.jit.pt", {{1, 3, 224, 224}}, 2e-5}),
-        PathAndInSize({"tests/modules/efficientnet_b0_scripted.jit.pt", {{1, 3, 224, 224}}, 2e-5}),
-        PathAndInSize({"tests/modules/vit_scripted.jit.pt", {{1, 3, 224, 224}}, 8e-2})));
-
+        PathAndInput({"tests/modules/resnet18_traced.jit.pt", {{1, 3, 224, 224}}, {at::kFloat}, 2e-5}),
+        PathAndInput({"tests/modules/resnet50_traced.jit.pt", {{1, 3, 224, 224}}, {at::kFloat}, 2e-5}),
+        PathAndInput({"tests/modules/mobilenet_v2_traced.jit.pt", {{1, 3, 224, 224}}, {at::kFloat}, 2e-5}),
+        PathAndInput({"tests/modules/resnet18_scripted.jit.pt", {{1, 3, 224, 224}}, {at::kFloat}, 2e-5}),
+        PathAndInput({"tests/modules/resnet50_scripted.jit.pt", {{1, 3, 224, 224}}, {at::kFloat}, 2e-5}),
+        PathAndInput({"tests/modules/mobilenet_v2_scripted.jit.pt", {{1, 3, 224, 224}}, {at::kFloat}, 2e-5}),
+        PathAndInput({"tests/modules/efficientnet_b0_scripted.jit.pt", {{1, 3, 224, 224}}, {at::kFloat}, 1e-4}),
+        PathAndInput({"tests/modules/vit_scripted.jit.pt", {{1, 3, 224, 224}}, {at::kFloat}, 8e-2})));
 #endif

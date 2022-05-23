@@ -11,3 +11,4 @@ Function Documentation
 
 
 .. doxygenfunction:: torch_tensorrt::ptq::make_int8_calibrator(DataLoader, const std::string&, bool)
+   :project: Torch-TensorRT

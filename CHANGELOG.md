@@ -793,3 +793,118 @@ Signed-off-by: Naren Dasan <narens@nvidia.com>
 
 
 
+# 1.1.0 (2022-05-10)
+
+### Bug Fixes
+
+* add at::adaptive_avg_pool1d in interpolate plugin and fix [#791](https://github.com/NVIDIA/TRTorch/issues/791) ([deb9f74](https://github.com/NVIDIA/TRTorch/commit/deb9f74))
+* Added ipywidget dependency to notebook ([0b2040a](https://github.com/NVIDIA/TRTorch/commit/0b2040a))
+* Added test case names ([296e98a](https://github.com/NVIDIA/TRTorch/commit/296e98a))
+* Added truncate_long_and_double ([417c096](https://github.com/NVIDIA/TRTorch/commit/417c096))
+* Adding truncate_long_and_double to ptq tests ([3a0640a](https://github.com/NVIDIA/TRTorch/commit/3a0640a))
+* Avoid resolving non-tensor inputs to torch segment_blocks unneccessarily ([3e090ee](https://github.com/NVIDIA/TRTorch/commit/3e090ee))
+* Considering rtol and atol in threshold comparison for floating point numbers ([0b0ba8d](https://github.com/NVIDIA/TRTorch/commit/0b0ba8d))
+* Disabled mobilenet_v2 test for DLFW CI ([40c611f](https://github.com/NVIDIA/TRTorch/commit/40c611f))
+* fix bug that python api doesn't pass truncate_long_and_double value to internal.partition_info ([828336d](https://github.com/NVIDIA/TRTorch/commit/828336d))
+* fix bugs in aten::to ([2ecd187](https://github.com/NVIDIA/TRTorch/commit/2ecd187))
+* Fix BUILD file for tests/accuracy ([8b0170e](https://github.com/NVIDIA/TRTorch/commit/8b0170e))
+* Fix existing uninstallation of Torch-TRT ([9ddd7a8](https://github.com/NVIDIA/TRTorch/commit/9ddd7a8))
+* Fix for torch scripted module faiure with DLFW ([88c02d9](https://github.com/NVIDIA/TRTorch/commit/88c02d9))
+* Fix fuse addmm pass ([58e9ea0](https://github.com/NVIDIA/TRTorch/commit/58e9ea0))
+* Fix pre_built name change in bazelrc ([3ecee21](https://github.com/NVIDIA/TRTorch/commit/3ecee21))
+* fix the bug that introduces kLong Tensor in prim::NumToTensor ([2c3e1d9](https://github.com/NVIDIA/TRTorch/commit/2c3e1d9))
+* Fix when TRT prunes away an output ([9465e1d](https://github.com/NVIDIA/TRTorch/commit/9465e1d))
+* Fixed bugs and addressed review comments ([588e1d1](https://github.com/NVIDIA/TRTorch/commit/588e1d1))
+* Fixed failures for host deps sessions ([ec2232f](https://github.com/NVIDIA/TRTorch/commit/ec2232f))
+* Fixed typo in the path ([43fab56](https://github.com/NVIDIA/TRTorch/commit/43fab56))
+* Getting unsupported ops will now bypass non-schema ops avoiding redundant failures ([d7d1511](https://github.com/NVIDIA/TRTorch/commit/d7d1511))
+* Guard test activation for CI testing ([6d1a1fd](https://github.com/NVIDIA/TRTorch/commit/6d1a1fd))
+* Implement a patch for gelu schema change in older NGC containers ([9ee3a04](https://github.com/NVIDIA/TRTorch/commit/9ee3a04))
+* Missing log severity ([6a4daef](https://github.com/NVIDIA/TRTorch/commit/6a4daef))
+* Preempt torch package override via timm in nox session ([8964d1b](https://github.com/NVIDIA/TRTorch/commit/8964d1b))
+* refactor the resegmentation for TensorRT segments in ResolveNonTensorInput ([3cc2dfb](https://github.com/NVIDIA/TRTorch/commit/3cc2dfb))
+* remove outdated member variables ([0268da2](https://github.com/NVIDIA/TRTorch/commit/0268da2))
+* Removed models directory dependencies ([c4413e1](https://github.com/NVIDIA/TRTorch/commit/c4413e1))
+* Resolve issues in exception elmination pass ([99cea1b](https://github.com/NVIDIA/TRTorch/commit/99cea1b))
+* Review comments incorporated ([962660d](https://github.com/NVIDIA/TRTorch/commit/962660d))
+* Review comments incorporated ([e9865c2](https://github.com/NVIDIA/TRTorch/commit/e9865c2))
+* support dict type for input in shape analysis ([630f9c4](https://github.com/NVIDIA/TRTorch/commit/630f9c4))
+* truncate_long_and_double incur torchscript inference issues ([c83aa15](https://github.com/NVIDIA/TRTorch/commit/c83aa15))
+* Typo fix for test case name ([2a516b2](https://github.com/NVIDIA/TRTorch/commit/2a516b2))
+* Update "reduceAxes" variable in GlobalPoolingConverter function and add corresponding uTests ([f6f5e3e](https://github.com/NVIDIA/TRTorch/commit/f6f5e3e))
+* **//core/conversion/evaluators:** Change how schemas are handled ([20e5d41](https://github.com/NVIDIA/TRTorch/commit/20e5d41))
+* Update base container for dockerfile ([1b3245a](https://github.com/NVIDIA/TRTorch/commit/1b3245a))
+* **//core:** Take user setting in the case we can't determine the ([01c89d1](https://github.com/NVIDIA/TRTorch/commit/01c89d1)), closes [#814](https://github.com/NVIDIA/TRTorch/issues/814)
+* Update test for new Exception syntax ([2357099](https://github.com/NVIDIA/TRTorch/commit/2357099))
+* **//core/conversion:** Add special case for If and Loop ([eacde8d](https://github.com/NVIDIA/TRTorch/commit/eacde8d))
+* **//core/runtime:** Support more delimiter variants ([819c911](https://github.com/NVIDIA/TRTorch/commit/819c911))
+* **//cpp/bin/torchtrtc:** Fix mbs ([aca175f](https://github.com/NVIDIA/TRTorch/commit/aca175f))
+* **//docsrc:** Fix dependencies for docgen ([806e663](https://github.com/NVIDIA/TRTorch/commit/806e663))
+* **//notebooks:** Render citrinet ([12dbda1](https://github.com/NVIDIA/TRTorch/commit/12dbda1))
+* **//py:** Constrain the CUDA version in container builds ([a21a045](https://github.com/NVIDIA/TRTorch/commit/a21a045))
+* Use user provided dtype when we can't infer it from the graph ([14650d1](https://github.com/NVIDIA/TRTorch/commit/14650d1))
+
+
+### Code Refactoring
+
+* removing the strict_types and max_batch_size apis ([b30cbd9](https://github.com/NVIDIA/TRTorch/commit/b30cbd9))
+* Rename enabled precisions arugment to ([10957eb](https://github.com/NVIDIA/TRTorch/commit/10957eb))
+* Removing the max-batch-size argument ([03bafc5](https://github.com/NVIDIA/TRTorch/commit/03bafc5))
+
+### Features
+
+* **//core/conversion:** Better tooling for debugging ([c5c5c47](https://github.com/NVIDIA/TRTorch/commit/c5c5c47))
+* **//core/conversion/evaluators:** aten::pow support ([c4fdfcb](https://github.com/NVIDIA/TRTorch/commit/c4fdfcb))
+* **//docker:** New base container to let master build in container ([446bf18](https://github.com/NVIDIA/TRTorch/commit/446bf18))
+* **//py:** Context managers to quickly switch logging level ([12e470f](https://github.com/NVIDIA/TRTorch/commit/12e470f))
+* Add converter files for reflection pad 1d and 2d ([406d860](https://github.com/NVIDIA/TRTorch/commit/406d860))
+* Add converter files for torch::max ([f628aca](https://github.com/NVIDIA/TRTorch/commit/f628aca))
+* Add converter files for torch::max ([569bcde](https://github.com/NVIDIA/TRTorch/commit/569bcde))
+* Add converter files for torch::max ([dd7a44e](https://github.com/NVIDIA/TRTorch/commit/dd7a44e))
+* Add converter for reflection pad 1d and 2d operation ([2484a43](https://github.com/NVIDIA/TRTorch/commit/2484a43))
+* Added comprehensive perf benchmark script ([a8016ff](https://github.com/NVIDIA/TRTorch/commit/a8016ff))
+* Added compute capability for Orin ([af3d0ff](https://github.com/NVIDIA/TRTorch/commit/af3d0ff))
+* Added env var for TOP_DIR ([c26180e](https://github.com/NVIDIA/TRTorch/commit/c26180e))
+* Added Python accuracy tests using Nox ([6ae8652](https://github.com/NVIDIA/TRTorch/commit/6ae8652))
+* Enable prim::DictConstruct to fallback without conversion check error ([01d98c7](https://github.com/NVIDIA/TRTorch/commit/01d98c7))
+* Handle empty schemas for unsupported ops ([bf6c929](https://github.com/NVIDIA/TRTorch/commit/bf6c929))
+* Implement fast approximation of Gelu as lowering pass to improve performance ([8024ea2](https://github.com/NVIDIA/TRTorch/commit/8024ea2))
+* Implement lowering for  aten::to.dtype schema ([4b3ae3a](https://github.com/NVIDIA/TRTorch/commit/4b3ae3a))
+* Implement test case for aten::to.dtype lowering ([bde8ee0](https://github.com/NVIDIA/TRTorch/commit/bde8ee0))
+* Perf benchmark initial draft ([f2d1655](https://github.com/NVIDIA/TRTorch/commit/f2d1655))
+* replace view with reshape during lowering ([d39b918](https://github.com/NVIDIA/TRTorch/commit/d39b918))
+* Review comment incorporated ([161ef3d](https://github.com/NVIDIA/TRTorch/commit/161ef3d))
+* support aten::adaptive_max_pool1d, aten::adaptive_avg_pool3d and aten::adaptive_max_pool3d operators ([e554dbd](https://github.com/NVIDIA/TRTorch/commit/e554dbd))
+* support aten::div.Tensor_mode ([bb3046a](https://github.com/NVIDIA/TRTorch/commit/bb3046a))
+* support aten::extend evaluator ([33c523d](https://github.com/NVIDIA/TRTorch/commit/33c523d))
+* support aten::format evaluator ([3a33d33](https://github.com/NVIDIA/TRTorch/commit/3a33d33))
+* Update Pytorch version to 1.11 ([c009a1f](https://github.com/NVIDIA/TRTorch/commit/c009a1f))
+* Upgrade TensorRT to 8.2.4.2 ([f1f151b](https://github.com/NVIDIA/TRTorch/commit/f1f151b))
+* **//tests:** Adding BERT to the test suite ([7996a10](https://github.com/NVIDIA/TRTorch/commit/7996a10))
+* **aten::__range_length:** Adding range length evaluator ([11c4608](https://github.com/NVIDIA/TRTorch/commit/11c4608))
+* **aten::add:** adding string concat evaluator ([65dbf90](https://github.com/NVIDIA/TRTorch/commit/65dbf90))
+* **aten::Int:** Adding a new pass to remove single use ([46ac757](https://github.com/NVIDIA/TRTorch/commit/46ac757))
+* **aten::Int:** Lowers out aten::Int ([908340f](https://github.com/NVIDIA/TRTorch/commit/908340f))
+* **core//conversion:** Implement converter for torch unbind ([268a49b](https://github.com/NVIDIA/TRTorch/commit/268a49b))
+
+
+### BREAKING CHANGES
+
+* This commit removes the strict types and max_batch_size apis. We are doing this because the functionality of these APIs in TRT is convoluted and likely to be ignored during building. A replacement for strict types with actual guarantees will be added at a later date.
+
+Signed-off-by: Dheeraj Peri <peri.dheeraj@gmail.com>
+* This is a minor change but may cause scripts
+using torchtrtc to fail. We are renaming enabled-precisions to
+enable-precision since it makes more sense as the argument can
+be repeated
+
+Signed-off-by: Naren Dasan <naren@narendasan.com>
+Signed-off-by: Naren Dasan <narens@nvidia.com>
+* This PR removes `--max-batch-size` from the CLI
+as it has no real functional effect
+
+Signed-off-by: Naren Dasan <naren@narendasan.com>
+Signed-off-by: Naren Dasan <narens@nvidia.com>
+
+
+

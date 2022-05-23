@@ -739,7 +739,12 @@ TORCHTRT_API std::string convert_method_to_trt_engine(
  * module. Registers execution of the engine as the forward method of the module
  * Forward is defined as: forward(Tensor[]) -> Tensor[]
  *
- * @return: A new module trageting a TensorRT engine
+ * TensorRT bindings must have names with the following format:
+ * - [symbol].[index in input / output array]
+ * ex.
+ * - [x.0, x.1, x.2] -> [y.0]
+ *
+ * @return: A new module targeting a TensorRT engine
  */
 TORCHTRT_API torch::jit::Module embed_engine_in_new_module(const std::string& engine, Device device);
 } // namespace torchscript

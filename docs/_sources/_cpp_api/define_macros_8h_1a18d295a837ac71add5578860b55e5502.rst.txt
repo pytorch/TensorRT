@@ -11,3 +11,4 @@ Define Documentation
 
 
 .. doxygendefine:: STR
+   :project: Torch-TensorRT
