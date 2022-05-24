@@ -23,7 +23,9 @@ CXX11_ABI = False
 JETPACK_VERSION = None
 
 __version__ = '1.2.0a0'
-
+__cuda_version__ = '11.3'
+__cudnn_version__ = '8.2'
+__tensorrt_version__ = '8.2'
 
 def get_git_revision_short_hash() -> str:
     return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode('ascii').strip()
@@ -114,7 +116,10 @@ def gen_version_file():
 
     with open(dir_path + '/torch_tensorrt/_version.py', 'w') as f:
         print("creating version file")
-        f.write("__version__ = \"" + __version__ + '\"')
+        f.write("__version__ = \"" + __version__ + '\"\n')
+        f.write("__cuda_version__ = \"" + __cuda_version__ + '\"\n')
+        f.write("__cudnn_version__ = \"" + __cudnn_version__ + '\"\n')
+        f.write("__tensorrt_version__ = \"" + __tensorrt_version__ + '\"\n')
 
 
 def copy_libtorchtrt(multilinux=False):
