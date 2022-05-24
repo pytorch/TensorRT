@@ -506,8 +506,17 @@ def acc_ops_size(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_val = kwargs["input"]
+    input_t = kwargs["input"]
+    if type(input_t) == torch.nn.Parameter or type(input_t) == torch.Tensor:
+        if (
+            not has_dynamic_shape(input_t.shape)
+            and network.has_implicit_batch_dimension
+        ):
+            return torch.Size((IMPLICIT_BATCH_DIM,) + tuple(input_t.shape))
+        return input_t.shape
 
+    # input_val = get_trt_tensor(network, input_t, f"{name}_input_t")
+    input_val = input_t
     if not isinstance(input_val, TRTTensor):
         raise RuntimeError(
             f"size received input {input_val} that is not part "
@@ -779,13 +788,8 @@ def acc_ops_tile(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_val = kwargs["input"]
-
-    if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"tile received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+    input_t = kwargs["input"]
+    input_val = get_trt_tensor(network, input_t, f"{name}_input")
 
     dims = tuple(cast(Sequence[int], kwargs["dims"]))
     n_input_dims = len(input_val.shape) + (
@@ -822,9 +826,28 @@ def acc_ops_tile(
     if network.has_implicit_batch_dimension:
         assert dims[0] == 1, "Can't tile the batch dim when it's implicit."
         dims = dims[1:]
-
     starts = [0] * len(dims)
-    shapes = [i * j for i, j in zip(input_val.shape, dims)]  # type: ignore[union-attr]
+    shapes = []
+    if all(isinstance(d, int) for d in dims):
+        shapes = [i * j for i, j in zip(input_val.shape, dims)]  # type: ignore[union-attr]
+    else:
+        shape = []
+        for i, (s, d) in enumerate(zip(input_val.shape, dims)):
+            if isinstance(d, TRTTensor) and len(d.shape) == 0:
+                d = prepend_ones(network, d, f"{name}_{i}", 1)
+            else:
+                d = get_trt_tensor(network, d, f"{name}_{i}")
+            shape.append(d)
+            mul = add_binary_elementwise_layer(
+                network,
+                s,
+                d,
+                trt.ElementWiseOperation.PROD,
+                target,
+                f"{name}_mul_{i}",
+            )
+            shapes.append(mul)
+        dims = shape
     # If there's dynmaic dim then there would be negative dims in shapes which is not allowed.
     # Here we build a dummy shapes array.
     if has_dynamic_shape(input_val.shape):  # type: ignore[union-attr]
@@ -838,9 +861,16 @@ def acc_ops_tile(
         starts_tensor = network.add_constant(
             (len(dims),), np.ascontiguousarray([0] * len(dims), np.int32)
         ).get_output(0)
-        dims_tensor = network.add_constant(
-            (len(dims),), np.ascontiguousarray(dims, np.int32)
-        ).get_output(0)
+        if all(isinstance(d, int) for d in dims):
+            dims_tensor = network.add_constant(
+                (len(dims),), np.ascontiguousarray(dims, np.int32)
+            ).get_output(0)
+        else:
+            assert all(isinstance(d, TRTTensor) for d in dims)
+            concat_dims_layer = network.add_concatenation(inputs=dims)
+            concat_dims_layer.axis = 0
+            concat_dims_layer.name = f"{name}_tile_dim"
+            dims_tensor = concat_dims_layer.get_output(0)
         input_shape_layer = network.add_shape(input_val)
         input_shape_layer.name = f"{name}_slice_input_shape"
         slice_shapes_tensor = add_binary_elementwise_layer(
@@ -1880,7 +1910,8 @@ def acc_ops_max_pool1d(
 
 
 @tensorrt_converter(acc_ops.max_pool2d)
-def acc_ops_max_pool2d(
+@tensorrt_converter(acc_ops.max_pool3d)
+def acc_ops_max_poolnd(
     network: TRTNetwork,
     target: Target,
     args: Tuple[Argument, ...],
@@ -1894,26 +1925,27 @@ def acc_ops_max_pool2d(
             f"MaxPool2d received input {input_val} that is not part "
             "of the TensorRT region!"
         )
-
-    kernel_size = extend_attr_to_tuple(kwargs["kernel_size"], 2)
-    stride = extend_attr_to_tuple(kwargs["stride"], 2)
-    padding = extend_attr_to_tuple(kwargs["padding"], 2)
-    dilation = extend_attr_to_tuple(kwargs["dilation"], 2)
+    extend_len = 2 if target == acc_ops.max_pool2d else 3
+    kernel_size = extend_attr_to_tuple(kwargs["kernel_size"], extend_len)
+    stride = extend_attr_to_tuple(kwargs["stride"], extend_len)
+    padding = extend_attr_to_tuple(kwargs["padding"], extend_len)
+    dilation = extend_attr_to_tuple(kwargs["dilation"], extend_len)
     ceil_mode = kwargs["ceil_mode"]
 
     if len(stride) == 0 or stride[0] == None:
         stride = kernel_size
 
-    if dilation != (1, 1):
+    ones = (1,) * extend_len
+    if dilation != ones:
         raise RuntimeError(
             f"Only support dilation=(1, 1) for maxpool, but got {dilation}"
         )
 
-    layer = network.add_pooling(
+    layer = network.add_pooling_nd(
         input=input_val, type=trt.PoolingType.MAX, window_size=kernel_size
     )
-    layer.stride = stride
-    layer.padding = padding
+    layer.stride_nd = stride
+    layer.padding_nd = padding
     set_layer_name(layer, target, name)
 
     if ceil_mode:
@@ -2093,8 +2125,8 @@ def acc_ops_unsqueeze(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_val = kwargs["input"]
-
+    input_t = kwargs["input"]
+    input_val = get_trt_tensor(network, input_t, f"{name}_input_t")
     if not isinstance(input_val, TRTTensor):
         raise RuntimeError(
             f"unsqueeze received input {input_val} that is not part "
@@ -2161,8 +2193,9 @@ def acc_ops_topk(
     return layer.get_output(0), layer.get_output(1)
 
 
+@tensorrt_converter(acc_ops.adaptive_avg_pool3d)
 @tensorrt_converter(acc_ops.adaptive_avg_pool2d)
-def acc_ops_adaptive_avg_pool2d(
+def acc_ops_adaptive_avg_poolnd(
     network: TRTNetwork,
     target: Target,
     args: Tuple[Argument, ...],
@@ -2177,30 +2210,32 @@ def acc_ops_adaptive_avg_pool2d(
             "of the TensorRT region!"
         )
 
-    assert (
-        input_val.shape[-1] != -1 and input_val.shape[-1] != -1
+    extend_len = 2 if target == acc_ops.adaptive_avg_pool2d else 3
+    assert all(
+        input_val.shape[-(i + 1)] != -1 for i in range(extend_len)
     ), "AdaptiveAvgPool2d currently doesn't support dynamic shapes for last two dims."
 
-    output_size = cast(Sequence[int], extend_attr_to_tuple(kwargs["output_size"], 2))
-    for input_dim, output_dim in zip(input_val.shape[-2:], output_size):
+    output_size = cast(
+        Sequence[int], extend_attr_to_tuple(kwargs["output_size"], extend_len)
+    )
+    for input_dim, output_dim in zip(input_val.shape[-extend_len:], output_size):
         if input_dim % output_dim != 0:
             raise RuntimeError(
                 "For AdaptiveAvgPool, input dim has to be integer multiple of output dim."
                 f"Got input dim {input_dim}, output dim {output_dim}"
             )
 
-    stride = (
-        input_val.shape[-2] // output_size[0],
-        input_val.shape[-1] // output_size[1],
+    stride = tuple(
+        input_val.shape[-extend_len + i] // output_size[i] for i in range(extend_len)
     )
-    kernel_size = (
-        input_val.shape[-2] - (output_size[0] - 1) * stride[0],
-        input_val.shape[-1] - (output_size[1] - 1) * stride[1],
+    kernel_size = tuple(
+        input_val.shape[-extend_len + i] - (output_size[i] - 1) * stride[i]
+        for i in range(extend_len)
     )
-    layer = network.add_pooling(
+    layer = network.add_pooling_nd(
         input=input_val, type=trt.PoolingType.AVERAGE, window_size=kernel_size
     )
-    layer.stride = stride
+    layer.stride_nd = stride
     set_layer_name(layer, target, name)
 
     return layer.get_output(0)
@@ -2781,7 +2816,6 @@ def acc_ops_getitem(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
     slices = kwargs["idx"]
-
     if not isinstance(input_val, TRTTensor):
         return operator.getitem(input_val, slices)  # type: ignore[arg-type]
 

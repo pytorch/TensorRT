@@ -15,6 +15,22 @@ class TestSizeConverter(AccTestCase):
         inputs = [torch.randn(1, 2, 3, 4)]
         self.run_test(Size(), inputs, expected_ops={acc_ops.size})
 
+    def test_size_param(self):
+        class Size(nn.Module):
+            def __init__(self, x):
+                super().__init__()
+                self.param = torch.nn.Parameter(x)
+
+            def forward(self, y):
+                bs = self.param.size(0)
+                return y.view(bs, -1)
+
+        self.run_test(
+            Size(torch.randn(1, 2, 3, 4)),
+            [torch.randn(1, 2, 3, 4)],
+            expected_ops={acc_ops.size},
+        )
+
     def test_size_dynamic_shape(self):
         class Size(nn.Module):
             def forward(self, x):

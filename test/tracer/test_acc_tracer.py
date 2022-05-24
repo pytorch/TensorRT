@@ -2382,6 +2382,46 @@ class AccTracerTest(unittest.TestCase):
                 torch.equal(ref, res), f"Tensors at don't match {ref=} {res=}"
             )
 
+    def test_repeat_interleave(self):
+        class TestModule(nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, x: torch.Tensor) -> torch.Tensor:
+                return torch.repeat_interleave(x, 2, 1)
+
+        # TODO: finish test later
+        m = TestModule()
+        x = torch.randn(3, 4)
+        traced = acc_tracer.trace(m, [x])
+        ph_in = tile = size = getitem = unsqueeze = reshape = None
+        for node in traced.graph.nodes:
+            if node.op == "placeholder":
+                ph_in = node
+            elif node.op == "call_function":
+                if node.target == acc_ops.size:
+                    self.assertEqual(node.kwargs["input"], ph_in)
+                    size = node
+                elif node.target == acc_ops.getitem:
+                    self.assertEqual(node.kwargs["input"], size)
+                    getitem = node
+                elif node.target == acc_ops.reshape:
+                    self.assertEqual(node.kwargs["input"], tile)
+                    reshape = node
+                elif node.target == acc_ops.unsqueeze:
+                    self.assertEqual(node.kwargs["input"], ph_in)
+                    unsqueeze = node
+                elif node.target == acc_ops.tile:
+                    self.assertEqual(node.kwargs["input"], unsqueeze)
+                    tile = node
+            elif node.op == "output":
+                self.assertEqual(reshape, node.args[0])
+            else:
+                self.fail(f"Unexpected node: {node.format_node()}")
+        if size is not None:
+            self.assertIsNotNone(getitem)
+        self.assertTrue(torch.equal(m(x), traced(x)))
+
     def test_all_acc_ops_registered(self):
         self.assertEqual(
             acc_normalizer._acc_ops,
@@ -2390,8 +2430,10 @@ class AccTracerTest(unittest.TestCase):
                 acc_ops.embedding,
                 acc_ops.max_pool1d,
                 acc_ops.max_pool2d,
+                acc_ops.max_pool3d,
                 acc_ops.flatten,
                 acc_ops.adaptive_avg_pool2d,
+                acc_ops.adaptive_avg_pool3d,
                 acc_ops.avg_pool2d,
                 acc_ops.avg_pool1d,
                 acc_ops.add,

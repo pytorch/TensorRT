@@ -68,6 +68,26 @@ class TestTile(AccTestCase):
             Tile(dims), input_specs, expected_ops={acc_ops.tile}
         )
 
+    def test_tile_non_int_dims(self):
+        class Tile(nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, x, y):
+                y = y * 2
+                return torch.tile(x, (1, y.shape[1], y.shape[1]))
+
+        inputs = [torch.randn(2, 2, 3), torch.randn(2, 2, 3)]
+        batch_size_range = (1, 2, 3)
+        input_specs = InputTensorSpec.from_tensors_with_dynamic_batch_size(
+            inputs, batch_size_range
+        )
+        self.run_test_with_dynamic_shape(
+            Tile(),
+            input_specs,
+            expected_ops={acc_ops.tile},
+        )
+
 
 if __name__ == "__main__":
     run_tests()

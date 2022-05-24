@@ -141,12 +141,36 @@ def max_pool2d(
     )
 
 
+@register_acc_op_mapping(op_and_target=("call_function", nn.functional.max_pool3d))
+@register_acc_op
+def max_pool3d(
+    *, input, kernel_size, stride, padding, dilation, ceil_mode, return_indices
+):
+    return nn.functional.max_pool3d(
+        input=input,
+        kernel_size=kernel_size,
+        stride=stride,
+        padding=padding,
+        dilation=dilation,
+        ceil_mode=ceil_mode,
+        return_indices=return_indices,
+    )
+
+
 @register_acc_op_mapping(
     op_and_target=("call_function", nn.functional.adaptive_avg_pool2d)
 )
 @register_acc_op
 def adaptive_avg_pool2d(*, input, output_size):
     return nn.functional.adaptive_avg_pool2d(input=input, output_size=output_size)
+
+
+@register_acc_op_mapping(
+    op_and_target=("call_function", nn.functional.adaptive_avg_pool3d)
+)
+@register_acc_op
+def adaptive_avg_pool3d(*, input, output_size):
+    return nn.functional.adaptive_avg_pool3d(input=input, output_size=output_size)
 
 
 @register_acc_op_mapping(op_and_target=("call_function", nn.functional.avg_pool1d))
@@ -359,6 +383,93 @@ def repeat_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
         )
         new_node.meta = node.meta.copy()
         return new_node
+
+
+@register_custom_acc_mapper_fn(
+    op_and_target=("call_method", "repeat_interleave"),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("repeats", "repeats"),
+        ("dim", "dim", this_arg_is_optional),
+        ("output_size", "output_size", this_arg_is_optional),
+    ],
+)
+@register_custom_acc_mapper_fn(
+    op_and_target=("call_function", torch.repeat_interleave),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("repeats", "repeats"),
+        ("dim", "dim", this_arg_is_optional),
+        ("output_size", "output_size", this_arg_is_optional),
+    ],
+)
+def repeat_interleave_mapper(node: torch.fx.Node, _: nn.Module):
+    input_node = node.kwargs["input"]
+    repeats = cast(int, node.kwargs["repeats"])
+    dim = node.kwargs["dim"]
+    assert (
+        type(repeats) is int
+    ), "We currently only support `repeat_interleave` with int repeats"
+    rank = node.meta["tensor_rank"]
+    if dim is None:
+        repeat_dim = rank - 1
+    else:
+        assert type(dim) is int, "dim should be an int"
+        repeat_dim = dim
+    tile_dims = [1] * (rank + 1)
+    tile_dims[repeat_dim + 1] = repeats
+
+    with node.graph.inserting_before(node):
+        unsqueeze_node = node.graph.create_node(
+            "call_function",
+            unsqueeze,
+            kwargs={"input": input_node, "dim": repeat_dim + 1},
+            name=f"{node.name}_unsqueeze",
+        )
+        tile_node = node.graph.create_node(
+            "call_function",
+            tile,
+            kwargs={"input": unsqueeze_node, "dims": tile_dims},
+            name=f"{node.name}_repeat_interleave_map_tile",
+        )
+        new_shape = []
+        if dim is not None:
+            if dim < 0:
+                repeat_dim = dim + rank
+            else:
+                repeat_dim = dim
+            size_node = node.graph.create_node(
+                "call_function",
+                size,
+                kwargs={"input": input_node},
+                name=f"{node.name}_size",
+            )
+            size_node.meta["type"] = torch.Size
+            for i in range(rank):
+                shape_i = node.graph.create_node(
+                    "call_function",
+                    getitem,
+                    kwargs={"input": size_node, "idx": i},
+                    name=f"{node.name}_size_{i}",
+                )
+                if i == repeat_dim:
+                    new_shape.append(-1)
+                else:
+                    new_shape.append(shape_i)
+        else:
+            new_shape.append(-1)
+
+        reshaped_node = node.graph.create_node(
+            "call_function",
+            reshape,
+            kwargs={
+                "input": tile_node,
+                "acc_out_ty": acc_utils.build_raw_tensor_meta(shape=new_shape),
+            },
+            name=f"{node.name}_reshape",
+        )
+        reshaped_node.meta = node.meta.copy()
+        return reshaped_node
 
 
 @register_custom_acc_mapper_fn(
