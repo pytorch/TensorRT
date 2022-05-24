@@ -96,7 +96,7 @@ class LowerPassManagerBuilder:
         for p in self.lower_setting.lower_basic_fuse_pass.passes:
             passes.append(wrapper(p, self._input))
         passes.append(
-            inplace_wrapper(partial(FUSE_PASSES_POST_OBSERVER.observe, self._input))
+            inplace_wrapper(lambda m: FUSE_PASSES_POST_OBSERVER.observe(m, self._input))
         )
 
         return PassManager.build_from_passlist(passes)
