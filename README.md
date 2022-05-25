@@ -250,6 +250,43 @@ docker run -it -v$(pwd)/..:/workspace/Torch-TensorRT build_torch_tensorrt_wheel 
 
 Python compilation expects using the tarball based compilation strategy from above.
 
+
+## Testing using Python backend
+
+Torch-TensorRT supports testing in Python using [nox](https://nox.thea.codes/en/stable)
+
+To install the nox using python-pip
+
+```
+python3 -m pip install --upgrade nox
+```
+
+To list supported nox sessions:
+
+```
+nox --session -l
+```
+
+Environment variables supported by nox
+
+```
+PYT_PATH          - To use different PYTHONPATH than system installed Python packages
+TOP_DIR           - To set the root directory of the noxfile
+USE_CXX11         - To use cxx11_abi (Defaults to 0)
+USE_HOST_DEPS     - To use host dependencies for tests (Defaults to 0)
+```
+
+Usage example
+
+```
+nox --session l0_api_tests
+```
+
+Supported Python versions:
+```
+["3.7", "3.8", "3.9", "3.10"]
+```
+
 ## How do I add support for a new op...
 
 ### In Torch-TensorRT?
