@@ -26,17 +26,22 @@ def unwrap_proxy(e):
     return e.proxy if isinstance(e, DispatchTensor) else e
 
 
-def build_outputs(func, args, kwargs, proxy_out):
+def build_outputs(func, func_overload, args, kwargs, proxy_out, call_module=False):
     # Kind of a hacky way to test if an op is in-place or not
     if func.__name__[-1] == "_" and func.__name__[0] != "_":
         args[0].proxy = proxy_out
 
     with no_dispatch():
-        real_out = func(*args, **kwargs)
+        real_out = func_overload(*args, **kwargs)
 
     def wrap_with_proxy(e, proxy):
-        if isinstance(e, torch.Tensor):
+        if e is None:
+            e = torch.empty(())
+        if type(e) == torch.Tensor:
             return DispatchTensor(e, proxy)
+        # if module output is dispatchTensor, then all op inside it are in-place
+        elif type(e) == DispatchTensor and call_module:
+            e.proxy = proxy_out
         else:
             return e
 
@@ -46,7 +51,7 @@ def build_outputs(func, args, kwargs, proxy_out):
         )
     elif isinstance(real_out, list):
         return [wrap_with_proxy(e, proxy_out[idx]) for idx, e in enumerate(real_out)]
-    elif isinstance(real_out, torch.Tensor):
+    elif type(real_out) == torch.Tensor:
         return wrap_with_proxy(real_out, proxy_out)
     else:
         return real_out
@@ -78,11 +83,12 @@ class DispatchTensor(torch.Tensor):
     __torch_function__ = _disabled_torch_function_impl
 
     @classmethod
-    def __torch_dispatch__(cls, func, types, args=(), kwargs=None):
+    def __torch_dispatch__(cls, func_overload, types, args=(), kwargs=None):
+        func = func_overload.overloadpacket
         proxy_args = pytree.tree_map(unwrap_proxy, args)
         proxy_kwargs = pytree.tree_map(unwrap_proxy, kwargs)
         proxy_out = func(*proxy_args, **proxy_kwargs)
-        return build_outputs(func, args, kwargs, proxy_out)
+        return build_outputs(func, func_overload, args, kwargs, proxy_out)
 
 
 class DispatchTracer(Tracer):
@@ -101,6 +107,7 @@ class DispatchTracer(Tracer):
             DEFAULT_LEAF_MODULE_LIST
         )
 
+    # User can use leaf_module_list but it won't work combine with functionalize
     def call_module(
         self,
         m: torch.nn.Module,
@@ -121,7 +128,10 @@ class DispatchTracer(Tracer):
             proxy_out = self.create_proxy(
                 "call_module", qualname, proxy_args, proxy_kwargs
             )
-            return build_outputs(forward, args, kwargs, proxy_out)
+
+            return build_outputs(
+                forward, forward, args, kwargs, proxy_out, call_module=True
+            )
         return forward(*args, **kwargs)
 
     def is_leaf_module(self, m) -> bool:
@@ -170,7 +180,7 @@ def dispatch_trace(
     gm = GraphModule(tracer.root, graph, name)
     gm.graph.eliminate_dead_code()
     gm.recompile()
-    return NormalizeArgs(gm).transform()
+    return gm
 
 
 def wrap_key(f, inps):
