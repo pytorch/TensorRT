@@ -181,7 +181,12 @@ auto aten_registrations TORCHTRT_UNUSED =
         .evaluator({c10::Symbol::fromQualString("aten::slice"),
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                       c10::List<c10::IValue> list = args.at(n->input(0)).IValue()->to<c10::List<c10::IValue>>();
-                      int64_t start = args.at(n->input(1)).unwrapToInt();
+
+                      int64_t start = 0;
+                      auto startIVal = args.at(n->input(1)).IValue();
+                      if(!startIVal->isNone()){
+                        start = args.at(n->input(1)).unwrapToInt();
+                      }
                       int64_t end = args.at(n->input(2)).unwrapToInt();
                       int64_t step = args.at(n->input(3)).unwrapToInt();
 
