@@ -2382,6 +2382,34 @@ class AccTracerTest(unittest.TestCase):
                 torch.equal(ref, res), f"Tensors at don't match {ref=} {res=}"
             )
 
+    def test_inplace_raise(self):
+        """
+        Test that encountering inplace is raised for exception
+        """
+
+        class TestModule(nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, a):
+                a = a + 2
+                a.sub_(3)
+                return a
+
+        m = TestModule()
+        in_a = torch.randn(5)
+        try:
+            acc_tracer.trace(
+                m,
+                [in_a],
+            )
+            self.fail("Shouldn't get here because exception should be thrown.")
+        except RuntimeError as e:
+            self.assertEqual(
+                "Tried to trace mutable operation sub_. FX only supports functional code",
+                str(e),
+            )
+
     def test_repeat_interleave(self):
         class TestModule(nn.Module):
             def __init__(self):

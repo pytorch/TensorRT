@@ -18,6 +18,7 @@ import torch.nn as nn
 from torch._sources import normalize_source_lines
 from torch.fx import Graph, Tracer
 from torch.fx.experimental.normalize import NormalizeArgs
+from torch.fx.node import Argument, Node, Target
 from torch.fx.passes import shape_prop
 
 
@@ -241,6 +242,42 @@ class AccRewritingTracer(Tracer):
             self.leaf_module_list.update(leaf_module_list)
         rewritten = _rewrite(root, ast_rewriter_allow_list, self.leaf_module_list)
         return super().trace(rewritten, concrete_args), rewritten
+
+    # override TraceBase's method
+    def create_node(
+        self,
+        kind: str,
+        target: Target,
+        args: Tuple[Argument, ...],
+        kwargs: Dict[str, Argument],
+        name: Optional[str] = None,
+        type_expr: Optional[Any] = None,
+    ) -> Node:
+        """
+        Inserts a graph node given target, args, kwargs, and name.
+
+        This method can be overridden to do extra checking, validation, or
+        modification of values used in node creation. For example, one might
+        want to disallow in-place operations from being recorded.
+        """
+
+        ## Hacky way to decide inplace ops
+        if type(target) != str:
+            name_target = target.__name__
+        else:
+            name_target = target
+
+        allow_list = ["and_", "or_"]  # python  operator.and_,  operator.or_
+        if (
+            name_target[-1] == "_"
+            and name_target[0] != "_"
+            and not (name_target in allow_list)
+        ):
+            raise RuntimeError(
+                f"Tried to trace mutable operation {name_target}. FX only supports functional code"
+            )
+
+        return self.graph.create_node(kind, target, args, kwargs, name, type_expr)
 
 
 # List of modules that need rewriting to be supported for tracing.
