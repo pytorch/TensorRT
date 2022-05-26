@@ -4,6 +4,7 @@
 #include "core/ir/ir.h"
 #include "core/runtime/runtime.h"
 #include "core/util/prelude.h"
+#include "core/util/trt_util.h"
 #include "cuda_runtime_api.h"
 #include "torch/csrc/jit/ir/ir.h"
 #include "torch/csrc/jit/ir/irparser.h"
@@ -19,7 +20,7 @@ namespace util {
 std::vector<core::ir::Input> toInputs(std::vector<at::Tensor> ten) {
   std::vector<core::ir::Input> a;
   for (auto i : ten) {
-    a.push_back(core::ir::Input(core::util::toVec(i.sizes())));
+    a.push_back(core::ir::Input(core::util::toVec(i.sizes()), core::util::ScalarTypeToTRTDataType(i.scalar_type())));
   }
   return std::move(a);
 }
