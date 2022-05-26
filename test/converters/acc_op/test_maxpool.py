@@ -40,7 +40,32 @@ class TestMaxPoolConverter(AccTestCase):
             TestModule(),
             inputs,
             expected_ops={acc_ops.max_pool1d},
-            test_explicit_batch_dim=False,
+        )
+
+    def test_max_pool1d_with_dynamic_shape(
+        self,
+    ):
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.max_pool = torch.nn.MaxPool1d(1)
+
+            def forward(self, x):
+                return self.max_pool(x)
+
+        # shape is not set to (-1, -1, -1) as reshape dimension with
+        # more than one -1 wildcard is not allowed while adding unsqueeze layer
+        input_specs = [
+            InputTensorSpec(
+                shape=(1, 1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1), (1, 1, 4), (1, 1, 4))],
+            ),
+        ]
+        self.run_test_with_dynamic_shape(
+            TestModule(),
+            input_specs,
+            expected_ops={acc_ops.max_pool1d},
         )
 
     @parameterized.expand(

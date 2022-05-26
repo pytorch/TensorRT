@@ -1849,7 +1849,7 @@ def acc_ops_embedding(
     return gather_layer.get_output(0)
 
 
-@tensorrt_converter(acc_ops.max_pool1d, no_explicit_batch_dim=True)
+@tensorrt_converter(acc_ops.max_pool1d)
 def acc_ops_max_pool1d(
     network: TRTNetwork,
     target: Target,
@@ -1857,12 +1857,12 @@ def acc_ops_max_pool1d(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    if not network.has_implicit_batch_dimension:
-        raise RuntimeError(
-            "Current implementation does not support dynamic shape. Make sure that the network has an explicit batch dimension!"
-        )
-
     input_trt = kwargs["input"]
+    if not isinstance(input_trt, TRTTensor):
+        raise RuntimeError(
+            f"Max_pool1d received input {input_trt} that is not part "
+            "of the TensorRT region!"
+        )
 
     # adds unsqueeze layer -> max pool 2d -> squeeze layer to emulate max pool 1d.
     unsqueeze_layer = network.add_shuffle(input=input_trt)
