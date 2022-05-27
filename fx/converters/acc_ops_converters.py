@@ -65,11 +65,11 @@ def acc_ops_conv1d(
         unsqueeze_weight_layer = network.add_shuffle(input=weight)
         unsqueeze_weight_layer.reshape_dims = tuple([*weight.shape, 1])
         set_layer_name(unsqueeze_layer, target, name + "_unsqueeze_weight")
-        weiht = unsqueeze_weight_layer.get_output(0)
+        weight = unsqueeze_weight_layer.get_output(0)
         weight_shape = tuple(kwargs["weight"].shape)  # type: ignore[union-attr]
         # will need to use uninitialized weight and set it later to support
         # ITensor weights
-        dummy_weight = trt.Weights(weight_shape)
+        dummy_weight = trt.Weights()
         layer = network.add_convolution_nd(
             input=input_val,
             num_output_maps=weight.shape[0],

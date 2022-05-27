@@ -473,7 +473,7 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
 
         # just testing conv2d since conv1d and conv3d are not supported in fx2trt
         for dim, has_relu, f_relu, is_qat in itertools.product(
-            [2], [True, False], [True, False], [True, False]
+            [1, 2], [True, False], [True, False], [True, False]
         ):
             # when has_relu=False, we have torch.nn.Identity, which would introduce
             # extra quant-dequat pair
@@ -564,7 +564,6 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
             ns.call_module(torch.nn.quantized._reference.Linear): 1,
             ns.call_module(torch.nn.quantized._reference.Conv2d): 1,
         }
-        print(m)
         self.checkGraphModuleNodes(m, expected_node_occurrence=expected_occurrence)
 
     def test_unsupported_qconfig(self):
@@ -725,7 +724,6 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
             example_inputs,
             backend_config_dict=modified_backend_config_dict,
         )
-        print(m)
         node_occurrence = {
             ns.call_module(torch.ao.quantization.HistogramObserver): 3,
         }
