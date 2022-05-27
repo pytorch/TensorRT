@@ -11,7 +11,8 @@ void pointwise_test_helper(
     bool dynamicInput = false,
     std::vector<int64_t> shape1 = {5},
     std::vector<int64_t> shape2 = {5},
-    bool negative_input = false) {
+    bool negative_input = false,
+    bool int_tensors = false) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph_ir, g.get());
 
@@ -25,6 +26,11 @@ void pointwise_test_helper(
   }
   if (!singleInput) {
     torch_inputs.push_back(at::randint(1, 5, shape2, {at::kCUDA}));
+  }
+  if(int_tensors){
+    for(size_t i = 0UL; i < torch_inputs.size(); ++i){
+      torch_inputs[i] = torch_inputs[i].to(at::kInt);
+    }
   }
   auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, torch_inputs);
@@ -124,6 +130,15 @@ TEST(Converters, ATenMulWithScalarConvertsCorrectly) {
         %1 : Tensor = aten::mul(%0, %scalar)
         return (%1))IR";
   pointwise_test_helper(graph, true);
+}
+
+TEST(Converters, ATenMulWithIntScalarConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor):
+        %scalar : int = prim::Constant[value=2]()
+        %1 : Tensor = aten::mul(%0, %scalar)
+        return (%1))IR";
+  pointwise_test_helper(graph, true, false, {5}, {5}, false, true);
 }
 
 TEST(Converters, ATenDivConvertsCorrectly) {
