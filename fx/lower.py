@@ -230,7 +230,10 @@ class Lowerer:
             == LowerPrecision.FP16
         ):
             module.half()
-            inputs = tuple(x.half() if x.dtype == torch.float32 else x for x in inputs)
+            inputs = tuple(
+                x.half() if x is not None and x.dtype == torch.float32 else x
+                for x in inputs
+            )
         pm = self.lower_pass_manager_builder.build_lower_pipeline(inputs)
 
         lower_result = pm(module)
