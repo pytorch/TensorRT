@@ -86,6 +86,43 @@ class TestTypeAsConverter(AccTestCase):
             precision=LowerPrecision.FP16,
         )
 
+    def test_type_tensor(self):
+        class Type_as(torch.nn.Module):
+            def forward(self, input):
+                return input.type(dtype=torch.float16)
+
+        input = torch.randn(2, 2)
+
+        inputs = [
+            input,
+        ]
+        self.run_test(
+            Type_as(),
+            inputs,
+            expected_ops={acc_ops.to_dtype},
+            precision=LowerPrecision.FP16,
+        )
+
+    def test_type_tensor_ext(self):
+        class Type_as(torch.nn.Module):
+            def forward(self, input, other):
+                t = input.type()
+                return other.type(t)
+
+        input = torch.randn(2, 2).to(dtype=torch.float16)
+        other = torch.randn(2, 2)
+
+        inputs = [
+            input,
+            other,
+        ]
+        self.run_test(
+            Type_as(),
+            inputs,
+            expected_ops={acc_ops.to_dtype, acc_ops.dtype},
+            precision=LowerPrecision.FP16,
+        )
+
 
 if __name__ == "__main__":
     run_tests()

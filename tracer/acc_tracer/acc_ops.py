@@ -223,6 +223,30 @@ def avg_pool2d(
 def sign(*, input):
     return torch.sign(input)
 
+@register_custom_acc_mapper_fn(
+    op_and_target=("call_method", "type"),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("dtype", "dtype", this_arg_is_optional),
+    ],
+)
+def custom_type_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
+    input_obj = node.kwargs["input"]
+    dtype_obj = node.kwargs.get("dtype")
+    with node.graph.inserting_before(node):
+        if dtype_obj == None:
+            dtype_node = node.graph.call_function(dtype, kwargs={"input": input_obj})
+            dtype_node.meta["type"] = torch.dtype
+            return dtype_node
+        else:
+            new_kwargs = {
+                "input": input_obj,
+                "acc_out_ty": acc_utils.build_raw_tensor_meta(dtype=dtype_obj),
+            }
+            new_node = node.graph.call_function(to_dtype, kwargs=new_kwargs)
+            new_node.meta = node.meta
+            return new_node
+
 
 @register_custom_acc_mapper_fn(
     op_and_target=("call_method", "type_as"),

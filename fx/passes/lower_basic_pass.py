@@ -451,8 +451,8 @@ def transform_setitem(gm: torch.fx.GraphModule, input: Input):
                     continue
                 node.replace_all_uses_with(concat_node_0)
                 map_replace[input_node] = concat_node_0
+            gm.graph.erase_node(node)
 
-    gm.graph.eliminate_dead_code()
     gm.graph.lint()
     gm.recompile()
     return gm

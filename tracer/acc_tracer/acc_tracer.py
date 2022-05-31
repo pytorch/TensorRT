@@ -272,6 +272,7 @@ class AccRewritingTracer(Tracer):
             name_target[-1] == "_"
             and name_target[0] != "_"
             and not (name_target in allow_list)
+            and kind != "placeholder"
         ):
             raise RuntimeError(
                 f"Tried to trace mutable operation {name_target}. FX only supports functional code"

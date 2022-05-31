@@ -1677,35 +1677,41 @@ def acc_ops_logical_xor(
     )
 
 
-@tensorrt_converter(acc_ops.isinf)
-def acc_ops_isinf(
-    network: TRTNetwork,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    input_t = kwargs["input"]
-    if not isinstance(input_t, TRTTensor):
-        raise RuntimeError(
-            f"isinf received input {input_t} that is not part "
-            "of the TensorRT region!"
-        )
-    inf_t = torch.ones(tuple(input_t.shape))
-    inf_t = inf_t * float("inf")
-    inf_t = get_trt_tensor(network, inf_t, f"{name}_inf_t")
+# T113156424 Have some accuracy problems in hf_T5.
+# [TRT] [W] Weights [name=isinf_1_inf_t]: Converted FP32 value in weights (either FP32 infinity or FP32 value outside FP16 range) to corresponding FP16 infinity. If this is not the desired behavior, please modify the weights or retrain with regularization to reduce the magnitude of the weights.
+# @tensorrt_converter(acc_ops.isinf)
+# def acc_ops_isinf(
+#     network: TRTNetwork,
+#     target: Target,
+#     args: Tuple[Argument, ...],
+#     kwargs: Dict[str, Argument],
+#     name: str,
+# ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+#     input_t = kwargs["input"]
+#     if not isinstance(input_t, TRTTensor):
+#         raise RuntimeError(
+#             f"isinf received input {input_t} that is not part "
+#             "of the TensorRT region!"
+#         )
+#     tdtype = torch_dtype_from_trt(input_t.dtype)
 
-    ninf_t = torch.ones(tuple(input_t.shape))
-    ninf_t = ninf_t * float("-inf")
-    ninf_t = get_trt_tensor(network, ninf_t, f"{name}_ninf_t")
+#     inf_t = torch.ones(tuple(input_t.shape))
+#     inf_t = inf_t * float("inf")
+#     inf_t = inf_t.to(tdtype)
+#     inf_t = get_trt_tensor(network, inf_t, f"{name}_inf_t")
 
-    kwargs_new = {"input": input_t, "other": inf_t}
-    inf_output = acc_ops_eq(network, target, None, kwargs_new, name + "_compare_inf")
-    kwargs_new = {"input": input_t, "other": ninf_t}
-    ninf_output = acc_ops_eq(network, target, None, kwargs_new, name + "_compare_ninf")
-    kwargs_new = {"input": inf_output, "other": ninf_output}
-    output = acc_ops_logical_or(network, target, None, kwargs_new, name + "_compare")
-    return output
+#     ninf_t = torch.ones(tuple(input_t.shape))
+#     ninf_t = ninf_t * float("-inf")
+#     ninf_t = ninf_t.to(tdtype)
+#     ninf_t = get_trt_tensor(network, ninf_t, f"{name}_ninf_t")
+
+#     kwargs_new = {"input": input_t, "other": inf_t}
+#     inf_output = acc_ops_eq(network, target, None, kwargs_new, name + "_compare_inf")
+#     kwargs_new = {"input": input_t, "other": ninf_t}
+#     ninf_output = acc_ops_eq(network, target, None, kwargs_new, name + "_compare_ninf")
+#     kwargs_new = {"input": inf_output, "other": ninf_output}
+#     output = acc_ops_logical_or(network, target, None, kwargs_new, name + "_compare")
+#     return output
 
 
 @tensorrt_converter(acc_ops.any)
@@ -1785,68 +1791,70 @@ def acc_ops_fmod(
     return sub_value
 
 
-@tensorrt_converter(acc_ops.embedding, no_implicit_batch_dim=True)
-def acc_ops_embedding(
-    network: TRTNetwork,
-    target: Target,
-    args: Tuple[Argument, ...],
-    kwargs: Dict[str, Argument],
-    name: str,
-) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    if network.has_implicit_batch_dimension:
-        raise RuntimeError(
-            "The `embedding` function should be called with explicit batch dimension."
-        )
+# T113156424 embedding implemenatation is very limited and shows no usage in hf models due to the indices are int64.
+# if we cast to int32, it will create accuracy issues. We'd better leave it to future implementation.
+# @tensorrt_converter(acc_ops.embedding, no_implicit_batch_dim=True)
+# def acc_ops_embedding(
+#     network: TRTNetwork,
+#     target: Target,
+#     args: Tuple[Argument, ...],
+#     kwargs: Dict[str, Argument],
+#     name: str,
+# ) -> Union[TRTTensor, Sequence[TRTTensor]]:
+#     if network.has_implicit_batch_dimension:
+#         raise RuntimeError(
+#             "The `embedding` function should be called with explicit batch dimension."
+#         )
 
-    indices_tensor = kwargs["input"]
-    embedding_tensor = kwargs["weight"]
-    if isinstance(indices_tensor, torch.Tensor) and indices_tensor.dtype == torch.int64:
-        indices_tensor = indices_tensor.to(torch.int32)
-        warnings.warn(
-            "Embedding op has indices_tensor dtype=int64. Reduce it to int32 to run on TRT. Accuracy may not be correct!"
-        )
-    if (
-        isinstance(embedding_tensor, torch.Tensor)
-        and embedding_tensor.dtype == torch.int64
-    ):
-        embedding_tensor = embedding_tensor.to(torch.int32)
-        warnings.warn(
-            "Embedding op has embedding_tensor dtype=int64. Reduce it to int32 to run on TRT. Accuracy may not be correct!"
-        )
-    indices_tensor = get_trt_tensor(network, indices_tensor, f"{name}_indices_tensor")
-    embedding_tensor = get_trt_tensor(
-        network, embedding_tensor, f"{name}_embedding_tensor"
-    )
+#     indices_tensor = kwargs["input"]
+#     embedding_tensor = kwargs["weight"]
+#     if isinstance(indices_tensor, torch.Tensor) and indices_tensor.dtype == torch.int64:
+#         indices_tensor = indices_tensor.to(torch.int32)
+#         warnings.warn(
+#             "Embedding op has indices_tensor dtype=int64. Reduce it to int32 to run on TRT. Accuracy may not be correct!"
+#         )
+#     if (
+#         isinstance(embedding_tensor, torch.Tensor)
+#         and embedding_tensor.dtype == torch.int64
+#     ):
+#         embedding_tensor = embedding_tensor.to(torch.int32)
+#         warnings.warn(
+#             "Embedding op has embedding_tensor dtype=int64. Reduce it to int32 to run on TRT. Accuracy may not be correct!"
+#         )
+#     indices_tensor = get_trt_tensor(network, indices_tensor, f"{name}_indices_tensor")
+#     embedding_tensor = get_trt_tensor(
+#         network, embedding_tensor, f"{name}_embedding_tensor"
+#     )
 
-    # unsupported parameters
-    # ignore padding_idx since it is meaningful for training only
-    max_norm = kwargs["max_norm"]
-    norm_type = kwargs["norm_type"]
-    scale_grad_by_freq = kwargs["scale_grad_by_freq"]
-    sparse = kwargs["sparse"]
+#     # unsupported parameters
+#     # ignore padding_idx since it is meaningful for training only
+#     max_norm = kwargs["max_norm"]
+#     norm_type = kwargs["norm_type"]
+#     scale_grad_by_freq = kwargs["scale_grad_by_freq"]
+#     sparse = kwargs["sparse"]
 
-    if max_norm is not None:
-        raise RuntimeError(
-            f"Currently we don't support specifying max_norm, got {max_norm}."
-        )
+#     if max_norm is not None:
+#         raise RuntimeError(
+#             f"Currently we don't support specifying max_norm, got {max_norm}."
+#         )
 
-    if norm_type != 2.0:
-        raise RuntimeError(
-            f"Currently we don't support specifying max_norm, got {norm_type} for norm_type."
-        )
+#     if norm_type != 2.0:
+#         raise RuntimeError(
+#             f"Currently we don't support specifying max_norm, got {norm_type} for norm_type."
+#         )
 
-    if scale_grad_by_freq:
-        raise RuntimeError(
-            "Currently we don't support scale gradient by word frequency."
-        )
+#     if scale_grad_by_freq:
+#         raise RuntimeError(
+#             "Currently we don't support scale gradient by word frequency."
+#         )
 
-    if sparse:
-        raise RuntimeError("Currently we don't support sparse gradient.")
+#     if sparse:
+#         raise RuntimeError("Currently we don't support sparse gradient.")
 
-    # Implement embedding lookup with gather layer
-    gather_layer = network.add_gather(embedding_tensor, indices_tensor, axis=0)
-    set_layer_name(gather_layer, target, name + "_gather")
-    return gather_layer.get_output(0)
+#     # Implement embedding lookup with gather layer
+#     gather_layer = network.add_gather(embedding_tensor, indices_tensor, axis=0)
+#     set_layer_name(gather_layer, target, name + "_gather")
+#     return gather_layer.get_output(0)
 
 
 @tensorrt_converter(acc_ops.max_pool1d)
@@ -2342,12 +2350,8 @@ def acc_ops_reshape(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
-
-    if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"Reshape received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+    # for case where input_val is TRTensor
+    input_val = get_trt_tensor(network, input_val, f"{name}_input_val")
 
     shape = kwargs["acc_out_ty"].shape  # type: ignore[misc]
     if network.has_implicit_batch_dimension:
