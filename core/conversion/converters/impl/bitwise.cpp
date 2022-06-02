@@ -19,14 +19,16 @@ auto bitwisenot TORCHTRT_UNUSED =
                     
                     if(in->getType() == nvinfer1::DataType::kINT32) {
                       // Integer case
-                      auto one = torch::tensor({1}, util::TRTDataTypeToScalarType(in->getType()));
-                      auto one_const = tensor_to_const(ctx, one);
-                      auto neg = ctx->net->addUnary(*in, nvinfer1::UnaryOperation::kNEG);
-                      TORCHTRT_CHECK(neg, "Unable to create neg unary layer from node: " << *n);
+                      auto neg_one = torch::tensor({-1}, util::TRTDataTypeToScalarType(in->getType()));
+                      auto neg_one_const = tensor_to_const(ctx, neg_one);
+                      auto neg = add_elementwise(
+                          ctx, nvinfer1::ElementWiseOperation::kPROD, in,
+                          neg_one_const, util::node_info(n) + std::string("_Negation"));
+                      TORCHTRT_CHECK(neg, "Unable to create prod layer from node: " << *n);
                       out = add_elementwise(
-                          ctx, nvinfer1::ElementWiseOperation::kSUB, neg->getOutput(0),
-                          one_const, util::node_info(n));
-                      TORCHTRT_CHECK(out, "Unable to create sub layer from node: " << *n);
+                          ctx, nvinfer1::ElementWiseOperation::kSUM, neg->getOutput(0),
+                          neg_one_const, util::node_info(n) + std::string("_SubOne"));
+                      TORCHTRT_CHECK(out, "Unable to create sum layer from node: " << *n);
                     } else if(in->getType() == nvinfer1::DataType::kBOOL) {
                       // Boolean case
                       out = ctx->net->addUnary(*in, nvinfer1::UnaryOperation::kNOT);
