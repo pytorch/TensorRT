@@ -75,7 +75,8 @@ void find_all_fallback_nodes(std::unordered_map<torch::jit::Node*, int>& fallbac
     q.pop();
     // for every node that produces this fallback node's NonTensor input, they should fallback too
     for (auto input : cur_node->inputs()) {
-      if (!isTensor(input) && fallback_nodes.insert({input->node(), 4}).second) {
+      if (!isTensor(input) && input->node()->kind() != torch::jit::prim::Constant &&
+          fallback_nodes.insert({input->node(), 4}).second) {
         q.push(input->node());
       }
     }
@@ -84,7 +85,7 @@ void find_all_fallback_nodes(std::unordered_map<torch::jit::Node*, int>& fallbac
       if (!isTensor(output)) {
         for (auto use : output->uses()) {
           auto node = use.user;
-          if (fallback_nodes.insert({node, 4}).second) {
+          if (node->kind() != torch::jit::prim::Constant && fallback_nodes.insert({node, 4}).second) {
             q.push(node);
           }
         }
