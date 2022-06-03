@@ -18,16 +18,22 @@ auto bitwisenot TORCHTRT_UNUSED =
                     nvinfer1::ILayer* out;
                     
                     if(in->getType() == nvinfer1::DataType::kINT32) {
-                      // Integer case
+                      // Integer case, using ~x = -x - 1
                       auto neg_one = torch::tensor({-1}, util::TRTDataTypeToScalarType(in->getType()));
                       auto neg_one_const = tensor_to_const(ctx, neg_one);
                       auto neg = add_elementwise(
-                          ctx, nvinfer1::ElementWiseOperation::kPROD, in,
-                          neg_one_const, util::node_info(n) + std::string("_Negation"));
+                          ctx,
+                          nvinfer1::ElementWiseOperation::kPROD,
+                          in,
+                          neg_one_const,
+                          util::node_info(n) + std::string("_Negation"));
                       TORCHTRT_CHECK(neg, "Unable to create prod layer from node: " << *n);
                       out = add_elementwise(
-                          ctx, nvinfer1::ElementWiseOperation::kSUM, neg->getOutput(0),
-                          neg_one_const, util::node_info(n) + std::string("_SubOne"));
+                          ctx,
+                          nvinfer1::ElementWiseOperation::kSUM,
+                          neg->getOutput(0),
+                          neg_one_const,
+                          util::node_info(n) + std::string("_SubOne"));
                       TORCHTRT_CHECK(out, "Unable to create sum layer from node: " << *n);
                     } else if(in->getType() == nvinfer1::DataType::kBOOL) {
                       // Boolean case
@@ -39,8 +45,7 @@ auto bitwisenot TORCHTRT_UNUSED =
                     }
 
                     out->setName(util::node_info(n).c_str());
-                    auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0],
-                                                                   out->getOutput(0));
+                    auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], out->getOutput(0));
                     LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
 
                     return true;

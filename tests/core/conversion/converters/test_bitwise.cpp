@@ -5,10 +5,10 @@
 #include "torch/csrc/jit/ir/irparser.h"
 
 std::string gen_test_graph() {
-    return R"IR(
-        graph(%0: Tensor):
-          %3 : Tensor = aten::bitwise_not(%0)
-          return (%3))IR";
+  return R"IR(
+      graph(%0: Tensor):
+        %3 : Tensor = aten::bitwise_not(%0)
+        return (%3))IR";
 }
 
 #define test_bitwise_not(dtype)                                                      \
