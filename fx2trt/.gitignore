@@ -1,6 +1,0 @@
-build/
-dist/
-*__pycache__*
-.DS_Store
-fx2trt_oss.egg-info/
-
