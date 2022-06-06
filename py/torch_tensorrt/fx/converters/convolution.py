@@ -2,6 +2,7 @@
 import numpy as np
 import tensorrt as trt
 import torch
+
 from ..converter_registry import tensorrt_converter
 
 from .converter_utils import (

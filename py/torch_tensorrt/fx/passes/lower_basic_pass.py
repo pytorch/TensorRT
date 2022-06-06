@@ -3,13 +3,15 @@ import operator
 import warnings
 from typing import Any
 
-from ..tracer.acc_tracer import acc_ops
 import torch
 import torch.fx
-from ..observer import observable
-from .pass_utils import log_before_after, validate_inference
-from ..tracer.acc_tracer.acc_utils import get_attr
 from torch.fx.experimental.const_fold import split_const_subgraphs
+
+from ..observer import observable
+
+from ..tracer.acc_tracer import acc_ops
+from ..tracer.acc_tracer.acc_utils import get_attr
+from .pass_utils import log_before_after, validate_inference
 
 # Create an alias for module input type to avoid littering pyre-ignore for Any
 # throughout the file.

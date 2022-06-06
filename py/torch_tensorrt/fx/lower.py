@@ -2,23 +2,27 @@ import dataclasses as dc
 import logging
 from typing import Any, Callable, Sequence
 
-from .tracer.acc_tracer import acc_tracer
-
 # @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch
 import torch.fx as fx
 import torch.nn as nn
-from .lower_setting import LowerSetting
-from .passes.pass_utils import decorate_method, validate_inference
-from .passes.splitter_base import SplitResult
 
 from .fx2trt import TRTInterpreter, TRTInterpreterResult
 from .input_tensor_spec import InputTensorSpec
+from .lower_setting import LowerSetting
 from .passes.lower_pass_manager_builder import LowerPassManagerBuilder
-from .passes.pass_utils import chain_passes, PassFunc
+from .passes.pass_utils import (
+    chain_passes,
+    decorate_method,
+    PassFunc,
+    validate_inference,
+)
+from .passes.splitter_base import SplitResult
 from .tools.timing_cache_utils import TimingCacheManager
 from .tools.trt_splitter import TRTSplitter, TRTSplitterSetting
+
+from .tracer.acc_tracer import acc_tracer
 from .trt_module import TRTModule
 from .utils import LowerPrecision
 

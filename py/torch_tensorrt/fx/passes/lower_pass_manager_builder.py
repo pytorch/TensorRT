@@ -2,17 +2,16 @@ from functools import partial, wraps
 from typing import Any, Callable, NamedTuple, Sequence
 
 import torch
-from ..lower_setting import LowerSetting
-from ..observer import Observer
-from .passes.remove_duplicate_output_args import (
-    remove_duplicate_output_args,
-)
 from torch import nn
 from torch.fx.passes.pass_manager import inplace_wrapper, PassManager
 from torch.fx.passes.shape_prop import ShapeProp
 from torch.fx.passes.splitter_base import SplitResult
 
+from ..lower_setting import LowerSetting
+from ..observer import Observer
+
 from .lower_basic_pass import run_const_fold
+from .passes.remove_duplicate_output_args import remove_duplicate_output_args
 
 Input = Sequence[Any]
 
