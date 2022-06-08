@@ -172,7 +172,7 @@ def compile(module: Any, ir="default", inputs=[], enabled_precisions=set([_enums
                     # profiling_verbosity=trt.ProfilingVerbosity.DETAILED, #For profile
                 )
                 # For profile
-                # from fx2trt_oss.fx.tools.trt_profiler_sorted import profile_trt_module
+                # from torch_tensorrt.fx.tools.trt_profiler_sorted import profile_trt_module
                 # profile_trt_module("", trt_mod, acc_inputs)
                 trt_mod = TRTModule(*r)
 

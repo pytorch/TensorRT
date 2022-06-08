@@ -1,14 +1,12 @@
 import dataclasses as dc
 from typing import List, Optional, Sequence, Set, Type
 
-from .input_tensor_spec import InputTensorSpec
-from .passes.lower_basic_pass import (
-    fuse_permute_linear,
-    fuse_permute_matmul,
-)
-from .utils import LowerPrecision
 from torch import nn
 from torch.fx.passes.pass_manager import PassManager
+
+from .input_tensor_spec import InputTensorSpec
+from .passes.lower_basic_pass import fuse_permute_linear, fuse_permute_matmul
+from .utils import LowerPrecision
 
 
 @dc.dataclass

@@ -1,9 +1,9 @@
 import torch
 import torchdynamo
-from fx2trt_oss.fx.passes.lower_basic_pass import transform_setitem
 from parameterized import parameterized
 from torch.testing._internal.common_fx2trt import AccTestCase
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt.fx.passes.lower_basic_pass import transform_setitem
 from torchdynamo.optimizations import backends
 
 

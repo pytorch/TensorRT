@@ -1,8 +1,8 @@
-import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
 import torch
-from fx2trt_oss.fx.utils import LowerPrecision
+import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from torch.testing._internal.common_fx2trt import AccTestCase
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt.fx.utils import LowerPrecision
 
 
 class TestTypeAsConverter(AccTestCase):

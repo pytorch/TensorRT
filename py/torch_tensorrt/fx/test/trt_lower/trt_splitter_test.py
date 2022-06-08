@@ -5,13 +5,13 @@ import operator
 import torch  # isort:skip
 import torch.fx  # isort:skip
 
-import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
 import torch.fx.passes.operator_support as op_support
 import torch.fx.passes.shape_prop as shape_prop
-from fx2trt_oss.fx.tools.trt_splitter import TRTSplitter
-from fx2trt_oss.tracer.acc_tracer import acc_tracer
+import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from torch.fx.passes import splitter_base
 from torch.testing._internal.common_utils import run_tests, TestCase
+from torch_tensorrt.fx.tools.trt_splitter import TRTSplitter
+from torch_tensorrt.fx.tracer.acc_tracer import acc_tracer
 
 
 ERROR_MSG_NO_ACC_MODULE = "FX split failed: Did not find any ACC submodule!"

@@ -3,9 +3,10 @@
 import operator
 import unittest
 
-import fx2trt_oss.tracer.acc_tracer.acc_shape_prop as acc_shape_prop
-import fx2trt_oss.tracer.acc_tracer.acc_tracer as acc_tracer
 import torch
+
+import torch_tensorrt.fx.tracer.acc_tracer.acc_shape_prop as acc_shape_prop
+import torch_tensorrt.fx.tracer.acc_tracer.acc_tracer as acc_tracer
 from parameterized import param, parameterized
 
 torch.manual_seed(0)

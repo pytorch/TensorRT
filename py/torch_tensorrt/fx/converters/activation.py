@@ -3,6 +3,7 @@ import numpy as np
 # @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch
+
 from ..converter_registry import tensorrt_converter
 
 from .converter_utils import mark_as_int8_layer

@@ -1,12 +1,12 @@
 # Owner(s): ["oncall: gpu_enablement"]
 
-import fx2trt_oss.tracer.acc_tracer.acc_ops  # noqa: F401
 import torch
 import torch.fx
 import torch.nn as nn
-from fx2trt_oss.fx.tools.trt_splitter import create_trt_operator_support
-from fx2trt_oss.tracer.acc_tracer import acc_ops, acc_tracer
+import torch_tensorrt.fx.tracer.acc_tracer.acc_ops  # noqa: F401
 from torch.testing._internal.common_utils import run_tests, TestCase
+from torch_tensorrt.fx.tools.trt_splitter import create_trt_operator_support
+from torch_tensorrt.fx.tracer.acc_tracer import acc_ops, acc_tracer
 
 
 class TestTRTOperatorSupport(TestCase):
