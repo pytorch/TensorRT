@@ -4,8 +4,8 @@ from dataclasses import dataclass, field, replace
 
 import torch
 import torchvision
-from fx2trt_oss.fx.lower import lower_to_trt
-from fx2trt_oss.fx.utils import LowerPrecision
+from torch_tensorrt.fx.lower import lower_to_trt
+from torch_tensorrt.fx.utils import LowerPrecision
 
 
 """

@@ -2,8 +2,9 @@ from typing import Any, Callable, Tuple
 
 import torch
 import torch.fx.passes.net_min_base as net_min_base
-from .. import InputTensorSpec, TRTInterpreter, TRTModule
 from torch.fx.passes.tools_common import Tensors
+
+from .. import InputTensorSpec, TRTInterpreter, TRTModule
 
 
 def lower_mod_default(

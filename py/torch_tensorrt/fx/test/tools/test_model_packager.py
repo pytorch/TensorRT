@@ -3,9 +3,12 @@ import unittest
 
 import torch
 import torch.fx
-from fx2trt_oss.fx.tools.model_packager import generate_standalone_repro, ModelPackager
 from torch import nn
 from torch.package import PackageImporter
+from torch_tensorrt.fx.tools.model_packager import (
+    generate_standalone_repro,
+    ModelPackager,
+)
 
 
 class TestModel(nn.Module):

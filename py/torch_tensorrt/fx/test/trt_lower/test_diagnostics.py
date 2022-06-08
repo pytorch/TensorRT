@@ -7,7 +7,7 @@ import tempfile
 from typing import Union
 from unittest import TestCase
 
-import fx2trt_oss.fx.diagnostics as diag
+import torch_tensorrt.fx.diagnostics as diag
 
 
 def reset_diag(fn):

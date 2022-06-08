@@ -6,8 +6,8 @@ import torchvision
 
 from functorch import make_fx as make_fx_pk
 from functorch.experimental import functionalize
-from fx2trt_oss.tracer.dispatch_tracer.tracer import make_fx
 from torch.library import Library
+from torch_tensorrt.fx.tracer.dispatch_tracer.tracer import make_fx
 from torchdynamo.optimizations.normalize import normalize_ir
 from torchdynamo.optimizations.python_key import fake_signature
 

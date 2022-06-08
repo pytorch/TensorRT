@@ -1,7 +1,7 @@
 # Owner(s): ["oncall: gpu_enablement"]
 
-import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
 import torch
+import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from parameterized import param, parameterized
 from torch.testing._internal.common_fx2trt import AccTestCase, InputTensorSpec
 from torch.testing._internal.common_utils import run_tests

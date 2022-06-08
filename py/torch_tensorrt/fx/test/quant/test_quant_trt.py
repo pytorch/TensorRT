@@ -5,15 +5,12 @@ import itertools
 import operator
 import unittest
 
-import fx2trt_oss.tracer.acc_tracer.acc_tracer as acc_tracer
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.quantized._reference as nnqr
-from fx2trt_oss.fx import InputTensorSpec, TRTInterpreter, TRTModule
-from fx2trt_oss.fx.passes.lower_basic_pass import run_const_fold
-from fx2trt_oss.fx.utils import LowerPrecision
-from fx2trt_oss.tracer.acc_tracer import acc_ops
+
+import torch_tensorrt.fx.tracer.acc_tracer.acc_tracer as acc_tracer
 from torch.ao.quantization import default_qconfig
 from torch.ao.quantization.backend_config.observation_type import ObservationType
 from torch.ao.quantization.fx.match_utils import MatchAllNode
@@ -29,6 +26,10 @@ from torch.testing._internal.common_quantization import (
     QuantizationTestCase,
 )
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt.fx import InputTensorSpec, TRTInterpreter, TRTModule
+from torch_tensorrt.fx.passes.lower_basic_pass import run_const_fold
+from torch_tensorrt.fx.tracer.acc_tracer import acc_ops
+from torch_tensorrt.fx.utils import LowerPrecision
 
 
 def lower_to_trt(model, inputs, shape_ranges):

@@ -9,12 +9,12 @@ import numpy
 import tensorrt as trt
 import torch
 import torch.fx
-from .observer import Observer
 from torch.fx.node import _get_qualified_name
 from torch.fx.passes.shape_prop import TensorMetadata
 
 from .converter_registry import CONVERTERS
 from .input_tensor_spec import InputTensorSpec
+from .observer import Observer
 from .utils import get_dynamic_dims, LowerPrecision, torch_dtype_to_trt
 
 

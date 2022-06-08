@@ -2,12 +2,13 @@
 
 import os
 
-import fx2trt_oss.tracer.acc_tracer.acc_tracer as acc_tracer
 import torch
 import torch.fx
-from fx2trt_oss.fx import InputTensorSpec, TRTInterpreter, TRTModule
-from fx2trt_oss.fx.utils import LowerPrecision
+
+import torch_tensorrt.fx.tracer.acc_tracer.acc_tracer as acc_tracer
 from torch.testing._internal.common_utils import run_tests, TestCase
+from torch_tensorrt.fx import InputTensorSpec, TRTInterpreter, TRTModule
+from torch_tensorrt.fx.utils import LowerPrecision
 
 
 class TestTRTModule(TestCase):

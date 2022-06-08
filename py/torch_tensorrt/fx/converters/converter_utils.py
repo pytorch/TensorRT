@@ -7,6 +7,8 @@ import numpy as np
 # @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch
+from torch.fx.node import Argument, Target
+
 from ..types import (
     Shape,
     TRTDataType,
@@ -18,7 +20,6 @@ from ..types import (
     TRTTensor,
 )
 from ..utils import torch_dtype_from_trt
-from torch.fx.node import Argument, Target
 
 
 def get_trt_plugin(
