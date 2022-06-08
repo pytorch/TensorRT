@@ -4,21 +4,20 @@ import operator
 import warnings
 from typing import cast, Dict, Optional, Sequence, Tuple, Union
 
-from ..tracer.acc_tracer import acc_ops
 import numpy as np
 
 # @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch
+
 from ..converter_registry import tensorrt_converter
+
+from ..tracer.acc_tracer import acc_ops
 from ..types import *  # noqa: F403
-from ..utils import (
-    get_dynamic_dims,
-    torch_dtype_from_trt,
-    torch_dtype_to_trt,
-)
 from torch.fx.immutable_collections import immutable_list
 from torch.fx.node import Argument, Target
+
+from ..utils import get_dynamic_dims, torch_dtype_from_trt, torch_dtype_to_trt
 
 from .converter_utils import *  # noqa: F403
 

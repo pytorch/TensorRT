@@ -8,10 +8,6 @@ import warnings
 from types import FunctionType
 from typing import Any, Dict, Optional, Sequence, Set, Tuple, Type
 
-from . import acc_normalizer
-from . import acc_ops  # noqa: F401
-from . import acc_shape_prop
-from . import acc_utils
 import torch
 import torch.jit as jit
 import torch.nn as nn
@@ -20,6 +16,8 @@ from torch.fx import Graph, Tracer
 from torch.fx.experimental.normalize import NormalizeArgs
 from torch.fx.node import Argument, Node, Target
 from torch.fx.passes import shape_prop
+
+from . import acc_normalizer, acc_ops, acc_shape_prop, acc_utils  # noqa: F401
 
 
 _LOGGER = logging.getLogger(__name__)

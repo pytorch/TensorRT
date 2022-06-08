@@ -1,9 +1,10 @@
 import unittest
 
-import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
 import tensorrt as trt
 import torch.fx
 import torch.nn as nn
+
+import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from torch.testing._internal.common_fx2trt import AccTestCase, InputTensorSpec
 from torch.testing._internal.common_utils import run_tests
 

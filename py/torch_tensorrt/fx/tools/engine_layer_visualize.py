@@ -14,7 +14,7 @@ would generate multiple dot graphs. However, multiple engine profiles are not
 supported.
 
 Usage:
-    python fx2trt_oss.fx/tools/engine_layer_visualize.py --log_file aaa --profile_file bbb
+    python torch_tensorrt.fx/tools/engine_layer_visualize.py --log_file aaa --profile_file bbb
 """
 
 

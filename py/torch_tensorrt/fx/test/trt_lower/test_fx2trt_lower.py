@@ -6,7 +6,7 @@ import unittest
 import torch
 import torch.fx as fx
 import torch.nn as nn
-from fx2trt_oss.fx.lower import Lowerer, LowerSetting
+from torch_tensorrt.fx.lower import Lowerer, LowerSetting
 
 logger = logging.getLogger(__name__)
 

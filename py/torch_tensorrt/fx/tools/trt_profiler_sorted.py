@@ -4,6 +4,7 @@ from typing import List, Mapping, Optional
 
 import tensorrt as trt
 import torch
+
 from .. import TRTModule
 
 

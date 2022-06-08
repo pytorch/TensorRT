@@ -1,5 +1,5 @@
-import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
 import torch
+import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from parameterized import parameterized
 from torch import nn
 from torch.testing._internal.common_fx2trt import AccTestCase, InputTensorSpec

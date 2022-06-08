@@ -3,6 +3,8 @@ from typing import Any, Dict, Iterable, Sequence
 import torch
 import torch.fx.passes.operator_support as ops
 import torch.fx.passes.splitter_base as splitter_base
+from torch.fx.passes.tools_common import get_acc_ops_name, Tensors
+
 from .. import (
     CONVERTERS,
     InputTensorSpec,
@@ -12,7 +14,6 @@ from .. import (
     TRTModule,
 )
 from ..tools.trt_minimizer import TensorRTMinimizer
-from torch.fx.passes.tools_common import get_acc_ops_name, Tensors
 
 
 def create_trt_operator_support(use_implicit_batch_dim=True) -> ops.OperatorSupportBase:
