@@ -39,9 +39,17 @@ bool containNonTensorOutputs(torch::jit::Node* n) {
   return false;
 }
 
-bool isModifyingNodes(torch::jit::Node* node) {
-  std::unordered_set<std::string> modifying_node_set{"aten::append"};
-  return modifying_node_set.find(node->kind().toQualString()) != modifying_node_set.end();
+bool isModifyingNodes(torch::jit::Node* node, torch::jit::Value* val) {
+  const auto& schema = node->schema();
+  for (size_t i = 0; i < node->inputs().size(); ++i) {
+    if (node->inputs()[i] == val) {
+      const at::AliasInfo* formal = schema.arguments()[i].alias_info();
+      if (formal->isWrite()) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 std::vector<torch::jit::Node*> findModifyingNodes(torch::jit::Value* val, const std::unordered_set<torch::jit::Node*> &seg_block_nodes) {
@@ -51,7 +59,7 @@ std::vector<torch::jit::Node*> findModifyingNodes(torch::jit::Value* val, const 
     if (seg_block_nodes.find(node) != seg_block_nodes.end()) {
       break;
     }
-    if (isModifyingNodes(node)) {
+    if (isModifyingNodes(node, val)) {
       modifying_nodes.push_back(node);
     }
   }
@@ -297,7 +305,6 @@ PartitionedGraph segment_graph(torch::jit::Block* block, const PartitionInfo& pa
     if (n->kind() == torch::jit::prim::Constant) {
       continue;
     }
-
 
     if (check_node_fallback(n, fallback_nodes)) {
       in_prog_trt_blk_nodes.push_back(n);
