@@ -39,7 +39,28 @@ bool containNonTensorOutputs(torch::jit::Node* n) {
   return false;
 }
 
-std::vector<torch::jit::Node*> getDependencyNodes(const std::vector<torch::jit::Value*>& vals) {
+bool isModifyingNodes(torch::jit::Node* node) {
+  std::unordered_set<std::string> modifying_node_set{"aten::append"};
+  return modifying_node_set.find(node->kind().toQualString()) != modifying_node_set.end();
+}
+
+std::vector<torch::jit::Node*> findModifyingNodes(torch::jit::Value* val, const std::unordered_set<torch::jit::Node*> &seg_block_nodes) {
+  std::vector<torch::jit::Node*> modifying_nodes;
+  for (auto use: val->uses()) {
+    torch::jit::Node* node = use.user;
+    if (seg_block_nodes.find(node) != seg_block_nodes.end()) {
+      break;
+    }
+    if (isModifyingNodes(node)) {
+      modifying_nodes.push_back(node);
+    }
+  }
+  return modifying_nodes;
+}
+
+std::vector<torch::jit::Node*> getDependencyNodes(const std::vector<torch::jit::Value*>& vals, const SegmentedBlock &seg_block) {
+  // get all nodes in the segmentedblock
+  std::unordered_set<torch::jit::Node*> seg_block_nodes(seg_block.raw_nodes().begin(), seg_block.raw_nodes().end());
   // use bfs to get the DAG dependency nodes for input value
   std::queue<torch::jit::Value*, std::deque<torch::jit::Value*>> q(
       std::deque<torch::jit::Value*>(vals.begin(), vals.end()));
@@ -51,6 +72,8 @@ std::vector<torch::jit::Node*> getDependencyNodes(const std::vector<torch::jit::
     auto node = cur_val->node();
     if (node->kind() != torch::jit::prim::Constant && !visited.count(node)) {
       visited.insert(node);
+      auto modifying_nodes = findModifyingNodes(cur_val, seg_block_nodes);
+      stk.insert(stk.end(), modifying_nodes.rbegin(), modifying_nodes.rend());
       stk.push_back(node);
       for (auto input : node->inputs()) {
         if (!isTensorOrTensorList(input)) {
@@ -107,7 +130,7 @@ void resolveTRTNonTensorInputs(PartitionedGraph& segmented_blocks) {
         }
       }
       if (!inputs_to_resolve.empty()) {
-        std::vector<torch::jit::Node*> dependency_nodes = getDependencyNodes(inputs_to_resolve);
+        std::vector<torch::jit::Node*> dependency_nodes = getDependencyNodes(inputs_to_resolve, segmented_blocks[i]);
         dependency_nodes.insert(
             dependency_nodes.end(), segmented_blocks[i].raw_nodes().begin(), segmented_blocks[i].raw_nodes().end());
         segmented_blocks[i] = SegmentedBlock(SegmentedBlock::kTensorRT, dependency_nodes);
@@ -144,7 +167,6 @@ void registerSegmentsOutputs(PartitionedGraph& segmented_blocks, torch::jit::Blo
     }
     // if no output, then register the last node's output as current graph's output
     if (seg_block.raw_outputs().empty()) {
-      LOG_DEBUG(seg_block << " no output\n");
       // for Torch segments, register input as output
       if (seg_block.target() == SegmentedBlock::kTorch) {
         seg_block.registerOutput(seg_block.raw_inputs()[0]);
@@ -275,6 +297,7 @@ PartitionedGraph segment_graph(torch::jit::Block* block, const PartitionInfo& pa
     if (n->kind() == torch::jit::prim::Constant) {
       continue;
     }
+
 
     if (check_node_fallback(n, fallback_nodes)) {
       in_prog_trt_blk_nodes.push_back(n);
