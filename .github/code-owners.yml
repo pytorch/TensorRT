@@ -114,8 +114,12 @@
   - "andi4191"
   - "narendasan"
 
-"component: ux":
+"ux":
   # Issues related to the user experience including debugging and installation
   - "narendasan"
   - "peri044"
 
+"component: fx":
+  - "frank-wei"
+  - "842974287"
+  - "wushirong"
