@@ -8,7 +8,7 @@ The most convenient way to run these notebooks is via a docker container, which 
 First, clone the repository:
 
 ```
-git clone https://github.com/NVIDIA/Torch-TensorRT
+git clone https://github.com/pytorch/TensorRT
 ```
 
 Next, navigate to the repo's root directory:
@@ -23,10 +23,10 @@ At this point, we recommend pulling the [PyTorch container](https://catalog.ngc.
 from [NVIDIA GPU Cloud](https://catalog.ngc.nvidia.com/) as follows: 
 
 ```
-docker pull nvcr.io/nvidia/pytorch:21.12-py3
+docker pull nvcr.io/nvidia/pytorch:22.05-py3
 ```
 
-Replace ```21.12``` with a different string in the form ```yy.mm```, 
+Replace ```22.05``` with a different string in the form ```yy.mm```, 
 where ```yy``` indicates the last two numbers of a calendar year, and 
 ```mm``` indicates the month in two-digit numerical form, if you wish 
 to pull a different version of the container. 
@@ -36,14 +36,18 @@ Therefore, you can run the container and the notebooks therein without
 mounting the repo to the container. To do so, run 
 
 ```
-docker run --gpus=all --rm -it --net=host --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 nvcr.io/nvidia/pytorch:21.12-py3 bash
+docker run --gpus=all --rm -it --net=host --ipc=host \
+--ulimit memlock=-1 --ulimit stack=67108864 \
+nvcr.io/nvidia/pytorch:22.05-py3 bash
 ```
 
 If, however, you wish for your work in the notebooks to persist, use the 
 ```-v``` flag to mount the repo to the container as follows: 
 
 ```
-docker run --gpus=all --rm -it -v $PWD:/Torch-TensorRT --net=host --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 nvcr.io/nvidia/pytorch:21.12-py3 bash
+docker run --gpus=all --rm -it -v $PWD:/Torch-TensorRT \
+--net=host --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 \
+nvcr.io/nvidia/pytorch:22.05-py3 bash
 ```
 
 ### b. Building a Torch-TensorRT container from source
@@ -57,7 +61,9 @@ docker build -t torch_tensorrt -f ./docker/Dockerfile .
 To run this container, enter the following command:  
 
 ```
-docker run --gpus=all --rm -it -v $PWD:/Torch-TensorRT --net=host --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 torch_tensorrt:latest bash
+docker run --gpus=all --rm -it -v $PWD:/Torch-TensorRT \
+--net=host --ipc=host --ulimit memlock=-1 --ulimit stack=67108864 \
+torch_tensorrt:latest bash
 ```
 
 ### c. Running the notebooks inside the container
@@ -100,8 +106,3 @@ Within the container, the notebooks themselves are located at `/Torch-TensorRT/n
 - [vgg-qat.ipynb](vgg-qat.ipynb): Quantization Aware Trained models in INT8 using Torch-TensorRT
 - [EfficientNet-example.ipynb](EfficientNet-example.ipynb): Simple use of 3rd party PyTorch model library
 - [CitriNet-example.ipynb](CitriNet-example.ipynb): Optimizing the Nemo Citrinet acoustic model
-
-
-```python
-
-```
