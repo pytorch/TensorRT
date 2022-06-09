@@ -2,15 +2,14 @@ from functools import partial, wraps
 from typing import Any, Callable, NamedTuple, Sequence
 
 import torch
-from ..lower_setting import LowerSetting
-from ..observer import Observer
-from .passes.remove_duplicate_output_args import (
-    remove_duplicate_output_args,
-)
 from torch import nn
 from torch.fx.passes.pass_manager import inplace_wrapper, PassManager
 from torch.fx.passes.shape_prop import ShapeProp
 from torch.fx.passes.splitter_base import SplitResult
+
+from ..lower_setting import LowerSetting
+from ..observer import Observer
+from ..passes.remove_duplicate_output_args import remove_duplicate_output_args
 
 from .lower_basic_pass import run_const_fold
 
@@ -23,7 +22,7 @@ Input = Sequence[Any]
 # List of observers. We can subscribe to them by calling its `add(callback)`
 # function from anywhere in code:
 #
-# >>> from fx2trt_oss.fx.lower import FUSE_PASSES_POST_OBSERVER
+# >>> from torch_tensorrt.fx.lower import FUSE_PASSES_POST_OBSERVER
 # >>> with FUSE_PASSES_POST_OBSERVER.add(print_module_and_input):
 # >>>     # print_module_and_input will be called right after the fuse passes
 # >>>     lower(module, sample_input)

@@ -3,13 +3,15 @@ import operator
 import warnings
 from typing import Any
 
-from ..tracer.acc_tracer import acc_ops
 import torch
 import torch.fx
-from ..observer import observable
-from .pass_utils import log_before_after, validate_inference
-from ..tracer.acc_tracer.acc_utils import get_attr
 from torch.fx.experimental.const_fold import split_const_subgraphs
+
+from ..observer import observable
+
+from ..tracer.acc_tracer import acc_ops
+from ..tracer.acc_tracer.acc_utils import get_attr
+from .pass_utils import log_before_after, validate_inference
 
 # Create an alias for module input type to avoid littering pyre-ignore for Any
 # throughout the file.
@@ -46,15 +48,15 @@ def fuse_sparse_matmul_add(gm: torch.fx.GraphModule, input: Input):
     def forward(self, x):
         a = self.a
         b = self.b
-        addmm_mm = fx2trt_oss.tracer.acc_tracer.acc_ops.matmul(input = a, other = b);  a = b = None
-        addmm_add = fx2trt_oss.tracer.acc_tracer.acc_ops.add(input = addmm_mm, other = x);  addmm_mm = x = None
+        addmm_mm = torch_tensorrt.fx.tracer.acc_tracer.acc_ops.matmul(input = a, other = b);  a = b = None
+        addmm_add = torch_tensorrt.fx.tracer.acc_tracer.acc_ops.add(input = addmm_mm, other = x);  addmm_mm = x = None
         return addmm_add
 
     After:
     def forward(self, x):
         a = self.a
         b = self.b
-        linear_1 = fx2trt_oss.tracer.acc_tracer.acc_ops.linear(input = a, weight = b, bias = x);  a = b = x = None
+        linear_1 = torch_tensorrt.fx.tracer.acc_tracer.acc_ops.linear(input = a, weight = b, bias = x);  a = b = x = None
         return linear_1
     """
     counter = 0
@@ -198,8 +200,8 @@ def fuse_permute_matmul(gm: torch.fx.GraphModule, input: Input):
 try:
     # @manual=//deeplearning/trt/python:py_tensorrt
     import tensorrt as trt
-    from fx2trt_oss.fx.converter_registry import tensorrt_converter
-    from fx2trt_oss.fx.converters.converter_utils import (
+    from torch_tensorrt.fx.converter_registry import tensorrt_converter
+    from torch_tensorrt.fx.converters.converter_utils import (
         add_binary_elementwise_layer,
         broadcast,
         get_trt_tensor,

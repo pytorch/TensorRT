@@ -3,13 +3,14 @@
 import unittest
 from typing import Callable, List
 
-import fx2trt_oss.tracer.acc_tracer.acc_normalizer as acc_normalizer
-import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
-import fx2trt_oss.tracer.acc_tracer.acc_tracer as acc_tracer
-import fx2trt_oss.tracer.acc_tracer.acc_utils as acc_utils
 import numpy as np
 import torch
 import torch.nn as nn
+
+import torch_tensorrt.fx.tracer.acc_tracer.acc_normalizer as acc_normalizer
+import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
+import torch_tensorrt.fx.tracer.acc_tracer.acc_tracer as acc_tracer
+import torch_tensorrt.fx.tracer.acc_tracer.acc_utils as acc_utils
 import torchvision
 from parameterized import param, parameterized
 
@@ -1725,9 +1726,10 @@ class AccTracerTest(unittest.TestCase):
         self._make_acc_op_function_test(
             acc_ops.trunc_div, lambda x: torch.div(x, 2, rounding_mode="trunc")
         )
-        self._make_acc_op_function_test(
-            acc_ops.trunc_div, lambda x: torch.floor_divide(x, 2)
-        )
+        # does not behave the same as floor_divide
+        # self._make_acc_op_function_test(
+        #     acc_ops.trunc_div, lambda x: torch.floor_divide(x, 2)
+        # )
 
     def test_view(self):
         """

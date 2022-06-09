@@ -2,10 +2,11 @@ import inspect
 import re
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Set, Tuple, Union
 
-from . import acc_utils
 import torch
 import torch.fx
 from torch.fx.node import _get_qualified_name
+
+from . import acc_utils
 
 # Need to keep up-to-date with https://fburl.com/codesearch/7r2hhh53
 ALIAS_MAP = {

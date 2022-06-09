@@ -1,9 +1,10 @@
 import unittest
 
-import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
 import tensorrt as trt
 import torch
 import torch.nn as nn
+
+import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from parameterized import param, parameterized
 from torch.testing._internal.common_fx2trt import AccTestCase
 from torch.testing._internal.common_utils import run_tests
