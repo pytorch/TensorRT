@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.17)
 project(Torch-TensorRT LANGUAGES CXX)
 
-# use c++14 
+# use c++17 
 set(CMAKE_CXX_STANDARD 17)
 
 # Build the libraries with -fPIC
@@ -12,6 +12,7 @@ if (DEFINED CMAKE_MODULE_PATH)
   set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} CACHE PATH "Path to the folder containing finders")
 endif()
 
+include(cmake/build_options.cmake)
 include(cmake/dependencies.cmake)
 include(cmake/paths.cmake)
 if(MSVC)
