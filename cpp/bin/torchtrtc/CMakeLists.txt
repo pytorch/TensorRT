@@ -22,4 +22,4 @@ target_include_directories(${executable_name}
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>"
 )
 
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${executable_name} DESTINATION "${CMAKE_INSTALL_BINDIR}")
+install(TARGETS ${executable_name} RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
