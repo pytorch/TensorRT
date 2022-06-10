@@ -15,7 +15,7 @@
 #include <string>
 #include <vector>
 
-#include <torch_tensorrt/macros.h>
+#include "torch_tensorrt/macros.h"
 
 // Just include the .h?
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
