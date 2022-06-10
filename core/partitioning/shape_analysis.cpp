@@ -1,6 +1,6 @@
 #include "core/partitioning/shape_analysis.h"
 #include <ATen/ATen.h>
-#include <inttypes.h>
+#include <cstdint>
 #include "core/util/prelude.h"
 #include "torch/csrc/jit/api/module.h"
 #include "torch/csrc/jit/passes/constant_pooling.h"
