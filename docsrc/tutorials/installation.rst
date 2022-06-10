@@ -261,7 +261,7 @@ A few useful CMake options include:
 
         cmake -S. -B<build directory> \
             [-DCMAKE_MODULE_PATH=cmake/Module] \
-            [-DTorch_DID=<path to libtorch>/share/cmake/Torch] \
+            [-DTorch_DIR=<path to libtorch>/share/cmake/Torch] \
             [-DTensorRT_ROOT=<path to TensorRT>] \
             [-DCMAKE_BUILD_TYPE=Debug|Release]
         cmake --build <build directory>
