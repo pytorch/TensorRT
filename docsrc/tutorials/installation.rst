@@ -238,6 +238,34 @@ To build using the pre-CXX11 ABI use the ``pre_cxx11_abi`` config
 
     bazel build //:libtorchtrt --config pre_cxx11_abi -c [dbg/opt]
 
+**Building with CMake**
+-----------------------
+
+It is possible to build the API libraries (in cpp/) and the torchtrtc executable using CMake instead of Bazel.
+Begin by installing CMake.
+
+    * Latest releases of CMake and instructions on how to install are available for different platforms 
+      [on their website](https://cmake.org/download/).
+
+A few useful CMake options include:
+
+    * CMake finders for TensorRT and cuDNN are provided in `cmake/Modules`. In order for CMake to use them, pass
+      `-DCMAKE_MODULE_PATH=cmake/Modules` when configuring the project with CMake.
+    * Libtorch provides its own CMake finder. In case CMake doesn't find it, pass the path to your install of 
+      libtorch with `-DTorch_DIR=<path to libtorch>/share/cmake/Torch`
+    * If TensorRT is not found with the provided cmake finder, specify `-DTensorRT_ROOT=<path to TensorRT>`
+    * Finally, configure and build the project in a build directory of your choice with the following command
+      from the root of Torch-TensorRT project:
+
+    .. code-block:: shell
+
+        cmake -S. -B<build directory> \
+            [-DCMAKE_MODULE_PATH=cmake/Module] \
+            [-DTorch_DID=<path to libtorch>/share/cmake/Torch] \
+            [-DTensorRT_ROOT=<path to TensorRT>] \
+            [-DCMAKE_BUILD_TYPE=Debug|Release]
+        cmake --build <build directory>
+
 **Building the Python package**
 --------------------------------
 
