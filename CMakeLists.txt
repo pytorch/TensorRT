@@ -13,8 +13,8 @@ if (DEFINED CMAKE_MODULE_PATH)
 endif()
 
 include(cmake/build_options.cmake)
-include(cmake/dependencies.cmake)
 include(cmake/paths.cmake)
+include(cmake/dependencies.cmake)
 if(MSVC)
 	add_compile_options(/wd4624 /wd4067 /permissive-)
   # When using Ninja generator, suppress the warning D9025
