@@ -29,6 +29,8 @@ target_link_libraries(${lib_name}
         core
 )
 
+target_compile_definitions(${lib_name} PUBLIC "USE_CMAKE_GENERATED_EXPORT_HEADER")
+
 include("GenerateExportHeader")
 generate_export_header(${lib_name}
     EXPORT_MACRO_NAME TORCHTRT_API
