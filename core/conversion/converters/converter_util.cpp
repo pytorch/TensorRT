@@ -129,24 +129,24 @@ nvinfer1::ITensor* applyIdentityOp(ConversionCtx* ctx, nvinfer1::ITensor* tensor
 }
 
 nvinfer1::ITensor* castITensor(ConversionCtx* ctx, nvinfer1::ITensor* tensor, nvinfer1::DataType dtype) {
-  if (tensor->getType() != dtype) {
-    std::ostringstream tensor_id;
-    tensor_id << reinterpret_cast<int*>(tensor);
+  // No matter whether tensor->getType() == dtype, identity layer is always needed.
+  // Otherwise will change the input tensor name in aten::to converter by AssociateValueAndTensor function
+  // When the input of aten::to is network input, will cause error
+  std::ostringstream tensor_id;
+  tensor_id << reinterpret_cast<int*>(tensor);
 
-    auto id_layer = ctx->net->addIdentity(*tensor);
-    TORCHTRT_CHECK(id_layer, "Unable to create identity layer for ITensor: " << tensor_id.str());
-    auto casted_tensor = id_layer->getOutput(0);
-    casted_tensor->setType(dtype);
+  auto id_layer = ctx->net->addIdentity(*tensor);
+  TORCHTRT_CHECK(id_layer, "Unable to create identity layer for ITensor: " << tensor_id.str());
+  auto casted_tensor = id_layer->getOutput(0);
+  casted_tensor->setType(dtype);
 
-    LOG_DEBUG(ctx->logger, "Casting ITensor " << tensor_id.str() << " from " << tensor->getType() << " to " << dtype);
+  LOG_DEBUG(ctx->logger, "Casting ITensor " << tensor_id.str() << " from " << tensor->getType() << " to " << dtype);
 
-    std::stringstream ss;
-    ss << "[Cast ITensor " << tensor_id.str() << " from " << tensor->getType() << " to " << dtype << "]";
-    id_layer->setName(ss.str().c_str());
-    return casted_tensor;
-  } else {
-    return tensor;
-  }
+  std::stringstream ss;
+  ss << "[Cast ITensor " << tensor_id.str() << " from " << tensor->getType() << " to " << dtype << "]";
+  id_layer->setName(ss.str().c_str());
+  return casted_tensor;
+
 }
 
 nvinfer1::ITensor* tensor_to_const(ConversionCtx* ctx, at::Tensor t, const std::string& name) {
