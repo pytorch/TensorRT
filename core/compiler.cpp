@@ -447,6 +447,15 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
         auto engine = conversion::ConvertBlockToEngine(g->block(), cfg.convert_info, static_params);
         AddEngineToGraph(new_mod, new_g, engine, cuda_device);
       }
+      for (auto input : new_g->block()->inputs()) {
+        LOG_DEBUG("input name:" << input->debugName());
+        if (input->debugName().find(".") != std::string::npos) {
+          auto pos = input->debugName().find(".");
+          auto newName = input->debugName().replace(pos, 1, "_");
+          input->setDebugName(newName);
+          LOG_DEBUG("changed name:" << input->debugName());
+        }
+      }
       auto new_method = new_mod._ivalue()->compilation_unit()->create_function(method.name(), new_g);
       auto schema = util::GenerateGraphSchema(new_method->name(), new_g);
       new_mod.type()->addMethod(new_method);
