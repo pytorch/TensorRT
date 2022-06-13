@@ -6,6 +6,7 @@
 #include "NvInfer.h"
 #include "core/ir/ir.h"
 #include "core/partitioning/PartitionInfo.h"
+#include "core/util/trt_util.h"
 #include "torch/csrc/jit/ir/ir.h"
 
 namespace torch_tensorrt {
@@ -76,6 +77,40 @@ struct SegmentedBlock {
   void register_inshapes(std::vector<ir::Input>& in_shapes) {
     in_shapes_ = in_shapes;
   }
+
+  void register_opt_shapes(std::vector<ir::Input>& opt_shapes) {
+    assert(in_shapes_.size() == opt_shapes.size());
+    for (size_t i = 0; i < opt_shapes.size(); i++) {
+      in_shapes_[i].opt = opt_shapes[i].opt;
+    }
+  }
+
+  void register_max_shapes(std::vector<ir::Input>& max_shapes) {
+    assert(in_shapes_.size() == max_shapes.size());
+    for (size_t i = 0; i < max_shapes.size(); i++) {
+      in_shapes_[i].max = max_shapes[i].max;
+    }
+  }
+
+  void construct_dynamic_shape() {
+    for (size_t i = 0; i < in_shapes_.size(); i++) {
+      std::vector<int64_t> dyn_shape;
+      for (int j = 0; j < in_shapes_[i].input_shape.nbDims; j++) {
+        std::set<uint64_t> dim;
+        dim.insert(in_shapes_[i].min.d[j]);
+        dim.insert(in_shapes_[i].opt.d[j]);
+        dim.insert(in_shapes_[i].max.d[j]);
+        if (dim.size() != 1) {
+          dyn_shape.push_back(-1);
+          in_shapes_[i].input_is_dynamic = true;
+        } else {
+          dyn_shape.push_back(in_shapes_[i].opt.d[j]);
+        }
+      }
+      in_shapes_[i].input_shape = util::toDims(dyn_shape);
+    }
+  }
+
   const std::vector<ir::Input>& in_shapes() const {
     return in_shapes_;
   }

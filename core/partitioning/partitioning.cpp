@@ -435,7 +435,7 @@ PartitionedGraph segment_graph(
 
 PartitionedGraph Partition(
     torch::jit::Block* block,
-    std::unordered_map<const torch::jit::Value*, torch::jit::IValue>& example_tensor_map,
+    std::vector<std::unordered_map<const torch::jit::Value*, torch::jit::IValue>>& example_tensor_maps,
     const PartitionInfo& partition_info,
     std::unordered_map<torch::jit::Node*, int>& global_fallback_nodes) {
   LOG_DEBUG(partition_info);
@@ -453,7 +453,7 @@ PartitionedGraph Partition(
   registerSegmentsOutputs(segmented_blocks, block);
 
   // run shape analysis on each segmented block
-  runShapeAnalysis(segmented_blocks, example_tensor_map, partition_info);
+  runShapeAnalysis(segmented_blocks, example_tensor_maps, partition_info);
 
   for (uint64_t i = 0; i < segmented_blocks.size(); i++) {
     segmented_blocks[i].update_id(i);

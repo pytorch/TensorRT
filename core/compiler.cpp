@@ -222,7 +222,7 @@ void AddIfBlockToGraph(
 GraphAndMapping ConstructFallbackGraph(
     torch::jit::script::Module& new_mod,
     torch::jit::Block* block,
-    std::unordered_map<const torch::jit::Value*, torch::jit::IValue> example_tensor_map,
+    std::vector<std::unordered_map<const torch::jit::Value*, torch::jit::IValue>> example_tensor_maps,
     CompileSpec cfg,
     ir::StaticParams static_params,
     std::unordered_map<torch::jit::Node*, int>& fallback_nodes) {
@@ -231,7 +231,7 @@ GraphAndMapping ConstructFallbackGraph(
 
   auto new_g = std::make_shared<torch::jit::Graph>();
 
-  auto segmented_blocks = partitioning::Partition(block, example_tensor_map, partition_info, fallback_nodes);
+  auto segmented_blocks = partitioning::Partition(block, example_tensor_maps, partition_info, fallback_nodes);
 
   // the mapping from lowering graph => fallback global graph
   std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_g;
@@ -272,7 +272,7 @@ GraphAndMapping ConstructFallbackGraph(
         std::vector<GraphAndMapping> graph_and_mappings;
         for (auto cur_block : if_node->blocks()) {
           graph_and_mappings.push_back(
-              ConstructFallbackGraph(new_mod, cur_block, example_tensor_map, cfg, static_params, fallback_nodes));
+              ConstructFallbackGraph(new_mod, cur_block, example_tensor_maps, cfg, static_params, fallback_nodes));
         }
         AddIfBlockToGraph(new_g, if_node, graph_and_mappings, old_to_new_g);
 
@@ -408,10 +408,10 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
       if (cfg.partition_info.enabled &&
           !(cfg.lower_info.forced_fallback_modules.size() == 0 &&
             cfg.partition_info.forced_fallback_operators.size() == 0 && isBlockConvertible)) {
-        auto input_ivalues_map = partitioning::generateRandomInputs(cfg.convert_info.inputs, first_use_types);
+        auto input_ivalues_maps = partitioning::generateRandomInputs(cfg.convert_info.inputs, first_use_types);
         std::unordered_map<torch::jit::Node*, int> fallback_nodes;
         auto graph_and_mapping =
-            ConstructFallbackGraph(new_mod, g->block(), input_ivalues_map, cfg, static_params, fallback_nodes);
+            ConstructFallbackGraph(new_mod, g->block(), input_ivalues_maps, cfg, static_params, fallback_nodes);
         new_g = graph_and_mapping.first;
         // renaming the input name of graph after fallback to ensure pytorch deserialize it correctly
         for (size_t i = 0; i < new_g->inputs().size(); ++i) {

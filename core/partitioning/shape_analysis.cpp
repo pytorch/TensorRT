@@ -8,9 +8,43 @@ namespace torch_tensorrt {
 namespace core {
 namespace partitioning {
 
-std::unordered_map<const torch::jit::Value*, torch::jit::IValue> generateRandomInputs(
+std::vector<std::unordered_map<const torch::jit::Value*, torch::jit::IValue>> generateRandomInputs(
     std::unordered_map<const torch::jit::Value*, ir::Input>& inputs,
     std::unordered_map<const torch::jit::Value*, c10::optional<at::ScalarType>>& types) {
+  std::vector<std::unordered_map<const torch::jit::Value*, torch::jit::IValue>> ivalue_maps;
+
+  bool is_dynamic = false;
+  for (auto& input : inputs) {
+    if (input.second.input_is_dynamic)
+      is_dynamic = true;
+  }
+  if (is_dynamic) {
+    LOG_WARNING("Dynamic fallback encountered");
+    std::unordered_map<const torch::jit::Value*, torch::jit::IValue> ivalue_map_min, ivalue_map_opt, ivalue_map_max;
+    for (auto& input : inputs) {
+      auto cur_min = input.second.min;
+      auto cur_opt = input.second.opt;
+      auto cur_max = input.second.max;
+      std::vector<int64_t> min_shape, opt_shape, max_shape;
+      min_shape.insert(min_shape.begin(), std::begin(cur_min.d), std::begin(cur_min.d) + cur_min.nbDims);
+      opt_shape.insert(opt_shape.begin(), std::begin(cur_opt.d), std::begin(cur_opt.d) + cur_opt.nbDims);
+      max_shape.insert(max_shape.begin(), std::begin(cur_max.d), std::begin(cur_max.d) + cur_max.nbDims);
+      auto type_opt = types[input.first];
+      auto type = at::kFloat;
+      if (type_opt) {
+        type = type_opt.value();
+      } else {
+        LOG_WARNING("Input type for doing shape analysis could not be determined, defaulting to F32");
+      }
+      auto in_min = at::randint(5, min_shape, {at::kCUDA}).to(type);
+      auto in_opt = at::randint(5, opt_shape, {at::kCUDA}).to(type);
+      auto in_max = at::randint(5, max_shape, {at::kCUDA}).to(type);
+      ivalue_map_min[input.first] = in_min.clone();
+      ivalue_map_opt[input.first] = in_opt.clone();
+      ivalue_map_max[input.first] = in_max.clone();
+    }
+    return {ivalue_map_min, ivalue_map_opt, ivalue_map_max};
+  }
   // generate random inputs for running pytorch segments
   std::unordered_map<const torch::jit::Value*, torch::jit::IValue> ivalue_map;
 
@@ -30,12 +64,13 @@ std::unordered_map<const torch::jit::Value*, torch::jit::IValue> generateRandomI
     ivalue_map[input.first] = in.clone();
     in_i++;
   }
-  return ivalue_map;
+  return {ivalue_map};
 }
 
 void getSegmentsOutputByRunning(
     SegmentedBlock& seg_block,
     std::unordered_map<const torch::jit::Value*, torch::jit::IValue>& ivalues_maps,
+    int register_iteration,
     const PartitionInfo& partition_info) {
   // create a module to run the graph
   auto g = seg_block.g();
@@ -62,6 +97,12 @@ void getSegmentsOutputByRunning(
   cur_method->setSchema(schema);
 
   std::vector<torch::jit::IValue> jit_inputs_ivalues;
+
+  for (auto& input : seg_block.raw_inputs()) {
+    LOG_DEBUG(
+        "Register input ivalues_maps for torch::jit::Value* " << input->debugName() << ", produced from "
+                                                              << util::node_info(input->node()));
+  }
 
   // set inputs ivalues, now supports Tensor/Int to pass argumentes between different segments
   for (auto& input : seg_block.raw_inputs()) {
@@ -111,6 +152,9 @@ void getSegmentsOutputByRunning(
   size_t idx = 0;
   for (auto& output : seg_block.raw_outputs()) {
     ivalues_maps[output] = jit_results[idx++];
+    LOG_DEBUG(
+        "Register output ivalues_maps for torch::jit::Value* " << output->debugName() << ", produced from "
+                                                               << util::node_info(output->node()));
   }
 
   // set input shape for each segmented block so we wil use it in conversion process
@@ -146,19 +190,50 @@ void getSegmentsOutputByRunning(
       input_types.push_back(cur_ivalue.toTensor().scalar_type());
     }
   }
-
-  seg_block.register_inshapes(input_shapes);
+  LOG_DEBUG("Begin register shape");
+  if (register_iteration == 0)
+    seg_block.register_inshapes(input_shapes);
+  else if (register_iteration == 1)
+    seg_block.register_opt_shapes(input_shapes);
+  else if (register_iteration == 2)
+    seg_block.register_max_shapes(input_shapes);
   seg_block.register_intypes(input_types);
+  LOG_DEBUG("Done");
 }
 
 void runShapeAnalysis(
     std::vector<SegmentedBlock>& segmented_blocks,
-    std::unordered_map<const torch::jit::Value*, torch::jit::IValue>& example_tensor_map,
+    std::vector<std::unordered_map<const torch::jit::Value*, torch::jit::IValue>>& example_tensor_maps,
     const PartitionInfo& partition_info) {
   // register every segment's input shape, and it's running output IValues
-  for (auto& seg_block : segmented_blocks) {
-    torch::jit::ConstantPooling(seg_block.g());
-    getSegmentsOutputByRunning(seg_block, example_tensor_map, partition_info);
+  if (example_tensor_maps.size() == 1) {
+    int i = 0;
+    for (auto& seg_block : segmented_blocks) {
+      torch::jit::ConstantPooling(seg_block.g());
+      LOG_DEBUG("Running the graph @" << i);
+      getSegmentsOutputByRunning(seg_block, example_tensor_maps[0], 0, partition_info);
+      i++;
+    }
+  } else if (example_tensor_maps.size() == 3) {
+    int i = 0;
+    for (auto& seg_block : segmented_blocks) {
+      torch::jit::ConstantPooling(seg_block.g());
+      LOG_DEBUG("Running min graph @" << i);
+      getSegmentsOutputByRunning(seg_block, example_tensor_maps[0], 0, partition_info);
+      i++;
+    }
+    for (auto& seg_block : segmented_blocks) {
+      torch::jit::ConstantPooling(seg_block.g());
+      LOG_DEBUG("Running opt graph @" << i);
+      getSegmentsOutputByRunning(seg_block, example_tensor_maps[1], 1, partition_info);
+    }
+    for (auto& seg_block : segmented_blocks) {
+      torch::jit::ConstantPooling(seg_block.g());
+      LOG_DEBUG("Running max graph @" << i);
+      getSegmentsOutputByRunning(seg_block, example_tensor_maps[2], 2, partition_info);
+    }
+    for (auto& seg_block : segmented_blocks)
+      seg_block.construct_dynamic_shape();
   }
   return;
 }

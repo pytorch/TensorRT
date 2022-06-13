@@ -37,7 +37,7 @@ PartitionedGraph segment_graph(
 
 PartitionedGraph Partition(
     torch::jit::Block* block,
-    std::unordered_map<const torch::jit::Value*, torch::jit::IValue>& example_tensor_map,
+    std::vector<std::unordered_map<const torch::jit::Value*, torch::jit::IValue>>& example_tensor_map,
     const PartitionInfo& partition_info,
     std::unordered_map<torch::jit::Node*, int>& fallback_nodes);
 
