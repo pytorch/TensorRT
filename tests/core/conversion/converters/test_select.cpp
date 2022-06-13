@@ -365,6 +365,181 @@ TEST(Converters, ATenSliceNegEndIndexConvertsCorrectly) {
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
+TEST(Converters, ATenSliceDynamicBatchConvertsCorrectly) {
+  const auto graph = R"IR(
+        graph(%x.1 : Tensor):
+              %2 : None = prim::Constant()
+              %dim : int = prim::Constant[value=0]()
+              %start : int = prim::Constant[value=1]()
+              %end : int = prim::Constant[value=15]()
+              %step : int = prim::Constant[value=2]()
+              %9 : Tensor = aten::slice(%x.1, %dim, %start, %end, %step)
+              return (%9))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+
+  torch::jit::parseIR(graph, g.get());
+
+  auto in = at::randint(1, 10, {16, 32}, {at::kCUDA});
+
+  auto jit_in = at::clone(in);
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
+
+  auto trt_in = at::clone(in);
+  // dynamic shape in batch
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {trt_in}, true);
+  auto trt = trt_results[0].reshape(jit_results[0].sizes());
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+}
+
+TEST(Converters, ATenSliceDynamicNegStartBatchConvertsCorrectly) {
+  const auto graph = R"IR(
+        graph(%x.1 : Tensor):
+              %2 : None = prim::Constant()
+              %dim : int = prim::Constant[value=0]()
+              %start : int = prim::Constant[value=-15]()
+              %end : int = prim::Constant[value=15]()
+              %step : int = prim::Constant[value=2]()
+              %9 : Tensor = aten::slice(%x.1, %dim, %start, %end, %step)
+              return (%9))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+
+  torch::jit::parseIR(graph, g.get());
+
+  auto in = at::randint(1, 10, {16, 32}, {at::kCUDA});
+
+  auto jit_in = at::clone(in);
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
+
+  auto trt_in = at::clone(in);
+  // dynamic shape in batch
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {trt_in}, true);
+  auto trt = trt_results[0].reshape(jit_results[0].sizes());
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+}
+
+TEST(Converters, ATenSliceDynamicNegEndBatchConvertsCorrectly) {
+  const auto graph = R"IR(
+        graph(%x.1 : Tensor):
+              %2 : None = prim::Constant()
+              %dim : int = prim::Constant[value=0]()
+              %start : int = prim::Constant[value=1]()
+              %end : int = prim::Constant[value=-2]()
+              %step : int = prim::Constant[value=3]()
+              %9 : Tensor = aten::slice(%x.1, %dim, %start, %end, %step)
+              return (%9))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+
+  torch::jit::parseIR(graph, g.get());
+
+  auto in = at::randint(1, 10, {16, 32}, {at::kCUDA});
+
+  auto jit_in = at::clone(in);
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
+
+  auto trt_in = at::clone(in);
+  // dynamic shape in batch
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {trt_in}, true);
+  auto trt = trt_results[0].reshape(jit_results[0].sizes());
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+}
+
+TEST(Converters, ATenSliceDynamicNoneBatchConvertsCorrectly) {
+  const auto graph = R"IR(
+        graph(%x.1 : Tensor):
+              %dim : int = prim::Constant[value=0]()
+              %start : None = prim::Constant()
+              %end : None = prim::Constant()
+              %step : int = prim::Constant[value=3]()
+              %9 : Tensor = aten::slice(%x.1, %dim, %start, %end, %step)
+              return (%9))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+
+  torch::jit::parseIR(graph, g.get());
+
+  auto in = at::randint(1, 10, {16, 32}, {at::kCUDA});
+
+  auto jit_in = at::clone(in);
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
+
+  auto trt_in = at::clone(in);
+  // dynamic shape in batch
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {trt_in}, true);
+  auto trt = trt_results[0].reshape(jit_results[0].sizes());
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+}
+
+
+TEST(Converters, ATenSliceDynamicConvertsCorrectly) {
+  const auto graph = R"IR(
+        graph(%x.1 : Tensor):
+              %2 : None = prim::Constant()
+              %dim : int = prim::Constant[value=1]()
+              %start : int = prim::Constant[value=3]()
+              %end : int = prim::Constant[value=32]()
+              %step : int = prim::Constant[value=3]()
+              %9 : Tensor = aten::slice(%x.1, %dim, %start, %end, %step)
+              return (%9))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+
+  torch::jit::parseIR(graph, g.get());
+
+  auto in = at::randint(1, 10, {16, 32}, {at::kCUDA});
+
+  auto jit_in = at::clone(in);
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
+
+  auto trt_in = at::clone(in);
+  // dynamic shape in dim 1, slice in dim 1
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {trt_in}, false);
+  auto trt = trt_results[0].reshape(jit_results[0].sizes());
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+}
+
+TEST(Converters, ATenSliceDynamic2ConvertsCorrectly) {
+  const auto graph = R"IR(
+        graph(%x.1 : Tensor):
+              %2 : None = prim::Constant()
+              %dim : int = prim::Constant[value=1]()
+              %start : int = prim::Constant[value=3]()
+              %end : int = prim::Constant[value=17]()
+              %step : int = prim::Constant[value=3]()
+              %9 : Tensor = aten::slice(%x.1, %dim, %start, %end, %step)
+              return (%9))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+
+  torch::jit::parseIR(graph, g.get());
+
+  auto in = at::randint(1, 10, {16, 32}, {at::kCUDA});
+
+  auto jit_in = at::clone(in);
+  auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {jit_in});
+
+  auto trt_in = at::clone(in);
+  // dynamic shape in batch, slice in dim 1
+  auto trt_results = torch_tensorrt::tests::util::RunGraphEngineDynamic(g, params, {trt_in}, true);
+  auto trt = trt_results[0].reshape(jit_results[0].sizes());
+
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
+}
+
+
 TEST(Converters, ATenSplitSizesInScriptingConvertsCorrectly) {
   const auto graph = R"IR(
         graph(%x.1 : Tensor):

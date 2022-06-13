@@ -199,6 +199,60 @@ nvinfer1::ITensor* tensor_to_const(ConversionCtx* ctx, at::Tensor t, const std::
   return out;
 }
 
+nvinfer1::ITensor* toITensor(ConversionCtx* ctx, const torch::jit::Node* n, at::Tensor* input) {
+
+    auto weights = Weights(ctx, *input);
+    // IConstantLayer to convert indices from Weights to ITensor
+    auto const_layer = ctx->net->addConstant(weights.shape, weights.data); // shouln't use constant
+    TORCHTRT_CHECK(const_layer, "Unable to create constant layer from node: " << *n);
+    auto const_out = const_layer->getOutput(0);
+    return const_out;
+}
+
+// clamp x to [lower_bound, upper_bound]
+nvinfer1::ITensor* clamp(ConversionCtx* ctx, const torch::jit::Node* n, nvinfer1::ITensor* x,
+                        nvinfer1::ITensor* lower_bound, nvinfer1::ITensor* upper_bound) {
+  auto max_layer = ctx->net->addElementWise(*x, *lower_bound, nvinfer1::ElementWiseOperation::kMAX);
+  auto max_itensor = max_layer->getOutput(0);
+  auto min_layer = ctx->net->addElementWise(*max_itensor, *upper_bound, nvinfer1::ElementWiseOperation::kMIN);
+  auto min_itensor = min_layer->getOutput(0);
+  return min_itensor;
+}
+
+// return indices < 0 ? inputDims + indices : indices
+nvinfer1::ITensor* bump_if_negtive(ConversionCtx* ctx, const torch::jit::Node* n, nvinfer1::ITensor* input_dim,
+                                   nvinfer1::ITensor* indices) {
+    auto nbdims = input_dim->getDimensions().d[0];
+    auto zero = torch::zeros({nbdims}).to(torch::kI32);
+    auto neg = - torch::ones({nbdims}).to(torch::kI32);
+    auto zero_itensor = toITensor(ctx, n, &zero);
+    auto neg_itensor = toITensor(ctx, n, &neg);
+    auto signs = clamp(ctx, n, indices, neg_itensor, zero_itensor);
+    auto mul = ctx->net->addElementWise(*signs, *input_dim, nvinfer1::ElementWiseOperation::kPROD);
+    auto mul_itensor = mul->getOutput(0);
+    auto sub = ctx->net->addElementWise(*indices, *mul_itensor, nvinfer1::ElementWiseOperation::kSUB);
+    auto sub_itensor = sub->getOutput(0);
+    return sub_itensor;
+}
+
+void update_start_and_end(ConversionCtx* ctx, const torch::jit::Node* n, nvinfer1::ITensor* in_shape, 
+                        nvinfer1::ITensor* in_start, nvinfer1::ITensor* in_end,
+                        nvinfer1::ITensor** out_start, nvinfer1::ITensor** out_end) {
+    *out_start = bump_if_negtive(ctx, n, in_shape, in_start);
+    *out_end = bump_if_negtive(ctx, n, in_shape, in_end);
+}
+
+bool is_dynamic_shape(nvinfer1::ITensor* tensor) {
+   auto dim = tensor->getDimensions();
+   auto ndims = dim.nbDims;
+   for (int i = 0; i < ndims; i++) {
+     if (dim.d[i] == -1) {
+       return true;
+     }
+   }
+   return false;
+}
+
 } // namespace converters
 } // namespace conversion
 } // namespace core
