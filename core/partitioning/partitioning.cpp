@@ -52,9 +52,11 @@ bool isModifyingNodes(torch::jit::Node* node, torch::jit::Value* val) {
   return false;
 }
 
-std::vector<torch::jit::Node*> findModifyingNodes(torch::jit::Value* val, const std::unordered_set<torch::jit::Node*> &seg_block_nodes) {
+std::vector<torch::jit::Node*> findModifyingNodes(
+    torch::jit::Value* val,
+    const std::unordered_set<torch::jit::Node*>& seg_block_nodes) {
   std::vector<torch::jit::Node*> modifying_nodes;
-  for (auto use: val->uses()) {
+  for (auto use : val->uses()) {
     torch::jit::Node* node = use.user;
     if (seg_block_nodes.find(node) != seg_block_nodes.end()) {
       break;
@@ -66,7 +68,9 @@ std::vector<torch::jit::Node*> findModifyingNodes(torch::jit::Value* val, const 
   return modifying_nodes;
 }
 
-std::vector<torch::jit::Node*> getDependencyNodes(const std::vector<torch::jit::Value*>& vals, const SegmentedBlock &seg_block) {
+std::vector<torch::jit::Node*> getDependencyNodes(
+    const std::vector<torch::jit::Value*>& vals,
+    const SegmentedBlock& seg_block) {
   // get all nodes in the segmentedblock
   std::unordered_set<torch::jit::Node*> seg_block_nodes(seg_block.raw_nodes().begin(), seg_block.raw_nodes().end());
   // use bfs to get the DAG dependency nodes for input value
@@ -251,10 +255,10 @@ void finalize_block(
 
 // use this function to get all initial fallback nodes (nodes that are unsupported or forced fallback)
 // we use a map to indicate the reason why it's fallback to torch
-std::unordered_map<torch::jit::Node*, int> get_fallback_nodes(
+void get_fallback_nodes(
     torch::jit::Block* block,
-    const std::unordered_set<std::string>& forced_fallback_ops) {
-  std::unordered_map<torch::jit::Node*, int> fallback_nodes;
+    const std::unordered_set<std::string>& forced_fallback_ops,
+    std::unordered_map<torch::jit::Node*, int>& fallback_nodes) {
   auto nodes = block->nodes();
   for (const auto n : nodes) {
     if (n->kind() == torch::jit::prim::Constant) {
@@ -277,16 +281,19 @@ std::unordered_map<torch::jit::Node*, int> get_fallback_nodes(
       fallback_nodes.insert({n, 2});
     }
   }
-  return fallback_nodes;
+  return;
 }
 
-PartitionedGraph segment_graph(torch::jit::Block* block, const PartitionInfo& partition_info) {
+PartitionedGraph segment_graph(
+    torch::jit::Block* block,
+    const PartitionInfo& partition_info,
+    std::unordered_map<torch::jit::Node*, int>& fallback_nodes) {
   auto min_block_size = partition_info.min_block_size;
   std::unordered_set<std::string> forced_fallback_ops(
       partition_info.forced_fallback_operators.begin(), partition_info.forced_fallback_operators.end());
 
   // get the initial fallback nodes (nodes that are unsupported or forced fallback)
-  auto fallback_nodes = get_fallback_nodes(block, forced_fallback_ops);
+  get_fallback_nodes(block, forced_fallback_ops, fallback_nodes);
 
   // For fallback nodes, if it consumes any NonTensor inputs or TensorList inputs, then the node that produces this
   // input should also fallback Similarly, if it produces any NonTensor outputs or TensorList outputs, then the node
@@ -371,11 +378,12 @@ PartitionedGraph segment_graph(torch::jit::Block* block, const PartitionInfo& pa
 PartitionedGraph Partition(
     torch::jit::Block* block,
     std::unordered_map<const torch::jit::Value*, torch::jit::IValue>& example_tensor_map,
-    const PartitionInfo& partition_info) {
+    const PartitionInfo& partition_info,
+    std::unordered_map<torch::jit::Node*, int>& fallback_nodes) {
   LOG_DEBUG(partition_info);
   // segment lowering global graph into blocks
   LOG_DEBUG("Parititioning source module into PyTorch and TensorRT sub blocks");
-  PartitionedGraph segmented_blocks = segment_graph(block, partition_info);
+  PartitionedGraph segmented_blocks = segment_graph(block, partition_info, fallback_nodes);
 
   // It's possible that some TensorRT blocks have nonTensor inputs/output because they are interleaved by Torch blocks
 
