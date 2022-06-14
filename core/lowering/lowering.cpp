@@ -39,7 +39,7 @@ void LowerGraph(std::shared_ptr<torch::jit::Graph>& g, LowerInfo lower_info) {
   }
   torch::jit::EliminateDeadCode(g);
   if (lower_info.forced_fallback_modules.size() > 0) {
-    passes::MarkNodesForFallback(g, true);
+    passes::MarkNodesForFallback(g, true, lower_info.default_torch_execution);
   }
   passes::UnpackHardSwish(g);
   passes::EliminateExceptionOrPassPattern(g);

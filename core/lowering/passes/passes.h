@@ -22,7 +22,7 @@ void EliminateExceptionOrPassPattern(std::shared_ptr<torch::jit::Graph> graph);
 void ReduceToOperation(std::shared_ptr<torch::jit::Graph>& graph);
 void ReduceGelu(std::shared_ptr<torch::jit::Graph>& graph);
 void ReduceRemainder(std::shared_ptr<torch::jit::Graph>& graph);
-void MarkNodesForFallback(std::shared_ptr<torch::jit::Graph>& g, bool delete_delims);
+void MarkNodesForFallback(std::shared_ptr<torch::jit::Graph>& g, bool delete_delims, bool default_torch_execution);
 void RemoveBNDimCheck(std::shared_ptr<torch::jit::Graph> graph);
 void RemoveContiguous(std::shared_ptr<torch::jit::Graph>& graph);
 void ViewToReshape(std::shared_ptr<torch::jit::Graph>& graph);

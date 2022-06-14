@@ -304,7 +304,8 @@ PYBIND11_MODULE(_C, m) {
       .def_readwrite("num_avg_timing_iters", &CompileSpec::num_avg_timing_iters)
       .def_readwrite("workspace_size", &CompileSpec::workspace_size)
       .def_readwrite("torch_fallback", &CompileSpec::torch_fallback)
-      .def_readwrite("truncate_long_and_double", &CompileSpec::truncate_long_and_double);
+      .def_readwrite("truncate_long_and_double", &CompileSpec::truncate_long_and_double)
+      .def_readwrite("default_torch_execution", &CompileSpec::default_torch_execution);
 
   py::class_<TorchFallback>(ts_sub_mod, "TorchFallback")
       .def(py::init<>())

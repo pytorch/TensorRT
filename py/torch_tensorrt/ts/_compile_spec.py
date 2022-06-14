@@ -221,7 +221,10 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> _ts_C.CompileSpec:
 
     if "torch_fallback" in compile_spec:
         info.torch_fallback = _parse_torch_fallback(compile_spec["torch_fallback"])
-
+    
+    if "default_torch_execution" in compile_spec:
+        assert type(compile_spec["default_torch_execution"]) is bool
+        info.default_torch_execution = compile_spec["default_torch_execution"]
     return info
 
 

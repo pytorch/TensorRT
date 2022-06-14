@@ -26,7 +26,9 @@ def compile(module: torch.jit.ScriptModule,
             require_full_compilation=False,
             min_block_size=3,
             torch_executed_ops=[],
-            torch_executed_modules=[]) -> torch.jit.ScriptModule:
+            torch_executed_modules=[],
+            default_torch_execution=False,
+            trt_executed_modules=[]) -> torch.jit.ScriptModule:
     """Compile a TorchScript module for NVIDIA GPUs using TensorRT
 
     Takes a existing TorchScript module and a set of settings to configure the compiler
@@ -74,6 +76,8 @@ def compile(module: torch.jit.ScriptModule,
         min_block_size (int): The minimum number of contiguous TensorRT convertable operations in order to run a set of operations in TensorRT
         torch_executed_ops (List[str]): List of aten operators that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True
         torch_executed_modules (List[str]): List of modules that must be run in PyTorch. An error will be thrown if this list is not empty but ``require_full_compilation`` is True
+        default_torch_execution (bool): If turned on, modules would be executed in torch by default, and those specified by trt_executed_modules would be compiled
+        trt_executed_modules (List[str]): List of modules that would be compiled to TensorRT. An error will be thrown if this list is not empty but ``default_torch_execution`` is False
 
     Returns:
         torch.jit.ScriptModule: Compiled TorchScript Module, when run it will execute via TensorRT
@@ -105,9 +109,10 @@ def compile(module: torch.jit.ScriptModule,
         "torch_fallback": {
             "enabled": not require_full_compilation,
             "forced_fallback_ops": torch_executed_ops,
-            "forced_fallback_modules": torch_executed_modules,
+            "forced_fallback_modules": torch_executed_modules if not default_torch_execution else trt_executed_modules,
             "min_block_size": min_block_size
-        }
+        },
+        "default_torch_execution": default_torch_execution
     }
 
     compiled_cpp_mod = _C.compile_graph(module._c, _parse_compile_spec(spec))

@@ -92,7 +92,7 @@ void NotateModuleForFallback(
   }
 }
 
-void MarkNodesForFallback(std::shared_ptr<torch::jit::Graph>& g, bool delete_delims) {
+void MarkNodesForFallback(std::shared_ptr<torch::jit::Graph>& g, bool delete_delims, bool default_torch_execution) {
   auto b = g->block();
 
   std::stack<bool> mark = std::stack<bool>({false});
@@ -126,7 +126,7 @@ void MarkNodesForFallback(std::shared_ptr<torch::jit::Graph>& g, bool delete_del
       if (n->s(c10::Symbol::attr("compilation_edge")) == "end") {
         LOG_WARNING("Found the end of segmented block targeted for torch while not actively marking a block");
       }
-    } else if (mark.top()) {
+    } else if ((!mark.top() && default_torch_execution) or (mark.top() && !default_torch_execution)) {
       LOG_GRAPH("Marking " << util::node_info(n) << " to run in PyTorch");
       n->i_(c10::Symbol::attr("to_compile"), (int64_t) false);
     }

@@ -163,6 +163,7 @@ struct CompileSpec : torch::CustomClassHolder {
   bool refit = false;
   bool debug = false;
   bool truncate_long_and_double = false;
+  bool default_torch_execution = false;
   Device device;
   TorchFallback torch_fallback;
   EngineCapability capability = EngineCapability::kDEFAULT;
