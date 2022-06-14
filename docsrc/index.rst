@@ -28,6 +28,7 @@ Getting Started
 * :ref:`use_from_pytorch`
 * :ref:`runtime`
 * :ref:`using_dla`
+* :ref:`deploy_torch_tensorrt_to_triton`
 
 .. toctree::
    :caption: Getting Started
@@ -43,6 +44,7 @@ Getting Started
    tutorials/use_from_pytorch
    tutorials/runtime
    tutorials/using_dla
+   tutorials/deploy_torch_tensorrt_to_triton
 
 .. toctree::
    :caption: Notebooks
