@@ -21,7 +21,8 @@ auto constant_pad_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns
        auto padding = args[1].unwrapToIntList().vec();
        int64_t padSize = padding.size();
        auto value = args[2].unwrapToScalar().to<float>();
-
+       at::Tensor value_tensor = torch::tensor(value, util::TRTDataTypeToScalarType(in->getType()));
+       auto valueTensor = tensor_to_const(ctx, value_tensor);
        TORCHTRT_CHECK(padSize % 2 == 0, "Length of pad must be even but instead it equals " << padSize);
 
        int64_t l_pad = padSize / 2;
@@ -55,8 +56,6 @@ auto constant_pad_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns
              auto fill_layer = ctx->net->addFill(nvinfer1::Dims{1, {1}}, nvinfer1::FillOperation::kLINSPACE);
              auto shape_gather_out = ctx->net->addShape(*left_gather_out)->getOutput(0);
              fill_layer->setInput(0, *shape_gather_out);
-             at::Tensor value_tensor = torch::tensor(value, torch::kFloat32);
-             auto valueTensor = tensor_to_const(ctx, value_tensor);
              fill_layer->setInput(1, *valueTensor);
              at::Tensor delta_tensor = torch::zeros(inRank);
              auto deltaTensor = tensor_to_const(ctx, delta_tensor);
@@ -69,8 +68,6 @@ auto constant_pad_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns
            } else {
              inDims.d[axis] = padding[padding_index];
              auto fill_layer = ctx->net->addFill(inDims, nvinfer1::FillOperation::kLINSPACE);
-             at::Tensor value_tensor = torch::tensor(value, torch::kFloat32);
-             auto valueTensor = tensor_to_const(ctx, value_tensor);
              fill_layer->setInput(1, *valueTensor);
              at::Tensor delta_tensor = torch::zeros(inRank);
              auto deltaTensor = tensor_to_const(ctx, delta_tensor);
@@ -111,9 +108,7 @@ auto constant_pad_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns
              // fill the right_gather_out with value
              auto fill_layer = ctx->net->addFill(nvinfer1::Dims{1, {1}}, nvinfer1::FillOperation::kLINSPACE);
              auto shape_gather_out = ctx->net->addShape(*right_gather_out)->getOutput(0);
-             fill_layer->setInput(0, *shape_gather_out);
-             at::Tensor value_tensor = torch::tensor(value, torch::kFloat32);
-             auto valueTensor = tensor_to_const(ctx, value_tensor);
+             fill_layer->setInput(0, *shape_gather_out);          
              fill_layer->setInput(1, *valueTensor);
              at::Tensor delta_tensor = torch::zeros(inRank);
              auto deltaTensor = tensor_to_const(ctx, delta_tensor);
@@ -126,8 +121,6 @@ auto constant_pad_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns
            } else {
              inDims.d[axis] = padding[padding_index + 1];
              auto fill_layer = ctx->net->addFill(inDims, nvinfer1::FillOperation::kLINSPACE);
-             at::Tensor value_tensor = torch::tensor(value, torch::kFloat32);
-             auto valueTensor = tensor_to_const(ctx, value_tensor);
              fill_layer->setInput(1, *valueTensor);
              at::Tensor delta_tensor = torch::zeros(inRank);
              auto deltaTensor = tensor_to_const(ctx, delta_tensor);
