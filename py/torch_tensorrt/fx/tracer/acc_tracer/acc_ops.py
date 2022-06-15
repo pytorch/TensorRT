@@ -2864,3 +2864,18 @@ def as_strided(*, input, size, stride, storage_offset=0):
     return torch.as_strided(
         input=input, size=size, stride=stride, storage_offset=storage_offset
     )
+
+
+@register_acc_op_mapping(op_and_target=("call_function", torch.var))
+@register_acc_op_mapping(
+    op_and_target=("call_method", "var"),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("dim", "dim"),
+        ("unbiased", "unbiased"),
+        ("keepdim", "keepdim"),
+    ],
+)
+@register_acc_op
+def var(*, input, dim, unbiased, keepdim=False):
+    return torch.var(input=input, dim=dim, unbiased=unbiased, keepdim=keepdim)

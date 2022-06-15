@@ -31,7 +31,9 @@ def run_const_fold(traced_mod: torch.fx.GraphModule) -> torch.fx.GraphModule:
                 return True
         return False
 
-    const_split_mod = split_const_subgraphs(traced_mod, skip_folding_quant_dequant)
+    const_split_mod = split_const_subgraphs(
+        traced_mod, skip_folding_quant_dequant, device_for_folded_attrs="cuda"
+    )
     const_split_mod.run_folding()
     return const_split_mod
 
