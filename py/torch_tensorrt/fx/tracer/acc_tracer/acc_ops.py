@@ -739,6 +739,13 @@ def square_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
         ("mat2", "other"),
     ],
 )
+@register_acc_op_mapping(
+    op_and_target=("call_function", torch.mm),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("mat2", "other"),
+    ],
+)
 @register_acc_op_mapping(op_and_target=("call_function", torch.matmul))
 @register_acc_op
 def matmul(*, input, other):
