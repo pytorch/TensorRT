@@ -2,8 +2,8 @@ Deploying a Torch-TensorRT model (to Triton)
 ============================================
 
 Optimization and deployment go hand in hand in a discussion about Machine 
-Learning infrastructure. For a Torch-TensorRT user, network level optimzation 
-to get the maximum performance would already be an area of expertize. 
+Learning infrastructure. Once network level optimzation are done 
+to get the maximum performance, the next step would be to deploy it. 
 
 However, serving this optimized model comes with it's own set of considerations
 and challenges like: building an infrastructure to support concorrent model
@@ -18,7 +18,7 @@ Step 1: Optimize your model with Torch-TensorRT
 -----------------------------------------------
 
 Most Torch-TensorRT users will be familiar with this step. For the purpose of
-this demoonstration, we will be using a ResNet50 model from Torchhub.
+this demonstration, we will be using a ResNet50 model from Torchhub.
 
 Let’s first pull the NGC PyTorch Docker container. You may need to create 
 an account and get the API key from `here <https://ngc.nvidia.com/setup/>`__. 
@@ -30,7 +30,7 @@ Sign up and login with your key (follow the instructions
    # <xx.xx> is the yy:mm for the publishing tag for NVIDIA's Pytorch 
    # container; eg. 22.04
 
-   docker run -it --gpus all -v /path/to/folder:/resnet50_eg nvcr.io/nvidia/pytorch:<xx.xx>-py3
+   docker run -it --gpus all -v /path/to/local/folder/to/copy/model:/resnet50_eg nvcr.io/nvidia/pytorch:<xx.xx>-py3
 
 Once inside the container, we can proceed to download a ResNet model from
 Torchhub and optimize it with Torch-TensorRT. 
@@ -180,25 +180,25 @@ with the Triton Inference Server.
 ::
 
    # Setting up client
-   triton_client = httpclient.InferenceServerClient(url="localhost:8000")
+   client = httpclient.InferenceServerClient(url="localhost:8000")
 
 Secondly, we specify the names of the input and output layer(s) of our model.
 
 ::
 
-   test_input = httpclient.InferInput("input__0", transformed_img.shape, datatype="FP32")
-   test_input.set_data_from_numpy(transformed_img, binary_data=True)
+   inputs = httpclient.InferInput("input__0", transformed_img.shape, datatype="FP32")
+   inputs.set_data_from_numpy(transformed_img, binary_data=True)
 
-   test_output = httpclient.InferRequestedOutput("output__0", binary_data=True, class_count=1000)
+   outputs = httpclient.InferRequestedOutput("output__0", binary_data=True, class_count=1000)
 
 Lastly, we send an inference request to the Triton Inference Server.
 
 ::
 
    # Querying the server
-   results = triton_client.infer(model_name="resnet50", inputs=[test_input], outputs=[test_output])
-   test_output_fin = results.as_numpy('output__0')
-   print(test_output_fin[:5])
+   results = client.infer(model_name="resnet50", inputs=[inputs], outputs=[outputs])
+   inference_output = results.as_numpy('output__0')
+   print(inference_output[:5])
 
 The output of the same should look like below:
 
