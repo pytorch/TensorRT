@@ -63,6 +63,12 @@ class LowerSetting(LowerSettingBasic):
     save_timing_cache: Save updated timing cache data into timing cache file if the timing
     cache file is provided.
     cuda_graph_batch_size (int): Cuda graph batch size, default to be -1.
+    preset_lowerer (str): when specified, use a preset logic to build the
+    instance of Lowerer. Refer to
+    `caffe2.torch.fb.model_transform.fx2trt.presets.LowererPresetsManager` on
+    how presets are applied. Refer to
+    `caffe2.torch.fb.model_transform.fx2trt.presets.ESUHMLowererPreset` on how
+    to add a preset.
     """
 
     input_specs: List[InputTensorSpec] = dc.field(default_factory=list)
@@ -79,3 +85,4 @@ class LowerSetting(LowerSettingBasic):
     timing_cache_prefix: str = ""
     save_timing_cache: bool = False
     cuda_graph_batch_size: int = -1
+    preset_lowerer: str = ""

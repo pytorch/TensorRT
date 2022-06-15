@@ -2576,5 +2576,6 @@ class AccTracerTest(unittest.TestCase):
                 acc_ops.new_ones,
                 acc_ops.einsum,
                 acc_ops.as_strided,
+                acc_ops.var,
             },
         )

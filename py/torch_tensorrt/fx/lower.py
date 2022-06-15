@@ -92,7 +92,18 @@ class LowerTrtInterpreter:
         input_specs_val = (
             self.lower_setting.input_specs
             if self.lower_setting.input_specs
-            else InputTensorSpec.from_tensors(input)
+            else (
+                InputTensorSpec.from_tensors_with_dynamic_batch_size(
+                    input,
+                    (
+                        0,
+                        self.lower_setting.max_batch_size,
+                        self.lower_setting.max_batch_size,
+                    ),
+                )
+                if self.lower_setting.explicit_batch_dimension
+                else InputTensorSpec.from_tensors(input)
+            )
         )
 
         # Prepare algorithm selector and timing_cache for TRTInterpreter
