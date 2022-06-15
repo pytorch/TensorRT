@@ -57,7 +57,7 @@ auto constant_pad_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns
              auto shape_gather_out = ctx->net->addShape(*left_gather_out)->getOutput(0);
              fill_layer->setInput(0, *shape_gather_out);
              fill_layer->setInput(1, *valueTensor);
-             at::Tensor delta_tensor = torch::zeros(inRank);
+             at::Tensor delta_tensor = torch::zeros(inRank, util::TRTDataTypeToScalarType(in->getType()));
              auto deltaTensor = tensor_to_const(ctx, delta_tensor);
              fill_layer->setInput(2, *deltaTensor);
              auto padTensor = fill_layer->getOutput(0);
@@ -69,7 +69,7 @@ auto constant_pad_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns
              inDims.d[axis] = padding[padding_index];
              auto fill_layer = ctx->net->addFill(inDims, nvinfer1::FillOperation::kLINSPACE);
              fill_layer->setInput(1, *valueTensor);
-             at::Tensor delta_tensor = torch::zeros(inRank);
+             at::Tensor delta_tensor = torch::zeros(inRank, util::TRTDataTypeToScalarType(in->getType()));
              auto deltaTensor = tensor_to_const(ctx, delta_tensor);
              fill_layer->setInput(2, *deltaTensor);
              auto padTensor = fill_layer->getOutput(0);
@@ -110,7 +110,7 @@ auto constant_pad_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns
              auto shape_gather_out = ctx->net->addShape(*right_gather_out)->getOutput(0);
              fill_layer->setInput(0, *shape_gather_out);          
              fill_layer->setInput(1, *valueTensor);
-             at::Tensor delta_tensor = torch::zeros(inRank);
+             at::Tensor delta_tensor = torch::zeros(inRank, util::TRTDataTypeToScalarType(in->getType()));
              auto deltaTensor = tensor_to_const(ctx, delta_tensor);
              fill_layer->setInput(2, *deltaTensor);
              auto padTensor = fill_layer->getOutput(0);
@@ -122,7 +122,7 @@ auto constant_pad_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns
              inDims.d[axis] = padding[padding_index + 1];
              auto fill_layer = ctx->net->addFill(inDims, nvinfer1::FillOperation::kLINSPACE);
              fill_layer->setInput(1, *valueTensor);
-             at::Tensor delta_tensor = torch::zeros(inRank);
+             at::Tensor delta_tensor = torch::zeros(inRank, util::TRTDataTypeToScalarType(in->getType()));
              auto deltaTensor = tensor_to_const(ctx, delta_tensor);
              fill_layer->setInput(2, *deltaTensor);
              auto padTensor = fill_layer->getOutput(0);
