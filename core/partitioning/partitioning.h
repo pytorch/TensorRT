@@ -16,7 +16,7 @@ namespace partitioning {
 
 typedef std::vector<SegmentedBlock> PartitionedGraph;
 
-PartitionedGraph segment_graph(torch::jit::Block* block, const PartitionInfo& partition_info);
+PartitionedGraph segment_graph(torch::jit::Block* block, const PartitionInfo& partition_info, std::unordered_map<torch::jit::Node*, int> &fallback_nodes);
 
 PartitionedGraph Partition(
     torch::jit::Block* block,

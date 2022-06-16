@@ -87,6 +87,18 @@ class FallbackIf(torch.nn.Module):
         return x
 
 
+# Sample Inplace OP in Conditional Block Model
+class FallbackInplaceOPIf(nn.Module):
+    def __init__(self):
+        super(FallbackInplaceOPIf, self).__init__()
+    def forward(self, x, y):
+        mod_list = [x]
+        if x.sum() > y.sum():
+            mod_list.append(y)
+        z = torch.cat(mod_list)
+        return z
+
+
 def BertModule():
     model_name = "bert-base-uncased"
     enc = BertTokenizer.from_pretrained(model_name)

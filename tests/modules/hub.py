@@ -96,6 +96,10 @@ models = {
         "model": cm.FallbackIf(),
         "path": "script"
     },
+    "inplace_op_if": {
+        "model": cm.FallbackInplaceOPIf(),
+        "path": "script"
+    },
     "bert-base-uncased": {
         "model": cm.BertModule(),
         "path": "trace"
