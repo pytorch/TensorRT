@@ -43,7 +43,6 @@ TEST(Partitioning, FallbackOnConditionalsCorrectly) {
   ASSERT_TRUE(conditional_engines_count == 2);
 }
 
-
 TEST(Partitioning, FallbackInplaceOPInConditionalsCorrectly) {
   torch::jit::script::Module mod;
   try {
@@ -62,7 +61,8 @@ TEST(Partitioning, FallbackInplaceOPInConditionalsCorrectly) {
     trt_inputs_ivalues.push_back(in.clone());
   }
 
-  std::vector<torch_tensorrt::core::ir::Input> inputs{torch_tensorrt::core::ir::Input({4, 4}), torch_tensorrt::core::ir::Input({4, 4})};
+  std::vector<torch_tensorrt::core::ir::Input> inputs{
+      torch_tensorrt::core::ir::Input({4, 4}), torch_tensorrt::core::ir::Input({4, 4})};
   auto g = mod.get_method("forward").graph();
   torch_tensorrt::core::CompileSpec cfg(inputs);
   cfg.partition_info.enabled = true;

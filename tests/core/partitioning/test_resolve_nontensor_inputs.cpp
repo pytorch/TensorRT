@@ -375,7 +375,8 @@ TEST(Partitioning, ResolveOnlyNeccessaryNonTensorInputs) {
   }
   auto input_ivalues_map = torch_tensorrt::core::partitioning::generateRandomInputs(inputs_map, input_types);
   std::unordered_map<torch::jit::Node*, int> fallback_nodes;
-  auto segmented_blocks = torch_tensorrt::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info, fallback_nodes);
+  auto segmented_blocks =
+      torch_tensorrt::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info, fallback_nodes);
 
   int torch_block_cnt = 0, trt_block_cnt = 0;
   for (const auto& segmented_block : segmented_blocks) {

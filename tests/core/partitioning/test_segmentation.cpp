@@ -148,7 +148,7 @@ TEST(Partitioning, SegmentSequentialModelWithForcedOPCorrectly) {
   partition_info.forced_fallback_operators.push_back("aten::relu");
   std::unordered_map<torch::jit::Node*, int> fallback_nodes;
   std::vector<torch_tensorrt::core::partitioning::SegmentedBlock> segmented_blocks =
-      torch_tensorrt::core::partitioning::segment_graph(g->block(), partition_info,fallback_nodes);
+      torch_tensorrt::core::partitioning::segment_graph(g->block(), partition_info, fallback_nodes);
   ASSERT_TRUE(
       checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTensorRT, 3));
   ASSERT_TRUE(

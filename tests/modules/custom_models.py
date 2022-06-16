@@ -89,8 +89,10 @@ class FallbackIf(torch.nn.Module):
 
 # Sample Inplace OP in Conditional Block Model
 class FallbackInplaceOPIf(nn.Module):
+
     def __init__(self):
         super(FallbackInplaceOPIf, self).__init__()
+
     def forward(self, x, y):
         mod_list = [x]
         if x.sum() > y.sum():
