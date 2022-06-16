@@ -20,7 +20,7 @@ Step 1: Optimize your model with Torch-TensorRT
 Most Torch-TensorRT users will be familiar with this step. For the purpose of
 this demonstration, we will be using a ResNet50 model from Torchhub.
 
-Let’s first pull the NGC PyTorch Docker container. You may need to create 
+Let’s first pull the `NGC PyTorch Docker container <https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch>`__. You may need to create 
 an account and get the API key from `here <https://ngc.nvidia.com/setup/>`__. 
 Sign up and login with your key (follow the instructions
 `here <https://ngc.nvidia.com/setup/api-key>`__ after signing up).
@@ -30,7 +30,8 @@ Sign up and login with your key (follow the instructions
    # <xx.xx> is the yy:mm for the publishing tag for NVIDIA's Pytorch 
    # container; eg. 22.04
 
-   docker run -it --gpus all -v ${PWD}:/workspace nvcr.io/nvidia/pytorch:<xx.xx>-py3
+   docker run -it --gpus all -v ${PWD}:/scratch_space nvcr.io/nvidia/pytorch:<xx.xx>-py3
+   cd /scratch_space
 
 Once inside the container, we can proceed to download a ResNet model from
 Torchhub and optimize it with Torch-TensorRT. 
@@ -53,7 +54,8 @@ Torchhub and optimize it with Torch-TensorRT.
    # Save the model
    torch.jit.save(trt_model, "model.pt")
 
-The next step in the process is to set up a Triton Inference Server.
+After copying the model, exit the container. The next step in the process 
+is to set up a Triton Inference Server.
 
 Step 2: Set Up Triton Inference Server
 --------------------------------------
@@ -114,7 +116,7 @@ documentation <https://github.com/triton-inference-server/server/blob/main/docs/
 for more details. 
 
 With the model repository setup, we can proceed to launch the Triton server
-with the docker command below.
+with the docker command below. Refer `this page <https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver>`__ for the pull tag for the container.
 
 ::
 
@@ -122,7 +124,7 @@ with the docker command below.
    # and TensorRT version in the environment used to optimize the model
    # are the same.
 
-   docker run --gpus all --rm -p 8000:8000 -p 8001:8001 -p 8002:8002 -v /full/path/to/docs/examples/model_repository:/models nvcr.io/nvidia/tritonserver:<xx.yy>-py3 tritonserver --model-repository=/models
+   docker run --gpus all --rm -p 8000:8000 -p 8001:8001 -p 8002:8002 -v /full/path/to/the_model_repository/model_repository:/models nvcr.io/nvidia/tritonserver:<xx.yy>-py3 tritonserver --model-repository=/models
 
 This should spin up a Triton Inference server. Next step, building a simple
 http client to query the server.
