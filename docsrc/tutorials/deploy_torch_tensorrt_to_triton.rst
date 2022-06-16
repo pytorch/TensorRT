@@ -30,7 +30,7 @@ Sign up and login with your key (follow the instructions
    # <xx.xx> is the yy:mm for the publishing tag for NVIDIA's Pytorch 
    # container; eg. 22.04
 
-   docker run -it --gpus all -v $(pwd):/workspace nvcr.io/nvidia/pytorch:<xx.xx>-py3
+   docker run -it --gpus all -v ${PWD}:/workspace nvcr.io/nvidia/pytorch:<xx.xx>-py3
 
 Once inside the container, we can proceed to download a ResNet model from
 Torchhub and optimize it with Torch-TensorRT. 
