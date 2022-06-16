@@ -18,6 +18,9 @@
 
 "component: evaluators":
   - core/conversion/evaluators/**/*
+  
+"component: fx":
+  - py/torch_tensorrt/fx/**/*
 
 "component: partitioning":
   - core/partitioning/**/*

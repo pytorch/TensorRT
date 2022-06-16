@@ -196,7 +196,7 @@
               
               
                 <div class="version">
-                  master (1.2.0a0+dcf3386)
+                  master (1.2.0a0+c558de8)
                 </div>
               
             
@@ -351,7 +351,7 @@
 <span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">from</span> <span class="nn">torch</span> <span class="kn">import</span> <span class="n">fx</span>
 <span class="kn">from</span> <span class="nn">enum</span> <span class="kn">import</span> <span class="n">Enum</span>
-
+<span class="kn">from</span> <span class="nn">torch_tensorrt</span> <span class="kn">import</span> <span class="n">fx</span>
 
 <span class="k">class</span> <span class="nc">_IRType</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Enum to set the minimum required logging level to print a message to stdout</span>
@@ -389,13 +389,7 @@
     <span class="k">if</span> <span class="n">module_is_tsable</span> <span class="ow">and</span> <span class="n">ir_targets_torchscript</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">_IRType</span><span class="o">.</span><span class="n">ts</span>
     <span class="k">elif</span> <span class="n">module_is_fxable</span> <span class="ow">and</span> <span class="n">ir_targets_fx</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">module_type</span> <span class="o">==</span> <span class="n">_ModuleType</span><span class="o">.</span><span class="n">fx</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Was given a torch.fx.GraphModule, fx is not currently supported by Torch-TensorRT&quot;</span><span class="p">)</span>
-        <span class="k">elif</span> <span class="n">ir_targets_fx</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Preferred ir was set to </span><span class="se">\&quot;</span><span class="s2">fx</span><span class="se">\&quot;</span><span class="s2"> which is currently not supported by Torch-TensorRT&quot;</span><span class="p">)</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Torch-TensorRT currently does not support fx&quot;</span><span class="p">)</span>
-        <span class="c1"># return _IRType.fx</span>
+        <span class="k">return</span> <span class="n">_IRType</span><span class="o">.</span><span class="n">fx</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">ir</span> <span class="o">==</span> <span class="s2">&quot;default&quot;</span><span class="p">:</span>
             <span class="c1"># Options are listed in order of preference</span>
@@ -460,7 +454,78 @@
             <span class="n">ts_mod</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">jit</span><span class="o">.</span><span class="n">script</span><span class="p">(</span><span class="n">module</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">torch_tensorrt</span><span class="o">.</span><span class="n">ts</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">ts_mod</span><span class="p">,</span> <span class="n">inputs</span><span class="o">=</span><span class="n">inputs</span><span class="p">,</span> <span class="n">enabled_precisions</span><span class="o">=</span><span class="n">enabled_precisions</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
     <span class="k">elif</span> <span class="n">target_ir</span> <span class="o">==</span> <span class="n">_IRType</span><span class="o">.</span><span class="n">fx</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;fx is currently not supported&quot;</span><span class="p">)</span>
+        <span class="kn">from</span> <span class="nn">torch_tensorrt.fx.tracer.acc_tracer</span> <span class="kn">import</span> <span class="n">acc_tracer</span>
+        <span class="kn">from</span> <span class="nn">torch_tensorrt.fx</span> <span class="kn">import</span> <span class="n">InputTensorSpec</span>
+        <span class="kn">from</span> <span class="nn">torch_tensorrt.fx</span> <span class="kn">import</span> <span class="n">TRTInterpreter</span>
+        <span class="kn">from</span> <span class="nn">torch_tensorrt.fx.passes.lower_basic_pass</span> <span class="kn">import</span> <span class="n">transform_setitem</span>
+        <span class="kn">from</span> <span class="nn">torch_tensorrt.fx.tools.trt_splitter</span> <span class="kn">import</span> <span class="n">TRTSplitter</span>
+        <span class="kn">from</span> <span class="nn">torch_tensorrt.fx.tools.trt_splitter</span> <span class="kn">import</span> <span class="n">TRTSplitterSetting</span>
+        <span class="kn">from</span> <span class="nn">torch_tensorrt.fx.trt_module</span> <span class="kn">import</span> <span class="n">TRTModule</span>
+        <span class="kn">from</span> <span class="nn">torch_tensorrt.fx.utils</span> <span class="kn">import</span> <span class="n">LowerPrecision</span>
+        <span class="n">acc_model</span> <span class="o">=</span> <span class="n">acc_tracer</span><span class="o">.</span><span class="n">trace</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">inputs</span><span class="p">)</span>
+
+        <span class="n">splitter_setting</span> <span class="o">=</span> <span class="n">TRTSplitterSetting</span><span class="p">()</span>
+        <span class="n">splitter_setting</span><span class="o">.</span><span class="n">use_implicit_batch_dim</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">splitter</span> <span class="o">=</span> <span class="n">TRTSplitter</span><span class="p">(</span><span class="n">acc_model</span><span class="p">,</span> <span class="n">inputs</span><span class="p">,</span> <span class="n">settings</span><span class="o">=</span><span class="n">splitter_setting</span><span class="p">)</span>
+        <span class="n">splitter</span><span class="o">.</span><span class="n">node_support_preview</span><span class="p">()</span>
+        <span class="n">split_mod</span> <span class="o">=</span> <span class="n">splitter</span><span class="p">()</span>
+        <span class="n">num_piece</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">split_mod</span><span class="o">.</span><span class="n">named_children</span><span class="p">():</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;graph is split into </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">num_piece</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="c1"># if the graph module is split into pieces larger than 8, we consider its perf</span>
+        <span class="c1"># is not good and fall back to non-TRT</span>
+        <span class="k">if</span> <span class="n">num_piece</span> <span class="o">&gt;</span> <span class="mi">8</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;The graph module is split into </span><span class="si">{</span><span class="n">num_piece</span><span class="si">}</span><span class="s2"> which is large than the </span><span class="se">\</span>
+<span class="s2">                threshold=8. Fall back to non-TRT module.&quot;</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="n">torch</span><span class="o">.</span><span class="n">float16</span> <span class="ow">in</span> <span class="n">enabled_precisions</span> <span class="ow">or</span> <span class="n">torch</span><span class="o">.</span><span class="n">half</span> <span class="ow">in</span> <span class="n">enabled_precisions</span><span class="p">:</span>
+            <span class="n">precision</span> <span class="o">=</span> <span class="n">LowerPrecision</span><span class="o">.</span><span class="n">FP16</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">precision</span> <span class="o">=</span> <span class="n">LowerPrecision</span><span class="o">.</span><span class="n">FP32</span>
+
+        <span class="k">def</span> <span class="nf">get_submod_inputs</span><span class="p">(</span><span class="n">mod</span><span class="p">,</span> <span class="n">submod</span><span class="p">,</span> <span class="n">inputs</span><span class="p">):</span>
+            <span class="n">acc_inputs</span> <span class="o">=</span> <span class="kc">None</span>
+
+            <span class="k">def</span> <span class="nf">get_input</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">inputs</span><span class="p">):</span>
+                <span class="k">nonlocal</span> <span class="n">acc_inputs</span>
+                <span class="n">acc_inputs</span> <span class="o">=</span> <span class="n">inputs</span>
+
+            <span class="n">handle</span> <span class="o">=</span> <span class="n">submod</span><span class="o">.</span><span class="n">register_forward_pre_hook</span><span class="p">(</span><span class="n">get_input</span><span class="p">)</span>
+            <span class="n">mod</span><span class="p">(</span><span class="o">*</span><span class="n">inputs</span><span class="p">)</span>
+            <span class="n">handle</span><span class="o">.</span><span class="n">remove</span><span class="p">()</span>
+            <span class="k">return</span> <span class="n">acc_inputs</span>
+
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">split_mod</span><span class="o">.</span><span class="n">named_children</span><span class="p">():</span>
+            <span class="k">if</span> <span class="s2">&quot;_run_on_acc&quot;</span> <span class="ow">in</span> <span class="n">name</span><span class="p">:</span>
+                <span class="n">submod</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">split_mod</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+                <span class="c1"># Get submodule inputs for fx2trt</span>
+                <span class="n">acc_inputs</span> <span class="o">=</span> <span class="n">get_submod_inputs</span><span class="p">(</span><span class="n">split_mod</span><span class="p">,</span> <span class="n">submod</span><span class="p">,</span> <span class="n">inputs</span><span class="p">)</span>
+
+                <span class="c1"># fx2trt replacement</span>
+                <span class="n">interp</span> <span class="o">=</span> <span class="n">TRTInterpreter</span><span class="p">(</span>
+                    <span class="n">submod</span><span class="p">,</span>
+                    <span class="n">InputTensorSpec</span><span class="o">.</span><span class="n">from_tensors</span><span class="p">(</span><span class="n">acc_inputs</span><span class="p">),</span>
+                    <span class="n">explicit_batch_dimension</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="n">r</span> <span class="o">=</span> <span class="n">interp</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+                    <span class="n">max_workspace_size</span><span class="o">=</span><span class="mi">20</span> <span class="o">&lt;&lt;</span> <span class="mi">30</span><span class="p">,</span>
+                    <span class="n">lower_precision</span><span class="o">=</span><span class="n">precision</span><span class="p">,</span>
+                    <span class="c1"># profiling_verbosity=trt.ProfilingVerbosity.DETAILED, #For profile</span>
+                <span class="p">)</span>
+                <span class="c1"># For profile</span>
+                <span class="c1"># from torch_tensorrt.fx.tools.trt_profiler_sorted import profile_trt_module</span>
+                <span class="c1"># profile_trt_module(&quot;&quot;, trt_mod, acc_inputs)</span>
+                <span class="n">trt_mod</span> <span class="o">=</span> <span class="n">TRTModule</span><span class="p">(</span><span class="o">*</span><span class="n">r</span><span class="p">)</span>
+
+                <span class="nb">setattr</span><span class="p">(</span><span class="n">split_mod</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">trt_mod</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">submod</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">split_mod</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">split_mod</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Module is an unknown format or the ir requested is unknown&quot;</span><span class="p">)</span></div>
 
