@@ -1,3 +1,5 @@
+.. _serving_torch_tensorrt_with_triton:
+
 Serving a Torch-TensorRT model with Triton
 ==========================================
 
@@ -210,5 +212,5 @@ The output of the same should look like below:
     b'8.234375:11']
 
 The output format here is ``<confidence_score>:<classification_index>``.
-To learn how to map these to the label names and more, refer to our
+To learn how to map these to the label names and more, refer to Triton Inference Server's
 `documentation <https://github.com/triton-inference-server/server/blob/main/docs/protocol/extension_classification.md>`__.
