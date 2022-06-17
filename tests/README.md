@@ -52,7 +52,7 @@ In order to **not** build the entire Torch-TensorRT library and only build the t
 bazel test //tests  --compilation_mode=dbg --test_output=summary --define torchtrt_src=prebuilt --jobs 2
 ```
 
- The flag `--define torchtrt_src=prebuilt` signals bazel to use pre-compiled library as an external dependency for tests. The pre-compiled library path is defined as a `local_repository` rule in root `WORKSPACE` file (`https://github.com/NVIDIA/Torch-TensorRT/blob/master/WORKSPACE`).
+ The flag `--define torchtrt_src=prebuilt` signals bazel to use pre-compiled library as an external dependency for tests. The pre-compiled library path is defined as a `local_repository` rule in root `WORKSPACE` file (`https://github.com/pytorch/TensorRT/blob/master/WORKSPACE`).
 
 ```
 # External dependency for torch_tensorrt if you already have precompiled binaries.
