@@ -690,7 +690,7 @@
     "In this notebook, we have walked through the complete process of compiling TorchScript models with Torch-TensorRT and test the performance impact of the optimization.\n",
     "\n",
     "### What's next\n",
-    "Now it's time to try Torch-TensorRT on your own model. Fill out issues at https://github.com/NVIDIA/Torch-TensorRT. Your involvement will help future development of Torch-TensorRT.\n"
+    "Now it's time to try Torch-TensorRT on your own model. Fill out issues at https://github.com/pytorch/TensorRT. Your involvement will help future development of Torch-TensorRT.\n"
    ]
   }
  ],

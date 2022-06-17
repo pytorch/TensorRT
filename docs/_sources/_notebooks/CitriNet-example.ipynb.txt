@@ -929,7 +929,7 @@
     "In this notebook, we have walked through the complete process of optimizing the Citrinet model with Torch-TensorRT. On an A100 GPU, with Torch-TensorRT, we observe a speedup of ~**2.4X** with FP32, and ~**2.9X** with FP16 at batchsize of 128.\n",
     "\n",
     "### What's next\n",
-    "Now it's time to try Torch-TensorRT on your own model. Fill out issues at https://github.com/NVIDIA/Torch-TensorRT. Your involvement will help future development of Torch-TensorRT.\n"
+    "Now it's time to try Torch-TensorRT on your own model. Fill out issues at https://github.com/pytorch/TensorRT. Your involvement will help future development of Torch-TensorRT.\n"
    ]
   },
   {

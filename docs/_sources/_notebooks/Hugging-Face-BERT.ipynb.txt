@@ -678,7 +678,7 @@
     "Torch-TensorRT (FP16): 3.15x\n",
     "\n",
     "### What's next\n",
-    "Now it's time to try Torch-TensorRT on your own model. If you run into any issues, you can fill them at https://github.com/NVIDIA/Torch-TensorRT. Your involvement will help future development of Torch-TensorRT."
+    "Now it's time to try Torch-TensorRT on your own model. If you run into any issues, you can fill them at https://github.com/pytorch/TensorRT. Your involvement will help future development of Torch-TensorRT."
    ]
   },
   {
