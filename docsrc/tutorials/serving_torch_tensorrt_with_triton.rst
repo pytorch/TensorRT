@@ -1,5 +1,5 @@
-Deploying a Torch-TensorRT model (to Triton)
-============================================
+Serving a Torch-TensorRT model with Triton
+==========================================
 
 Optimization and deployment go hand in hand in a discussion about Machine 
 Learning infrastructure. Once network level optimzation are done 
