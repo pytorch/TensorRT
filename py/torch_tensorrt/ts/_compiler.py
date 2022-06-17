@@ -91,6 +91,14 @@ def compile(module: torch.jit.ScriptModule,
         raise ValueError(
             "require_full_compilation is enabled however the list of modules and ops to run in torch is not empty. Found: torch_executed_ops: "
             + torch_executed_ops + ", torch_executed_modules: " + torch_executed_modules)
+    
+    if default_torch_execution:
+        if require_full_compilation:
+            raise ValueError("require_full_compilation is enabled however default_torch_execution mode is also switched on, which causes confliction")
+        if len(torch_executed_modules) > 0:
+            raise ValueError("With default_torch_execution=True, it is unnecessary to specify torch_executed_modules")
+        if len(trt_executed_modules) == 0:
+            raise ValueError("With default_torch_execution=True, it is necesary to specify some trt_executed_modules otherwise nothing will be compiled")
 
     spec = {
         "inputs": inputs,
