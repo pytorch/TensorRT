@@ -1,18 +1,18 @@
-Deploying a Torch-TensorRT model (to Triton)
+Serving Torch-TensorRT models with Triton
 ============================================
 
-Optimization and deployment go hand in hand in a discussion about Machine 
-Learning infrastructure. Once network level optimzation are done 
-to get the maximum performance, the next step would be to deploy it. 
+Optimization and deployment go hand in hand in a discussion about Machine
+Learning infrastructure. Once network level optimizations are done
+to get the maximum performance, the next step would be to deploy it.
 
 However, serving this optimized model comes with it's own set of considerations
-and challenges like: building an infrastructure to support concorrent model
+and challenges like: building an infrastructure to support concurrent model
 executions, supporting clients over HTTP or gRPC and more.
 
-The `Triton Inference Server <https://github.com/triton-inference-server/server>`__ 
+The `Triton Inference Server <https://github.com/triton-inference-server/server>`__
 solves the aforementioned and more. Let's discuss step-by-step, the process of
 optimizing a model with Torch-TensorRT, deploying it on Triton Inference
-Server, and building a client to query the model. 
+Server, and building a client to query the model.
 
 Step 1: Optimize your model with Torch-TensorRT
 -----------------------------------------------
@@ -20,21 +20,21 @@ Step 1: Optimize your model with Torch-TensorRT
 Most Torch-TensorRT users will be familiar with this step. For the purpose of
 this demonstration, we will be using a ResNet50 model from Torchhub.
 
-Let’s first pull the `NGC PyTorch Docker container <https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch>`__. You may need to create 
-an account and get the API key from `here <https://ngc.nvidia.com/setup/>`__. 
+Let’s first pull the `NGC PyTorch Docker container <https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch>`__. You may need to create
+an account and get the API key from `here <https://ngc.nvidia.com/setup/>`__.
 Sign up and login with your key (follow the instructions
 `here <https://ngc.nvidia.com/setup/api-key>`__ after signing up).
 
 ::
 
-   # <xx.xx> is the yy:mm for the publishing tag for NVIDIA's Pytorch 
+   # <xx.xx> is the yy:mm for the publishing tag for NVIDIA's Pytorch
    # container; eg. 22.04
 
    docker run -it --gpus all -v ${PWD}:/scratch_space nvcr.io/nvidia/pytorch:<xx.xx>-py3
    cd /scratch_space
 
 Once inside the container, we can proceed to download a ResNet model from
-Torchhub and optimize it with Torch-TensorRT. 
+Torchhub and optimize it with Torch-TensorRT.
 
 ::
 
@@ -45,8 +45,8 @@ Torchhub and optimize it with Torch-TensorRT.
    # load model
    model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet50', pretrained=True).eval().to("cuda")
 
-   # Compile with Torch TensorRT; 
-   trt_model = torch_tensorrt.compile(model, 
+   # Compile with Torch TensorRT;
+   trt_model = torch_tensorrt.compile(model,
        inputs= [torch_tensorrt.Input((1, 3, 224, 224))],
        enabled_precisions= { torch.half} # Run with FP32
    )
@@ -54,7 +54,7 @@ Torchhub and optimize it with Torch-TensorRT.
    # Save the model
    torch.jit.save(trt_model, "model.pt")
 
-After copying the model, exit the container. The next step in the process 
+After copying the model, exit the container. The next step in the process
 is to set up a Triton Inference Server.
 
 Step 2: Set Up Triton Inference Server
@@ -84,7 +84,7 @@ The structure of this repository should look something like this:
 
 There are two files that Triton requires to serve the model: the model itself
 and a model configuration file which is typically provided in ``config.pbtxt``.
-For the model we prepared in step 1, the following configuration can be used: 
+For the model we prepared in step 1, the following configuration can be used:
 
 ::
 
@@ -108,12 +108,12 @@ For the model we prepared in step 1, the following configuration can be used:
      }
    ]
 
-The ``config.pbtxt`` file is used to describe the exact model configuration 
+The ``config.pbtxt`` file is used to describe the exact model configuration
 with details like the names and shapes of the input and output layer(s),
-datatypes, scheduling and batching details and more. If you are new to Triton, 
+datatypes, scheduling and batching details and more. If you are new to Triton,
 we highly encourage you to check out this `section of our
 documentation <https://github.com/triton-inference-server/server/blob/main/docs/model_configuration.md>`__
-for more details. 
+for more details.
 
 With the model repository setup, we can proceed to launch the Triton server
 with the docker command below. Refer `this page <https://catalog.ngc.nvidia.com/orgs/nvidia/containers/tritonserver>`__ for the pull tag for the container.
@@ -133,7 +133,7 @@ Step 3: Building a Triton Client to Query the Server
 ----------------------------------------------------
 
 Before proceeding, make sure to have a sample image on hand. If you don't
-have one, download an example image to test inference. In this section, we 
+have one, download an example image to test inference. In this section, we
 will be going over a very basic client. For a variety of more fleshed out
 examples, refer to the `Triton Client Repository <https://github.com/triton-inference-server/client/tree/main/src/python/examples>`__
 
@@ -141,7 +141,7 @@ examples, refer to the `Triton Client Repository <https://github.com/triton-infe
 
    wget  -O img1.jpg "https://www.hakaimagazine.com/wp-content/uploads/header-gulf-birds.jpg"
 
-We then need to install dependencies for building a python client. These will 
+We then need to install dependencies for building a python client. These will
 change from client to client. For a full list of all languages supported by Triton,
 please refer to `Triton's client repository <https://github.com/triton-inference-server/client>`__.
 
