@@ -15,7 +15,7 @@ from the user. Shapes can be calculated by running the graphs with JIT.
   it's still a phase in our partitioning process.
 - `Stitching`. Stitch all TensorRT engines with PyTorch nodes altogether.
 
-Test cases for each of these components could be found [here](https://github.com/NVIDIA/Torch-TensorRT/tree/master/tests/core/partitioning).
+Test cases for each of these components could be found [here](https://github.com/pytorch/TensorRT/tree/master/tests/core/partitioning).
 
 Here is the brief description of functionalities of each file:
 - `PartitionInfo.h/cpp`: The automatic fallback APIs that is used for partitioning.
