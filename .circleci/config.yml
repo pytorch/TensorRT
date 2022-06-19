@@ -6,10 +6,10 @@ version: 2.1
 # See: https://circleci.com/docs/2.0/configuration-reference/#jobs
 jobs:
   build:
-    machine:
+    docker:
     # Primary container image where all steps run.
-      # image: nvcr.io/nvidia/tensorrt:22.01-py3 
-      image: ubuntu-2004-cuda-11.4:202110-01
+      - image: nvcr.io/nvidia/tensorrt:22.01-py3 
+      # image: ubuntu-2004-cuda-11.4:202110-01
     resource_class: gpu.nvidia.medium
     steps:
       - checkout
