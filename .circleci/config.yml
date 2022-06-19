@@ -21,6 +21,13 @@ jobs:
             pip3 install --upgrade nvidia-tensorrt
             pip3 install --pre torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/nightly/cu113
             pip3 install pytest parameterized expecttest
+            
+      - run:
+          name: install fx2trt
+          command: |
+            cd py/torch_tensorrt/fx/setup
+            python3 setup.py install
+      
      
 
 # Invoke jobs via workflows
