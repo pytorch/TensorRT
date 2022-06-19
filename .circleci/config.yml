@@ -8,7 +8,7 @@ jobs:
   build:
     docker:
     # Primary container image where all steps run.
-     - image: cimg/base:current
+     - image: nvcr.io/nvidia/tensorrt:22.01-py3
     steps:
       - checkout
       - run:
