@@ -6,14 +6,18 @@ version: 2.1
 # See: https://circleci.com/docs/2.0/configuration-reference/#jobs
 jobs:
   build:
-    docker:
+    machine:
     # Primary container image where all steps run.
-     - image: nvcr.io/nvidia/tensorrt:22.01-py3
+      image: nvcr.io/nvidia/tensorrt:22.01-py3
+    resource_class: gpu.nvidia.medium
     steps:
       - checkout
+      # - run:
+      #     name: "Say hello"
+      #     command: "echo Hello, World!"
       - run:
-          name: "Say hello"
-          command: "echo Hello, World!"
+          name: Setup CI environment
+          command: ./scripts/setup_ci.sh
 
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
