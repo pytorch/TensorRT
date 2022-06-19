@@ -8,7 +8,7 @@ jobs:
   build:
     machine:
     # Primary container image where all steps run.
-      image: nvcr.io/nvidia/tensorrt:22.01-py3
+      image: nvcr.io/nvidia/tensorrt:22.01-py3 
     resource_class: gpu.nvidia.medium
     steps:
       - checkout
