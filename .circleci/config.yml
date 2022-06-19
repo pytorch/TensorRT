@@ -8,21 +8,24 @@ jobs:
   build:
     machine:
     # Primary container image where all steps run.
-      # image: nvcr.io/nvidia/tensorrt:22.01-py3 
+      # image: nvcr.io/nvidia/tensorrt:22.01-py3 # does not work with customized image
+      # https://circleci.com/docs/2.0/configuration-reference#available-linux-gpu-images
       image: ubuntu-2004-cuda-11.4:202110-01
     resource_class: gpu.nvidia.medium
     steps:
       - checkout
       - run:
-          name: "Say hello"
-          command: "echo Hello, World!"
-      # - run:
-      #     name: Setup CI environment
-      #     command: ./scripts/setup_ci.sh
+          name: set up environment
+          command: |
+            pip3 install nvidia-pyindex
+            pip3 install --upgrade nvidia-tensorrt
+            pip3 install --pre torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/nightly/cu113
+            pip3 install pytest parameterized expecttest
+     
 
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
 workflows:
-  say-hello-workflow:
+  build_setup:
     jobs:
       - build
