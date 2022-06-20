@@ -54,7 +54,7 @@ jobs:
             # cd py/torch_tensorrt/fx/setup
             # python3 setup.py install
       - run:
-          name: run tests
+          name: run fx2trt tests
           command: |
             # one fix pending to enable below
             # cd py/torch_tensorrt/fx/test
