@@ -32,6 +32,7 @@ jobs:
       - run:
           name: run tests
           command: |
+            cd py/torch_tensorrt/fx
             pushd test/converters/acc_op
             pytest 
             popd
