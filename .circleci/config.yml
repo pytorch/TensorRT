@@ -28,6 +28,14 @@ jobs:
             sudo apt-get update
             sudo apt-get install libcudnn8=8.2.1.*-1+cuda11.3
             sudo apt-get install libcudnn8-dev=8.2.1.*-1+cuda11.3
+
+            sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/{OS}/x86_64/3bf863cc.pub
+            sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/${OS}/x86_64/ /"
+            sudo apt-get update
+            v=8.2.4-1+cuda11.4
+            sudo apt-get install libnvinfer8=${v} libnvonnxparsers8=${v} libnvparsers8=${v} libnvinfer-plugin8=${v} libnvinfer-dev=${v} libnvonnxparsers-dev=${v} libnvparsers-dev=${v} libnvinfer-plugin-dev=${v} python3-libnvinfer=${v}
+            # check available version, apt list libnvinfer8 -a
+            
       - run:
           name: set up environment
           command: |
