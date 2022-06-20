@@ -27,8 +27,25 @@ jobs:
           command: |
             cd py/torch_tensorrt/fx/setup
             python3 setup.py install
-      
-     
+            cd ..
+      - run:
+          name: run tests
+          command: |
+            cd test/converters/acc_ops
+            pytest 
+            cd ../../passes
+            pytest
+            cd ../core
+            pytest
+            cd ../quant
+            pytest
+            cd ../tools
+            pytest
+            cd ../trt_lower
+            pytest
+            cd ../tracer
+            pytest test_acc_shape_prop.py
+            pytest test_acc_tracer.py
 
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
