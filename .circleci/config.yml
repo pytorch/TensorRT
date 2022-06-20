@@ -37,14 +37,15 @@ jobs:
             pytest 
             popd
             pushd test/passes
-            pytest
+            list_passes=$(ls | grep -v test_setitem*) 
+            pytest $list_passes
             popd
             pushd test/core
             pytest
             popd
-            pushd test/quant
-            pytest
-            popd
+            # pushd test/quant
+            # pytest
+            # popd
             pushd test/tools
             pytest
             popd
@@ -52,8 +53,8 @@ jobs:
             pytest
             popd
             pushd test/tracer
-            pytest test_acc_shape_prop.py
-            pytest test_acc_tracer.py
+            list_tracer=$(ls | grep -v test_dispatch_*) 
+            pytest $list_tracer
             popd
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
