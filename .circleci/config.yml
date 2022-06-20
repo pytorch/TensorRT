@@ -25,28 +25,35 @@ jobs:
       - run:
           name: install fx2trt
           command: |
-            cd py/torch_tensorrt/fx/setup
+            cd py/torch_tensorrt/fx
+            pushd setup
             python3 setup.py install
-            cd ..
+            popd
       - run:
           name: run tests
           command: |
-            cd test/converters/acc_op
+            pushd test/converters/acc_op
             pytest 
-            cd ../../passes
+            popd
+            pushd test/passes
             pytest
-            cd ../core
+            popd
+            pushd test/core
             pytest
-            cd ../quant
+            popd
+            pushd test/quant
             pytest
-            cd ../tools
+            popd
+            pushd test/tools
             pytest
-            cd ../trt_lower
+            popd
+            pushd test/trt_lower
             pytest
-            cd ../tracer
+            popd
+            pushd test/tracer
             pytest test_acc_shape_prop.py
             pytest test_acc_tracer.py
-
+            popd
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
 workflows:
