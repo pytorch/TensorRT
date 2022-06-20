@@ -50,30 +50,31 @@ jobs:
       - run:
           name: run tests
           command: |
-            cd py/torch_tensorrt/fx
-            pushd test/converters/acc_op
-            pytest 
-            popd
-            pushd test/passes
-            list_passes=$(ls | grep -v test_setitem*) 
-            pytest $list_passes
-            popd
-            pushd test/core
-            pytest
-            popd
-            # pushd test/quant
+            cd py/torch_tensorrt/fx/test
+            pytest $(find . -name '*.py' | grep -v test_dispatch* | grep -v test_setitem*)
+            # pushd test/converters/acc_op
+            # pytest 
+            # popd
+            # pushd test/passes
+            # list_passes=$(ls | grep -v test_setitem*) 
+            # pytest $list_passes
+            # popd
+            # pushd test/core
             # pytest
             # popd
-            pushd test/tools
-            pytest
-            popd
-            pushd test/trt_lower
-            pytest
-            popd
-            pushd test/tracer
-            list_tracer=$(ls | grep -v test_dispatch_*) 
-            pytest $list_tracer
-            popd
+            # # pushd test/quant
+            # # pytest
+            # # popd
+            # pushd test/tools
+            # pytest
+            # popd
+            # pushd test/trt_lower
+            # pytest
+            # popd
+            # pushd test/tracer
+            # list_tracer=$(ls | grep -v test_dispatch_*) 
+            # pytest $list_tracer
+            # popd
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
 workflows:
