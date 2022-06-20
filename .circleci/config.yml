@@ -15,7 +15,7 @@ jobs:
     steps:
       - checkout
       - run:
-          name: install cudnn + tensorrt
+          name: install cudnn + tensorrt + bazel
           command: |
             cd ~
             OS=ubuntu2004
@@ -35,46 +35,55 @@ jobs:
             v=8.2.4-1+cuda11.4
             sudo apt-get install libnvinfer8=${v} libnvonnxparsers8=${v} libnvparsers8=${v} libnvinfer-plugin8=${v} libnvinfer-dev=${v} libnvonnxparsers-dev=${v} libnvparsers-dev=${v} libnvinfer-plugin-dev=${v} python3-libnvinfer=${v}
             # check available version, apt list libnvinfer8 -a
+            BAZEL_VERSION=5.1.1
+            sudo wget -q https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-linux-x86_64 -O /usr/bin/bazel
+            sudo chmod a+x /usr/bin/bazel
 
       - run:
-          name: set up environment
+          name: set up python environment
           command: |
             pip3 install nvidia-pyindex
             pip3 install nvidia-tensorrt==8.2.4.2
             pip3 install --pre torch==1.13.0.dev20220618  torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/nightly/cu113
             pip3 install pytest parameterized expecttest
-            # install fx2trt
-            cd py/torch_tensorrt/fx
-            pushd setup
+            # install torch_tensorrt
+            cd py
             python3 setup.py install
+
+            # install fx2trt
+            # cd py/torch_tensorrt/fx/setup
+            # python3 setup.py install
       - run:
           name: run tests
           command: |
+            # one fix pending to enable below
+            # cd py/torch_tensorrt/fx/test
+            # pytest $(find . -name '*.py' | grep -v test_dispatch* | grep -v test_setitem*)
+            
             cd py/torch_tensorrt/fx/test
-            pytest $(find . -name '*.py' | grep -v test_dispatch* | grep -v test_setitem*)
-            # pushd test/converters/acc_op
-            # pytest 
-            # popd
-            # pushd test/passes
-            # list_passes=$(ls | grep -v test_setitem*) 
-            # pytest $list_passes
-            # popd
-            # pushd test/core
+            pushd converters/acc_op
+            pytest 
+            popd
+            pushd passes
+            list_passes=$(ls | grep -v test_setitem*) 
+            pytest $list_passes
+            popd
+            pushd core
+            pytest
+            popd
+            # pushd quant
             # pytest
             # popd
-            # # pushd test/quant
-            # # pytest
-            # # popd
-            # pushd test/tools
-            # pytest
-            # popd
-            # pushd test/trt_lower
-            # pytest
-            # popd
-            # pushd test/tracer
-            # list_tracer=$(ls | grep -v test_dispatch_*) 
-            # pytest $list_tracer
-            # popd
+            pushd tools
+            pytest
+            popd
+            pushd trt_lower
+            pytest
+            popd
+            pushd tracer
+            list_tracer=$(ls | grep -v test_dispatch_*) 
+            pytest $list_tracer
+            popd
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
 workflows:
