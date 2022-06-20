@@ -11,7 +11,7 @@ jobs:
       # image: nvcr.io/nvidia/tensorrt:22.01-py3 # does not work with customized image
       # https://circleci.com/docs/2.0/configuration-reference#available-linux-gpu-images
       image: ubuntu-2004-cuda-11.4:202110-01
-    resource_class: gpu.nvidia.medium
+    resource_class: gpu.nvidia.large
     steps:
       - checkout
       - run:
