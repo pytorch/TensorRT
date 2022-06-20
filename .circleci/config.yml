@@ -31,7 +31,7 @@ jobs:
       - run:
           name: run tests
           command: |
-            cd test/converters/acc_ops
+            cd test/converters/acc_op
             pytest 
             cd ../../passes
             pytest
