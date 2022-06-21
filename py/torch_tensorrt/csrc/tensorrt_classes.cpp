@@ -221,8 +221,6 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
   info.convert_info.engine_settings.truncate_long_and_double = truncate_long_and_double;
 
   info.convert_info.engine_settings.capability = toTRTEngineCapability(capability);
-  TORCHTRT_CHECK(num_min_timing_iters >= 0, "num_min_timing_iters must be 0 or greater");
-  info.convert_info.engine_settings.num_min_timing_iters = num_min_timing_iters;
   TORCHTRT_CHECK(num_avg_timing_iters >= 0, "num_avg_timing_iters must be 0 or greater");
   info.convert_info.engine_settings.num_avg_timing_iters = num_avg_timing_iters;
   TORCHTRT_CHECK(workspace_size >= 0, "workspace_size must be 0 or greater");
@@ -249,7 +247,6 @@ std::string CompileSpec::stringify() {
   ss << "    \"Debug\": " << debug << std::endl;
   ss << "    \"Device\": " << device.to_str() << std::endl;
   ss << "    \"Engine Capability\": " << to_str(capability) << std::endl;
-  ss << "    \"Num Min Timing Iters\": " << num_min_timing_iters << std::endl;
   ss << "    \"Num Avg Timing Iters\": " << num_avg_timing_iters << std::endl;
   ss << "    \"Workspace Size\": " << workspace_size << std::endl;
   ss << "    \"Truncate long and double\": " << truncate_long_and_double << std::endl;

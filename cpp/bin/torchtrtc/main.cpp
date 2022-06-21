@@ -113,8 +113,6 @@ int main(int argc, char** argv) {
       "Whether to treat input file as a serialized TensorRT engine and embed it into a TorchScript module (device spec must be provided)",
       {"embed-engine"});
 
-  args::ValueFlag<uint64_t> num_min_timing_iters(
-      parser, "num_iters", "Number of minimization timing iterations used to select kernels", {"num-min-timing-iter"});
   args::ValueFlag<uint64_t> num_avg_timing_iters(
       parser, "num_iters", "Number of averaging timing iterations used to select kernels", {"num-avg-timing-iters"});
   args::ValueFlag<uint64_t> workspace_size(
