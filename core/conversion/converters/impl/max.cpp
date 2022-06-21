@@ -31,18 +31,18 @@ auto max_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().patter
 
        nvinfer1::ITensor* out0;
        nvinfer1::ITensor* out1;
-       if (!keep_dims){
+       if (!keep_dims) {
          if (topk_dims[dim] == 1) {
-             auto squeeze_layer = ctx->net->addShuffle(*topk_layer->getOutput(0));
-             squeeze_layer->setReshapeDimensions(util::squeezeDims(topk_layer->getOutput(0)->getDimensions(), dim));
-             TORCHTRT_CHECK(squeeze_layer, "Unable to create squeeze_layer layer from node: " << *n);
-             out0 = ctx->AssociateValueAndTensor(n->outputs()[0], squeeze_layer->getOutput(0));
+           auto squeeze_layer = ctx->net->addShuffle(*topk_layer->getOutput(0));
+           squeeze_layer->setReshapeDimensions(util::squeezeDims(topk_layer->getOutput(0)->getDimensions(), dim));
+           TORCHTRT_CHECK(squeeze_layer, "Unable to create squeeze_layer layer from node: " << *n);
+           out0 = ctx->AssociateValueAndTensor(n->outputs()[0], squeeze_layer->getOutput(0));
 
-             auto squeeze_layer_indices = ctx->net->addShuffle(*topk_layer->getOutput(1));
-             squeeze_layer_indices->setReshapeDimensions(util::squeezeDims(topk_layer->getOutput(1)->getDimensions(), dim));
-             TORCHTRT_CHECK(squeeze_layer_indices, "Unable to create squeeze_layer_indices layer from node: " << *n);
-             out1 = ctx->AssociateValueAndTensor(n->outputs()[1], squeeze_layer_indices->getOutput(0));
-
+           auto squeeze_layer_indices = ctx->net->addShuffle(*topk_layer->getOutput(1));
+           squeeze_layer_indices->setReshapeDimensions(
+               util::squeezeDims(topk_layer->getOutput(1)->getDimensions(), dim));
+           TORCHTRT_CHECK(squeeze_layer_indices, "Unable to create squeeze_layer_indices layer from node: " << *n);
+           out1 = ctx->AssociateValueAndTensor(n->outputs()[1], squeeze_layer_indices->getOutput(0));
          }
        } else {
          out0 = ctx->AssociateValueAndTensor(n->outputs()[0], topk_layer->getOutput(0));
