@@ -92,10 +92,12 @@ def acc_ops_conv1d(
             kernel=weight,
             bias=bias,
         )
-    padding = kwargs["padding"]
-    padding = padding + (0,)
-    stride = extend_attr_to_tuple(kwargs["stride"], 1)
-    dilation = extend_attr_to_tuple(kwargs["dilation"], 1)
+    # expand params to 2d for computation
+    padding = list(kwargs["padding"])
+    padding.append(0)
+    stride = extend_attr_to_tuple(kwargs["stride"], 2)
+    dilation = extend_attr_to_tuple(kwargs["dilation"], 2)
+
     set_layer_name(layer, target, name)
     layer.stride_nd = stride
     layer.padding_nd = padding
