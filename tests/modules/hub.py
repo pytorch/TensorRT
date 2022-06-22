@@ -92,6 +92,10 @@ models = {
         "model": cm.LoopFallbackEval(),
         "path": "script"
     },
+    "loop_fallback_no_eval_scripted": {
+        "model": cm.LoopFallbackNoEval(),
+        "path": "script"
+    },
     "conditional": {
         "model": cm.FallbackIf(),
         "path": "script"
