@@ -217,6 +217,14 @@ bazel build //:libtorchtrt --compilation_mode opt
 ``` shell
 bazel build //:libtorchtrt --compilation_mode=dbg
 ```
+### Install only FX module
+
+FX2TRT is python based module in torch_tensorrt. If the users would like to install only the FX module of torch_tensorrt, please run
+``` shell
+pushd py
+python3 setup.py install --fx2trt-only
+popd
+```
 
 ### Native compilation on NVIDIA Jetson AGX
 We performed end to end testing on Jetson platform using Jetpack SDK 4.6.
