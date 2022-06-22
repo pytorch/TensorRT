@@ -1,0 +1,96 @@
+# Use the latest 2.1 version of CircleCI pipeline process engine.
+# See: https://circleci.com/docs/2.0/configuration-reference
+version: 2.1
+
+# Define a job to be invoked later in a workflow.
+# See: https://circleci.com/docs/2.0/configuration-reference/#jobs
+jobs:
+  build:
+    machine:
+    # Primary container image where all steps run.
+      # image: nvcr.io/nvidia/tensorrt:22.01-py3 # does not work with customized image
+      # https://circleci.com/docs/2.0/configuration-reference#available-linux-gpu-images
+      image: ubuntu-2004-cuda-11.4:202110-01
+    resource_class: gpu.nvidia.large
+    steps:
+      - checkout
+      - run:
+          name: install cudnn + tensorrt + bazel
+          command: |
+            cd ~
+            OS=ubuntu2004
+            CUDNN_VERSION=8.2.1.*-1+cuda11.3
+            TRT_VERSION=8.2.4-1+cuda11.4
+            BAZEL_VERSION=5.1.1
+            
+            wget https://developer.download.nvidia.com/compute/cuda/repos/${OS}/x86_64/cuda-${OS}.pin 
+            sudo mv cuda-${OS}.pin /etc/apt/preferences.d/cuda-repository-pin-600
+            sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/${OS}/x86_64/7fa2af80.pub
+            sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 536F8F1DE80F6A35
+            sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys A4B469963BF863CC
+            sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/${OS}/x86_64/ /"
+            sudo apt-get update
+            sudo apt-get install libcudnn8=${CUDNN_VERSION}
+            sudo apt-get install libcudnn8-dev=${CUDNN_VERSION}
+
+            sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/{OS}/x86_64/3bf863cc.pub
+            sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/${OS}/x86_64/ /"
+            sudo apt-get update
+             
+            sudo apt-get install libnvinfer8=${TRT_VERSION} libnvonnxparsers8=${TRT_VERSION} libnvparsers8=${TRT_VERSION} libnvinfer-plugin8=${TRT_VERSION} libnvinfer-dev=${TRT_VERSION} libnvonnxparsers-dev=${TRT_VERSION} libnvparsers-dev=${TRT_VERSION} libnvinfer-plugin-dev=${TRT_VERSION} python3-libnvinfer=${TRT_VERSION}
+            # check available version, apt list libnvinfer8 -a
+            sudo wget -q https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-linux-x86_64 -O /usr/bin/bazel
+            sudo chmod a+x /usr/bin/bazel
+
+      - run:
+          name: set up python environment
+          command: |
+            pip3 install nvidia-pyindex
+            pip3 install nvidia-tensorrt==8.2.4.2
+            pip3 install --pre torch==1.13.0.dev20220618  torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/nightly/cu113
+            pip3 install pytest parameterized expecttest
+            # install torch_tensorrt
+            mv WORKSPACE.ci WORKSPACE
+            cd py
+            python3 setup.py install
+
+            # install fx2trt
+            # cd py/torch_tensorrt/fx/setup
+            # python3 setup.py install
+      - run:
+          name: run fx2trt tests
+          command: |
+            # one fix pending to enable below
+            # cd py/torch_tensorrt/fx/test
+            # pytest $(find . -name '*.py' | grep -v test_dispatch* | grep -v test_setitem*)
+            
+            cd py/torch_tensorrt/fx/test
+            pushd converters/acc_op
+            pytest 
+            popd
+            pushd passes
+            list_passes=$(ls | grep -v test_setitem*) 
+            pytest $list_passes
+            popd
+            pushd core
+            pytest
+            popd
+            # pushd quant
+            # pytest
+            # popd
+            pushd tools
+            pytest
+            popd
+            pushd trt_lower
+            pytest
+            popd
+            pushd tracer
+            list_tracer=$(ls | grep -v test_dispatch_*) 
+            pytest $list_tracer
+            popd
+# Invoke jobs via workflows
+# See: https://circleci.com/docs/2.0/configuration-reference/#workflows
+workflows:
+  build_run:
+    jobs:
+      - build
