@@ -198,6 +198,6 @@ def run_configuration_benchmark(
 
 
 if __name__ == "__main__":
-    test_model = torchvision.models.resnet101()
-    input = [torch.cuda.FloatTensor(1024, 3, 224, 224)]  # type: ignore[attr-defined]
-    benchmark(test_model, input, 100, 1024)
+    test_model = torchvision.models.resnet18()
+    input = [torch.cuda.FloatTensor(32, 3, 224, 224)]  # type: ignore[attr-defined]
+    benchmark(test_model, input, 30, 32)
