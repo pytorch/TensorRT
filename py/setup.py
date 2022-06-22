@@ -338,4 +338,4 @@ setup(
     exclude_package_data={
         '': ['*.cpp'],
         'torch_tensorrt': ['csrc/*.cpp'],
-    }),
+    })
