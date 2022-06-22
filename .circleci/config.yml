@@ -19,6 +19,10 @@ jobs:
           command: |
             cd ~
             OS=ubuntu2004
+            CUDNN_VERSION=8.2.1.*-1+cuda11.3
+            TRT_VERSION=8.2.4-1+cuda11.4
+            BAZEL_VERSION=5.1.1
+            
             wget https://developer.download.nvidia.com/compute/cuda/repos/${OS}/x86_64/cuda-${OS}.pin 
             sudo mv cuda-${OS}.pin /etc/apt/preferences.d/cuda-repository-pin-600
             sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/${OS}/x86_64/7fa2af80.pub
@@ -26,18 +30,18 @@ jobs:
             sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys A4B469963BF863CC
             sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/${OS}/x86_64/ /"
             sudo apt-get update
-            sudo apt-get install libcudnn8=8.2.1.*-1+cuda11.3
-            sudo apt-get install libcudnn8-dev=8.2.1.*-1+cuda11.3
+            sudo apt-get install libcudnn8=${CUDNN_VERSION}
+            sudo apt-get install libcudnn8-dev=${CUDNN_VERSION}
 
             sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/{OS}/x86_64/3bf863cc.pub
             sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/${OS}/x86_64/ /"
             sudo apt-get update
-            v=8.2.4-1+cuda11.4
-            sudo apt-get install libnvinfer8=${v} libnvonnxparsers8=${v} libnvparsers8=${v} libnvinfer-plugin8=${v} libnvinfer-dev=${v} libnvonnxparsers-dev=${v} libnvparsers-dev=${v} libnvinfer-plugin-dev=${v} python3-libnvinfer=${v}
+             
+            sudo apt-get install libnvinfer8=${TRT_VERSION} libnvonnxparsers8=${TRT_VERSION} libnvparsers8=${TRT_VERSION} libnvinfer-plugin8=${TRT_VERSION} libnvinfer-dev=${TRT_VERSION} libnvonnxparsers-dev=${TRT_VERSION} libnvparsers-dev=${TRT_VERSION} libnvinfer-plugin-dev=${TRT_VERSION} python3-libnvinfer=${TRT_VERSION}
             # check available version, apt list libnvinfer8 -a
-            BAZEL_VERSION=5.1.1
             sudo wget -q https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-linux-x86_64 -O /usr/bin/bazel
             sudo chmod a+x /usr/bin/bazel
+            mv WORKSPACE.ci WORKSPACE
 
       - run:
           name: set up python environment
