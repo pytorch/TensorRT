@@ -41,7 +41,6 @@ jobs:
             # check available version, apt list libnvinfer8 -a
             sudo wget -q https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-linux-x86_64 -O /usr/bin/bazel
             sudo chmod a+x /usr/bin/bazel
-            mv WORKSPACE.ci WORKSPACE
 
       - run:
           name: set up python environment
@@ -51,6 +50,7 @@ jobs:
             pip3 install --pre torch==1.13.0.dev20220618  torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/nightly/cu113
             pip3 install pytest parameterized expecttest
             # install torch_tensorrt
+            mv WORKSPACE.ci WORKSPACE
             cd py
             python3 setup.py install
 
