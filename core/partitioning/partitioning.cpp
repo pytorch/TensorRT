@@ -44,7 +44,7 @@ bool isModifyingNodes(torch::jit::Node* node, torch::jit::Value* val) {
   for (size_t i = 0; i < node->inputs().size(); ++i) {
     if (node->inputs()[i] == val) {
       const at::AliasInfo* formal = schema.arguments()[i].alias_info();
-      if (formal->isWrite()) {
+      if (formal && formal->isWrite()) {
         return true;
       }
     }
