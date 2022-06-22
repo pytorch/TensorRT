@@ -92,7 +92,7 @@ models = {
         "model": cm.LoopFallbackEval(),
         "path": "script"
     },
-    "loop_fallback_no_eval_scripted": {
+    "loop_fallback_no_eval": {
         "model": cm.LoopFallbackNoEval(),
         "path": "script"
     },
