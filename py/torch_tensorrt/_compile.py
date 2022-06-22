@@ -3,9 +3,9 @@ from torch_tensorrt import _enums
 import torch_tensorrt.ts
 from torch_tensorrt import logging
 import torch
-from torch import fx
+import torch.fx
 from enum import Enum
-from torch_tensorrt import fx
+import torch_tensorrt.fx
 
 class _IRType(Enum):
     """Enum to set the minimum required logging level to print a message to stdout
@@ -108,79 +108,7 @@ def compile(module: Any, ir="default", inputs=[], enabled_precisions=set([_enums
             ts_mod = torch.jit.script(module)
         return torch_tensorrt.ts.compile(ts_mod, inputs=inputs, enabled_precisions=enabled_precisions, **kwargs)
     elif target_ir == _IRType.fx:
-        return torch_tensorrt.fx.util.compile(module, inputs=inputs, enabled_precisions=enabled_precisions, **kwargs)
-        # from torch_tensorrt.fx.tracer.acc_tracer import acc_tracer
-        # from torch_tensorrt.fx import InputTensorSpec
-        # from torch_tensorrt.fx import TRTInterpreter
-        # from torch_tensorrt.fx.passes.lower_basic_pass import transform_setitem
-        # from torch_tensorrt.fx.tools.trt_splitter import TRTSplitter
-        # from torch_tensorrt.fx.tools.trt_splitter import TRTSplitterSetting
-        # from torch_tensorrt.fx.trt_module import TRTModule
-        # from torch_tensorrt.fx.utils import LowerPrecision
-        # acc_model = acc_tracer.trace(module, inputs)
-
-        # splitter_setting = TRTSplitterSetting()
-        # splitter_setting.use_implicit_batch_dim = False
-        # splitter = TRTSplitter(acc_model, inputs, settings=splitter_setting)
-        # splitter.node_support_preview()
-        # split_mod = splitter()
-        # num_piece = 0
-        # for name, _ in split_mod.named_children():
-        #     print(f"graph is split into {name}")
-        #     num_piece += 1
-
-        # # if the graph module is split into pieces larger than 8, we consider its perf
-        # # is not good and fall back to non-TRT
-        # if num_piece > 8:
-        #     print(
-        #         f"The graph module is split into {num_piece} which is large than the \
-        #         threshold=8. Fall back to non-TRT module."
-        #     )
-        #     return None
-
-        # if torch.float16 in enabled_precisions or torch.half in enabled_precisions:
-        #     precision = LowerPrecision.FP16
-        # else:
-        #     precision = LowerPrecision.FP32
-
-        # def get_submod_inputs(mod, submod, inputs):
-        #     acc_inputs = None
-
-        #     def get_input(self, inputs):
-        #         nonlocal acc_inputs
-        #         acc_inputs = inputs
-
-        #     handle = submod.register_forward_pre_hook(get_input)
-        #     mod(*inputs)
-        #     handle.remove()
-        #     return acc_inputs
-
-        # for name, _ in split_mod.named_children():
-        #     if "_run_on_acc" in name:
-        #         submod = getattr(split_mod, name)
-        #         # Get submodule inputs for fx2trt
-        #         acc_inputs = get_submod_inputs(split_mod, submod, inputs)
-
-        #         # fx2trt replacement
-        #         interp = TRTInterpreter(
-        #             submod,
-        #             InputTensorSpec.from_tensors(acc_inputs),
-        #             explicit_batch_dimension=True,
-        #         )
-        #         r = interp.run(
-        #             max_workspace_size=20 << 30,
-        #             lower_precision=precision,
-        #             # profiling_verbosity=trt.ProfilingVerbosity.DETAILED, #For profile
-        #         )
-        #         # For profile
-        #         # from torch_tensorrt.fx.tools.trt_profiler_sorted import profile_trt_module
-        #         # profile_trt_module("", trt_mod, acc_inputs)
-        #         trt_mod = TRTModule(*r)
-
-        #         setattr(split_mod, name, trt_mod)
-        #     else:
-        #         submod = getattr(split_mod, name)
-        # return split_mod
+        return torch_tensorrt.fx.compile(module, inputs=inputs, enabled_precisions=enabled_precisions, **kwargs)
     else:
         raise RuntimeError("Module is an unknown format or the ir requested is unknown")
 

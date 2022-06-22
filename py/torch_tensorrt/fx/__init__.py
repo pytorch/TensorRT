@@ -8,3 +8,4 @@ from .converter_registry import (  # noqa
 from .fx2trt import TRTInterpreter, TRTInterpreterResult  # noqa
 from .input_tensor_spec import InputTensorSpec  # noqa
 from .trt_module import TRTModule  # noqa
+from .compile import compile  # noqa
