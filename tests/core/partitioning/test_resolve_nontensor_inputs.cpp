@@ -123,8 +123,9 @@ TEST(Partitioning, ResolveNonTensorInputsCorrectly) {
     input_types.insert({g->inputs()[i], {at::kFloat}});
   }
   auto input_ivalues_map = torch_tensorrt::core::partitioning::generateRandomInputs(inputs_map, input_types);
+  std::unordered_map<torch::jit::Node*, int> fallback_nodes;
   std::vector<torch_tensorrt::core::partitioning::SegmentedBlock> segmented_blocks =
-      torch_tensorrt::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info);
+      torch_tensorrt::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info, fallback_nodes);
 
   int torch_block_cnt = 0, trt_block_cnt = 0;
   for (const auto& segmented_block : segmented_blocks) {
@@ -181,8 +182,9 @@ TEST(Partitioning, ResolveTensorListInputsInTrtCorrectly) {
     input_types.insert({g->inputs()[i], {at::kFloat}});
   }
   auto input_ivalues_map = torch_tensorrt::core::partitioning::generateRandomInputs(inputs_map, input_types);
+  std::unordered_map<torch::jit::Node*, int> fallback_nodes;
   std::vector<torch_tensorrt::core::partitioning::SegmentedBlock> segmented_blocks =
-      torch_tensorrt::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info);
+      torch_tensorrt::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info, fallback_nodes);
 
   int torch_block_cnt = 0, trt_block_cnt = 0;
   for (const auto& segmented_block : segmented_blocks) {
@@ -255,7 +257,7 @@ TEST(Partitioning, ConvertForTensorListInputsInFallbackCorrectly) {
   torch::jit::script::Module new_mod = torch_tensorrt::core::CompileGraph(mod, cfg);
   auto fallback_g = new_mod.get_method("forward").graph();
   int count = count_trt_engines(fallback_g);
-  ASSERT_TRUE(count == 2);
+  ASSERT_TRUE(count == 1);
 }
 
 TEST(Partitioning, ResolveOnlyNeccessaryNonTensorInputs) {
@@ -372,7 +374,9 @@ TEST(Partitioning, ResolveOnlyNeccessaryNonTensorInputs) {
     input_types.insert({g->inputs()[i], {at::kFloat}});
   }
   auto input_ivalues_map = torch_tensorrt::core::partitioning::generateRandomInputs(inputs_map, input_types);
-  auto segmented_blocks = torch_tensorrt::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info);
+  std::unordered_map<torch::jit::Node*, int> fallback_nodes;
+  auto segmented_blocks =
+      torch_tensorrt::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info, fallback_nodes);
 
   int torch_block_cnt = 0, trt_block_cnt = 0;
   for (const auto& segmented_block : segmented_blocks) {

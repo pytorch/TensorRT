@@ -13,7 +13,8 @@ filegroup(
             "//tests/modules:mobilenet_v2_traced.jit.pt",
             "//tests/modules:conditional_scripted.jit.pt",
             "//tests/modules:loop_fallback_eval_scripted.jit.pt",
-            "//tests/modules:loop_fallback_no_eval_scripted.jit.pt"]
+            "//tests/modules:loop_fallback_no_eval_scripted.jit.pt",
+            "//tests/modules:inplace_op_if_scripted.jit.pt"]
 )
 
 partitioning_test(
