@@ -23,14 +23,14 @@ CXX11_ABI = False
 JETPACK_VERSION = None
 
 __version__ = '1.2.0a0'
-FX2TRT_ONLY = False
+FX_ONLY = False
 
 def get_git_revision_short_hash() -> str:
     return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode('ascii').strip()
 
-if "--fx2trt-only" in sys.argv:
-    FX2TRT_ONLY = True
-    sys.argv.remove("--fx2trt-only")
+if "--fx-only" in sys.argv:
+    FX_ONLY = True
+    sys.argv.remove("--fx-only")
 
 if "--release" not in sys.argv:
     __version__ = __version__ + "+" + get_git_revision_short_hash()
@@ -141,7 +141,7 @@ class DevelopCommand(develop):
         develop.finalize_options(self)
 
     def run(self):
-        if FX2TRT_ONLY:
+        if FX_ONLY:
             develop.run(self)
         else:
             global CXX11_ABI
@@ -161,7 +161,7 @@ class InstallCommand(install):
         install.finalize_options(self)
 
     def run(self):
-        if FX2TRT_ONLY:
+        if FX_ONLY:
             install.run(self)
         else:
             global CXX11_ABI
@@ -263,7 +263,7 @@ ext_modules = [
         ] + (["-D_GLIBCXX_USE_CXX11_ABI=1"] if CXX11_ABI else ["-D_GLIBCXX_USE_CXX11_ABI=0"]),
         undef_macros=["NDEBUG"])
 ]
-if FX2TRT_ONLY:
+if FX_ONLY:
     ext_modules=None
     packages=[
         "torch_tensorrt.fx",
@@ -308,8 +308,8 @@ setup(
     },
     zip_safe=False,
     license="BSD",
-    packages=packages if FX2TRT_ONLY else find_packages(),
-    package_dir=package_dir if FX2TRT_ONLY else {},
+    packages=packages if FX_ONLY else find_packages(),
+    package_dir=package_dir if FX_ONLY else {},
     classifiers=[
         "Development Status :: 5 - Stable", "Environment :: GPU :: NVIDIA CUDA",
         "License :: OSI Approved :: BSD License", "Intended Audience :: Developers",
