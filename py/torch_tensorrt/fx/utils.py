@@ -7,6 +7,7 @@ import torch
 
 from .types import Shape, TRTDataType
 
+
 class LowerPrecision(Enum):
     FP32 = "fp32"
     FP16 = "fp16"

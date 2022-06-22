@@ -1,9 +1,6 @@
-
-
 # @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch
-
 
 from torch_tensorrt.fx.tracer.acc_tracer import acc_tracer
 from torch_tensorrt.fx import InputTensorSpec
