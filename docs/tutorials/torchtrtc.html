@@ -199,7 +199,7 @@
               
               
                 <div class="version">
-                  master (1.2.0a0+c51ba38)
+                  master (1.2.0a0+a94e493)
                 </div>
               
             
@@ -436,10 +436,12 @@ OPTIONS:
                                       used to select kernels
     --workspace-size=[workspace_size] Maximum size of workspace given to
                                       TensorRT
-    -t[threshold],
-    --threshold=[threshold]           Maximum acceptable numerical deviation
-                                      from standard torchscript output
-                                      (default 2e-5)
+    --atol=[atol]                     Absolute tolerance threshold for acceptable
+                                      numerical deviation from standard torchscript
+                                      output (default 1e-8)
+    --rtol=[rtol]                     Relative tolerance threshold for acceptable
+                                      numerical deviation from standard torchscript
+                                      output  (default 1e-5)
     --no-threshold-check              Skip checking threshold compliance
     --truncate-long-double,
     --truncate, --truncate-64bit      Truncate weights that are provided in
