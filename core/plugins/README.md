@@ -37,4 +37,4 @@ If you'd like to compile your plugin with Torch-TensorRT,
 
 Once you've completed the above steps, upon successful compilation of Torch-TensorRT library, your plugin should be available in  `libtorchtrt_plugins.so`.
 
-A sample runtime application on how to run a network with plugins can be found <a href="https://github.com/NVIDIA/Torch-TensorRT/tree/master/examples/torchtrt_runtime_example" >here</a>
+A sample runtime application on how to run a network with plugins can be found <a href="https://github.com/pytorch/TensorRT/tree/master/examples/torchtrt_runtime_example" >here</a>
