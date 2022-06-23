@@ -69,6 +69,8 @@ class LowerSetting(LowerSettingBasic):
     how presets are applied. Refer to
     `caffe2.torch.fb.model_transform.fx2trt.presets.ESUHMLowererPreset` on how
     to add a preset.
+    opt_profile_replica (int): the number of opt profile set for TensorRT engine, this field is
+    only used by explicit batch dim with dynamic shape mode.
     """
 
     input_specs: List[InputTensorSpec] = dc.field(default_factory=list)
@@ -86,3 +88,4 @@ class LowerSetting(LowerSettingBasic):
     save_timing_cache: bool = False
     cuda_graph_batch_size: int = -1
     preset_lowerer: str = ""
+    opt_profile_replica: int = 1

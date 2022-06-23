@@ -1,8 +1,8 @@
 import torch
 import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from parameterized import parameterized
-from torch.testing._internal.common_fx2trt import AccTestCase
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase
 
 
 class TestAndMethodSimpleConverter(AccTestCase):

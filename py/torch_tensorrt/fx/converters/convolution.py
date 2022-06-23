@@ -32,13 +32,13 @@ def common_conv(network, mod, dimension, input_val, layer_name, is_quantized):
         unsqueeze_layer.name = f"{layer_name}_unsqueeze"
         input_val = unsqueeze_layer.get_output(0)
 
-        padding = padding + (0,)
         kernel = np.expand_dims(kernel, -1)
         kernel_size = kernel.shape[2:]
         if bias is not None:
             bias = bias[None]
-            # bias = np.expand_dims(bias, -1)
-
+        stride = (stride[0], 1)
+        padding = (padding[0], 0)
+        dilation = (dilation[0], 1)
     layer = network.add_convolution_nd(
         input=input_val,
         num_output_maps=mod.out_channels,
