@@ -100,6 +100,7 @@ class LowerTrtInterpreter:
                         self.lower_setting.max_batch_size,
                         self.lower_setting.max_batch_size,
                     ),
+                    self.lower_setting.opt_profile_replica,
                 )
                 if self.lower_setting.explicit_batch_dimension
                 else InputTensorSpec.from_tensors(input)
