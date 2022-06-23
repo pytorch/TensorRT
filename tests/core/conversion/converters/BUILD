@@ -16,6 +16,10 @@ converter_test(
 )
 
 converter_test(
+    name = "test_bitwise",
+)
+
+converter_test(
     name = "test_instance_norm",
 )
 
@@ -136,6 +140,7 @@ test_suite(
     tests = [
         ":test_activation",
         ":test_batch_norm",
+        ":test_bitwise",
         ":test_instance_norm",
         ":test_cast",
         ":test_clone",
