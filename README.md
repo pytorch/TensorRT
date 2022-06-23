@@ -212,8 +212,8 @@ new_local_repository(
 bazel build //:libtorchtrt --compilation_mode opt
 ```
 
-### FX path (Python only) installatioin
-If the user plan to try FX path (Python only) and would like avoid bazel build. Please follow the steps below.
+### FX path (Python only) installation
+If the user plan to try FX path (Python only) and would like to avoid bazel build. Please follow the steps below.
 ``` shell
 cd py && python3 setup.py install --fx-only
 ```
