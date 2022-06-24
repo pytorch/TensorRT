@@ -6,6 +6,8 @@ import torch
 import torch.fx
 from enum import Enum
 import torch_tensorrt.fx
+from torch_tensorrt.fx.lower import lower_to_trt
+from torch_tensorrt.fx.utils import LowerPrecision
 
 class _IRType(Enum):
     """Enum to set the minimum required logging level to print a message to stdout
@@ -108,7 +110,14 @@ def compile(module: Any, ir="default", inputs=[], enabled_precisions=set([_enums
             ts_mod = torch.jit.script(module)
         return torch_tensorrt.ts.compile(ts_mod, inputs=inputs, enabled_precisions=enabled_precisions, **kwargs)
     elif target_ir == _IRType.fx:
-        return torch_tensorrt.fx.compile(module, inputs=inputs, enabled_precisions=enabled_precisions, **kwargs)
+        if torch.float16 in enabled_precisions or torch_tensorrt.dtype.half in enabled_precisions:
+            lower_precision = LowerPrecision.FP16
+        elif torch.float32 in enabled_precisions or torch_tensorrt.dtype.float in enabled_precisions:
+            lower_precision = LowerPrecision.FP32
+        else:
+            raise ValueError(f"Precision {enabled_precisions} not supported on FX")
+
+        return lower_to_trt(module, inputs, lower_precision=lower_precision, max_batch_size=inputs[0].size(0), explicit_batch_dimension=True, dynamic_batch=False)
     else:
         raise RuntimeError("Module is an unknown format or the ir requested is unknown")
 
