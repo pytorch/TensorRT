@@ -71,6 +71,7 @@ class LowerSetting(LowerSettingBasic):
     to add a preset.
     opt_profile_replica (int): the number of opt profile set for TensorRT engine, this field is
     only used by explicit batch dim with dynamic shape mode.
+    dynamic_batch: enable the dynamic shape in TRT with dim=-1 for the 1st dimension.
     """
 
     input_specs: List[InputTensorSpec] = dc.field(default_factory=list)
@@ -90,4 +91,3 @@ class LowerSetting(LowerSettingBasic):
     preset_lowerer: str = ""
     opt_profile_replica: int = 1
     dynamic_batch: bool = True
-    
