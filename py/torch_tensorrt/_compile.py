@@ -117,7 +117,7 @@ def compile(module: Any, ir="default", inputs=[], enabled_precisions=set([_enums
         else:
             raise ValueError(f"Precision {enabled_precisions} not supported on FX")
 
-        return lower_to_trt(module, inputs, lower_precision=lower_precision, max_batch_size=inputs[0].size(0), explicit_batch_dimension=True, dynamic_batch=False)
+        return lower_to_trt(module, inputs, lower_precision=lower_precision, max_batch_size=inputs[0].size(0), explicit_batch_dimension=True)
     else:
         raise RuntimeError("Module is an unknown format or the ir requested is unknown")
 
