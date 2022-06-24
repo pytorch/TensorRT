@@ -92,7 +92,7 @@ class TestConvertFxDoNotUse(QuantizationTestCase):
             m,
             qconfig_dict,
             example_inputs,
-            prepare_custom_config_dict=prepare_custom_config_dict,
+            prepare_custom_config=prepare_custom_config_dict,
         )
         self.checkGraphModuleNodes(mp, expected_node_occurrence=prepare_count_check)
         mp(torch.randn(1, 1, 4, 4))
@@ -249,7 +249,7 @@ class TestConvertFxDoNotUse(QuantizationTestCase):
             original_m_copy,
             qconfig_dict,
             example_inputs,
-            prepare_custom_config_dict=prepare_config,
+            prepare_custom_config=prepare_config,
             backend_config_dict=backend_config_dict,
         )
         # calibration
@@ -827,7 +827,7 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
             m,
             {"": qconfig},
             example_inputs,
-            prepare_custom_config_dict=prepare_custom_config_dict,
+            prepare_custom_config=prepare_custom_config_dict,
             backend_config_dict=backend_config_dict,
         )
         node_occurrence = {

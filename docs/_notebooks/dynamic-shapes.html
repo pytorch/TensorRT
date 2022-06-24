@@ -199,7 +199,7 @@
               
               
                 <div class="version">
-                  master (1.2.0a0+30cd67c)
+                  master (1.2.0a0+b498d8b)
                 </div>
               
             
@@ -618,13 +618,30 @@ div.rendered_html tbody tr:hover {
 </pre></div>
 </div>
 </div>
+<p><img alt="958effdbafb54a8590afeb1361868233" class="no-scaled-link" src="http://developer.download.nvidia.com/notebooks/dlsw-notebooks/tensorrt_torchtrt_dynamic_shapes/nvidia_logo.png" style="width: 90px;" /></p>
 <section id="Torch-TensorRT---Using-Dynamic-Shapes">
 <h1>Torch-TensorRT - Using Dynamic Shapes<a class="headerlink" href="#Torch-TensorRT---Using-Dynamic-Shapes" title="Permalink to this headline">¶</a></h1>
 <p>Torch-TensorRT is a compiler for PyTorch/TorchScript, targeting NVIDIA GPUs via NVIDIA’s TensorRT Deep Learning Optimizer and Runtime. Unlike PyTorch’s Just-In-Time (JIT) compiler, Torch-TensorRT is an Ahead-of-Time (AOT) compiler, meaning that before you deploy your TorchScript code, you go through an explicit compile step to convert a standard TorchScript program into a module targeting a TensorRT engine. Torch-TensorRT operates as a PyTorch extension and compiles modules that integrate into
 the JIT runtime seamlessly. After compilation, using the optimized graph should feel no different than running a TorchScript module. You also have access to TensorRT’s suite of configurations at compile-time, so you are able to specify operating precision (FP32/FP16/INT8) and other settings for your module.</p>
 <p>We highly encourage users to run this notebook using our NVIDIA’s <a class="reference external" href="https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch">PyTorch container</a>. It comes packaged with a host of NVIDIA libraries and optimizations to widely used third-party libraries. In addition, this container is tested and updated on a monthly cadence!</p>
-<p>This notebook has the following sections: 1. TL;DR Explanation 1. Setting up the model 1. Working with Dynamic shapes in Torch TRT]</p>
-<p>torch_tensorrt.Input( min_shape=(1, 224, 224, 3), opt_shape=(1, 512, 512, 3), max_shape=(1, 1024, 1024, 3), dtype=torch.int32 format=torch.channel_last ) … ``` In this example, we are going to use a simple ResNet model to demonstrate the use of the API. We will be using different batch sizes in the example, but you can use the same method to alter any of the dimensions of the tensor.</p>
+<p>This notebook has the following sections: 1. <a class="reference external" href="#1">TL;DR Explanation</a> 2. <a class="reference external" href="#2">Setting up the model</a> 3. <a class="reference external" href="#3">Working with Dynamic shapes in Torch TRT</a></p>
+<section id="TL;DR-Explanation">
+<h2>TL;DR Explanation<a class="headerlink" href="#TL;DR-Explanation" title="Permalink to this headline">¶</a></h2>
+<p>Making use of Dynamic Shaped Tensors in Torch TensorRT is quite simple. Let’s say you are using the <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.compile(...)</span></code> function to compile a torchscript module.</p>
+<p>One of the <code class="docutils literal notranslate"><span class="pre">args</span></code> in this function in this function is <code class="docutils literal notranslate"><span class="pre">input</span></code>: which defines an input to a module in terms of expected shape, data type and tensor format: <code class="docutils literal notranslate"><span class="pre">torch_tensorrt.Input</span></code>.</p>
+<p>For the purposes of this walkthrough we just need three <code class="docutils literal notranslate"><span class="pre">kwargs</span></code>: <code class="docutils literal notranslate"><span class="pre">min_shape</span></code>, <code class="docutils literal notranslate"><span class="pre">opt_shape</span></code> and <code class="docutils literal notranslate"><span class="pre">max_shape</span></code>.</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>...
+torch_tensorrt.Input(
+        min_shape=(1, 224, 224, 3),
+        opt_shape=(1, 512, 512, 3),
+        max_shape=(1, 1024, 1024, 3),
+        dtype=torch.int32
+        format=torch.channel_last
+    )
+...
+</pre></div>
+</div>
+<p>In this example, we are going to use a simple ResNet model to demonstrate the use of the API. We will be using different batch sizes in the example, but you can use the same method to alter any of the dimensions of the tensor.</p>
 <div class="nbinput docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
 </pre></div>
@@ -726,7 +743,7 @@ Requirement already satisfied: executing in /opt/conda/lib/python3.8/site-packag
 <span class="ansi-yellow-fg">WARNING: Running pip as the &#39;root&#39; user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv</span>
 </pre></div></div>
 </div>
-<hr class="docutils" />
+</section>
 <section id="Setting-up-the-model">
 <h2>Setting up the model<a class="headerlink" href="#Setting-up-the-model" title="Permalink to this headline">¶</a></h2>
 <p>In this section, we will: * Get sample data. * Download model from torch hub. * Build simple utility functions</p>
@@ -1275,7 +1292,6 @@ Average batch time: 6.40 ms
 </div>
 <p>With the baseline ready, we can proceed to the section working discussing dynamic shapes!</p>
 </section>
-<hr class="docutils" />
 <section id="Working-with-Dynamic-shapes-in-Torch-TRT">
 <h2>Working with Dynamic shapes in Torch TRT<a class="headerlink" href="#Working-with-Dynamic-shapes-in-Torch-TRT" title="Permalink to this headline">¶</a></h2>
 <p>Enabling “Dynamic Shaped” tensors to be used is essentially enabling the ability to defer defining the shape of tensors until run-time. Torch TensorRT simply leverages TensorRT’s Dynamic shape support. You can read more about TensorRT’s implementation in the <a class="reference external" href="https://docs.nvidia.com/deeplearning/tensorrt/developer-guide/index.html#work_dynamic_shapes">TensorRT Documentation</a>.</p>
@@ -1478,6 +1494,7 @@ Average batch time: 12.57 ms
             <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
               <ul>
 <li><a class="reference internal" href="#">Torch-TensorRT - Using Dynamic Shapes</a><ul>
+<li><a class="reference internal" href="#TL;DR-Explanation">TL;DR Explanation</a></li>
 <li><a class="reference internal" href="#Setting-up-the-model">Setting up the model</a><ul>
 <li><a class="reference internal" href="#Getting-sample-data">Getting sample data</a></li>
 <li><a class="reference internal" href="#Download-model-from-torch-hub.">Download model from torch hub.</a></li>

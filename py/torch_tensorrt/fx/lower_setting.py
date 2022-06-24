@@ -90,3 +90,4 @@ class LowerSetting(LowerSettingBasic):
     preset_lowerer: str = ""
     opt_profile_replica: int = 1
     dynamic_batch: bool = True
+    
