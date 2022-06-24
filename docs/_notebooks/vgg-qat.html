@@ -199,7 +199,7 @@
               
               
                 <div class="version">
-                  master (1.2.0a0+30cd67c)
+                  master (1.2.0a0+b498d8b)
                 </div>
               
             
@@ -597,6 +597,28 @@ div.rendered_html tbody tr:hover {
   background: rgba(66, 165, 245, 0.2);
 }
 </style>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Copyright 2020-2022 NVIDIA Corporation. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+</pre></div>
+</div>
+</div>
+<p><img alt="ce6d31f903944a9f8f81ff2836cb670d" class="no-scaled-link" src="http://developer.download.nvidia.com/notebooks/dlsw-notebooks/tensorrt_torchtrt_qat_vgg/nvidia_logo.png" style="width: 90px;" /></p>
 <section id="Deploying-Quantization-Aware-Trained-models-in-INT8-using-Torch-TensorRT">
 <h1>Deploying Quantization Aware Trained models in INT8 using Torch-TensorRT<a class="headerlink" href="#Deploying-Quantization-Aware-Trained-models-in-INT8-using-Torch-TensorRT" title="Permalink to this headline">¶</a></h1>
 <section id="Overview">
@@ -661,7 +683,7 @@ from vgg16 import vgg16
 2.1.0
 </pre></div></div>
 </div>
-<p>## 2. VGG16 Overview ### Very Deep Convolutional Networks for Large-Scale Image Recognition VGG is one of the earliest family of image classification networks that first used small (3x3) convolution filters and achieved significant improvements on ImageNet recognition challenge. The network architecture looks as follows <img alt="695acaff76884d14adc5f015936c72b8" src="https://neurohive.io/wp-content/uploads/2018/11/vgg16-1-e1542731207177.png" /></p>
+<p>## 2. VGG16 Overview ### Very Deep Convolutional Networks for Large-Scale Image Recognition VGG is one of the earliest family of image classification networks that first used small (3x3) convolution filters and achieved significant improvements on ImageNet recognition challenge. The network architecture looks as follows <img alt="5714d26bdeff431ebc9d92117a898b63" src="https://neurohive.io/wp-content/uploads/2018/11/vgg16-1-e1542731207177.png" /></p>
 <p>## 3. Training a baseline VGG16 model We train VGG16 on CIFAR10 dataset. Define training and testing datasets and dataloaders. This will download the CIFAR 10 data in your <code class="docutils literal notranslate"><span class="pre">data</span></code> directory. Data preprocessing is performed using <code class="docutils literal notranslate"><span class="pre">torchvision</span></code> transforms.</p>
 <div class="nbinput docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
