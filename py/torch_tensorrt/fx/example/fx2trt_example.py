@@ -132,8 +132,13 @@ for name, _ in split_mod.named_children():
 
 lowered_model_output = split_mod(*inputs)
 
+# Save and load model
+torch.save(split_mod, "trt.pt")
+reload_trt_mod = torch.load("trt.pt")
+reload_model_output = reload_trt_mod(*inputs)
+
 # Make sure the results match
 regular_model_output = model(*inputs)
 torch.testing.assert_close(
-    lowered_model_output, regular_model_output, atol=3e-3, rtol=1e-2
+    reload_model_output, regular_model_output, atol=3e-3, rtol=1e-2
 )
