@@ -74,13 +74,14 @@ def which(program):
 
     return None
 
+BAZEL_EXE = None
+if not FX_ONLY:
+    BAZEL_EXE = which("bazelisk")
 
-BAZEL_EXE = which("bazelisk")
-
-if BAZEL_EXE is None:
-    BAZEL_EXE = which("bazel")
     if BAZEL_EXE is None:
-        sys.exit("Could not find bazel in PATH")
+        BAZEL_EXE = which("bazel")
+        if BAZEL_EXE is None:
+            sys.exit("Could not find bazel in PATH")
 
 
 def build_libtorchtrt_pre_cxx11_abi(develop=True, use_dist_dir=True, cxx11_abi=False):
