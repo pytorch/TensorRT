@@ -42,6 +42,7 @@ def lower_to_trt(
     timing_cache_prefix="",
     save_timing_cache=False,
     cuda_graph_batch_size=-1,
+    dynamic_batch=False,
 ) -> nn.Module:
     """
     Takes in original module, input and lowering setting, run lowering workflow to turn module
@@ -71,6 +72,7 @@ def lower_to_trt(
         timing_cache_prefix=timing_cache_prefix,
         save_timing_cache=save_timing_cache,
         cuda_graph_batch_size=cuda_graph_batch_size,
+        dynamic_batch=dynamic_batch,
     )
     lowerer = Lowerer.create(lower_setting=lower_setting)
     return lowerer(module, input)
@@ -102,11 +104,10 @@ class LowerTrtInterpreter:
                     ),
                     self.lower_setting.opt_profile_replica,
                 )
-                if self.lower_setting.explicit_batch_dimension
+                if self.lower_setting.explicit_batch_dimension and self.lower_setting.dynamic_batch
                 else InputTensorSpec.from_tensors(input)
             )
         )
-
         # Prepare algorithm selector and timing_cache for TRTInterpreter
         algo_selector = None
         if self.lower_setting.algo_selector:
