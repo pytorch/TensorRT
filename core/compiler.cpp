@@ -235,8 +235,11 @@ GraphAndMapping ConstructFallbackGraph(
 
   // the mapping from lowering graph => fallback global graph
   std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_g;
-  for (auto input : block->inputs()) {
-    util::getOrAddInputForValue(input, new_g, old_to_new_g);
+
+  for (uint64_t i = 0; i < block->inputs().size(); i++) {
+    auto in_val = new_g->addInput(std::string("input_") + std::to_string(i));
+    in_val->setType(block->inputs()[i]->type());
+    old_to_new_g[block->inputs()[i]] = in_val;
   }
 
   for (auto& seg_block : segmented_blocks) {
