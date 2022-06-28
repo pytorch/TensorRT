@@ -199,7 +199,7 @@
               
               
                 <div class="version">
-                  master (1.2.0a0+3a8704db)
+                  master (1.2.0a0+ffedb78)
                 </div>
               
             
@@ -618,7 +618,7 @@ div.rendered_html tbody tr:hover {
 </pre></div>
 </div>
 </div>
-<p><img alt="41bd2c3185814f14a40caa4b3963533a" class="no-scaled-link" src="http://developer.download.nvidia.com/notebooks/dlsw-notebooks/tensorrt_torchtrt_efficientnet/nvidia_logo.png" style="width: 90px;" /></p>
+<p><img alt="783b2cf2fc5d4e06a7736325633fdd88" class="no-scaled-link" src="http://developer.download.nvidia.com/notebooks/dlsw-notebooks/tensorrt_torchtrt_efficientnet/nvidia_logo.png" style="width: 90px;" /></p>
 <section id="Torch-TensorRT-Getting-Started---EfficientNet-B0">
 <h1>Torch-TensorRT Getting Started - EfficientNet-B0<a class="headerlink" href="#Torch-TensorRT-Getting-Started---EfficientNet-B0" title="Permalink to this headline">¶</a></h1>
 <section id="Overview">
@@ -691,22 +691,16 @@ Fri Feb  4 21:29:36 2022
 +-----------------------------------------------------------------------------+
 </pre></div></div>
 </div>
-<blockquote>
-<div><p>## 1. Requirements</p>
-</div></blockquote>
+<p>## 1. Requirements</p>
 <p>NVIDIA’s NGC provides PyTorch Docker Container which contains PyTorch and Torch-TensorRT. We can make use of <a class="reference external" href="https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch">latest pytorch</a> container to run this notebook.</p>
 <p>Otherwise, you can follow the steps in <code class="docutils literal notranslate"><span class="pre">notebooks/README</span></code> to prepare a Docker container yourself, within which you can run this demo notebook.</p>
-<blockquote>
-<div><p>## 2. EfficientNet Overview</p>
-</div></blockquote>
+<p>## 2. EfficientNet Overview</p>
 <p>PyTorch has a model repository called <code class="docutils literal notranslate"><span class="pre">timm</span></code>, which is a source for high quality implementations of computer vision models. We can get our EfficientNet model from there pretrained on ImageNet.</p>
 <section id="Model-Description">
 <h3>Model Description<a class="headerlink" href="#Model-Description" title="Permalink to this headline">¶</a></h3>
 <p>This model is based on the <a class="reference external" href="https://arxiv.org/abs/1905.11946">EfficientNet: Rethinking Model Scaling for Convolutional Neural Networks</a> paper.</p>
 <p><img alt="alt" class="no-scaled-link" src="https://1.bp.blogspot.com/-Cdtb97FtgdA/XO3BHsB7oEI/AAAAAAAAEKE/bmtkonwgs8cmWyI5esVo8wJPnhPLQ5bGQCLcBGAs/s1600/image4.png" style="width: 100%;" /></p>
-<blockquote>
-<div><p>## 3. Running the model without optimizations</p>
-</div></blockquote>
+<p>## 3. Running the model without optimizations</p>
 <p>PyTorch has a model repository called <code class="docutils literal notranslate"><span class="pre">timm</span></code>, which is a source for high quality implementations of computer vision models. We can get our EfficientNet model from there pretrained on ImageNet.</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
@@ -981,9 +975,7 @@ Output features size: torch.Size([128, 1000])
 Average throughput: 3393.46 images/second
 </pre></div></div>
 </div>
-<blockquote>
-<div><p>## 4. Accelerating with Torch-TensorRT</p>
-</div></blockquote>
+<p>## 4. Accelerating with Torch-TensorRT</p>
 <p>Onwards to the next step, accelerating with Torch TensorRT. In these examples we showcase the results for FP32 (single precision) and FP16 (half precision). We do not demonstrat specific tuning, just showcase the simplicity of usage. If you want to learn more about the possible customizations, visit our <a class="reference external" href="https://nvidia.github.io/Torch-TensorRT/">documentation</a>.</p>
 </section>
 <section id="FP32-(single-precision)">
@@ -1134,9 +1126,7 @@ Output features size: torch.Size([128, 1000])
 Average throughput: 10362.23 images/second
 </pre></div></div>
 </div>
-<blockquote>
-<div><p>## 5. Conclusion</p>
-</div></blockquote>
+<p>## 5. Conclusion</p>
 <p>In this notebook, we have walked through the complete process of compiling TorchScript models with Torch-TensorRT for EfficientNet-B0 model and test the performance impact of the optimization. With Torch-TensorRT, we observe a speedup of <strong>1.35x</strong> with FP32, and <strong>3.13x</strong> with FP16 on an NVIDIA 3090 GPU. These acceleration numbers will vary from GPU to GPU(as well as implementation to implementation based on the ops used) and we encorage you to try out latest generation of Data center compute
 cards for maximum acceleration.</p>
 </section>

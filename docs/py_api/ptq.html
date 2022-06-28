@@ -199,7 +199,7 @@
               
               
                 <div class="version">
-                  master (1.2.0a0+3a8704db)
+                  master (1.2.0a0+ffedb78)
                 </div>
               
             
@@ -353,11 +353,121 @@
               
   <section id="torch-tensorrt-ptq">
 <span id="torch-tensorrt-ptq-py"></span><h1>torch_tensorrt.ptq<a class="headerlink" href="#torch-tensorrt-ptq" title="Permalink to this headline">¶</a></h1>
+<span class="target" id="module-torch_tensorrt.ptq"></span><dl class="py class">
+<dt class="sig sig-object py" id="torch_tensorrt.ptq.CacheCalibrator">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.ptq.</span></span><span class="sig-name descname"><span class="pre">CacheCalibrator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/ptq.html#CacheCalibrator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.ptq.CacheCalibrator" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Constructs a calibrator class in TensorRT which directly uses pre-existing cache file for calibration.
+:param cache_file: path to cache file.
+:param algo_type: choice of calibration algorithm.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="torch_tensorrt.ptq.CalibrationAlgo">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.ptq.</span></span><span class="sig-name descname"><span class="pre">CalibrationAlgo</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/ptq.html#CalibrationAlgo"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.ptq.CalibrationAlgo" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">enum.Enum</span></code></p>
+<p>An enumeration.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.ptq.CalibrationAlgo.ENTROPY_CALIBRATION">
+<span class="sig-name descname"><span class="pre">ENTROPY_CALIBRATION</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;CalibrationAlgo.ENTROPY_CALIBRATION:</span> <span class="pre">1&gt;</span></em><a class="headerlink" href="#torch_tensorrt.ptq.CalibrationAlgo.ENTROPY_CALIBRATION" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.ptq.CalibrationAlgo.ENTROPY_CALIBRATION_2">
+<span class="sig-name descname"><span class="pre">ENTROPY_CALIBRATION_2</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;CalibrationAlgo.ENTROPY_CALIBRATION_2:</span> <span class="pre">2&gt;</span></em><a class="headerlink" href="#torch_tensorrt.ptq.CalibrationAlgo.ENTROPY_CALIBRATION_2" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.ptq.CalibrationAlgo.LEGACY_CALIBRATION">
+<span class="sig-name descname"><span class="pre">LEGACY_CALIBRATION</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;CalibrationAlgo.LEGACY_CALIBRATION:</span> <span class="pre">0&gt;</span></em><a class="headerlink" href="#torch_tensorrt.ptq.CalibrationAlgo.LEGACY_CALIBRATION" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="torch_tensorrt.ptq.CalibrationAlgo.MINMAX_CALIBRATION">
+<span class="sig-name descname"><span class="pre">MINMAX_CALIBRATION</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">&lt;CalibrationAlgo.MINMAX_CALIBRATION:</span> <span class="pre">3&gt;</span></em><a class="headerlink" href="#torch_tensorrt.ptq.CalibrationAlgo.MINMAX_CALIBRATION" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="torch_tensorrt.ptq.DataLoaderCalibrator">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.ptq.</span></span><span class="sig-name descname"><span class="pre">DataLoaderCalibrator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/ptq.html#DataLoaderCalibrator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.ptq.DataLoaderCalibrator" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Constructs a calibrator class in TensorRT and uses pytorch dataloader to load/preproces
+data which is passed during calibration.
+:param dataloader: an instance of pytorch dataloader which iterates through a given dataset.
+:param algo_type: choice of calibration algorithm.
+:param cache_file: path to cache file.
+:param use_cache: flag which enables usage of pre-existing cache.
+:param device: device on which calibration data is copied to.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch_tensorrt.ptq.get_batch">
+<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.ptq.</span></span><span class="sig-name descname"><span class="pre">get_batch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">names</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/ptq.html#get_batch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.ptq.get_batch" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch_tensorrt.ptq.get_batch_size">
+<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.ptq.</span></span><span class="sig-name descname"><span class="pre">get_batch_size</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/ptq.html#get_batch_size"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.ptq.get_batch_size" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch_tensorrt.ptq.get_cache_mode_batch">
+<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.ptq.</span></span><span class="sig-name descname"><span class="pre">get_cache_mode_batch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/ptq.html#get_cache_mode_batch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.ptq.get_cache_mode_batch" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch_tensorrt.ptq.read_calibration_cache">
+<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.ptq.</span></span><span class="sig-name descname"><span class="pre">read_calibration_cache</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/ptq.html#read_calibration_cache"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.ptq.read_calibration_cache" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="torch_tensorrt.ptq.write_calibration_cache">
+<span class="sig-prename descclassname"><span class="pre">torch_tensorrt.ptq.</span></span><span class="sig-name descname"><span class="pre">write_calibration_cache</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cache</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/ptq.html#write_calibration_cache"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.ptq.write_calibration_cache" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
 <section id="classes">
 <h2>Classes<a class="headerlink" href="#classes" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="id0">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.ptq.</span></span><span class="sig-name descname"><span class="pre">DataLoaderCalibrator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/ptq.html#DataLoaderCalibrator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id0" title="Permalink to this definition">¶</a></dt>
+<dd><p>Constructs a calibrator class in TensorRT and uses pytorch dataloader to load/preproces
+data which is passed during calibration.
+:param dataloader: an instance of pytorch dataloader which iterates through a given dataset.
+:param algo_type: choice of calibration algorithm.
+:param cache_file: path to cache file.
+:param use_cache: flag which enables usage of pre-existing cache.
+:param device: device on which calibration data is copied to.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.ptq.DataLoaderCalibrator.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/ptq.html#DataLoaderCalibrator.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.ptq.DataLoaderCalibrator.__init__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="id1">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.ptq.</span></span><span class="sig-name descname"><span class="pre">CacheCalibrator</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/ptq.html#CacheCalibrator"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id1" title="Permalink to this definition">¶</a></dt>
+<dd><p>Constructs a calibrator class in TensorRT which directly uses pre-existing cache file for calibration.
+:param cache_file: path to cache file.
+:param algo_type: choice of calibration algorithm.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="torch_tensorrt.ptq.CacheCalibrator.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/ptq.html#CacheCalibrator.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#torch_tensorrt.ptq.CacheCalibrator.__init__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
 </section>
 <section id="enums">
 <h2>Enums<a class="headerlink" href="#enums" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="id2">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">torch_tensorrt.ptq.</span></span><span class="sig-name descname"><span class="pre">CalibrationAlgo</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/torch_tensorrt/ptq.html#CalibrationAlgo"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#id2" title="Permalink to this definition">¶</a></dt>
+<dd><p>An enumeration.</p>
+</dd></dl>
+
 </section>
 </section>
 
