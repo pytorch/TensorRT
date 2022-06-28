@@ -199,7 +199,7 @@
               
               
                 <div class="version">
-                  master (1.2.0a0+ffedb78)
+                  master (1.2.0a0+3a8704db)
                 </div>
               
             
@@ -618,7 +618,7 @@ div.rendered_html tbody tr:hover {
 </pre></div>
 </div>
 </div>
-<p><img alt="2acf632451c2482b8eee3d1e461fb6c5" class="no-scaled-link" src="http://developer.download.nvidia.com/notebooks/dlsw-notebooks/tensorrt_torchtrt_citrinet/nvidia_logo.png" style="width: 90px;" /></p>
+<p><img alt="058c2a32b62b4b52a6bf5f2233a2258a" class="no-scaled-link" src="http://developer.download.nvidia.com/notebooks/dlsw-notebooks/tensorrt_torchtrt_citrinet/nvidia_logo.png" style="width: 90px;" /></p>
 <section id="Torch-TensorRT-Getting-Started---CitriNet">
 <h1>Torch-TensorRT Getting Started - CitriNet<a class="headerlink" href="#Torch-TensorRT-Getting-Started---CitriNet" title="Permalink to this headline">¶</a></h1>
 <section id="Overview">
@@ -640,7 +640,9 @@ div.rendered_html tbody tr:hover {
 <li><p><a class="reference external" href="#4">Benchmark Torch-TensorRT models</a></p></li>
 <li><p><a class="reference external" href="#5">Conclusion</a></p></li>
 </ol>
-<p>## 1. Requirements</p>
+<blockquote>
+<div><p>## 1. Requirements</p>
+</div></blockquote>
 <p>Follow the steps in <a class="reference external" href="README.md">README</a> to prepare a Docker container, within which you can run this notebook. This notebook assumes that you are within a Jupyter environment in a docker container with Torch-TensorRT installed, such as an NGC monthly release of <code class="docutils literal notranslate"><span class="pre">nvcr.io/nvidia/pytorch:&lt;yy.mm&gt;-py3</span></code> (where <code class="docutils literal notranslate"><span class="pre">yy</span></code> indicates the last two numbers of a calendar year, and <code class="docutils literal notranslate"><span class="pre">mm</span></code> indicates the month in two-digit numerical form)</p>
 <p>Now that you are in the docker, the next step is to install the required dependencies.</p>
 <div class="nbinput docutils container">
@@ -913,7 +915,9 @@ Requirement already satisfied: smmap&lt;6,&gt;=3.0.1 in /opt/conda/lib/python3.8
 <span class="ansi-yellow-fg">WARNING: Running pip as the &#39;root&#39; user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv</span>
 </pre></div></div>
 </div>
-<p>## 2. Download Citrinet model</p>
+<blockquote>
+<div><p>## 2. Download Citrinet model</p>
+</div></blockquote>
 <p>Next, we download a pretrained Nemo Citrinet model and convert it to a Torchscript module:</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
@@ -1220,7 +1224,9 @@ Thu Apr 21 23:13:32 2022
 +-----------------------------------------------------------------------------+
 </pre></div></div>
 </div>
-<p>## 3. Create Torch-TensorRT modules</p>
+<blockquote>
+<div><p>## 3. Create Torch-TensorRT modules</p>
+</div></blockquote>
 <p>In this step, we optimize the Citrinet Torchscript module with Torch-TensorRT with various precisions and batch sizes.</p>
 <div class="nbinput docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
@@ -1266,7 +1272,9 @@ Generating Torchscript-TensorRT module for batchsize 32 precision torch.float16
 Generating Torchscript-TensorRT module for batchsize 128 precision torch.float16
 </pre></div></div>
 </div>
-<p>## 4. Benchmark Torch-TensorRT models</p>
+<blockquote>
+<div><p>## 4. Benchmark Torch-TensorRT models</p>
+</div></blockquote>
 <p>Finally, we are ready to benchmark the Torch-TensorRT optimized Citrinet models.</p>
 </section>
 <section id="FP32-(single-precision)">
@@ -1417,7 +1425,9 @@ batch size=128, num iterations=50
 
 </pre></div></div>
 </div>
-<p>## 5. Conclusion</p>
+<blockquote>
+<div><p>## 5. Conclusion</p>
+</div></blockquote>
 <p>In this notebook, we have walked through the complete process of optimizing the Citrinet model with Torch-TensorRT. On an A100 GPU, with Torch-TensorRT, we observe a speedup of ~<strong>2.4X</strong> with FP32, and ~<strong>2.9X</strong> with FP16 at batchsize of 128.</p>
 </section>
 <section id="What’s-next">

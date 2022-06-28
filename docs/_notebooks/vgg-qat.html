@@ -199,7 +199,7 @@
               
               
                 <div class="version">
-                  master (1.2.0a0+ffedb78)
+                  master (1.2.0a0+3a8704db)
                 </div>
               
             
@@ -618,7 +618,7 @@ div.rendered_html tbody tr:hover {
 </pre></div>
 </div>
 </div>
-<p><img alt="ea58b17a1b2146f390fb14f89011e298" class="no-scaled-link" src="http://developer.download.nvidia.com/notebooks/dlsw-notebooks/tensorrt_torchtrt_qat_vgg/nvidia_logo.png" style="width: 90px;" /></p>
+<p><img alt="f4642ae2930e4f81bafc0d2cea4c2431" class="no-scaled-link" src="http://developer.download.nvidia.com/notebooks/dlsw-notebooks/tensorrt_torchtrt_qat_vgg/nvidia_logo.png" style="width: 90px;" /></p>
 <section id="Deploying-Quantization-Aware-Trained-models-in-INT8-using-Torch-TensorRT">
 <h1>Deploying Quantization Aware Trained models in INT8 using Torch-TensorRT<a class="headerlink" href="#Deploying-Quantization-Aware-Trained-models-in-INT8-using-Torch-TensorRT" title="Permalink to this headline">¶</a></h1>
 <section id="Overview">
@@ -635,7 +635,9 @@ div.rendered_html tbody tr:hover {
 <li><p><a class="reference external" href="#8">Inference using Torch-TensorRT</a></p></li>
 <li><p><a class="reference external" href="#8">References</a></p></li>
 </ol>
-<p>## 1. Requirements Please install the required dependencies and import these libraries accordingly</p>
+<blockquote>
+<div><p>## 1. Requirements Please install the required dependencies and import these libraries accordingly</p>
+</div></blockquote>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
 </pre></div>
@@ -683,8 +685,12 @@ from vgg16 import vgg16
 2.1.0
 </pre></div></div>
 </div>
-<p>## 2. VGG16 Overview ### Very Deep Convolutional Networks for Large-Scale Image Recognition VGG is one of the earliest family of image classification networks that first used small (3x3) convolution filters and achieved significant improvements on ImageNet recognition challenge. The network architecture looks as follows <img alt="0f5a0c4917974040a2d4b6035bb1c98a" src="https://neurohive.io/wp-content/uploads/2018/11/vgg16-1-e1542731207177.png" /></p>
-<p>## 3. Training a baseline VGG16 model We train VGG16 on CIFAR10 dataset. Define training and testing datasets and dataloaders. This will download the CIFAR 10 data in your <code class="docutils literal notranslate"><span class="pre">data</span></code> directory. Data preprocessing is performed using <code class="docutils literal notranslate"><span class="pre">torchvision</span></code> transforms.</p>
+<blockquote>
+<div><p>## 2. VGG16 Overview ### Very Deep Convolutional Networks for Large-Scale Image Recognition VGG is one of the earliest family of image classification networks that first used small (3x3) convolution filters and achieved significant improvements on ImageNet recognition challenge. The network architecture looks as follows <img alt="67bfeaf143e44c928a91cc8c029d57f2" src="https://neurohive.io/wp-content/uploads/2018/11/vgg16-1-e1542731207177.png" /></p>
+</div></blockquote>
+<blockquote>
+<div><p>## 3. Training a baseline VGG16 model We train VGG16 on CIFAR10 dataset. Define training and testing datasets and dataloaders. This will download the CIFAR 10 data in your <code class="docutils literal notranslate"><span class="pre">data</span></code> directory. Data preprocessing is performed using <code class="docutils literal notranslate"><span class="pre">torchvision</span></code> transforms.</p>
+</div></blockquote>
 <div class="nbinput docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
 </pre></div>
@@ -980,7 +986,9 @@ Test Loss: 0.03466 Test Acc: 82.00%
 Checkpoint saved
 </pre></div></div>
 </div>
-<p>## 4. Apply Quantization</p>
+<blockquote>
+<div><p>## 4. Apply Quantization</p>
+</div></blockquote>
 <p><code class="docutils literal notranslate"><span class="pre">quant_modules.initialize()</span></code> will ensure quantized version of modules will be called instead of original modules. For example, when you define a model with convolution, linear, pooling layers, <code class="docutils literal notranslate"><span class="pre">QuantConv2d</span></code>, <code class="docutils literal notranslate"><span class="pre">QuantLinear</span></code> and <code class="docutils literal notranslate"><span class="pre">QuantPooling</span></code> will be called. <code class="docutils literal notranslate"><span class="pre">QuantConv2d</span></code> basically wraps quantizer nodes around inputs and weights of regular <code class="docutils literal notranslate"><span class="pre">Conv2d</span></code>. Please refer to all the quantized modules in pytorch-quantization toolkit for more information. A <code class="docutils literal notranslate"><span class="pre">QuantConv2d</span></code> is represented in
 <code class="docutils literal notranslate"><span class="pre">pytorch-quantization</span></code> toolkit as follows.</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>def forward(self, input):
@@ -1038,7 +1046,9 @@ opt.load_state_dict(ckpt[&quot;opt_state_dict&quot;])
 </pre></div>
 </div>
 </div>
-<p>## 5. Model Calibration</p>
+<blockquote>
+<div><p>## 5. Model Calibration</p>
+</div></blockquote>
 <p>The quantizer nodes introduced in the model around desired layers capture the dynamic range (min_value, max_value) that is observed by the layer. Calibration is the process of computing the dynamic range of these layers by passing calibration data, which is usually a subset of training or validation data. There are different ways of calibration: <code class="docutils literal notranslate"><span class="pre">max</span></code>, <code class="docutils literal notranslate"><span class="pre">histogram</span></code> and <code class="docutils literal notranslate"><span class="pre">entropy</span></code>. We use <code class="docutils literal notranslate"><span class="pre">max</span></code> calibration technique as it is simple and effective.</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
@@ -1266,7 +1276,9 @@ classifier.6._input_quantizer           : TensorQuantizer(8bit narrow fake per-t
 classifier.6._weight_quantizer          : TensorQuantizer(8bit narrow fake axis=0 amax=[0.3877, 0.5620](10) calibrator=MaxCalibrator scale=1.0 quant)
 </pre></div></div>
 </div>
-<p>## 6. Quantization Aware Training</p>
+<blockquote>
+<div><p>## 6. Quantization Aware Training</p>
+</div></blockquote>
 <p>In this phase, we finetune the model weights and leave the quantizer node values frozen. The dynamic ranges for each layer obtained from the calibration are kept constant while the weights of the model are finetuned to be close to the accuracy of original FP32 model (model without quantizer nodes) is preserved. Usually the finetuning of QAT model should be quick compared to the full training of the original model. Use QAT to fine-tune for around 10% of the original training schedule with an
 annealing learning-rate. Please refer to Achieving FP32 Accuracy for INT8 Inference Using Quantization Aware Training with NVIDIA TensorRT for detailed recommendations. For this VGG model, it is enough to finetune for 1 epoch to get acceptable accuracy. During finetuning with QAT, the quantization is applied as a composition of <code class="docutils literal notranslate"><span class="pre">max</span></code>, <code class="docutils literal notranslate"><span class="pre">clamp</span></code>, <code class="docutils literal notranslate"><span class="pre">round</span></code> and <code class="docutils literal notranslate"><span class="pre">mul</span></code> ops.</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span># amax is absolute maximum value for an input
@@ -1316,8 +1328,10 @@ Test Loss: 0.03291 Test Acc: 82.98%
 Checkpoint saved
 </pre></div></div>
 </div>
-<p>## 7. Export to Torchscript Export the model to Torch script. Trace the model and convert it into torchscript for deployment. To learn more about Torchscript, please refer to <a class="reference external" href="https://pytorch.org/docs/stable/jit.html">https://pytorch.org/docs/stable/jit.html</a>. Setting <code class="docutils literal notranslate"><span class="pre">quant_nn.TensorQuantizer.use_fb_fake_quant</span> <span class="pre">=</span> <span class="pre">True</span></code> enables the QAT model to use <code class="docutils literal notranslate"><span class="pre">torch.fake_quantize_per_tensor_affine</span></code> and <code class="docutils literal notranslate"><span class="pre">torch.fake_quantize_per_channel_affine</span></code> operators instead of <code class="docutils literal notranslate"><span class="pre">tensor_quant</span></code> function to export quantization operators. In torchscript, they
-are represented as <code class="docutils literal notranslate"><span class="pre">aten::fake_quantize_per_tensor_affine</span></code> and <code class="docutils literal notranslate"><span class="pre">aten::fake_quantize_per_channel_affine</span></code>.</p>
+<blockquote>
+<div><p>## 7. Export to Torchscript Export the model to Torch script. Trace the model and convert it into torchscript for deployment. To learn more about Torchscript, please refer to <a class="reference external" href="https://pytorch.org/docs/stable/jit.html">https://pytorch.org/docs/stable/jit.html</a>. Setting <code class="docutils literal notranslate"><span class="pre">quant_nn.TensorQuantizer.use_fb_fake_quant</span> <span class="pre">=</span> <span class="pre">True</span></code> enables the QAT model to use <code class="docutils literal notranslate"><span class="pre">torch.fake_quantize_per_tensor_affine</span></code> and <code class="docutils literal notranslate"><span class="pre">torch.fake_quantize_per_channel_affine</span></code> operators instead of <code class="docutils literal notranslate"><span class="pre">tensor_quant</span></code> function to export quantization operators. In torchscript, they</p>
+</div></blockquote>
+<p>are represented as <code class="docutils literal notranslate"><span class="pre">aten::fake_quantize_per_tensor_affine</span></code> and <code class="docutils literal notranslate"><span class="pre">aten::fake_quantize_per_channel_affine</span></code>.</p>
 <div class="nbinput docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[13]:
 </pre></div>
@@ -1475,8 +1489,10 @@ E1109 04:02:37.488416 139704147265344 tensor_quantizer.py:120] Fake quantize mod
 E1109 04:02:37.488986 139704147265344 tensor_quantizer.py:120] Fake quantize mode doesn&#39;t use scale explicitly!
 </pre></div></div>
 </div>
-<p>## 8. Inference using Torch-TensorRT In this phase, we run the exported torchscript graph of VGG QAT using Torch-TensorRT. Torch-TensorRT is a Pytorch-TensorRT compiler which converts Torchscript graphs into TensorRT. TensorRT 8.0 supports inference of quantization aware trained models and introduces new APIs; <code class="docutils literal notranslate"><span class="pre">QuantizeLayer</span></code> and <code class="docutils literal notranslate"><span class="pre">DequantizeLayer</span></code>. We can observe the entire VGG QAT graph quantization nodes from the debug log of Torch-TensorRT. To enable debug logging, you can set
-<code class="docutils literal notranslate"><span class="pre">torch_tensorrt.logging.set_reportable_log_level(torch_tensorrt.logging.Level.Debug)</span></code>. For example, <code class="docutils literal notranslate"><span class="pre">QuantConv2d</span></code> layer from <code class="docutils literal notranslate"><span class="pre">pytorch_quantization</span></code> toolkit is represented as follows in Torchscript</p>
+<blockquote>
+<div><p>## 8. Inference using Torch-TensorRT In this phase, we run the exported torchscript graph of VGG QAT using Torch-TensorRT. Torch-TensorRT is a Pytorch-TensorRT compiler which converts Torchscript graphs into TensorRT. TensorRT 8.0 supports inference of quantization aware trained models and introduces new APIs; <code class="docutils literal notranslate"><span class="pre">QuantizeLayer</span></code> and <code class="docutils literal notranslate"><span class="pre">DequantizeLayer</span></code>. We can observe the entire VGG QAT graph quantization nodes from the debug log of Torch-TensorRT. To enable debug logging, you can set</p>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">torch_tensorrt.logging.set_reportable_log_level(torch_tensorrt.logging.Level.Debug)</span></code>. For example, <code class="docutils literal notranslate"><span class="pre">QuantConv2d</span></code> layer from <code class="docutils literal notranslate"><span class="pre">pytorch_quantization</span></code> toolkit is represented as follows in Torchscript</p>
 <div class="highlight-none notranslate"><div class="highlight"><pre><span></span>%quant_input : Tensor = aten::fake_quantize_per_tensor_affine(%x, %636, %637, %638, %639)
 %quant_weight : Tensor = aten::fake_quantize_per_channel_affine(%394, %640, %641, %637, %638, %639)
 %input.2 : Tensor = aten::_convolution(%quant_input, %quant_weight, %395, %687, %688, %689, %643, %690, %642, %643, %643, %644, %644)
@@ -1623,7 +1639,9 @@ Output shape: torch.Size([16, 10])
 Average batch time: 1.79 ms
 </pre></div></div>
 </div>
-<p>## 9. References * Very Deep Convolution Networks for large scale Image Recognition * Achieving FP32 Accuracy for INT8 Inference Using Quantization Aware Training with NVIDIA TensorRT * QAT workflow for VGG16 * Deploying VGG QAT model in C++ using Torch-TensorRT * Pytorch-quantization toolkit from NVIDIA * Pytorch quantization toolkit userguide * Quantization basics</p>
+<blockquote>
+<div><p>## 9. References * Very Deep Convolution Networks for large scale Image Recognition * Achieving FP32 Accuracy for INT8 Inference Using Quantization Aware Training with NVIDIA TensorRT * QAT workflow for VGG16 * Deploying VGG QAT model in C++ using Torch-TensorRT * Pytorch-quantization toolkit from NVIDIA * Pytorch quantization toolkit userguide * Quantization basics</p>
+</div></blockquote>
 </section>
 </section>
 </section>

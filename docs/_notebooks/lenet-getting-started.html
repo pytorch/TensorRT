@@ -199,7 +199,7 @@
               
               
                 <div class="version">
-                  master (1.2.0a0+ffedb78)
+                  master (1.2.0a0+3a8704db)
                 </div>
               
             
@@ -618,7 +618,7 @@ div.rendered_html tbody tr:hover {
 </pre></div>
 </div>
 </div>
-<p><img alt="e35ce4ca215c4513810fb9d533909cc9" class="no-scaled-link" src="http://developer.download.nvidia.com/notebooks/dlsw-notebooks/tensorrt_torchtrt_lenet/nvidia_logo.png" style="width: 90px;" /></p>
+<p><img alt="2f280e0eb74d46ecafdf6432a54d6ea6" class="no-scaled-link" src="http://developer.download.nvidia.com/notebooks/dlsw-notebooks/tensorrt_torchtrt_lenet/nvidia_logo.png" style="width: 90px;" /></p>
 <section id="Torch-TensorRT-Getting-Started---LeNet">
 <h1>Torch-TensorRT Getting Started - LeNet<a class="headerlink" href="#Torch-TensorRT-Getting-Started---LeNet" title="Permalink to this headline">¶</a></h1>
 <section id="Overview">
@@ -641,7 +641,9 @@ perform best on the target GPU. TensorRT also has strong support for reduced ope
 <li><p><a class="reference external" href="#2">Creating TorchScript modules</a></p></li>
 <li><p><a class="reference external" href="#3">Compiling with Torch-TensorRT</a></p></li>
 </ol>
-<p>## 1. Requirements</p>
+<blockquote>
+<div><p>## 1. Requirements</p>
+</div></blockquote>
 <p>Follow the steps in <code class="docutils literal notranslate"><span class="pre">notebooks/README</span></code> to prepare a Docker container, within which you can run this notebook.</p>
 <div class="nbinput docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
@@ -744,7 +746,9 @@ Thu Feb 10 22:01:27 2022
 +-----------------------------------------------------------------------------+
 </pre></div></div>
 </div>
-<p>## 2. Creating TorchScript modules</p>
+<blockquote>
+<div><p>## 2. Creating TorchScript modules</p>
+</div></blockquote>
 <p>Here we create two submodules for a feature extractor and a classifier and stitch them together in a single LeNet module. In this case this is overkill but modules give us granular control over our program including where we decide to optimize and where we don’t. It is also the unit that the TorchScript compiler operates on. So you can decide to only convert/optimize the feature extractor and leave the classifier in standard PyTorch or you can convert the whole thing. When compiling your module
 to TorchScript, there are two paths: Tracing and Scripting.</p>
 <div class="nbinput nblast docutils container">
@@ -1033,7 +1037,9 @@ Output features size: torch.Size([1024, 10])
 Average batch time: 5.56 ms
 </pre></div></div>
 </div>
-<p>## 3. Compiling with Torch-TensorRT</p>
+<blockquote>
+<div><p>## 3. Compiling with Torch-TensorRT</p>
+</div></blockquote>
 </section>
 <section id="TorchScript-traced-model">
 <h3>TorchScript traced model<a class="headerlink" href="#TorchScript-traced-model" title="Permalink to this headline">¶</a></h3>

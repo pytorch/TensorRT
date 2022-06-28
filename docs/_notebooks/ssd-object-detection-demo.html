@@ -199,7 +199,7 @@
               
               
                 <div class="version">
-                  master (1.2.0a0+ffedb78)
+                  master (1.2.0a0+3a8704db)
                 </div>
               
             
@@ -618,7 +618,7 @@ div.rendered_html tbody tr:hover {
 </pre></div>
 </div>
 </div>
-<p><img alt="aa77691fd7754170ac652a03d651d0b9" class="no-scaled-link" src="http://developer.download.nvidia.com/notebooks/dlsw-notebooks/tensorrt_torchtrt_ssd/nvidia_logo.png" style="width: 90px;" /></p>
+<p><img alt="3185e4b1941b4216b8d84f22f38f5cf7" class="no-scaled-link" src="http://developer.download.nvidia.com/notebooks/dlsw-notebooks/tensorrt_torchtrt_ssd/nvidia_logo.png" style="width: 90px;" /></p>
 <section id="Object-Detection-with-Torch-TensorRT-(SSD)">
 <h1>Object Detection with Torch-TensorRT (SSD)<a class="headerlink" href="#Object-Detection-with-Torch-TensorRT-(SSD)" title="Permalink to this headline">¶</a></h1>
 <hr class="docutils" />
@@ -647,7 +647,9 @@ perform best on the target GPU. TensorRT also has strong support for reduced ope
 <li><p><a class="reference external" href="#7">Conclusion</a></p></li>
 </ol>
 <hr class="docutils" />
-<p>## 1. Requirements</p>
+<blockquote>
+<div><p>## 1. Requirements</p>
+</div></blockquote>
 <p>Follow the steps in <code class="docutils literal notranslate"><span class="pre">notebooks/README</span></code> to prepare a Docker container, within which you can run this demo notebook.</p>
 <p>In addition to that, run the following cell to obtain additional libraries specific to this demo.</p>
 <div class="nbinput docutils container">
@@ -765,7 +767,9 @@ Successfully installed ipywidgets-7.7.0 jupyterlab-widgets-1.1.0 widgetsnbextens
 </pre></div></div>
 </div>
 <hr class="docutils" />
-<p>## 2. SSD</p>
+<blockquote>
+<div><p>## 2. SSD</p>
+</div></blockquote>
 <section id="Single-Shot-MultiBox-Detector-model-for-object-detection">
 <h3>Single Shot MultiBox Detector model for object detection<a class="headerlink" href="#Single-Shot-MultiBox-Detector-model-for-object-detection" title="Permalink to this headline">¶</a></h3>
 <table class="docutils align-default">
@@ -1078,7 +1082,9 @@ Average batch time: 167.31 ms
 </pre></div></div>
 </div>
 <hr class="docutils" />
-<p>## 3. Creating TorchScript modules</p>
+<blockquote>
+<div><p>## 3. Creating TorchScript modules</p>
+</div></blockquote>
 <p>To compile with Torch-TensorRT, the model must first be in <strong>TorchScript</strong>. TorchScript is a programming language included in PyTorch which removes the Python dependency normal PyTorch models have. This conversion is done via a JIT compiler which given a PyTorch Module will generate an equivalent TorchScript Module. There are two paths that can be used to generate TorchScript: <strong>Tracing</strong> and <strong>Scripting</strong>. - Tracing follows execution of PyTorch generating ops in TorchScript corresponding to
 what it sees. - Scripting does an analysis of the Python code and generates TorchScript, this allows the resulting graph to include control flow which tracing cannot do.</p>
 <p>Tracing however due to its simplicity is more likely to compile successfully with Torch-TensorRT (though both systems are supported).</p>
@@ -1134,7 +1140,9 @@ Average batch time: 166.59 ms
 </pre></div></div>
 </div>
 <hr class="docutils" />
-<p>## 4. Compiling with Torch-TensorRT TorchScript modules behave just like normal PyTorch modules and are intercompatible. From TorchScript we can now compile a TensorRT based module. This module will still be implemented in TorchScript but all the computation will be done in TensorRT.</p>
+<blockquote>
+<div><p>## 4. Compiling with Torch-TensorRT TorchScript modules behave just like normal PyTorch modules and are intercompatible. From TorchScript we can now compile a TensorRT based module. This module will still be implemented in TorchScript but all the computation will be done in TensorRT.</p>
+</div></blockquote>
 <div class="nbinput docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
 </pre></div>
@@ -1173,7 +1181,9 @@ WARNING: [Torch-TensorRT] - There may be undefined behavior using dynamic shape 
 </pre></div></div>
 </div>
 <hr class="docutils" />
-<p>## 5. Running Inference</p>
+<blockquote>
+<div><p>## 5. Running Inference</p>
+</div></blockquote>
 <p>Next, we run object detection</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[16]:

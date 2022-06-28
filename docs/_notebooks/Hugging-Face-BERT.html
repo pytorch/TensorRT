@@ -199,7 +199,7 @@
               
               
                 <div class="version">
-                  master (1.2.0a0+ffedb78)
+                  master (1.2.0a0+3a8704db)
                 </div>
               
             
@@ -618,7 +618,7 @@ div.rendered_html tbody tr:hover {
 </pre></div>
 </div>
 </div>
-<p><img alt="2e8a7944f7a54c9a93c9656fc33a0ab3" class="no-scaled-link" src="http://developer.download.nvidia.com/notebooks/dlsw-notebooks/tensorrt_torchtrt_hf_bert/nvidia_logo.png" style="width: 90px;" /></p>
+<p><img alt="8ebcdec6af2d48ce9991ef016c10f3fd" class="no-scaled-link" src="http://developer.download.nvidia.com/notebooks/dlsw-notebooks/tensorrt_torchtrt_hf_bert/nvidia_logo.png" style="width: 90px;" /></p>
 <section id="Masked-Language-Modeling-(MLM)-with-Hugging-Face-BERT-Transformer">
 <h1>Masked Language Modeling (MLM) with Hugging Face BERT Transformer<a class="headerlink" href="#Masked-Language-Modeling-(MLM)-with-Hugging-Face-BERT-Transformer" title="Permalink to this headline">¶</a></h1>
 <section id="Learning-objectives">
@@ -635,7 +635,9 @@ div.rendered_html tbody tr:hover {
 <li><p><a class="reference external" href="#5">Benchmarking</a></p></li>
 <li><p><a class="reference external" href="#6">Conclusion</a></p></li>
 </ol>
-<p>## 1. Requirements</p>
+<blockquote>
+<div><p>## 1. Requirements</p>
+</div></blockquote>
 <p>NVIDIA’s NGC provides a PyTorch Docker Container which contains PyTorch and Torch-TensorRT. Starting with version <code class="docutils literal notranslate"><span class="pre">22.05-py3</span></code>, we can make use of <a class="reference external" href="https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch">latest pytorch</a> container to run this notebook.</p>
 <p>Otherwise, you can follow the steps in <code class="docutils literal notranslate"><span class="pre">notebooks/README</span></code> to prepare a Docker container yourself, within which you can run this demo notebook.</p>
 <div class="nbinput docutils container">
@@ -688,13 +690,17 @@ import torch.backends.cudnn as cudnn
 </pre></div>
 </div>
 </div>
-<p>## 2. BERT Overview</p>
+<blockquote>
+<div><p>## 2. BERT Overview</p>
+</div></blockquote>
 <p>Transformers comprise a class of deep learning algorithms employing self-attention; broadly speaking, the models learn large matrices of numbers, each element of which denotes how important one component of input data is to another. Since their introduction in 2017, transformers have enjoyed widespread adoption, particularly in natural language processing, but also in computer vision problems. This is largely because they are easier to parallelize than the sequence models which attention
 mechanisms were originally designed to augment.</p>
 <p>Hugging Face is a company that maintains a huge respository of pre-trained transformer models. The company also provides tools for integrating those models into PyTorch code and running inference with them.</p>
 <p>One of the most popular transformer models is BERT (Bidirectional Encoder Representations from Transformers). First developed at Google and released in 2018, it has become the backbone of Google’s search engine and a standard benchmark for NLP experiments. BERT was originally trained for next sentence prediction and masked language modeling (MLM), which aims to predict hidden words in sentences. In this notebook, we will use Hugging Face’s <code class="docutils literal notranslate"><span class="pre">bert-base-uncased</span></code> model (BERT’s smallest and
 simplest form, which does not employ text capitalization) for MLM.</p>
-<p>## 3. Creating TorchScript modules</p>
+<blockquote>
+<div><p>## 3. Creating TorchScript modules</p>
+</div></blockquote>
 <p>First, create a pretrained BERT tokenizer from the <code class="docutils literal notranslate"><span class="pre">bert-base-uncased</span></code> model</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
@@ -809,7 +815,9 @@ A baseball game consists of at least nine innings.
 Topology is a branch of mathematics concerned with the properties of geometric objects that remain unchanged under continuous transformations.
 </pre></div></div>
 </div>
-<p>## 4. Compiling with Torch-TensorRT</p>
+<blockquote>
+<div><p>## 4. Compiling with Torch-TensorRT</p>
+</div></blockquote>
 <p>Change the logging level to avoid long printouts</p>
 <div class="nbinput nblast docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
@@ -879,7 +887,9 @@ Topology is a branch of mathematics concerned with the properties of geometric o
 </pre></div>
 </div>
 </div>
-<p>## 5. Benchmarking</p>
+<blockquote>
+<div><p>## 5. Benchmarking</p>
+</div></blockquote>
 <p>In developing this notebook, we conducted our benchmarking on a single NVIDIA A100 GPU. Your results may differ from those shown, particularly on a different GPU.</p>
 <p>This function passes the inputs into the model and runs inference <code class="docutils literal notranslate"><span class="pre">num_loops</span></code> times, then returns a list of length containing the amount of time in seconds that each instance of inference took.</p>
 <div class="nbinput nblast docutils container">
@@ -1049,7 +1059,9 @@ batch size=4, num iterations=50
 
 </pre></div></div>
 </div>
-<p>## 6. Conclusion</p>
+<blockquote>
+<div><p>## 6. Conclusion</p>
+</div></blockquote>
 <p>In this notebook, we have walked through the complete process of compiling TorchScript models with Torch-TensorRT for Masked Language Modeling with Hugging Face’s <code class="docutils literal notranslate"><span class="pre">bert-base-uncased</span></code> transformer and testing the performance impact of the optimization. With Torch-TensorRT on an NVIDIA A100 GPU, we observe the speedups indicated below. These acceleration numbers will vary from GPU to GPU (as well as implementation to implementation based on the ops used) and we encorage you to try out latest
 generation of Data center compute cards for maximum acceleration.</p>
 <p>Scripted (GPU): 1.0x Traced (GPU): 1.62x Torch-TensorRT (FP32): 2.14x Torch-TensorRT (FP16): 3.15x</p>
