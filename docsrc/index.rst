@@ -29,6 +29,7 @@ Getting Started
 * :ref:`runtime`
 * :ref:`using_dla`
 * :ref:`serving_torch_tensorrt_with_triton`
+* :ref:`user_guide`
 
 .. toctree::
    :caption: Getting Started
@@ -45,6 +46,7 @@ Getting Started
    tutorials/runtime
    tutorials/using_dla
    tutorials/serving_torch_tensorrt_with_triton
+   tutorials/getting_started_with_fx_path
 
 .. toctree::
    :caption: Notebooks

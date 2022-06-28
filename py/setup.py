@@ -143,6 +143,7 @@ class DevelopCommand(develop):
 
     def run(self):
         if FX_ONLY:
+            gen_version_file()
             develop.run(self)
         else:
             global CXX11_ABI
@@ -163,6 +164,7 @@ class InstallCommand(install):
 
     def run(self):
         if FX_ONLY:
+            gen_version_file()
             install.run(self)
         else:
             global CXX11_ABI
