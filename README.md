@@ -118,7 +118,7 @@ These are the following dependencies used to verify the testcases. Torch-TensorR
 
 ## Prebuilt Binaries and Wheel files
 
-Releases: https://github.com/NVIDIA/Torch-TensorRT/releases
+Releases: https://github.com/pytorch/TensorRT/releases
 
 ## Compiling Torch-TensorRT
 
@@ -212,6 +212,12 @@ new_local_repository(
 bazel build //:libtorchtrt --compilation_mode opt
 ```
 
+### FX path (Python only) installation
+If the user plan to try FX path (Python only) and would like to avoid bazel build. Please follow the steps below.
+``` shell
+cd py && python3 setup.py install --fx-only
+```
+
 ### Debug build
 
 ``` shell
@@ -250,11 +256,48 @@ docker run -it -v$(pwd)/..:/workspace/Torch-TensorRT build_torch_tensorrt_wheel 
 
 Python compilation expects using the tarball based compilation strategy from above.
 
+
+## Testing using Python backend
+
+Torch-TensorRT supports testing in Python using [nox](https://nox.thea.codes/en/stable)
+
+To install the nox using python-pip
+
+```
+python3 -m pip install --upgrade nox
+```
+
+To list supported nox sessions:
+
+```
+nox --session -l
+```
+
+Environment variables supported by nox
+
+```
+PYT_PATH          - To use different PYTHONPATH than system installed Python packages
+TOP_DIR           - To set the root directory of the noxfile
+USE_CXX11         - To use cxx11_abi (Defaults to 0)
+USE_HOST_DEPS     - To use host dependencies for tests (Defaults to 0)
+```
+
+Usage example
+
+```
+nox --session l0_api_tests
+```
+
+Supported Python versions:
+```
+["3.7", "3.8", "3.9", "3.10"]
+```
+
 ## How do I add support for a new op...
 
 ### In Torch-TensorRT?
 
-Thanks for wanting to contribute! There are two main ways to handle supporting a new op. Either you can write a converter for the op from scratch and register it in the NodeConverterRegistry or if you can map the op to a set of ops that already have converters you can write a graph rewrite pass which will replace your new op with an equivalent subgraph of supported ops. Its preferred to use graph rewriting because then we do not need to maintain a large library of op converters. Also do look at the various op support trackers in the [issues](https://github.com/NVIDIA/Torch-TensorRT/issues) for information on the support status of various operators.
+Thanks for wanting to contribute! There are two main ways to handle supporting a new op. Either you can write a converter for the op from scratch and register it in the NodeConverterRegistry or if you can map the op to a set of ops that already have converters you can write a graph rewrite pass which will replace your new op with an equivalent subgraph of supported ops. Its preferred to use graph rewriting because then we do not need to maintain a large library of op converters. Also do look at the various op support trackers in the [issues](https://github.com/pytorch/TensorRT/issues) for information on the support status of various operators.
 
 ### In my application?
 

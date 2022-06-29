@@ -3,9 +3,11 @@ from torch_tensorrt import _enums
 import torch_tensorrt.ts
 from torch_tensorrt import logging
 import torch
-from torch import fx
+import torch.fx
 from enum import Enum
-
+import torch_tensorrt.fx
+from torch_tensorrt.fx.lower import lower_to_trt
+from torch_tensorrt.fx.utils import LowerPrecision
 
 class _IRType(Enum):
     """Enum to set the minimum required logging level to print a message to stdout
@@ -43,13 +45,7 @@ def _get_target_ir(module_type: _ModuleType, ir: str) -> _IRType:
     if module_is_tsable and ir_targets_torchscript:
         return _IRType.ts
     elif module_is_fxable and ir_targets_fx:
-        if module_type == _ModuleType.fx:
-            raise ValueError("Was given a torch.fx.GraphModule, fx is not currently supported by Torch-TensorRT")
-        elif ir_targets_fx:
-            raise ValueError("Preferred ir was set to \"fx\" which is currently not supported by Torch-TensorRT")
-        else:
-            raise ValueError("Torch-TensorRT currently does not support fx")
-        # return _IRType.fx
+        return _IRType.fx
     else:
         if ir == "default":
             # Options are listed in order of preference
@@ -114,7 +110,14 @@ def compile(module: Any, ir="default", inputs=[], enabled_precisions=set([_enums
             ts_mod = torch.jit.script(module)
         return torch_tensorrt.ts.compile(ts_mod, inputs=inputs, enabled_precisions=enabled_precisions, **kwargs)
     elif target_ir == _IRType.fx:
-        raise RuntimeError("fx is currently not supported")
+        if torch.float16 in enabled_precisions or torch_tensorrt.dtype.half in enabled_precisions:
+            lower_precision = LowerPrecision.FP16
+        elif torch.float32 in enabled_precisions or torch_tensorrt.dtype.float in enabled_precisions:
+            lower_precision = LowerPrecision.FP32
+        else:
+            raise ValueError(f"Precision {enabled_precisions} not supported on FX")
+
+        return lower_to_trt(module, inputs, lower_precision=lower_precision, max_batch_size=inputs[0].size(0), explicit_batch_dimension=True)
     else:
         raise RuntimeError("Module is an unknown format or the ir requested is unknown")
 

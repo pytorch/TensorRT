@@ -11,7 +11,7 @@ namespace torch_tensorrt {
 namespace tests {
 namespace util {
 
-bool almostEqual(const at::Tensor& a, const at::Tensor& b, float threshold, float atol = 1e-8, float rtol = 1e-5);
+bool almostEqual(const at::Tensor& computed_tensor, const at::Tensor& gt_tensor, float atol = 1e-8, float rtol = 1e-5);
 
 bool exactlyEqual(const at::Tensor& a, const at::Tensor& b);
 

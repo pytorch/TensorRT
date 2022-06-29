@@ -119,11 +119,16 @@ int main(int argc, char** argv) {
       parser, "num_iters", "Number of averaging timing iterations used to select kernels", {"num-avg-timing-iters"});
   args::ValueFlag<uint64_t> workspace_size(
       parser, "workspace_size", "Maximum size of workspace given to TensorRT", {"workspace-size"});
-  args::ValueFlag<double> threshold(
+  args::ValueFlag<double> atol(
       parser,
-      "threshold",
-      "Maximum acceptable numerical deviation from standard torchscript output (default 2e-5)",
-      {'t', "threshold"});
+      "atol",
+      "Absolute tolerance threshold for acceptable numerical deviation from standard torchscript output (default 1e-8)",
+      {"atol"});
+  args::ValueFlag<double> rtol(
+      parser,
+      "rtol",
+      "Relative tolerance threshold for acceptable numerical deviation from standard torchscript output (default 1e-5)",
+      {"rtol"});
 
   args::Flag no_threshold_check(
       parser, "no-threshold-check", "Skip checking threshold compliance", {"no-threshold-check", "no-threshold-check"});
@@ -392,9 +397,13 @@ int main(int argc, char** argv) {
         (compile_settings.enabled_precisions.size() == 1 &&
          compile_settings.enabled_precisions.find(torchtrt::DataType::kFloat) !=
              compile_settings.enabled_precisions.end())) {
-      double threshold_val = 2e-5;
-      if (threshold) {
-        threshold_val = args::get(threshold);
+      double atol_val = 1e-8;
+      double rtol_val = 1e-5;
+      if (atol) {
+        atol_val = args::get(atol);
+      }
+      if (rtol) {
+        rtol_val = args::get(rtol);
       }
 
       std::vector<torch::jit::IValue> jit_inputs_ivalues;
@@ -431,14 +440,18 @@ int main(int argc, char** argv) {
       }
 
       for (size_t i = 0; i < trt_results.size(); i++) {
+        std::ostringstream threshold_ss;
+        threshold_ss << "atol: " << atol_val << " rtol: " << rtol_val;
         if (!torchtrtc::accuracy::almost_equal(
-                jit_results[i], trt_results[i].reshape_as(jit_results[i]), threshold_val)) {
-          std::ostringstream threshold_ss;
-          threshold_ss << threshold_val;
+                jit_results[i], trt_results[i].reshape_as(jit_results[i]), atol_val, rtol_val)) {
           torchtrt::logging::log(
               torchtrt::logging::Level::kWARNING,
-              std::string("Maximum numerical deviation for output exceeds set threshold (") + threshold_ss.str() +
-                  std::string(")"));
+              std::string("Maximum numerical deviation for output exceeds tolerance thresholds (") +
+                  threshold_ss.str() + std::string(")"));
+        } else {
+          torchtrt::logging::log(
+              torchtrt::logging::Level::kDEBUG,
+              std::string("Maximum numerical deviation within threshold limits ") + threshold_ss.str());
         }
       }
     } else {

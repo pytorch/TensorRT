@@ -33,11 +33,11 @@ This will build a binary named `qat` in `bazel-out/k8-<opt|dbg>/bin/cpp/int8/qat
 
 ## Compilation using Makefile
 
-1) Download releases of <a href="https://pytorch.org">LibTorch</a>, <a href="https://github.com/NVIDIA/Torch-TensorRT/releases">Torch-TensorRT </a>and <a href="https://developer.nvidia.com/nvidia-tensorrt-download">TensorRT</a> and unpack them in the deps directory. Ensure CUDA is installed at `/usr/local/cuda` , if not you need to modify the CUDA include and lib paths in the Makefile.
+1) Download releases of <a href="https://pytorch.org">LibTorch</a>, <a href="https://github.com/pytorch/TensorRT/releases">Torch-TensorRT </a>and <a href="https://developer.nvidia.com/nvidia-tensorrt-download">TensorRT</a> and unpack them in the deps directory. Ensure CUDA is installed at `/usr/local/cuda` , if not you need to modify the CUDA include and lib paths in the Makefile.
 
 ```sh
 cd examples/torch_tensorrt_example/deps
-# Download latest Torch-TensorRT release tar file (libtorch_tensorrt.tar.gz) from https://github.com/NVIDIA/Torch-TensorRT/releases
+# Download latest Torch-TensorRT release tar file (libtorch_tensorrt.tar.gz) from https://github.com/pytorch/TensorRT/releases
 tar -xvzf libtorch_tensorrt.tar.gz
 # unzip libtorch downloaded from pytorch.org
 unzip libtorch.zip
