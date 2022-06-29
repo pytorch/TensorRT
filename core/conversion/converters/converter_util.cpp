@@ -219,6 +219,24 @@ nvinfer1::ITensor* clamp(ConversionCtx* ctx, const torch::jit::Node* n, nvinfer1
   return min_itensor;
 }
 
+// clamp x to [0, input_dim]
+nvinfer1::ITensor* clamp_to_input_dim(ConversionCtx* ctx, const torch::jit::Node* n, nvinfer1::ITensor* x,
+                        nvinfer1::ITensor* input_dim) {
+  auto nbdims = input_dim->getDimensions().d[0];
+  auto zero = torch::zeros({nbdims}).to(torch::kI32);
+  auto zero_itensor = toITensor(ctx, n, &zero);
+  auto one = torch::ones({nbdims}).to(torch::kI32);
+  auto one_itensor = toITensor(ctx, n, &one);
+  auto upper_bound_layer = ctx->net->addElementWise(*input_dim, *one_itensor, nvinfer1::ElementWiseOperation::kSUB);
+  auto upper_bound = upper_bound_layer->getOutput(0);
+  auto max_layer = ctx->net->addElementWise(*x, *zero_itensor, nvinfer1::ElementWiseOperation::kMAX);
+  auto max_itensor = max_layer->getOutput(0);
+  auto min_layer = ctx->net->addElementWise(*max_itensor, *upper_bound, nvinfer1::ElementWiseOperation::kMIN);
+  auto min_itensor = min_layer->getOutput(0);
+  return min_itensor;
+}
+
+
 // return indices < 0 ? inputDims + indices : indices
 nvinfer1::ITensor* bump_if_negtive(ConversionCtx* ctx, const torch::jit::Node* n, nvinfer1::ITensor* input_dim,
                                    nvinfer1::ITensor* indices) {
@@ -238,8 +256,10 @@ nvinfer1::ITensor* bump_if_negtive(ConversionCtx* ctx, const torch::jit::Node* n
 void update_start_and_end(ConversionCtx* ctx, const torch::jit::Node* n, nvinfer1::ITensor* in_shape, 
                         nvinfer1::ITensor* in_start, nvinfer1::ITensor* in_end,
                         nvinfer1::ITensor** out_start, nvinfer1::ITensor** out_end) {
-    *out_start = bump_if_negtive(ctx, n, in_shape, in_start);
-    *out_end = bump_if_negtive(ctx, n, in_shape, in_end);
+    auto start = bump_if_negtive(ctx, n, in_shape, in_start);
+    *out_start = clamp_to_input_dim(ctx, n, start, in_shape);
+    auto end = bump_if_negtive(ctx, n, in_shape, in_end);
+    *out_end = clamp_to_input_dim(ctx, n, end, in_shape);
 }
 
 bool is_dynamic_shape(nvinfer1::ITensor* tensor) {
