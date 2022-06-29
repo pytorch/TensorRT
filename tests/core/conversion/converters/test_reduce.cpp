@@ -212,6 +212,18 @@ TEST(Converters, ATenProdKeepDimsConvertsCorrectly) {
   test_body(graph, in);
 }
 
+TEST(Converters, ATenMaxKeepDimsConvertsCorrectly) {
+  const auto graph = R"IR(
+    graph(%x : Tensor):
+          %2 : int = prim::Constant[value=-1]()
+          %3 : bool = prim::Constant[value=1]()
+          %keep.1 : Tensor, %6 : Tensor = aten::max(%x, %2, %3)
+          return (%keep.1, %6))IR";
+
+  auto in = at::randint(-5, 5, {4, 4}, at::kCUDA);
+  test_body(graph, in);
+}
+
 TEST(Converters, ATenMeanDimNegOneIndexConvertsCorrectly) {
   const auto graph = R"IR(
     graph(%0 : Tensor):

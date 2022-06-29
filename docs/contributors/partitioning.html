@@ -199,7 +199,7 @@
               
               
                 <div class="version">
-                  master (1.2.0a0+c09084f)
+                  master (1.2.0a0+ffedb78)
                 </div>
               
             
@@ -240,6 +240,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/use_from_pytorch.html">Using Torch-TensorRT Directly From PyTorch</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/runtime.html">Deploying Torch-TensorRT Programs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/using_dla.html">DLA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Notebooks</span></p>
 <ul>
@@ -355,6 +356,81 @@
 <p>The phase is optional and enabled by the user. It instructs the compiler to separate nodes into ones that should run in PyTorch and ones that should run in TensorRT.
 Criteria for separation include: Lack of a converter, operator is explicitly set to run in PyTorch by the user or the node has a flag which tells partitioning to
 run in PyTorch by the module fallback passes.</p>
+<p>On a high level, Torch-TensorRT partitioning phase does the following:</p>
+<ul class="simple">
+<li><p>Segmentation. Go through the set of operators in order and verify if there is converter for each operator. Then, roughly separate the graph into parts that Torch-TensorRT can support and parts Torch-TensorRT cannot.</p></li>
+<li><p>Dependency Analysis. For every to be compiled operator there is a “complete dependency graph”, which means that every input can to traced back to an input as Tensor or TensorList. Go through all segments after segmentation then do dependency analysis to ensure that there are only Tensor/TensorList inputs and outputs for TensorRT segments.</p></li>
+<li><p>Shape Analysis. For each segments, figure out the input and outputs shapes starting from the provided input shape from the user. Shapes can be calculated by running the graphs with JIT.</p></li>
+<li><p>Conversion. Every TensorRT segments will be converted to TensorRT engine. This part is done in compiler.cpp, but it’s still a phase in our partitioning process.</p></li>
+<li><p>Stitching. Stitch all TensorRT engines with PyTorch nodes altogether.</p></li>
+</ul>
+<p>Here are the brief description of these functions of each file:</p>
+<section id="partitoninfo-h-cpp">
+<h2>PartitonInfo.h/.cpp<a class="headerlink" href="#partitoninfo-h-cpp" title="Permalink to this headline">¶</a></h2>
+<blockquote>
+<div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/partitioning/PartitionInfo.h">core/partitioning/PartitionInfo.h</a></p>
+</div></blockquote>
+<p>The automatic fallback APIs that is used for partitioning.</p>
+</section>
+<section id="segmentedblock-h-cpp">
+<h2>SegmentedBlock.h/.cpp<a class="headerlink" href="#segmentedblock-h-cpp" title="Permalink to this headline">¶</a></h2>
+<blockquote>
+<div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/partitioning/SegmentedBlock.h">core/partitioning/SegmentedBlock.h</a></p>
+</div></blockquote>
+<p>The main data structures that is used to maintain information for each segments after segmentation.</p>
+</section>
+<section id="shape-analysis-h-cpp">
+<h2>shape_analysis.h/.cpp<a class="headerlink" href="#shape-analysis-h-cpp" title="Permalink to this headline">¶</a></h2>
+<blockquote>
+<div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/partitioning/shape_analysis.h">core/partitioning/shape_analysis.h</a></p>
+</div></blockquote>
+<p>Code implementation to get the shapes for each segments by running them in JIT.</p>
+</section>
+<section id="partitioning-h-cpp">
+<h2>partitioning.h/.cpp<a class="headerlink" href="#partitioning-h-cpp" title="Permalink to this headline">¶</a></h2>
+<blockquote>
+<div><p><a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/core/partitioning/partitioning.h">core/partitioning/partitioning.h</a></p>
+</div></blockquote>
+<p>APIs and main code implementation for partitioning phase.</p>
+</section>
+</section>
+<section id="automatic-fallback">
+<h1>Automatic Fallback<a class="headerlink" href="#automatic-fallback" title="Permalink to this headline">¶</a></h1>
+<p>To enable automatic fallback feature, you can set following attributes in Python:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>import torch
+import torch_tensorrt as torchtrt
+
+...
+model = MyModel()
+ts_model = torch.jit.script(model)
+trt_model = torchtrt.ts.compile(model, **{
+  ...
+  &quot;min_block_size&quot; : 3,
+  &quot;torch_executed_ops&quot;: [&quot;aten::add&quot;],
+  &quot;torch_executed_modules&quot;: [],
+})
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>enabled: By default automatic fallback will be off. It is enabled by setting it to True.</p></li>
+<li><p>min_block_size: The minimum number of consecutive operations that must satisfy to be converted to TensorRT. For example, if it’s set to 3, then there must be 3 consecutive supported operators then this segments will be converted.</p></li>
+<li><p>forced_fallback_ops: A list of strings that will be the names of operations that the user explicitly want to be in PyTorch nodes.</p></li>
+</ul>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>#include &quot;torch/script.h&quot;
+#include &quot;torch_tensorrt/torch_tensorrt.h&quot;
+
+...
+auto in = torch::randn({1, 3, 224, 224}, {torch::kCUDA});
+
+auto mod = torch::jit::load(&quot;trt_ts_module.ts&quot;);
+auto input_sizes =  std::vector&lt;torchtrt::InputRange&gt;{{in.sizes()}};
+torchtrt::ts::CompileSpec cfg(input_sizes);
+cfg.min_block_size = 2;
+cfg.torch_executed_ops.push_back(&quot;aten::relu&quot;);
+auto trt_mod = torchtrt::ts::compile(mod, cfg);
+auto out = trt_mod.forward({in});
+</pre></div>
+</div>
 </section>
 
 
@@ -400,7 +476,14 @@ run in PyTorch by the module fallback passes.</p>
           <div class="pytorch-right-menu" id="pytorch-right-menu">
             <div class="pytorch-side-scroll" id="pytorch-side-scroll-right">
               <ul>
-<li><a class="reference internal" href="#">Partitioning Phase</a></li>
+<li><a class="reference internal" href="#">Partitioning Phase</a><ul>
+<li><a class="reference internal" href="#partitoninfo-h-cpp">PartitonInfo.h/.cpp</a></li>
+<li><a class="reference internal" href="#segmentedblock-h-cpp">SegmentedBlock.h/.cpp</a></li>
+<li><a class="reference internal" href="#shape-analysis-h-cpp">shape_analysis.h/.cpp</a></li>
+<li><a class="reference internal" href="#partitioning-h-cpp">partitioning.h/.cpp</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#automatic-fallback">Automatic Fallback</a></li>
 </ul>
 
             </div>

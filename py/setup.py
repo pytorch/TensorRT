@@ -23,11 +23,14 @@ CXX11_ABI = False
 JETPACK_VERSION = None
 
 __version__ = '1.2.0a0'
-
+FX_ONLY = False
 
 def get_git_revision_short_hash() -> str:
     return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode('ascii').strip()
 
+if "--fx-only" in sys.argv:
+    FX_ONLY = True
+    sys.argv.remove("--fx-only")
 
 if "--release" not in sys.argv:
     __version__ = __version__ + "+" + get_git_revision_short_hash()
@@ -71,13 +74,14 @@ def which(program):
 
     return None
 
+BAZEL_EXE = None
+if not FX_ONLY:
+    BAZEL_EXE = which("bazelisk")
 
-BAZEL_EXE = which("bazelisk")
-
-if BAZEL_EXE is None:
-    BAZEL_EXE = which("bazel")
     if BAZEL_EXE is None:
-        sys.exit("Could not find bazel in PATH")
+        BAZEL_EXE = which("bazel")
+        if BAZEL_EXE is None:
+            sys.exit("Could not find bazel in PATH")
 
 
 def build_libtorchtrt_pre_cxx11_abi(develop=True, use_dist_dir=True, cxx11_abi=False):
@@ -138,11 +142,15 @@ class DevelopCommand(develop):
         develop.finalize_options(self)
 
     def run(self):
-        global CXX11_ABI
-        build_libtorchtrt_pre_cxx11_abi(develop=True, cxx11_abi=CXX11_ABI)
-        gen_version_file()
-        copy_libtorchtrt()
-        develop.run(self)
+        if FX_ONLY:
+            gen_version_file()
+            develop.run(self)
+        else:
+            global CXX11_ABI
+            build_libtorchtrt_pre_cxx11_abi(develop=True, cxx11_abi=CXX11_ABI)
+            gen_version_file()
+            copy_libtorchtrt()
+            develop.run(self)
 
 
 class InstallCommand(install):
@@ -155,11 +163,15 @@ class InstallCommand(install):
         install.finalize_options(self)
 
     def run(self):
-        global CXX11_ABI
-        build_libtorchtrt_pre_cxx11_abi(develop=False, cxx11_abi=CXX11_ABI)
-        gen_version_file()
-        copy_libtorchtrt()
-        install.run(self)
+        if FX_ONLY:
+            gen_version_file()
+            install.run(self)
+        else:
+            global CXX11_ABI
+            build_libtorchtrt_pre_cxx11_abi(develop=False, cxx11_abi=CXX11_ABI)
+            gen_version_file()
+            copy_libtorchtrt()
+            install.run(self)
 
 
 class BdistCommand(bdist_wheel):
@@ -254,6 +266,23 @@ ext_modules = [
         ] + (["-D_GLIBCXX_USE_CXX11_ABI=1"] if CXX11_ABI else ["-D_GLIBCXX_USE_CXX11_ABI=0"]),
         undef_macros=["NDEBUG"])
 ]
+if FX_ONLY:
+    ext_modules=None
+    packages=[
+        "torch_tensorrt.fx",
+        "torch_tensorrt.fx.converters",
+        "torch_tensorrt.fx.passes",
+        "torch_tensorrt.fx.tools",
+        "torch_tensorrt.fx.tracer.acc_tracer",
+    ]
+    package_dir={
+        "torch_tensorrt.fx": "torch_tensorrt/fx",
+        "torch_tensorrt.fx.converters": "torch_tensorrt/fx/converters",
+        "torch_tensorrt.fx.passes": "torch_tensorrt/fx/passes",
+        "torch_tensorrt.fx.tools": "torch_tensorrt/fx/tools",
+        "torch_tensorrt.fx.tracer.acc_tracer": "torch_tensorrt/fx/tracer/acc_tracer",
+    }
+
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
@@ -282,7 +311,8 @@ setup(
     },
     zip_safe=False,
     license="BSD",
-    packages=find_packages(),
+    packages=packages if FX_ONLY else find_packages(),
+    package_dir=package_dir if FX_ONLY else {},
     classifiers=[
         "Development Status :: 5 - Stable", "Environment :: GPU :: NVIDIA CUDA",
         "License :: OSI Approved :: BSD License", "Intended Audience :: Developers",

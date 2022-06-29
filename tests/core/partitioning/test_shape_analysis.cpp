@@ -66,8 +66,9 @@ TEST(Partitioning, InferSequentialModelSegmentedBlockShapeCorrectly) {
     input_types.insert({g->inputs()[i], {at::kFloat}});
   }
   auto input_ivalues_map = torch_tensorrt::core::partitioning::generateRandomInputs(inputs_map, input_types);
+  std::unordered_map<torch::jit::Node*, int> fallback_nodes;
   std::vector<torch_tensorrt::core::partitioning::SegmentedBlock> segmented_blocks =
-      torch_tensorrt::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info);
+      torch_tensorrt::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info, fallback_nodes);
 
   ASSERT_TRUE(checkSegmentedBlockInputShape(
       segmented_blocks,
@@ -116,8 +117,9 @@ TEST(Partitioning, InferBranchModelSegmentedBlockShapeCorrectly) {
     input_types.insert({g->inputs()[i], {at::kFloat}});
   }
   auto input_ivalues_map = torch_tensorrt::core::partitioning::generateRandomInputs(inputs_map, input_types);
+  std::unordered_map<torch::jit::Node*, int> fallback_nodes;
   std::vector<torch_tensorrt::core::partitioning::SegmentedBlock> segmented_blocks =
-      torch_tensorrt::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info);
+      torch_tensorrt::core::partitioning::Partition(g->block(), input_ivalues_map, partition_info, fallback_nodes);
 
   ASSERT_TRUE(checkSegmentedBlockInputShape(
       segmented_blocks,

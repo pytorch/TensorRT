@@ -399,56 +399,57 @@ auto select_registrations TORCHTRT_UNUSED =
 
                return true;
              }})
-        .pattern(
-            {"aten::split(Tensor self, int[] split_sizes, int dim=0) -> (Tensor[])",
-             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-               add_split(ctx, n, args, true, false);
-               LOG_DEBUG("Converted split op into a list of IValues");
-               return true;
-             }})
-        .pattern(
-            {"aten::split.Tensor(Tensor(a) self, int split_size, int dim=0) -> (Tensor[])",
-             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-               add_split(ctx, n, args, false, false);
-               LOG_DEBUG("Converted split op into a list of IValues");
-               return true;
-             }})
-        .pattern(
-            {"aten::split_with_sizes(Tensor(a) self, int[] split_sizes, int dim=0) -> (Tensor[])",
-             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-               add_split(ctx, n, args, true, false);
-               LOG_DEBUG("Converted split op into a list of IValues");
-               return true;
-             }})
-        .pattern(
-            {"aten::unbind.int(Tensor(a -> *) self, int dim=0) -> (Tensor[])",
-             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-               add_split(ctx, n, args, false, true);
-               LOG_DEBUG("Converted split op into a list of IValues");
-               return true;
-             }})
-        .pattern(
-            {"aten::masked_fill.Scalar(Tensor self, Tensor mask, Scalar value) -> (Tensor)",
-             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-               auto self = args[0].ITensorOrFreeze(ctx);
-               auto mask = args[1].ITensorOrFreeze(ctx);
-               mask = addPadding(ctx, n, mask, self->getDimensions().nbDims, false, true);
-               auto val = args[2].unwrapToScalar().to<float>();
-               auto val_t = tensor_to_const(ctx, torch::full(util::toVec(self->getDimensions()), val));
+        .pattern({"aten::split(Tensor self, int[] split_sizes, int dim=0) -> (Tensor[])",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    add_split(ctx, n, args, true, false);
+                    LOG_DEBUG("Converted split op into a list of IValues");
+                    return true;
+                  }})
+        .pattern({"aten::split.sizes(Tensor(a -> *) self, int[] split_size, int dim=0) -> (Tensor[])",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    add_split(ctx, n, args, true, false);
+                    LOG_DEBUG("Converted split op into a list of IValues");
+                    return true;
+                  }})
+        .pattern({"aten::split.Tensor(Tensor(a) self, int split_size, int dim=0) -> (Tensor[])",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    add_split(ctx, n, args, false, false);
+                    LOG_DEBUG("Converted split op into a list of IValues");
+                    return true;
+                  }})
+        .pattern({"aten::split_with_sizes(Tensor(a) self, int[] split_sizes, int dim=0) -> (Tensor[])",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    add_split(ctx, n, args, true, false);
+                    LOG_DEBUG("Converted split op into a list of IValues");
+                    return true;
+                  }})
+        .pattern({"aten::unbind.int(Tensor(a -> *) self, int dim=0) -> (Tensor[])",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    add_split(ctx, n, args, false, true);
+                    LOG_DEBUG("Converted split op into a list of IValues");
+                    return true;
+                  }})
+        .pattern({"aten::masked_fill.Scalar(Tensor self, Tensor mask, Scalar value) -> (Tensor)",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    auto self = args[0].ITensorOrFreeze(ctx);
+                    auto mask = args[1].ITensorOrFreeze(ctx);
+                    mask = addPadding(ctx, n, mask, self->getDimensions().nbDims, false, true);
+                    auto val = args[2].unwrapToScalar().to<float>();
+                    auto val_t = tensor_to_const(ctx, torch::full(util::toVec(self->getDimensions()), val));
 
-               TORCHTRT_CHECK(
-                   util::broadcastable(self->getDimensions(), mask->getDimensions(), /*multidirectional=*/false),
-                   "Self and mask tensors are not broadcastable");
+                    TORCHTRT_CHECK(
+                        util::broadcastable(self->getDimensions(), mask->getDimensions(), /*multidirectional=*/false),
+                        "Self and mask tensors are not broadcastable");
 
-               auto new_layer = ctx->net->addSelect(*mask, *val_t, *self);
-               TORCHTRT_CHECK(new_layer, "Unable to create layer for aten::masked_fill");
+                    auto new_layer = ctx->net->addSelect(*mask, *val_t, *self);
+                    TORCHTRT_CHECK(new_layer, "Unable to create layer for aten::masked_fill");
 
-               new_layer->setName(util::node_info(n).c_str());
+                    new_layer->setName(util::node_info(n).c_str());
 
-               auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
-               LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
-               return true;
-             }});
+                    auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
+                    LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+                    return true;
+                  }});
 
 } // namespace
 } // namespace impl

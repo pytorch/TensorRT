@@ -199,7 +199,7 @@
               
               
                 <div class="version">
-                  master (1.2.0a0+c09084f)
+                  master (1.2.0a0+ffedb78)
                 </div>
               
             
@@ -240,6 +240,7 @@
 <li class="toctree-l1"><a class="reference internal" href="use_from_pytorch.html">Using Torch-TensorRT Directly From PyTorch</a></li>
 <li class="toctree-l1"><a class="reference internal" href="runtime.html">Deploying Torch-TensorRT Programs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="using_dla.html">DLA</a></li>
+<li class="toctree-l1"><a class="reference internal" href="serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Notebooks</span></p>
 <ul>
@@ -435,10 +436,12 @@ OPTIONS:
                                       used to select kernels
     --workspace-size=[workspace_size] Maximum size of workspace given to
                                       TensorRT
-    -t[threshold],
-    --threshold=[threshold]           Maximum acceptable numerical deviation
-                                      from standard torchscript output
-                                      (default 2e-5)
+    --atol=[atol]                     Absolute tolerance threshold for acceptable
+                                      numerical deviation from standard torchscript
+                                      output (default 1e-8)
+    --rtol=[rtol]                     Relative tolerance threshold for acceptable
+                                      numerical deviation from standard torchscript
+                                      output  (default 1e-5)
     --no-threshold-check              Skip checking threshold compliance
     --truncate-long-double,
     --truncate, --truncate-64bit      Truncate weights that are provided in
