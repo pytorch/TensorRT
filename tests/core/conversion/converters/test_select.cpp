@@ -509,7 +509,6 @@ TEST(Converters, ATenSliceDynamicNoneBatchConvertsCorrectly) {
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
-
 TEST(Converters, ATenSliceDynamicConvertsCorrectly) {
   const auto graph = R"IR(
         graph(%x.1 : Tensor):
@@ -567,7 +566,6 @@ TEST(Converters, ATenSliceDynamic2ConvertsCorrectly) {
 
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
-
 
 TEST(Converters, ATenSplitSizesInScriptingConvertsCorrectly) {
   const auto graph = R"IR(
