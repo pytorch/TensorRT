@@ -199,67 +199,108 @@ nvinfer1::ITensor* tensor_to_const(ConversionCtx* ctx, at::Tensor t, const std::
   return out;
 }
 
-nvinfer1::ITensor* toITensor(ConversionCtx* ctx, const torch::jit::Node* n, at::Tensor* input) {
-
-    auto weights = Weights(ctx, *input);
-    // IConstantLayer to convert indices from Weights to ITensor
-    auto const_layer = ctx->net->addConstant(weights.shape, weights.data); // shouln't use constant
-    TORCHTRT_CHECK(const_layer, "Unable to create constant layer from node: " << *n);
-    auto const_out = const_layer->getOutput(0);
-    return const_out;
-}
-
 // clamp x to [lower_bound, upper_bound]
-nvinfer1::ITensor* clamp(ConversionCtx* ctx, const torch::jit::Node* n, nvinfer1::ITensor* x,
+nvinfer1::ITensor* clamp(ConversionCtx* ctx, nvinfer1::ITensor* x,
                         nvinfer1::ITensor* lower_bound, nvinfer1::ITensor* upper_bound) {
   auto max_layer = ctx->net->addElementWise(*x, *lower_bound, nvinfer1::ElementWiseOperation::kMAX);
+  TORCHTRT_CHECK(max_layer, "Unable to create max layer for clamp");
+  LOG_DEBUG(ctx->logger, "Create " << max_layer->getName() << " for clamp");
   auto max_itensor = max_layer->getOutput(0);
+  
   auto min_layer = ctx->net->addElementWise(*max_itensor, *upper_bound, nvinfer1::ElementWiseOperation::kMIN);
+  TORCHTRT_CHECK(min_layer, "Unable to create min layer for clamp");
+  LOG_DEBUG(ctx->logger, "Create " << min_layer->getName() << " for clamp");
   auto min_itensor = min_layer->getOutput(0);
   return min_itensor;
 }
 
 // clamp x to [0, input_dim]
-nvinfer1::ITensor* clamp_to_input_dim(ConversionCtx* ctx, const torch::jit::Node* n, nvinfer1::ITensor* x,
+nvinfer1::ITensor* clamp_to_input_dim(ConversionCtx* ctx, nvinfer1::ITensor* x,
                         nvinfer1::ITensor* input_dim) {
   auto nbdims = input_dim->getDimensions().d[0];
   auto zero = torch::zeros({nbdims}).to(torch::kI32);
-  auto zero_itensor = toITensor(ctx, n, &zero);
+  auto zero_itensor = tensor_to_const(ctx, zero);
   auto one = torch::ones({nbdims}).to(torch::kI32);
-  auto one_itensor = toITensor(ctx, n, &one);
+  auto one_itensor = tensor_to_const(ctx, one);
+
   auto upper_bound_layer = ctx->net->addElementWise(*input_dim, *one_itensor, nvinfer1::ElementWiseOperation::kSUB);
+  TORCHTRT_CHECK(upper_bound_layer, "Unable to create sub layer for clamp to inputDim");
+  LOG_DEBUG(ctx->logger, "Create " << upper_bound_layer->getName() << " for clamp to inputDim");
   auto upper_bound = upper_bound_layer->getOutput(0);
+  
   auto max_layer = ctx->net->addElementWise(*x, *zero_itensor, nvinfer1::ElementWiseOperation::kMAX);
+  TORCHTRT_CHECK(max_layer, "Unable to create max_layer for clamp to inputDim");
+  LOG_DEBUG(ctx->logger, "Create " << max_layer->getName() << " for clamp to inputDim");
   auto max_itensor = max_layer->getOutput(0);
+  
   auto min_layer = ctx->net->addElementWise(*max_itensor, *upper_bound, nvinfer1::ElementWiseOperation::kMIN);
+  TORCHTRT_CHECK(min_layer, "Unable to create min_layer for clamp to inputDim");
+  LOG_DEBUG(ctx->logger, "Create " << min_layer->getName() << " for clamp to inputDim");
   auto min_itensor = min_layer->getOutput(0);
   return min_itensor;
 }
 
 
 // return indices < 0 ? inputDims + indices : indices
-nvinfer1::ITensor* bump_if_negtive(ConversionCtx* ctx, const torch::jit::Node* n, nvinfer1::ITensor* input_dim,
+nvinfer1::ITensor* bump_if_negtive(ConversionCtx* ctx, nvinfer1::ITensor* input_dim,
                                    nvinfer1::ITensor* indices) {
     auto nbdims = input_dim->getDimensions().d[0];
     auto zero = torch::zeros({nbdims}).to(torch::kI32);
     auto neg = - torch::ones({nbdims}).to(torch::kI32);
-    auto zero_itensor = toITensor(ctx, n, &zero);
-    auto neg_itensor = toITensor(ctx, n, &neg);
-    auto signs = clamp(ctx, n, indices, neg_itensor, zero_itensor);
+    auto zero_itensor = tensor_to_const(ctx, zero);
+    auto neg_itensor = tensor_to_const(ctx, neg);
+    // find the indices that = -1
+    auto signs = clamp(ctx, indices, neg_itensor, zero_itensor);
+
+    // get the inputDim value where indices == -1, else 0
     auto mul = ctx->net->addElementWise(*signs, *input_dim, nvinfer1::ElementWiseOperation::kPROD);
+    TORCHTRT_CHECK(mul, "Unable to create mul layer in bump_if_negtive");
+    LOG_DEBUG(ctx->logger, "Create " << mul->getName() << " for bump_if_negtive");
     auto mul_itensor = mul->getOutput(0);
+
+    // add the inputDim value to indices where indices == -1
     auto sub = ctx->net->addElementWise(*indices, *mul_itensor, nvinfer1::ElementWiseOperation::kSUB);
+    TORCHTRT_CHECK(sub, "Unable to create sub layer in bump_if_negtive");
+    LOG_DEBUG(ctx->logger, "Create " << sub->getName() << " for bump_if_negtive");
     auto sub_itensor = sub->getOutput(0);
     return sub_itensor;
 }
 
-void update_start_and_end(ConversionCtx* ctx, const torch::jit::Node* n, nvinfer1::ITensor* in_shape, 
-                        nvinfer1::ITensor* in_start, nvinfer1::ITensor* in_end,
-                        nvinfer1::ITensor** out_start, nvinfer1::ITensor** out_end) {
-    auto start = bump_if_negtive(ctx, n, in_shape, in_start);
-    *out_start = clamp_to_input_dim(ctx, n, start, in_shape);
-    auto end = bump_if_negtive(ctx, n, in_shape, in_end);
-    *out_end = clamp_to_input_dim(ctx, n, end, in_shape);
+std::vector<nvinfer1::ITensor*> update_start_and_end(ConversionCtx* ctx, nvinfer1::ITensor* in_shape, 
+                        nvinfer1::ITensor* in_start, nvinfer1::ITensor* in_end) {
+    auto start = bump_if_negtive(ctx, in_shape, in_start);
+    auto out_start = clamp_to_input_dim(ctx, start, in_shape);
+    auto end = bump_if_negtive(ctx, in_shape, in_end);
+    auto out_end = clamp_to_input_dim(ctx, end, in_shape);
+    std::vector<nvinfer1::ITensor*> outputs;
+    outputs.push_back(out_start);
+    outputs.push_back(out_end);
+    return outputs;
+}
+
+// size = (end - start) / stride + 1, where range is [start, end], end is included
+nvinfer1::ITensor* calculate_output_size(ConversionCtx* ctx, nvinfer1::ITensor* start, nvinfer1::ITensor* end,
+                                nvinfer1::ITensor* stride, int nbdims) {
+
+    at::Tensor one_tensor = torch::ones({nbdims}).to(torch::kI32);
+    auto one_itensor = tensor_to_const(ctx, one_tensor);
+    
+    auto sub_layer = ctx->net->addElementWise(*end, *start, nvinfer1::ElementWiseOperation::kSUB);
+    TORCHTRT_CHECK(sub_layer, "Unable to create sub layer in calculate_output_size");
+    LOG_DEBUG(ctx->logger, "Create " << sub_layer->getName() << " for calculate_output_size");
+    auto sub_itensor = sub_layer->getOutput(0);
+
+    auto div_layer = ctx->net->addElementWise(*sub_itensor, *stride, nvinfer1::ElementWiseOperation::kDIV);
+    TORCHTRT_CHECK(div_layer, "Unable to create div layer in calculate_output_size");
+    LOG_DEBUG(ctx->logger, "Create " << div_layer->getName() << " for calculate_output_size");
+    auto div_itensor = div_layer->getOutput(0);
+
+    auto add_layer = ctx->net->addElementWise(*div_itensor, *one_itensor, nvinfer1::ElementWiseOperation::kSUM);
+    TORCHTRT_CHECK(add_layer, "Unable to create add layer in calculate_output_size");
+    LOG_DEBUG(ctx->logger, "Create " << add_layer->getName() << " for calculate_output_size");
+    auto size_itensor = add_layer->getOutput(0);
+
+    return size_itensor;
 }
 
 bool is_dynamic_shape(nvinfer1::ITensor* tensor) {

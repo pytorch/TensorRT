@@ -332,6 +332,7 @@ auto select_registrations TORCHTRT_UNUSED =
                 }
                 auto step = args[4].unwrapToInt();
 
+                // update start, end, stride for static shape
                 auto nbdims = in->getDimensions().nbDims;
                 nvinfer1::Dims start_, size_, stride_;
                 start_.nbDims = nbdims;
@@ -355,12 +356,12 @@ auto select_registrations TORCHTRT_UNUSED =
                   // start tensor
                   at::Tensor start_tensor = torch::zeros({nbdims}).to(torch::kI32);;
                   start_tensor[axis] = startIdx;
-                  auto start_itensor = toITensor(ctx, n, &start_tensor);
+                  auto start_itensor = tensor_to_const(ctx, start_tensor);
 
                   // step tensor
                   at::Tensor stride_tensor = torch::ones({nbdims}).to(torch::kI32);
                   stride_tensor[axis] = step;
-                  auto stride_itensor = toITensor(ctx, n, &stride_tensor);
+                  auto stride_itensor = tensor_to_const(ctx, stride_tensor);
 
                   // end tensor
                   at::Tensor end_tensor = torch::zeros({nbdims}).to(torch::kI32);
@@ -371,32 +372,21 @@ auto select_registrations TORCHTRT_UNUSED =
                       end_tensor[i] = input_dim.d[i] == -1 ? -1 : input_dim.d[i]-1;
                     }
                   }
-                  auto end_itensor = toITensor(ctx, n, &end_tensor);
-
-                  // one itensor
-                  at::Tensor one_tensor = torch::ones({nbdims}).to(torch::kI32);
-                  auto one_itensor = toITensor(ctx, n, &one_tensor);
+                  auto end_itensor = tensor_to_const(ctx, end_tensor);
 
                   // update start and end 
                   nvinfer1::ITensor* out_start;
                   nvinfer1::ITensor* out_end;
-                  update_start_and_end(ctx, n, ishape_tensor, 
-                        start_itensor, end_itensor,
-                        &out_start, &out_end);
+                  auto start_end = update_start_and_end(ctx, ishape_tensor, start_itensor, end_itensor);
+                  out_start = start_end[0];
+                  out_end = start_end[1];
 
                   // calculate size
-                  auto sub_layer = ctx->net->addElementWise(*out_end, *out_start, nvinfer1::ElementWiseOperation::kSUB);
-                  auto sub_itensor = sub_layer->getOutput(0);
-                  auto div_layer = ctx->net->addElementWise(*sub_itensor, *stride_itensor, nvinfer1::ElementWiseOperation::kDIV);
-                  auto div_itensor = div_layer->getOutput(0);
-                  auto add_layer = ctx->net->addElementWise(*div_itensor, *one_itensor, nvinfer1::ElementWiseOperation::kSUM);
-                  auto size_itensor = add_layer->getOutput(0);
-                  
+                  auto size_itensor = calculate_output_size(ctx, out_start, out_end, stride_itensor, nbdims);
 
                   // update slice layer
                   slice_layer->setInput(1, *out_start); // start
                   slice_layer->setInput(2, *size_itensor); // size, must be set if input is dynamic
-
                 }
                 auto slice_out = slice_layer->getOutput(0);
                 auto out = ctx->AssociateValueAndTensor(n->outputs()[0], slice_out);
