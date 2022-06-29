@@ -307,18 +307,18 @@ auto select_registrations TORCHTRT_UNUSED =
             {"aten::slice.Tensor(Tensor(a) self, int dim=0, int? start=None, int? end=None, int step=1) -> Tensor(a)",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                auto in = args[0].ITensorOrFreeze(ctx);
-               auto axis = args[1].unwrapToInt();
-               auto maxDim = static_cast<int64_t>(in->getDimensions().d[axis]);
+               int axis = args[1].unwrapToInt();
+               int maxDim = static_cast<int32_t>(in->getDimensions().d[axis]);
                bool dynamic_shape = is_dynamic_shape(in);
                auto input_dim = in->getDimensions();
                // add Shape Tensor
                auto ishape_layer = ctx->net->addShape(*in);
                auto ishape_tensor = ishape_layer->getOutput(0); // input shape
 
-               auto startIdx = 0;
+               int startIdx = 0;
                auto startIdxIVal = args[2].IValue();
                if (!startIdxIVal->isNone()) {
-                 startIdx = startIdxIVal->toInt();
+                 startIdx = std::min((int64_t)std::numeric_limits<int32_t>::max(), startIdxIVal->toInt());
                }
                // Handle case when given tensor index is negative
                if (maxDim > 0) { // only for static shape
@@ -326,18 +326,19 @@ auto select_registrations TORCHTRT_UNUSED =
                }
 
                // Bound the end index to input tensor dimensions at specified axis
-               auto endIdx = maxDim; // -1 for dynamic shape
+               int endIdx = maxDim; // -1 for dynamic shape
                auto endIdxIVal = args[3].IValue();
                if (!endIdxIVal->isNone()) {
-                 endIdx = maxDim == -1 ? endIdxIVal->toInt() : std::min(endIdxIVal->toInt(), maxDim);
+                 int truncate_value = std::min((int64_t)std::numeric_limits<int32_t>::max(), endIdxIVal->toInt());
+                 endIdx = maxDim == -1 ? truncate_value : std::min(truncate_value, maxDim);
                }
                if (maxDim > 0) {
                  endIdx = (endIdx < 0) ? (maxDim + endIdx) : endIdx;
                }
-               auto step = args[4].unwrapToInt();
+               int step = args[4].unwrapToInt();
 
                // update start, end, stride for static shape
-               auto nbdims = in->getDimensions().nbDims;
+               int nbdims = in->getDimensions().nbDims;
                nvinfer1::Dims start_, size_, stride_;
                start_.nbDims = nbdims;
                size_.nbDims = nbdims;

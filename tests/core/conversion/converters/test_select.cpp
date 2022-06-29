@@ -400,7 +400,7 @@ TEST(Converters, ATenSliceDynamicBatchLargeEndConvertsCorrectly) {
               %2 : None = prim::Constant()
               %dim : int = prim::Constant[value=0]()
               %start : int = prim::Constant[value=1]()
-              %end : int = prim::Constant[value=99999]()
+              %end : int = prim::Constant[value=9223372036854775807]()
               %step : int = prim::Constant[value=2]()
               %9 : Tensor = aten::slice(%x.1, %dim, %start, %end, %step)
               return (%9))IR";
