@@ -203,6 +203,10 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> _ts_C.CompileSpec:
         assert isinstance(compile_spec["capability"], _enums.EngineCapability)
         info.capability = compile_spec["capability"]
 
+    if "num_min_timing_iters" in compile_spec:
+        assert type(compile_spec["num_min_timing_iters"]) is int
+        info.num_min_timing_iters = compile_spec["num_min_timing_iters"]
+
     if "num_avg_timing_iters" in compile_spec:
         assert type(compile_spec["num_avg_timing_iters"]) is int
         info.num_avg_timing_iters = compile_spec["num_avg_timing_iters"]

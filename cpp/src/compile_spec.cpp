@@ -81,6 +81,7 @@ torchtrt::core::CompileSpec to_internal_compile_spec(CompileSpec external) {
 
   internal.convert_info.engine_settings.device.gpu_id = external.device.gpu_id;
   internal.convert_info.engine_settings.device.dla_core = external.device.dla_core;
+  internal.convert_info.engine_settings.num_min_timing_iters = external.num_min_timing_iters;
   internal.convert_info.engine_settings.num_avg_timing_iters = external.num_avg_timing_iters;
   internal.convert_info.engine_settings.workspace_size = external.workspace_size;
 
