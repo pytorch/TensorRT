@@ -2,12 +2,12 @@
 
 import torch
 import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
-from torch.testing._internal.common_fx2trt import AccTestCase
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt.fx.passes.lower_basic_pass import (
     fuse_permute_linear,
     trt_transposed_linear,
 )
+from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase
 
 
 class TestFusePermuteLinear(AccTestCase):

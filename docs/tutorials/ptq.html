@@ -199,7 +199,7 @@
               
               
                 <div class="version">
-                  master (1.2.0a0+2585b77)
+                  master (1.2.0a0+ffedb78)
                 </div>
               
             
@@ -240,7 +240,7 @@
 <li class="toctree-l1"><a class="reference internal" href="use_from_pytorch.html">Using Torch-TensorRT Directly From PyTorch</a></li>
 <li class="toctree-l1"><a class="reference internal" href="runtime.html">Deploying Torch-TensorRT Programs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="using_dla.html">DLA</a></li>
-<li class="toctree-l1"><a class="reference internal" href="deploy_torch_tensorrt_to_triton.html">Deploying a Torch-TensorRT model (to Triton)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Notebooks</span></p>
 <ul>
@@ -465,7 +465,7 @@ defines the calibration algorithm used when calibrating. You can explicitly make
 <p>If you have an existing Calibrator implementation for TensorRT you may directly set the <code class="docutils literal notranslate"><span class="pre">ptq_calibrator</span></code> field with a pointer to your calibrator and it will work as well.
 From here not much changes in terms of how to execution works. You are still able to fully use LibTorch as the sole interface for inference. Data should remain
 in FP32 precision when it’s passed into <cite>trt_mod.forward</cite>. There exists an example application in the Torch-TensorRT demo that takes you from training a VGG16 network on
-CIFAR10 to deploying in INT8 with Torch-TensorRT here: <a class="reference external" href="https://github.com/NVIDIA/Torch-TensorRT/tree/master/cpp/ptq">https://github.com/NVIDIA/Torch-TensorRT/tree/master/cpp/ptq</a></p>
+CIFAR10 to deploying in INT8 with Torch-TensorRT here: <a class="reference external" href="https://github.com/pytorch/TensorRT/tree/master/cpp/ptq">https://github.com/pytorch/TensorRT/tree/master/cpp/ptq</a></p>
 </section>
 <section id="how-to-create-your-own-ptq-application-in-python">
 <span id="writing-ptq-python"></span><h2>How to create your own PTQ application in Python<a class="headerlink" href="#how-to-create-your-own-ptq-application-in-python" title="Permalink to this headline">¶</a></h2>
@@ -519,8 +519,8 @@ to use <code class="docutils literal notranslate"><span class="pre">CacheCalibra
 </pre></div>
 </div>
 <p>If you already have an existing calibrator class (implemented directly using TensorRT API), you can directly set the calibrator field to your class which can be very convenient.
-For a demo on how PTQ can be performed on a VGG network using Torch-TensorRT API, you can refer to <a class="reference external" href="https://github.com/NVIDIA/Torch-TensorRT/blob/master/tests/py/test_ptq_dataloader_calibrator.py">https://github.com/NVIDIA/Torch-TensorRT/blob/master/tests/py/test_ptq_dataloader_calibrator.py</a>
-and <a class="reference external" href="https://github.com/NVIDIA/Torch-TensorRT/blob/master/tests/py/test_ptq_trt_calibrator.py">https://github.com/NVIDIA/Torch-TensorRT/blob/master/tests/py/test_ptq_trt_calibrator.py</a></p>
+For a demo on how PTQ can be performed on a VGG network using Torch-TensorRT API, you can refer to <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/tests/py/test_ptq_dataloader_calibrator.py">https://github.com/pytorch/TensorRT/blob/master/tests/py/test_ptq_dataloader_calibrator.py</a>
+and <a class="reference external" href="https://github.com/pytorch/TensorRT/blob/master/tests/py/test_ptq_trt_calibrator.py">https://github.com/pytorch/TensorRT/blob/master/tests/py/test_ptq_trt_calibrator.py</a></p>
 <section id="citations">
 <h3>Citations<a class="headerlink" href="#citations" title="Permalink to this headline">¶</a></h3>
 <p>Krizhevsky, A., &amp; Hinton, G. (2009). Learning multiple layers of features from tiny images.</p>

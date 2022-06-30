@@ -199,7 +199,7 @@
               
               
                 <div class="version">
-                  master (1.2.0a0+2585b77)
+                  master (1.2.0a0+ffedb78)
                 </div>
               
             
@@ -240,7 +240,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/use_from_pytorch.html">Using Torch-TensorRT Directly From PyTorch</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/runtime.html">Deploying Torch-TensorRT Programs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../tutorials/using_dla.html">DLA</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../tutorials/deploy_torch_tensorrt_to_triton.html">Deploying a Torch-TensorRT model (to Triton)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/serving_torch_tensorrt_with_triton.html">Serving a Torch-TensorRT model with Triton</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Notebooks</span></p>
 <ul class="current">
@@ -597,6 +597,28 @@ div.rendered_html tbody tr:hover {
   background: rgba(66, 165, 245, 0.2);
 }
 </style>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span># Copyright 2020-2022 NVIDIA Corporation. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+</pre></div>
+</div>
+</div>
+<p><img alt="ea58b17a1b2146f390fb14f89011e298" class="no-scaled-link" src="http://developer.download.nvidia.com/notebooks/dlsw-notebooks/tensorrt_torchtrt_qat_vgg/nvidia_logo.png" style="width: 90px;" /></p>
 <section id="Deploying-Quantization-Aware-Trained-models-in-INT8-using-Torch-TensorRT">
 <h1>Deploying Quantization Aware Trained models in INT8 using Torch-TensorRT<a class="headerlink" href="#Deploying-Quantization-Aware-Trained-models-in-INT8-using-Torch-TensorRT" title="Permalink to this headline">¶</a></h1>
 <section id="Overview">
@@ -661,7 +683,7 @@ from vgg16 import vgg16
 2.1.0
 </pre></div></div>
 </div>
-<p>## 2. VGG16 Overview ### Very Deep Convolutional Networks for Large-Scale Image Recognition VGG is one of the earliest family of image classification networks that first used small (3x3) convolution filters and achieved significant improvements on ImageNet recognition challenge. The network architecture looks as follows <img alt="4689b071c2e64b46bc53fd78e7483a43" src="https://neurohive.io/wp-content/uploads/2018/11/vgg16-1-e1542731207177.png" /></p>
+<p>## 2. VGG16 Overview ### Very Deep Convolutional Networks for Large-Scale Image Recognition VGG is one of the earliest family of image classification networks that first used small (3x3) convolution filters and achieved significant improvements on ImageNet recognition challenge. The network architecture looks as follows <img alt="0f5a0c4917974040a2d4b6035bb1c98a" src="https://neurohive.io/wp-content/uploads/2018/11/vgg16-1-e1542731207177.png" /></p>
 <p>## 3. Training a baseline VGG16 model We train VGG16 on CIFAR10 dataset. Define training and testing datasets and dataloaders. This will download the CIFAR 10 data in your <code class="docutils literal notranslate"><span class="pre">data</span></code> directory. Data preprocessing is performed using <code class="docutils literal notranslate"><span class="pre">torchvision</span></code> transforms.</p>
 <div class="nbinput docutils container">
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:

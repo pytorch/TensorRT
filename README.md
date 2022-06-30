@@ -118,7 +118,7 @@ These are the following dependencies used to verify the testcases. Torch-TensorR
 
 ## Prebuilt Binaries and Wheel files
 
-Releases: https://github.com/NVIDIA/Torch-TensorRT/releases
+Releases: https://github.com/pytorch/TensorRT/releases
 
 ## Compiling Torch-TensorRT
 
@@ -212,6 +212,12 @@ new_local_repository(
 bazel build //:libtorchtrt --compilation_mode opt
 ```
 
+### FX path (Python only) installation
+If the user plan to try FX path (Python only) and would like to avoid bazel build. Please follow the steps below.
+``` shell
+cd py && python3 setup.py install --fx-only
+```
+
 ### Debug build
 
 ``` shell
@@ -291,7 +297,7 @@ Supported Python versions:
 
 ### In Torch-TensorRT?
 
-Thanks for wanting to contribute! There are two main ways to handle supporting a new op. Either you can write a converter for the op from scratch and register it in the NodeConverterRegistry or if you can map the op to a set of ops that already have converters you can write a graph rewrite pass which will replace your new op with an equivalent subgraph of supported ops. Its preferred to use graph rewriting because then we do not need to maintain a large library of op converters. Also do look at the various op support trackers in the [issues](https://github.com/NVIDIA/Torch-TensorRT/issues) for information on the support status of various operators.
+Thanks for wanting to contribute! There are two main ways to handle supporting a new op. Either you can write a converter for the op from scratch and register it in the NodeConverterRegistry or if you can map the op to a set of ops that already have converters you can write a graph rewrite pass which will replace your new op with an equivalent subgraph of supported ops. Its preferred to use graph rewriting because then we do not need to maintain a large library of op converters. Also do look at the various op support trackers in the [issues](https://github.com/pytorch/TensorRT/issues) for information on the support status of various operators.
 
 ### In my application?
 

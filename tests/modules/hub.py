@@ -92,8 +92,16 @@ models = {
         "model": cm.LoopFallbackEval(),
         "path": "script"
     },
+    "loop_fallback_no_eval": {
+        "model": cm.LoopFallbackNoEval(),
+        "path": "script"
+    },
     "conditional": {
         "model": cm.FallbackIf(),
+        "path": "script"
+    },
+    "inplace_op_if": {
+        "model": cm.FallbackInplaceOPIf(),
         "path": "script"
     },
     "bert-base-uncased": {
