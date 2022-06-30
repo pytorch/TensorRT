@@ -80,7 +80,7 @@ models = {
         "model": timm.create_model('vit_base_patch16_224', pretrained=True),
         "path": "script"
     },
-    "pool": {
+    "pooling": {
         "model": cm.Pool(),
         "path": "trace"
     },
