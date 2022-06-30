@@ -77,7 +77,7 @@ http_archive(
     name = "cudnn",
     build_file = "@//third_party/cudnn/archive:BUILD",
     sha256 = "ec96d2376d81fca42bdd3d4c3d705a99b29a065bab57f920561c763e29c67d01",
-    strip_prefix = "cuda",
+    strip_prefix = "cudnn-linux-x86_64-8.4.1.50_cuda11.6-archive",
     urls = [
         "https://developer.nvidia.com/compute/cudnn/secure/8.4.1/local_installers/11.6/cudnn-linux-x86_64-8.4.1.50_cuda11.6-archive.tar.xz",
     ],
