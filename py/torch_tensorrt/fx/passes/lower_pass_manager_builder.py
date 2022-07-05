@@ -1,5 +1,5 @@
 from functools import partial, wraps
-from typing import Any, Callable, NamedTuple, Sequence
+from typing import Any, Callable, Sequence
 
 import torch
 from torch import nn
@@ -10,6 +10,7 @@ from torch.fx.passes.splitter_base import SplitResult
 from ..lower_setting import LowerSetting
 from ..observer import Observer
 from ..passes.remove_duplicate_output_args import remove_duplicate_output_args
+from .graph_opts import common_subexpression_elimination
 
 from .lower_basic_pass import run_const_fold
 
@@ -94,6 +95,8 @@ class LowerPassManagerBuilder:
             passes.append(wrapper(p, self._input))
         for p in self.lower_setting.lower_basic_fuse_pass.passes:
             passes.append(wrapper(p, self._input))
+
+        passes.append(inplace_wrapper(common_subexpression_elimination))
         passes.append(
             inplace_wrapper(lambda m: FUSE_PASSES_POST_OBSERVER.observe(m, self._input))
         )

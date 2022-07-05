@@ -80,7 +80,7 @@ class TRTInterpreter(torch.fx.Interpreter):
         ] = dict()
 
     def validate_input_specs(self):
-        for shape, dtpe, _, shape_ranges, has_batch_dim in self.input_specs:
+        for shape, _, _, shape_ranges, has_batch_dim in self.input_specs:
             if not self.network.has_implicit_batch_dimension:
                 assert (
                     has_batch_dim

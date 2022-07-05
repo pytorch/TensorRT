@@ -415,9 +415,8 @@ def add_binary_elementwise_layer(
     This function adds a TensorRT elementwise layer. We allow both operands to be
     constant (not a trt tensor) because in implicit batch dimension mode, we could
     introduce constant via .size() op. Other scenario should be const folded first.
-    If any operand is not a trt tensor, we make it a trt constant layer which has
-    the same type as the other trt tensor. Then we broadcast these two inputs to
-    have the same number of dimensions.
+    If any operand is not a trt tensor, we make it a trt constant layer while preserve
+    its dtype. Then we broadcast these two inputs to have the same number of dimensions.
 
     Limitation:
         If we are using implicit batch dim mode, the operand that is not a trt
@@ -436,14 +435,16 @@ def add_binary_elementwise_layer(
     Returns:
         The output of TensorRT Elementwise layer.
     """
-    dtype = None
+    lhs_dtype = None
+    rhs_dtype = None
     is_lhs_trt_tensor = False
     is_rhs_trt_tensor = False
+
     if isinstance(lhs_val, TRTTensor):
-        dtype = torch_dtype_from_trt(lhs_val.dtype)
+        lhs_dtype = torch_dtype_from_trt(lhs_val.dtype)
         is_lhs_trt_tensor = True
     if isinstance(rhs_val, TRTTensor):
-        dtype = torch_dtype_from_trt(rhs_val.dtype)
+        rhs_dtype = torch_dtype_from_trt(rhs_val.dtype)
         is_rhs_trt_tensor = True
 
     if not is_lhs_trt_tensor and not is_rhs_trt_tensor:
@@ -463,10 +464,14 @@ def add_binary_elementwise_layer(
     # this way the shape will become [1], and then will be properly squeezed
     # into [], meaning that the result will have shape [], which is what we
     # expect.
+    #
+    # Note that the dtype here is supposed to be the same as the scalar
+    # dtype but we don't have a way to detect whether it makes sense for the
+    # scalar to be float or half. Hence we go with the lhs dtype.
     if is_lhs_trt_tensor and isinstance(rhs_val, (float, int)):
-        rhs_val = torch.tensor([rhs_val], dtype=dtype)
+        rhs_val = torch.tensor([rhs_val], dtype=lhs_dtype)
     if is_rhs_trt_tensor and isinstance(lhs_val, (float, int)):
-        lhs_val = torch.tensor([lhs_val], dtype=dtype)
+        lhs_val = torch.tensor([lhs_val], dtype=rhs_dtype)
 
     # When lhs is scalar, and rhs has shape [1,], then currently the assert
     # will fail because lhs shape has fewer dimensions than rhs shape.  This
@@ -482,8 +487,8 @@ def add_binary_elementwise_layer(
         if isinstance(rhs_val, torch.Tensor):
             rhs_val = squeeze_left(rhs_val)
 
-    lhs_val = get_trt_tensor(network, lhs_val, f"{name}_lhs", dtype)
-    rhs_val = get_trt_tensor(network, rhs_val, f"{name}_rhs", dtype)
+    lhs_val = get_trt_tensor(network, lhs_val, f"{name}_lhs", lhs_dtype)
+    rhs_val = get_trt_tensor(network, rhs_val, f"{name}_rhs", rhs_dtype)
 
     # Check the limitation in the doc string.
     if network.has_implicit_batch_dimension:

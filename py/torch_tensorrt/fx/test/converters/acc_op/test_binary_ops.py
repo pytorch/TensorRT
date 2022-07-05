@@ -142,6 +142,46 @@ class TestBinaryOpConverters(AccTestCase):
 
         self.run_test_with_dynamic_shape(Op(), input_specs, expected_ops={expected_op})
 
+    @parameterized.expand(
+        [
+            (
+                f"no_broadcast_{op[1].__name__}",
+                op[0],
+                op[1],
+            )
+            for op in elementwise_ops
+        ]
+        + [
+            (
+                f"broadcast_{op[1].__name__}",
+                op[0],
+                op[1],
+            )
+            for op in elementwise_ops
+        ]
+    )
+    def test_elementwise_op_with_dynamic_shape_four_dimensions(
+        self, _, orig_op, expected_op
+    ):
+        class Op(nn.Module):
+            def forward(self, x, y):
+                return orig_op(x, y)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (3, 3, 3, 3), (5, 5, 5, 5))],
+            ),
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (3, 3, 3, 3), (5, 5, 5, 5))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(Op(), input_specs, expected_ops={expected_op})
+
     def test_elementwise_ops_with_scalar_lhs(self):
         def orig_op(x, y):
             return x + y

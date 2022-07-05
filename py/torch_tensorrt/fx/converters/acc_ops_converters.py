@@ -2222,7 +2222,7 @@ def acc_ops_adaptive_avg_poolnd(
     extend_len = 2 if target == acc_ops.adaptive_avg_pool2d else 3
     assert all(
         input_val.shape[-(i + 1)] != -1 for i in range(extend_len)
-    ), "AdaptiveAvgPool2d currently doesn't support dynamic shapes for last two dims."
+    ), "AdaptiveAvgPool2d and AdaptiveAvgPool3d currently doesn't support dynamic shapes for last two dims."
 
     output_size = cast(
         Sequence[int], extend_attr_to_tuple(kwargs["output_size"], extend_len)

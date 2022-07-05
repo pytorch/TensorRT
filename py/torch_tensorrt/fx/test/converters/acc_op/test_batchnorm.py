@@ -38,6 +38,8 @@ class TestBatchNormConverter(AccTestCase):
             TestModule(), input_specs, expected_ops={acc_ops.batch_norm}
         )
 
+    # Testing with shape=(-1, -1, -1, -1) results in AssertionError: Channel dim can't be dynamic for batch norm.
+
 
 if __name__ == "__main__":
     run_tests()
