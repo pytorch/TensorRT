@@ -49,6 +49,7 @@ jobs:
             pip3 install nvidia-tensorrt==8.2.4.2
             pip3 install --pre torch==1.13.0.dev20220621  torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/nightly/cu113
             pip3 install pytest parameterized expecttest
+            pip3 install tabulate
             # install torch_tensorrt
             mv WORKSPACE.ci WORKSPACE
             cd py
