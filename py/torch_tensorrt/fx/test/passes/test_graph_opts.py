@@ -18,7 +18,7 @@ def debug_print_graph_module(mod_graph: torch.fx.GraphModule) -> None:
 
 
 @torch.fx.wrap
-def test_op(keys, value):
+def _test_op(keys, value):
     return value
 
 
@@ -170,7 +170,7 @@ class GraphOptsTest(unittest.TestCase):
     def test_common_subexpression_elimination_string_arg(self):
         class TestModule(torch.nn.Module):
             def forward(self, a):
-                x = test_op(["foo", "bar"], a)
+                x = _test_op(["foo", "bar"], a)
                 return x
 
         self._test_opt_with_module(
