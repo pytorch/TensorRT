@@ -235,11 +235,8 @@ GraphAndMapping ConstructFallbackGraph(
 
   // the mapping from lowering graph => fallback global graph
   std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_g;
-
-  for (uint64_t i = 0; i < block->inputs().size(); i++) {
-    auto in_val = new_g->addInput(std::string("input_") + std::to_string(i));
-    in_val->setType(block->inputs()[i]->type());
-    old_to_new_g[block->inputs()[i]] = in_val;
+  for (auto input : block->inputs()) {
+    util::getOrAddInputForValue(input, new_g, old_to_new_g);
   }
 
   for (auto& seg_block : segmented_blocks) {
@@ -439,7 +436,11 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
         auto graph_and_mapping =
             ConstructFallbackGraph(new_mod, g->block(), input_ivalues_map, cfg, static_params, fallback_nodes);
         new_g = graph_and_mapping.first;
-        LOG_INFO("Segmented Graph: " << *new_g);
+        // renaming the input name of graph after fallback to ensure pytorch deserialize it correctly
+        for (size_t i = 0; i < new_g->inputs().size(); ++i) {
+          new_g->inputs()[i]->setDebugName(std::string("input_") + std::to_string(i));
+        }
+        LOG_INFO(*new_g << "(GraphAfterFallback)");
 
         // if there is no tensorrt engine self in fallback graph, there is no conversion, we just return the initial
         // module
