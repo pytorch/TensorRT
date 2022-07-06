@@ -130,14 +130,23 @@ ConversionCtx::~ConversionCtx() {
 }
 
 nvinfer1::ITensor* ConversionCtx::AssociateValueAndTensor(const torch::jit::Value* value, nvinfer1::ITensor* tensor) {
+  if (!AddNamedTensor(value, tensor)) {
+    LOG_WARNING(
+        "Trying to rewrite the name " << value->debugName() << " to a named ITensor " << tensor->getName() << ".");
+  }
   tensor->setName(value->debugName().c_str());
-  this->value_tensor_map[value] = tensor;
   return tensor;
 }
 
 torch::jit::IValue* ConversionCtx::AssociateValueAndIValue(const torch::jit::Value* value, torch::jit::IValue ivalue) {
   this->evaluated_value_map[value] = std::move(ivalue);
   return &this->evaluated_value_map[value];
+}
+
+bool ConversionCtx::AddNamedTensor(const torch::jit::Value* value, nvinfer1::ITensor* tensor) {
+  value_tensor_map[value] = tensor;
+  auto ret = named_tensors.insert(tensor);
+  return ret.second;
 }
 
 std::string ConversionCtx::SerializeEngine() {

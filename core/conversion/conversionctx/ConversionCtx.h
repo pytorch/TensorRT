@@ -46,6 +46,7 @@ struct ConversionCtx {
   ConversionCtx(BuilderSettings settings);
   std::string SerializeEngine();
   nvinfer1::ITensor* AssociateValueAndTensor(const torch::jit::Value* value, nvinfer1::ITensor* tensor);
+  bool AddNamedTensor(const torch::jit::Value* value, nvinfer1::ITensor* tensor);
   torch::jit::IValue* AssociateValueAndIValue(const torch::jit::Value* value, torch::jit::IValue tensor);
   bool CheckLayerAddition(const torch::jit::Node* n);
 
@@ -69,6 +70,9 @@ struct ConversionCtx {
 
   std::unordered_map<const torch::jit::Value*, nvinfer1::ITensor*> value_tensor_map;
   std::unordered_map<const torch::jit::Value*, torch::jit::IValue> evaluated_value_map;
+
+  // record already named ITensors to prevent rewriting another name to the same tensor
+  std::unordered_set<nvinfer1::ITensor*> named_tensors;
 };
 
 } // namespace conversion

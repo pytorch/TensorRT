@@ -188,7 +188,7 @@ void AddInputs(
       ctx->input_is_dynamic = true;
     }
 
-    ctx->value_tensor_map[in] = trt_in;
+    ctx->AddNamedTensor(in, trt_in);
     ctx->num_inputs += 1;
   }
 
