@@ -318,7 +318,8 @@ auto select_registrations TORCHTRT_UNUSED =
                int startIdx = 0;
                auto startIdxIVal = args[2].IValue();
                if (!startIdxIVal->isNone()) {
-                 startIdx = std::min((int64_t)std::numeric_limits<int32_t>::max(), startIdxIVal->toInt());
+                 startIdx = startIdxIVal->toInt() > std::numeric_limits<int32_t>::max() ? maxDim : startIdxIVal->toInt();
+                 startIdx = maxDim == -1 ? startIdx : std::min(startIdx, maxDim);
                }
                // Handle case when given tensor index is negative
                if (maxDim > 0) { // only for static shape
@@ -329,7 +330,7 @@ auto select_registrations TORCHTRT_UNUSED =
                int endIdx = maxDim; // -1 for dynamic shape
                auto endIdxIVal = args[3].IValue();
                if (!endIdxIVal->isNone()) {
-                 int truncate_value = std::min((int64_t)std::numeric_limits<int32_t>::max(), endIdxIVal->toInt());
+                 int truncate_value = endIdxIVal->toInt() > std::numeric_limits<int32_t>::max() ? maxDim : endIdxIVal->toInt();
                  endIdx = maxDim == -1 ? truncate_value : std::min(truncate_value, maxDim);
                }
                if (maxDim > 0) {
@@ -373,7 +374,7 @@ auto select_registrations TORCHTRT_UNUSED =
                  at::Tensor end_tensor = torch::zeros({nbdims}).to(torch::kI32);
                  for (int i = 0; i < nbdims; i++) {
                    if (i == axis) {
-                     end_tensor[i] = endIdxIVal->isNone() ? -1 : endIdx - 1;
+                     end_tensor[i] = endIdx == -1 ? -1 : endIdx - 1;
                    } else {
                      end_tensor[i] = input_dim.d[i] == -1 ? -1 : input_dim.d[i] - 1;
                    }
@@ -383,7 +384,7 @@ auto select_registrations TORCHTRT_UNUSED =
                  // update start and end
                  nvinfer1::ITensor* out_start;
                  nvinfer1::ITensor* out_end;
-                 auto start_end = update_start_and_end(ctx, ishape_tensor, start_itensor, end_itensor);
+                 auto start_end = update_start_and_end(ctx, ishape_tensor, start_itensor, end_itensor, nbdims);
                  out_start = start_end[0];
                  out_end = start_end[1];
 

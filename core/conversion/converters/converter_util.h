@@ -63,7 +63,8 @@ std::vector<nvinfer1::ITensor*> update_start_and_end(
     ConversionCtx* ctx,
     nvinfer1::ITensor* in_shape,
     nvinfer1::ITensor* in_start,
-    nvinfer1::ITensor* in_end);
+    nvinfer1::ITensor* in_end,
+    int nbdims);
 
 nvinfer1::ITensor* calculate_output_size(
     ConversionCtx* ctx,

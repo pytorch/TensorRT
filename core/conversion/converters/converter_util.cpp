@@ -218,8 +218,8 @@ nvinfer1::ITensor* clamp(
 }
 
 // clamp x to [0, input_dim]
-nvinfer1::ITensor* clamp_to_input_dim(ConversionCtx* ctx, nvinfer1::ITensor* x, nvinfer1::ITensor* input_dim) {
-  auto nbdims = input_dim->getDimensions().d[0];
+nvinfer1::ITensor* clamp_to_input_dim(ConversionCtx* ctx, nvinfer1::ITensor* x, nvinfer1::ITensor* input_dim, int nbdims) {
+  // auto nbdims = input_dim->getDimensions().d[0];
   auto zero = torch::zeros({nbdims}).to(torch::kI32);
   auto zero_itensor = tensor_to_const(ctx, zero);
   auto one = torch::ones({nbdims}).to(torch::kI32);
@@ -243,8 +243,7 @@ nvinfer1::ITensor* clamp_to_input_dim(ConversionCtx* ctx, nvinfer1::ITensor* x, 
 }
 
 // return indices < 0 ? inputDims + indices : indices
-nvinfer1::ITensor* bump_if_negtive(ConversionCtx* ctx, nvinfer1::ITensor* input_dim, nvinfer1::ITensor* indices) {
-  auto nbdims = input_dim->getDimensions().d[0];
+nvinfer1::ITensor* bump_if_negtive(ConversionCtx* ctx, nvinfer1::ITensor* input_dim, nvinfer1::ITensor* indices, int nbdims) {
   auto zero = torch::zeros({nbdims}).to(torch::kI32);
   auto neg = -torch::ones({nbdims}).to(torch::kI32);
   auto zero_itensor = tensor_to_const(ctx, zero);
@@ -270,11 +269,12 @@ std::vector<nvinfer1::ITensor*> update_start_and_end(
     ConversionCtx* ctx,
     nvinfer1::ITensor* in_shape,
     nvinfer1::ITensor* in_start,
-    nvinfer1::ITensor* in_end) {
-  auto start = bump_if_negtive(ctx, in_shape, in_start);
-  auto out_start = clamp_to_input_dim(ctx, start, in_shape);
-  auto end = bump_if_negtive(ctx, in_shape, in_end);
-  auto out_end = clamp_to_input_dim(ctx, end, in_shape);
+    nvinfer1::ITensor* in_end,
+    int nbdims) {
+  auto start = bump_if_negtive(ctx, in_shape, in_start, nbdims);
+  auto out_start = clamp_to_input_dim(ctx, start, in_shape, nbdims);
+  auto end = bump_if_negtive(ctx, in_shape, in_end, nbdims);
+  auto out_end = clamp_to_input_dim(ctx, end, in_shape, nbdims);
   std::vector<nvinfer1::ITensor*> outputs;
   outputs.push_back(out_start);
   outputs.push_back(out_end);
