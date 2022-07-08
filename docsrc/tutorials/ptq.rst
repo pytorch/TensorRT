@@ -181,7 +181,7 @@ a TensorRT calibrator by providing desired configuration. The following code dem
                  "disable_tf32": False
              }
          }
-    trt_mod = torch_tensorrt.compile(model, compile_spec)
+    trt_mod = torch_tensorrt.compile(model, **compile_spec)
 
 In the cases where there is a pre-existing calibration cache file that users want to use, ``CacheCalibrator`` can be used without any dataloaders. The following example demonstrates how
 to use ``CacheCalibrator`` to use in INT8 mode.
@@ -196,7 +196,7 @@ to use ``CacheCalibrator`` to use in INT8 mode.
         "calibrator": calibrator,
     }
 
-  trt_mod = torch_tensorrt.compile(model, compile_settings)
+  trt_mod = torch_tensorrt.compile(model, **compile_settings)
 
 If you already have an existing calibrator class (implemented directly using TensorRT API), you can directly set the calibrator field to your class which can be very convenient.
 For a demo on how PTQ can be performed on a VGG network using Torch-TensorRT API, you can refer to https://github.com/pytorch/TensorRT/blob/master/tests/py/test_ptq_dataloader_calibrator.py
