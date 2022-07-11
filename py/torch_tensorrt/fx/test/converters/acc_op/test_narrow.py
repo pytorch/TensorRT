@@ -27,5 +27,33 @@ class TestNarrowConverter(AccTestCase):
         )
 
 
+# Testing with (-1, -1, -1 , -1) results in following error:
+# AssertionError: Can't chunk on dynamic shape dimension!
+"""
+class TestNarrowConverterWithDynamicShape(AccTestCase):
+    @parameterized.expand(
+        [
+            ("positive_dim", 1, 0, 1),
+            ("negative_dim", -1, 1, 2),
+        ]
+    )
+    def test_narrow(self, _, dim, start, length):
+        class Narrow(nn.Module):
+            def forward(self, x):
+                return x.narrow(dim, start, length)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 5, 5), (2, 3, 5, 5), (2, 3, 5, 5))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            Narrow(), input_specs, expected_ops={acc_ops.slice_tensor}
+        )
+"""
+
 if __name__ == "__main__":
     run_tests()

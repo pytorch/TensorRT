@@ -104,10 +104,13 @@ class LowerTrtInterpreter:
                     ),
                     self.lower_setting.opt_profile_replica,
                 )
-                if self.lower_setting.explicit_batch_dimension and self.lower_setting.dynamic_batch
+                if self.lower_setting.explicit_batch_dimension
+                and self.lower_setting.dynamic_batch
                 else InputTensorSpec.from_tensors(input)
             )
         )
+        logger.info(f"{split_name=} {input_specs_val=}")
+
         # Prepare algorithm selector and timing_cache for TRTInterpreter
         algo_selector = None
         if self.lower_setting.algo_selector:

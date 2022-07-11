@@ -148,6 +148,52 @@ class TestGetitemConverter(AccTestCase):
             Getitem(idx), input_specs, expected_ops={acc_ops.getitem}
         )
 
+    # Testing with following parameters results into Error:
+    # AssertionError: We don't support slicing tensor on dynamic shape.
+
+    """
+        ("ellipsis", (slice(None, None, None), ..., slice(0, -3, 2))),
+        (
+            "slice_end_none",
+            (slice(None, None, None), slice(None, None, None), slice(1, None, 1)),
+        ),
+        (
+            "slice_step_none",
+            (slice(None, None, None), slice(None, None, None), slice(0, 3, None)),
+        ),
+    """
+
+    @parameterized.expand(
+        [
+            ("slice_batch_dim", slice(None, None, None)),
+            (
+                "slice_all_none",
+                (slice(None, None, None), slice(None, None, None)),
+            ),
+        ]
+    )
+    def test_getitem_with_dynamic_shape_four_dimensions(self, _, idx):
+        class Getitem(nn.Module):
+            def __init__(self, idx):
+                super().__init__()
+                self.idx = idx
+
+            def forward(self, x):
+                x = x + x
+                return x[self.idx]
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (3, 3, 3, 3), (5, 5, 5, 5))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            Getitem(idx), input_specs, expected_ops={acc_ops.getitem}
+        )
+
 
 if __name__ == "__main__":
     run_tests()

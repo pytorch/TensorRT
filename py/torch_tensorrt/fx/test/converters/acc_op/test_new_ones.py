@@ -46,5 +46,58 @@ class TestNewOnesConverter(AccTestCase):
         )
 
 
+class TestNewOnesConverterWithDynamicShape(AccTestCase):
+    def test_newone(self):
+        class TestModule(nn.Module):
+            def forward(self, x):
+                return x.new_ones((3, 5), dtype=torch.float16)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (2, 3, 4, 5), (2, 3, 10, 10))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.new_ones}
+        )
+
+    def test_newone_no_dtype(self):
+        class TestModule(nn.Module):
+            def forward(self, x):
+                return x.new_ones((3, 5))
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (2, 3, 4, 5), (2, 3, 10, 10))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.new_ones}
+        )
+
+    def test_newone_device(self):
+        class TestModule(nn.Module):
+            def forward(self, x):
+                return x.new_ones((3, 5), device="cuda")
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (2, 3, 4, 5), (2, 3, 10, 10))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.new_ones}
+        )
+
+
 if __name__ == "__main__":
     run_tests()

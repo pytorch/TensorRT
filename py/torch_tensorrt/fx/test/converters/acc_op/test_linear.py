@@ -52,6 +52,9 @@ class TestLinearConverter(AccTestCase):
             expected_ops={acc_ops.linear},
         )
 
+    # Testing with (-1, -1, 512) results into following error:
+    # AssertionError: Currently we only support one dynmaic dim for linear and it can't be the last dim.
+
 
 if __name__ == "__main__":
     run_tests()

@@ -2,7 +2,7 @@ import torch
 import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase
+from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase, InputTensorSpec
 
 
 class TestLogicalXorMethodSimpleConverter(AccTestCase):
@@ -42,6 +42,30 @@ class TestLogicalXorMethodSimpleConverter(AccTestCase):
             inputs,
             expected_ops={acc_ops.logical_xor},
             test_implicit_batch_dim=False,
+        )
+
+
+class TestLogicalXorMethodSimpleConverterWithDynamicShape(AccTestCase):
+    def test_logical_xor(self):
+        class LogicalXor(torch.nn.Module):
+            def forward(self, x, y):
+                return x.logical_xor(y)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (2, 3, 4, 5), (2, 3, 10, 10))],
+            ),
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (2, 3, 4, 5), (2, 3, 10, 10))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            LogicalXor(), input_specs, expected_ops={acc_ops.logical_xor}
         )
 
 
@@ -85,6 +109,30 @@ class TestLogicalXorFunctionSimpleConverter(AccTestCase):
         )
 
 
+class TestLogicalXorFunctionSimpleConverterWithDynamicShape(AccTestCase):
+    def test_logical_xor(self):
+        class LogicalXor(torch.nn.Module):
+            def forward(self, x, y):
+                return torch.logical_xor(x, y)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (2, 3, 4, 5), (2, 3, 10, 10))],
+            ),
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (2, 3, 4, 5), (2, 3, 10, 10))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            LogicalXor(), input_specs, expected_ops={acc_ops.logical_xor}
+        )
+
+
 class TestLogicalXorOperatorSimpleConverter(AccTestCase):
     @parameterized.expand(
         [
@@ -122,6 +170,30 @@ class TestLogicalXorOperatorSimpleConverter(AccTestCase):
             inputs,
             expected_ops={acc_ops.logical_xor},
             test_implicit_batch_dim=False,
+        )
+
+
+class TestLogicalXorOperatorSimpleConverterWithDynamicShape(AccTestCase):
+    def test_logical_xor(self):
+        class LogicalXor(torch.nn.Module):
+            def forward(self, x, y):
+                return x ^ y
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.bool,
+                shape_ranges=[((1, 1, 5, 5), (2, 3, 5, 5), (2, 3, 5, 5))],
+            ),
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.bool,
+                shape_ranges=[((1, 1, 5, 5), (2, 3, 5, 5), (2, 3, 5, 5))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            LogicalXor(), input_specs, expected_ops={acc_ops.logical_xor}
         )
 
 
