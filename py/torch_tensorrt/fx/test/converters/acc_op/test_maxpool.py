@@ -259,6 +259,121 @@ class TestMaxPoolConverter(AccTestCase):
         inputs = [torch.randn(1, 3, 32, 32, 32)]
         self.run_test(TestModule(), inputs, expected_ops={acc_ops.max_pool3d})
 
+    @parameterized.expand(
+        [
+            ("default", 1),
+            param("stride", 2, stride=()),
+        ]
+    )
+    def test_stride_none_max_pool1d_with_dynamic_shape(
+        self,
+        test_name,
+        kernel_size,
+        stride=None,
+        padding=0,
+        dilation=1,
+        ceil_mode=False,
+    ):
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, x):
+                return torch.nn.functional.max_pool1d(
+                    x,
+                    kernel_size,
+                    stride=stride,
+                    padding=padding,
+                    ceil_mode=ceil_mode,
+                    dilation=dilation,
+                )
+
+        # shape is not set to (-1, -1, -1) as reshape dimension with
+        # more than one -1 wildcard is not allowed while adding unsqueeze layer
+        input_specs = [
+            InputTensorSpec(
+                shape=(1, 1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1), (1, 1, 4), (1, 1, 4))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            TestModule(),
+            input_specs,
+            expected_ops={acc_ops.max_pool1d},
+        )
+
+    @parameterized.expand(
+        [
+            ("default", 1),
+            param("stride", 2, stride=()),
+        ]
+    )
+    def test_stride_none_max_pool2d_with_dynamic_shape(
+        self,
+        test_name,
+        kernel_size,
+        stride=None,
+        padding=0,
+        ceil_mode=False,
+    ):
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, x):
+                return torch.nn.functional.max_pool2d(
+                    x, kernel_size, stride=stride, padding=padding, ceil_mode=ceil_mode
+                )
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (1, 2, 4, 4), (2, 4, 4, 4))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.max_pool2d}
+        )
+
+    @parameterized.expand(
+        [
+            ("default", 1),
+            param("stride", 2, stride=()),
+        ]
+    )
+    def test_stride_none_max_pool3d_with_dynamic_shape(
+        self,
+        test_name,
+        kernel_size,
+        stride=None,
+        padding=0,
+        ceil_mode=False,
+    ):
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, x):
+                return torch.nn.functional.max_pool3d(
+                    x, kernel_size, stride=stride, padding=padding, ceil_mode=ceil_mode
+                )
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1, 1), (1, 2, 4, 4, 4), (2, 4, 4, 4, 4))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.max_pool3d}
+        )
+
 
 if __name__ == "__main__":
     run_tests()

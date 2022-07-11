@@ -30,6 +30,23 @@ class TestELUConverter(AccTestCase):
             TestModule(), input_specs, expected_ops={acc_ops.elu}
         )
 
+    def test_elu_with_dynamic_shape_four_dimensions(self):
+        class TestModule(nn.Module):
+            def forward(self, x):
+                return nn.functional.elu(x)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (1, 2, 3, 5), (3, 3, 3, 5))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.elu}
+        )
+
 
 if __name__ == "__main__":
     run_tests()

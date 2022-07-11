@@ -49,7 +49,7 @@ def build_int8_trt(rn18):
         # uncomment to check per channel quant works
         weight=torch.quantization.default_per_channel_weight_observer,
     )
-    prepared = prepare_fx(rn18, {"": qconfig})
+    prepared = prepare_fx(rn18, {"": qconfig}, data)
     for _ in range(10):
         prepared(data)
     quantized_rn18 = convert_to_reference(prepared)

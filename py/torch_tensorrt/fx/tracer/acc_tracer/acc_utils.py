@@ -10,7 +10,6 @@ from torch.fx.graph_module import GraphModule
 from torch.fx.immutable_collections import immutable_list
 from torch.fx.node import _get_qualified_name
 from torch.fx.passes import graph_drawer
-from torch.fx.passes.graph_manipulation import serialize_module
 from torch.fx.passes.shape_prop import TensorMetadata
 
 
@@ -75,13 +74,6 @@ def is_acc_op_with_kwarg(
     )
     assert not isinstance(target, str)
     return kwarg in inspect.signature(inspect.unwrap(target)).parameters
-
-
-def serialize_module_json_to_file(fx_module: GraphModule, fname: str):
-    weights: Dict = {}
-    serialized_json = json.dumps(serialize_module(fx_module, weights), indent=2)
-    with open(fname, "w") as ofile:
-        ofile.write(serialized_json)
 
 
 def build_raw_tensor_meta(
