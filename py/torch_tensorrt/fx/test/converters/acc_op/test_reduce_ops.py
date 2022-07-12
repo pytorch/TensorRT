@@ -1,8 +1,8 @@
-import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
 import torch
+import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from parameterized import parameterized
-from torch.testing._internal.common_fx2trt import AccTestCase
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase
 
 reduce_ops = [(torch.sum, acc_ops.sum), (torch.mean, acc_ops.mean)]
 

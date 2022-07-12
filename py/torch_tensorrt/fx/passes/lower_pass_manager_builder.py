@@ -1,16 +1,16 @@
 from functools import partial, wraps
-from typing import Any, Callable, NamedTuple, Sequence
+from typing import Any, Callable, Sequence
 
 import torch
-from ..lower_setting import LowerSetting
-from ..observer import Observer
-from .passes.remove_duplicate_output_args import (
-    remove_duplicate_output_args,
-)
 from torch import nn
 from torch.fx.passes.pass_manager import inplace_wrapper, PassManager
 from torch.fx.passes.shape_prop import ShapeProp
 from torch.fx.passes.splitter_base import SplitResult
+
+from ..lower_setting import LowerSetting
+from ..observer import Observer
+from ..passes.remove_duplicate_output_args import remove_duplicate_output_args
+from .graph_opts import common_subexpression_elimination
 
 from .lower_basic_pass import run_const_fold
 
@@ -23,7 +23,7 @@ Input = Sequence[Any]
 # List of observers. We can subscribe to them by calling its `add(callback)`
 # function from anywhere in code:
 #
-# >>> from fx2trt_oss.fx.lower import FUSE_PASSES_POST_OBSERVER
+# >>> from torch_tensorrt.fx.lower import FUSE_PASSES_POST_OBSERVER
 # >>> with FUSE_PASSES_POST_OBSERVER.add(print_module_and_input):
 # >>>     # print_module_and_input will be called right after the fuse passes
 # >>>     lower(module, sample_input)
@@ -95,6 +95,8 @@ class LowerPassManagerBuilder:
             passes.append(wrapper(p, self._input))
         for p in self.lower_setting.lower_basic_fuse_pass.passes:
             passes.append(wrapper(p, self._input))
+
+        passes.append(inplace_wrapper(common_subexpression_elimination))
         passes.append(
             inplace_wrapper(lambda m: FUSE_PASSES_POST_OBSERVER.observe(m, self._input))
         )

@@ -1,14 +1,14 @@
 # Owner(s): ["oncall: gpu_enablement"]
 
-import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
 import torch
-from fx2trt_oss.fx.passes.lower_basic_pass import (
+import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
+from parameterized import param, parameterized
+from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt.fx.passes.lower_basic_pass import (
     fuse_permute_matmul,
     trt_transposed_matmul,
 )
-from parameterized import param, parameterized
-from torch.testing._internal.common_fx2trt import AccTestCase
-from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase
 
 
 def tranpose_last_two_dims(x):

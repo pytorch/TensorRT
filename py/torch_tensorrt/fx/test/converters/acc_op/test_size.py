@@ -1,8 +1,8 @@
-import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
 import torch
 import torch.nn as nn
-from torch.testing._internal.common_fx2trt import AccTestCase, InputTensorSpec
+import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase, InputTensorSpec
 
 
 class TestSizeConverter(AccTestCase):
@@ -44,6 +44,24 @@ class TestSizeConverter(AccTestCase):
                 shape_ranges=[((1, 12, 32), (3, 12, 32), (100, 12, 32))],
             ),
         ]
+        self.run_test_with_dynamic_shape(
+            Size(), input_specs, expected_ops={acc_ops.size}
+        )
+
+    def test_size_dynamic_shape_four_dimensions(self):
+        class Size(nn.Module):
+            def forward(self, x):
+                bs = x.size(0)
+                return x.view(bs, -1)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 12, 32, 3), (3, 12, 32, 3), (100, 12, 32, 3))],
+            ),
+        ]
+
         self.run_test_with_dynamic_shape(
             Size(), input_specs, expected_ops={acc_ops.size}
         )

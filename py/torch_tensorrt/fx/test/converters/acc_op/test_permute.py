@@ -1,9 +1,9 @@
-import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
 import torch
 import torch.nn as nn
+import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from parameterized import parameterized
-from torch.testing._internal.common_fx2trt import AccTestCase, InputTensorSpec
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase, InputTensorSpec
 
 
 class TestPermuteConverter(AccTestCase):
@@ -61,6 +61,23 @@ class TestPermuteConverter(AccTestCase):
                 shape_ranges=[((1, 1, 1), (1, 2, 3), (3, 3, 3))],
             ),
         ]
+        self.run_test_with_dynamic_shape(
+            Permute(), input_specs, expected_ops={acc_ops.permute}
+        )
+
+    def test_permute_with_dynamic_shape_four_dimensions(self):
+        class Permute(nn.Module):
+            def forward(self, x):
+                return x.permute(1, 2, 3, 0)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 5), (1, 2, 3, 5), (3, 3, 3, 5))],
+            ),
+        ]
+
         self.run_test_with_dynamic_shape(
             Permute(), input_specs, expected_ops={acc_ops.permute}
         )

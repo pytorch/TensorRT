@@ -1,8 +1,8 @@
-import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
 import torch
+import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from parameterized import parameterized
-from torch.testing._internal.common_fx2trt import AccTestCase
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase, InputTensorSpec
 
 
 class TestAndMethodSimpleConverter(AccTestCase):
@@ -55,6 +55,30 @@ class TestAndMethodSimpleConverter(AccTestCase):
             inputs,
             expected_ops={acc_ops.logical_and},
             test_implicit_batch_dim=False,
+        )
+
+
+class TestAndMethodSimpleConverterWithDynamicShape(AccTestCase):
+    def test_and(self):
+        class And(torch.nn.Module):
+            def forward(self, x, y):
+                return x.logical_and(y)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (2, 3, 4, 5), (2, 3, 10, 10))],
+            ),
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (2, 3, 4, 5), (2, 3, 10, 10))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            And(), input_specs, expected_ops={acc_ops.logical_and}
         )
 
 
@@ -175,6 +199,30 @@ class TestAndOperatorConstantConverter(AccTestCase):
             inputs,
             expected_ops={acc_ops.bitwise_and},
             test_implicit_batch_dim=False,
+        )
+
+
+class TestAndFunctionSimpleConverterWithDynamicShape(AccTestCase):
+    def test_and(self):
+        class And(torch.nn.Module):
+            def forward(self, x, y):
+                return torch.logical_and(x, y)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.bool,
+                shape_ranges=[((1, 1, 5, 5), (2, 3, 5, 5), (2, 3, 5, 5))],
+            ),
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.bool,
+                shape_ranges=[((1, 1, 5, 5), (2, 3, 5, 5), (2, 3, 5, 5))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            And(), input_specs, expected_ops={acc_ops.logical_and}
         )
 
 

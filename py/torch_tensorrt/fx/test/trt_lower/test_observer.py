@@ -4,8 +4,8 @@ import typing as t
 from contextlib import contextmanager
 from unittest import TestCase
 
-import fx2trt_oss.fx.observer as ob
-from fx2trt_oss.fx.observer import observable
+import torch_tensorrt.fx.observer as ob
+from torch_tensorrt.fx.observer import observable
 
 
 def set_observer_callback_rethrow(fn):

@@ -1,12 +1,12 @@
 # type: ignore[]
 
-import fx2trt_oss.tracer.acc_tracer.acc_tracer as acc_tracer
 import torch
 import torch.fx
 import torch.nn as nn
-from fx2trt_oss.fx import InputTensorSpec, TRTInterpreter, TRTModule
-from fx2trt_oss.fx.tools.trt_splitter import TRTSplitter
-
+from torch_tensorrt.fx.utils import LowerPrecision
+import torch_tensorrt.fx.tracer.acc_tracer.acc_tracer as acc_tracer
+from torch_tensorrt.fx import InputTensorSpec, TRTInterpreter, TRTModule
+from torch_tensorrt.fx.tools.trt_splitter import TRTSplitter
 
 # The purpose of this example is to demonstrate the overall flow of lowering a PyTorch
 # model to TensorRT via FX with existing FX based tooling. The general lowering flow
@@ -30,11 +30,12 @@ class Model(nn.Module):
         x = self.linear(x)
         x = self.relu(x)
         x = torch.linalg.norm(x, ord=2, dim=1)
+        x = self.relu(x)
         return x
 
 
-inputs = [torch.randn(1, 10)]
-model = Model().eval()
+inputs = [torch.randn((1, 10), device=torch.device('cuda'))]
+model = Model().cuda().eval()
 
 # acc_tracer is a custom fx tracer that maps nodes whose targets are PyTorch operators
 # to acc ops.
@@ -64,58 +65,80 @@ acc_ops.linalg_norm: ((), {'input': torch.float32})
 # Split.
 split_mod = splitter()
 
-# After split we have two submodules, _run_on_acc_0 and _run_on_gpu_1.
+# After split we have three submodules, _run_on_acc_0 and _run_on_gpu_1.
 print(split_mod.graph)
 """
 graph():
     %x : [#users=1] = placeholder[target=x]
     %_run_on_acc_0 : [#users=1] = call_module[target=_run_on_acc_0](args = (%x,), kwargs = {})
     %_run_on_gpu_1 : [#users=1] = call_module[target=_run_on_gpu_1](args = (%_run_on_acc_0,), kwargs = {})
-    return _run_on_gpu_1
+    %_run_on_acc_2 : [#users=1] = call_module[target=_run_on_acc_2](args = (%_run_on_gpu_1,), kwargs = {})
+    return _run_on_acc_2
 """
 
 # Take a look at what inside each submodule. _run_on_acc_0 contains linear and relu while
-# _run_on_gpu_1 contains linalg_norm which currently is not supported by fx2trt.
+# _run_on_gpu_1 contains linalg_norm which currently is not supported by fx2trt. _run_on_acc_3
+# is the another submodule supported.
 print(split_mod._run_on_acc_0.graph)
 print(split_mod._run_on_gpu_1.graph)
+print(split_mod._run_on_acc_2.graph)
 """
 graph():
     %x : [#users=1] = placeholder[target=x]
     %linear_weight : [#users=1] = get_attr[target=linear.weight]
     %linear_bias : [#users=1] = get_attr[target=linear.bias]
-    %linear_1 : [#users=1] = call_function[target=fx2trt_oss.tracer.acc_tracer.acc_ops.linear](args = (), ...
-    %relu_1 : [#users=1] = call_function[target=fx2trt_oss.tracer.acc_tracer.acc_ops.relu](args = (), ...
+    %linear_1 : [#users=1] = call_function[target=torch_tensorrt.fx.tracer.acc_tracer.acc_ops.linear](args = (), ...
+    %relu_1 : [#users=1] = call_function[target=torch_tensorrt.fx.tracer.acc_tracer.acc_ops.relu](args = (), ...
     return relu_1
 graph():
     %relu_1 : [#users=1] = placeholder[target=relu_1]
-    %linalg_norm_1 : [#users=1] = call_function[target=fx2trt_oss.tracer.acc_tracer.acc_ops.linalg_norm](args = (), ...
+    %linalg_norm_1 : [#users=1] = call_function[target=torch_tensorrt.fx.tracer.acc_tracer.acc_ops.linalg_norm](args = (), ...
     return linalg_norm_1
+graph():
+    %linalg_norm_1 : [#users=1] = placeholder[target=linalg_norm_1]
+    %relu_3 : [#users=1] = call_function[target=torch_tensorrt.fx.tracer.acc_tracer.acc_ops.relu](args = (), kwargs = {input: %linalg_norm_1, inplace: False})
+    return relu_3
 """
 
-# Now let's lower split_mod._run_on_acc_0. If we know the model can be fully lowered,
-# we can skip the splitter part.
-interp = TRTInterpreter(split_mod._run_on_acc_0, InputTensorSpec.from_tensors(inputs))
-r = interp.run()
-trt_mod = TRTModule(r.engine, r.input_names, r.output_names)
-split_mod._run_on_acc_0 = trt_mod
+def get_submod_inputs(mod, submod, inputs):
+    acc_inputs = None
 
-cuda_inputs = [input.cuda() for input in inputs]
-split_mod.cuda()
-lowered_model_output = split_mod(*cuda_inputs)
+    def get_input(self, inputs):
+        nonlocal acc_inputs
+        acc_inputs = inputs
+
+    handle = submod.register_forward_pre_hook(get_input)
+    mod(*inputs)
+    handle.remove()
+    return acc_inputs
+
+# Since the model is splitted into three segments. We need to lower each TRT eligible segment.
+# If we know the model can be fully lowered, we can skip the splitter part.
+for name, _ in split_mod.named_children():
+    if "_run_on_acc" in name:
+        submod = getattr(split_mod, name)
+        # Get submodule inputs for fx2trt
+        acc_inputs = get_submod_inputs(split_mod, submod, inputs)
+
+        # fx2trt replacement
+        interp = TRTInterpreter(
+            submod,
+            InputTensorSpec.from_tensors(acc_inputs),
+            explicit_batch_dimension=True,
+        )
+        r = interp.run(lower_precision=LowerPrecision.FP32)
+        trt_mod = TRTModule(*r)
+        setattr(split_mod, name, trt_mod)
+
+lowered_model_output = split_mod(*inputs)
+
+# Save and load model
+torch.save(split_mod, "trt.pt")
+reload_trt_mod = torch.load("trt.pt")
+reload_model_output = reload_trt_mod(*inputs)
 
 # Make sure the results match
-model.cuda()
-regular_model_output = model(*cuda_inputs)
+regular_model_output = model(*inputs)
 torch.testing.assert_close(
-    lowered_model_output, regular_model_output.to(torch.float16), atol=3e-3, rtol=1e-2
+    reload_model_output, regular_model_output, atol=3e-3, rtol=1e-2
 )
-
-# We can utilize the trt profiler to print out the time spend on each layer.
-trt_mod.enable_profiling()
-trt_mod(*cuda_inputs)
-"""
-Reformatting CopyNode for Input Tensor 0 to LayerType.FULLY_CONNECTED_acc_ops.linear_linear_1: 0.027392ms
-LayerType.FULLY_CONNECTED_acc_ops.linear_linear_1: 0.023072ms
-PWN(ActivationType.RELU_acc_ops.relu_relu_1): 0.008928ms
-"""
-trt_mod.disable_profiling()

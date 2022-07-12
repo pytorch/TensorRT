@@ -1,16 +1,20 @@
 import copy
 
-import fx2trt_oss.tracer.acc_tracer.acc_tracer as acc_tracer
-
 # @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch.fx
+
+import torch_tensorrt.fx.tracer.acc_tracer.acc_tracer as acc_tracer
 import torchvision.models as models
-from fx2trt_oss.fx import InputTensorSpec, TRTInterpreter, TRTModule
-from fx2trt_oss.fx.utils import LowerPrecision
-from torch.ao.quantization.quantize_fx import convert_fx, prepare_fx
+from torch.ao.quantization.quantize_fx import (
+    convert_fx,
+    convert_to_reference,
+    prepare_fx,
+)
 from torch.fx.experimental.normalize import NormalizeArgs
 from torch.fx.passes import shape_prop
+from torch_tensorrt.fx import InputTensorSpec, TRTInterpreter, TRTModule
+from torch_tensorrt.fx.utils import LowerPrecision
 
 rn18 = models.resnet18().eval()
 
@@ -45,10 +49,10 @@ def build_int8_trt(rn18):
         # uncomment to check per channel quant works
         weight=torch.quantization.default_per_channel_weight_observer,
     )
-    prepared = prepare_fx(rn18, {"": qconfig})
+    prepared = prepare_fx(rn18, {"": qconfig}, data)
     for _ in range(10):
         prepared(data)
-    quantized_rn18 = convert_fx(prepared, is_reference=True)
+    quantized_rn18 = convert_to_reference(prepared)
     ref_res = quantized_rn18(data)
     print("quantized model:", quantized_rn18)
 

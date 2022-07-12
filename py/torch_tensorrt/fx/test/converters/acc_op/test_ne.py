@@ -1,8 +1,8 @@
-import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
 import torch
+import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from parameterized import parameterized
-from torch.testing._internal.common_fx2trt import AccTestCase
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase, InputTensorSpec
 
 
 class TestNeFunctionConverter(AccTestCase):
@@ -55,6 +55,28 @@ class TestNeFunctionConverter(AccTestCase):
         )
 
 
+class TestNeFunctionConverterWithDynamicShape(AccTestCase):
+    def test_ne(self):
+        class Ne(torch.nn.Module):
+            def forward(self, x, y):
+                return torch.ne(x, y)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (2, 3, 4, 5), (2, 3, 10, 10))],
+            ),
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (2, 3, 4, 5), (2, 3, 10, 10))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(Ne(), input_specs, expected_ops={acc_ops.ne})
+
+
 class TestNeMethodConverter(AccTestCase):
     @parameterized.expand(
         [
@@ -105,6 +127,28 @@ class TestNeMethodConverter(AccTestCase):
         )
 
 
+class TestNeMethodConverterWithDynamicShape(AccTestCase):
+    def test_ne(self):
+        class Ne(torch.nn.Module):
+            def forward(self, x, y):
+                return x.ne(y)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (2, 3, 4, 5), (2, 3, 10, 10))],
+            ),
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (2, 3, 4, 5), (2, 3, 10, 10))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(Ne(), input_specs, expected_ops={acc_ops.ne})
+
+
 class TestNeOperatorConverter(AccTestCase):
     @parameterized.expand(
         [
@@ -153,6 +197,28 @@ class TestNeOperatorConverter(AccTestCase):
         self.run_test(
             Ne(), inputs, expected_ops={acc_ops.ne}, test_implicit_batch_dim=False
         )
+
+
+class TestNeOperatorConverterWithDynamicShape(AccTestCase):
+    def test_ne(self):
+        class Ne(torch.nn.Module):
+            def forward(self, x, y):
+                return x != y
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (2, 3, 4, 5), (2, 3, 10, 10))],
+            ),
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (2, 3, 4, 5), (2, 3, 10, 10))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(Ne(), input_specs, expected_ops={acc_ops.ne})
 
 
 class TestNeOperatorConstantConverter(AccTestCase):
@@ -212,6 +278,26 @@ class TestConstInputConverter(AccTestCase):
         self.run_test(
             Ne(), inputs, expected_ops={acc_ops.ne}, test_implicit_batch_dim=False
         )
+
+
+class TestConstInputConverterWithDynamicShape(AccTestCase):
+    def test_ne(self):
+        class Ne(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, x):
+                return x.shape[0] != 4
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 5, 5), (2, 3, 5, 5), (2, 3, 5, 5))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(Ne(), input_specs, expected_ops={acc_ops.ne})
 
 
 if __name__ == "__main__":

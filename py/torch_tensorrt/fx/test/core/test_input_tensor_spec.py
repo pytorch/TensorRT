@@ -3,8 +3,8 @@
 from typing import List, Optional
 
 import torch
-from fx2trt_oss.fx import InputTensorSpec
 from torch.testing._internal.common_utils import run_tests, TestCase
+from torch_tensorrt.fx import InputTensorSpec
 
 
 class TestTRTModule(TestCase):

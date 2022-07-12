@@ -1,11 +1,12 @@
 from typing import Callable
 
-import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
 import torch
 import torch.nn as nn
+
+import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from parameterized import parameterized
-from torch.testing._internal.common_fx2trt import AccTestCase, InputTensorSpec
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase, InputTensorSpec
 
 NEED_TEST_BOTH_CONSTANTS_CASE = True
 
@@ -136,6 +137,46 @@ class TestBinaryOpConverters(AccTestCase):
                 shape=y_shape,
                 dtype=torch.float32,
                 shape_ranges=[y_shape_ranges],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(Op(), input_specs, expected_ops={expected_op})
+
+    @parameterized.expand(
+        [
+            (
+                f"no_broadcast_{op[1].__name__}",
+                op[0],
+                op[1],
+            )
+            for op in elementwise_ops
+        ]
+        + [
+            (
+                f"broadcast_{op[1].__name__}",
+                op[0],
+                op[1],
+            )
+            for op in elementwise_ops
+        ]
+    )
+    def test_elementwise_op_with_dynamic_shape_four_dimensions(
+        self, _, orig_op, expected_op
+    ):
+        class Op(nn.Module):
+            def forward(self, x, y):
+                return orig_op(x, y)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (3, 3, 3, 3), (5, 5, 5, 5))],
+            ),
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (3, 3, 3, 3), (5, 5, 5, 5))],
             ),
         ]
 

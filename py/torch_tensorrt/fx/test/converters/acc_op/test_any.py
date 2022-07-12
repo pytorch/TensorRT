@@ -1,9 +1,11 @@
-import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
 import torch
 import torch.nn as nn
+import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from parameterized import parameterized
-from torch.testing._internal.common_fx2trt import AccTestCase
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase
+
+# from torch_tensorrt.fx.tools.common_fx2trt import InputTensorSpec
 
 
 class TestAnyConverters(AccTestCase):
@@ -63,6 +65,26 @@ class TestAnyConverters(AccTestCase):
             expected_ops={acc_ops.any},
             test_implicit_batch_dim=False,
         )
+
+    # Testing with shape (-1, -1, -1, -1) results into error: torch.zeros(tuple([*input_t.shape])). Trying to create tensor with negative dimension -1: [-1, -1, -1, -1]
+    """
+    def test_ops_with_dynamic_shape_four_dimensions(self):
+        class TestModule(nn.Module):
+            def forward(self, x):
+                return torch.any(x)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 256, 256), (3, 3, 256, 256), (5, 5, 256, 256))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.any}
+        )
+    """
 
 
 if __name__ == "__main__":

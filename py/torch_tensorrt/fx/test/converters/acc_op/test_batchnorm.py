@@ -1,7 +1,7 @@
-import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
 import torch
-from torch.testing._internal.common_fx2trt import AccTestCase, InputTensorSpec
+import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase, InputTensorSpec
 
 
 class TestBatchNormConverter(AccTestCase):
@@ -37,6 +37,8 @@ class TestBatchNormConverter(AccTestCase):
         self.run_test_with_dynamic_shape(
             TestModule(), input_specs, expected_ops={acc_ops.batch_norm}
         )
+
+    # Testing with shape=(-1, -1, -1, -1) results in AssertionError: Channel dim can't be dynamic for batch norm.
 
 
 if __name__ == "__main__":

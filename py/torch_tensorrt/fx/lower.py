@@ -2,23 +2,27 @@ import dataclasses as dc
 import logging
 from typing import Any, Callable, Sequence
 
-from .tracer.acc_tracer import acc_tracer
-
 # @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch
 import torch.fx as fx
 import torch.nn as nn
-from .lower_setting import LowerSetting
-from .passes.pass_utils import decorate_method, validate_inference
-from .passes.splitter_base import SplitResult
+from torch.fx.passes.splitter_base import SplitResult
 
 from .fx2trt import TRTInterpreter, TRTInterpreterResult
 from .input_tensor_spec import InputTensorSpec
+from .lower_setting import LowerSetting
 from .passes.lower_pass_manager_builder import LowerPassManagerBuilder
-from .passes.pass_utils import chain_passes, PassFunc
+from .passes.pass_utils import (
+    chain_passes,
+    decorate_method,
+    PassFunc,
+    validate_inference,
+)
 from .tools.timing_cache_utils import TimingCacheManager
 from .tools.trt_splitter import TRTSplitter, TRTSplitterSetting
+
+from .tracer.acc_tracer import acc_tracer
 from .trt_module import TRTModule
 from .utils import LowerPrecision
 
@@ -38,6 +42,7 @@ def lower_to_trt(
     timing_cache_prefix="",
     save_timing_cache=False,
     cuda_graph_batch_size=-1,
+    dynamic_batch=False,
 ) -> nn.Module:
     """
     Takes in original module, input and lowering setting, run lowering workflow to turn module
@@ -67,6 +72,7 @@ def lower_to_trt(
         timing_cache_prefix=timing_cache_prefix,
         save_timing_cache=save_timing_cache,
         cuda_graph_batch_size=cuda_graph_batch_size,
+        dynamic_batch=dynamic_batch,
     )
     lowerer = Lowerer.create(lower_setting=lower_setting)
     return lowerer(module, input)
@@ -88,8 +94,22 @@ class LowerTrtInterpreter:
         input_specs_val = (
             self.lower_setting.input_specs
             if self.lower_setting.input_specs
-            else InputTensorSpec.from_tensors(input)
+            else (
+                InputTensorSpec.from_tensors_with_dynamic_batch_size(
+                    input,
+                    (
+                        0,
+                        self.lower_setting.max_batch_size,
+                        self.lower_setting.max_batch_size,
+                    ),
+                    self.lower_setting.opt_profile_replica,
+                )
+                if self.lower_setting.explicit_batch_dimension
+                and self.lower_setting.dynamic_batch
+                else InputTensorSpec.from_tensors(input)
+            )
         )
+        logger.info(f"{split_name=} {input_specs_val=}")
 
         # Prepare algorithm selector and timing_cache for TRTInterpreter
         algo_selector = None

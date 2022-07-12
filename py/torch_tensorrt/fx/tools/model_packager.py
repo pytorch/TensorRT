@@ -102,9 +102,9 @@ class ModelPackager:
         pe.mock(
             "**",
             exclude=[
-                "fx2trt_oss.tracer.acc_tracer.acc_ops",
-                "fx2trt_oss.tracer.acc_tracer.acc_normalizer",
-                "fx2trt_oss.tracer.acc_tracer.acc_op_properties",
+                "torch_tensorrt.fx.tracer.acc_tracer.acc_ops",
+                "torch_tensorrt.fx.tracer.acc_tracer.acc_normalizer",
+                "torch_tensorrt.fx.tracer.acc_tracer.acc_op_properties",
             ],
         )
 

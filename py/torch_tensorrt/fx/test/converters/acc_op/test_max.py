@@ -1,8 +1,8 @@
-import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
 import torch
+import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from parameterized import parameterized
-from torch.testing._internal.common_fx2trt import AccTestCase
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase, InputTensorSpec
 
 
 class TestMaxConverter(AccTestCase):
@@ -76,6 +76,55 @@ class TestMaxConverter(AccTestCase):
 
         inputs = [torch.randn(3, 4), torch.randn(3, 4)]
         self.run_test(MaxMethod(), inputs, expected_ops={acc_ops.maximum})
+
+
+class TestMaxConverterWithDynamicShape(AccTestCase):
+    def test_max_full_reduce(
+        self,
+    ):
+        class MaxFullReduce(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, x):
+                return torch.max(x)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 5, 5), (2, 3, 5, 5), (2, 3, 5, 5))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            MaxFullReduce(), input_specs, expected_ops={acc_ops.max_full_reduce}
+        )
+
+    def test_max_method(self):
+        class MaxMethod(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, input, other):
+                return input.max(other)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 5, 5), (2, 3, 5, 5), (2, 3, 5, 5))],
+            ),
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 5, 5), (2, 3, 5, 5), (2, 3, 5, 5))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            MaxMethod(), input_specs, expected_ops={acc_ops.maximum}
+        )
 
 
 if __name__ == "__main__":

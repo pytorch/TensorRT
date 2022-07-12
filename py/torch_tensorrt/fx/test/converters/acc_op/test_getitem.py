@@ -1,9 +1,9 @@
-import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
 import torch
 import torch.nn as nn
+import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from parameterized import parameterized
-from torch.testing._internal.common_fx2trt import AccTestCase, InputTensorSpec
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase, InputTensorSpec
 
 
 class TestGetitemConverter(AccTestCase):
@@ -144,6 +144,52 @@ class TestGetitemConverter(AccTestCase):
                 shape_ranges=[((1, 128, 256), (3, 192, 256), (5, 256, 256))],
             ),
         ]
+        self.run_test_with_dynamic_shape(
+            Getitem(idx), input_specs, expected_ops={acc_ops.getitem}
+        )
+
+    # Testing with following parameters results into Error:
+    # AssertionError: We don't support slicing tensor on dynamic shape.
+
+    """
+        ("ellipsis", (slice(None, None, None), ..., slice(0, -3, 2))),
+        (
+            "slice_end_none",
+            (slice(None, None, None), slice(None, None, None), slice(1, None, 1)),
+        ),
+        (
+            "slice_step_none",
+            (slice(None, None, None), slice(None, None, None), slice(0, 3, None)),
+        ),
+    """
+
+    @parameterized.expand(
+        [
+            ("slice_batch_dim", slice(None, None, None)),
+            (
+                "slice_all_none",
+                (slice(None, None, None), slice(None, None, None)),
+            ),
+        ]
+    )
+    def test_getitem_with_dynamic_shape_four_dimensions(self, _, idx):
+        class Getitem(nn.Module):
+            def __init__(self, idx):
+                super().__init__()
+                self.idx = idx
+
+            def forward(self, x):
+                x = x + x
+                return x[self.idx]
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (3, 3, 3, 3), (5, 5, 5, 5))],
+            ),
+        ]
+
         self.run_test_with_dynamic_shape(
             Getitem(idx), input_specs, expected_ops={acc_ops.getitem}
         )

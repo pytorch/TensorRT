@@ -39,12 +39,14 @@ class TRTModule(torch.nn.Module):
         primary_input_outputs.update(self.output_binding_indices_in_order)
         self.hidden_output_binding_indices_in_order: Sequence[int] = []
         self.hidden_output_names: Sequence[str] = []
-        for i in range(self.engine.num_bindings):
+        for i in range(
+            self.engine.num_bindings // self.engine.num_optimization_profiles
+        ):
             if i not in primary_input_outputs:
                 self.hidden_output_binding_indices_in_order.append(i)
                 self.hidden_output_names.append(self.engine.get_binding_name(i))
 
-        assert self.engine.num_bindings == (
+        assert (self.engine.num_bindings // self.engine.num_optimization_profiles) == (
             len(self.input_names)
             + len(self.output_names)
             + len(self.hidden_output_names)

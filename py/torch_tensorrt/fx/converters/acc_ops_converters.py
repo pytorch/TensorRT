@@ -4,21 +4,20 @@ import operator
 import warnings
 from typing import cast, Dict, Optional, Sequence, Tuple, Union
 
-from ..tracer.acc_tracer import acc_ops
 import numpy as np
 
 # @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
 import torch
+
 from ..converter_registry import tensorrt_converter
+
+from ..tracer.acc_tracer import acc_ops
 from ..types import *  # noqa: F403
-from ..utils import (
-    get_dynamic_dims,
-    torch_dtype_from_trt,
-    torch_dtype_to_trt,
-)
 from torch.fx.immutable_collections import immutable_list
 from torch.fx.node import Argument, Target
+
+from ..utils import get_dynamic_dims, torch_dtype_from_trt, torch_dtype_to_trt
 
 from .converter_utils import *  # noqa: F403
 
@@ -93,10 +92,12 @@ def acc_ops_conv1d(
             kernel=weight,
             bias=bias,
         )
-    padding = kwargs["padding"]
-    padding = padding + (0,)
-    stride = extend_attr_to_tuple(kwargs["stride"], 1)
-    dilation = extend_attr_to_tuple(kwargs["dilation"], 1)
+    # expand params to 2d for computation
+    padding = list(kwargs["padding"])
+    padding.append(0)
+    stride = extend_attr_to_tuple(kwargs["stride"], 2)
+    dilation = extend_attr_to_tuple(kwargs["dilation"], 2)
+
     set_layer_name(layer, target, name)
     layer.stride_nd = stride
     layer.padding_nd = padding
@@ -2221,7 +2222,7 @@ def acc_ops_adaptive_avg_poolnd(
     extend_len = 2 if target == acc_ops.adaptive_avg_pool2d else 3
     assert all(
         input_val.shape[-(i + 1)] != -1 for i in range(extend_len)
-    ), "AdaptiveAvgPool2d currently doesn't support dynamic shapes for last two dims."
+    ), "AdaptiveAvgPool2d and AdaptiveAvgPool3d currently doesn't support dynamic shapes for last two dims."
 
     output_size = cast(
         Sequence[int], extend_attr_to_tuple(kwargs["output_size"], extend_len)

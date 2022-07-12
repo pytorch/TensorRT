@@ -2,9 +2,9 @@
 import functools
 from unittest import TestCase
 
-import fx2trt_oss.fx.observer as ob
-from fx2trt_oss.fx.passes.lower_basic_pass import fuse_permute_linear
+import torch_tensorrt.fx.observer as ob
 from test_observer import execution_verifier, set_observer_callback_rethrow
+from torch_tensorrt.fx.passes.lower_basic_pass import fuse_permute_linear
 
 
 class ObserverGPUTests(TestCase):
@@ -16,10 +16,11 @@ class ObserverGPUTests(TestCase):
         """
         from dataclasses import replace
 
-        import fx2trt_oss.fx.lower as lower
         import torch
         import torch.nn as nn
-        from fx2trt_oss.fx.lower_setting import LowerSetting
+
+        import torch_tensorrt.fx.lower as lower
+        from torch_tensorrt.fx.lower_setting import LowerSetting
 
         class Model(nn.Module):
             def forward(self, x, y):

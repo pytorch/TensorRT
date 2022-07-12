@@ -1,8 +1,8 @@
-import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
 import torch
+import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from parameterized import parameterized
-from torch.testing._internal.common_fx2trt import AccTestCase, InputTensorSpec
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase, InputTensorSpec
 
 
 class TestAdaptiveAvgPoolConverter(AccTestCase):
@@ -91,6 +91,8 @@ class TestAdaptiveAvgPoolConverter(AccTestCase):
         self.run_test_with_dynamic_shape(
             TestModule(), input_specs, expected_ops={acc_ops.adaptive_avg_pool3d}
         )
+
+    #  Testing with shape(-1, -1, -1, -1) results into error: "AdaptiveAvgPool2d and AdaptiveAvgPool3d currently doesn't support dynamic shapes for last two dims."
 
 
 if __name__ == "__main__":

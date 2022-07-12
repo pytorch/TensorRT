@@ -5,18 +5,16 @@ import warnings
 import torch  # isort:skip
 from typing import cast, Iterable, List, Sequence
 
-from . import acc_utils
 import torch.nn as nn
+from torch.fx.passes.shape_prop import _extract_tensor_metadata
+
+from . import acc_utils
 from .acc_normalizer import (
     register_acc_op,
     register_acc_op_mapping,
     register_custom_acc_mapper_fn,
 )
-from .acc_op_properties import (
-    AccOpProperty,
-    register_acc_op_properties,
-)
-from torch.fx.passes.shape_prop import _extract_tensor_metadata
+from .acc_op_properties import AccOpProperty, register_acc_op_properties
 
 this_arg_is_optional = True
 move_to_qparams = True
@@ -222,6 +220,7 @@ def avg_pool2d(
 @register_acc_op
 def sign(*, input):
     return torch.sign(input)
+
 
 @register_custom_acc_mapper_fn(
     op_and_target=("call_method", "type"),
@@ -735,6 +734,13 @@ def square_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
 )
 @register_acc_op_mapping(
     op_and_target=("call_function", torch.bmm),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("mat2", "other"),
+    ],
+)
+@register_acc_op_mapping(
+    op_and_target=("call_function", torch.mm),
     arg_replacement_tuples=[
         ("input", "input"),
         ("mat2", "other"),
@@ -2865,3 +2871,18 @@ def as_strided(*, input, size, stride, storage_offset=0):
     return torch.as_strided(
         input=input, size=size, stride=stride, storage_offset=storage_offset
     )
+
+
+@register_acc_op_mapping(op_and_target=("call_function", torch.var))
+@register_acc_op_mapping(
+    op_and_target=("call_method", "var"),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("dim", "dim"),
+        ("unbiased", "unbiased"),
+        ("keepdim", "keepdim"),
+    ],
+)
+@register_acc_op
+def var(*, input, dim, unbiased, keepdim=False):
+    return torch.var(input=input, dim=dim, unbiased=unbiased, keepdim=keepdim)

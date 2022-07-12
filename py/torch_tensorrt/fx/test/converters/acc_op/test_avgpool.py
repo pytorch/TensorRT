@@ -1,8 +1,8 @@
-import fx2trt_oss.tracer.acc_tracer.acc_ops as acc_ops
 import torch
+import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from parameterized import param, parameterized
-from torch.testing._internal.common_fx2trt import AccTestCase
 from torch.testing._internal.common_utils import run_tests
+from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase, InputTensorSpec
 
 
 class TestAvgPoolConverter(AccTestCase):
@@ -38,6 +38,43 @@ class TestAvgPoolConverter(AccTestCase):
 
         inputs = [torch.randn(1, 3, 224)]
         self.run_test(TestModule(), inputs, expected_ops={acc_ops.avg_pool1d})
+
+    def test_avg_pool2d_with_dynamic_shape_four_dimensions(
+        self,
+        test_name="default",
+        kernel_size=1,
+        stride=1,
+        padding=0,
+        ceil_mode=False,
+        count_include_pad=True,
+        divisor_override=None,
+    ):
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.avg_pool = torch.nn.AvgPool2d(
+                    kernel_size,
+                    stride,
+                    padding,
+                    ceil_mode,
+                    count_include_pad,
+                    divisor_override,
+                )
+
+            def forward(self, x):
+                return self.avg_pool(x)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (3, 3, 3, 3), (5, 5, 5, 5))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.avg_pool2d}
+        )
 
     @parameterized.expand(
         [
@@ -84,7 +121,7 @@ class TestAvgPoolConverter(AccTestCase):
             param("stride", 2, stride=()),
         ]
     )
-    def test_stride_none__avg_pool1d(
+    def test_stride_none_avg_pool1d(
         self,
         test_name,
         kernel_size,
@@ -143,6 +180,75 @@ class TestAvgPoolConverter(AccTestCase):
 
         inputs = [torch.randn(1, 3, 224, 224)]
         self.run_test(TestModule(), inputs, expected_ops={acc_ops.avg_pool2d})
+
+    def test_stride_none_avg_pool2d_with_dynamic_shape_four_dimensions(
+        self,
+        test_name="default",
+        kernel_size=1,
+        stride=None,
+        padding=0,
+        ceil_mode=False,
+        count_include_pad=True,
+        divisor_override=None,
+    ):
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, x):
+                return torch.nn.functional.avg_pool2d(
+                    x,
+                    kernel_size,
+                    stride=stride,
+                    padding=padding,
+                    ceil_mode=ceil_mode,
+                    count_include_pad=count_include_pad,
+                    divisor_override=divisor_override,
+                )
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (3, 3, 3, 3), (5, 5, 5, 5))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.avg_pool2d}
+        )
+
+    # Testing with (-1, -1, -1, -1) results in error: RuntimeError: ShapeProp error for: node=%avg_pool1d : [#users=1] = call_function[target=torch.avg_pool1d](args = (%x, (1,), (1,), (0,), False, True), kwargs = {}) with meta={}
+    """
+    def test_avg_pool1d_with_dynamic_shape_four_dimensions(
+        self,
+        test_name="default",
+        kernel_size=1,
+        stride=1,
+        padding=0,
+        ceil_mode=False,
+        count_include_pad=True,
+    ):
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.avg_pool = torch.nn.AvgPool1d(
+                    kernel_size, stride, padding, ceil_mode, count_include_pad
+                )
+
+            def forward(self, x):
+                return self.avg_pool(x)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (3, 3, 3, 3), (5, 5, 5, 5))],
+            ),
+        ]
+
+        self.run_test(TestModule(), input_specs, expected_ops={acc_ops.avg_pool1d})
+    """
 
 
 if __name__ == "__main__":
