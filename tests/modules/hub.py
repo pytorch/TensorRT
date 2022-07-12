@@ -88,7 +88,7 @@ models = {
         "model": cm.ModuleFallbackMain(),
         "path": "script"
     },
-    "loop_fallback": {
+    "loop_fallback_eval": {
         "model": cm.LoopFallbackEval(),
         "path": "script"
     },
