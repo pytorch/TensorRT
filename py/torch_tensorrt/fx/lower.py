@@ -1,6 +1,6 @@
 import dataclasses as dc
 import logging
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Optional, Sequence
 
 # @manual=//deeplearning/trt/python:py_tensorrt
 import tensorrt as trt
@@ -10,15 +10,9 @@ import torch.nn as nn
 from torch.fx.passes.splitter_base import SplitResult
 
 from .fx2trt import TRTInterpreter, TRTInterpreterResult
-from .input_tensor_spec import InputTensorSpec
 from .lower_setting import LowerSetting
 from .passes.lower_pass_manager_builder import LowerPassManagerBuilder
-from .passes.pass_utils import (
-    chain_passes,
-    decorate_method,
-    PassFunc,
-    validate_inference,
-)
+from .passes.pass_utils import decorate_method, PassFunc, validate_inference
 from .tools.timing_cache_utils import TimingCacheManager
 from .tools.trt_splitter import TRTSplitter, TRTSplitterSetting
 
@@ -91,25 +85,8 @@ class LowerTrtInterpreter:
         return LowerTrtInterpreter(lower_setting, timing_cache_manager)
 
     def __call__(self, mod, input, split_name) -> TRTInterpreterResult:
-        input_specs_val = (
-            self.lower_setting.input_specs
-            if self.lower_setting.input_specs
-            else (
-                InputTensorSpec.from_tensors_with_dynamic_batch_size(
-                    input,
-                    (
-                        0,
-                        self.lower_setting.max_batch_size,
-                        self.lower_setting.max_batch_size,
-                    ),
-                    self.lower_setting.opt_profile_replica,
-                )
-                if self.lower_setting.explicit_batch_dimension
-                and self.lower_setting.dynamic_batch
-                else InputTensorSpec.from_tensors(input)
-            )
-        )
-        logger.info(f"{split_name=} {input_specs_val=}")
+        assert self.lower_setting.input_specs, "Can't find input specs for lowering!"
+        logger.info(f"{split_name=} {self.lower_setting.input_specs=}")
 
         # Prepare algorithm selector and timing_cache for TRTInterpreter
         algo_selector = None
@@ -125,7 +102,7 @@ class LowerTrtInterpreter:
 
         interpreter = TRTInterpreter(
             mod,
-            input_specs=input_specs_val,
+            input_specs=self.lower_setting.input_specs,
             explicit_batch_dimension=self.lower_setting.explicit_batch_dimension,
             explicit_precision=self.lower_setting.explicit_precision,
             logger_level=trt.Logger.VERBOSE
@@ -242,6 +219,7 @@ class Lowerer:
         self,
         module: nn.Module,
         inputs: Input,
+        additional_inputs: Optional[Input] = None,
     ) -> nn.Module:
         module.eval()
 
@@ -254,7 +232,9 @@ class Lowerer:
                 x.half() if x is not None and x.dtype == torch.float32 else x
                 for x in inputs
             )
-        pm = self.lower_pass_manager_builder.build_lower_pipeline(inputs)
+        pm = self.lower_pass_manager_builder.build_lower_pipeline(
+            inputs, additional_inputs
+        )
 
         lower_result = pm(module)
 
