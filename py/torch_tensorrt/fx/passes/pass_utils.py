@@ -41,10 +41,13 @@ def validate_inference(rtol=None, atol=None, suppress_accuracy_check_failure=Fal
 
         @wraps(pass_)
         def pass_with_validation(
-            module: fx.GraphModule, input: Input
+            module: fx.GraphModule,
+            input: Input,
+            *args,
+            **kwargs,
         ) -> fx.GraphModule:
             res0 = module(*input)
-            processed_module = pass_(module, input)
+            processed_module = pass_(module, input, *args, **kwargs)
             res1 = processed_module(*input)
 
             tensor_res_0 = _collect_tensors(res0)
