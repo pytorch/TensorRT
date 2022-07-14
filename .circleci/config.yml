@@ -32,8 +32,8 @@ jobs:
               sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys A4B469963BF863CC
               sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/${OS}/sbsa/ /"
               sudo apt-get update
-              sudo apt-get install libcudnn8=${CUDNN_PKG_NAME}
-              sudo apt-get install libcudnn8-dev=${CUDNN_PKG_NAME}
+              #sudo apt-get install libcudnn8=${CUDNN_PKG_NAME}
+              #sudo apt-get install libcudnn8-dev=${CUDNN_PKG_NAME}
 
               sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/{OS}/sbsa/3bf863cc.pub
               sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/${OS}/sbsa/ /"
