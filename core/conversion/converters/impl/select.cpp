@@ -309,7 +309,7 @@ auto select_registrations TORCHTRT_UNUSED =
                auto in = args[0].ITensorOrFreeze(ctx);
                int axis = args[1].unwrapToInt();
                int maxDim = static_cast<int32_t>(in->getDimensions().d[axis]);
-               bool dynamic_shape = is_dynamic_shape(in);
+               bool dynamic_shape = ctx->input_is_dynamic;
                auto input_dim = in->getDimensions();
                // add Shape Tensor
                auto ishape_layer = ctx->net->addShape(*in);

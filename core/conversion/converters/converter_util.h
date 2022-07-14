@@ -57,7 +57,7 @@ nvinfer1::ITensor* clamp(
     nvinfer1::ITensor* lower_bound,
     nvinfer1::ITensor* upper_bound);
 
-nvinfer1::ITensor* bump_if_negtive(ConversionCtx* ctx, nvinfer1::ITensor* input_dim, nvinfer1::ITensor* indices);
+nvinfer1::ITensor* bump_if_negative(ConversionCtx* ctx, nvinfer1::ITensor* input_dim, nvinfer1::ITensor* indices);
 
 std::vector<nvinfer1::ITensor*> update_start_and_end(
     ConversionCtx* ctx,
@@ -72,8 +72,6 @@ nvinfer1::ITensor* calculate_output_size(
     nvinfer1::ITensor* end,
     nvinfer1::ITensor* stride,
     int nbdims);
-
-bool is_dynamic_shape(nvinfer1::ITensor* tensor);
 
 } // namespace converters
 } // namespace conversion
