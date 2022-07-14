@@ -183,4 +183,4 @@ jobs:
 workflows:
   build_run:
     jobs:
-      - build_aarch64
+      - build-aarch64
