@@ -5,6 +5,57 @@ version: 2.1
 # Define a job to be invoked later in a workflow.
 # See: https://circleci.com/docs/2.0/configuration-reference/#jobs
 jobs:
+  build-aarch64:
+    environment:
+      CUDNN_VERSION: "8.2.1"
+      TRT_VERSION: "8.2.4"
+      TRT_VERSION_LONG: "8.2.4.2"
+      BAZEL_VERSION: "5.1.1"
+      CUDNN_PKG_NAME: "8.2.1.*-1+cuda11.3"
+      TRT_PKG_NAME: "8.2.4-1+cuda11.4"
+      TORCH_BUILD: "1.11.0+cu113"
+      OS: "ubuntu2004"
+    machine:
+      image: "ubuntu-2004:current"
+    resource_class: arm.xlarge
+    steps:
+        - checkout
+        - run:
+            name: Install cuda + cudnn + tensorrt + bazel
+            command: |
+              cd ~
+
+              wget https://developer.download.nvidia.com/compute/cuda/repos/${OS}/sbsa/cuda-${OS}.pin
+              sudo mv cuda-${OS}.pin /etc/apt/preferences.d/cuda-repository-pin-600
+              sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/${OS}/sbsa/7fa2af80.pub
+              sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 536F8F1DE80F6A35
+              sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys A4B469963BF863CC
+              sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/${OS}/sbsa/ /"
+              sudo apt-get update
+              sudo apt-get install libcudnn8=${CUDNN_PKG_NAME}
+              sudo apt-get install libcudnn8-dev=${CUDNN_PKG_NAME}
+
+              sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/{OS}/sbsa/3bf863cc.pub
+              sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/${OS}/sbsa/ /"
+              sudo apt-get update
+
+              sudo apt-get install libnvinfer8=${TRT_PKG_NAME} libnvinfer-plugin8=${TRT_PKG_NAME} libnvinfer-dev=${TRT_PKG_NAME} libnvinfer-plugin-dev=${TRT_PKG_NAME}
+              # check available version, apt list libnvinfer8 -a
+              sudo wget -q https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-linux-arm64 -O /usr/bin/bazel
+              sudo chmod a+x /usr/bin/bazel
+
+        - run:
+            name: Build Library
+            command: |
+              # install torch_tensorrt
+              mv WORKSPACE.ci WORKSPACE
+              cd py
+              python3 setup.py bdist_wheel
+
+        - store_artifacts: 
+            path: dist/
+            destination: torch-tensorrt-nightly-aarch64
+
   build:
     environment:
       CUDNN_VERSION: "8.2.1"
@@ -132,4 +183,4 @@ jobs:
 workflows:
   build_run:
     jobs:
-      - build
+      - build_aarch64
