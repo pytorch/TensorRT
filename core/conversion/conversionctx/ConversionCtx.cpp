@@ -130,7 +130,7 @@ ConversionCtx::~ConversionCtx() {
 }
 
 nvinfer1::ITensor* ConversionCtx::AssociateValueAndTensor(const torch::jit::Value* value, nvinfer1::ITensor* tensor) {
-  if (!AddNamedTensor(value, tensor)) {
+  if (!RecordNewTensor(value, tensor)) {
     LOG_WARNING(
         "Trying to rewrite the name " << value->debugName() << " to a named ITensor " << tensor->getName() << ".");
   }
@@ -143,9 +143,9 @@ torch::jit::IValue* ConversionCtx::AssociateValueAndIValue(const torch::jit::Val
   return &this->evaluated_value_map[value];
 }
 
-bool ConversionCtx::AddNamedTensor(const torch::jit::Value* value, nvinfer1::ITensor* tensor) {
+bool ConversionCtx::RecordNewTensor(const torch::jit::Value* value, nvinfer1::ITensor* tensor) {
   value_tensor_map[value] = tensor;
-  auto ret = named_tensors.insert(tensor);
+  auto ret = known_tensors.insert(tensor);
   return ret.second;
 }
 
