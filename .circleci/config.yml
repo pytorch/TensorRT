@@ -6,6 +6,11 @@ version: 2.1
 # See: https://circleci.com/docs/2.0/configuration-reference/#jobs
 jobs:
   build-aarch64:
+    parameters:
+      torch-build:
+        type: string
+      torch-build-url:
+        type: string
     environment:
       CUDNN_VERSION: "8.2.1"
       TRT_VERSION: "8.2.4"
@@ -57,7 +62,7 @@ jobs:
 
         - store_artifacts: 
             path: dist/
-            destination: torch-tensorrt-aarch64-pyt-official
+            destination: torch-tensorrt-aarch64
 
   build:
     environment:
