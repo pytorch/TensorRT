@@ -49,8 +49,8 @@ jobs:
               sudo chmod a+x /usr/bin/bazel
 
               wget << parameters.torch-build-url >> -O << parameters.torch-build >>
-              pip install --upgrade pip
-              pip install << parameters.torch-build >>
+              pip3 install --upgrade pip
+              pip3 install << parameters.torch-build >>
 
         - run:
             name: Build Library
