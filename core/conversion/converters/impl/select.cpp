@@ -314,6 +314,7 @@ auto select_registrations TORCHTRT_UNUSED =
                // add Shape Tensor
                auto ishape_layer = ctx->net->addShape(*in);
                auto ishape_tensor = ishape_layer->getOutput(0); // input shape
+               std::string node_name = n->outputs()[0]->debugName().c_str();
 
                int startIdx = 0;
                auto startIdxIVal = args[2].IValue();
@@ -384,18 +385,19 @@ auto select_registrations TORCHTRT_UNUSED =
                  // update start and end
                  nvinfer1::ITensor* out_start;
                  nvinfer1::ITensor* out_end;
-                 auto start_end = update_start_and_end(ctx, ishape_tensor, start_itensor, end_itensor, nbdims);
+                 auto start_end = normalize_start_and_end(ctx, ishape_tensor, start_itensor, end_itensor, nbdims, node_name);
                  out_start = start_end[0];
                  out_end = start_end[1];
 
                  // calculate size
-                 auto size_itensor = calculate_output_size(ctx, out_start, out_end, stride_itensor, nbdims);
+                 auto size_itensor = get_slice_size(ctx, out_start, out_end, stride_itensor, nbdims, node_name);
 
                  // update slice layer
                  slice_layer->setInput(1, *out_start); // start
                  slice_layer->setInput(2, *size_itensor); // size, must be set if input is dynamic
                }
                auto slice_out = slice_layer->getOutput(0);
+               
                auto out = ctx->AssociateValueAndTensor(n->outputs()[0], slice_out);
                LOG_DEBUG("Slice layer output shape: " << out->getDimensions());
 
