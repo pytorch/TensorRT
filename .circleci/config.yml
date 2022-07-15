@@ -5,7 +5,7 @@ version: 2.1
 # Define a job to be invoked later in a workflow.
 # See: https://circleci.com/docs/2.0/configuration-reference/#jobs
 jobs:
-  build-aarch64:
+  build-torch-tensorrt-aarch64:
     parameters:
       torch-build:
         type: string
@@ -191,7 +191,7 @@ jobs:
 workflows:
   build:
     jobs:
-      - build-aarch64:
+      - build-torch-tensorrt-aarch64:
           matrix:
               parameters:
                 torch-build: ["torch-1.11.0-cp38-cp38-linux_aarch64.whl"]
