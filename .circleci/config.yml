@@ -13,7 +13,8 @@ jobs:
       BAZEL_VERSION: "5.1.1"
       CUDNN_PKG_NAME: "8.2.1.*-1+cuda11.3"
       TRT_PKG_NAME: "8.2.4-1+cuda11.4"
-      TORCH_BUILD: "1.11.0+cu113"
+      TORCH_BUILD: "torch-1.11.0-cp38-cp38-linux_aarch64.whl"
+      TORCH_BUILD_URL: "https://nvidia.box.com/shared/static/ssf2v7pf5i245fk4i0q926hy4imzs2ph.whl"
       OS: "ubuntu2004"
     machine:
       image: "ubuntu-2004:current"
@@ -21,7 +22,7 @@ jobs:
     steps:
         - checkout
         - run:
-            name: Install cuda + cudnn + tensorrt + bazel
+            name: Install cuda + cudnn + tensorrt + bazel + pytorch
             command: |
               cd ~
 
@@ -43,6 +44,10 @@ jobs:
               # check available version, apt list libnvinfer8 -a
               sudo wget -q https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-linux-arm64 -O /usr/bin/bazel
               sudo chmod a+x /usr/bin/bazel
+
+              wget ${TORCH_BUILD_URL} -O ${TORCH_BUILD}
+              pip install --upgrade pip
+              pip install ${TORCH_BUILD}
 
         - run:
             name: Build Library
