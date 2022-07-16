@@ -76,20 +76,20 @@ http_archive(
 http_archive(
     name = "cudnn",
     build_file = "@//third_party/cudnn/archive:BUILD",
-    sha256 = "0e5d2df890b9967efa6619da421310d97323565a79f05a1a8cb9b7165baad0d7",
-    strip_prefix = "cuda",
+    sha256 = "5500953c08c5e5d1dddcfda234f9efbddcdbe43a53b26dc0a82c723fa170c457",
+    strip_prefix = "cudnn-linux-x86_64-8.3.2.44_cuda11.5-archive",
     urls = [
-        "https://developer.nvidia.com/compute/machine-learning/cudnn/secure/8.2.4/11.4_20210831/cudnn-11.4-linux-x64-v8.2.4.15.tgz",
+        "https://developer.nvidia.com/compute/cudnn/secure/8.3.2/local_installers/11.5/cudnn-linux-x86_64-8.3.2.44_cuda11.5-archive.tar.xz",
     ],
 )
 
 http_archive(
     name = "tensorrt",
     build_file = "@//third_party/tensorrt/archive:BUILD",
-    sha256 = "826180eaaecdf9a7e76116855b9f1f3400ea9b06e66b06a3f6a0747ba6f863ad",
-    strip_prefix = "TensorRT-8.2.4.2",
+    sha256 = "0cd8071d717f1b870ada79ce5889ab3d702439c356e96cbef23d0b469007fcb4",
+    strip_prefix = "TensorRT-8.4.0.6",
     urls = [
-        "https://developer.nvidia.com/compute/machine-learning/tensorrt/secure/8.2.4/tars/tensorrt-8.2.4.2.linux.x86_64-gnu.cuda-11.4.cudnn8.2.tar.gz",
+        "https://developer.nvidia.com/compute/machine-learning/tensorrt/secure/8.4.0/tars/tensorrt-8.4.0.6.linux.x86_64-gnu.cuda-11.6.cudnn8.3.tar.gz",
     ],
 )
 
