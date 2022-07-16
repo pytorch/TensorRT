@@ -351,6 +351,27 @@ jobs:
           name: "Install torch-tensorrt"
           command: pip3 install /tmp/dist/nightly/* 
       - test-fx
+
+parameters:
+  torch-nightly-build:
+    type: string
+    default: "1.13.0.dev20220715+cu113"
+  torch-nightly-build-index:
+    type: string
+    default: "https://download.pytorch.org/whl/nightly/cu113"
+  torch-release-build:
+    type: string
+    default: "1.11.0+cu113"
+  torch-release-build-index:
+    type: string
+    default: "https://download.pytorch.org/whl/cu113"
+  torch-jetson-build:
+    type: string
+    default: "torch-1.11.0-cp38-cp38-linux_aarch64.whl"
+  torch-jetson-build-url:
+    type: string
+    default: "https://nvidia.box.com/shared/static/ssf2v7pf5i245fk4i0q926hy4imzs2ph.whl"
+    
     
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
@@ -365,33 +386,48 @@ workflows:
                 - master
     jobs:
       - build-aarch64-pyt-jetson:
-          torch-build: "torch-1.11.0-cp38-cp38-linux_aarch64.whl"
-          torch-build-url: "https://nvidia.box.com/shared/static/ssf2v7pf5i245fk4i0q926hy4imzs2ph.whl"
-      - build-x86_64-pyt-release:
-          torch-build: "1.11.0+cu113"
-          torch-build-index: "https://download.pytorch.org/whl/cu113"
-    
-  on-push:
-    jobs:
-      - build-aarch64-pyt-jetson:
-          torch-build: "torch-1.11.0-cp38-cp38-linux_aarch64.whl"
-          torch-build-url: "https://nvidia.box.com/shared/static/ssf2v7pf5i245fk4i0q926hy4imzs2ph.whl"
+          torch-build: << pipeline.parameters.torch-jetson-build >>
+          torch-build-url: << pipeline.parameters.torch-jetson-build-url >>
           
       - build-x86_64-pyt-release:
-          torch-build: "1.11.0+cu113"
-          torch-build-index: "https://download.pytorch.org/whl/cu113"
+          torch-build: << pipeline.parameters.torch-release-build >>
+          torch-build-index: << pipeline.parameters.torch-release-build-index >>
       - test-x86_64-pyt-release:
-          torch-build: "1.11.0+cu113"
-          torch-build-index: "https://download.pytorch.org/whl/cu113"
+          torch-build: << pipeline.parameters.torch-release-build >>
+          torch-build-index: << pipeline.parameters.torch-release-build-index >>
           requires:
             - build-x86_64-pyt-release
             
       - build-x86_64-pyt-nightly:
-          torch-build: "1.13.0.dev20220715+cu113"
-          torch-build-index: "https://download.pytorch.org/whl/nightly/cu113"
+          torch-build: << pipeline.parameters.torch-nightly-build >>
+          torch-build-index: << pipeline.parameters.torch-nightly-build-index >>
       - test-x86_64-pyt-nightly:
-          torch-build: "1.13.0.dev20220715+cu113"
-          torch-build-index: "https://download.pytorch.org/whl/nightly/cu113"
+          torch-build: << pipeline.parameters.torch-nightly-build >>
+          torch-build-index: << pipeline.parameters.torch-nightly-build-index >>
           requires:
-            - build-x86_64-pyt-nightly     
+            - build-x86_64-pyt-nightly 
+    
+  on-push:
+    jobs:
+      - build-aarch64-pyt-jetson:
+          torch-build: << pipeline.parameters.torch-jetson-build >>
+          torch-build-url: << pipeline.parameters.torch-jetson-build-url >>
+          
+      - build-x86_64-pyt-release:
+          torch-build: << pipeline.parameters.torch-release-build >>
+          torch-build-index: << pipeline.parameters.torch-release-build-index >>
+      - test-x86_64-pyt-release:
+          torch-build: << pipeline.parameters.torch-release-build >>
+          torch-build-index: << pipeline.parameters.torch-release-build-index >>
+          requires:
+            - build-x86_64-pyt-release
+            
+      - build-x86_64-pyt-nightly:
+          torch-build: << pipeline.parameters.torch-nightly-build >>
+          torch-build-index: << pipeline.parameters.torch-nightly-build-index >>
+      - test-x86_64-pyt-nightly:
+          torch-build: << pipeline.parameters.torch-nightly-build >>
+          torch-build-index: << pipeline.parameters.torch-nightly-build-index >>
+          requires:
+            - build-x86_64-pyt-nightly    
        
