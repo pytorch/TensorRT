@@ -379,10 +379,10 @@ workflows:
           
       - build-x86_64-pyt-release:
           torch-build: "1.11.0+cu113"
-          torch-build-url: "https://download.pytorch.org/whl/cu113"
+          torch-build-index: "https://download.pytorch.org/whl/cu113"
       - test-x86_64-pyt-release:
           torch-build: "1.11.0+cu113"
-          torch-build-url: "https://download.pytorch.org/whl/cu113"
+          torch-build-index: "https://download.pytorch.org/whl/cu113"
           requires:
             - build-x86_64-pyt-release
             
