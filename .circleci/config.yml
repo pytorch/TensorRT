@@ -72,6 +72,7 @@ commands:
             name: Set up python environment
             command: |
               pip3 install --upgrade pip
+              pip3 install wheel setuptools
               pip3 install nvidia-pyindex
               pip3 install tabulate
               pip3 install nvidia-tensorrt==<< parameters.trt-version-long >>
