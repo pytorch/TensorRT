@@ -128,7 +128,7 @@ commands:
             bazel test //tests --jobs 2
 
   test-fx:
-    decription: "Test the fx backend"
+    description: "Test the fx backend"
     steps:
       - run:
           name: Run fx tests
