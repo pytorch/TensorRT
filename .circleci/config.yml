@@ -70,11 +70,10 @@ commands:
             pip3 install --upgrade pip
             pip3 install nvidia-pyindex
             pip3 install tabulate
-            pip3 install nvidia-tensorrt==<< parameters.trt-version >>
+            pip3 install nvidia-tensorrt==<< parameters.trt-version-long >>
             pip3 install --pre torch==<< parameters.torch-build >>  torchvision torchaudio --extra-index-url << parameters.torch-build-index >>
             pip3 install pytest parameterized expecttest nox
             # install torch_tensorrt
-            mv WORKSPACE.ci WORKSPACE
 
   build-py:
     description: "Build the torch-tensorrt python release"
@@ -82,6 +81,7 @@ commands:
       - run:
           name: Build python api
           command: |
+            mv WORKSPACE.ci WORKSPACE
             python3 setup.py bdist_wheel
             python3 setup.py install
 
@@ -246,6 +246,10 @@ jobs:
           torch-build:  "1.11.0+cu113"
           torch-build-index: "https://download.pytorch.org/whl/cu113"
       - build-py
+      - store_artifacts:
+          path: ${CIRCLE_WORKING_DIRECTORY}/py/dist
+          destination: x86_64-pyt-release
+
 
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
