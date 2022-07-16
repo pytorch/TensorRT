@@ -108,8 +108,8 @@ commands:
             python3 -m pip install pybind11==2.6.2
             python3 setup.py bdist_wheel
             python3 setup.py install
-            mkdir -p /tmp/dist
-            cp dist/* /tmp/dist
+            mkdir -p /tmp/dist/builds
+            cp dist/* /tmp/dist/builds
 
   dump-test-env:
     description: "Dump the test env to console"
@@ -227,8 +227,13 @@ jobs:
             destination: aarch64-pyt-jetson
 
   build-x86_64-pyt-release:
+    parameters:
+      torch-build:
+        type: string
+      torch-build-index:
+        type: string
     machine:
-    # Primary container image where all steps run.
+      # Primary container image where all steps run.
       # image: nvcr.io/nvidia/tensorrt:22.01-py3 # does not work with customized image
       # https://circleci.com/docs/2.0/configuration-reference#available-linux-gpu-images
       image: ubuntu-2004-cuda-11.4:202110-01
@@ -245,18 +250,68 @@ jobs:
           bazel-version:  "5.1.1"
           bazel-platform: "x86_64"
       - install-torch-from-index:
-          torch-build:  "1.11.0+cu113"
-          torch-build-index: "https://download.pytorch.org/whl/cu113"
+          torch-build:  << parameters.torch-build >>
+          torch-build-index: << parameters.torch-build-index >>
       - build-py
+      - run:
+        name: Move to release dir
+        command: |
+          mkdir -p /tmp/dist/release
+          cp -r /tmp/dist/builds/* /tmp/dist/release
       - persist_to_workspace:
-          root: /tmp
+          root: /tmp/dist
           paths:
-            - dist
+            - release
       - store_artifacts:
-          path: /tmp/dist
+          path: /tmp/dist/release
           destination: x86_64-pyt-release
+          
+  build-x86_64-pyt-nightly:
+    parameters:
+      torch-build:
+        type: string
+      torch-build-index:
+        type: string
+    machine:
+      # Primary container image where all steps run.
+      # image: nvcr.io/nvidia/tensorrt:22.01-py3 # does not work with customized image
+      # https://circleci.com/docs/2.0/configuration-reference#available-linux-gpu-images
+      image: ubuntu-2004-cuda-11.4:202110-01
+    resource_class: xlarge
+    steps:
+      - checkout
+      - create-env:
+          os: "ubuntu2004"
+          platform: "x86_64"
+          cudnn-version: "8.2.1"
+          cudnn-pkg-name:  "8.2.1.*-1+cuda11.3"
+          trt-version-short:  "8.2.4"
+          trt-pkg-name: "8.2.4-1+cuda11.4"
+          bazel-version:  "5.1.1"
+          bazel-platform: "x86_64"
+      - install-torch-from-index:
+          torch-build:  << parameters.torch-build >>
+          torch-build-index: << parameters.torch-build-index >>
+      - build-py
+      - run:
+        name: Move to nightly dir
+        command: |
+          mkdir -p /tmp/dist/nightly
+          cp -r /tmp/dist/builds/* /tmp/dist/nightly
+      - persist_to_workspace:
+          root: /tmp/dist
+          paths:
+            - nightly
+      - store_artifacts:
+          path: /tmp/dist/nightly
+          destination: x86_64-pyt-nightly
 
   test-x86_64-pyt-release:
+    parameters:
+      torch-build:
+        type: string
+      torch-build-index:
+        type: string
     machine:
       image: ubuntu-2004-cuda-11.4:202110-01
     resource_class: gpu.nvidia.large
@@ -265,15 +320,37 @@ jobs:
       - create-py-env:
           trt-version-long: "8.2.4.2"
       - install-torch-from-index:
-          torch-build:  "1.11.0+cu113"
-          torch-build-index: "https://download.pytorch.org/whl/cu113"
+          torch-build:  << parameters.torch-build >>
+          torch-build-index: << parameters.torch-build-index >>
       - attach_workspace:
           at: /tmp/dist
       - run:
           name: "Install torch-tensorrt"
-          command: pip3 install /tmp/dist/* 
+          command: pip3 install /tmp/dist/release/* 
       - test-ts-core
 
+  test-x86_64-pyt-nightly:
+    parameters:
+      torch-build:
+        type: string
+      torch-build-index:
+        type: string
+    machine:
+      image: ubuntu-2004-cuda-11.4:202110-01
+    resource_class: gpu.nvidia.large
+    steps:
+      - checkout
+      - create-py-env:
+          trt-version-long: "8.2.4.2"
+      - install-torch-from-index:
+          torch-build:  << parameters.torch-build >>
+          torch-build-index: << parameters.torch-build-index >>
+      - attach_workspace:
+          at: /tmp/dist/
+      - run:
+          name: "Install torch-tensorrt"
+          command: pip3 install /tmp/dist/nightly/* 
+      - test-fx
     
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
@@ -290,14 +367,31 @@ workflows:
       - build-aarch64-pyt-jetson:
           torch-build: "torch-1.11.0-cp38-cp38-linux_aarch64.whl"
           torch-build-url: "https://nvidia.box.com/shared/static/ssf2v7pf5i245fk4i0q926hy4imzs2ph.whl"
-      - build-x86_64-pyt-release
+      - build-x86_64-pyt-release:
+          torch-build: "1.11.0+cu113"
+          torch-build-url: "https://download.pytorch.org/whl/cu113"
     
   on-push:
     jobs:
       - build-aarch64-pyt-jetson:
           torch-build: "torch-1.11.0-cp38-cp38-linux_aarch64.whl"
           torch-build-url: "https://nvidia.box.com/shared/static/ssf2v7pf5i245fk4i0q926hy4imzs2ph.whl"
-      - build-x86_64-pyt-release
+          
+      - build-x86_64-pyt-release:
+          torch-build: "1.11.0+cu113"
+          torch-build-url: "https://download.pytorch.org/whl/cu113"
       - test-x86_64-pyt-release:
+          torch-build: "1.11.0+cu113"
+          torch-build-url: "https://download.pytorch.org/whl/cu113"
           requires:
             - build-x86_64-pyt-release
+            
+      - build-x86_64-pyt-nightly:
+          torch-build: "1.13.0.dev20220621"
+          torch-build-index: "https://download.pytorch.org/whl/nightly/cu113"
+      - test-x86_64-pyt-nightly:
+          torch-build: "1.13.0.dev20220621"
+          torch-build-index: "https://download.pytorch.org/whl/nightly/cu113"
+          requires:
+            - build-x86_64-pyt-nightly     
+       
