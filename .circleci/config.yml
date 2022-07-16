@@ -95,7 +95,6 @@ commands:
             pip3 install --upgrade pip
             pip3 install --pre torch==<< parameters.torch-build >>  torchvision torchaudio --extra-index-url << parameters.torch-build-index >>
 
-
   build-py:
     description: "Build the torch-tensorrt python release"
     steps:
@@ -140,18 +139,22 @@ commands:
   test-ts-core:
     description: "Test torchscript backend c++ api"
     steps:
+      - pull-test-models
       - run:
           name: Run core / C++ tests
           command: |
-            bazel test //tests --jobs 2
+            bazel test //tests --jobs 2 --config ci_testing
+      - store_test_results:
+          path: bazel-testlogs
 
-  test-ts-py:
-    description: "Test torchscript backend py api"
+  test-ts-py-L0:
+    description: "Run L0 torch-tensorrt python tests"
     steps:
+      - pull-test-models
       - run:
-          name: Run core / C++ tests
+          name: Run L0 torch-tensorrt python tests
           command: |
-            bazel test //tests --jobs 2
+            nox -s l0_api_tests-3.9
 
   test-fx:
     description: "Test the fx backend"
@@ -244,6 +247,10 @@ jobs:
           torch-build:  "1.11.0+cu113"
           torch-build-index: "https://download.pytorch.org/whl/cu113"
       - build-py
+      - persist_to_workspace:
+          root: /tmp
+          paths:
+            - dist
       - store_artifacts:
           path: /tmp/dist
           destination: x86_64-pyt-release
@@ -259,6 +266,13 @@ jobs:
       - install-torch-from-index:
           torch-build:  "1.11.0+cu113"
           torch-build-index: "https://download.pytorch.org/whl/cu113"
+      - attach_workspace:
+          at: /tmp/dist
+      - run:
+          name: "Install torch-tensorrt"
+          command: pip3 install /tmp/dist/* 
+      - test-ts-core
+
     
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
