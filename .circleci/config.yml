@@ -387,10 +387,10 @@ workflows:
             - build-x86_64-pyt-release
             
       - build-x86_64-pyt-nightly:
-          torch-build: "1.13.0.dev20220621"
+          torch-build: "1.13.0.dev20220715+cu113"
           torch-build-index: "https://download.pytorch.org/whl/nightly/cu113"
       - test-x86_64-pyt-nightly:
-          torch-build: "1.13.0.dev20220621"
+          torch-build: "1.13.0.dev20220715+cu113"
           torch-build-index: "https://download.pytorch.org/whl/nightly/cu113"
           requires:
             - build-x86_64-pyt-nightly     
