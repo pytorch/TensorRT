@@ -254,10 +254,10 @@ jobs:
           torch-build-index: << parameters.torch-build-index >>
       - build-py
       - run:
-        name: Move to release dir
-        command: |
-          mkdir -p /tmp/dist/release
-          cp -r /tmp/dist/builds/* /tmp/dist/release
+          name: Move to release dir
+          command: |
+            mkdir -p /tmp/dist/release
+            cp -r /tmp/dist/builds/* /tmp/dist/release
       - persist_to_workspace:
           root: /tmp/dist
           paths:
@@ -294,10 +294,10 @@ jobs:
           torch-build-index: << parameters.torch-build-index >>
       - build-py
       - run:
-        name: Move to nightly dir
-        command: |
-          mkdir -p /tmp/dist/nightly
-          cp -r /tmp/dist/builds/* /tmp/dist/nightly
+          name: Move to nightly dir
+          command: |
+            mkdir -p /tmp/dist/nightly
+            cp -r /tmp/dist/builds/* /tmp/dist/nightly
       - persist_to_workspace:
           root: /tmp/dist
           paths:
