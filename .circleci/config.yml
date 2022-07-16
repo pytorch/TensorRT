@@ -110,7 +110,7 @@ commands:
     description: "Build the torch-tensorrt python release"
     steps:
       - run:
-          name: Build python api
+          name: Build torch-tensorrt python release
           command: |
             mv WORKSPACE.ci WORKSPACE
             cd py
@@ -125,7 +125,7 @@ commands:
     description: "Build the torch-tensorrt python release with only the fx backend"
     steps:
       - run:
-          name: Build python api
+          name: Build torch-tensorrt python release with only the fx backend
           command: |
             mv WORKSPACE.ci WORKSPACE
             cd py
