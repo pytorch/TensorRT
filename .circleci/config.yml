@@ -2,10 +2,170 @@
 # See: https://circleci.com/docs/2.0/configuration-reference
 version: 2.1
 
+commands:
+  create-env:
+    description: "Install dependencies for Torch-TensorRT"
+    parameters:
+      os: 
+        type: string
+        default: "ubuntu2004"
+      platform:
+        type: string
+        default: "x86_64"
+      cudnn-version: 
+        type: string
+        default: "8.2.1"
+      cudnn-pkg-name:
+        type: string
+        default: "8.2.1.*-1+cuda11.3"
+      trt-version:
+        type: string
+        default: "8.2.4"
+      trt-version-long:
+        type: string
+        default: "8.2.4.2"
+      trt-pkg-name:
+        type: string
+        default: "8.2.4-1+cuda11.4"
+      bazel-version:
+        type: string
+        default: "5.1.1"
+      bazel-platform:
+        type: string
+        default: "x86_64"
+      torch-build:
+        type: string
+        default: "1.11.0+cu113"
+      torch-build-index:
+        type: string
+        default: "https://download.pytorch.org/whl/cu113"
+    steps: 
+      - run:
+          name: Install cudnn + tensorrt + bazel
+          command: |
+            cd ~
+
+            wget https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/cuda-<< parameters.os >>.pin
+            sudo mv cuda-<< parameters.os >>.pin /etc/apt/preferences.d/cuda-repository-pin-600
+            sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/7fa2af80.pub
+            sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 536F8F1DE80F6A35
+            sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys A4B469963BF863CC
+            sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/ /"
+            sudo apt-get update
+            sudo apt-get install libcudnn8=<< parameters.cudnn-pkg-name >>
+            sudo apt-get install libcudnn8-dev=<< parameters.cudnn-pkg-name >>
+
+            sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/3bf863cc.pub
+            sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/ /"
+            sudo apt-get update
+
+            sudo apt-get install libnvinfer8=<< parameters.trt-pkg-name >> libnvinfer-plugin8=<< parameters.trt-pkg-name >> libnvinfer-dev=<< parameters.trt-pkg-name >> libnvinfer-plugin-dev=<< parameters.trt-pkg-name >>
+            # check available version, apt list libnvinfer8 -a
+            sudo wget -q https://github.com/bazelbuild/bazel/releases/download/<< parameters.bazel-version >>/bazel-<< parameters.bazel-version >>-linux-<< parameters.bazel-platform >> -O /usr/bin/bazel
+            sudo chmod a+x /usr/bin/bazel
+
+      - run:
+          name: Set up python environment
+          command: |
+            pip3 install --upgrade pip
+            pip3 install nvidia-pyindex
+            pip3 install tabulate
+            pip3 install nvidia-tensorrt==<< parameters.trt-version >>
+            pip3 install --pre torch==<< parameters.torch-build >>  torchvision torchaudio --extra-index-url << parameters.torch-build-index >>
+            pip3 install pytest parameterized expecttest nox
+            # install torch_tensorrt
+            mv WORKSPACE.ci WORKSPACE
+
+  build-py:
+    description: "Build the torch-tensorrt python release"
+    steps:
+      - run:
+          name: Build python api
+          command: |
+            python3 setup.py bdist_wheel
+            python3 setup.py install
+
+  dump-test-env:
+    description: "Dump the test env to console"
+    steps:
+      - run:
+          name: GPU Config
+          command: |
+            nvidia-smi
+
+      - run:
+          name: Test torch
+          command: |
+            python3 -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.device_count())"
+
+  pull-test-models:
+    description: "Pull the test model set"
+    steps:
+      - run:
+          name: Pull test models
+          environment:
+            USE_HOST_DEPS: "1"
+          command: |
+            cd tests/modules
+            pip3 install -r requirements.txt
+            python3 hub.py
+            cd ../..
+
+  test-ts-core:
+    description: "Test torchscript backend c++ api"
+    steps:
+      - run:
+          name: Run core / C++ tests
+          command: |
+            bazel test //tests --jobs 2
+
+  test-ts-py:
+    description: "Test torchscript backend py api"
+    steps:
+      - run:
+          name: Run core / C++ tests
+          command: |
+            bazel test //tests --jobs 2
+
+  test-fx:
+    decription: "Test the fx backend"
+    steps:
+      - run:
+          name: Run fx tests
+          command: |
+            # one fix pending to enable below
+            # cd py/torch_tensorrt/fx/test
+            # pytest $(find . -name '*.py' | grep -v test_dispatch* | grep -v test_setitem*)
+
+            cd py/torch_tensorrt/fx/test
+            pushd converters/acc_op
+            pytest
+            popd
+            pushd passes
+            list_passes=$(ls | grep -v test_setitem*)
+            pytest $list_passes
+            popd
+            pushd core
+            pytest
+            popd
+            # pushd quant
+            # pytest
+            # popd
+            pushd tools
+            pytest
+            popd
+            pushd trt_lower
+            pytest
+            popd
+            pushd tracer
+            list_tracer=$(ls | grep -v test_dispatch_*)
+            pytest $list_tracer
+            popd
+  
 # Define a job to be invoked later in a workflow.
 # See: https://circleci.com/docs/2.0/configuration-reference/#jobs
 jobs:
-  build-torch-tensorrt-aarch64:
+  build-aarch64-pyt-release:
     parameters:
       torch-build:
         type: string
@@ -64,16 +224,7 @@ jobs:
             path: dist/
             destination: torch-tensorrt-aarch64
 
-  build:
-    environment:
-      CUDNN_VERSION: "8.2.1"
-      TRT_VERSION: "8.2.4"
-      TRT_VERSION_LONG: "8.2.4.2"
-      BAZEL_VERSION: "5.1.1"
-      CUDNN_PKG_NAME: "8.2.1.*-1+cuda11.3"
-      TRT_PKG_NAME: "8.2.4-1+cuda11.4"
-      TORCH_BUILD: "1.11.0+cu113"
-      OS: "ubuntu2004"
+  build-x86_64-pyt-release:
     machine:
     # Primary container image where all steps run.
       # image: nvcr.io/nvidia/tensorrt:22.01-py3 # does not work with customized image
@@ -82,118 +233,37 @@ jobs:
     resource_class: gpu.nvidia.large
     steps:
       - checkout
-      - run:
-          name: Install cudnn + tensorrt + bazel
-          command: |
-            cd ~
+      - create-env:
+          os: "ubuntu2004"
+          platform: "x86_64"
+          cudnn-version: "8.2.1"
+          cudnn-pkg-name:  "8.2.1.*-1+cuda11.3"
+          trt-version:  "8.2.4"
+          trt-version-long: "8.2.4.2"
+          trt-pkg-name: "8.2.4-1+cuda11.4"
+          bazel-version:  "5.1.1"
+          bazel-platform: "x86_64"
+          torch-build:  "1.11.0+cu113"
+          torch-build-index: "https://download.pytorch.org/whl/cu113"
+      - build-py
 
-            wget https://developer.download.nvidia.com/compute/cuda/repos/${OS}/x86_64/cuda-${OS}.pin
-            sudo mv cuda-${OS}.pin /etc/apt/preferences.d/cuda-repository-pin-600
-            sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/${OS}/x86_64/7fa2af80.pub
-            sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 536F8F1DE80F6A35
-            sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys A4B469963BF863CC
-            sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/${OS}/x86_64/ /"
-            sudo apt-get update
-            sudo apt-get install libcudnn8=${CUDNN_PKG_NAME}
-            sudo apt-get install libcudnn8-dev=${CUDNN_PKG_NAME}
-
-            sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/{OS}/x86_64/3bf863cc.pub
-            sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/${OS}/x86_64/ /"
-            sudo apt-get update
-
-            sudo apt-get install libnvinfer8=${TRT_PKG_NAME} libnvinfer-plugin8=${TRT_PKG_NAME} libnvinfer-dev=${TRT_PKG_NAME} libnvinfer-plugin-dev=${TRT_PKG_NAME}
-            # check available version, apt list libnvinfer8 -a
-            sudo wget -q https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-linux-x86_64 -O /usr/bin/bazel
-            sudo chmod a+x /usr/bin/bazel
-
-      - run:
-          name: Set up python environment
-          command: |
-            pip3 install --upgrade pip
-            pip3 install nvidia-pyindex
-            pip3 install tabulate
-            pip3 install nvidia-tensorrt==${TRT_VERSION_LONG}
-            #pip3 install --pre torch==${TORCH_BUILD}  torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/nightly/cu113
-            pip3 install torch==${TORCH_BUILD} torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu113
-            pip3 install pytest parameterized expecttest nox
-            # install torch_tensorrt
-            mv WORKSPACE.ci WORKSPACE
-            cd py
-            python3 setup.py install
-
-            # install fx2trt
-            # cd py/torch_tensorrt/fx/setup
-            # python3 setup.py install
-
-      - run:
-          name: GPU Config
-          command: |
-            nvidia-smi
-
-      - run:
-          name: Test torch
-          command: |
-            python3 -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.device_count())"
-
-      - run:
-          name: Pull test models
-          environment:
-            USE_HOST_DEPS: "1"
-          command: |
-            cd tests/modules
-            pip3 install -r requirements.txt
-            python3 hub.py
-            cd ../..
-
-      - run:
-          name: Run core / C++ tests
-          command: |
-            bazel test //tests --jobs 2
-
-      - run:
-          name: Run L0 python tests
-          command: |
-            nox -s l0_api_tests
-
-      - run:
-          name: Run fx tests
-          command: |
-            # one fix pending to enable below
-            # cd py/torch_tensorrt/fx/test
-            # pytest $(find . -name '*.py' | grep -v test_dispatch* | grep -v test_setitem*)
-
-            cd py/torch_tensorrt/fx/test
-            pushd converters/acc_op
-            pytest
-            popd
-            pushd passes
-            list_passes=$(ls | grep -v test_setitem*)
-            pytest $list_passes
-            popd
-            pushd core
-            pytest
-            popd
-            # pushd quant
-            # pytest
-            # popd
-            pushd tools
-            pytest
-            popd
-            pushd trt_lower
-            pytest
-            popd
-            pushd tracer
-            list_tracer=$(ls | grep -v test_dispatch_*)
-            pytest $list_tracer
-            popd
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
 workflows:
-  build:
+  build-torch-tensorrt:
     jobs:
-      - build-torch-tensorrt-aarch64:
-          matrix:
-              parameters:
-                torch-build: ["torch-1.11.0-cp38-cp38-linux_aarch64.whl"]
-                torch-build-url: ["https://nvidia.box.com/shared/static/ssf2v7pf5i245fk4i0q926hy4imzs2ph.whl"]
-
+      - build-aarch64-pyt-release
+        #  matrix:
+        #      parameters:
+        #        torch-build: ["torch-1.11.0-cp38-cp38-linux_aarch64.whl"]
+        #        torch-build-url: ["https://nvidia.box.com/shared/static/ssf2v7pf5i245fk4i0q926hy4imzs2ph.whl"]
+      - build-x86_64-pyt-release
+        #  matrix:
+        #      parameters:
+        #        torch-build: ["1.11.0+cu113"]
+        #        torch-build-index: ["https://download.pytorch.org/whl/cu113"]
+      #- build-x86_64-pyt-nightly:
+      #    matrix:
+      #        parameters:
+      #          torch-build: ["1.13.0.dev20220621"]
+      #          torch-build-index: ["https://download.pytorch.org/whl/nightly/cu113"]
