@@ -14,10 +14,10 @@ commands:
         default: "5.1.1"
     steps:
       - run: 
-        name: Install bazel
-        command: |
-          sudo wget -q https://github.com/bazelbuild/bazel/releases/download/<< parameters.version >>/bazel-<< parameters.version >>-linux-<< parameters.platform >> -O /usr/bin/bazel
-          sudo chmod a+x /usr/bin/bazel
+          name: Install bazel
+          command: |
+            sudo wget -q https://github.com/bazelbuild/bazel/releases/download/<< parameters.version >>/bazel-<< parameters.version >>-linux-<< parameters.platform >> -O /usr/bin/bazel
+            sudo chmod a+x /usr/bin/bazel
     
   create-env:
     description: "Install dependencies for Torch-TensorRT"
