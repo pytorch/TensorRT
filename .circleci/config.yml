@@ -171,7 +171,7 @@ commands:
           environment:
             LD_LIBRARY_PATH: "/tmp/bazel-workspace/bazel-TensorRT/external/libtorch/lib/:/tmp/bazel-workspace/bazel-TensorRT/external/cudnn/lib64/:/tmp/bazel-workspace/bazel-TensorRT/external/tensorrt/lib/:/usr/local/cuda/lib64/:$LD_LIBRARY_PATH"
           command: |
-            mkdir -p /tmp/bazel-out
+            mkdir -p /tmp/bazel-workspace
             mv WORKSPACE.ci WORKSPACE
             bazel test //tests --jobs 2 --config ci_testing --config pre_cxx11_abi --symlink_prefix=/tmp/bazel-workspace
       - store_test_results:
