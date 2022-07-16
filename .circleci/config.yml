@@ -3,6 +3,22 @@
 version: 2.1
 
 commands:
+  install-bazel:
+    description: "Install bazel"
+    parameters:
+      platform:
+        type: string
+        default: "x86_64"
+      version:
+        type: string
+        default: "5.1.1"
+    steps:
+      - run: 
+        name: Install bazel
+        command: |
+          sudo wget -q https://github.com/bazelbuild/bazel/releases/download/<< parameters.version >>/bazel-<< parameters.version >>-linux-<< parameters.platform >> -O /usr/bin/bazel
+          sudo chmod a+x /usr/bin/bazel
+    
   create-env:
     description: "Install dependencies for Torch-TensorRT"
     parameters:
@@ -32,7 +48,7 @@ commands:
         default: "x86_64"
     steps: 
       - run:
-          name: Install cudnn + tensorrt + bazel
+          name: Install cudnn + tensorrt
           command: |
             cd ~
 
@@ -52,8 +68,9 @@ commands:
 
             sudo apt-get install libnvinfer8=<< parameters.trt-pkg-name >> libnvinfer-plugin8=<< parameters.trt-pkg-name >> libnvinfer-dev=<< parameters.trt-pkg-name >> libnvinfer-plugin-dev=<< parameters.trt-pkg-name >>
             # check available version, apt list libnvinfer8 -a
-            sudo wget -q https://github.com/bazelbuild/bazel/releases/download/<< parameters.bazel-version >>/bazel-<< parameters.bazel-version >>-linux-<< parameters.bazel-platform >> -O /usr/bin/bazel
-            sudo chmod a+x /usr/bin/bazel
+      - install-bazel:
+          platform: << parameters.bazel-platform >>
+          version: << parameters.bazel-version >>        
 
   create-py-env:
       description: "Install python dependencies"
@@ -133,6 +150,7 @@ commands:
   test-ts-core:
     description: "Test torchscript backend c++ api"
     steps:
+      - install-bazel
       - pull-test-models
       - run:
           name: Run core / C++ tests
