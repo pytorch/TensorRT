@@ -369,7 +369,7 @@ workflows:
           torch-build-url: "https://nvidia.box.com/shared/static/ssf2v7pf5i245fk4i0q926hy4imzs2ph.whl"
       - build-x86_64-pyt-release:
           torch-build: "1.11.0+cu113"
-          torch-build-url: "https://download.pytorch.org/whl/cu113"
+          torch-build-index: "https://download.pytorch.org/whl/cu113"
     
   on-push:
     jobs:
