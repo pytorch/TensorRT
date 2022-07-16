@@ -147,7 +147,7 @@ commands:
       - store_test_results:
           path: bazel-testlogs
 
-  test-ts-py-L0:
+  test-ts-py-api:
     description: "Run L0 torch-tensorrt python tests"
     steps:
       - pull-test-models
