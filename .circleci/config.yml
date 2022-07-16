@@ -155,6 +155,7 @@ commands:
       - run:
           name: Run core / C++ tests
           command: |
+            mv WORKSPACE.ci WORKSPACE
             bazel test //tests --jobs 2 --config ci_testing
       - store_test_results:
           path: bazel-testlogs
