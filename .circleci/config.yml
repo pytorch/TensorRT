@@ -186,20 +186,12 @@ commands:
 # Define a job to be invoked later in a workflow.
 # See: https://circleci.com/docs/2.0/configuration-reference/#jobs
 jobs:
-  build-aarch64-pyt-release:
+  build-aarch64-pyt-jetson:
     parameters:
       torch-build:
         type: string
       torch-build-url:
         type: string
-    environment:
-      CUDNN_VERSION: "8.2.1"
-      TRT_VERSION: "8.2.4"
-      TRT_VERSION_LONG: "8.2.4.2"
-      BAZEL_VERSION: "5.1.1"
-      CUDNN_PKG_NAME: "8.2.1.*-1+cuda11.3"
-      TRT_PKG_NAME: "8.2.4-1+cuda11.4"
-      OS: "ubuntu2004"
     machine:
       image: "ubuntu-2004:current"
     resource_class: arm.xlarge
@@ -275,23 +267,17 @@ workflows:
               only:
                 - master
     jobs:
-      - build-aarch64-pyt-release
+      - build-aarch64-pyt-jetson:
+          torch-build: "torch-1.11.0-cp38-cp38-linux_aarch64.whl"
+          torch-build-url: "https://nvidia.box.com/shared/static/ssf2v7pf5i245fk4i0q926hy4imzs2ph.whl"
       - build-x86_64-pyt-release
     
   on-push:
     jobs:
-      - build-aarch64-pyt-release
+      - build-aarch64-pyt-jetson:
+          torch-build: "torch-1.11.0-cp38-cp38-linux_aarch64.whl"
+          torch-build-url: "https://nvidia.box.com/shared/static/ssf2v7pf5i245fk4i0q926hy4imzs2ph.whl"
       - build-x86_64-pyt-release
       - test-x86_64-pyt-release:
           requires:
             - build-x86_64-pyt-release
-
-        #  matrix:
-        #      parameters:
-        #        torch-build: ["1.11.0+cu113"]
-        #        torch-build-index: ["https://download.pytorch.org/whl/cu113"]
-      #- build-x86_64-pyt-nightly:
-      #    matrix:
-      #        parameters:
-      #          torch-build: ["1.13.0.dev20220621"]
-      #          torch-build-index: ["https://download.pytorch.org/whl/nightly/cu113"]
