@@ -18,12 +18,9 @@ commands:
       cudnn-pkg-name:
         type: string
         default: "8.2.1.*-1+cuda11.3"
-      trt-version:
+      trt-version-short:
         type: string
         default: "8.2.4"
-      trt-version-long:
-        type: string
-        default: "8.2.4.2"
       trt-pkg-name:
         type: string
         default: "8.2.4-1+cuda11.4"
@@ -33,12 +30,6 @@ commands:
       bazel-platform:
         type: string
         default: "x86_64"
-      torch-build:
-        type: string
-        default: "1.11.0+cu113"
-      torch-build-index:
-        type: string
-        default: "https://download.pytorch.org/whl/cu113"
     steps: 
       - run:
           name: Install cudnn + tensorrt + bazel
@@ -64,16 +55,46 @@ commands:
             sudo wget -q https://github.com/bazelbuild/bazel/releases/download/<< parameters.bazel-version >>/bazel-<< parameters.bazel-version >>-linux-<< parameters.bazel-platform >> -O /usr/bin/bazel
             sudo chmod a+x /usr/bin/bazel
 
+  create-py-env:
+      description: "Install python dependencies"
+      parameters:
+        trt-version-long:
+          type: string
+          default: "8.2.4.2"
+        torch-build:
+          type: string
+          default: "1.11.0+cu113"
+        torch-build-index:
+          type: string
+          default: "https://download.pytorch.org/whl/cu113"
+      steps:
+        - run:
+            name: Set up python environment
+            command: |
+              pip3 install --upgrade pip
+              pip3 install nvidia-pyindex
+              pip3 install tabulate
+              pip3 install nvidia-tensorrt==<< parameters.trt-version-long >>
+              pip3 install --pre torch==<< parameters.torch-build >>  torchvision torchaudio --extra-index-url << parameters.torch-build-index >>
+              pip3 install pytest parameterized expecttest nox
+            # install torch_tensorrt
+
+  install-torch-from-index:
+    description: "Install python dependencies"
+    parameters:
+      torch-build:
+        type: string
+        default: "1.11.0+cu113"
+      torch-build-index:
+        type: string
+        default: "https://download.pytorch.org/whl/cu113"
+    steps:
       - run:
-          name: Set up python environment
+          name: Install Torch
           command: |
             pip3 install --upgrade pip
-            pip3 install nvidia-pyindex
-            pip3 install tabulate
-            pip3 install nvidia-tensorrt==<< parameters.trt-version-long >>
             pip3 install --pre torch==<< parameters.torch-build >>  torchvision torchaudio --extra-index-url << parameters.torch-build-index >>
-            pip3 install pytest parameterized expecttest nox
-            # install torch_tensorrt
+
 
   build-py:
     description: "Build the torch-tensorrt python release"
@@ -184,44 +205,24 @@ jobs:
     resource_class: arm.xlarge
     steps:
         - checkout
+        - create-env:
+            os: "ubuntu2004"
+            platform: "sbsa"
+            cudnn-version: "8.2.1"
+            cudnn-pkg-name:  "8.2.1.*-1+cuda11.3"
+            trt-version-short:  "8.2.4"
+            trt-pkg-name: "8.2.4-1+cuda11.4"
+            bazel-version:  "5.1.1"
+            bazel-platform: "arm64"
         - run:
-            name: Install cuda + cudnn + tensorrt + bazel + pytorch
+            name: Install torch from box
             command: |
-              cd ~
-
-              wget https://developer.download.nvidia.com/compute/cuda/repos/${OS}/sbsa/cuda-${OS}.pin
-              sudo mv cuda-${OS}.pin /etc/apt/preferences.d/cuda-repository-pin-600
-              sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/${OS}/sbsa/7fa2af80.pub
-              sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 536F8F1DE80F6A35
-              sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys A4B469963BF863CC
-              sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/${OS}/sbsa/ /"
-              sudo apt-get update
-              #sudo apt-get install libcudnn8=${CUDNN_PKG_NAME}
-              #sudo apt-get install libcudnn8-dev=${CUDNN_PKG_NAME}
-
-              sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/{OS}/sbsa/3bf863cc.pub
-              sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/${OS}/sbsa/ /"
-              sudo apt-get update
-
-              sudo apt-get install libnvinfer8=${TRT_PKG_NAME} libnvinfer-plugin8=${TRT_PKG_NAME} libnvinfer-dev=${TRT_PKG_NAME} libnvinfer-plugin-dev=${TRT_PKG_NAME}
-              # check available version, apt list libnvinfer8 -a
-              sudo wget -q https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-linux-arm64 -O /usr/bin/bazel
-              sudo chmod a+x /usr/bin/bazel
-
               wget << parameters.torch-build-url >> -O << parameters.torch-build >>
               pip3 install --upgrade pip
               pip3 install << parameters.torch-build >>
-
-        - run:
-            name: Build Library
-            command: |
-              # install torch_tensorrt
-              mv WORKSPACE.ci WORKSPACE
-              cd py
-              python3 setup.py bdist_wheel
-
+        - build-py
         - store_artifacts: 
-            path: dist/
+            path: ${CIRCLE_WORKING_DIRECTORY}/py/dist
             destination: torch-tensorrt-aarch64
 
   build-x86_64-pyt-release:
@@ -238,11 +239,11 @@ jobs:
           platform: "x86_64"
           cudnn-version: "8.2.1"
           cudnn-pkg-name:  "8.2.1.*-1+cuda11.3"
-          trt-version:  "8.2.4"
-          trt-version-long: "8.2.4.2"
+          trt-version-short:  "8.2.4"
           trt-pkg-name: "8.2.4-1+cuda11.4"
           bazel-version:  "5.1.1"
           bazel-platform: "x86_64"
+      - install-torch-from-index:
           torch-build:  "1.11.0+cu113"
           torch-build-index: "https://download.pytorch.org/whl/cu113"
       - build-py
@@ -250,13 +251,41 @@ jobs:
           path: ${CIRCLE_WORKING_DIRECTORY}/py/dist
           destination: x86_64-pyt-release
 
-
+test-x86_64-pyt-release:
+  machine:
+    image: ubuntu-2004-cuda-11.4:202110-01
+  resource_class: gpu.nvidia.large
+  steps:
+    - checkout
+    - create-py-env:
+        trt-version-long: "8.2.4.2"
+    - install-torch-from-index:
+        torch-build:  "1.11.0+cu113"
+        torch-build-index: "https://download.pytorch.org/whl/cu113"
+    
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
 workflows:
-  build-torch-tensorrt:
+  nightly:
+    triggers:
+      - schedule:
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only:
+                - master
     jobs:
+      - build-aarch64-pyt-release
       - build-x86_64-pyt-release
+    
+  on-push:
+    jobs:
+      - build-aarch64-pyt-release
+      - build-x86_64-pyt-release
+      - test-x86_64-pyt-release:
+          requires:
+            - build-x86_64-pyt-release
+
         #  matrix:
         #      parameters:
         #        torch-build: ["1.11.0+cu113"]
