@@ -108,6 +108,8 @@ commands:
             python3 -m pip install pybind11==2.6.2
             python3 setup.py bdist_wheel
             python3 setup.py install
+            mkdir -p /tmp/dist
+            cp dist/* /tmp/dist
 
   dump-test-env:
     description: "Dump the test env to console"
@@ -217,8 +219,8 @@ jobs:
               pip3 install << parameters.torch-build >>
         - build-py
         - store_artifacts: 
-            path: ${CIRCLE_WORKING_DIRECTORY}/py/dist
-            destination: torch-tensorrt-aarch64
+            path: /tmp/dist
+            destination: aarch64-pyt-jetson
 
   build-x86_64-pyt-release:
     machine:
@@ -243,7 +245,7 @@ jobs:
           torch-build-index: "https://download.pytorch.org/whl/cu113"
       - build-py
       - store_artifacts:
-          path: ${CIRCLE_WORKING_DIRECTORY}/py/dist
+          path: /tmp/dist
           destination: x86_64-pyt-release
 
   test-x86_64-pyt-release:
