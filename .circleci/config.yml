@@ -103,6 +103,7 @@ commands:
           name: Build python api
           command: |
             mv WORKSPACE.ci WORKSPACE
+            cd py
             python3 setup.py bdist_wheel
             python3 setup.py install
 
