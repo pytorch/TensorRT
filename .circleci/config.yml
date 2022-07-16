@@ -121,6 +121,21 @@ commands:
             mkdir -p /tmp/dist/builds
             cp dist/* /tmp/dist/builds
 
+  build-py-fx-only:
+    description: "Build the torch-tensorrt python release with only the fx backend"
+    steps:
+      - run:
+          name: Build python api
+          command: |
+            mv WORKSPACE.ci WORKSPACE
+            cd py
+            python3 -m pip install wheel setuptools
+            python3 -m pip install pybind11==2.6.2
+            python3 setup.py bdist_wheel --fx-only
+            python3 setup.py install --fx-only
+            mkdir -p /tmp/dist/builds
+            cp dist/* /tmp/dist/builds
+
   dump-test-env:
     description: "Dump the test env to console"
     steps:
@@ -150,19 +165,25 @@ commands:
   test-ts-core:
     description: "Test torchscript backend c++ api"
     steps:
-      - install-bazel
       - pull-test-models
       - run:
           name: Run core / C++ tests
           command: |
+            mkdir -p /tmp/bazel-out
             mv WORKSPACE.ci WORKSPACE
-            bazel test //tests --jobs 2 --config ci_testing
+            bazel test //tests --jobs 2 --config ci_testing --symlink_prefix=/tmp/bazel-out
       - store_test_results:
-          path: bazel-testlogs
+          path: /tmp/bazel-out/bazel-testlogs
 
   test-ts-py-api:
     description: "Run L0 torch-tensorrt python tests"
+    parameters:
+        trt-version-long:
+          type: string
+          default: "8.2.4.2"
     steps:
+      - create-py-env:
+          trt-version-long: << parameters.trt-version-long >>
       - pull-test-models
       - run:
           name: Run L0 torch-tensorrt python tests
@@ -304,7 +325,7 @@ jobs:
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
           torch-build-index: << parameters.torch-build-index >>
-      - build-py
+      - build-py-fx-only
       - run:
           name: Move to nightly dir
           command: |
@@ -329,6 +350,15 @@ jobs:
     resource_class: gpu.nvidia.large
     steps:
       - checkout
+      - create-env:
+          os: "ubuntu2004"
+          platform: "x86_64"
+          cudnn-version: "8.2.1"
+          cudnn-pkg-name:  "8.2.1.*-1+cuda11.3"
+          trt-version-short:  "8.2.4"
+          trt-pkg-name: "8.2.4-1+cuda11.4"
+          bazel-version:  "5.1.1"
+          bazel-platform: "x86_64"
       - create-py-env:
           trt-version-long: "8.2.4.2"
       - install-torch-from-index:
