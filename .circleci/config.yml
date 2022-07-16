@@ -168,6 +168,8 @@ commands:
       - pull-test-models
       - run:
           name: Run core / C++ tests
+          environment:
+            LD_LIBRARY_PATH: "${CIRCLE_WORKING_DIRECTORY}/bazel-TensorRT/external/libtorch/lib/:${CIRCLE_WORKING_DIRECTORY}/bazel-TensorRT/external/cudnn/lib64/:${CIRCLE_WORKING_DIRECTORY}/bazel-TensorRT/external/tensorrt/lib/:/usr/local/cuda/lib64/:$LD_LIBRARY_PATH"
           command: |
             mkdir -p /tmp/bazel-out
             mv WORKSPACE.ci WORKSPACE
