@@ -243,17 +243,17 @@ jobs:
           path: ${CIRCLE_WORKING_DIRECTORY}/py/dist
           destination: x86_64-pyt-release
 
-test-x86_64-pyt-release:
-  machine:
-    image: ubuntu-2004-cuda-11.4:202110-01
-  resource_class: gpu.nvidia.large
-  steps:
-    - checkout
-    - create-py-env:
-        trt-version-long: "8.2.4.2"
-    - install-torch-from-index:
-        torch-build:  "1.11.0+cu113"
-        torch-build-index: "https://download.pytorch.org/whl/cu113"
+  test-x86_64-pyt-release:
+    machine:
+      image: ubuntu-2004-cuda-11.4:202110-01
+    resource_class: gpu.nvidia.large
+    steps:
+      - checkout
+      - create-py-env:
+          trt-version-long: "8.2.4.2"
+      - install-torch-from-index:
+          torch-build:  "1.11.0+cu113"
+          torch-build-index: "https://download.pytorch.org/whl/cu113"
     
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
