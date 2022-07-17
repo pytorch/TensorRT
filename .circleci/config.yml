@@ -163,6 +163,7 @@ commands:
     description: "Test torchscript backend c++ api"
     steps:
       - pull-test-models
+      - run: mkdir -p /tmp/artifacts
       - run:
           name: Run core / C++ tests
           environment:
@@ -172,15 +173,9 @@ commands:
             ls
             set -e
             mv WORKSPACE.ci WORKSPACE
-            bazel test //tests --jobs 2 --config ci_testing --config pre_cxx11_abi
-      - run:
-          name: Collect logs
-          command: |
-            ls
-            mkdir /tmp/testlogs
-            cp -r bazel-testlogs /tmp/testlogs
+            bazel test //tests --test_arg=--gtest_output=xml:/tmp/artifacts/test_results/ --jobs 2 --config ci_testing --config pre_cxx11_abi
       - store_test_results:
-          path: /tmp/testlogs
+          path: /tmp/artifacts
 
   test-ts-py-api:
     description: "Run L0 torch-tensorrt python tests"
