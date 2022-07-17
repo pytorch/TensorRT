@@ -167,7 +167,7 @@ commands:
       - run:
           name: Run core / C++ tests
           environment:
-            LD_LIBRARY_PATH: "~/project/bazel-project/external/libtorch/lib/:~/project/bazel-project/external/cudnn/lib64/:~/project/bazel-project/external/tensorrt/lib/:/usr/local/cuda/lib64/:$LD_LIBRARY_PATH"
+            LD_LIBRARY_PATH: "~/project/bazel-project/external/libtorch_pre_cxx11_abi/lib/:~/project/bazel-project/external/cudnn/lib64/:~/project/bazel-project/external/tensorrt/lib/:/usr/local/cuda/lib64/:$LD_LIBRARY_PATH"
           command: |
             pwd
             ls
