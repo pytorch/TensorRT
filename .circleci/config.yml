@@ -170,6 +170,7 @@ commands:
           command: |
             pwd
             ls
+            set -e
             mv WORKSPACE.ci WORKSPACE
             bazel test //tests --jobs 2 --config ci_testing --config pre_cxx11_abi
       - run:
