@@ -157,10 +157,7 @@ commands:
           environment:
             USE_HOST_DEPS: "1"
           command: |
-            cd tests/modules
-            pip3 install -r requirements.txt
-            python3 hub.py
-            cd ../..
+            nox -s download_test_models-3.9
 
   test-ts-core:
     description: "Test torchscript backend c++ api"
