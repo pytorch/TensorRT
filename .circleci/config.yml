@@ -172,6 +172,9 @@ commands:
             ls
             mv WORKSPACE.ci WORKSPACE
             bazel test //tests --jobs 2 --config ci_testing --config pre_cxx11_abi
+      - run:
+          name: Collect logs
+          command: |
             ls
             mkdir /tmp/testlogs
             cp -r bazel-testlogs /tmp/testlogs
