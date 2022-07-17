@@ -166,14 +166,17 @@ commands:
       - run:
           name: Run core / C++ tests
           environment:
-            LD_LIBRARY_PATH: "~/project/bazel-TensorRT/external/libtorch/lib/:~/project/bazel-TensorRT/external/cudnn/lib64/:~/project/bazel-TensorRT/external/tensorrt/lib/:/usr/local/cuda/lib64/:$LD_LIBRARY_PATH"
+            LD_LIBRARY_PATH: "~/project/bazel-project/external/libtorch/lib/:~/project/bazel-project/external/cudnn/lib64/:~/project/bazel-project/external/tensorrt/lib/:/usr/local/cuda/lib64/:$LD_LIBRARY_PATH"
           command: |
             pwd
             ls
             mv WORKSPACE.ci WORKSPACE
             bazel test //tests --jobs 2 --config ci_testing --config pre_cxx11_abi
+            pwd
+            mkdir /tmp/testlogs
+            cp -r bazel-testlogs /tmp/testlogs
       - store_test_results:
-          path: bazel-testlogs
+          path: /tmp/testlogs
 
   test-ts-py-api:
     description: "Run L0 torch-tensorrt python tests"
