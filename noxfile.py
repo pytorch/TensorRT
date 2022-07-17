@@ -313,4 +313,8 @@ def l2_multi_gpu_tests(session):
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def download_test_models(session):
     """Grab all the models needed for testing"""
+    try:
+        import torch
+    except ModuleNotFoundError:
+        install_deps(session)
     download_models(session)
