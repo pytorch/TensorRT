@@ -192,11 +192,12 @@ commands:
           when: on_fail
           command: |
             mkdir -p /tmp/testlogs
+            cp -r bazel-testlogs /tmp/testlogs
 
       - store_test_results:
           path: /tmp/artifacts
       - store_artifacts:
-          path: bazel-testlogs
+          path: /tmp/testlogs
 
   test-ts-py-api:
     description: "Run L0 torch-tensorrt python tests"
