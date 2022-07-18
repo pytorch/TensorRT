@@ -341,7 +341,7 @@ jobs:
           path: /tmp/dist/nightly
           destination: x86_64-pyt-nightly
 
-  test-x86_64-pyt-release:
+  test-core-cpp-x86_64-pyt-release:
     parameters:
       torch-build:
         type: string
@@ -372,6 +372,37 @@ jobs:
           name: "Install torch-tensorrt"
           command: pip3 install /tmp/dist/release/* 
       - test-ts-core
+
+  test-ts-py-x86_64-pyt-release:
+    parameters:
+      torch-build:
+        type: string
+      torch-build-index:
+        type: string
+    machine:
+      image: ubuntu-2004-cuda-11.4:202110-01
+    resource_class: gpu.nvidia.large
+    steps:
+      - checkout
+      - create-env:
+          os: "ubuntu2004"
+          platform: "x86_64"
+          cudnn-version: "8.2.1"
+          cudnn-pkg-name:  "8.2.1.*-1+cuda11.3"
+          trt-version-short:  "8.2.4"
+          trt-pkg-name: "8.2.4-1+cuda11.4"
+          bazel-version:  "5.1.1"
+          bazel-platform: "x86_64"
+      - install-torch-from-index:
+          torch-build:  << parameters.torch-build >>
+          torch-build-index: << parameters.torch-build-index >>
+      - attach_workspace:
+          at: /tmp/dist
+      - run:
+          name: "Install torch-tensorrt"
+          command: pip3 install /tmp/dist/release/* 
+      - test-ts-py-api:
+          trt-version-long: "8.2.4.2"
 
   test-x86_64-pyt-nightly:
     parameters:
@@ -415,8 +446,7 @@ parameters:
   torch-jetson-build-url:
     type: string
     default: "https://nvidia.box.com/shared/static/ssf2v7pf5i245fk4i0q926hy4imzs2ph.whl"
-    
-    
+  
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
 workflows:
@@ -460,7 +490,12 @@ workflows:
       - build-x86_64-pyt-release:
           torch-build: << pipeline.parameters.torch-release-build >>
           torch-build-index: << pipeline.parameters.torch-release-build-index >>
-      - test-x86_64-pyt-release:
+      - test-core-cpp-x86_64-pyt-release:
+          torch-build: << pipeline.parameters.torch-release-build >>
+          torch-build-index: << pipeline.parameters.torch-release-build-index >>
+          requires:
+            - build-x86_64-pyt-release
+      - test-ts-py-x86_64-pyt-release:
           torch-build: << pipeline.parameters.torch-release-build >>
           torch-build-index: << pipeline.parameters.torch-release-build-index >>
           requires:
