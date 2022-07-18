@@ -107,7 +107,22 @@ commands:
             pip3 install --pre torch==<< parameters.torch-build >>  torchvision torchaudio --extra-index-url << parameters.torch-build-index >>
 
   build-py:
-    description: "Build the torch-tensorrt python release"
+    description: "Build the torch-tensorrt python release (pre-cxx11-abi)"
+    steps:
+      - run:
+          name: Build torch-tensorrt python release (pre-cxx11-abi)
+          command: |
+            mv WORKSPACE.ci WORKSPACE
+            cd py
+            python3 -m pip install wheel setuptools
+            python3 -m pip install pybind11==2.6.2
+            python3 setup.py bdist_wheel
+            python3 setup.py install
+            mkdir -p /tmp/dist/builds
+            cp dist/* /tmp/dist/builds
+            
+  build-py-cxx11-abi:
+    description: "Build the torch-tensorrt python release (cxx11-abi)"
     steps:
       - run:
           name: Build torch-tensorrt python release
@@ -116,8 +131,8 @@ commands:
             cd py
             python3 -m pip install wheel setuptools
             python3 -m pip install pybind11==2.6.2
-            python3 setup.py bdist_wheel
-            python3 setup.py install
+            python3 setup.py bdist_wheel --use-cxx11-abi
+            python3 setup.py install --use-cxx11-abi
             mkdir -p /tmp/dist/builds
             cp dist/* /tmp/dist/builds
 
@@ -172,6 +187,12 @@ commands:
             set -e
             mv WORKSPACE.ci WORKSPACE
             bazel test //tests --test_arg=--gtest_output=xml:/tmp/artifacts/test_results/ --jobs 2 --config ci_testing --config pre_cxx11_abi --noshow_progress
+      - run:
+          name: Collect logs
+          when: on_fail
+          command: |
+            mkdir -p /tmp/testlogs
+
       - store_test_results:
           path: /tmp/artifacts
       - store_artifacts:
@@ -238,6 +259,9 @@ jobs:
         type: string
       torch-build-url:
         type: string
+      cxx11-abi: 
+        type: boolean
+        default: true
     machine:
       image: "ubuntu-2004:current"
     resource_class: arm.xlarge
@@ -258,9 +282,25 @@ jobs:
               wget << parameters.torch-build-url >> -O << parameters.torch-build >>
               pip3 install --upgrade pip
               pip3 install << parameters.torch-build >>
-        - build-py
-        - store_artifacts: 
-            path: /tmp/dist
+        - when:
+            condition: << parameters.cxx11-abi >>
+            steps: 
+              - build-py-cxx11-abi
+        - unless:
+            condition: << parameters.cxx11-abi >>
+            steps:
+              - build-py
+        - run:
+            name: Move to release dir
+            command: |
+              mkdir -p /tmp/dist/release
+              cp -r /tmp/dist/builds/* /tmp/dist/release
+        - persist_to_workspace:
+            root: /tmp/dist
+            paths:
+              - release
+        - store_artifacts:
+            path: /tmp/dist/release
             destination: aarch64-pyt-jetson
 
   build-x86_64-pyt-release:
@@ -269,6 +309,9 @@ jobs:
         type: string
       torch-build-index:
         type: string
+      cxx11-abi: 
+        type: boolean
+        default: false
     machine:
       # Primary container image where all steps run.
       # image: nvcr.io/nvidia/tensorrt:22.01-py3 # does not work with customized image
@@ -289,7 +332,14 @@ jobs:
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
           torch-build-index: << parameters.torch-build-index >>
-      - build-py
+      - when:
+          condition: << parameters.cxx11-abi >>
+          steps: 
+            - build-py-cxx11-abi
+      - unless:
+          condition: << parameters.cxx11-abi >>
+          steps:
+            - build-py
       - run:
           name: Move to release dir
           command: |
@@ -309,6 +359,9 @@ jobs:
         type: string
       torch-build-index:
         type: string
+      cxx11-abi: 
+        type: boolean
+        default: true
     machine:
       # Primary container image where all steps run.
       # image: nvcr.io/nvidia/tensorrt:22.01-py3 # does not work with customized image
@@ -329,7 +382,14 @@ jobs:
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
           torch-build-index: << parameters.torch-build-index >>
-      - build-py
+      - when:
+          condition: << parameters.cxx11-abi >>
+          steps: 
+            - build-py-cxx11-abi
+      - unless:
+          condition: << parameters.cxx11-abi >>
+          steps:
+            - build-py
       - run:
           name: Move to nightly dir
           command: |
