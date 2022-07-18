@@ -193,6 +193,8 @@ commands:
           command: |
             mkdir -p /tmp/testlogs
             cp -r bazel-testlogs /tmp/testlogs
+            sudo apt install tree
+            tree . > /tmp/testlogs/dir_structure.txt
 
       - store_test_results:
           path: /tmp/artifacts
