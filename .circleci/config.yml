@@ -412,7 +412,7 @@ jobs:
           bazel-version:  << pipeline.parameters.bazel-version >>
           bazel-platform: "x86_64"
       - create-py-env:
-          trt-version-long: << parameters.trt-version-long >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
           torch-build-index: << parameters.torch-build-index >>
@@ -435,7 +435,7 @@ jobs:
     steps:
       - checkout
       - create-py-env:
-          trt-version-long: << parameters.trt-version-long >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
           torch-build-index: << parameters.torch-build-index >>
@@ -458,7 +458,7 @@ jobs:
     steps:
       - checkout
       - create-py-env:
-          trt-version-long: << parameters.trt-version-long >>
+          trt-version-long: << pipeline.parameters.trt-version-long >>
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
           torch-build-index: << parameters.torch-build-index >>
