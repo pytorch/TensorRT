@@ -173,7 +173,9 @@ commands:
             ls
             set -e
             mv WORKSPACE.ci WORKSPACE
-            bazel test //tests --test_arg=--gtest_output=xml:/tmp/artifacts/test_results/ --jobs 2 --config ci_testing --config pre_cxx11_abi
+            bazel build //:libtorchtrt --config pre_cxx11_abi
+            #bazel test //tests --test_arg=--gtest_output=xml:/tmp/artifacts/test_results/ --jobs 2 --config ci_testing --config pre_cxx11_abi
+            ls
       - store_test_results:
           path: /tmp/artifacts
 
