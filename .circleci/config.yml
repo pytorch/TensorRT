@@ -200,13 +200,7 @@ commands:
 
   test-ts-py-api:
     description: "Run L0 torch-tensorrt python tests"
-    parameters:
-        trt-version-long:
-          type: string
-          default: "8.2.4.2"
     steps:
-      - create-py-env:
-          trt-version-long: << parameters.trt-version-long >>
       - pull-test-models
       - run:
           name: Run L0 torch-tensorrt python tests
@@ -270,11 +264,11 @@ jobs:
         - create-env:
             os: "ubuntu2004"
             platform: "sbsa"
-            cudnn-version: "8.2.1"
-            cudnn-pkg-name:  "8.2.1.*-1+cuda11.3"
-            trt-version-short:  "8.2.4"
-            trt-pkg-name: "8.2.4-1+cuda11.4"
-            bazel-version:  "5.1.1"
+            cudnn-version: << pipeline.parameters.cudnn-version >>
+            cudnn-pkg-name:  << pipeline.parameters.cudnn-pkg-name >>
+            trt-version-short:  << pipeline.parameters.trt-version-short >>
+            trt-pkg-name: << pipeline.parameters.trt-pkg-name >>
+            bazel-version:  << pipeline.parameters.bazel-version >>
             bazel-platform: "arm64"
         - run:
             name: Install torch from box
@@ -313,9 +307,6 @@ jobs:
         type: boolean
         default: false
     machine:
-      # Primary container image where all steps run.
-      # image: nvcr.io/nvidia/tensorrt:22.01-py3 # does not work with customized image
-      # https://circleci.com/docs/2.0/configuration-reference#available-linux-gpu-images
       image: ubuntu-2004-cuda-11.4:202110-01
     resource_class: xlarge
     steps:
@@ -323,11 +314,11 @@ jobs:
       - create-env:
           os: "ubuntu2004"
           platform: "x86_64"
-          cudnn-version: "8.2.1"
-          cudnn-pkg-name:  "8.2.1.*-1+cuda11.3"
-          trt-version-short:  "8.2.4"
-          trt-pkg-name: "8.2.4-1+cuda11.4"
-          bazel-version:  "5.1.1"
+          cudnn-version: << pipeline.parameters.cudnn-version >>
+          cudnn-pkg-name:  << pipeline.parameters.cudnn-pkg-name >>
+          trt-version-short:  << pipeline.parameters.trt-version-short >>
+          trt-pkg-name: << pipeline.parameters.trt-pkg-name >>
+          bazel-version:  << pipeline.parameters.bazel-version >>
           bazel-platform: "x86_64"
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
@@ -361,11 +352,8 @@ jobs:
         type: string
       cxx11-abi: 
         type: boolean
-        default: true
+        default: false
     machine:
-      # Primary container image where all steps run.
-      # image: nvcr.io/nvidia/tensorrt:22.01-py3 # does not work with customized image
-      # https://circleci.com/docs/2.0/configuration-reference#available-linux-gpu-images
       image: ubuntu-2004-cuda-11.4:202110-01
     resource_class: xlarge
     steps:
@@ -373,11 +361,11 @@ jobs:
       - create-env:
           os: "ubuntu2004"
           platform: "x86_64"
-          cudnn-version: "8.2.1"
-          cudnn-pkg-name:  "8.2.1.*-1+cuda11.3"
-          trt-version-short:  "8.2.4"
-          trt-pkg-name: "8.2.4-1+cuda11.4"
-          bazel-version:  "5.1.1"
+          cudnn-version: << pipeline.parameters.cudnn-version >>
+          cudnn-pkg-name:  << pipeline.parameters.cudnn-pkg-name >>
+          trt-version-short:  << pipeline.parameters.trt-version-short >>
+          trt-pkg-name: << pipeline.parameters.trt-pkg-name >>
+          bazel-version:  << pipeline.parameters.bazel-version >>
           bazel-platform: "x86_64"
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
@@ -417,14 +405,14 @@ jobs:
       - create-env:
           os: "ubuntu2004"
           platform: "x86_64"
-          cudnn-version: "8.2.1"
-          cudnn-pkg-name:  "8.2.1.*-1+cuda11.3"
-          trt-version-short:  "8.2.4"
-          trt-pkg-name: "8.2.4-1+cuda11.4"
-          bazel-version:  "5.1.1"
+          cudnn-version: << pipeline.parameters.cudnn-version >>
+          cudnn-pkg-name:  << pipeline.parameters.cudnn-pkg-name >>
+          trt-version-short:  << pipeline.parameters.trt-version-short >>
+          trt-pkg-name: << pipeline.parameters.trt-pkg-name >>
+          bazel-version:  << pipeline.parameters.bazel-version >>
           bazel-platform: "x86_64"
       - create-py-env:
-          trt-version-long: "8.2.4.2"
+          trt-version-long: << parameters.trt-version-long >>
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
           torch-build-index: << parameters.torch-build-index >>
@@ -446,15 +434,8 @@ jobs:
     resource_class: gpu.nvidia.large
     steps:
       - checkout
-      - create-env:
-          os: "ubuntu2004"
-          platform: "x86_64"
-          cudnn-version: "8.2.1"
-          cudnn-pkg-name:  "8.2.1.*-1+cuda11.3"
-          trt-version-short:  "8.2.4"
-          trt-pkg-name: "8.2.4-1+cuda11.4"
-          bazel-version:  "5.1.1"
-          bazel-platform: "x86_64"
+      - create-py-env:
+          trt-version-long: << parameters.trt-version-long >>
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
           torch-build-index: << parameters.torch-build-index >>
@@ -463,8 +444,7 @@ jobs:
       - run:
           name: "Install torch-tensorrt"
           command: pip3 install /tmp/dist/release/* 
-      - test-ts-py-api:
-          trt-version-long: "8.2.4.2"
+      - test-ts-py-api
 
   test-x86_64-pyt-nightly:
     parameters:
@@ -478,7 +458,7 @@ jobs:
     steps:
       - checkout
       - create-py-env:
-          trt-version-long: "8.2.4.2"
+          trt-version-long: << parameters.trt-version-long >>
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
           torch-build-index: << parameters.torch-build-index >>
@@ -508,6 +488,21 @@ parameters:
   torch-jetson-build-url:
     type: string
     default: "https://nvidia.box.com/shared/static/ssf2v7pf5i245fk4i0q926hy4imzs2ph.whl"
+  cudnn-version: 
+    type: string
+    default: "8.2.1"
+  cudnn-pkg-name:
+    type: string
+    default: "8.2.1.*-1+cuda11.3"
+  trt-version-short:
+    type: string
+    default: "8.2.4"
+  trt-pkg-name:
+    type: string
+    default: "8.2.4-1+cuda11.4"
+  bazel-version:
+    type: string
+    default: "5.1.1"
   
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
