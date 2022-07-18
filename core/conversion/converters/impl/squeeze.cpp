@@ -26,7 +26,8 @@ auto squeeze_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().pa
        }
 
        if (selfDim[dim] != 1) {
-         auto out = ctx->AssociateValueAndTensor(n->outputs()[0], self);
+         auto id_layer = ctx->net->addIdentity(*self);
+         auto out = ctx->AssociateValueAndTensor(n->outputs()[0], id_layer->getOutput(0));
 
          LOG_DEBUG("Output tensor shape: " << out->getDimensions());
 
