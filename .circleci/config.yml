@@ -329,7 +329,7 @@ jobs:
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
           torch-build-index: << parameters.torch-build-index >>
-      - build-py-fx-only
+      - build-py
       - run:
           name: Move to nightly dir
           command: |
