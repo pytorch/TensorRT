@@ -167,15 +167,14 @@ commands:
       - run:
           name: Run core / C++ tests
           environment:
-            LD_LIBRARY_PATH: "~/project/bazel-project/external/libtorch_pre_cxx11_abi/lib/:~/project/bazel-project/external/cudnn/lib64/:~/project/bazel-project/external/tensorrt/lib/:/usr/local/cuda/lib64/:$LD_LIBRARY_PATH"
+            LD_LIBRARY_PATH: "/home/circleci/project/bazel-project/external/libtorch_pre_cxx11_abi/lib/:/home/circleci/project/bazel-project/external/cudnn/lib64/:/home/circleci/project/bazel-project/external/tensorrt/lib/:/usr/local/cuda/lib64/:$LD_LIBRARY_PATH"
           command: |
             pwd
             ls
             set -e
             mv WORKSPACE.ci WORKSPACE
-            bazel build //:libtorchtrt --config pre_cxx11_abi
-            #bazel test //tests --test_arg=--gtest_output=xml:/tmp/artifacts/test_results/ --jobs 2 --config ci_testing --config pre_cxx11_abi
-            ls
+            #bazel build //:libtorchtrt --config pre_cxx11_abi
+            bazel test //tests --test_arg=--gtest_output=xml:/tmp/artifacts/test_results/ --jobs 2 --config ci_testing --config pre_cxx11_abi
       - store_test_results:
           path: /tmp/artifacts
 
