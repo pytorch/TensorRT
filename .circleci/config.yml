@@ -189,6 +189,8 @@ commands:
       - pull-test-models
       - run:
           name: Run L0 torch-tensorrt python tests
+          environment:
+            USE_HOST_DEPS: "1"
           command: |
             nox -s l0_api_tests-3.9
 
