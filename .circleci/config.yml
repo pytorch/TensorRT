@@ -497,6 +497,9 @@ parameters:
   trt-version-short:
     type: string
     default: "8.2.4"
+  trt-version-long:
+    type: string
+    default: "8.2.4.2"
   trt-pkg-name:
     type: string
     default: "8.2.4-1+cuda11.4"
