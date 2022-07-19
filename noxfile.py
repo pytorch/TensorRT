@@ -5,16 +5,20 @@ import sys
 
 # Use system installed Python packages
 PYT_PATH='/opt/conda/lib/python3.8/site-packages' if not 'PYT_PATH' in os.environ else os.environ["PYT_PATH"]
+print(f"Using python path {PYT_PATH}")
 
 # Set the root directory to the directory of the noxfile unless the user wants to
 # TOP_DIR
 TOP_DIR=os.path.dirname(os.path.realpath(__file__)) if not 'TOP_DIR' in os.environ else os.environ["TOP_DIR"]
+print(f"Test root directory {TOP_DIR}")
 
 # Set the USE_CXX11=1 to use cxx11_abi
 USE_CXX11=0 if not 'USE_CXX11' in os.environ else os.environ["USE_CXX11"]
+print("Using cxx11 abi")
 
 # Set the USE_HOST_DEPS=1 to use host dependencies for tests
 USE_HOST_DEPS=0 if not 'USE_HOST_DEPS' in os.environ else os.environ["USE_HOST_DEPS"]
+print("Using dependencies from host python")
 
 SUPPORTED_PYTHON_VERSIONS=["3.7", "3.8", "3.9", "3.10"]
 
