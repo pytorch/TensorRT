@@ -209,6 +209,7 @@ commands:
           name: Run L0 torch-tensorrt python tests
           environment:
             USE_HOST_DEPS: "1"
+            PYT_PATH: "/opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/site-packages/"
           command: |
             nox -s l0_api_tests-3.9
 
