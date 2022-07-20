@@ -19,6 +19,33 @@ commands:
             sudo wget -q https://github.com/bazelbuild/bazel/releases/download/<< parameters.version >>/bazel-<< parameters.version >>-linux-<< parameters.platform >> -O /usr/bin/bazel
             sudo chmod a+x /usr/bin/bazel
 
+  install-cuda:
+    description: "Install CUDA"
+    parameters:
+      os:
+        type: string
+        default: "ubuntu2004"
+      platform:
+        type: string
+        default: "x86_64"
+      cuda-pkg-name:
+        type: string
+        default: "cuda-toolkit-11-4"
+    steps:
+      - run:
+          name: Install CUDA
+          command: |
+            cd ~
+
+            wget https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/cuda-<< parameters.os >>.pin
+            sudo mv cuda-<< parameters.os >>.pin /etc/apt/preferences.d/cuda-repository-pin-600
+
+            sudo apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/3bf863cc.pub
+            sudo add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/<< parameters.os >>/<< parameters.platform >>/ /"
+            sudo apt-get update
+
+            sudo apt-get install << parameters.cuda-pkg-name >>
+
   create-env:
     description: "Install dependencies for Torch-TensorRT"
     parameters:
@@ -283,10 +310,14 @@ jobs:
         type: string
         default: 3.8.13
     machine:
-      image: ubuntu-2004-cuda-11.4:202110-01
+      image: ubuntu-2004:current
     resource_class: arm.xlarge
     steps:
         - checkout
+        - install-cuda:
+            os: "ubuntu2004"
+            platform: "sbsa"
+            cuda-pkg-name: "cuda-toolkit-11-4"
         - create-env:
             os: "ubuntu2004"
             platform: "sbsa"
