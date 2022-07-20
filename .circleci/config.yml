@@ -279,7 +279,7 @@ commands:
             popd
             pushd passes
             list_passes=$(ls | grep -v test_setitem*)
-            pytest $list_passes1.12.0a0+2c916ef
+            pytest $list_passes
             # pushd quant
             # pytest
             # popd
