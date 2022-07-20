@@ -135,11 +135,15 @@ commands:
 
   build-py:
     description: "Build the torch-tensorrt python release (pre-cxx11-abi)"
+    parameters:
+      platform:
+        type: string
+        default: "x86_64"
     steps:
       - run:
           name: Build torch-tensorrt python release (pre-cxx11-abi)
           command: |
-            mv WORKSPACE.ci WORKSPACE
+            mv toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >> WORKSPACE
             cd py
             python3 -m pip install wheel setuptools
             python3 -m pip install pybind11==2.6.2
@@ -150,11 +154,15 @@ commands:
 
   build-py-cxx11-abi:
     description: "Build the torch-tensorrt python release (cxx11-abi)"
+    parameters:
+      platform:
+        type: string
+        default: "x86_64"
     steps:
       - run:
           name: Build torch-tensorrt python release
           command: |
-            mv WORKSPACE.ci WORKSPACE
+            mv toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >> WORKSPACE
             cd py
             python3 -m pip install wheel setuptools
             python3 -m pip install pybind11==2.6.2
@@ -165,11 +173,15 @@ commands:
 
   build-py-fx-only:
     description: "Build the torch-tensorrt python release with only the fx backend"
+    parameters:
+      platform:
+        type: string
+        default: "x86_64"
     steps:
       - run:
           name: Build torch-tensorrt python release with only the fx backend
           command: |
-            mv WORKSPACE.ci WORKSPACE
+            mv toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >> WORKSPACE
             cd py
             python3 -m pip install wheel setuptools
             python3 -m pip install pybind11==2.6.2
@@ -211,6 +223,10 @@ commands:
 
   test-ts-core:
     description: "Test torchscript backend c++ api"
+    parameters:
+      platform:
+        type: string
+        default: "x86_64"
     steps:
       - pull-test-models
       - run: mkdir -p /tmp/artifacts
@@ -220,7 +236,7 @@ commands:
             LD_LIBRARY_PATH: "/home/circleci/project/bazel-project/external/libtorch_pre_cxx11_abi/lib/:/home/circleci/project/bazel-project/external/tensorrt/lib/:/usr/local/cuda/lib64/:$LD_LIBRARY_PATH"
           command: |
             set -e
-            mv WORKSPACE.ci WORKSPACE
+            mv toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >> WORKSPACE
             bazel query 'kind(cc_*, tests(//tests))' --noshow_progress >> /tmp/test_manifest.txt
             circleci tests split < /tmp/test_manifest.txt > /tmp/node_test_manifest.txt
             bazel test $(cat /tmp/node_test_manifest.txt) --test_arg=--gtest_output=xml:/tmp/artifacts/test_results/ --jobs 4 --config ci_testing --config pre_cxx11_abi --noshow_progress
@@ -346,7 +362,7 @@ jobs:
               pyenv global << parameters.python-version >>
         - run:
             name: Install NGC Torch
-            environment: 
+            environment:
               TORCH_INSTALL: https://developer.download.nvidia.com/compute/redist/jp/v<< parameters.jetpack-version >>/pytorch/<< parameters.torch-build >>
             command: |
               set -e
@@ -354,11 +370,13 @@ jobs:
         - when:
             condition: << parameters.cxx11-abi >>
             steps:
-              - build-py-cxx11-abi
+              - build-py-cxx11-abi:
+                  platform: "sbsa"
         - unless:
             condition: << parameters.cxx11-abi >>
             steps:
-              - build-py
+              - build-py:
+                  platform: "sbsa"
         - run:
             name: Move to release dir
             command: |
