@@ -185,11 +185,11 @@ commands:
       - run:
           name: Run core / C++ tests
           environment:
-            LD_LIBRARY_PATH: "/home/circleci/project/bazel-project/external/libtorch_pre_cxx11_abi/lib/:/home/circleci/project/bazel-project/external/cudnn/lib64/:/home/circleci/project/bazel-project/external/tensorrt/lib/:/usr/local/cuda/lib64/:$LD_LIBRARY_PATH"
+            LD_LIBRARY_PATH: "/home/circleci/project/bazel-project/external/libtorch_pre_cxx11_abi/lib/:/home/circleci/project/bazel-project/external/tensorrt/lib/:/usr/local/cuda/lib64/:$LD_LIBRARY_PATH"
           command: |
             set -e
             mv WORKSPACE.ci WORKSPACE
-            bazel test //tests --test_arg=--gtest_output=xml:/tmp/artifacts/test_results/ --jobs 2 --config ci_testing --config pre_cxx11_abi --noshow_progress
+            bazel test //tests --test_arg=--gtest_output=xml:/tmp/artifacts/test_results/ --jobs 4 --config ci_testing --config pre_cxx11_abi --noshow_progress
       - run:
           name: Collect logs
           when: on_fail
@@ -213,11 +213,14 @@ commands:
           environment:
             USE_HOST_DEPS: "1"
             PYT_PATH: "/opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/site-packages/"
+            LD_LIBRARY_PATH: "/usr/lib/x86_64-linux-gnu/:/usr/local/cuda/lib64/:$LD_LIBRARY_PATH"
           command: |
+            set -e
+            mkdir -p /tmp/artifacts/test_results
             cd tests/py
             pip3 install -r requirements.txt
-            python3 test_api.py
-            python3 test_to_backend_api.py
+            pytest --junitxml=/tmp/artifacts/test_results/test_api_results.xml test_api.py
+            pytest --junitxml=/tmp/artifacts/test_results/test_to_backend_api.xml test_to_backend_api.py
             cd ~/project
 
   test-fx:
