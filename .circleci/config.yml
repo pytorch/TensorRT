@@ -338,57 +338,57 @@ jobs:
       image: ubuntu-2004:current
     resource_class: arm.xlarge
     steps:
-        - checkout
-        - install-cuda:
-            os: "ubuntu2004"
-            platform: "sbsa"
-            cuda-pkg-name: "cuda-toolkit-11-4"
-        - run:
-            name: Install openblas
-            command: sudo apt install libopenblas-dev
-        - create-env:
-            os: "ubuntu2004"
-            platform: "sbsa"
-            cudnn-version: << pipeline.parameters.cudnn-version >>
-            cudnn-pkg-name:  << pipeline.parameters.cudnn-pkg-name >>
-            trt-version-short:  << pipeline.parameters.trt-version-short >>
-            trt-pkg-name: << pipeline.parameters.trt-pkg-name >>
-            bazel-version:  << pipeline.parameters.bazel-version >>
-            bazel-platform: "arm64"
-        - run:
-            name: Set python version
-            command: |
-              pyenv install << parameters.python-version >>
-              pyenv global << parameters.python-version >>
-        - run:
-            name: Install NGC Torch
-            environment:
-              TORCH_INSTALL: https://developer.download.nvidia.com/compute/redist/jp/v<< parameters.jetpack-version >>/pytorch/<< parameters.torch-build >>
-            command: |
-              set -e
-              python3 -m pip install --upgrade pip; python3 -m pip install setuptools wheel; python3 -m pip install expecttest xmlrunner hypothesis aiohttp numpy=='1.19.4' pyyaml scipy=='1.5.3' ninja cython typing_extensions protobuf; export "LD_LIBRARY_PATH=/usr/lib/llvm-8/lib:$LD_LIBRARY_PATH"; python3 -m pip install --upgrade protobuf; python3 -m pip install --no-cache $TORCH_INSTALL
-        - when:
-            condition: << parameters.cxx11-abi >>
-            steps:
-              - build-py-cxx11-abi:
-                  platform: "sbsa"
-        - unless:
-            condition: << parameters.cxx11-abi >>
-            steps:
-              - build-py:
-                  platform: "sbsa"
-        - run:
-            name: Move to release dir
-            command: |
-              mkdir -p /tmp/dist/jetson
-              cp -r /tmp/dist/builds/* /tmp/dist/jetson
-        - persist_to_workspace:
-            root: /tmp/dist
-            paths:
-              - jetson
-        - store_artifacts:
-            path: /tmp/dist/jetson
-            destination: aarch64-pyt-jetson
+      - checkout
+      - install-cuda:
+          os: "ubuntu2004"
+          platform: "sbsa"
+          cuda-pkg-name: "cuda-toolkit-11-4"
+      - run:
+          name: Install openblas
+          command: sudo apt install libopenblas-dev
+      - create-env:
+          os: "ubuntu2004"
+          platform: "sbsa"
+          cudnn-version: << pipeline.parameters.cudnn-jetson-version >>
+          cudnn-pkg-name:  << pipeline.parameters.cudnn-jetson-pkg-name >>
+          trt-version-short:  << pipeline.parameters.trt-jetson-version-short >>
+          trt-pkg-name: << pipeline.parameters.trt-jetson-pkg-name >>
+          bazel-version: "5.1.1"
+          bazel-platform: "arm64"
+      - run:
+          name: Set python version
+          command: |
+            pyenv install << parameters.python-version >>
+            pyenv global << parameters.python-version >>
+      - run:
+          name: Install NGC Torch
+          environment:
+            TORCH_INSTALL: https://developer.download.nvidia.com/compute/redist/jp/v<< parameters.jetpack-version >>/pytorch/<< parameters.torch-build >>
+          command: |
+            set -e
+            python3 -m pip install --upgrade pip; python3 -m pip install setuptools wheel; python3 -m pip install expecttest xmlrunner hypothesis aiohttp numpy=='1.19.4' pyyaml scipy=='1.5.3' ninja cython typing_extensions protobuf; export "LD_LIBRARY_PATH=/usr/lib/llvm-8/lib:$LD_LIBRARY_PATH"; python3 -m pip install --upgrade protobuf; python3 -m pip install --no-cache $TORCH_INSTALL
+      - when:
+          condition: << parameters.cxx11-abi >>
+          steps:
+            - build-py-cxx11-abi:
+                platform: "sbsa"
+      - unless:
+          condition: << parameters.cxx11-abi >>
+          steps:
+            - build-py:
+                platform: "sbsa"
+      - run:
+          name: Move to release dir
+          command: |
+            mkdir -p /tmp/dist/jetson
+            cp -r /tmp/dist/builds/* /tmp/dist/jetson
+      - persist_to_workspace:
+          root: /tmp/dist
+          paths:
+            - jetson
+      - store_artifacts:
+          path: /tmp/dist/jetson
+          destination: aarch64-pyt-jetson
 
   build-x86_64-pyt-release:
     parameters:
@@ -407,11 +407,11 @@ jobs:
       - create-env:
           os: "ubuntu2004"
           platform: "x86_64"
-          cudnn-version: << pipeline.parameters.cudnn-version >>
-          cudnn-pkg-name:  << pipeline.parameters.cudnn-pkg-name >>
-          trt-version-short:  << pipeline.parameters.trt-version-short >>
-          trt-pkg-name: << pipeline.parameters.trt-pkg-name >>
-          bazel-version:  << pipeline.parameters.bazel-version >>
+          cudnn-version: << pipeline.parameters.cudnn-release-version >>
+          cudnn-pkg-name:  << pipeline.parameters.cudnn-release-pkg-name >>
+          trt-version-short:  << pipeline.parameters.trt-release-version-short >>
+          trt-pkg-name: << pipeline.parameters.trt-release-pkg-name >>
+          bazel-version: "5.1.1"
           bazel-platform: "x86_64"
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
@@ -454,11 +454,11 @@ jobs:
       - create-env:
           os: "ubuntu2004"
           platform: "x86_64"
-          cudnn-version: << pipeline.parameters.cudnn-version >>
-          cudnn-pkg-name:  << pipeline.parameters.cudnn-pkg-name >>
-          trt-version-short:  << pipeline.parameters.trt-version-short >>
-          trt-pkg-name: << pipeline.parameters.trt-pkg-name >>
-          bazel-version:  << pipeline.parameters.bazel-version >>
+          cudnn-version: << pipeline.parameters.cudnn-nightly-version >>
+          cudnn-pkg-name:  << pipeline.parameters.cudnn-nightly-pkg-name >>
+          trt-version-short:  << pipeline.parameters.trt-nightly-version-short >>
+          trt-pkg-name: << pipeline.parameters.trt-nightly-pkg-name >>
+          bazel-version: "5.1.1"
           bazel-platform: "x86_64"
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
@@ -499,14 +499,14 @@ jobs:
       - create-env:
           os: "ubuntu2004"
           platform: "x86_64"
-          cudnn-version: << pipeline.parameters.cudnn-version >>
-          cudnn-pkg-name:  << pipeline.parameters.cudnn-pkg-name >>
-          trt-version-short:  << pipeline.parameters.trt-version-short >>
-          trt-pkg-name: << pipeline.parameters.trt-pkg-name >>
-          bazel-version:  << pipeline.parameters.bazel-version >>
+          cudnn-version: << pipeline.parameters.cudnn-release-version >>
+          cudnn-pkg-name:  << pipeline.parameters.cudnn-release-pkg-name >>
+          trt-version-short:  << pipeline.parameters.trt-release-version-short >>
+          trt-pkg-name: << pipeline.parameters.trt-release-pkg-name >>
+          bazel-version: "5.1.1"
           bazel-platform: "x86_64"
       - create-py-env:
-          trt-version-long: << pipeline.parameters.trt-version-long >>
+          trt-version-long: << pipeline.parameters.trt-release-version-long >>
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
           torch-build-index: << parameters.torch-build-index >>
@@ -530,7 +530,7 @@ jobs:
     steps:
       - checkout
       - create-py-env:
-          trt-version-long: << pipeline.parameters.trt-version-long >>
+          trt-version-long: << pipeline.parameters.trt-release-version-long >>
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
           torch-build-index: << parameters.torch-build-index >>
@@ -554,7 +554,7 @@ jobs:
     steps:
       - checkout
       - create-py-env:
-          trt-version-long: << pipeline.parameters.trt-version-long >>
+          trt-version-long: << pipeline.parameters.trt-nightly-version-long >>
       - attach_workspace:
           at: /tmp/dist/
       - run:
@@ -568,42 +568,74 @@ jobs:
       - test-fx
 
 parameters:
+  # Nightly platform config
   torch-nightly-build:
     type: string
     default: "1.13.0.dev20220715+cu113"
   torch-nightly-build-index:
     type: string
     default: "https://download.pytorch.org/whl/nightly/cu113"
+  cudnn-nightly-version:
+    type: string
+    default: "8.4.0"
+  cudnn-nightly-pkg-name:
+    type: string
+    default: "8.4.0.*-1+cuda11.6"
+  trt-nightly-version-short:
+    type: string
+    default: "8.4.1"
+  trt-nightly-version-long:
+    type: string
+    default: "8.4.1.5"
+  trt-nightly-pkg-name:
+    type: string
+    default: "8.4.1-1+cuda11.6"
+
+  # Release platform config
   torch-release-build:
     type: string
     default: "1.11.0+cu113"
   torch-release-build-index:
     type: string
     default: "https://download.pytorch.org/whl/cu113"
+  cudnn-release-version:
+    type: string
+    default: "8.2.1"
+  cudnn-release-pkg-name:
+    type: string
+    default: "8.2.1.*-1+cuda11.3"
+  trt-release-version-short:
+    type: string
+    default: "8.2.4"
+  trt-release-version-long:
+    type: string
+    default: "8.2.4.2"
+  trt-release-pkg-name:
+    type: string
+    default: "8.2.4-1+cuda11.4"
+
+  # Jetson platform config
   torch-jetson-build:
     type: string
     default: "torch-1.12.0a0+84d1cb9.nv22.4-cp38-cp38-linux_aarch64.whl"
   jetpack-version:
     type: string
     default: "50"
-  cudnn-version:
+  cudnn-jetson-version:
     type: string
-    default: "8.2.1"
-  cudnn-pkg-name:
+    default: "8.3.2"
+  cudnn-jetson-pkg-name:
     type: string
-    default: "8.2.1.*-1+cuda11.3"
-  trt-version-short:
+    default: "8.3.2.*-1+cuda11.5"
+  trt-jetson-version-short:
     type: string
-    default: "8.2.4"
-  trt-version-long:
+    default: "8.4.0"
+  trt-jetson-version-long:
     type: string
-    default: "8.2.4.2"
-  trt-pkg-name:
+    default: "8.4.0.6"
+  trt-jetson-pkg-name:
     type: string
-    default: "8.2.4-1+cuda11.4"
-  bazel-version:
-    type: string
-    default: "5.1.1"
+    default: "8.4.0-1+cuda11.6"
 
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
