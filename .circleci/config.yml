@@ -307,7 +307,7 @@ jobs:
               TORCH_INSTALL: https://developer.download.nvidia.com/compute/redist/jp/v<< parameters.jetpack-version >>/pytorch/<< parameters.torch-build >>
             command: |
               set -e
-              python3 -m pip install --upgrade pip; python3 -m pip install wheel setuptools; python3 -m pip install expecttest xmlrunner hypothesis aiohttp numpy=='1.19.4' pyyaml scipy=='1.5.3' ninja cython typing_extensions protobuf; export "LD_LIBRARY_PATH=/usr/lib/llvm-8/lib:$LD_LIBRARY_PATH"; python3 -m pip install --upgrade protobuf; python3 -m pip install --no-cache $TORCH_INSTALL
+              python3 -m pip install --upgrade pip; python3 -m pip install setuptools wheel; python3 -m pip install expecttest xmlrunner hypothesis aiohttp numpy=='1.19.4' pyyaml scipy=='1.5.3' ninja cython typing_extensions protobuf; export "LD_LIBRARY_PATH=/usr/lib/llvm-8/lib:$LD_LIBRARY_PATH"; python3 -m pip install --upgrade protobuf; python3 -m pip install --no-cache $TORCH_INSTALL
         - when:
             condition: << parameters.cxx11-abi >>
             steps:
