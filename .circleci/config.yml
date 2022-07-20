@@ -220,14 +220,14 @@ commands:
             cd tests/py
             pip3 install -r requirements.txt
             pytest --junitxml=/tmp/artifacts/test_results/api/api_test_results.xml api/
-            pytest --junitxml=/tmp/artifacts/test_results/integrations/test_to_backend_api.xml integrations/test_to_backend_api.py
+            pytest --junitxml=/tmp/artifacts/test_results/integrations/integrations_test_results.xml integrations/
             cd ~/project
 
       - store_test_results:
           path: /tmp/artifacts
       - store_artifacts:
           path: /tmp/testlogs
-            
+
 
   test-fx:
     description: "Test the fx backend"
