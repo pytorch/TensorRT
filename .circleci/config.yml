@@ -269,30 +269,39 @@ commands:
       - run:
           name: Run fx tests
           command: |
+            mkdir -p /tmp/artifacts/test_results
             # one fix pending to enable below
             # cd py/torch_tensorrt/fx/test
             # pytest $(find . -name '*.py' | grep -v test_dispatch* | grep -v test_setitem*)
-
             cd py/torch_tensorrt/fx/test
             pushd converters/acc_op
-            pytest
+            pytest --junitxml=/tmp/artifacts/test_results/fx/converters/acc_op/test_results.xml
             popd
             pushd passes
             list_passes=$(ls | grep -v test_setitem*)
-            pytest $list_passes
+            pytest $list_passes --junitxml=/tmp/artifacts/test_results/fx/passes/test_results.xml
+            popd
+            pushd core
+            pytest --junitxml=/tmp/artifacts/test_results/fx/core/test_results.xml
+            popd
             # pushd quant
-            # pytest
+            # pytest --junitxml=/tmp/artifacts/test_results/fx/quant/test_results.xml
             # popd
             pushd tools
-            pytest
+            pytest --junitxml=/tmp/artifacts/test_results/fx/tools/test_results.xml
             popd
             pushd trt_lower
-            pytest
+            pytest --junitxml=/tmp/artifacts/test_results/fx/trt_lower/test_results.xml
             popd
             pushd tracer
             list_tracer=$(ls | grep -v test_dispatch_*)
-            pytest $list_tracer
+            pytest $list_tracer --junitxml=/tmp/artifacts/test_results/fx/tracer/test_results.xml
             popd
+            cd ~/project
+      - store_test_results:
+          path: /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/testlogs
 
 # Define a job to be invoked later in a workflow.
 # See: https://circleci.com/docs/2.0/configuration-reference/#jobs
