@@ -56,7 +56,7 @@ class TestCompile(unittest.TestCase):
                                        inputs=[self.input],
                                        device=torchtrt.Device(gpu_id=0),
                                        enabled_precisions={torch.float})
-            same = (trt_mod(self.input) - self.scripted_model(self.input)).abs().max()
+            same = (trt_mod(self.input) - self.model(self.input)).abs().max()
             self.assertTrue(same < 2e-2)
 
     def test_from_torch_tensor(self):
@@ -138,16 +138,16 @@ class TestPTtoTRTtoPT(unittest.TestCase):
 class TestCheckMethodOpSupport(unittest.TestCase):
 
     def test_check_support(self):
-        module = models.alexnet(pretrained=True).to("cuda").eval().to("cuda")
+        module = models.alexnet(pretrained=True).eval().to("cuda")
         self.module = torch.jit.trace(module, torch.ones((1, 3, 224, 224)).to("cuda"))
 
         self.assertTrue(torchtrt.ts.check_method_op_support(self.module, "forward"))
 
 
-class TestModule(unittest.TestCase):
+class TestModuleIdentification(unittest.TestCase):
 
     def test_module_type(self):
-        nn_module = models.alexnet(pretrained=True).to("cuda").eval().to("cuda")
+        nn_module = models.alexnet(pretrained=True).eval().to("cuda")
         ts_module = torch.jit.trace(nn_module, torch.ones([1, 3, 224, 224]).to("cuda"))
         fx_module = torch.fx.symbolic_trace(nn_module)
 
