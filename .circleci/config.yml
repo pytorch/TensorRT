@@ -555,7 +555,7 @@ workflows:
     jobs:
       - build-aarch64-pyt-jetson:
           torch-build: << pipeline.parameters.torch-jetson-build >>
-          jetpack-verion: << pipeline.parameters.jetpack-version >>
+          jetpack-version: << pipeline.parameters.jetpack-version >>
           python-version: 3.8.13
 
       - build-x86_64-pyt-release:
@@ -580,7 +580,7 @@ workflows:
     jobs:
       - build-aarch64-pyt-jetson:
           torch-build: << pipeline.parameters.torch-jetson-build >>
-          jetpack-verion: << pipeline.parameters.jetpack-version >>
+          jetpack-version: << pipeline.parameters.jetpack-version >>
           python-version: 3.8.13
 
       - build-x86_64-pyt-release:
