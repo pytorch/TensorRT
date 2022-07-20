@@ -526,7 +526,7 @@ parameters:
   torch-jetson-build:
     type: string
     default: "1.12.0a0+2c916ef"
-  jetson-version:
+  jetpack-version:
     type: string
     default: "50"
   cudnn-version:
