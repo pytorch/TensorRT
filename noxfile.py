@@ -146,14 +146,14 @@ def run_base_tests(session):
     print("Running basic tests")
     session.chdir(os.path.join(TOP_DIR, 'tests/py'))
     tests = [
-        "test_api.py",
-        "test_to_backend_api.py",
+        "api",
+        "integrations/test_to_backend_api.py",
     ]
     for test in tests:
         if USE_HOST_DEPS:
-            session.run_always('python', test, env={'PYTHONPATH': PYT_PATH})
+            session.run_always('pytest', test, env={'PYTHONPATH': PYT_PATH})
         else:
-            session.run_always("python", test)
+            session.run_always("pytest", test)
 
 def run_accuracy_tests(session):
     print("Running accuracy tests")

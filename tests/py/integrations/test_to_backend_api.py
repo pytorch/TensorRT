@@ -3,13 +3,12 @@ import torch_tensorrt as torchtrt
 import torch
 import torchvision.models as models
 
-from model_test_case import ModelTestCase
 
-
-class TestToBackendLowering(ModelTestCase):
+class TestToBackendLowering(unittest.TestCase):
 
     def setUp(self):
         self.input = torch.randn((1, 3, 300, 300)).to("cuda")
+        self.model = models.resnet18(pretrained=True).eval().to("cuda")
         self.scripted_model = torch.jit.script(self.model)
         self.spec = {
             "forward":
@@ -37,17 +36,5 @@ class TestToBackendLowering(ModelTestCase):
         same = (trt_mod.forward(self.input) - self.scripted_model(self.input)).abs().max()
         self.assertTrue(same < 2e-3)
 
-
-def test_suite():
-    suite = unittest.TestSuite()
-    suite.addTest(TestToBackendLowering.parametrize(TestToBackendLowering, model=models.resnet18(pretrained=True)))
-
-    return suite
-
-
-suite = test_suite()
-
-runner = unittest.TextTestRunner()
-result = runner.run(suite)
-
-exit(int(not result.wasSuccessful()))
+if __name__ == "__main__":
+    unittest.main()
