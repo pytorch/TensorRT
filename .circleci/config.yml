@@ -164,6 +164,11 @@ commands:
           command: |
             python3 -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.device_count())"
 
+      - run:
+          name: Get torch-tensorrt version information
+          command: |
+            python3 -c "import torch_tensorrt; torch_tensorrt.dump_build_info()"
+
   pull-test-models:
     description: "Pull the test model set"
     steps:
@@ -190,7 +195,7 @@ commands:
             set -e
             mv WORKSPACE.ci WORKSPACE
             bazel query 'kind(cc_*, tests(//tests))' --noshow_progress >> /tmp/test_manifest.txt
-            circleci tests split < /tmp/test_manifest.txt > /tmp/node_test_manifest.txt 
+            circleci tests split < /tmp/test_manifest.txt > /tmp/node_test_manifest.txt
             bazel test $(cat /tmp/node_test_manifest.txt) --test_arg=--gtest_output=xml:/tmp/artifacts/test_results/ --jobs 4 --config ci_testing --config pre_cxx11_abi --noshow_progress
       - run:
           name: Collect logs
@@ -444,6 +449,7 @@ jobs:
       - run:
           name: "Install torch-tensorrt"
           command: pip3 install /tmp/dist/release/*
+      - dump-test-env
       - test-ts-core
 
   test-ts-py-x86_64-pyt-release:
@@ -467,6 +473,7 @@ jobs:
       - run:
           name: "Install torch-tensorrt"
           command: pip3 install /tmp/dist/release/*
+      - dump-test-env
       - test-ts-py-api
 
   test-x86_64-pyt-nightly:
@@ -490,6 +497,7 @@ jobs:
       - run:
           name: "Install torch-tensorrt"
           command: pip3 install /tmp/dist/nightly/*
+      - dump-test-env
       - test-fx
 
 parameters:
