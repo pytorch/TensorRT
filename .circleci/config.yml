@@ -319,14 +319,14 @@ jobs:
         - run:
             name: Move to release dir
             command: |
-              mkdir -p /tmp/dist/release
-              cp -r /tmp/dist/builds/* /tmp/dist/release
+              mkdir -p /tmp/dist/jetson
+              cp -r /tmp/dist/builds/* /tmp/dist/jetson
         - persist_to_workspace:
             root: /tmp/dist
             paths:
-              - release
+              - jetson
         - store_artifacts:
-            path: /tmp/dist/release
+            path: /tmp/dist/jetson
             destination: aarch64-pyt-jetson
 
   build-x86_64-pyt-release:
@@ -369,7 +369,10 @@ jobs:
             mkdir -p /tmp/dist/release
             cp -r /tmp/dist/builds/* /tmp/dist/release
       - persist_to_workspace:
-          root: /tmp/dist1.12.0a0+2c916ef
+          root: /tmp/dist
+          paths:
+            - release
+      - store_artifacts:
           path: /tmp/dist/release
           destination: x86_64-pyt-release
 
@@ -518,7 +521,7 @@ parameters:
     default: "https://download.pytorch.org/whl/cu113"
   torch-jetson-build:
     type: string
-    default: "1.12.0a0+2c916ef"
+    default: "torch-1.12.0a0+84d1cb9.nv22.4-cp38-cp38-linux_aarch64.whl"
   jetpack-version:
     type: string
     default: "50"
