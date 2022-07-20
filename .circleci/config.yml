@@ -327,6 +327,9 @@ jobs:
             os: "ubuntu2004"
             platform: "sbsa"
             cuda-pkg-name: "cuda-toolkit-11-4"
+        - run:
+            name: Install openblas
+            command: sudo apt install libopenblas-dev
         - create-env:
             os: "ubuntu2004"
             platform: "sbsa"
