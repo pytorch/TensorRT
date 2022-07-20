@@ -489,14 +489,15 @@ jobs:
       - checkout
       - create-py-env:
           trt-version-long: << pipeline.parameters.trt-version-long >>
-      - install-torch-from-index:
-          torch-build:  << parameters.torch-build >>
-          torch-build-index: << parameters.torch-build-index >>
       - attach_workspace:
           at: /tmp/dist/
       - run:
           name: "Install torch-tensorrt"
           command: pip3 install /tmp/dist/nightly/*
+      # We install torch after torch-trt because pip automatically enforces the version constraint otherwise, swap back after versions are synced
+      - install-torch-from-index:
+          torch-build:  << parameters.torch-build >>
+          torch-build-index: << parameters.torch-build-index >>
       - dump-test-env
       - test-fx
 
