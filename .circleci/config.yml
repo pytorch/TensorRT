@@ -435,7 +435,6 @@ jobs:
       - run:
           name: "Install torch-tensorrt"
           command: pip3 install /tmp/dist/release/*
-      - pull-test-models
       - test-ts-core
 
   test-ts-py-x86_64-pyt-release:
@@ -459,7 +458,6 @@ jobs:
       - run:
           name: "Install torch-tensorrt"
           command: pip3 install /tmp/dist/release/*
-      - pull-test-models
       - test-ts-py-api
 
   test-x86_64-pyt-nightly:
