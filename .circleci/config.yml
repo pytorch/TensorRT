@@ -219,11 +219,14 @@ commands:
             mkdir -p /tmp/artifacts/test_results
             cd tests/py
             pip3 install -r requirements.txt
-            pytest --junitxml=/tmp/artifacts/test_results/test_api_results.xml test_api.py
-            pytest --junitxml=/tmp/artifacts/test_results/test_to_backend_api.xml test_to_backend_api.py
+            pytest --junitxml=/tmp/artifacts/test_results/api/api_test_results.xml api/
+            pytest --junitxml=/tmp/artifacts/test_results/integrations/test_to_backend_api.xml integrations/test_to_backend_api.py
             cd ~/project
+
       - store_test_results:
           path: /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/testlogs
             
 
   test-fx:
