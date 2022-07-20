@@ -525,10 +525,10 @@ parameters:
     default: "https://download.pytorch.org/whl/cu113"
   torch-jetson-build:
     type: string
-    default: "torch-1.11.0-cp38-cp38-linux_aarch64.whl"
-  torch-jetson-build-url:
+    default: "1.12.0a0+2c916ef"
+  jetson-version:
     type: string
-    default: "https://nvidia.box.com/shared/static/ssf2v7pf5i245fk4i0q926hy4imzs2ph.whl"
+    default: "50"
   cudnn-version:
     type: string
     default: "8.2.1"
@@ -562,7 +562,8 @@ workflows:
     jobs:
       - build-aarch64-pyt-jetson:
           torch-build: << pipeline.parameters.torch-jetson-build >>
-          torch-build-url: << pipeline.parameters.torch-jetson-build-url >>
+          jetpack-verions: << pipeline.parameters.jetpack-version >>
+          python-version: 3.8.13
 
       - build-x86_64-pyt-release:
           torch-build: << pipeline.parameters.torch-release-build >>
@@ -586,7 +587,8 @@ workflows:
     jobs:
       - build-aarch64-pyt-jetson:
           torch-build: << pipeline.parameters.torch-jetson-build >>
-          torch-build-url: << pipeline.parameters.torch-jetson-build-url >>
+          jetpack-verions: << pipeline.parameters.jetpack-version >>
+          python-version: 3.8.13
 
       - build-x86_64-pyt-release:
           torch-build: << pipeline.parameters.torch-release-build >>
