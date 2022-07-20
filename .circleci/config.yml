@@ -13,22 +13,22 @@ commands:
         type: string
         default: "5.1.1"
     steps:
-      - run: 
+      - run:
           name: Install bazel
           command: |
             sudo wget -q https://github.com/bazelbuild/bazel/releases/download/<< parameters.version >>/bazel-<< parameters.version >>-linux-<< parameters.platform >> -O /usr/bin/bazel
             sudo chmod a+x /usr/bin/bazel
-    
+
   create-env:
     description: "Install dependencies for Torch-TensorRT"
     parameters:
-      os: 
+      os:
         type: string
         default: "ubuntu2004"
       platform:
         type: string
         default: "x86_64"
-      cudnn-version: 
+      cudnn-version:
         type: string
         default: "8.2.1"
       cudnn-pkg-name:
@@ -46,7 +46,7 @@ commands:
       bazel-platform:
         type: string
         default: "x86_64"
-    steps: 
+    steps:
       - run:
           name: Install cudnn + tensorrt
           command: |
@@ -70,7 +70,7 @@ commands:
             # check available version, apt list libnvinfer8 -a
       - install-bazel:
           platform: << parameters.bazel-platform >>
-          version: << parameters.bazel-version >>        
+          version: << parameters.bazel-version >>
 
   create-py-env:
       description: "Install python dependencies"
@@ -120,7 +120,7 @@ commands:
             python3 setup.py install
             mkdir -p /tmp/dist/builds
             cp dist/* /tmp/dist/builds
-            
+
   build-py-cxx11-abi:
     description: "Build the torch-tensorrt python release (cxx11-abi)"
     steps:
@@ -172,7 +172,10 @@ commands:
           environment:
             USE_HOST_DEPS: "1"
           command: |
-            nox -s download_test_models-3.9
+            cd tests/modules
+            pip3 install -r requirements.txt
+            python3 hub.py
+            cd ~/project
 
   test-ts-core:
     description: "Test torchscript backend c++ api"
@@ -211,7 +214,11 @@ commands:
             USE_HOST_DEPS: "1"
             PYT_PATH: "/opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/site-packages/"
           command: |
-            nox -s l0_api_tests-3.9
+            cd tests/py
+            pip3 install -r requirements.txt
+            python3 test_api.py
+            python3 test_to_backend_api.py
+            cd ~/project
 
   test-fx:
     description: "Test the fx backend"
@@ -247,7 +254,7 @@ commands:
             list_tracer=$(ls | grep -v test_dispatch_*)
             pytest $list_tracer
             popd
-  
+
 # Define a job to be invoked later in a workflow.
 # See: https://circleci.com/docs/2.0/configuration-reference/#jobs
 jobs:
@@ -257,7 +264,7 @@ jobs:
         type: string
       torch-build-url:
         type: string
-      cxx11-abi: 
+      cxx11-abi:
         type: boolean
         default: true
     machine:
@@ -282,7 +289,7 @@ jobs:
               pip3 install << parameters.torch-build >>
         - when:
             condition: << parameters.cxx11-abi >>
-            steps: 
+            steps:
               - build-py-cxx11-abi
         - unless:
             condition: << parameters.cxx11-abi >>
@@ -307,7 +314,7 @@ jobs:
         type: string
       torch-build-index:
         type: string
-      cxx11-abi: 
+      cxx11-abi:
         type: boolean
         default: false
     machine:
@@ -329,7 +336,7 @@ jobs:
           torch-build-index: << parameters.torch-build-index >>
       - when:
           condition: << parameters.cxx11-abi >>
-          steps: 
+          steps:
             - build-py-cxx11-abi
       - unless:
           condition: << parameters.cxx11-abi >>
@@ -347,14 +354,14 @@ jobs:
       - store_artifacts:
           path: /tmp/dist/release
           destination: x86_64-pyt-release
-          
+
   build-x86_64-pyt-nightly:
     parameters:
       torch-build:
         type: string
       torch-build-index:
         type: string
-      cxx11-abi: 
+      cxx11-abi:
         type: boolean
         default: false
     machine:
@@ -376,7 +383,7 @@ jobs:
           torch-build-index: << parameters.torch-build-index >>
       - when:
           condition: << parameters.cxx11-abi >>
-          steps: 
+          steps:
             - build-py-cxx11-abi
       - unless:
           condition: << parameters.cxx11-abi >>
@@ -424,7 +431,8 @@ jobs:
           at: /tmp/dist
       - run:
           name: "Install torch-tensorrt"
-          command: pip3 install /tmp/dist/release/* 
+          command: pip3 install /tmp/dist/release/*
+      - pull-test-models
       - test-ts-core
 
   test-ts-py-x86_64-pyt-release:
@@ -447,7 +455,8 @@ jobs:
           at: /tmp/dist
       - run:
           name: "Install torch-tensorrt"
-          command: pip3 install /tmp/dist/release/* 
+          command: pip3 install /tmp/dist/release/*
+      - pull-test-models
       - test-ts-py-api
 
   test-x86_64-pyt-nightly:
@@ -470,7 +479,7 @@ jobs:
           at: /tmp/dist/
       - run:
           name: "Install torch-tensorrt"
-          command: pip3 install /tmp/dist/nightly/* 
+          command: pip3 install /tmp/dist/nightly/*
       - test-fx
 
 parameters:
@@ -492,7 +501,7 @@ parameters:
   torch-jetson-build-url:
     type: string
     default: "https://nvidia.box.com/shared/static/ssf2v7pf5i245fk4i0q926hy4imzs2ph.whl"
-  cudnn-version: 
+  cudnn-version:
     type: string
     default: "8.2.1"
   cudnn-pkg-name:
@@ -510,7 +519,7 @@ parameters:
   bazel-version:
     type: string
     default: "5.1.1"
-  
+
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
 workflows:
@@ -526,7 +535,7 @@ workflows:
       - build-aarch64-pyt-jetson:
           torch-build: << pipeline.parameters.torch-jetson-build >>
           torch-build-url: << pipeline.parameters.torch-jetson-build-url >>
-          
+
       - build-x86_64-pyt-release:
           torch-build: << pipeline.parameters.torch-release-build >>
           torch-build-index: << pipeline.parameters.torch-release-build-index >>
@@ -535,7 +544,7 @@ workflows:
           torch-build-index: << pipeline.parameters.torch-release-build-index >>
           requires:
             - build-x86_64-pyt-release
-            
+
       - build-x86_64-pyt-nightly:
           torch-build: << pipeline.parameters.torch-nightly-build >>
           torch-build-index: << pipeline.parameters.torch-nightly-build-index >>
@@ -543,14 +552,14 @@ workflows:
           torch-build: << pipeline.parameters.torch-nightly-build >>
           torch-build-index: << pipeline.parameters.torch-nightly-build-index >>
           requires:
-            - build-x86_64-pyt-nightly 
-    
+            - build-x86_64-pyt-nightly
+
   on-push:
     jobs:
       - build-aarch64-pyt-jetson:
           torch-build: << pipeline.parameters.torch-jetson-build >>
           torch-build-url: << pipeline.parameters.torch-jetson-build-url >>
-          
+
       - build-x86_64-pyt-release:
           torch-build: << pipeline.parameters.torch-release-build >>
           torch-build-index: << pipeline.parameters.torch-release-build-index >>
@@ -564,7 +573,7 @@ workflows:
           torch-build-index: << pipeline.parameters.torch-release-build-index >>
           requires:
             - build-x86_64-pyt-release
-            
+
       - build-x86_64-pyt-nightly:
           torch-build: << pipeline.parameters.torch-nightly-build >>
           torch-build-index: << pipeline.parameters.torch-nightly-build-index >>
@@ -572,5 +581,5 @@ workflows:
           torch-build: << pipeline.parameters.torch-nightly-build >>
           torch-build-index: << pipeline.parameters.torch-nightly-build-index >>
           requires:
-            - build-x86_64-pyt-nightly    
-       
+            - build-x86_64-pyt-nightly
+

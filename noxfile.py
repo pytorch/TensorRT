@@ -14,11 +14,13 @@ print(f"Test root directory {TOP_DIR}")
 
 # Set the USE_CXX11=1 to use cxx11_abi
 USE_CXX11=0 if not 'USE_CXX11' in os.environ else os.environ["USE_CXX11"]
-print("Using cxx11 abi")
+if USE_CXX11:
+    print("Using cxx11 abi")
 
 # Set the USE_HOST_DEPS=1 to use host dependencies for tests
 USE_HOST_DEPS=0 if not 'USE_HOST_DEPS' in os.environ else os.environ["USE_HOST_DEPS"]
-print("Using dependencies from host python")
+if USE_HOST_DEPS:
+    print("Using dependencies from host python")
 
 SUPPORTED_PYTHON_VERSIONS=["3.7", "3.8", "3.9", "3.10"]
 
