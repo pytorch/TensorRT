@@ -252,11 +252,7 @@ commands:
             popd
             pushd passes
             list_passes=$(ls | grep -v test_setitem*)
-            pytest $list_passes
-            popd
-            pushd core
-            pytest
-            popd
+            pytest $list_passes1.12.0a0+2c916ef
             # pushd quant
             # pytest
             # popd
@@ -373,10 +369,7 @@ jobs:
             mkdir -p /tmp/dist/release
             cp -r /tmp/dist/builds/* /tmp/dist/release
       - persist_to_workspace:
-          root: /tmp/dist
-          paths:
-            - release
-      - store_artifacts:
+          root: /tmp/dist1.12.0a0+2c916ef
           path: /tmp/dist/release
           destination: x86_64-pyt-release
 
@@ -562,7 +555,7 @@ workflows:
     jobs:
       - build-aarch64-pyt-jetson:
           torch-build: << pipeline.parameters.torch-jetson-build >>
-          jetpack-verions: << pipeline.parameters.jetpack-version >>
+          jetpack-verion: << pipeline.parameters.jetpack-version >>
           python-version: 3.8.13
 
       - build-x86_64-pyt-release:
@@ -587,7 +580,7 @@ workflows:
     jobs:
       - build-aarch64-pyt-jetson:
           torch-build: << pipeline.parameters.torch-jetson-build >>
-          jetpack-verions: << pipeline.parameters.jetpack-version >>
+          jetpack-verion: << pipeline.parameters.jetpack-version >>
           python-version: 3.8.13
 
       - build-x86_64-pyt-release:
