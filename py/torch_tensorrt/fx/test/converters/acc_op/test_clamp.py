@@ -2,7 +2,7 @@ import torch
 import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from parameterized import param, parameterized
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase
+from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase, InputTensorSpec
 
 
 class TestClampConverter(AccTestCase):
@@ -27,8 +27,6 @@ class TestClampConverter(AccTestCase):
         inputs = [torch.randn(3, 4)]
         self.run_test(TestModule(), inputs, expected_ops={acc_ops.clamp})
 
-    # Error: RuntimeError: ShapeProp error for: node=%clamp : [#users=1] = call_function[target=torch.clamp](args = (%x, 1, 0), kwargs = {}) with meta={}
-    """
     @parameterized.expand(
         [
             param("default", min=-1, max=0),
@@ -55,8 +53,9 @@ class TestClampConverter(AccTestCase):
             ),
         ]
 
-        self.run_test(TestModule(), input_specs, expected_ops={acc_ops.clamp})
-    """
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.clamp}
+        )
 
 
 if __name__ == "__main__":

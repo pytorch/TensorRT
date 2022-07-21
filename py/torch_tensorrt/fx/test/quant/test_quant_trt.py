@@ -15,7 +15,7 @@ from torch.ao.quantization import default_qconfig
 from torch.ao.quantization.backend_config.observation_type import ObservationType
 from torch.ao.quantization.fx.match_utils import MatchAllNode
 from torch.ao.quantization.quantize_fx import (
-    convert_to_reference,
+    convert_to_reference_fx,
     get_tensorrt_backend_config_dict,
     prepare_fx,
     prepare_qat_fx,
@@ -96,7 +96,9 @@ class TestConvertFxDoNotUse(QuantizationTestCase):
         )
         self.checkGraphModuleNodes(mp, expected_node_occurrence=prepare_count_check)
         mp(torch.randn(1, 1, 4, 4))
-        mq = convert_to_reference(mp, backend_config_dict=self.trt_backend_config_dict)
+        mq = convert_to_reference_fx(
+            mp, backend_config_dict=self.trt_backend_config_dict
+        )
         self.checkGraphModuleNodes(mq, expected_node_occurrence=convert_count_check)
 
     def test_quantized_input_quantized_output(self):
@@ -258,7 +260,7 @@ class TestConvertFxDoNotUse(QuantizationTestCase):
         )
 
         # check converted/quantized model
-        m = convert_to_reference(m, backend_config_dict=backend_config_dict)
+        m = convert_to_reference_fx(m, backend_config_dict=backend_config_dict)
         self.checkGraphModuleNodes(m, expected_node_occurrence=convert_count_check)
         self.checkGraphModuleNodes(
             m.standalone, expected_node_occurrence=standalone_convert_count_check
@@ -273,7 +275,7 @@ class TestConvertFxDoNotUse(QuantizationTestCase):
             backend_config_dict=backend_config_dict,
         )
         ref_m(data)
-        ref_m = convert_to_reference(ref_m, backend_config_dict=backend_config_dict)
+        ref_m = convert_to_reference_fx(ref_m, backend_config_dict=backend_config_dict)
         ref_res = ref_m(data)
         self.assertEqual(res, ref_res)
 
@@ -433,7 +435,7 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
         self.checkGraphModuleNodes(prepared, expected_node_occurrence=no_prepare)
         # calibration
         prepared(*inputs)
-        quantized = convert_to_reference(
+        quantized = convert_to_reference_fx(
             prepared,
             backend_config_dict=self.trt_backend_config_dict,
         )
@@ -551,7 +553,7 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
             example_inputs,
             backend_config_dict=self.trt_backend_config_dict,
         )
-        m = convert_to_reference(m, backend_config_dict=self.trt_backend_config_dict)
+        m = convert_to_reference_fx(m, backend_config_dict=self.trt_backend_config_dict)
         expected_occurrence = {
             ns.call_function(torch.quantize_per_tensor): 5,
             ns.call_method("dequantize"): 5,
@@ -584,7 +586,7 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
         )
         # calibration
         prepared(linear_module_input)
-        quantized = convert_to_reference(
+        quantized = convert_to_reference_fx(
             prepared,
             backend_config_dict=self.trt_backend_config_dict,
         )
@@ -614,7 +616,7 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
             backend_config_dict=self.trt_backend_config_dict,
         )
         self.assertTrue(len(dict(prepared.named_children())) == 1)
-        quantized = convert_to_reference(
+        quantized = convert_to_reference_fx(
             prepared,
             backend_config_dict=self.trt_backend_config_dict,
         )
@@ -650,7 +652,7 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
             ns.call_module(torch.ao.quantization.HistogramObserver): 2,
         }
         self.checkGraphModuleNodes(prepared, expected_node_occurrence=node_occurrence)
-        quantized = convert_to_reference(
+        quantized = convert_to_reference_fx(
             prepared,
             backend_config_dict=self.trt_backend_config_dict,
         )
@@ -719,7 +721,7 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
             ns.call_module(torch.ao.quantization.HistogramObserver): 3,
         }
         self.checkGraphModuleNodes(m, expected_node_occurrence=node_occurrence)
-        m = convert_to_reference(m, backend_config_dict=modified_backend_config_dict)
+        m = convert_to_reference_fx(m, backend_config_dict=modified_backend_config_dict)
         node_occurrence = {
             ns.call_function(torch.quantize_per_tensor): 3,
             ns.call_method("dequantize"): 3,
@@ -831,7 +833,7 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
         self.checkGraphModuleNodes(
             m.standalone, expected_node_occurrence=standalone_node_occurrence
         )
-        m = convert_to_reference(m, backend_config_dict=backend_config_dict)
+        m = convert_to_reference_fx(m, backend_config_dict=backend_config_dict)
         node_occurrence = {
             # two inputs for standalone module
             ns.call_function(torch.quantize_per_tensor): 2,
@@ -870,7 +872,7 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
             example_inputs,
             backend_config_dict=self.trt_backend_config_dict,
         )
-        quantized = convert_to_reference(
+        quantized = convert_to_reference_fx(
             prepared,
             backend_config_dict=self.trt_backend_config_dict,
         )

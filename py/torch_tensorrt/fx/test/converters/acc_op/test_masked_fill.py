@@ -35,6 +35,9 @@ class TestMaskedFill(AccTestCase):
             test_implicit_batch_dim=False,
         )
 
+    # Testing with (-1, -1, -1, -1) results into following error:
+    # RuntimeError: Trying to create tensor with negative dimension -1: [-1, -1, -1, -1]
+
     @parameterized.expand(
         [
             ("same_dims", (2, 3), (2, 3), 5),

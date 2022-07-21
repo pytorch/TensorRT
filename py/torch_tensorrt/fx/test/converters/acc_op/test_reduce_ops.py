@@ -2,7 +2,7 @@ import torch
 import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase
+from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase, InputTensorSpec
 
 reduce_ops = [(torch.sum, acc_ops.sum), (torch.mean, acc_ops.mean)]
 
@@ -74,6 +74,33 @@ class TestReduceConverter(AccTestCase):
             inputs,
             expected_ops={expected_acc_op},
             test_implicit_batch_dim=False,
+        )
+
+    @parameterized.expand(
+        [
+            (f"{acc_op.__name__}_no_dim_no_keepdim", op, acc_op)
+            for op, acc_op in reduce_ops
+        ]
+    )
+    def test_reduce_all_dims_with_dynamic_shape_four_dimensions(
+        self,
+        test_name,
+        op,
+        expected_acc_op,
+    ):
+        class Reduce(torch.nn.Module):
+            def forward(self, x):
+                return op(x)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (3, 3, 3, 3), (3, 3, 3, 3))],
+            ),
+        ]
+        self.run_test_with_dynamic_shape(
+            Reduce(), input_specs, expected_ops={expected_acc_op}
         )
 
 

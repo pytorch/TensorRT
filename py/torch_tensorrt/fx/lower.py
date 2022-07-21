@@ -36,7 +36,7 @@ def lower_to_trt(
     timing_cache_prefix="",
     save_timing_cache=False,
     cuda_graph_batch_size=-1,
-    dynamic_batch=False,
+    dynamic_batch=True,
 ) -> nn.Module:
     """
     Takes in original module, input and lowering setting, run lowering workflow to turn module

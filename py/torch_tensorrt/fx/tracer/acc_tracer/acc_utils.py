@@ -171,7 +171,9 @@ def map_tensor_metadata(a: Any, fn: Callable):
     Map some `fn` to `a`, where `a` is either a TensorMetadata, or else a tuple/list
     recursively containing TensorMetadata.
     """
-    if isinstance(a, TensorMetadata):
+    if isinstance(a, int):
+        return 1
+    elif isinstance(a, TensorMetadata):
         return fn(a)
     elif isinstance(a, tuple):
         return tuple(map_tensor_metadata(elem, fn) for elem in a)
