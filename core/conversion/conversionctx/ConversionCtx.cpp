@@ -20,7 +20,6 @@ std::ostream& operator<<(std::ostream& os, const BuilderSettings& s) {
        << "\n    Debuggable Engine: " << s.debug                                           \
        << "\n    GPU ID: " << s.device.gpu_id                                              \
        << "\n    Allow GPU Fallback (if running on DLA): " << s.device.allow_gpu_fallback  \
-       << "\n    Min Timing Iterations: " << s.num_min_timing_iters                        \
        << "\n    Avg Timing Iterations: " << s.num_avg_timing_iters                        \
        << "\n    Max Workspace Size: " << s.workspace_size;
 
@@ -104,7 +103,6 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
     cfg->setFlag(nvinfer1::BuilderFlag::kGPU_FALLBACK);
   }
 
-  cfg->setMinTimingIterations(settings.num_min_timing_iters);
   cfg->setAvgTimingIterations(settings.num_avg_timing_iters);
   cfg->setMaxWorkspaceSize(settings.workspace_size);
   cfg->setDefaultDeviceType(settings.device.device_type);
