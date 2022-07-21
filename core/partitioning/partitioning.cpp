@@ -98,9 +98,13 @@ std::vector<torch::jit::Node*> getDependencyNodes(
   return stk;
 }
 
-void find_all_fallback_nodes(std::unordered_map<torch::jit::Node*, int>& fallback_nodes) {
+void find_all_fallback_nodes(
+    std::unordered_map<torch::jit::Node*, int>& initial_fallback_nodes,
+    std::unordered_map<torch::jit::Node*, int>& global_fallback_nodes) {
+  // initial_fallback_nodes are the fallback nodes that we have before we run BFS in this function
+  // global_fallback_nodes are the fallback nodes that we maintain globally
   std::queue<torch::jit::Node*> q;
-  for (auto& node : fallback_nodes) {
+  for (auto& node : initial_fallback_nodes) {
     q.push(node.first);
   }
 
@@ -111,7 +115,7 @@ void find_all_fallback_nodes(std::unordered_map<torch::jit::Node*, int>& fallbac
     // for every node that produces this fallback node's NonTensor input, they should fallback too
     for (auto input : cur_node->inputs()) {
       if (!isTensor(input) && input->node()->kind() != torch::jit::prim::Constant &&
-          fallback_nodes.insert({input->node(), 4}).second) {
+          global_fallback_nodes.insert({input->node(), 4}).second) {
         q.push(input->node());
       }
     }
@@ -120,7 +124,7 @@ void find_all_fallback_nodes(std::unordered_map<torch::jit::Node*, int>& fallbac
       if (!isTensor(output)) {
         for (auto use : output->uses()) {
           auto node = use.user;
-          if (node->kind() != torch::jit::prim::Constant && fallback_nodes.insert({node, 4}).second) {
+          if (node->kind() != torch::jit::prim::Constant && global_fallback_nodes.insert({node, 4}).second) {
             q.push(node);
           }
         }
@@ -231,6 +235,8 @@ bool check_node_fallback(torch::jit::Node* n, const std::unordered_map<torch::ji
       LOG_GRAPH("Node explicitly set to run in torch: " << util::node_info(n));
     } else if (fallback_nodes.at(n) == 2) {
       LOG_GRAPH("Node is within a module set to run in torch: " << util::node_info(n));
+    } else if (fallback_nodes.at(n) == 3) {
+      LOG_GRAPH("Node fallback to Torch because of min_block_size" << util::node_info(n));
     } else {
       LOG_GRAPH(
           "Node fallback to Torch because the NonTensor dependencies with other fallback nodes: "
@@ -284,22 +290,74 @@ void get_fallback_nodes(
   return;
 }
 
+std::vector<torch::jit::Node*> traverse_nodes_for_min_block_size(
+    torch::jit::Block* block,
+    const std::unordered_map<torch::jit::Node*, int>& global_fallback_nodes,
+    size_t min_block_size) {
+  auto nodes = block->nodes();
+  std::vector<torch::jit::Node*> cur_trt_nodes;
+  std::vector<torch::jit::Node*> min_block_fallback_nodes;
+  for (const auto n : nodes) {
+    if (n->kind() == torch::jit::prim::Constant)
+      continue;
+
+    // check if current node fallback or not
+    if (!global_fallback_nodes.count(n)) {
+      // if this node is not in fallback nodes, then it's in trt segments
+      cur_trt_nodes.push_back(n);
+    } else {
+      if (cur_trt_nodes.size() < min_block_size) {
+        min_block_fallback_nodes.insert(min_block_fallback_nodes.end(), cur_trt_nodes.begin(), cur_trt_nodes.end());
+      }
+      cur_trt_nodes.clear();
+    }
+  }
+  if (cur_trt_nodes.size() < min_block_size) {
+    min_block_fallback_nodes.insert(min_block_fallback_nodes.end(), cur_trt_nodes.begin(), cur_trt_nodes.end());
+  }
+  return min_block_fallback_nodes;
+}
+
+void find_min_block_size_fallback_nodes(
+    torch::jit::Block* block,
+    std::unordered_map<torch::jit::Node*, int>& global_fallback_nodes,
+    size_t min_block_size) {
+  // first traverse all the nodes to find the initial nodes that don't meet the min_block_size requirement
+  auto min_block_fallback_nodes = traverse_nodes_for_min_block_size(block, global_fallback_nodes, min_block_size);
+  std::unordered_map<torch::jit::Node*, int> initial_fallback_nodes;
+
+  // keep fallback until all segments meet the min_block_size requirement
+  while (!min_block_fallback_nodes.empty()) {
+    for (const auto i : min_block_fallback_nodes) {
+      initial_fallback_nodes.insert({i, 3});
+    }
+    global_fallback_nodes.insert(initial_fallback_nodes.begin(), initial_fallback_nodes.end());
+    // find the fallback nodes because of dependency with min_block_size caused fallback nodes
+    find_all_fallback_nodes(initial_fallback_nodes, global_fallback_nodes);
+    // keep traverse the graph until there is no node fallback because of min_block_size
+    min_block_fallback_nodes = traverse_nodes_for_min_block_size(block, global_fallback_nodes, min_block_size);
+  }
+}
+
 PartitionedGraph segment_graph(
     torch::jit::Block* block,
     const PartitionInfo& partition_info,
-    std::unordered_map<torch::jit::Node*, int>& fallback_nodes) {
+    std::unordered_map<torch::jit::Node*, int>& global_fallback_nodes) {
   auto min_block_size = partition_info.min_block_size;
   std::unordered_set<std::string> forced_fallback_ops(
       partition_info.forced_fallback_operators.begin(), partition_info.forced_fallback_operators.end());
 
   // get the initial fallback nodes (nodes that are unsupported or forced fallback)
-  get_fallback_nodes(block, forced_fallback_ops, fallback_nodes);
+  get_fallback_nodes(block, forced_fallback_ops, global_fallback_nodes);
 
   // For fallback nodes, if it consumes any NonTensor inputs or TensorList inputs, then the node that produces this
   // input should also fallback Similarly, if it produces any NonTensor outputs or TensorList outputs, then the node
   // that produces this input should also fallback
   // TODO: don't need to fallback the TensorList related nodes once the collection feature is supported
-  find_all_fallback_nodes(fallback_nodes);
+  find_all_fallback_nodes(global_fallback_nodes, global_fallback_nodes);
+
+  // find all fallback nodes because of the min_block_size requirement
+  find_min_block_size_fallback_nodes(block, global_fallback_nodes, min_block_size);
 
   auto nodes = block->nodes();
 
@@ -313,7 +371,7 @@ PartitionedGraph segment_graph(
       continue;
     }
 
-    if (check_node_fallback(n, fallback_nodes)) {
+    if (check_node_fallback(n, global_fallback_nodes)) {
       in_prog_trt_blk_nodes.push_back(n);
 
       // If there is an active PyTorch block and we have passed the threshold for a valid TRT
@@ -379,11 +437,11 @@ PartitionedGraph Partition(
     torch::jit::Block* block,
     std::unordered_map<const torch::jit::Value*, torch::jit::IValue>& example_tensor_map,
     const PartitionInfo& partition_info,
-    std::unordered_map<torch::jit::Node*, int>& fallback_nodes) {
+    std::unordered_map<torch::jit::Node*, int>& global_fallback_nodes) {
   LOG_DEBUG(partition_info);
   // segment lowering global graph into blocks
   LOG_DEBUG("Parititioning source module into PyTorch and TensorRT sub blocks");
-  PartitionedGraph segmented_blocks = segment_graph(block, partition_info, fallback_nodes);
+  PartitionedGraph segmented_blocks = segment_graph(block, partition_info, global_fallback_nodes);
 
   // It's possible that some TensorRT blocks have nonTensor inputs/output because they are interleaved by Torch blocks
 

@@ -240,7 +240,7 @@ GraphAndMapping ConstructFallbackGraph(
   }
 
   for (auto& seg_block : segmented_blocks) {
-    LOG_INFO(*seg_block.g() << "(GraphInSegmentedBlock)\n");
+    LOG_INFO(seg_block << "(GraphInSegmentedBlock)\n");
     std::ostringstream trt_engine_id;
     trt_engine_id << reinterpret_cast<const int*>(&seg_block);
 
@@ -436,7 +436,7 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
         auto graph_and_mapping =
             ConstructFallbackGraph(new_mod, g->block(), input_ivalues_map, cfg, static_params, fallback_nodes);
         new_g = graph_and_mapping.first;
-        LOG_INFO("Segmented Graph: " << *new_g);
+        LOG_INFO("Graph after Fallback: " << *new_g);
 
         // if there is no tensorrt engine self in fallback graph, there is no conversion, we just return the initial
         // module
