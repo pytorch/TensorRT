@@ -79,6 +79,34 @@ class TestMinConverter(AccTestCase):
 
 
 class TestMinConverterWithDynamicShape(AccTestCase):
+    @parameterized.expand(
+        [
+            ("dim0_keepdim", 0, True),
+            ("dim1_keepdim", 1, True),
+            ("dim2_keepdim", 2, True),
+            ("dim3_keepdim", 3, True),
+        ]
+    )
+    def test_min_dim_reduce(self, test_name, dim, keepdim):
+        class MinDimReduce(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, x):
+                return torch.min(x, dim, keepdim)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 5, 5), (2, 3, 5, 5), (2, 3, 5, 5))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            MinDimReduce(), input_specs, expected_ops={acc_ops.min_dim_reduce}
+        )
+
     def test_min_full_reduce(
         self,
     ):

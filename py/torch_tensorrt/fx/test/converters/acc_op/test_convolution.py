@@ -47,6 +47,43 @@ class TestConvolutionConverter(AccTestCase):
     @parameterized.expand(
         [
             ("default", 1),
+        ]
+    )
+    def test_conv1d_with_dynamic_shape(
+        self,
+        _,
+        kernel_size,
+        stride=1,
+        padding=0,
+        dilation=1,
+        groups=1,
+        bias=True,
+    ):
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.conv = torch.nn.Conv1d(
+                    3, 6, kernel_size, stride, padding, dilation, groups, bias
+                )
+
+            def forward(self, x):
+                return self.conv(x)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, 3, 3),
+                dtype=torch.float32,
+                shape_ranges=[((1, 3, 3), (3, 3, 3), (5, 3, 3))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.conv1d}
+        )
+
+    @parameterized.expand(
+        [
+            ("default", 1),
             param("no_bias", 1, bias=False),
             ("tuple_parameters", 1, (1, 1), (1, 1)),
             param("non_zero_padding", 1, padding=1),
@@ -76,6 +113,9 @@ class TestConvolutionConverter(AccTestCase):
 
         inputs = [torch.randn(1, 3, 32, 32)]
         self.run_test(TestModule(), inputs, expected_ops={acc_ops.conv2d})
+
+    # Testing with (-1, -1, -1, -1) results into Error:
+    # AssertionError: Channel dim can't be dynamic for convolution.
 
     def test_conv2d_with_dynamic_shape(self):
         class TestModule(torch.nn.Module):
@@ -129,6 +169,9 @@ class TestConvolutionConverter(AccTestCase):
 
         inputs = [torch.randn(1, 3, 32, 32, 32)]
         self.run_test(TestModule(), inputs, expected_ops={acc_ops.conv3d})
+
+    # Testing with (-1, -1, -1, -1, -1) results into Error:
+    # AssertionError: Channel dim can't be dynamic for convolution.
 
     def test_conv3d_with_dynamic_shape(self):
         class TestModule(torch.nn.Module):

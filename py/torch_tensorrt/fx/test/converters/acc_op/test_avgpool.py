@@ -39,6 +39,48 @@ class TestAvgPoolConverter(AccTestCase):
         inputs = [torch.randn(1, 3, 224)]
         self.run_test(TestModule(), inputs, expected_ops={acc_ops.avg_pool1d})
 
+    @parameterized.expand(
+        [
+            ("default", 1),
+            ("kernal_size", 3),
+            ("stride", 1, 2),
+            ("tuple_parameters", 2, (1,), (1,)),
+            param("padding", 2, padding=1),
+            param("ceil_mode", 1, ceil_mode=True),
+            param("include_pad", 2, padding=1, count_include_pad=False),
+        ]
+    )
+    def test_avg_pool1d_with_dynamic_shape(
+        self,
+        test_name="default",
+        kernel_size=1,
+        stride=1,
+        padding=0,
+        ceil_mode=False,
+        count_include_pad=True,
+    ):
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.avg_pool = torch.nn.AvgPool1d(
+                    kernel_size, stride, padding, ceil_mode, count_include_pad
+                )
+
+            def forward(self, x):
+                return self.avg_pool(x)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, 3, 3),
+                dtype=torch.float32,
+                shape_ranges=[((1, 3, 3), (3, 3, 3), (3, 3, 3))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.avg_pool1d}
+        )
+
     def test_avg_pool2d_with_dynamic_shape_four_dimensions(
         self,
         test_name="default",
@@ -217,38 +259,6 @@ class TestAvgPoolConverter(AccTestCase):
         self.run_test_with_dynamic_shape(
             TestModule(), input_specs, expected_ops={acc_ops.avg_pool2d}
         )
-
-    # Testing with (-1, -1, -1, -1) results in error: RuntimeError: ShapeProp error for: node=%avg_pool1d : [#users=1] = call_function[target=torch.avg_pool1d](args = (%x, (1,), (1,), (0,), False, True), kwargs = {}) with meta={}
-    """
-    def test_avg_pool1d_with_dynamic_shape_four_dimensions(
-        self,
-        test_name="default",
-        kernel_size=1,
-        stride=1,
-        padding=0,
-        ceil_mode=False,
-        count_include_pad=True,
-    ):
-        class TestModule(torch.nn.Module):
-            def __init__(self):
-                super().__init__()
-                self.avg_pool = torch.nn.AvgPool1d(
-                    kernel_size, stride, padding, ceil_mode, count_include_pad
-                )
-
-            def forward(self, x):
-                return self.avg_pool(x)
-
-        input_specs = [
-            InputTensorSpec(
-                shape=(-1, -1, -1, -1),
-                dtype=torch.float32,
-                shape_ranges=[((1, 1, 1, 1), (3, 3, 3, 3), (5, 5, 5, 5))],
-            ),
-        ]
-
-        self.run_test(TestModule(), input_specs, expected_ops={acc_ops.avg_pool1d})
-    """
 
 
 if __name__ == "__main__":

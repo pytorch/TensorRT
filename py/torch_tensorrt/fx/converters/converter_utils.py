@@ -41,6 +41,11 @@ def get_trt_plugin(
     Returns:
         A TensorRT plugin that can be added to TensorRT network as Plugin layer.
     """
+    # print the registered plugins
+    # PLUGIN_CREATORS = trt.get_plugin_registry().plugin_creator_list
+    # for plugin_creator in PLUGIN_CREATORS:
+    #     print(plugin_creator.name)
+
     plugin_registry = trt.get_plugin_registry()
     plugin_creator = plugin_registry.get_plugin_creator(
         plugin_name, version, plugin_namespace
@@ -214,7 +219,6 @@ def create_constant(
 
     if dtype:
         value = value.to(dtype)
-
     constant = network.add_constant(value.shape, to_numpy(value))
     constant.name = name
     return constant.get_output(0)

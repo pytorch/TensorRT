@@ -6,15 +6,17 @@ from .types import Shape, ShapeRange
 from .utils import get_dynamic_dims
 
 
-def generate_input_specs(
-    inputs, lower_setting, additional_inputs=None, fixed_shape=False
-):
+def generate_input_specs(inputs, lower_setting, additional_inputs=None):
     # AIT lower setting doesn't have explicit_batch_dimension field and
     # we just return None.
     if not hasattr(lower_setting, "explicit_batch_dimension"):
         return None
 
-    if not lower_setting.explicit_batch_dimension or fixed_shape:
+    # dynamic_batch is TRT only flag. It does not exist in AIT lower setting
+    if (
+        not lower_setting.explicit_batch_dimension
+        or lower_setting.dynamic_batch is False
+    ):
         return InputTensorSpec.from_tensors(inputs)
 
     # If we don't have additional inputs, we assume the first dimension

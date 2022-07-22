@@ -1,3 +1,4 @@
+import datetime
 from functools import partial, wraps
 from typing import Any, Callable, Optional, Sequence
 
@@ -142,6 +143,9 @@ class LowerPassManagerBuilder:
 
                 # Only acc submodules will be lowered.
                 if not submod_name.startswith(split_result.non_acc_submodule_prefix):
+                    print("Now lowering submodule", submod_name)
+                    lowering_start_time = datetime.datetime.now()
+
                     self.lower_setting.input_specs = generate_input_specs(
                         submod_inputs,
                         self.lower_setting,
@@ -155,6 +159,10 @@ class LowerPassManagerBuilder:
                     setattr(split_result.split_module, submod_name, lowered_module)
                     LOWER_SPLIT_POST_OBSERVER.observe(
                         submod_name, lowered_module, submod_inputs
+                    )
+                    print(
+                        f"Lowering submodule {submod_name} elapsed time",
+                        datetime.datetime.now() - lowering_start_time,
                     )
 
             return split_result.split_module
