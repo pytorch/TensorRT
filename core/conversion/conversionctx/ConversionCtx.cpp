@@ -130,7 +130,6 @@ ConversionCtx::~ConversionCtx() {
 }
 
 nvinfer1::ITensor* ConversionCtx::AssociateValueAndTensor(const torch::jit::Value* value, nvinfer1::ITensor* tensor) {
-  tensor->setName(value->debugName().c_str());
   this->value_tensor_map[value] = tensor;
   return tensor;
 }

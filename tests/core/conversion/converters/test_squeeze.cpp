@@ -57,7 +57,8 @@ TEST(Converters, ATenSqueezeDontNeedSqueezeConvertsCorrectly) {
       torch_tensorrt::tests::util::almostEqual(jit_results[0], trt_results[0].reshape_as(jit_results[0]), 2e-6));
 }
 
-TEST(Converters, ATenSqueezeNeedIdentityConvertsCorrectly) {
+// Test for renaming ITensor related binding issues
+TEST(Converters, ATenSqueezeSingleConvertsCorrectly) {
   const auto graph = R"IR(
       graph(%0 : Tensor):
         %2 : int = prim::Constant[value=1]()
