@@ -44,9 +44,6 @@ except:
 
     if sys.platform.startswith("win"):
         WIN_LIBS = [
-            f"cublas64_{CUDA_MAJOR}.dll",
-            f"cublasLt64_{CUDA_MAJOR}.dll",
-            f"cudnn64_{CUDNN_MAJOR}.dll",
             "nvinfer.dll",
             "nvinfer_plugin.dll",
         ]
@@ -76,7 +73,6 @@ except:
             ]
 
         LINUX_LIBS = [
-            f"libcudnn.so.{CUDNN_MAJOR}",
             f"libnvinfer.so.{TENSORRT_MAJOR}",
             f"libnvinfer_plugin.so.{TENSORRT_MAJOR}",
         ]
