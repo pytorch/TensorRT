@@ -36,6 +36,9 @@ struct BuilderSettings {
   uint64_t num_min_timing_iters = 2;
   uint64_t num_avg_timing_iters = 1;
   uint64_t workspace_size = 0;
+  uint64_t dla_sram_size = 1048576;
+  uint64_t dla_local_dram_size = 1073741824;
+  uint64_t dla_global_dram_size = 536870912;
 
   BuilderSettings() = default;
   BuilderSettings(const BuilderSettings& other) = default;

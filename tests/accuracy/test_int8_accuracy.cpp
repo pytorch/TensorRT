@@ -27,8 +27,6 @@ TEST_P(AccuracyTests, INT8AccuracyIsClose) {
   compile_spec.enabled_precisions.insert(torch::kI8);
   // Use the TensorRT Entropy Calibrator
   compile_spec.ptq_calibrator = calibrator;
-  // Set a larger workspace
-  compile_spec.workspace_size = 1 << 28;
 
   mod.eval();
 

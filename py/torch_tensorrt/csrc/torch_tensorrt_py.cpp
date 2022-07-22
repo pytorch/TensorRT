@@ -303,6 +303,9 @@ PYBIND11_MODULE(_C, m) {
       .def_readwrite("num_min_timing_iters", &CompileSpec::num_min_timing_iters)
       .def_readwrite("num_avg_timing_iters", &CompileSpec::num_avg_timing_iters)
       .def_readwrite("workspace_size", &CompileSpec::workspace_size)
+      .def_readwrite("dla_sram_size", &CompileSpec::dla_sram_size)
+      .def_readwrite("dla_local_dram_size", &CompileSpec::dla_local_dram_size)
+      .def_readwrite("dla_global_dram_size", &CompileSpec::dla_global_dram_size)
       .def_readwrite("torch_fallback", &CompileSpec::torch_fallback)
       .def_readwrite("truncate_long_and_double", &CompileSpec::truncate_long_and_double);
 

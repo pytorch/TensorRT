@@ -651,6 +651,21 @@ struct TORCHTRT_API CompileSpec {
   uint64_t workspace_size = 0;
 
   /**
+   * Fast software managed RAM used by DLA to communicate within a layer.
+   */
+  uint64_t dla_sram_size = 1048576;
+
+  /**
+   * Host RAM used by DLA to share intermediate tensor data across operations
+   */
+  uint64_t dla_local_dram_size = 1073741824;
+
+  /**
+   * host RAM used by DLA to store weights and metadata for execution
+   */
+  uint64_t dla_global_dram_size = 536870912;
+
+  /**
    * Calibration dataloaders for each input for post training quantizatiom
    */
   nvinfer1::IInt8Calibrator* ptq_calibrator = nullptr;

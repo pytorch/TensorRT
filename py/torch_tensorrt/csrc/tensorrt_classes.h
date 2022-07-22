@@ -149,6 +149,9 @@ struct CompileSpec : torch::CustomClassHolder {
   ADD_ENUM_GET_SET(capability, EngineCapability, static_cast<int64_t>(EngineCapability::kSAFE_DLA));
   ADD_FIELD_GET_SET(num_avg_timing_iters, int64_t);
   ADD_FIELD_GET_SET(workspace_size, int64_t);
+  ADD_FIELD_GET_SET(dla_sram_size, int64_t);
+  ADD_FIELD_GET_SET(dla_local_dram_size, int64_t);
+  ADD_FIELD_GET_SET(dla_global_dram_size, int64_t);
   ADD_FIELD_GET_SET(truncate_long_and_double, bool);
   ADD_FIELD_GET_SET(device, Device);
   ADD_FIELD_GET_SET(torch_fallback, TorchFallback);
@@ -167,6 +170,9 @@ struct CompileSpec : torch::CustomClassHolder {
   EngineCapability capability = EngineCapability::kDEFAULT;
   int64_t num_avg_timing_iters = 1;
   int64_t workspace_size = 0;
+  int64_t dla_sram_size = 1048576;
+  int64_t dla_local_dram_size = 1073741824;
+  int64_t dla_global_dram_size = 536870912;
 };
 
 } // namespace pyapi

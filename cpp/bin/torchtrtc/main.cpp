@@ -117,6 +117,12 @@ int main(int argc, char** argv) {
       parser, "num_iters", "Number of averaging timing iterations used to select kernels", {"num-avg-timing-iters"});
   args::ValueFlag<uint64_t> workspace_size(
       parser, "workspace_size", "Maximum size of workspace given to TensorRT", {"workspace-size"});
+  args::ValueFlag<uint64_t> dla_sram_size(
+      parser, "dla_sram_size", "DLA managed SRAM size", {"dla-sram-size"});
+  args::ValueFlag<uint64_t> dla_local_dram_size(
+      parser, "dla_local_dram_size", "DLA Local DRAM size", {"dla-local-dram-size"});
+  args::ValueFlag<uint64_t> dla_global_dram_size(
+      parser, "dla_global_dram_size", "DLA Global DRAM size", {"dla-global-dram-size"});
   args::ValueFlag<double> atol(
       parser,
       "atol",
@@ -322,6 +328,15 @@ int main(int argc, char** argv) {
       compile_settings.device.device_type = torchtrt::Device::DeviceType::kDLA;
       if (dla_core) {
         compile_settings.device.dla_core = args::get(dla_core);
+      }
+      if (dla_sram_size) {
+        compile_settings.dla_sram_size = args::get(dla_sram_size);
+      }
+      if (dla_local_dram_size) {
+        compile_settings.dla_local_dram_size = args::get(dla_local_dram_size);
+      }
+      if (dla_global_dram_size) {
+        compile_settings.dla_global_dram_size = args::get(dla_global_dram_size);
       }
     } else {
       torchtrt::logging::log(
