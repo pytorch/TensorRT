@@ -80,7 +80,7 @@ models = {
         "model": timm.create_model('vit_base_patch16_224', pretrained=True),
         "path": "script"
     },
-    "pool": {
+    "pooling": {
         "model": cm.Pool(),
         "path": "trace"
     },
@@ -104,7 +104,7 @@ models = {
         "model": cm.FallbackInplaceOPIf(),
         "path": "script"
     },
-    "bert-base-uncased": {
+    "bert_base_uncased": {
         "model": cm.BertModule(),
         "path": "trace"
     }

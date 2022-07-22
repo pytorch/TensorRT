@@ -5,16 +5,22 @@ import sys
 
 # Use system installed Python packages
 PYT_PATH='/opt/conda/lib/python3.8/site-packages' if not 'PYT_PATH' in os.environ else os.environ["PYT_PATH"]
+print(f"Using python path {PYT_PATH}")
 
 # Set the root directory to the directory of the noxfile unless the user wants to
 # TOP_DIR
 TOP_DIR=os.path.dirname(os.path.realpath(__file__)) if not 'TOP_DIR' in os.environ else os.environ["TOP_DIR"]
+print(f"Test root directory {TOP_DIR}")
 
 # Set the USE_CXX11=1 to use cxx11_abi
 USE_CXX11=0 if not 'USE_CXX11' in os.environ else os.environ["USE_CXX11"]
+if USE_CXX11:
+    print("Using cxx11 abi")
 
 # Set the USE_HOST_DEPS=1 to use host dependencies for tests
 USE_HOST_DEPS=0 if not 'USE_HOST_DEPS' in os.environ else os.environ["USE_HOST_DEPS"]
+if USE_HOST_DEPS:
+    print("Using dependencies from host python")
 
 SUPPORTED_PYTHON_VERSIONS=["3.7", "3.8", "3.9", "3.10"]
 
@@ -58,6 +64,12 @@ def download_datasets(session):
 
 def train_model(session):
     session.chdir(os.path.join(TOP_DIR, 'examples/int8/training/vgg16'))
+    session.install("-r", "requirements.txt")
+    if os.path.exists('vgg16_ckpts/ckpt_epoch25.pth'):
+        session.run_always('python',
+                'export_ckpt.py',
+                'vgg16_ckpts/ckpt_epoch25.pth')
+        return
     if USE_HOST_DEPS:
         session.run_always('python',
             'main.py',
@@ -140,14 +152,14 @@ def run_base_tests(session):
     print("Running basic tests")
     session.chdir(os.path.join(TOP_DIR, 'tests/py'))
     tests = [
-        "test_api.py",
-        "test_to_backend_api.py",
+        "api",
+        "integrations/test_to_backend_api.py",
     ]
     for test in tests:
         if USE_HOST_DEPS:
-            session.run_always('python', test, env={'PYTHONPATH': PYT_PATH})
+            session.run_always('pytest', test, env={'PYTHONPATH': PYT_PATH})
         else:
-            session.run_always("python", test)
+            session.run_always("pytest", test)
 
 def run_accuracy_tests(session):
     print("Running accuracy tests")
@@ -169,7 +181,7 @@ def copy_model(session):
             session.run_always('cp',
                                '-rpf',
                                os.path.join(TOP_DIR, src_file),
-                               os.path.join(TOP_DIR, str('tests/py/') + file_name),
+                               os.path.join(TOP_DIR, str('tests/modules/') + file_name),
                                external=True)
 
 def run_int8_accuracy_tests(session):
@@ -177,15 +189,15 @@ def run_int8_accuracy_tests(session):
     copy_model(session)
     session.chdir(os.path.join(TOP_DIR, 'tests/py'))
     tests = [
-        "test_ptq_dataloader_calibrator.py",
-        "test_ptq_to_backend.py",
-        "test_qat_trt_accuracy.py",
+        "ptq/test_ptq_to_backend.py",
+        "ptq/test_ptq_dataloader_calibrator.py",
+        "qat/",
     ]
     for test in tests:
         if USE_HOST_DEPS:
-            session.run_always('python', test, env={'PYTHONPATH': PYT_PATH})
+            session.run_always('pytest', test, env={'PYTHONPATH': PYT_PATH})
         else:
-            session.run_always("python", test)
+            session.run_always("pytest", test)
 
 def run_trt_compatibility_tests(session):
     print("Running TensorRT compatibility tests")
@@ -197,9 +209,9 @@ def run_trt_compatibility_tests(session):
     ]
     for test in tests:
         if USE_HOST_DEPS:
-            session.run_always('python', test, env={'PYTHONPATH': PYT_PATH})
+            session.run_always('pytest', test, env={'PYTHONPATH': PYT_PATH})
         else:
-            session.run_always("python", test)
+            session.run_always("pytest", test)
 
 def run_dla_tests(session):
     print("Running DLA tests")
@@ -209,9 +221,9 @@ def run_dla_tests(session):
     ]
     for test in tests:
         if USE_HOST_DEPS:
-            session.run_always('python', test, env={'PYTHONPATH': PYT_PATH})
+            session.run_always('pytest', test, env={'PYTHONPATH': PYT_PATH})
         else:
-            session.run_always("python", test)
+            session.run_always("pytest", test)
 
 def run_multi_gpu_tests(session):
     print("Running multi GPU tests")
@@ -221,9 +233,9 @@ def run_multi_gpu_tests(session):
     ]
     for test in tests:
         if USE_HOST_DEPS:
-            session.run_always('python', test, env={'PYTHONPATH': PYT_PATH})
+            session.run_always('pytest', test, env={'PYTHONPATH': PYT_PATH})
         else:
-            session.run_always("python", test)
+            session.run_always("pytest", test)
 
 def run_l0_api_tests(session):
     if not USE_HOST_DEPS:
@@ -245,7 +257,6 @@ def run_l1_accuracy_tests(session):
     if not USE_HOST_DEPS:
         install_deps(session)
         install_torch_trt(session)
-    download_models(session)
     download_datasets(session)
     train_model(session)
     run_accuracy_tests(session)
@@ -255,7 +266,6 @@ def run_l1_int8_accuracy_tests(session):
     if not USE_HOST_DEPS:
         install_deps(session)
         install_torch_trt(session)
-    download_models(session)
     download_datasets(session)
     train_model(session)
     finetune_model(session)
@@ -313,4 +323,8 @@ def l2_multi_gpu_tests(session):
 @nox.session(python=SUPPORTED_PYTHON_VERSIONS, reuse_venv=True)
 def download_test_models(session):
     """Grab all the models needed for testing"""
+    try:
+        import torch
+    except ModuleNotFoundError:
+        install_deps(session)
     download_models(session)
