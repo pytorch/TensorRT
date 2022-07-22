@@ -46,7 +46,7 @@ struct ConversionCtx {
   ConversionCtx(BuilderSettings settings);
   std::string SerializeEngine();
   nvinfer1::ITensor* AssociateValueAndTensor(const torch::jit::Value* value, nvinfer1::ITensor* tensor);
-  bool RecordNewTensor(const torch::jit::Value* value, nvinfer1::ITensor* tensor);
+  void RecordNewTensor(const torch::jit::Value* value, nvinfer1::ITensor* tensor);
   torch::jit::IValue* AssociateValueAndIValue(const torch::jit::Value* value, torch::jit::IValue tensor);
   bool CheckLayerAddition(const torch::jit::Node* n);
 
