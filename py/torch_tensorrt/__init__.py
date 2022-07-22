@@ -60,7 +60,10 @@ except:
     elif sys.platform.startswith("linux"):
         LINUX_PATHS = [
             "/usr/local/cuda/lib64",
-        ] + os.environ["LD_LIBRARY_PATH"].split(os.path.pathsep)
+        ]
+
+        if "LD_LIBRARY_PATH" in os.environ:
+            LINUX_PATHS += os.environ["LD_LIBRARY_PATH"].split(os.path.pathsep)
 
         if platform.uname().processor == "x86_64":
             LINUX_PATHS += [
