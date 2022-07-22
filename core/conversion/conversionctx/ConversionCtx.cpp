@@ -143,7 +143,7 @@ torch::jit::IValue* ConversionCtx::AssociateValueAndIValue(const torch::jit::Val
 void ConversionCtx::RecordNewTensor(const torch::jit::Value* value, nvinfer1::ITensor* tensor) {
   value_tensor_map[value] = tensor;
   auto ret = known_tensors.insert(tensor);
-  if (!ret) {
+  if (!ret.second) {
     LOG_WARNING(
         "Trying to record the value " << value->debugName() << " with the ITensor " << tensor->getName() << " again.");
   }
