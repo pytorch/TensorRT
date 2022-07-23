@@ -68,6 +68,32 @@ class TestTile(AccTestCase):
             Tile(dims), input_specs, expected_ops={acc_ops.tile}
         )
 
+    @parameterized.expand(
+        [
+            ("all_dynamic_dim", (-1, -1), (1, 2, 2, 1)),
+        ]
+    )
+    def test_tile_with_dynamic_shape_four_dimensions(self, _, shape, dims):
+        class Tile(nn.Module):
+            def __init__(self, dims):
+                super().__init__()
+                self.dims = dims
+
+            def forward(self, x):
+                return torch.tile(x, self.dims)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 3), (3, 3, 3, 3), (3, 3, 3, 3))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            Tile(dims), input_specs, expected_ops={acc_ops.tile}
+        )
+
     def test_tile_non_int_dims(self):
         class Tile(nn.Module):
             def __init__(self):
@@ -86,6 +112,32 @@ class TestTile(AccTestCase):
             Tile(),
             input_specs,
             expected_ops={acc_ops.tile},
+        )
+
+    def test_tile_non_int_dims_with_dynamic_shape_four_dimensions(self):
+        class Tile(nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, x, y):
+                y = y * 2
+                return torch.tile(x, (1, y.shape[1], y.shape[1]))
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 3), (3, 3, 3, 3), (3, 3, 3, 3))],
+            ),
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 3), (3, 3, 3, 3), (3, 3, 3, 3))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            Tile(), input_specs, expected_ops={acc_ops.tile}
         )
 
 

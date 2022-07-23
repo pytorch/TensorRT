@@ -5,6 +5,8 @@ from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase
 
+# from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase, InputTensorSpec
+
 
 class TestConverter(AccTestCase):
     @parameterized.expand(
@@ -29,6 +31,28 @@ class TestConverter(AccTestCase):
             expected_ops={acc_ops.as_strided},
             test_implicit_batch_dim=False,
         )
+
+    # Testing with shape (-1, 3) results into error:
+    # RuntimeError: setStorage: sizes [2, 3], strides [1, 2], storage offset 0, and itemsize 8 requiring a storage size of 48 are out of bounds for storage of size 16
+
+    """
+    def test_as_strided_with_dynamic_shape_four_dimensions(self):
+        class Stride(nn.Module):
+            def forward(self, x):
+                return torch.as_strided(torch.tensor([5, 5]), (2, 3), (1, 2), 0)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, 3),
+                dtype=torch.float32,
+                shape_ranges=[((1, 3), (2, 3), (2, 3))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            Stride(), input_specs, expected_ops={acc_ops.as_strided}
+        )
+    """
 
 
 if __name__ == "__main__":

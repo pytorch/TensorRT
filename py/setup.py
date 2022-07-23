@@ -143,6 +143,7 @@ class DevelopCommand(develop):
 
     def run(self):
         if FX_ONLY:
+            gen_version_file()
             develop.run(self)
         else:
             global CXX11_ABI
@@ -163,6 +164,7 @@ class InstallCommand(install):
 
     def run(self):
         if FX_ONLY:
+            gen_version_file()
             install.run(self)
         else:
             global CXX11_ABI
@@ -297,7 +299,7 @@ setup(
     long_description=long_description,
     ext_modules=ext_modules,
     install_requires=[
-        'torch>=1.11.0+cu113<1.12.0',
+        'torch>=1.11.0+cu113,<1.12.0',
     ],
     setup_requires=[],
     cmdclass={

@@ -92,6 +92,8 @@ class TestAdaptiveAvgPoolConverter(AccTestCase):
             TestModule(), input_specs, expected_ops={acc_ops.adaptive_avg_pool3d}
         )
 
+    #  Testing with shape(-1, -1, -1, -1) results into error: "AdaptiveAvgPool2d and AdaptiveAvgPool3d currently doesn't support dynamic shapes for last two dims."
+
 
 if __name__ == "__main__":
     run_tests()

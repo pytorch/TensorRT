@@ -45,6 +45,24 @@ class TestDequantizeConverter(AccTestCase):
             TestModule(), input_specs, expected_ops={acc_ops.dequantize}
         )
 
+    def test_dequantize_with_dynamic_shape_four_dimensions(self):
+        class TestModule(nn.Module):
+            def forward(self, x):
+                x = torch.quantize_per_tensor(x, 1, 0, torch.quint8)
+                return x.dequantize()
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (1, 2, 3, 3), (3, 3, 3, 3))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.dequantize}
+        )
+
 
 if __name__ == "__main__":
     run_tests()

@@ -5,9 +5,11 @@ import torch
 import torch.nn as nn
 
 import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
-from parameterized import param, parameterized
+from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase
+
+# from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase, InputTensorSpec
 
 
 class TestPadConverter(AccTestCase):
@@ -50,6 +52,27 @@ class TestPadConverter(AccTestCase):
             # enable value will not work with implicit batch
             test_implicit_batch_dim=False,
         )
+
+    # Testing with (-1, 3, 3, 3) results into following error:
+    # test_pad_with_dynamic_shape_four_dimensions_0_2d (deeplearning.trt.torch_tensorrt.py.torch_tensorrt.fx.test.converters.acc_op.test_pad.TestPadConverter) ... [07/15/2022-09:23:18] [TRT] [E] 2: [intInterval.cpp::max::26] Error Code 2: Internal Error (Assertion !empty() failed. )
+    # Segmentation fault (core dumped)
+
+    """
+    def test_pad_with_dynamic_shape_four_dimensions(self):
+        class Pad(nn.Module):
+            def forward(self, x):
+                return torch.nn.functional.pad(x, (1, 1))
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, 3, 3, 3),
+                dtype=torch.float32,
+                shape_ranges=[((1, 3, 3, 3), (2, 3, 3, 3), (2, 3, 3, 3))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(Pad(), input_specs, expected_ops={acc_ops.pad})
+    """
 
     @parameterized.expand(
         [
