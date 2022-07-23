@@ -236,7 +236,7 @@ commands:
             mv toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >> WORKSPACE
             bazel query 'kind(cc_*, tests(//tests))' --noshow_progress >> /tmp/test_manifest.txt
             circleci tests split < /tmp/test_manifest.txt > /tmp/node_test_manifest.txt
-            bazel test $(cat /tmp/node_test_manifest.txt) --test_arg=--gtest_output=xml:/tmp/artifacts/test_results/ --jobs 4 --config ci_testing --config pre_cxx11_abi --noshow_progress
+            bazel test $(cat /tmp/node_test_manifest.txt) --test_arg=--gtest_output=xml:/tmp/artifacts/test_results/ --jobs 3 --config ci_testing --config pre_cxx11_abi --noshow_progress
       - run:
           name: Collect logs
           when: on_fail
