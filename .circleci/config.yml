@@ -265,7 +265,6 @@ commands:
             set -e
             mkdir -p /tmp/artifacts/test_results
             cd tests/py
-            pip3 install -r requirements.txt
             pytest --junitxml=/tmp/artifacts/test_results/api/api_test_results.xml api/
             pytest --junitxml=/tmp/artifacts/test_results/integrations/integrations_test_results.xml integrations/
             cd ~/project
