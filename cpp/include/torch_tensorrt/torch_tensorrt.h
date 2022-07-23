@@ -14,6 +14,7 @@
 #include <set>
 #include <string>
 #include <vector>
+#include "torch/custom_class.h"
 
 // Just include the .h?
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
@@ -363,7 +364,7 @@ class TORCHTRT_API TensorFormat {
  * signifying a static input shape or a set of three input shapes representing
  * the min, optiminal and max input shapes allowed for the engine.
  */
-struct TORCHTRT_API Input {
+struct TORCHTRT_API Input : torch::CustomClassHolder{
   /// Minimum acceptable input size into the engine
   std::vector<int64_t> min_shape;
   /// Optimal input size into the engine (size optimized for given kernels accept any size in min max range)
@@ -378,6 +379,7 @@ struct TORCHTRT_API Input {
   /// Expected tensor format for the input
   TensorFormat format;
 
+  Input() {}
   /**
    * @brief Construct a new Input spec object for static input size from
    * vector, optional arguments allow the user to configure expected input shape
@@ -513,6 +515,16 @@ struct TORCHTRT_API Input {
 };
 
 /**
+ * @brief A struct to hold complex inputs
+ *
+ * This struct can either hold a complex inputs of shape or a flattened one,
+ */
+struct TORCHTRT_API GraphInputs {
+  torch::jit::IValue input_signature;  // nested Input, full input spec
+  std::vector<Input> inputs; // flatten input spec
+};
+
+/**
  * @brief Get the build information for the library including the dependency
  * versions
  *
@@ -579,18 +591,22 @@ struct TORCHTRT_API CompileSpec {
    *
    * @param inputs
    */
-  CompileSpec(std::vector<Input> inputs) : inputs(std::move(inputs)) {}
+  CompileSpec(std::vector<Input> inputs);
 
+  /**
+   * @brief Construct a new Extra Info object from IValue.
+   * The IValue store a complex Input
+   *
+   * @param input_signature
+   */
+  CompileSpec(torch::jit::IValue input_signature);
   // Defaults should reflect TensorRT defaults for BuilderConfig
 
   /**
-   * @brief Specifications for inputs to the engine, can either be a single size or a range defined by min, opt and max
-   * sizes Users can also specify expected input type as well as tensor memory format
-   *
-   * Order in vector should match call order for the function
+   * @brief Specifications for inputs to the engine, can store a IValue which has stored complex Input
+   *  or a flatened Input
    */
-  std::vector<Input> inputs;
-
+  GraphInputs graph_inputs;
   /**
    * @brief The set of precisions TensorRT is allowed to use for kernels during compilation
    *

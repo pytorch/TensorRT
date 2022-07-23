@@ -104,6 +104,12 @@ std::string Input::to_str() {
   return ss.str();
 }
 
+std::string InputSignature::to_str() {
+  std::stringstream ss;
+  ss << signature_ivalue;
+  return ss.str();
+}
+
 std::string to_str(DeviceType value) {
   switch (value) {
     case DeviceType::kDLA:
@@ -184,13 +190,63 @@ std::string TorchFallback::to_str() {
   return ss.str();
 }
 
-core::CompileSpec CompileSpec::toInternalCompileSpec() {
-  std::vector<core::ir::Input> internal_inputs;
-  for (auto i : inputs) {
-    internal_inputs.push_back(i.toInternalInput());
-  }
+void to_internal_input_signature(torch::jit::IValue input_ivalue, torch::jit::IValue& converted_ivalue) {
+    if (input_ivalue.isTuple()) {
+      auto input_tuple = input_ivalue.toTuple();
+      std::vector<torch::jit::IValue> converted_elements;
+      for (auto item: input_tuple->elements()) {
+        torch::jit::IValue converted_item;
+        to_internal_input_signature(item, converted_item);
+        converted_elements.push_back(converted_item);
+        auto tuple_ptr = c10::ivalue::Tuple::create(converted_elements);
+        converted_ivalue = torch::jit::IValue(tuple_ptr);
+      }
+    } else if(input_ivalue.isList()) {
+      auto input_list = input_ivalue.toList().vec();
+      c10::TypePtr type = input_list[0].type();
+      auto converted_elements = c10::impl::GenericList(type);
+      for (auto item: input_list) {
+        torch::jit::IValue converted_item;
+        to_internal_input_signature(item, converted_item);
+        converted_elements.push_back(converted_item);
+      }
+      converted_ivalue = torch::jit::IValue(converted_elements);
+    } else if(input_ivalue.isCustomClass()) {
+      core::ir::Input cur_input = (*(input_ivalue.toCustomClass<Input>())).toInternalInput();
+      converted_ivalue = torch::jit::IValue(std::move(c10::make_intrusive<core::ir::Input>(cur_input)));
+    } else if(input_ivalue.isPyObject()) {
+      auto py_object_holder = input_ivalue.toPyObjectHolder();
+      auto infer_type = py_object_holder->tryToInferType();
+      auto type = infer_type.type();
+      torch::jit::IValue ival = py_object_holder->toIValue(type);
+      torch::jit::IValue converted_item;
+      to_internal_input_signature(ival, converted_item);
+      converted_ivalue = torch::jit::IValue(converted_item);
+    } else {
+      LOG_ERROR("Unknown input spec type");
+    }
+}
 
-  auto info = core::CompileSpec(internal_inputs);
+core::CompileSpec init_compile_spec(CompileSpec external) {
+  if (external.inputs.size() > 0) {
+    LOG_DEBUG("init_compile_spec with input vector");
+    std::vector<core::ir::Input> internal_inputs;
+    for (auto i : external.inputs) {
+      internal_inputs.push_back(i.toInternalInput());
+    }
+    core::CompileSpec internal(internal_inputs);
+    return internal;
+  } else {
+    LOG_DEBUG("init_compile_spec with input signature");
+    torch::jit::IValue converted_input_signature;
+    to_internal_input_signature(external.input_signature.signature_ivalue, converted_input_signature);
+    core::CompileSpec internal(converted_input_signature);
+    return internal;
+  }
+}
+
+core::CompileSpec CompileSpec::toInternalCompileSpec() {
+  core::CompileSpec info = init_compile_spec(*this);
 
   for (auto p : enabled_precisions) {
     info.convert_info.engine_settings.enabled_precisions.insert(toTRTDataType(p));
@@ -237,16 +293,20 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
 std::string CompileSpec::stringify() {
   std::stringstream ss;
   ss << "TensorRT Compile Spec: {" << std::endl;
-  ss << "    \"Inputs\": [" << std::endl;
-  for (auto i : inputs) {
-    ss << i.to_str();
+  if (inputs.size() > 0) {
+    ss << "    \"Inputs\": [" << std::endl;
+    for (auto i : inputs) {
+      ss << i.to_str();
+    }
+    ss << "    ]" << std::endl;
+  } else {
+    ss << "    \"Input Signature\": " << input_signature.to_str() << std::endl;
   }
-  ss << "    ]" << std::endl;
-  ss << "    \"Enabled Precision\": [" << std::endl;
+  ss << "    \"Enabled Precision\": [";
   for (auto p : enabled_precisions) {
-    ss << to_str(p);
+    ss << to_str(p) << ", " ;
   }
-  ss << "    ]" << std::endl;
+  ss << "]" << std::endl;
   ss << "    \"TF32 Disabled\": " << disable_tf32 << std::endl;
   ss << "    \"Sparsity\": " << sparse_weights << std::endl;
   ss << "    \"Refit\": " << refit << std::endl;

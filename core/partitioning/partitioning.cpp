@@ -242,6 +242,36 @@ bool check_node_fallback(torch::jit::Node* n, const std::unordered_map<torch::ji
           "Node fallback to Torch because the NonTensor dependencies with other fallback nodes: "
           << util::node_info(n));
     }
+  }
+  return false;
+}
+
+bool is_collection(torch::jit::Node* n) {
+  for (auto out: n->outputs()) {
+    if(out->type()->kind() == torch::jit::TypeKind::TupleType || out->type()->kind() == torch::jit::TypeKind::ListType) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool should_run_in_trt(torch::jit::Node* n, const std::unordered_set<std::string>& torch_ops) {
+  // If the op is not supported by the conversion phase it should run in PyTorch
+  if (!conversion::OpSupported(n)) {
+    LOG_GRAPH("Node not supported by conversion: " << util::node_info(n));
+    return false;
+  }
+
+  // If the user specifies the op to run in Torch it should run in PyTorch
+  if (torch_ops.find(n->kind().toQualString()) != torch_ops.end()) {
+    LOG_GRAPH("Node explicitly set to run in torch: " << util::node_info(n));
+    return false;
+  }
+
+  // If the user specifies the module containing this op to run in torch it should run in PyTorch
+  const auto to_compile_sym = c10::Symbol::attr("to_compile");
+  if (n->hasAttribute(to_compile_sym) && n->i(to_compile_sym) == (int64_t) false) {
+    LOG_GRAPH("Node is within a module set to run in torch: " << util::node_info(n));
     return false;
   }
 
@@ -360,19 +390,25 @@ PartitionedGraph segment_graph(
   find_min_block_size_fallback_nodes(block, global_fallback_nodes, min_block_size);
 
   auto nodes = block->nodes();
-
+  auto reverse_nodes = nodes.reverse(); // merge from output side to input side
   PartitionedGraph segmented_blocks;
 
   // segment the nodes
   std::vector<torch::jit::Node*> in_prog_trt_blk_nodes, in_prog_pyt_blk_nodes;
-  for (const auto n : nodes) {
+  for (const auto n : reverse_nodes) {
     // Skip constant nodes as they are resources for both kinds of modules
     if (n->kind() == torch::jit::prim::Constant) {
       continue;
     }
+<<<<<<< HEAD
 
     if (check_node_fallback(n, global_fallback_nodes)) {
       in_prog_trt_blk_nodes.push_back(n);
+=======
+    // the outputs of trt subgraph shouldn't be collections
+    if (should_run_in_trt(n, forced_fallback_ops) && !(in_prog_trt_blk_nodes.size() == 0 && is_collection(n))) {
+      in_prog_trt_blk_nodes.insert(in_prog_trt_blk_nodes.begin(), n);
+>>>>>>> feat: support for grouped inputs
 
       // If there is an active PyTorch block and we have passed the threshold for a valid TRT
       // block then segment and reset the active PyTorch block
@@ -388,7 +424,7 @@ PartitionedGraph segment_graph(
         LOG_DEBUG(
             "In progress TRT block does not meet minimum block size requirements, therefore folding into in progress PyTorch block");
         in_prog_pyt_blk_nodes.insert(
-            in_prog_pyt_blk_nodes.end(), in_prog_trt_blk_nodes.begin(), in_prog_trt_blk_nodes.end());
+            in_prog_pyt_blk_nodes.begin(), in_prog_trt_blk_nodes.begin(), in_prog_trt_blk_nodes.end());
       }
       in_prog_trt_blk_nodes.clear();
       // if there is a prim::If then this if node will be encapsulated in a SegmentedBlock
@@ -407,14 +443,14 @@ PartitionedGraph segment_graph(
           finalize_block(segmented_blocks, SegmentedBlock::kTorch, in_prog_pyt_blk_nodes);
         }
         if (checkLoopEvaluatable(n)) {
-          in_prog_trt_blk_nodes.push_back(n);
+          in_prog_trt_blk_nodes.insert(in_prog_trt_blk_nodes.begin(), n);
         } else {
           auto loop_node = std::vector<torch::jit::Node*>{n};
           finalize_block(segmented_blocks, SegmentedBlock::kTorch, loop_node);
         }
         continue;
       }
-      in_prog_pyt_blk_nodes.push_back(n);
+      in_prog_pyt_blk_nodes.insert(in_prog_pyt_blk_nodes.begin(), n);
     }
   }
 
@@ -429,7 +465,7 @@ PartitionedGraph segment_graph(
         in_prog_pyt_blk_nodes.end(), in_prog_trt_blk_nodes.begin(), in_prog_trt_blk_nodes.end());
     finalize_block(segmented_blocks, SegmentedBlock::kTorch, in_prog_pyt_blk_nodes);
   }
-
+  std::reverse(segmented_blocks.begin(), segmented_blocks.end());
   return segmented_blocks;
 }
 
