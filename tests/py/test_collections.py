@@ -29,9 +29,11 @@ class TestTupleInput(ModelTestCase):
 
     def test_compile(self):
         compile_spec = {
-            "input_signature": ((torchtrt.Input(self.input.shape), torchtrt.Input(self.input.shape))),
+            "input_signature": ((torchtrt.Input(self.input.shape), torchtrt.Input(self.input.shape)),),
             "device": torchtrt.Device("gpu:0"),
-            "enabled_precisions": {torch.float}
+            "enabled_precisions": {torch.float},
+            "require_full_compilation": False,
+            "min_block_size": 3
         }
 
         trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
@@ -45,9 +47,11 @@ class TestListInput(ModelTestCase):
 
     def test_compile(self):
         compile_spec = {
-            "input_signature": ([torchtrt.Input(self.input.shape), torchtrt.Input(self.input.shape)]),
+            "input_signature": ([torchtrt.Input(self.input.shape), torchtrt.Input(self.input.shape)],),
             "device": torchtrt.Device("gpu:0"),
-            "enabled_precisions": {torch.float}
+            "enabled_precisions": {torch.float},
+            "require_full_compilation": False,
+            "min_block_size": 3
         }
 
         trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
@@ -61,9 +65,11 @@ class TestTupleInputOutput(ModelTestCase):
 
     def test_compile(self):
         compile_spec = {
-            "input_signature": ((torchtrt.Input(self.input.shape), torchtrt.Input(self.input.shape))),
+            "input_signature": ((torchtrt.Input(self.input.shape), torchtrt.Input(self.input.shape)),),
             "device": torchtrt.Device("gpu:0"),
-            "enabled_precisions": {torch.float}
+            "enabled_precisions": {torch.float},
+            "require_full_compilation": False,
+            "min_block_size": 3
         }
 
         trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
@@ -79,9 +85,11 @@ class TestListInputOutput(ModelTestCase):
 
     def test_compile(self):
         compile_spec = {
-            "input_signature": ([torchtrt.Input(self.input.shape), torchtrt.Input(self.input.shape)]),
+            "input_signature": ([torchtrt.Input(self.input.shape), torchtrt.Input(self.input.shape)],),
             "device": torchtrt.Device("gpu:0"),
-            "enabled_precisions": {torch.float}
+            "enabled_precisions": {torch.float},
+            "require_full_compilation": False,
+            "min_block_size": 3
         }
 
         trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
@@ -98,9 +106,11 @@ class TestListInputTupleOutput(ModelTestCase):
 
     def test_compile(self):
         compile_spec = {
-            "input_signature": ([torchtrt.Input(self.input.shape), torchtrt.Input(self.input.shape)]),
+            "input_signature": ([torchtrt.Input(self.input.shape), torchtrt.Input(self.input.shape)],),
             "device": torchtrt.Device("gpu:0"),
-            "enabled_precisions": {torch.float}
+            "enabled_precisions": {torch.float},
+            "require_full_compilation": False,
+            "min_block_size": 3
         }
 
         trt_mod = torchtrt.ts.compile(self.model, **compile_spec)

@@ -68,6 +68,7 @@ GraphInputs::GraphInputs(torch::jit::IValue& input_signature_) {
     inputs = flattened_inputs;
     input_signature = input_signature_;
     collection_inputs = collection_inputs_;
+    LOG_DEBUG("Collection Input Size: " << collection_inputs_.size());
 }
 
 } // namespace ir

@@ -168,8 +168,7 @@ def _parse_torch_fallback(fallback_info: Dict[str, Any]) -> _ts_C.TorchFallback:
 
     return info
 
-def _parse_input_signature(input_signature: Any) -> _C.InputSignature:
-    print(input_signature)
+def _parse_input_signature(input_signature: Any):
     if isinstance(input_signature, tuple):
         input_list = []
         for item in input_signature:
@@ -180,7 +179,7 @@ def _parse_input_signature(input_signature: Any) -> _C.InputSignature:
         input_list = []
         for item in input_signature:
            input = _parse_input_signature(item)
-        input_list.append(input)
+           input_list.append(input)
         return input_list
     elif isinstance(input_signature, Input) or isinstance(input_signature, torch.Tensor):
         i = Input._from_tensor(input_signature) if isinstance(input_signature, torch.Tensor) else input_signature
@@ -202,16 +201,13 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> _ts_C.CompileSpec:
 
     elif compile_spec["input_signature"] is not None:
         log(Level.Warning, "Input signature parsing is an experimental feature, behavior and APIs may change")
-        signature =_parse_input_signature(compile_spec["input_signature"])
-        print(signature)
-        info.input_signature = signature
+        signature = _parse_input_signature(compile_spec["input_signature"])
+        info.input_signature = _C.InputSignature(signature) # py_object
 
     else:
         raise KeyError(
             "Module input definitions are requried to compile module. Provide a list of torch_tensorrt.Input keyed to \"inputs\" in the compile spec"
         )
-
-    #assert(len(info.inputs) > 0 or compile_spec["input_signature"] is not None, "Require at least one input definition to compile model")
 
     if "enabled_precisions" in compile_spec:
         info.enabled_precisions = _parse_enabled_precisions(compile_spec["enabled_precisions"])
