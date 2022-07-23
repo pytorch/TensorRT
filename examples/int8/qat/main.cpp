@@ -33,8 +33,6 @@ torch::jit::Module compile_int8_qat_model(const std::string& data_dir, torch::ji
   auto compile_spec = torch_tensorrt::ts::CompileSpec(inputs);
   /// Set operating precision to INT8
   compile_spec.enabled_precisions.insert(torch::kI8);
-  /// Set a larger workspace
-  compile_spec.workspace_size = 1 << 28;
 
 #ifdef SAVE_ENGINE
   std::cout << "Compiling graph to save as TRT engine (/tmp/engine_converted_from_jit.trt)" << std::endl;

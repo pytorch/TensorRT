@@ -32,7 +32,6 @@ TEST_P(AccuracyTests, DLAFP16AccuracyIsClose) {
   compile_spec.device.gpu_id = 0;
   compile_spec.device.dla_core = 1;
   compile_spec.device.allow_gpu_fallback = true;
-  compile_spec.workspace_size = 1 << 28;
 
   auto trt_mod = torch_tensorrt::ts::compile(mod, compile_spec);
 

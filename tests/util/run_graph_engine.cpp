@@ -83,7 +83,6 @@ std::vector<at::Tensor> RunGraphEngine(
   auto in = core::ir::pair_input_vals_with_specs(var_ins, toInputs(inputs));
   auto info = core::conversion::ConversionInfo();
   info.inputs = std::move(in);
-  info.engine_settings.workspace_size = (1 << 30);
   info.engine_settings.enabled_precisions.insert(op_precision);
   std::string eng = core::conversion::ConvertBlockToEngine(g->block(), info, named_params);
   return RunEngine(eng, inputs);
@@ -99,7 +98,6 @@ std::vector<at::Tensor> RunGraphEngineDynamic(
   auto in = core::ir::pair_input_vals_with_specs(var_ins, toInputsDynamic(inputs, dynamic_batch));
   auto info = core::conversion::ConversionInfo();
   info.inputs = std::move(in);
-  info.engine_settings.workspace_size = (1 << 30);
   std::string eng = core::conversion::ConvertBlockToEngine(g->block(), info, named_params);
   return RunEngine(eng, inputs);
 }

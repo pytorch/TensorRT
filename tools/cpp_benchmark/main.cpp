@@ -121,7 +121,6 @@ int main(int argc, const char* argv[]) {
 
 #ifdef TRT
   auto compile_spec = torch_tensorrt::ts::CompileSpec(dims);
-  compile_spec.workspace_size = 1 << 20;
 
 #ifdef HALF
   compile_spec.enabled_precisions.insert(torch::kF16);
