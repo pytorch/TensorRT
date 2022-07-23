@@ -188,7 +188,7 @@ void AddInputs(
       ctx->input_is_dynamic = true;
     }
 
-    ctx->RecordNewTensor(in, trt_in);
+    ctx->RecordNewITensor(in, trt_in);
     ctx->num_inputs += 1;
   }
 

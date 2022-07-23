@@ -130,7 +130,7 @@ ConversionCtx::~ConversionCtx() {
 }
 
 nvinfer1::ITensor* ConversionCtx::AssociateValueAndTensor(const torch::jit::Value* value, nvinfer1::ITensor* tensor) {
-  RecordNewTensor(value, tensor);
+  RecordNewITensor(value, tensor);
 
   return tensor;
 }
@@ -140,9 +140,9 @@ torch::jit::IValue* ConversionCtx::AssociateValueAndIValue(const torch::jit::Val
   return &this->evaluated_value_map[value];
 }
 
-void ConversionCtx::RecordNewTensor(const torch::jit::Value* value, nvinfer1::ITensor* tensor) {
+void ConversionCtx::RecordNewITensor(const torch::jit::Value* value, nvinfer1::ITensor* tensor) {
   value_tensor_map[value] = tensor;
-  auto ret = known_tensors.insert(tensor);
+  auto ret = seen_itensors.insert(tensor);
   if (!ret.second) {
     LOG_WARNING(
         "Trying to record the value " << value->debugName() << " with the ITensor " << tensor->getName() << " again.");
