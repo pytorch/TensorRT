@@ -41,10 +41,13 @@ def validate_inference(rtol=None, atol=None, suppress_accuracy_check_failure=Fal
 
         @wraps(pass_)
         def pass_with_validation(
-            module: fx.GraphModule, input: Input
+            module: fx.GraphModule,
+            input: Input,
+            *args,
+            **kwargs,
         ) -> fx.GraphModule:
             res0 = module(*input)
-            processed_module = pass_(module, input)
+            processed_module = pass_(module, input, *args, **kwargs)
             res1 = processed_module(*input)
 
             tensor_res_0 = _collect_tensors(res0)
@@ -63,14 +66,17 @@ def validate_inference(rtol=None, atol=None, suppress_accuracy_check_failure=Fal
                     y = y.cpu()
                 accuracy_check = torch.allclose(x, y, **kwargs)
                 if not accuracy_check:
+                    _LOGGER.error(
+                        f"Pass {pass_} failed correctness check, get original model output as {x} and processed model output as {y} for output {kk}."
+                    )
                     if suppress_accuracy_check_failure:
                         _LOGGER.error(
-                            f"pass {pass_} failed correctness check due to output {kk}, escape current pass."
+                            f"Pass {pass_} failed correctness check due to output {kk}."
                         )
                         return processed_module
                     else:
                         raise RuntimeError(
-                            f"pass {pass_} failed correctness check due to output {kk}"
+                            f"Pass {pass_} failed correctness check due to output {kk}"
                         )
             return processed_module
 

@@ -591,9 +591,33 @@ def acc_ops_batch_norm(
     )
     power = np.ones_like(scale)
 
+    # For BatchNorm1d, reshape 1d to 2d
+    output_shape = input_val.shape
+    if not network.has_implicit_batch_dimension and len(input_val.shape) < 4:
+        assert (
+            len(get_dynamic_dims(input_val.shape)) <= 1
+        ), "BatchNorm1D with more than one dynamic dims is not currently supported."
+        reshape_layer = network.add_shuffle(input_val)
+        if len(input_val.shape) == 2:
+            reshape_layer.reshape_dims = (input_val.shape[0], input_val.shape[1], 1, 1)
+        else:  # len(input_val.shape) == 3
+            reshape_layer.reshape_dims = (
+                input_val.shape[0],
+                input_val.shape[1],
+                input_val.shape[2],
+                1,
+            )
+        set_layer_name(reshape_layer, target, f"{name}_reshape_2d")
+        input_val = reshape_layer.get_output(0)
     layer = network.add_scale(input_val, trt.ScaleMode.CHANNEL, bias, scale, power)
     set_layer_name(layer, target, name)
 
+    # For BatchNorm1d, reshape output back to 1d
+    if not network.has_implicit_batch_dimension and len(output_shape) < 4:
+        reshape_output_layer = network.add_shuffle(layer.get_output(0))
+        reshape_output_layer.reshape_dims = tuple(output_shape)
+        set_layer_name(reshape_output_layer, target, f"{name}_reshape_1d")
+        layer = reshape_output_layer
     return layer.get_output(0)
 
 
@@ -614,7 +638,18 @@ def acc_ops_layer_norm(network, target, args, kwargs, name):
     eps_field = trt.PluginField(
         "eps", np.array([kwargs["eps"]], dtype=np.float32), trt.PluginFieldType.FLOAT32
     )
-    field_collection = trt.PluginFieldCollection([gamma_field, beta_field, eps_field])
+    try:
+        normalized_shape = np.array(kwargs["normalized_shape"], dtype=np.int32)
+    except TypeError:
+        print("Unable to convert normalized_shape to a field, fall back to []")
+        normalized_shape = np.array([], dtype=np.int32)
+
+    normalized_shape_filed = trt.PluginField(
+        "normalized_shape", normalized_shape, trt.PluginFieldType.INT32
+    )
+    field_collection = trt.PluginFieldCollection(
+        [gamma_field, beta_field, eps_field, normalized_shape_filed]
+    )
 
     try:
         if network.has_implicit_batch_dimension:
@@ -2222,7 +2257,7 @@ def acc_ops_adaptive_avg_poolnd(
     extend_len = 2 if target == acc_ops.adaptive_avg_pool2d else 3
     assert all(
         input_val.shape[-(i + 1)] != -1 for i in range(extend_len)
-    ), "AdaptiveAvgPool2d currently doesn't support dynamic shapes for last two dims."
+    ), "AdaptiveAvgPool2d and AdaptiveAvgPool3d currently doesn't support dynamic shapes for last two dims."
 
     output_size = cast(
         Sequence[int], extend_attr_to_tuple(kwargs["output_size"], extend_len)
@@ -2838,11 +2873,7 @@ def acc_ops_getitem(
         """
         Gather the number of slice in getitem slices.
         """
-        num_slice = 0
-        for s in slices:
-            if isinstance(s, slice) or isinstance(s, int):
-                num_slice += 1
-        return num_slice
+        return sum(1 for s in slices if isinstance(s, slice) or isinstance(s, int))
 
     def slice_to_trt_params(py_slice, dim_size):
         """
@@ -2878,9 +2909,9 @@ def acc_ops_getitem(
     new_slices = []
     for s in slices:
         if s == Ellipsis:
-            while num_ellipsis > 0:
+            # pass explicit start to guard against negative num_ellipsis
+            for _ in range(0, num_ellipsis):
                 new_slices.append(slice(None, None, None))
-                num_ellipsis -= 1
         else:
             new_slices.append(s)
     slices = new_slices

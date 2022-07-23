@@ -42,6 +42,27 @@ class TestCatConverter(AccTestCase):
         ]
         self.run_test_with_dynamic_shape(Cat(), input_specs, expected_ops={acc_ops.cat})
 
+    def test_cat_with_dynamic_shape_four_dimensions(self):
+        class Cat(nn.Module):
+            def forward(self, x, y):
+                x = x + y
+                return torch.cat((x, y), 0)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (2, 3, 4, 4), (2, 3, 10, 10))],
+            ),
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (2, 3, 4, 4), (2, 3, 10, 10))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(Cat(), input_specs, expected_ops={acc_ops.cat})
+
 
 if __name__ == "__main__":
     run_tests()

@@ -113,12 +113,16 @@ int main(int argc, char** argv) {
       "Whether to treat input file as a serialized TensorRT engine and embed it into a TorchScript module (device spec must be provided)",
       {"embed-engine"});
 
-  args::ValueFlag<uint64_t> num_min_timing_iters(
-      parser, "num_iters", "Number of minimization timing iterations used to select kernels", {"num-min-timing-iter"});
   args::ValueFlag<uint64_t> num_avg_timing_iters(
       parser, "num_iters", "Number of averaging timing iterations used to select kernels", {"num-avg-timing-iters"});
   args::ValueFlag<uint64_t> workspace_size(
       parser, "workspace_size", "Maximum size of workspace given to TensorRT", {"workspace-size"});
+  args::ValueFlag<uint64_t> dla_sram_size(
+      parser, "dla_sram_size", "DLA managed SRAM size", {"dla-sram-size"});
+  args::ValueFlag<uint64_t> dla_local_dram_size(
+      parser, "dla_local_dram_size", "DLA Local DRAM size", {"dla-local-dram-size"});
+  args::ValueFlag<uint64_t> dla_global_dram_size(
+      parser, "dla_global_dram_size", "DLA Global DRAM size", {"dla-global-dram-size"});
   args::ValueFlag<double> atol(
       parser,
       "atol",
@@ -325,6 +329,15 @@ int main(int argc, char** argv) {
       if (dla_core) {
         compile_settings.device.dla_core = args::get(dla_core);
       }
+      if (dla_sram_size) {
+        compile_settings.dla_sram_size = args::get(dla_sram_size);
+      }
+      if (dla_local_dram_size) {
+        compile_settings.dla_local_dram_size = args::get(dla_local_dram_size);
+      }
+      if (dla_global_dram_size) {
+        compile_settings.dla_global_dram_size = args::get(dla_global_dram_size);
+      }
     } else {
       torchtrt::logging::log(
           torchtrt::logging::Level::kERROR, "Invalid device type, options are [ gpu | dla ] found: " + device);
@@ -350,10 +363,6 @@ int main(int argc, char** argv) {
       std::cerr << std::endl << parser;
       return 1;
     }
-  }
-
-  if (num_min_timing_iters) {
-    compile_settings.num_min_timing_iters = args::get(num_min_timing_iters);
   }
 
   if (num_avg_timing_iters) {

@@ -4,16 +4,13 @@ import torch
 import torchvision.models as models
 import tensorrt as trt
 
-from model_test_case import ModelTestCase
 
-
-class TestPyTorchToTRTEngine(ModelTestCase):
-
-    def setUp(self):
-        self.input = torch.randn((1, 3, 224, 224)).to("cuda:0")
-        self.ts_model = torch.jit.script(self.model)
+class TestPyTorchToTRTEngine(unittest.TestCase):
 
     def test_pt_to_trt(self):
+        self.model=models.resnet18(pretrained=True).eval().to("cuda:0")
+        self.input = torch.randn((1, 3, 224, 224)).to("cuda:0")
+        self.ts_model = torch.jit.script(self.model)
         compile_spec = {
             "inputs": [torchtrt.Input(self.input.shape)],
             "truncate_long_and_double": True,
@@ -40,17 +37,5 @@ class TestPyTorchToTRTEngine(ModelTestCase):
                 same = (out - self.ts_model(self.input)).abs().max()
                 self.assertTrue(same < 2e-3)
 
-
-def test_suite():
-    suite = unittest.TestSuite()
-    suite.addTest(TestPyTorchToTRTEngine.parametrize(TestPyTorchToTRTEngine, model=models.resnet18(pretrained=True)))
-
-    return suite
-
-
-suite = test_suite()
-
-runner = unittest.TextTestRunner()
-result = runner.run(suite)
-
-exit(int(not result.wasSuccessful()))
+if __name__ == "__main__":
+    unittest.main()

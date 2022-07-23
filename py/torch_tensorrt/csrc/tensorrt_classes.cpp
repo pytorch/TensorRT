@@ -221,12 +221,16 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
   info.convert_info.engine_settings.truncate_long_and_double = truncate_long_and_double;
 
   info.convert_info.engine_settings.capability = toTRTEngineCapability(capability);
-  TORCHTRT_CHECK(num_min_timing_iters >= 0, "num_min_timing_iters must be 0 or greater");
-  info.convert_info.engine_settings.num_min_timing_iters = num_min_timing_iters;
   TORCHTRT_CHECK(num_avg_timing_iters >= 0, "num_avg_timing_iters must be 0 or greater");
   info.convert_info.engine_settings.num_avg_timing_iters = num_avg_timing_iters;
   TORCHTRT_CHECK(workspace_size >= 0, "workspace_size must be 0 or greater");
   info.convert_info.engine_settings.workspace_size = workspace_size;
+  TORCHTRT_CHECK(dla_sram_size >= 4096, "DLA managed SRAM size must be at least 4 KiB and must be a power of 2. This defaults to 1 MiB");
+  info.convert_info.engine_settings.dla_sram_size = dla_sram_size;
+  TORCHTRT_CHECK(dla_local_dram_size >= 4096, "DLA Local DRAM size must be at least 4 KiB and must be a power of 2. This defaults to 1 GiB");
+  info.convert_info.engine_settings.dla_local_dram_size = dla_local_dram_size;
+  TORCHTRT_CHECK(dla_global_dram_size >= 4096, "DLA Global DRAM size must be at least 4 KiB and must be a power of 2. This defaults to 512 MiB");
+  info.convert_info.engine_settings.dla_global_dram_size = dla_global_dram_size;
   return info;
 }
 
@@ -249,9 +253,11 @@ std::string CompileSpec::stringify() {
   ss << "    \"Debug\": " << debug << std::endl;
   ss << "    \"Device\": " << device.to_str() << std::endl;
   ss << "    \"Engine Capability\": " << to_str(capability) << std::endl;
-  ss << "    \"Num Min Timing Iters\": " << num_min_timing_iters << std::endl;
   ss << "    \"Num Avg Timing Iters\": " << num_avg_timing_iters << std::endl;
   ss << "    \"Workspace Size\": " << workspace_size << std::endl;
+  ss << "    \"DLA SRAM Size\": " << dla_sram_size << std::endl;
+  ss << "    \"DLA Local DRAM Size\": " << dla_local_dram_size << std::endl;
+  ss << "    \"DLA Global DRAM Size\": " << dla_global_dram_size << std::endl;
   ss << "    \"Truncate long and double\": " << truncate_long_and_double << std::endl;
   ss << "    \"Torch Fallback\": " << torch_fallback.to_str();
   ss << "}";

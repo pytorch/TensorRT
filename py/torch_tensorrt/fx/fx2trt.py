@@ -80,7 +80,7 @@ class TRTInterpreter(torch.fx.Interpreter):
         ] = dict()
 
     def validate_input_specs(self):
-        for shape, dtpe, _, shape_ranges, has_batch_dim in self.input_specs:
+        for shape, _, _, shape_ranges, has_batch_dim in self.input_specs:
             if not self.network.has_implicit_batch_dimension:
                 assert (
                     has_batch_dim
@@ -164,6 +164,21 @@ class TRTInterpreter(torch.fx.Interpreter):
         timing_cache=None,
         profiling_verbosity=None,
     ) -> TRTInterpreterResult:
+        """
+        Build TensorRT engine with some configs.
+        Args:
+            max_batch_size: set accordingly for maximum batch size you will use.
+            max_workspace_size: set to the maximum size we can afford for temporary buffer
+            lower_precision: the precision model layers are running on (TensorRT will choose the best perforamnce precision).
+            sparse_weights: allow the builder to examine weights and use optimized functions when weights have suitable sparsity
+            force_fp32_output: force output to be fp32
+            strict_type_constraints: Usually we should set it to False unless we want to control the precision of certain layer for numeric reasons.
+            algorithm_selector: set up algorithm selection for certain layer
+            timing_cache: enable timing cache for TensorRT
+            profiling_verbosity: TensorRT logging level
+        Return:
+            TRTInterpreterResult
+        """
         TRT_INTERPRETER_CALL_PRE_OBSERVER.observe(self.module)
 
         # For float outputs, we set their dtype to fp16 only if lower_precision == LowerPrecision.FP16 and

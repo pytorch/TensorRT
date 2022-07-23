@@ -74,13 +74,14 @@ def which(program):
 
     return None
 
+BAZEL_EXE = None
+if not FX_ONLY:
+    BAZEL_EXE = which("bazelisk")
 
-BAZEL_EXE = which("bazelisk")
-
-if BAZEL_EXE is None:
-    BAZEL_EXE = which("bazel")
     if BAZEL_EXE is None:
-        sys.exit("Could not find bazel in PATH")
+        BAZEL_EXE = which("bazel")
+        if BAZEL_EXE is None:
+            sys.exit("Could not find bazel in PATH")
 
 
 def build_libtorchtrt_pre_cxx11_abi(develop=True, use_dist_dir=True, cxx11_abi=False):
@@ -142,6 +143,7 @@ class DevelopCommand(develop):
 
     def run(self):
         if FX_ONLY:
+            gen_version_file()
             develop.run(self)
         else:
             global CXX11_ABI
@@ -162,6 +164,7 @@ class InstallCommand(install):
 
     def run(self):
         if FX_ONLY:
+            gen_version_file()
             install.run(self)
         else:
             global CXX11_ABI
@@ -296,7 +299,7 @@ setup(
     long_description=long_description,
     ext_modules=ext_modules,
     install_requires=[
-        'torch>=1.11.0+cu113<1.12.0',
+        'torch>=1.11.0+cu113,<1.12.0',
     ],
     setup_requires=[],
     cmdclass={

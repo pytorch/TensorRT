@@ -48,6 +48,24 @@ class TestSizeConverter(AccTestCase):
             Size(), input_specs, expected_ops={acc_ops.size}
         )
 
+    def test_size_dynamic_shape_four_dimensions(self):
+        class Size(nn.Module):
+            def forward(self, x):
+                bs = x.size(0)
+                return x.view(bs, -1)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 12, 32, 3), (3, 12, 32, 3), (100, 12, 32, 3))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            Size(), input_specs, expected_ops={acc_ops.size}
+        )
+
 
 if __name__ == "__main__":
     run_tests()
