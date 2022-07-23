@@ -637,10 +637,6 @@ struct TORCHTRT_API CompileSpec {
   EngineCapability capability = EngineCapability::kSTANDARD;
 
   /**
-   * Number of minimization timing iterations used to select kernels
-   */
-  uint64_t num_min_timing_iters = 2;
-  /**
    * Number of averaging timing iterations used to select kernels
    */
   uint64_t num_avg_timing_iters = 1;

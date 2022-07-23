@@ -211,6 +211,18 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> _ts_C.CompileSpec:
         assert type(compile_spec["workspace_size"]) is int
         info.workspace_size = compile_spec["workspace_size"]
 
+    if "dla_sram_size" in compile_spec:
+        assert type(compile_spec["dla_sram_size"]) is int
+        info.dla_sram_size = compile_spec["dla_sram_size"]
+
+    if "dla_local_dram_size" in compile_spec:
+        assert type(compile_spec["dla_local_dram_size"]) is int
+        info.dla_local_dram_size = compile_spec["dla_local_dram_size"]
+
+    if "dla_global_dram_size" in compile_spec:
+        assert type(compile_spec["dla_global_dram_size"]) is int
+        info.dla_global_dram_size = compile_spec["dla_global_dram_size"]
+
     if "truncate_long_and_double" in compile_spec:
         assert type(compile_spec["truncate_long_and_double"]) is bool
         info.truncate_long_and_double = compile_spec["truncate_long_and_double"]
@@ -229,9 +241,11 @@ def TensorRTCompileSpec(inputs=[],
                         refit=False,
                         debug=False,
                         capability=_enums.EngineCapability.default,
-                        num_min_timing_iters=2,
                         num_avg_timing_iters=1,
                         workspace_size=0,
+                        dla_sram_size=1048576,
+                        dla_local_dram_size=1073741824,
+                        dla_global_dram_size=536870912,
                         truncate_long_and_double=False,
                         calibrator=None) -> torch.classes.tensorrt.CompileSpec:
     """Utility to create a formated spec dictionary for using the PyTorch TensorRT backend
@@ -263,7 +277,6 @@ def TensorRTCompileSpec(inputs=[],
         refit (bool): Enable refitting
         debug (bool): Enable debuggable engine
         capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
-        num_min_timing_iters (int): Number of minimization timing iterations used to select kernels
         num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
         workspace_size (int): Maximum size of workspace given to TensorRT
         truncate_long_and_double (bool): Truncate weights provided in int64 or double (float64) to int32 and float32
@@ -283,9 +296,11 @@ def TensorRTCompileSpec(inputs=[],
         "refit": refit,  # enable refit
         "debug": debug,  # enable debuggable engine
         "capability": capability,  # Restrict kernel selection to safe gpu kernels or safe dla kernels
-        "num_min_timing_iters": num_min_timing_iters,  # Number of minimization timing iterations used to select kernels
         "num_avg_timing_iters": num_avg_timing_iters,  # Number of averaging timing iterations used to select kernels
         "workspace_size": workspace_size,  # Maximum size of workspace given to TensorRT
+        "dla_sram_size": dla_sram_size,  # Fast software managed RAM used by DLA to communicate within a layer.
+        "dla_local_dram_size": dla_local_dram_size,  # Host RAM used by DLA to share intermediate tensor data across operations
+        "dla_global_dram_size": dla_global_dram_size,  # Host RAM used by DLA to store weights and metadata for execution
         "calibrator": calibrator,
         "truncate_long_and_double": truncate_long_and_double
     }
@@ -331,9 +346,11 @@ def TensorRTCompileSpec(inputs=[],
     backend_spec._set_debug(parsed_spec.debug)
     backend_spec._set_refit(parsed_spec.refit)
     backend_spec._set_capability(int(parsed_spec.capability))
-    backend_spec._set_num_min_timing_iters(parsed_spec.num_min_timing_iters)
     backend_spec._set_num_avg_timing_iters(parsed_spec.num_avg_timing_iters)
     backend_spec._set_workspace_size(parsed_spec.workspace_size)
+    backend_spec._set_dla_sram_size(parsed_spec.dla_sram_size)
+    backend_spec._set_dla_local_dram_size(parsed_spec.dla_local_dram_size)
+    backend_spec._set_dla_global_dram_size(parsed_spec._set_dla_global_dram_size)
     backend_spec._set_truncate_long_and_double(parsed_spec.truncate_long_and_double)
     backend_spec._set_ptq_calibrator(parsed_spec._get_calibrator_handle())
 

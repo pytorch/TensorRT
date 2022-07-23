@@ -33,7 +33,6 @@ struct BuilderSettings {
   Device device;
   nvinfer1::EngineCapability capability = TRT_ENGINE_CAPABILITY_STANDARD;
   nvinfer1::IInt8Calibrator* calibrator = nullptr;
-  uint64_t num_min_timing_iters = 2;
   uint64_t num_avg_timing_iters = 1;
   uint64_t workspace_size = 0;
   uint64_t dla_sram_size = 1048576;

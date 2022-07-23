@@ -365,10 +365,6 @@ int main(int argc, char** argv) {
     }
   }
 
-  if (num_min_timing_iters) {
-    compile_settings.num_min_timing_iters = args::get(num_min_timing_iters);
-  }
-
   if (num_avg_timing_iters) {
     compile_settings.num_avg_timing_iters = args::get(num_avg_timing_iters);
   }
