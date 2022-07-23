@@ -350,7 +350,7 @@ def TensorRTCompileSpec(inputs=[],
     backend_spec._set_workspace_size(parsed_spec.workspace_size)
     backend_spec._set_dla_sram_size(parsed_spec.dla_sram_size)
     backend_spec._set_dla_local_dram_size(parsed_spec.dla_local_dram_size)
-    backend_spec._set_dla_global_dram_size(parsed_spec._set_dla_global_dram_size)
+    backend_spec._set_dla_global_dram_size(parsed_spec.dla_global_dram_size)
     backend_spec._set_truncate_long_and_double(parsed_spec.truncate_long_and_double)
     backend_spec._set_ptq_calibrator(parsed_spec._get_calibrator_handle())
 
