@@ -22,8 +22,12 @@ CXX11_ABI = False
 
 JETPACK_VERSION = None
 
-__version__ = '1.2.0a0'
 FX_ONLY = False
+
+__version__ = '1.2.0a0'
+__cuda_version__ = '11.3'
+__cudnn_version__ = '8.2'
+__tensorrt_version__ = '8.2'
 
 def get_git_revision_short_hash() -> str:
     return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode('ascii').strip()
@@ -51,8 +55,10 @@ if platform.uname().processor == "aarch64":
             JETPACK_VERSION = "4.5"
         elif version == "4.6":
             JETPACK_VERSION = "4.6"
+        elif version == "5.0":
+            JETPACK_VERSION = "4.6"
     if not JETPACK_VERSION:
-        warnings.warn("Assuming jetpack version to be 4.6, if not use the --jetpack-version option")
+        warnings.warn("Assuming jetpack version to be 4.6 or greater, if not use the --jetpack-version option")
         JETPACK_VERSION = "4.6"
 
 
@@ -103,7 +109,7 @@ def build_libtorchtrt_pre_cxx11_abi(develop=True, use_dist_dir=True, cxx11_abi=F
         print("Jetpack version: 4.5")
     elif JETPACK_VERSION == "4.6":
         cmd.append("--platforms=//toolchains:jetpack_4.6")
-        print("Jetpack version: 4.6")
+        print("Jetpack version: >=4.6")
 
     print("building libtorchtrt")
     status_code = subprocess.run(cmd).returncode
@@ -118,7 +124,10 @@ def gen_version_file():
 
     with open(dir_path + '/torch_tensorrt/_version.py', 'w') as f:
         print("creating version file")
-        f.write("__version__ = \"" + __version__ + '\"')
+        f.write("__version__ = \"" + __version__ + '\"\n')
+        f.write("__cuda_version__ = \"" + __cuda_version__ + '\"\n')
+        f.write("__cudnn_version__ = \"" + __cudnn_version__ + '\"\n')
+        f.write("__tensorrt_version__ = \"" + __tensorrt_version__ + '\"\n')
 
 
 def copy_libtorchtrt(multilinux=False):
@@ -299,7 +308,7 @@ setup(
     long_description=long_description,
     ext_modules=ext_modules,
     install_requires=[
-        'torch>=1.11.0+cu113,<1.12.0',
+        'torch>=1.12.0+cu113,<1.13.0',
     ],
     setup_requires=[],
     cmdclass={
