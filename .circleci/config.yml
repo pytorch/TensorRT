@@ -482,7 +482,7 @@ jobs:
           path: /tmp/dist/nightly
           destination: x86_64-pyt-nightly
 
-  test-core-cpp-x86_64-pyt-release:
+  test-core-cpp-x86_64:
     parameters:
       torch-build:
         type: string
@@ -514,7 +514,7 @@ jobs:
       - dump-test-env
       - test-ts-core
 
-  test-ts-py-x86_64-pyt-release:
+  test-py-ts-x86_64:
     parameters:
       torch-build:
         type: string
@@ -527,18 +527,19 @@ jobs:
       - checkout
       - create-py-env:
           trt-version-long: << pipeline.parameters.trt-release-version-long >>
-      - install-torch-from-index:
-          torch-build:  << parameters.torch-build >>
-          torch-build-index: << parameters.torch-build-index >>
       - attach_workspace:
           at: /tmp/dist
       - run:
           name: "Install torch-tensorrt"
           command: pip3 install /tmp/dist/release/*
+      # We install torch after torch-trt because pip automatically enforces the version constraint otherwise
+      - install-torch-from-index:
+          torch-build:  << parameters.torch-build >>
+          torch-build-index: << parameters.torch-build-index >>
       - dump-test-env
       - test-ts-py-api
 
-  test-x86_64-pyt-nightly:
+  test-py-fx-x86_64:
     parameters:
       torch-build:
         type: string
@@ -556,7 +557,7 @@ jobs:
       - run:
           name: "Install torch-tensorrt"
           command: pip3 install /tmp/dist/nightly/*
-      # We install torch after torch-trt because pip automatically enforces the version constraint otherwise, swap back after versions are synced
+      # We install torch after torch-trt because pip automatically enforces the version constraint otherwise
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
           torch-build-index: << parameters.torch-build-index >>
@@ -573,30 +574,30 @@ parameters:
     default: "https://download.pytorch.org/whl/nightly/cu113"
   cudnn-nightly-version:
     type: string
-    default: "8.2.1"
+    default: "8.4.1"
   trt-nightly-version-short:
     type: string
-    default: "8.2.4"
+    default: "8.4.1"
   trt-nightly-version-long:
     type: string
-    default: "8.2.4.2"
+    default: "8.4.1.5"
 
   # Release platform config
   torch-release-build:
     type: string
-    default: "1.11.0+cu113"
+    default: "1.12.0+cu113"
   torch-release-build-index:
     type: string
     default: "https://download.pytorch.org/whl/cu113"
   cudnn-release-version:
     type: string
-    default: "8.2.1"
+    default: "8.4.1"
   trt-release-version-short:
     type: string
-    default: "8.2.4"
+    default: "8.4.1"
   trt-release-version-long:
     type: string
-    default: "8.2.4.2"
+    default: "8.4.1.5"
 
   # Jetson platform config
   torch-jetson-build:
@@ -635,16 +636,42 @@ workflows:
       - build-x86_64-pyt-release:
           torch-build: << pipeline.parameters.torch-release-build >>
           torch-build-index: << pipeline.parameters.torch-release-build-index >>
-      - test-core-cpp-x86_64-pyt-release:
+      - test-core-cpp-x86_64:
+          name: test-core-cpp-x86_64-pyt-release
           torch-build: << pipeline.parameters.torch-release-build >>
           torch-build-index: << pipeline.parameters.torch-release-build-index >>
+          requires:
+            - build-x86_64-pyt-release
+      - test-py-ts-x86_64:
+          name: test-py-ts-x86_64-pyt-release
+          torch-build: << pipeline.parameters.torch-release-build >>
+          torch-build-index: << pipeline.parameters.torch-release-build-index >>
+          requires:
+            - build-x86_64-pyt-release
+      - test-py-ts-x86_64:
+          name: test-py-fx-x86_64-pyt-release
+          torch-build: << pipeline.parameters.torch-nightly-build >>
+          torch-build-index: << pipeline.parameters.torch-nightly-build-index >>
           requires:
             - build-x86_64-pyt-release
 
       - build-x86_64-pyt-nightly:
           torch-build: << pipeline.parameters.torch-nightly-build >>
           torch-build-index: << pipeline.parameters.torch-nightly-build-index >>
-      - test-x86_64-pyt-nightly:
+      - test-core-cpp-x86_64:
+          name: test-core-cpp-x86_64-pyt-nightly
+          torch-build: << pipeline.parameters.torch-release-build >>
+          torch-build-index: << pipeline.parameters.torch-release-build-index >>
+          requires:
+            - build-x86_64-pyt-nightly
+      - test-py-ts-x86_64:
+          name: test-py-ts-x86_64-pyt-nightly
+          torch-build: << pipeline.parameters.torch-release-build >>
+          torch-build-index: << pipeline.parameters.torch-release-build-index >>
+          requires:
+            - build-x86_64-pyt-nightly
+      - test-py-fx-x86_64:
+          name: test-py-fx-x86_64-pyt-nightly
           torch-build: << pipeline.parameters.torch-nightly-build >>
           torch-build-index: << pipeline.parameters.torch-nightly-build-index >>
           requires:
@@ -660,21 +687,42 @@ workflows:
       - build-x86_64-pyt-release:
           torch-build: << pipeline.parameters.torch-release-build >>
           torch-build-index: << pipeline.parameters.torch-release-build-index >>
-      - test-core-cpp-x86_64-pyt-release:
+      - test-core-cpp-x86_64:
+          name: test-core-cpp-x86_64-pyt-release
           torch-build: << pipeline.parameters.torch-release-build >>
           torch-build-index: << pipeline.parameters.torch-release-build-index >>
           requires:
             - build-x86_64-pyt-release
-      - test-ts-py-x86_64-pyt-release:
+      - test-py-ts-x86_64:
+          name: test-py-ts-x86_64-pyt-release
           torch-build: << pipeline.parameters.torch-release-build >>
           torch-build-index: << pipeline.parameters.torch-release-build-index >>
+          requires:
+            - build-x86_64-pyt-release
+      - test-py-ts-x86_64:
+          name: test-py-fx-x86_64-pyt-release
+          torch-build: << pipeline.parameters.torch-nightly-build >>
+          torch-build-index: << pipeline.parameters.torch-nightly-build-index >>
           requires:
             - build-x86_64-pyt-release
 
       - build-x86_64-pyt-nightly:
           torch-build: << pipeline.parameters.torch-nightly-build >>
           torch-build-index: << pipeline.parameters.torch-nightly-build-index >>
-      - test-x86_64-pyt-nightly:
+      - test-core-cpp-x86_64:
+          name: test-core-cpp-x86_64-pyt-nightly
+          torch-build: << pipeline.parameters.torch-release-build >>
+          torch-build-index: << pipeline.parameters.torch-release-build-index >>
+          requires:
+            - build-x86_64-pyt-nightly
+      - test-py-ts-x86_64:
+          name: test-py-ts-x86_64-pyt-nightly
+          torch-build: << pipeline.parameters.torch-release-build >>
+          torch-build-index: << pipeline.parameters.torch-release-build-index >>
+          requires:
+            - build-x86_64-pyt-nightly
+      - test-py-fx-x86_64:
+          name: test-py-fx-x86_64-pyt-nightly
           torch-build: << pipeline.parameters.torch-nightly-build >>
           torch-build-index: << pipeline.parameters.torch-nightly-build-index >>
           requires:

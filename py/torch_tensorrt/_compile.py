@@ -5,9 +5,9 @@ from torch_tensorrt import logging
 import torch
 import torch.fx
 from enum import Enum
-import torch_tensorrt.fx
-from torch_tensorrt.fx.lower import lower_to_trt
-from torch_tensorrt.fx.utils import LowerPrecision
+#import torch_tensorrt.fx
+#from torch_tensorrt.fx.lower import lower_to_trt
+#from torch_tensorrt.fx.utils import LowerPrecision
 
 class _IRType(Enum):
     """Enum to set the minimum required logging level to print a message to stdout
