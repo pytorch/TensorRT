@@ -45,7 +45,6 @@ at the documentation for the Torch-TensorRT ``TensorRTCompileSpec`` API.
                     "allow_gpu_fallback": True
                 },
                 "capability": torch_tensorrt.EngineCapability.default,
-                "num_min_timing_iters": 2,
                 "num_avg_timing_iters": 1,
             })
         }

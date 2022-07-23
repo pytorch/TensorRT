@@ -8,7 +8,7 @@ import torch_tensorrt.fx.tracer.acc_tracer.acc_tracer as acc_tracer
 import torchvision.models as models
 from torch.ao.quantization.quantize_fx import (
     convert_fx,
-    convert_to_reference,
+    convert_to_reference_fx,
     prepare_fx,
 )
 from torch.fx.experimental.normalize import NormalizeArgs
@@ -52,7 +52,7 @@ def build_int8_trt(rn18):
     prepared = prepare_fx(rn18, {"": qconfig}, data)
     for _ in range(10):
         prepared(data)
-    quantized_rn18 = convert_to_reference(prepared)
+    quantized_rn18 = convert_to_reference_fx(prepared)
     ref_res = quantized_rn18(data)
     print("quantized model:", quantized_rn18)
 

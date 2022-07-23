@@ -1,11 +1,14 @@
+import datetime
 from functools import partial, wraps
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Optional, Sequence
 
 import torch
 from torch import nn
 from torch.fx.passes.pass_manager import inplace_wrapper, PassManager
 from torch.fx.passes.shape_prop import ShapeProp
-from torch.fx.passes.splitter_base import SplitResult
+from torch.fx.passes.splitter_base import generate_inputs_for_submodules, SplitResult
+
+from ..input_tensor_spec import generate_input_specs
 
 from ..lower_setting import LowerSetting
 from ..observer import Observer
@@ -120,6 +123,19 @@ class LowerPassManagerBuilder:
 
     def _lower_pass(self) -> PassManager:
         def lower_func(split_result: SplitResult) -> nn.Module:
+            if (
+                hasattr(self.lower_setting, "explicit_batch_dimension")
+                and self.lower_setting.explicit_batch_dimension
+                and self._additional_input
+            ):
+                additional_submodule_inputs = generate_inputs_for_submodules(
+                    split_result.split_module,
+                    self._additional_input,
+                    list(split_result.submodule_inputs.keys()),
+                )
+            else:
+                additional_submodule_inputs = None
+
             for submod_name, submod_inputs in split_result.submodule_inputs.items():
                 submod = getattr(split_result.split_module, submod_name)
 
@@ -127,6 +143,16 @@ class LowerPassManagerBuilder:
 
                 # Only acc submodules will be lowered.
                 if not submod_name.startswith(split_result.non_acc_submodule_prefix):
+                    print("Now lowering submodule", submod_name)
+                    lowering_start_time = datetime.datetime.now()
+
+                    self.lower_setting.input_specs = generate_input_specs(
+                        submod_inputs,
+                        self.lower_setting,
+                        additional_submodule_inputs[submod_name]
+                        if additional_submodule_inputs
+                        else None,
+                    )
                     lowered_module = self._lower_func(
                         submod, submod_inputs, self.lower_setting, submod_name
                     )
@@ -134,13 +160,20 @@ class LowerPassManagerBuilder:
                     LOWER_SPLIT_POST_OBSERVER.observe(
                         submod_name, lowered_module, submod_inputs
                     )
+                    print(
+                        f"Lowering submodule {submod_name} elapsed time",
+                        datetime.datetime.now() - lowering_start_time,
+                    )
 
             return split_result.split_module
 
         return PassManager.build_from_passlist([lower_func])
 
-    def build_lower_pipeline(self, input: Input) -> PassManager:
+    def build_lower_pipeline(
+        self, input: Input, additional_input: Optional[Input] = None
+    ) -> PassManager:
         self._input = input
+        self._additional_input = additional_input
         passes = []
 
         passes.append(self._const_fold_pass())

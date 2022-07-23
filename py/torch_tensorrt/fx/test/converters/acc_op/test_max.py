@@ -79,6 +79,35 @@ class TestMaxConverter(AccTestCase):
 
 
 class TestMaxConverterWithDynamicShape(AccTestCase):
+    @parameterized.expand(
+        [
+            # keepdim can not be False for dynamic shape
+            ("dim0_keepdim", 0, True),
+            ("dim1_keepdim", 1, True),
+            ("dim2_keepdim", 2, True),
+            ("dim3_keepdim", 3, True),
+        ]
+    )
+    def test_max_dim_reduce(self, _, dim, keepdim):
+        class MaxDimReduce(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, x):
+                return torch.max(x, dim, keepdim=keepdim)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 5, 5), (2, 3, 5, 5), (2, 3, 5, 5))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            MaxDimReduce(), input_specs, expected_ops={acc_ops.max_dim_reduce}
+        )
+
     def test_max_full_reduce(
         self,
     ):

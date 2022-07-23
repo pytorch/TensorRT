@@ -17,6 +17,27 @@ class TestBatchNormConverter(AccTestCase):
         inputs = [torch.randn(1, 3, 224, 224)]
         self.run_test(TestModule(), inputs, expected_ops={acc_ops.batch_norm})
 
+    def test_batchnorm1d_with_dynamic_shape(self):
+        class TestModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.bn = torch.nn.BatchNorm1d(3)
+
+            def forward(self, x):
+                return self.bn(x)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, 3, 5),
+                dtype=torch.float32,
+                shape_ranges=[((2, 3, 5), (6, 3, 5), (10, 3, 5))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.batch_norm}
+        )
+
     def test_batchnorm_with_dynamic_shape(self):
         class TestModule(torch.nn.Module):
             def __init__(self):

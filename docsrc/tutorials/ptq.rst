@@ -130,8 +130,6 @@ Then all thats required to setup the module for INT8 calibration is to set the f
     compile_spec.enabled_precisions.insert(torch::kI8);
     /// Use the TensorRT Entropy Calibrator
     compile_spec.ptq_calibrator = calibrator;
-    /// Set a larger workspace (you may get better performace from doing so)
-    compile_spec.workspace_size = 1 << 28;
 
     auto trt_mod = torch_tensorrt::CompileGraph(mod, compile_spec);
 

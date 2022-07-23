@@ -86,4 +86,4 @@ class LowerSetting(LowerSettingBasic):
     cuda_graph_batch_size: int = -1
     preset_lowerer: str = ""
     opt_profile_replica: int = 1
-    dynamic_batch: bool = False
+    dynamic_batch: bool = True

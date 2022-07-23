@@ -1,3 +1,2 @@
--f https://download.pytorch.org/whl/torch_stable.html
 timm==v0.4.12
 transformers==4.17.0

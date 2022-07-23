@@ -30,7 +30,9 @@ Installation
 
 Converting a PyTorch Model to TensorRT Engine
 ---------------------------------------------
-We will go through an example to illustrate the major steps that FX path uses to 
+In general, users are welcome to use the ``lower_to_trt()`` to finish the conversion from a model to tensorRT engine. It is a wrapper API that consists of the major steps needed to finish this converison. Please refer to ``lower_example.py`` file in ``examples/fx``. 
+
+In this section, we will go through an example to illustrate the major steps that FX path uses. Users can refer to ``fx2trt_example.py`` file in ``examples/fx``.
 
 * **Step 1: Trace the model with acc_tracer**
 Acc_tracer is a tracer inheritated from FX tracer. It comes with args normalizer to convert all args to kwargs and pass to TRT converters.

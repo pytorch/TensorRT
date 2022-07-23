@@ -18,9 +18,11 @@ def compile(module: torch.jit.ScriptModule,
             refit=False,
             debug=False,
             capability=_enums.EngineCapability.default,
-            num_min_timing_iters=2,
             num_avg_timing_iters=1,
             workspace_size=0,
+            dla_sram_size=1048576,
+            dla_local_dram_size=1073741824,
+            dla_global_dram_size=536870912,
             calibrator=None,
             truncate_long_and_double=False,
             require_full_compilation=False,
@@ -65,9 +67,11 @@ def compile(module: torch.jit.ScriptModule,
         refit (bool): Enable refitting
         debug (bool): Enable debuggable engine
         capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
-        num_min_timing_iters (int): Number of minimization timing iterations used to select kernels
         num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
         workspace_size (int): Maximum size of workspace given to TensorRT
+        dla_sram_size (int): Fast software managed RAM used by DLA to communicate within a layer.
+        dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations
+        dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
         truncate_long_and_double (bool): Truncate weights provided in int64 or double (float64) to int32 and float32
         calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
         require_full_compilation (bool): Require modules to be compiled end to end or return an error as opposed to returning a hybrid graph where operations that cannot be run in TensorRT are run in PyTorch
@@ -97,7 +101,6 @@ def compile(module: torch.jit.ScriptModule,
         "refit": refit,  # enable refit
         "debug": debug,  # enable debuggable engine
         "capability": capability,  # Restrict kernel selection to safe gpu kernels or safe dla kernels
-        "num_min_timing_iters": num_min_timing_iters,  # Number of minimization timing iterations used to select kernels
         "num_avg_timing_iters": num_avg_timing_iters,  # Number of averaging timing iterations used to select kernels
         "workspace_size": workspace_size,  # Maximum size of workspace given to TensorRT
         "calibrator": calibrator,
@@ -125,9 +128,11 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule,
                                  refit=False,
                                  debug=False,
                                  capability=_enums.EngineCapability.default,
-                                 num_min_timing_iters=2,
                                  num_avg_timing_iters=1,
                                  workspace_size=0,
+                                 dla_sram_size=1048576,
+                                 dla_local_dram_size=1073741824,
+                                 dla_global_dram_size=536870912,
                                  truncate_long_and_double=False,
                                  calibrator=None) -> str:
     """Convert a TorchScript module method to a serialized TensorRT engine
@@ -166,9 +171,11 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule,
         refit (bool): Enable refitting
         debug (bool): Enable debuggable engine
         capability (torch_tensorrt.EngineCapability): Restrict kernel selection to safe gpu kernels or safe dla kernels
-        num_min_timing_iters (int): Number of minimization timing iterations used to select kernels
         num_avg_timing_iters (int): Number of averaging timing iterations used to select kernels
         workspace_size (int): Maximum size of workspace given to TensorRT
+        dla_sram_size (int): Fast software managed RAM used by DLA to communicate within a layer.
+        dla_local_dram_size (int): Host RAM used by DLA to share intermediate tensor data across operations
+        dla_global_dram_size (int): Host RAM used by DLA to store weights and metadata for execution
         truncate_long_and_double (bool): Truncate weights provided in int64 or double (float64) to int32 and float32
         calibrator (Union(torch_tensorrt._C.IInt8Calibrator, tensorrt.IInt8Calibrator)): Calibrator object which will provide data to the PTQ system for INT8 Calibration
 
@@ -189,7 +196,6 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule,
         "refit": refit,  # enable refit
         "debug": debug,  # enable debuggable engine
         "capability": capability,  # Restrict kernel selection to safe gpu kernels or safe dla kernels
-        "num_min_timing_iters": num_min_timing_iters,  # Number of minimization timing iterations used to select kernels
         "num_avg_timing_iters": num_avg_timing_iters,  # Number of averaging timing iterations used to select kernels
         "workspace_size": workspace_size,  # Maximum size of workspace given to TensorRT
         "calibrator": calibrator,
