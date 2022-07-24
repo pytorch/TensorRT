@@ -2,6 +2,7 @@ import unittest
 import torch_tensorrt as torchtrt
 import torch
 import torchvision.models as models
+import os
 
 def find_repo_root(max_depth=10):
     dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -22,7 +23,7 @@ class TestStandardTensorInput(unittest.TestCase):
     def test_compile(self):
 
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
-        self.model = torch.jit.load(MODULE_DIR + "/standard_tensor_input.jit.pt").eval().to("cuda")
+        self.model = torch.jit.load(MODULE_DIR + "/standard_tensor_input_scripted.jit.pt").eval().to("cuda")
 
         compile_spec = {
             "inputs": [torchtrt.Input(self.input.shape),
@@ -41,7 +42,7 @@ class TestTupleInput(unittest.TestCase):
     def test_compile(self):
 
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
-        self.model = torch.jit.load(MODULE_DIR + "/tuple_input.jit.pt").eval().to("cuda")
+        self.model = torch.jit.load(MODULE_DIR + "/tuple_input_scripted.jit.pt").eval().to("cuda")
 
         compile_spec = {
             "input_signature": ((torchtrt.Input(self.input.shape), torchtrt.Input(self.input.shape)),),
@@ -61,7 +62,7 @@ class TestListInput(unittest.TestCase):
     def test_compile(self):
 
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
-        self.model = torch.jit.load(MODULE_DIR + "/list_input.jit.pt").eval().to("cuda")
+        self.model = torch.jit.load(MODULE_DIR + "/list_input_scripted.jit.pt").eval().to("cuda")
 
 
         compile_spec = {
@@ -81,7 +82,7 @@ class TestTupleInputOutput(unittest.TestCase):
     def test_compile(self):
 
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
-        self.model = torch.jit.load(MODULE_DIR + "/tuple_input_output.jit.pt").eval().to("cuda")
+        self.model = torch.jit.load(MODULE_DIR + "/tuple_input_output_scripted.jit.pt").eval().to("cuda")
 
 
         compile_spec = {
@@ -103,7 +104,7 @@ class TestListInputOutput(unittest.TestCase):
     def test_compile(self):
 
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
-        self.model = torch.jit.load(MODULE_DIR + "/list_input_output.jit.pt").eval().to("cuda")
+        self.model = torch.jit.load(MODULE_DIR + "/list_input_output_scripted.jit.pt").eval().to("cuda")
 
 
         compile_spec = {
@@ -126,7 +127,7 @@ class TestListInputTupleOutput(unittest.TestCase):
     def test_compile(self):
 
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
-        self.model = torch.jit.load(MODULE_DIR + "/list_input_tuple_output.jit.pt").eval().to("cuda")
+        self.model = torch.jit.load(MODULE_DIR + "/list_input_tuple_output_scripted.jit.pt").eval().to("cuda")
 
 
         compile_spec = {
