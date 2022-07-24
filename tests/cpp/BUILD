@@ -19,7 +19,7 @@ test_suite(
         ":test_serialization",
         ":test_module_fallback",
         ":test_example_tensors",
-        ":test_collection"
+        ":test_collections"
     ],
 )
 
@@ -34,7 +34,7 @@ test_suite(
         ":test_serialization",
         ":test_module_fallback",
         ":test_example_tensors",
-        ":test_collection"
+        ":test_collections"
     ],
 )
 
@@ -125,8 +125,8 @@ cc_test(
 )
 
 cc_test(
-    name = "test_collection",
-    srcs = ["test_collection.cpp"],
+    name = "test_collections",
+    srcs = ["test_collections.cpp"],
     data = [
         "//tests/modules:jit_models",
     ],

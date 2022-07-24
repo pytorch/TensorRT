@@ -674,7 +674,7 @@ workflows:
           requires:
             - build-x86_64-pyt-release
 
-      - test-py-ts-x86_64:
+      - test-py-fx-x86_64:
           name: test-py-fx-x86_64-pyt-release
           channel: "release"
           torch-build: << pipeline.parameters.torch-release-build >>
@@ -752,7 +752,7 @@ workflows:
           requires:
             - build-x86_64-pyt-release
 
-      - test-py-ts-x86_64:
+      - test-py-fx-x86_64:
           name: test-py-fx-x86_64-pyt-release
           channel: "release"
           torch-build: << pipeline.parameters.torch-release-build >>

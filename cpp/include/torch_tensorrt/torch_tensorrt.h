@@ -569,7 +569,7 @@ struct TORCHTRT_API CompileSpec {
   CompileSpec(std::vector<std::vector<int64_t>> fixed_sizes);
 
   /**
-   * @brief Construct a new Extra Info object
+   * @brief Construct a new Compile Spec object
    * Convienence constructor to set fixed input size from c10::ArrayRef's (the
    * output of tensor.sizes()) describing size of input tensors. Each entry in
    * the vector represents a input and should be provided in call order.
@@ -583,7 +583,7 @@ struct TORCHTRT_API CompileSpec {
   CompileSpec(std::vector<c10::ArrayRef<int64_t>> fixed_sizes);
 
   /**
-   * @brief Construct a new Extra Info object from input ranges.
+   * @brief Construct a new Compile Spec object from input ranges.
    * Each entry in the vector represents a input and should be provided in call
    * order.
    *
@@ -594,8 +594,7 @@ struct TORCHTRT_API CompileSpec {
   CompileSpec(std::vector<Input> inputs);
 
   /**
-   * @brief Construct a new Extra Info object from IValue.
-   * The IValue store a complex Input
+   * @brief Construct a new Compile Spec  object from IValue which represents the nesting of input tensors for a module.
    *
    * @param input_signature
    */

@@ -8,7 +8,7 @@
 
 TEST(CppAPITests, TestCollectionStandardTensorInput) {
 
-  std::string path = "tests/modules/standard_tensor_input.jit.pt";
+  std::string path = "tests/modules/standard_tensor_input_scripted.jit.pt";
   torch::Tensor in0 = torch::randn({1, 3, 512, 512}, torch::kCUDA).to(torch::kHalf);
   std::vector<at::Tensor> inputs;
   inputs.push_back(in0);
@@ -53,7 +53,7 @@ TEST(CppAPITests, TestCollectionStandardTensorInput) {
 
 TEST(CppAPITests, TestCollectionTupleInput) {
 
-  std::string path = "tests/modules/tuple_input.jit.pt";
+  std::string path = "tests/modules/tuple_input_scripted.jit.pt";
   torch::Tensor in0 = torch::randn({1, 3, 512, 512}, torch::kCUDA).to(torch::kHalf);
 
   torch::jit::Module mod;
@@ -103,7 +103,7 @@ TEST(CppAPITests, TestCollectionTupleInput) {
 
 TEST(CppAPITests, TestCollectionListInput) {
 
-  std::string path = "tests/modules/list_input.jit.pt";
+  std::string path = "tests/modules/list_input_scripted.jit.pt";
   torch::Tensor in0 = torch::randn({1, 3, 512, 512}, torch::kCUDA).to(torch::kHalf);
   std::vector<at::Tensor> inputs;
   inputs.push_back(in0);
@@ -169,7 +169,7 @@ TEST(CppAPITests, TestCollectionListInput) {
 
 TEST(CppAPITests, TestCollectionTupleInputOutput) {
 
-  std::string path = "tests/modules/tuple_input_output.jit.pt";
+  std::string path = "tests/modules/tuple_input_output_scripted.jit.pt";
 
   torch::Tensor in0 = torch::randn({1, 3, 512, 512}, torch::kCUDA).to(torch::kHalf);
 
@@ -224,7 +224,7 @@ TEST(CppAPITests, TestCollectionTupleInputOutput) {
 
 TEST(CppAPITests, TestCollectionListInputOutput) {
 
-  std::string path = "tests/modules/list_input_output.jit.pt";
+  std::string path = "tests/modules/list_input_output_scripted.jit.pt";
   torch::Tensor in0 = torch::randn({1, 3, 512, 512}, torch::kCUDA).to(torch::kHalf);
   std::vector<at::Tensor> inputs;
   inputs.push_back(in0);
@@ -295,7 +295,7 @@ TEST(CppAPITests, TestCollectionListInputOutput) {
 
 TEST(CppAPITests, TestCollectionComplexModel) {
 
-  std::string path = "tests/modules/complex_model.jit.pt";
+  std::string path = "tests/modules/list_input_tuple_output_scripted.jit.pt";
   torch::Tensor in0 = torch::randn({1, 3, 512, 512}, torch::kCUDA).to(torch::kHalf);
   std::vector<at::Tensor> inputs;
   inputs.push_back(in0);
