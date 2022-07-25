@@ -115,7 +115,7 @@ void find_all_fallback_nodes(
     // for every node that produces this fallback node's NonTensor input, they should fallback too
     for (auto input : cur_node->inputs()) {
       if (!isTensor(input) && input->node()->kind() != torch::jit::prim::Constant &&
-          global_fallback_nodes.insert({input->node(), 4}).second) {
+          global_fallback_nodes.insert({input->node(), FallbackNodeType::kNON_TENSOR}).second) {
         q.push(input->node());
       }
     }
@@ -124,7 +124,7 @@ void find_all_fallback_nodes(
       if (!isTensor(output)) {
         for (auto use : output->uses()) {
           auto node = use.user;
-          if (node->kind() != torch::jit::prim::Constant && global_fallback_nodes.insert({node, 4}).second) {
+          if (node->kind() != torch::jit::prim::Constant && global_fallback_nodes.insert({node, FallbackNodeType::kNON_TENSOR}).second) {
             q.push(node);
           }
         }
@@ -229,13 +229,13 @@ bool checkLoopEvaluatable(torch::jit::Node* n) {
 
 bool check_node_fallback(torch::jit::Node* n, const std::unordered_map<torch::jit::Node*, int>& fallback_nodes) {
   if (fallback_nodes.count(n)) {
-    if (fallback_nodes.at(n) == 0) {
+    if (fallback_nodes.at(n) == FallbackNodeType::kUNSUPPORTED) {
       LOG_GRAPH("Node not supported by conversion: " << util::node_info(n));
-    } else if (fallback_nodes.at(n) == 1) {
+    } else if (fallback_nodes.at(n) == FallbackNodeType::kOPERATOR_FALLBACK) {
       LOG_GRAPH("Node explicitly set to run in torch: " << util::node_info(n));
-    } else if (fallback_nodes.at(n) == 2) {
+    } else if (fallback_nodes.at(n) == FallbackNodeType::kMODULE_FALLBACK) {
       LOG_GRAPH("Node is within a module set to run in torch: " << util::node_info(n));
-    } else if (fallback_nodes.at(n) == 3) {
+    } else if (fallback_nodes.at(n) == FallbackNodeType::kMIN_BLOCK_FALLBACK) {
       LOG_GRAPH("Node fallback to Torch because of min_block_size" << util::node_info(n));
     } else {
       LOG_GRAPH(
@@ -273,18 +273,18 @@ void get_fallback_nodes(
 
     // If the op is not supported by the conversion phase it should run in PyTorch
     if (!conversion::OpSupported(n)) {
-      fallback_nodes.insert({n, 0});
+      fallback_nodes.insert({n, FallbackNodeType::kUNSUPPORTED});
     }
 
     // If the user specifies the op to run in Torch it should run in PyTorch
     if (forced_fallback_ops.find(n->kind().toQualString()) != forced_fallback_ops.end()) {
-      fallback_nodes.insert({n, 1});
+      fallback_nodes.insert({n, FallbackNodeType::kOPERATOR_FALLBACK});
     }
 
     // If the user specifies the module containing this op to run in torch it should run in PyTorch
     const auto to_compile_sym = c10::Symbol::attr("to_compile");
     if (n->hasAttribute(to_compile_sym) && n->i(to_compile_sym) == (int64_t) false) {
-      fallback_nodes.insert({n, 2});
+      fallback_nodes.insert({n, FallbackNodeType::kMODULE_FALLBACK});
     }
   }
   return;
@@ -329,7 +329,7 @@ void find_min_block_size_fallback_nodes(
   // keep fallback until all segments meet the min_block_size requirement
   while (!min_block_fallback_nodes.empty()) {
     for (const auto i : min_block_fallback_nodes) {
-      initial_fallback_nodes.insert({i, 3});
+      initial_fallback_nodes.insert({i, FallbackNodeType::kMIN_BLOCK_FALLBACK});
     }
     global_fallback_nodes.insert(initial_fallback_nodes.begin(), initial_fallback_nodes.end());
     // find the fallback nodes because of dependency with min_block_size caused fallback nodes
