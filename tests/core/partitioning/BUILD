@@ -38,6 +38,21 @@ partitioning_test(
 )
 
 cc_test(
+  name = "test_loading_model",
+  srcs = ["test_loading_model.cpp"],
+  deps = [
+      "//tests/util",
+      "@googletest//:gtest_main",
+  ] + select({
+      ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
+      "//conditions:default":  ["@libtorch//:libtorch"],
+  }),
+  data = [
+      ":jit_models"
+  ]
+)
+
+cc_test(
   name = "test_fallback_graph_output",
   srcs = ["test_fallback_graph_output.cpp"],
   deps = [
@@ -92,6 +107,7 @@ test_suite(
         ":test_fallback_graph_output",
         ":test_loop_fallback",
         ":test_conditionals",
-        ":test_resolve_nontensor_inputs"
+        ":test_resolve_nontensor_inputs",
+        ":test_loading_model"
     ]
 )

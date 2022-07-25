@@ -428,7 +428,11 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
         auto graph_and_mapping =
             ConstructFallbackGraph(new_mod, g->block(), input_ivalues_map, cfg, static_params, fallback_nodes);
         new_g = graph_and_mapping.first;
-        LOG_INFO("Segmented Graph: " << *new_g);
+        // renaming the input name of graph after fallback to ensure pytorch deserialize it correctly
+        for (size_t i = 0; i < new_g->inputs().size(); ++i) {
+          new_g->inputs()[i]->setDebugName(std::string("input_") + std::to_string(i));
+        }
+        LOG_INFO(*new_g << "(GraphAfterFallback)");
 
         // if there is no tensorrt engine self in fallback graph, there is no conversion, we just return the initial
         // module
