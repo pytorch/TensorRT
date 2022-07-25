@@ -232,7 +232,7 @@ class Lowerer:
                 x.half() if x is not None and x.dtype == torch.float32 else x
                 for x in inputs
             )
-        pm = self.lower_pass_manager_builder.build_lower_pipeline(
+        pm = self.lower_pass_manager_builder.build_trt_lower_pipeline(
             inputs, additional_inputs
         )
 
