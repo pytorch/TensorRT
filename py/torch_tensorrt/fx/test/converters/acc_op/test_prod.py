@@ -2,7 +2,7 @@ import torch
 import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase
+from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase, InputTensorSpec
 
 # NOTE torch.prod will only accept one dim unlike other reduce ops which accept tuples
 
@@ -91,6 +91,26 @@ class TestProdConverter(AccTestCase):
             inputs,
             expected_ops={expected_acc_op},
             test_implicit_batch_dim=False,
+        )
+
+    def test_prod_all_dims_with_dynamic_shape(
+        self,
+        op=torch.prod,
+    ):
+        class Prod(torch.nn.Module):
+            def forward(self, x):
+                return op(x)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (2, 3, 4, 5), (2, 3, 10, 10))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            Prod(), input_specs, expected_ops={acc_ops.prod}
         )
 
 

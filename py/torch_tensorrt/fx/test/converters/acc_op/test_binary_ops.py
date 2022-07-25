@@ -13,6 +13,8 @@ NEED_TEST_BOTH_CONSTANTS_CASE = True
 elementwise_ops = [
     ((lambda x, y: x + y), acc_ops.add, NEED_TEST_BOTH_CONSTANTS_CASE),
     ((lambda x, y: x - y), acc_ops.sub, NEED_TEST_BOTH_CONSTANTS_CASE),
+    ((lambda x, y: torch.sub(x, y)), acc_ops.sub, False),
+    ((lambda x, y: x.sub(y)), acc_ops.sub, False),
     ((lambda x, y: x / y), acc_ops.div, NEED_TEST_BOTH_CONSTANTS_CASE),
     ((lambda x, y: x // y), acc_ops.floor_div, NEED_TEST_BOTH_CONSTANTS_CASE),
     (
@@ -137,6 +139,46 @@ class TestBinaryOpConverters(AccTestCase):
                 shape=y_shape,
                 dtype=torch.float32,
                 shape_ranges=[y_shape_ranges],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(Op(), input_specs, expected_ops={expected_op})
+
+    @parameterized.expand(
+        [
+            (
+                f"no_broadcast_{op[1].__name__}",
+                op[0],
+                op[1],
+            )
+            for op in elementwise_ops
+        ]
+        + [
+            (
+                f"broadcast_{op[1].__name__}",
+                op[0],
+                op[1],
+            )
+            for op in elementwise_ops
+        ]
+    )
+    def test_elementwise_op_with_dynamic_shape_four_dimensions(
+        self, _, orig_op, expected_op
+    ):
+        class Op(nn.Module):
+            def forward(self, x, y):
+                return orig_op(x, y)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (3, 3, 3, 3), (5, 5, 5, 5))],
+            ),
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (3, 3, 3, 3), (5, 5, 5, 5))],
             ),
         ]
 

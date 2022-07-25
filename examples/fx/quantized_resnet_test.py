@@ -6,7 +6,11 @@ import torch.fx
 
 import torch_tensorrt.fx.tracer.acc_tracer.acc_tracer as acc_tracer
 import torchvision.models as models
-from torch.ao.quantization.quantize_fx import convert_fx, prepare_fx
+from torch.ao.quantization.quantize_fx import (
+    convert_fx,
+    convert_to_reference_fx,
+    prepare_fx,
+)
 from torch.fx.experimental.normalize import NormalizeArgs
 from torch.fx.passes import shape_prop
 from torch_tensorrt.fx import InputTensorSpec, TRTInterpreter, TRTModule
@@ -45,10 +49,10 @@ def build_int8_trt(rn18):
         # uncomment to check per channel quant works
         weight=torch.quantization.default_per_channel_weight_observer,
     )
-    prepared = prepare_fx(rn18, {"": qconfig})
+    prepared = prepare_fx(rn18, {"": qconfig}, data)
     for _ in range(10):
         prepared(data)
-    quantized_rn18 = convert_fx(prepared, is_reference=True)
+    quantized_rn18 = convert_to_reference_fx(prepared)
     ref_res = quantized_rn18(data)
     print("quantized model:", quantized_rn18)
 

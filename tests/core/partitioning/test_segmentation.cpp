@@ -120,6 +120,46 @@ TEST(Partitioning, SegmentSequentialModelWithMinBlockSizeCorrectly) {
   ASSERT_TRUE(checkSegmentedBlockNodesMapping(segmented_blocks, g, {{0, 1, 2}, {3, 4}}));
 }
 
+TEST(Partitioning, SegmentModelWithMinBlockSizeCausedFallbackCorrectly) {
+  const auto graph = R"IR(
+          graph(%0 : Tensor,
+                %1 : Tensor,
+                %2 : Tensor):
+            %3 : int[] = prim::Constant[value=[-1, 5]]()
+            %4 : int[] = prim::Constant[value=[-1]]()
+            %5 : int = prim::Constant[value=2]()
+            %6 : int = prim::Constant[value=4]()
+            %7 : int = prim::Constant[value=5]()
+            %8 : int = prim::Constant[value=0]()
+            %9 : bool = prim::Constant[value=0]()
+            %10 : NoneType = prim::Constant()
+            %11 : int = prim::Constant[value=1]()
+            %12: Tensor = aten::reshape(%1, %4)
+            %13: Tensor = aten::reshape(%2, %3)
+            %14: Tensor = aten::reshape(%1, %3)
+            %15 : Tensor = aten::to(%12, %6, %9, %9, %10)
+            %16 : int = aten::size(%1, %8)
+            %17 : int[] = prim::ListConstruct(%16, %6, %5, %7)
+            %18 : Tensor = aten::index_add_(%14, %8, %15, %13, %11)
+            %20 : Tensor = aten::reshape(%18, %17)
+            return (%20))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  torch_tensorrt::core::partitioning::PartitionInfo partition_info;
+  partition_info.enabled = true;
+  partition_info.min_block_size = 3;
+  std::unordered_map<torch::jit::Node*, int> fallback_nodes;
+  std::vector<torch_tensorrt::core::partitioning::SegmentedBlock> segmented_blocks =
+      torch_tensorrt::core::partitioning::segment_graph(g->block(), partition_info, fallback_nodes);
+  ASSERT_TRUE(
+      checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTensorRT, 1));
+  ASSERT_TRUE(
+      checkSegmentedBlockNumber(segmented_blocks, torch_tensorrt::core::partitioning::SegmentedBlock::kTorch, 1));
+  ASSERT_TRUE(checkSegmentedBlockNodesMapping(segmented_blocks, g, {{0, 1, 2, 3}, {4, 5, 6, 7}}));
+}
+
 TEST(Partitioning, SegmentSequentialModelWithForcedOPCorrectly) {
   const auto graph = R"IR(
             graph(%0 : Tensor,

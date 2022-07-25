@@ -15,5 +15,27 @@ class TestNumelConverter(AccTestCase):
         self.run_test(Numel(), inputs, expected_ops={acc_ops.numel})
 
 
+# Testing with (-1, -1, -1 , -1) results in following error:
+# RuntimeError: numel does not support dynamic shapes.
+"""
+class TestNumelConverterWithDynamicShape(AccTestCase):
+    def test_numel(self):
+        class Numel(nn.Module):
+            def forward(self, x):
+                return torch.numel(x) * x
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (2, 3, 4, 5), (2, 3, 10, 10))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            Numel(), input_specs, expected_ops={acc_ops.numel}
+        )
+"""
+
 if __name__ == "__main__":
     run_tests()

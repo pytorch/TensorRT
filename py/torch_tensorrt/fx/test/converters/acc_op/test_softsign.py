@@ -30,6 +30,23 @@ class TestSoftsignConverter(AccTestCase):
             TestModule(), input_specs, expected_ops={acc_ops.softsign}
         )
 
+    def test_softsign_with_dynamic_shape_four_dimensions(self):
+        class TestModule(nn.Module):
+            def forward(self, x):
+                return nn.functional.softsign(x)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (1, 2, 3, 3), (3, 3, 3, 3))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.softsign}
+        )
+
 
 if __name__ == "__main__":
     run_tests()

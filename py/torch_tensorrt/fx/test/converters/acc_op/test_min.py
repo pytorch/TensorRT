@@ -2,7 +2,7 @@ import torch
 import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase
+from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase, InputTensorSpec
 
 
 class TestMinConverter(AccTestCase):
@@ -76,6 +76,83 @@ class TestMinConverter(AccTestCase):
 
         inputs = [torch.randn(3, 4), torch.randn(3, 4)]
         self.run_test(MinMethod(), inputs, expected_ops={acc_ops.minimum})
+
+
+class TestMinConverterWithDynamicShape(AccTestCase):
+    @parameterized.expand(
+        [
+            ("dim0_keepdim", 0, True),
+            ("dim1_keepdim", 1, True),
+            ("dim2_keepdim", 2, True),
+            ("dim3_keepdim", 3, True),
+        ]
+    )
+    def test_min_dim_reduce(self, test_name, dim, keepdim):
+        class MinDimReduce(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, x):
+                return torch.min(x, dim, keepdim)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 5, 5), (2, 3, 5, 5), (2, 3, 5, 5))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            MinDimReduce(), input_specs, expected_ops={acc_ops.min_dim_reduce}
+        )
+
+    def test_min_full_reduce(
+        self,
+    ):
+        class MinFullReduce(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, x):
+                return torch.min(x)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 5, 5), (2, 3, 5, 5), (2, 3, 5, 5))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            MinFullReduce(), input_specs, expected_ops={acc_ops.min_full_reduce}
+        )
+
+    def test_min_method(self):
+        class MinMethod(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, input, other):
+                return input.min(other)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 5, 5), (2, 3, 5, 5), (2, 3, 5, 5))],
+            ),
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 5, 5), (2, 3, 5, 5), (2, 3, 5, 5))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            MinMethod(), input_specs, expected_ops={acc_ops.minimum}
+        )
 
 
 if __name__ == "__main__":

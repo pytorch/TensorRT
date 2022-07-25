@@ -76,6 +76,9 @@ class TestSplitConverter(AccTestCase):
             },
         )
 
+    # Testing with (-1, -1, -1) results into following error:
+    # AssertionError: Can't chunk on dynamic shape dimension!
+
     @parameterized.expand(
         [
             ("split_with_size", [2, 3, 5], 1),

@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase
+from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase, InputTensorSpec
 
 
 class TestConverter(AccTestCase):
@@ -28,6 +28,37 @@ class TestConverter(AccTestCase):
             inputs,
             expected_ops={acc_ops.einsum},
             test_implicit_batch_dim=False,
+        )
+
+    @parameterized.expand(
+        [
+            ("4d_dim", "bcwd,bcdh->bcwh", (2, 3, 4, 5), (2, 3, 5, 6)),
+            ("4d_dim_ext", "bcxd,bcyd->bcxy", (2, 3, 4, 5), (2, 3, 6, 5)),
+            # TRT does not support ellipsis or diagonal operations
+        ]
+    )
+    def test_einsum_with_dynamic_shape_four_dimensions(
+        self, _, equation, x_size, y_size
+    ):
+        class Einsum(nn.Module):
+            def forward(self, x, y):
+                return torch.einsum(equation, x, y)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 3, 3), (1, 2, 3, 3), (3, 3, 3, 3))],
+            ),
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 3, 3), (1, 2, 3, 3), (3, 3, 3, 3))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            Einsum(), input_specs, expected_ops={acc_ops.einsum}
         )
 
 

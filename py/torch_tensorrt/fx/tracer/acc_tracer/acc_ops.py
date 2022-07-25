@@ -528,7 +528,6 @@ def stack_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
         return cat_node
 
 
-@register_acc_op_properties(AccOpProperty.pointwise, AccOpProperty.unary)
 @register_acc_op_mapping(op_and_target=("call_function", torch.clamp))
 @register_acc_op_mapping(op_and_target=("call_method", "clamp"))
 @register_acc_op
@@ -975,7 +974,9 @@ def rescale_quantize_per_channel(*, input, acc_out_ty=None):
 
 
 @register_acc_op_properties(AccOpProperty.pointwise)
+@register_acc_op_mapping(op_and_target=("call_function", torch.sub))
 @register_acc_op_mapping(op_and_target=("call_function", operator.sub))
+@register_acc_op_mapping(op_and_target=("call_method", "sub"))
 @register_acc_op
 def sub(*, input, other):
     return input - other
@@ -1741,7 +1742,7 @@ def quantized_conv2d(
     dilation,
     groups,
     padding_mode,
-    acc_out_ty,
+    acc_out_ty=None,
 ):
     qparams = acc_out_ty.qparams
     return torch.nn.quantized.functional.conv2d(
@@ -2039,7 +2040,7 @@ def quantized_batch_norm2d(
     weight,
     bias,
     eps,
-    acc_out_ty,
+    acc_out_ty=None,
 ):
     qparams = acc_out_ty.qparams
     return torch.ops.quantized.batch_norm2d(
@@ -2738,6 +2739,34 @@ def expand_as_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
         )
         expand_node.meta = node.meta.copy()
         return expand_node
+
+
+@register_acc_op_mapping(
+    op_and_target=("call_function", torch.nn.functional.grid_sample),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("grid", "grid"),
+        ("mode", "mode", this_arg_is_optional),
+        ("padding_mode", "padding_mode", this_arg_is_optional),
+        ("align_corners", "align_corners", this_arg_is_optional),
+    ],
+)
+@register_acc_op
+def grid_sample(
+    *,
+    input,
+    grid,
+    mode="bilinear",
+    padding_mode="zeros",
+    align_corners=None,
+):
+    return torch.nn.functional.grid_sample(
+        input=input,
+        grid=grid,
+        mode=mode,
+        padding_mode=padding_mode,
+        align_corners=align_corners,
+    )
 
 
 @register_acc_op_mapping(

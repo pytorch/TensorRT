@@ -62,3 +62,6 @@ bazel-Torch-TensorRT-Preview
 docsrc/src/
 bazel-TensorRT
 bazel-tensorrt
+.pytest_cache
+*.cache
+*cifar-10-batches-py*
