@@ -7,12 +7,7 @@ from .utils import get_dynamic_dims
 
 
 def generate_input_specs(inputs, lower_setting, additional_inputs=None):
-    # AIT lower setting doesn't have explicit_batch_dimension field and
-    # we just return None.
-    if not hasattr(lower_setting, "explicit_batch_dimension"):
-        return None
-
-    # dynamic_batch is TRT only flag. It does not exist in AIT lower setting
+    # dynamic_batch is TRT only flag.
     if (
         not lower_setting.explicit_batch_dimension
         or lower_setting.dynamic_batch is False

@@ -121,7 +121,7 @@ class LowerPassManagerBuilder:
         )
         return PassManager.build_from_passlist(passes)
 
-    def _lower_pass(self) -> PassManager:
+    def _trt_lower_pass(self) -> PassManager:
         def lower_func(split_result: SplitResult) -> nn.Module:
             if (
                 hasattr(self.lower_setting, "explicit_batch_dimension")
@@ -169,7 +169,36 @@ class LowerPassManagerBuilder:
 
         return PassManager.build_from_passlist([lower_func])
 
-    def build_lower_pipeline(
+    def _default_lower_pass(self) -> PassManager:
+        def lower_func(split_result: SplitResult) -> nn.Module:
+
+            for submod_name, submod_inputs in split_result.submodule_inputs.items():
+                submod = getattr(split_result.split_module, submod_name)
+
+                LOWER_SPLIT_PRE_OBSERVER.observe(submod_name, submod, submod_inputs)
+
+                # Only acc submodules will be lowered.
+                if not submod_name.startswith(split_result.non_acc_submodule_prefix):
+                    print("Now lowering submodule", submod_name)
+                    lowering_start_time = datetime.datetime.now()
+
+                    lowered_module = self._lower_func(
+                        submod, submod_inputs, self.lower_setting, submod_name
+                    )
+                    setattr(split_result.split_module, submod_name, lowered_module)
+                    LOWER_SPLIT_POST_OBSERVER.observe(
+                        submod_name, lowered_module, submod_inputs
+                    )
+                    print(
+                        f"Lowering submodule {submod_name} elapsed time",
+                        datetime.datetime.now() - lowering_start_time,
+                    )
+
+            return split_result.split_module
+
+        return PassManager.build_from_passlist([lower_func])
+
+    def build_trt_lower_pipeline(
         self, input: Input, additional_input: Optional[Input] = None
     ) -> PassManager:
         self._input = input
@@ -179,7 +208,22 @@ class LowerPassManagerBuilder:
         passes.append(self._const_fold_pass())
         passes.append(self.graph_optimization_pass())
         passes.append(self._split_pass())
-        passes.append(self._lower_pass())
+        passes.append(self._trt_lower_pass())
+
+        pm = PassManager.build_from_passlist(passes)
+        return pm
+
+    def build_default_lower_pipeline(
+        self, input: Input, additional_input: Optional[Input] = None
+    ) -> PassManager:
+        self._input = input
+        self._additional_input = additional_input
+        passes = []
+
+        passes.append(self._const_fold_pass())
+        passes.append(self.graph_optimization_pass())
+        passes.append(self._split_pass())
+        passes.append(self._default_lower_pass())
 
         pm = PassManager.build_from_passlist(passes)
         return pm

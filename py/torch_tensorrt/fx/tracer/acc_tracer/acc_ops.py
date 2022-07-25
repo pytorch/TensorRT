@@ -528,7 +528,6 @@ def stack_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
         return cat_node
 
 
-@register_acc_op_properties(AccOpProperty.pointwise, AccOpProperty.unary)
 @register_acc_op_mapping(op_and_target=("call_function", torch.clamp))
 @register_acc_op_mapping(op_and_target=("call_method", "clamp"))
 @register_acc_op
@@ -1743,7 +1742,7 @@ def quantized_conv2d(
     dilation,
     groups,
     padding_mode,
-    acc_out_ty,
+    acc_out_ty=None,
 ):
     qparams = acc_out_ty.qparams
     return torch.nn.quantized.functional.conv2d(
@@ -2041,7 +2040,7 @@ def quantized_batch_norm2d(
     weight,
     bias,
     eps,
-    acc_out_ty,
+    acc_out_ty=None,
 ):
     qparams = acc_out_ty.qparams
     return torch.ops.quantized.batch_norm2d(
