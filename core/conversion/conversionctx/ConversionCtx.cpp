@@ -20,9 +20,11 @@ std::ostream& operator<<(std::ostream& os, const BuilderSettings& s) {
        << "\n    Debuggable Engine: " << s.debug                                           \
        << "\n    GPU ID: " << s.device.gpu_id                                              \
        << "\n    Allow GPU Fallback (if running on DLA): " << s.device.allow_gpu_fallback  \
-       << "\n    Min Timing Iterations: " << s.num_min_timing_iters                        \
        << "\n    Avg Timing Iterations: " << s.num_avg_timing_iters                        \
-       << "\n    Max Workspace Size: " << s.workspace_size;
+       << "\n    Max Workspace Size: " << s.workspace_size                                 \
+       << "\n    DLA SRAM Size: " << s.dla_sram_size                                       \
+       << "\n    DLA Local DRAM Size: " << s.dla_local_dram_size                           \
+       << "\n    DLA Global DRAM Size: " << s.dla_global_dram_size;
 
     os << "\n    Device Type: " << s.device.device_type                                    \
        << "\n    GPU ID: " << s.device.gpu_id;
@@ -104,9 +106,11 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
     cfg->setFlag(nvinfer1::BuilderFlag::kGPU_FALLBACK);
   }
 
-  cfg->setMinTimingIterations(settings.num_min_timing_iters);
   cfg->setAvgTimingIterations(settings.num_avg_timing_iters);
-  cfg->setMaxWorkspaceSize(settings.workspace_size);
+  if (settings.workspace_size != 0){
+    cfg->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kWORKSPACE, settings.workspace_size);
+  }
+
   cfg->setDefaultDeviceType(settings.device.device_type);
   cfg->setEngineCapability(settings.capability);
 
@@ -120,6 +124,15 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
         settings.enabled_precisions.find(nvinfer1::DataType::kFLOAT) == settings.enabled_precisions.end(),
         "DLA supports only fp16 or int8 precision");
     cfg->setDLACore(settings.device.dla_core);
+    if (settings.dla_sram_size != 1048576){
+      cfg->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kDLA_MANAGED_SRAM, settings.dla_sram_size);
+    }
+    if (settings.dla_local_dram_size != 1073741824){
+      cfg->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kDLA_LOCAL_DRAM, settings.dla_local_dram_size);
+    }
+    if (settings.dla_global_dram_size != 536870912){
+      cfg->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kDLA_GLOBAL_DRAM, settings.dla_global_dram_size);
+    }
   }
 }
 
@@ -130,14 +143,23 @@ ConversionCtx::~ConversionCtx() {
 }
 
 nvinfer1::ITensor* ConversionCtx::AssociateValueAndTensor(const torch::jit::Value* value, nvinfer1::ITensor* tensor) {
-  tensor->setName(value->debugName().c_str());
-  this->value_tensor_map[value] = tensor;
+  RecordNewITensor(value, tensor);
+
   return tensor;
 }
 
 torch::jit::IValue* ConversionCtx::AssociateValueAndIValue(const torch::jit::Value* value, torch::jit::IValue ivalue) {
   this->evaluated_value_map[value] = std::move(ivalue);
   return &this->evaluated_value_map[value];
+}
+
+void ConversionCtx::RecordNewITensor(const torch::jit::Value* value, nvinfer1::ITensor* tensor) {
+  value_tensor_map[value] = tensor;
+  auto ret = seen_itensors.insert(tensor);
+  if (!ret.second) {
+    LOG_WARNING(
+        "Trying to record the value " << value->debugName() << " with the ITensor " << tensor->getName() << " again.");
+  }
 }
 
 std::string ConversionCtx::SerializeEngine() {

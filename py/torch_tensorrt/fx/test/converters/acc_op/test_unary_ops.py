@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase
+from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase, InputTensorSpec
 
 unary_ops = [
     (torch.sin, acc_ops.sin),
@@ -45,6 +45,30 @@ class TestUnaryOpConverters(AccTestCase):
         self.run_test(m, inputs, expected_ops={expected_op})
 
 
+class TestUnaryOpConvertersWithDynamicShapeFourDimensions(AccTestCase):
+    @parameterized.expand([(op[1].__name__, op[0], op[1]) for op in unary_ops])
+    def test_unary_ops(self, name, orig_op: Callable, expected_op):
+        class TestModule(nn.Module):
+            def __init__(self, orig_op):
+                super().__init__()
+                self.orig_op = orig_op
+
+            def forward(self, x):
+                return self.orig_op(x)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (3, 3, 3, 3), (3, 3, 3, 3))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            TestModule(orig_op), input_specs, expected_ops={expected_op}
+        )
+
+
 class TestUnaryOpNotConverters(AccTestCase):
     @parameterized.expand(
         [
@@ -70,6 +94,37 @@ class TestUnaryOpNotConverters(AccTestCase):
         )
 
 
+class TestUnaryOpNotConvertersWithDynamicShapeFourDimensions(AccTestCase):
+    @parameterized.expand(
+        [
+            ("not_bool", torch.logical_not, acc_ops.logical_not, torch.bool),
+            ("not_float", torch.logical_not, acc_ops.logical_not, torch.float),
+            ("not_int", torch.logical_not, acc_ops.logical_not, torch.int),
+        ]
+    )
+    def test_unary_ops(self, name, orig_op: Callable, expected_op, input_dtype):
+        class TestModule(nn.Module):
+            def __init__(self, orig_op):
+                super().__init__()
+                self.orig_op = orig_op
+
+            def forward(self, x):
+                x = self.orig_op(x)
+                return self.orig_op(x)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (3, 3, 3, 3), (3, 3, 3, 3))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            TestModule(orig_op), input_specs, expected_ops={expected_op}
+        )
+
+
 class TestUnaryRSQRTConverters(AccTestCase):
     def test_unary_ops(self):
         class TestModule(nn.Module):
@@ -79,6 +134,25 @@ class TestUnaryRSQRTConverters(AccTestCase):
         m = TestModule()
         inputs = [torch.randn(2, 2, 3)]
         self.run_test(m, inputs, expected_ops={acc_ops.sqrt, acc_ops.reciprocal})
+
+
+class TestUnaryRSQRTConvertersWithDynamicShapeFourDimensions(AccTestCase):
+    def test_unary_ops(self):
+        class TestModule(nn.Module):
+            def forward(self, x):
+                return torch.rsqrt(x)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (3, 3, 3, 3), (3, 3, 3, 3))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.sqrt, acc_ops.reciprocal}
+        )
 
 
 if __name__ == "__main__":

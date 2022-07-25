@@ -27,6 +27,8 @@ class TestExpandConverter(AccTestCase):
             expected_ops={acc_ops.expand},
         )
 
+    # Dynamic shape is not suitable for the expand operation.
+
 
 if __name__ == "__main__":
     run_tests()

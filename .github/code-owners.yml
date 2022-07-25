@@ -110,7 +110,7 @@
   - "peri044"
   - "bowang007"
 
-"component: docker":
+"channel: docker":
   - "andi4191"
   - "narendasan"
 

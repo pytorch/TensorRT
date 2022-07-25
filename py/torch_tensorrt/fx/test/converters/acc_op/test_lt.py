@@ -2,7 +2,7 @@ import torch
 import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from parameterized import parameterized
 from torch.testing._internal.common_utils import run_tests
-from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase
+from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase, InputTensorSpec
 
 
 class TestLtConverter(AccTestCase):
@@ -169,6 +169,28 @@ class TestEqOperatorSimpleConverter(AccTestCase):
         )
 
 
+class TestEqOperatorSimpleConverterWithDynamicShape(AccTestCase):
+    def test_eq(self):
+        class Eq(torch.nn.Module):
+            def forward(self, x, y):
+                return x < y
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (2, 3, 4, 5), (2, 3, 10, 10))],
+            ),
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (2, 3, 4, 5), (2, 3, 10, 10))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(Eq(), input_specs, expected_ops={acc_ops.lt})
+
+
 class TestEqOperatorConstantConverter(AccTestCase):
     @parameterized.expand(
         [
@@ -226,6 +248,26 @@ class TestConstInputConverter(AccTestCase):
         self.run_test(
             Lt(), inputs, expected_ops={acc_ops.lt}, test_implicit_batch_dim=False
         )
+
+
+class TestConstInputConverterWithDynamicShape(AccTestCase):
+    def test_lt(self):
+        class Lt(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, x):
+                return x.shape[0] < 4
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (2, 3, 4, 5), (2, 3, 10, 10))],
+            )
+        ]
+
+        self.run_test_with_dynamic_shape(Lt(), input_specs, expected_ops={acc_ops.lt})
 
 
 if __name__ == "__main__":

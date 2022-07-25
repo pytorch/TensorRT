@@ -2,6 +2,7 @@
 
 #include <map>
 #include <string>
+#include <limits>
 
 #include "core/conversion/conversionctx/ConversionCtx.h"
 #include "core/conversion/converters/Weights.h"
@@ -49,6 +50,35 @@ nvinfer1::ITensor* castITensor(ConversionCtx* ctx, nvinfer1::ITensor* tensor, nv
 
 // Freeze an at::Tensor in a IConstant layer
 nvinfer1::ITensor* tensor_to_const(ConversionCtx* ctx, at::Tensor t, const std::string& name = std::string());
+
+nvinfer1::ITensor* clamp(
+    ConversionCtx* ctx,
+    nvinfer1::ITensor* x,
+    nvinfer1::ITensor* lower_bound,
+    nvinfer1::ITensor* upper_bound,
+    std::string const& name);
+
+nvinfer1::ITensor* normalize_indices(
+    ConversionCtx* ctx,
+    nvinfer1::ITensor* input_dim,
+    nvinfer1::ITensor* indices,
+    std::string const& name);
+
+std::vector<nvinfer1::ITensor*> normalize_start_and_end(
+    ConversionCtx* ctx,
+    nvinfer1::ITensor* in_shape,
+    nvinfer1::ITensor* in_start,
+    nvinfer1::ITensor* in_end,
+    int nbdims,
+    std::string const& name);
+
+nvinfer1::ITensor* get_slice_size(
+    ConversionCtx* ctx,
+    nvinfer1::ITensor* start,
+    nvinfer1::ITensor* end,
+    nvinfer1::ITensor* stride,
+    int nbdims,
+    std::string const& name);
 
 } // namespace converters
 } // namespace conversion

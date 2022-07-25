@@ -43,6 +43,23 @@ class TestSoftmaxConverter(AccTestCase):
             Softmax(), input_specs, expected_ops={acc_ops.softmax}
         )
 
+    def test_softmax_with_dynamic_shape_four_dimensions(self):
+        class Softmax(nn.Module):
+            def forward(self, x):
+                return nn.functional.softmax(x)
+
+        input_specs = [
+            InputTensorSpec(
+                shape=(-1, -1, -1, -1),
+                dtype=torch.float32,
+                shape_ranges=[((1, 1, 1, 1), (1, 2, 3, 3), (3, 3, 3, 3))],
+            ),
+        ]
+
+        self.run_test_with_dynamic_shape(
+            Softmax(), input_specs, expected_ops={acc_ops.softmax}
+        )
+
     def test_softmax_with_implicit_batch_dim0_fail(self):
         class Softmax(nn.Module):
             def __init__(self):

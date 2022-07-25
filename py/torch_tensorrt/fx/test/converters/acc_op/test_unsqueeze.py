@@ -26,6 +26,9 @@ class TestUnsqueeze(AccTestCase):
         inputs = [torch.randn(1, 2, 3)]
         self.run_test(Unsqueeze(dim), inputs, expected_ops={acc_ops.unsqueeze})
 
+    # Testing with more than one dynamic dims results in following error:
+    # AssertionError: Currently we don't support unsqueeze with more than one dynamic dims.
+
     @parameterized.expand(
         [
             ("negative_dim_dynamic", -4),

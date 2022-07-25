@@ -33,9 +33,6 @@ Using DLA in a C++ application
     # If a layer fails to run on DLA it will fallback to GPU
     compile_spec.device.allow_gpu_fallback = true;
 
-    # Set the workspace size
-    compile_spec.workspace_size = 1 << 28;
-
 
 Using DLA in a python application
 

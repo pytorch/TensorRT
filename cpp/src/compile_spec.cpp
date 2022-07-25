@@ -81,9 +81,11 @@ torchtrt::core::CompileSpec to_internal_compile_spec(CompileSpec external) {
 
   internal.convert_info.engine_settings.device.gpu_id = external.device.gpu_id;
   internal.convert_info.engine_settings.device.dla_core = external.device.dla_core;
-  internal.convert_info.engine_settings.num_min_timing_iters = external.num_min_timing_iters;
   internal.convert_info.engine_settings.num_avg_timing_iters = external.num_avg_timing_iters;
   internal.convert_info.engine_settings.workspace_size = external.workspace_size;
+  internal.convert_info.engine_settings.dla_sram_size = external.dla_sram_size;
+  internal.convert_info.engine_settings.dla_local_dram_size = external.dla_local_dram_size;
+  internal.convert_info.engine_settings.dla_global_dram_size = external.dla_global_dram_size;
 
   if (internal.convert_info.engine_settings.enabled_precisions.find(nvinfer1::DataType::kINT8) !=
       internal.convert_info.engine_settings.enabled_precisions.end()) {

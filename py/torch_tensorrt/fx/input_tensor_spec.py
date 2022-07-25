@@ -1,9 +1,61 @@
-from typing import Iterable, List, NamedTuple, Sequence, Tuple
+from typing import Iterable, List, NamedTuple, Optional, Sequence, Tuple
 
 import torch
 
 from .types import Shape, ShapeRange
 from .utils import get_dynamic_dims
+
+
+def generate_input_specs(inputs, lower_setting, additional_inputs=None):
+    # dynamic_batch is TRT only flag.
+    if (
+        not lower_setting.explicit_batch_dimension
+        or lower_setting.dynamic_batch is False
+    ):
+        return InputTensorSpec.from_tensors(inputs)
+
+    # If we don't have additional inputs, we assume the first dimension
+    # is the dynamic batch dimension. Otherwise, we use the additional
+    # inputs to determine the batch dimension.
+    if additional_inputs is None:
+        return InputTensorSpec.from_tensors_with_dynamic_batch_size(
+            inputs,
+            (
+                0,
+                lower_setting.max_batch_size,
+                lower_setting.max_batch_size,
+            ),
+            lower_setting.opt_profile_replica,
+        )
+    else:
+        batch_dims = []
+
+        for i, j in zip(inputs, additional_inputs):
+            found_batch_dim = False
+
+            for idx, values in enumerate(zip(i.shape, j.shape)):
+                if values[0] != values[1]:
+                    assert (
+                        found_batch_dim is False
+                    ), f"We've already found a batch dim, {i.shape}, {j.shape}."
+                    batch_dims.append(idx)
+                    found_batch_dim = True
+
+            if not found_batch_dim:
+                raise RuntimeError(
+                    f"Failed to find batch dimension because shapes are the same, {i.shape}"
+                )
+
+        return InputTensorSpec.from_tensors_with_dynamic_batch_size(
+            inputs,
+            (
+                0,
+                lower_setting.max_batch_size,
+                lower_setting.max_batch_size,
+            ),
+            lower_setting.opt_profile_replica,
+            batch_dims,
+        )
 
 
 class InputTensorSpec(NamedTuple):
@@ -70,6 +122,7 @@ class InputTensorSpec(NamedTuple):
         tensors: Sequence[torch.Tensor],
         batch_size_range: Tuple[int, int, int],
         opt_profile_replica: int = 1,
+        batch_dims: Optional[List[int]] = None,
     ) -> List["InputTensorSpec"]:
         """
         Produce a list of InputTenosrSpec named tuples which would contain
@@ -83,20 +136,30 @@ class InputTensorSpec(NamedTuple):
                 the smallest batch size allowed. The second integer indiceates
                 the batch size that we'll optimize for. The third integer indicates
                 the largest batch size allowed.
+            opt_profile_replica (int): If dynamic shape is enabled, each execution
+                context requires a different optimization profile. This arg determines
+                how many optimization profile replicas we want to produce.
+            batch_dims (Optional[List[int]]): The batch dim might not be the leading dim
+                and allow user to specify the batch dims using this arg. Default we treat
+                dim 0 as the batch dim.
 
         Returns:
             A list of InputTensorSpec named tuples with dynamic ranges.
         """
+        if batch_dims is None:
+            batch_dims = [0] * len(tensors)
+
         input_specs = []
-        batch_size = tensors[0].size(0)
+        batch_size = tensors[0].size(batch_dims[0])
 
         for i, tensor in enumerate(tensors):
+            batch_dim = batch_dims[i]
             assert batch_size == tensor.size(
-                0
+                batch_dim
             ), f"The {i}th tensor (shape: {tensor.shape}) doesn't have the correct batch size: {batch_size}."
             shape = list(tensor.shape)
-            shape[0] = -1
-            shape_ranges: List[ShapeRange] = [tuple(tuple([bs] + shape[1:]) for bs in batch_size_range)] * opt_profile_replica  # type: ignore[list-item]
+            shape[batch_dim] = -1
+            shape_ranges: List[ShapeRange] = [tuple(tuple(shape[0:batch_dim] + [bs] + shape[batch_dim + 1 :]) for bs in batch_size_range)] * opt_profile_replica  # type: ignore[list-item]
             input_specs.append(
                 cls(tuple(shape), tensor.dtype, tensor.device, shape_ranges)
             )
