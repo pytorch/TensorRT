@@ -242,6 +242,7 @@ To build using the pre-CXX11 ABI use the ``pre_cxx11_abi`` config
 -----------------------
 
 It is possible to build the API libraries (in cpp/) and the torchtrtc executable using CMake instead of Bazel.
+Currently, the python API and the tests cannot be built with CMake.
 Begin by installing CMake.
 
     * Latest releases of CMake and instructions on how to install are available for different platforms 
