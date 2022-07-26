@@ -1,0 +1,12 @@
+name: 'Assigner'
+description: 'Automatically assign issues based on label to component owners for triaging'
+inputs:
+  repo-token:
+    description: 'GITHUB_TOKEN secret'
+  config-path:
+    description: 'Path to code-owners list'
+    required: true
+
+runs:
+  using: 'node16'
+  main: 'dist/index.js'

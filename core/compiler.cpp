@@ -198,7 +198,8 @@ void AddIfBlockToGraph(
 
     auto env = [&](torch::jit::Value* v) { return util::getOrAddInputForValue(v, new_g, block_graph_to_new_g); };
     new_if_block->cloneFrom(cur_block_graph->block(), env);
-    if (cur_block_graph->inputs()[0]->type()->str().find("__torch__") != std::string::npos) {
+    if (cur_block_graph->inputs().size() &&
+        cur_block_graph->inputs()[0]->type()->str().find("__torch__") != std::string::npos) {
       if (new_g->inputs()[0]->type()->str().find("__torch__") == std::string::npos) {
         auto self = new_g->insertInput(0, "self_1");
         self->setType(cur_block_graph->inputs()[0]->type());
@@ -223,13 +224,14 @@ GraphAndMapping ConstructFallbackGraph(
     torch::jit::Block* block,
     std::unordered_map<const torch::jit::Value*, torch::jit::IValue> example_tensor_map,
     CompileSpec cfg,
-    ir::StaticParams static_params) {
+    ir::StaticParams static_params,
+    std::unordered_map<torch::jit::Node*, int>& fallback_nodes) {
   auto convert_cfg = cfg.convert_info;
   auto partition_info = cfg.partition_info;
 
   auto new_g = std::make_shared<torch::jit::Graph>();
 
-  auto segmented_blocks = partitioning::Partition(block, example_tensor_map, partition_info);
+  auto segmented_blocks = partitioning::Partition(block, example_tensor_map, partition_info, fallback_nodes);
 
   // the mapping from lowering graph => fallback global graph
   std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_g;
@@ -238,7 +240,7 @@ GraphAndMapping ConstructFallbackGraph(
   }
 
   for (auto& seg_block : segmented_blocks) {
-    LOG_INFO(*seg_block.g() << "(GraphInSegmentedBlock)\n");
+    LOG_INFO(seg_block << "(GraphInSegmentedBlock)\n");
     std::ostringstream trt_engine_id;
     trt_engine_id << reinterpret_cast<const int*>(&seg_block);
 
@@ -270,7 +272,7 @@ GraphAndMapping ConstructFallbackGraph(
         std::vector<GraphAndMapping> graph_and_mappings;
         for (auto cur_block : if_node->blocks()) {
           graph_and_mappings.push_back(
-              ConstructFallbackGraph(new_mod, cur_block, example_tensor_map, cfg, static_params));
+              ConstructFallbackGraph(new_mod, cur_block, example_tensor_map, cfg, static_params, fallback_nodes));
         }
         AddIfBlockToGraph(new_g, if_node, graph_and_mappings, old_to_new_g);
 
@@ -293,7 +295,7 @@ GraphAndMapping ConstructFallbackGraph(
     // Set the output as the produced tuple
     new_g->registerOutput(return_tuple_node->outputs()[0]);
   } else {
-    if (old_to_new_g.count(block->outputs()[0])) {
+    if (block->outputs().size() && old_to_new_g.count(block->outputs()[0])) {
       new_g->registerOutput(old_to_new_g[block->outputs()[0]]);
     }
   }
@@ -357,14 +359,6 @@ void MapInputsAndDetermineDTypes(
   }
 }
 
-uint64_t GetRecommendedWorkspaceSize(const runtime::CudaDevice& device) {
-  if (device.major < 6) {
-    return 256 * (1 << 20);
-  } else {
-    return 1 << 30;
-  }
-}
-
 std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::string method_name, CompileSpec cfg) {
   // Go through Lowering to simplify graph and extract weight parameters
   auto graph_and_parameters = lowering::Lower(mod, method_name, cfg.lower_info);
@@ -378,15 +372,6 @@ std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::
   // Infer the type of an input from the weights of the calculation
   auto first_use_types = ir::get_block_first_calc_dtypes_opt(g->block());
 
-  // GPU default WS size : 1 GB
-  // Set WS = 256 Mb for Jetson nano/TX1 like platforms whose compute capability is 5.X.
-  auto workspace_size = cfg.convert_info.engine_settings.workspace_size;
-  auto device_spec = cfg.convert_info.engine_settings.device;
-  auto cuda_device = runtime::CudaDevice(device_spec.gpu_id, device_spec.device_type);
-  if (workspace_size == 0) {
-    cfg.convert_info.engine_settings.workspace_size = GetRecommendedWorkspaceSize(cuda_device);
-  }
-
   MapInputsAndDetermineDTypes(cfg, g, static_params, first_use_types);
 
   auto engine = conversion::ConvertBlockToEngine(g->block(), cfg.convert_info, static_params);
@@ -397,14 +382,8 @@ std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::
 torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) {
   torch::jit::Module new_mod(mod._ivalue()->name() + "_trt");
 
-  // GPU default WS size : 1 GB
-  // Set WS = 256 Mb for Jetson nano/TX1 like platforms whose compute capability is 5.X.
-  auto workspace_size = cfg.convert_info.engine_settings.workspace_size;
   auto device_spec = cfg.convert_info.engine_settings.device;
   auto cuda_device = runtime::CudaDevice(device_spec.gpu_id, device_spec.device_type);
-  if (workspace_size == 0) {
-    cfg.convert_info.engine_settings.workspace_size = GetRecommendedWorkspaceSize(cuda_device);
-  }
 
   for (const torch::jit::Method& method : mod.get_methods()) {
     if (method.name().compare("forward") == 0) {
@@ -430,9 +409,15 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
           !(cfg.lower_info.forced_fallback_modules.size() == 0 &&
             cfg.partition_info.forced_fallback_operators.size() == 0 && isBlockConvertible)) {
         auto input_ivalues_map = partitioning::generateRandomInputs(cfg.convert_info.inputs, first_use_types);
-        auto graph_and_mapping = ConstructFallbackGraph(new_mod, g->block(), input_ivalues_map, cfg, static_params);
+        std::unordered_map<torch::jit::Node*, int> fallback_nodes;
+        auto graph_and_mapping =
+            ConstructFallbackGraph(new_mod, g->block(), input_ivalues_map, cfg, static_params, fallback_nodes);
         new_g = graph_and_mapping.first;
-        LOG_INFO("Segmented Graph: " << *new_g);
+        // renaming the input name of graph after fallback to ensure pytorch deserialize it correctly
+        for (size_t i = 0; i < new_g->inputs().size(); ++i) {
+          new_g->inputs()[i]->setDebugName(std::string("input_") + std::to_string(i));
+        }
+        LOG_INFO(*new_g << "(GraphAfterFallback)");
 
         // if there is no tensorrt engine self in fallback graph, there is no conversion, we just return the initial
         // module

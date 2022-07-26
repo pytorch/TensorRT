@@ -4,6 +4,7 @@
 #include "core/ir/ir.h"
 #include "core/runtime/runtime.h"
 #include "core/util/prelude.h"
+#include "core/util/trt_util.h"
 #include "cuda_runtime_api.h"
 #include "torch/csrc/jit/ir/ir.h"
 #include "torch/csrc/jit/ir/irparser.h"
@@ -19,7 +20,7 @@ namespace util {
 std::vector<core::ir::Input> toInputs(std::vector<at::Tensor> ten) {
   std::vector<core::ir::Input> a;
   for (auto i : ten) {
-    a.push_back(core::ir::Input(core::util::toVec(i.sizes())));
+    a.push_back(core::ir::Input(core::util::toVec(i.sizes()), core::util::ScalarTypeToTRTDataType(i.scalar_type())));
   }
   return a;
 }
@@ -82,7 +83,6 @@ std::vector<at::Tensor> RunGraphEngine(
   auto in = core::ir::pair_input_vals_with_specs(var_ins, toInputs(inputs));
   auto info = core::conversion::ConversionInfo();
   info.inputs = std::move(in);
-  info.engine_settings.workspace_size = (1 << 30);
   info.engine_settings.enabled_precisions.insert(op_precision);
   std::string eng = core::conversion::ConvertBlockToEngine(g->block(), info, named_params);
   return RunEngine(eng, inputs);
@@ -95,10 +95,9 @@ std::vector<at::Tensor> RunGraphEngineDynamic(
     bool dynamic_batch) {
   LOG_DEBUG("Running TRT version");
   auto var_ins = get_var_inputs(g->inputs(), named_params);
-  auto in = core::ir::pair_input_vals_with_specs(var_ins, toInputs(inputs));
+  auto in = core::ir::pair_input_vals_with_specs(var_ins, toInputsDynamic(inputs, dynamic_batch));
   auto info = core::conversion::ConversionInfo();
   info.inputs = std::move(in);
-  info.engine_settings.workspace_size = (1 << 30);
   std::string eng = core::conversion::ConvertBlockToEngine(g->block(), info, named_params);
   return RunEngine(eng, inputs);
 }

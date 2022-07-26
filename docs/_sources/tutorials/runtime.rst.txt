@@ -26,7 +26,7 @@ programs just as you would otherwise via PyTorch API.
 
 .. note:: If you are linking ``libtorchtrt_runtime.so``, likely using the following flags will help ``-Wl,--no-as-needed -ltorchtrt -Wl,--as-needed`` as theres no direct symbol dependency to anything in the Torch-TensorRT runtime for most Torch-TensorRT runtime applications
 
-An example of how to use ``libtorchtrt_runtime.so`` can be found here: https://github.com/NVIDIA/Torch-TensorRT/tree/master/examples/torchtrt_example
+An example of how to use ``libtorchtrt_runtime.so`` can be found here: https://github.com/pytorch/TensorRT/tree/master/examples/torchtrt_runtime_example
 
 Plugin Library
 ---------------

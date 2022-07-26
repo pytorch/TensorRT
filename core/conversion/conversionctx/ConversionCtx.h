@@ -33,9 +33,11 @@ struct BuilderSettings {
   Device device;
   nvinfer1::EngineCapability capability = TRT_ENGINE_CAPABILITY_STANDARD;
   nvinfer1::IInt8Calibrator* calibrator = nullptr;
-  uint64_t num_min_timing_iters = 2;
   uint64_t num_avg_timing_iters = 1;
   uint64_t workspace_size = 0;
+  uint64_t dla_sram_size = 1048576;
+  uint64_t dla_local_dram_size = 1073741824;
+  uint64_t dla_global_dram_size = 536870912;
 
   BuilderSettings() = default;
   BuilderSettings(const BuilderSettings& other) = default;
@@ -46,6 +48,7 @@ struct ConversionCtx {
   ConversionCtx(BuilderSettings settings);
   std::string SerializeEngine();
   nvinfer1::ITensor* AssociateValueAndTensor(const torch::jit::Value* value, nvinfer1::ITensor* tensor);
+  void RecordNewITensor(const torch::jit::Value* value, nvinfer1::ITensor* tensor);
   torch::jit::IValue* AssociateValueAndIValue(const torch::jit::Value* value, torch::jit::IValue tensor);
   bool CheckLayerAddition(const torch::jit::Node* n);
 
@@ -69,6 +72,9 @@ struct ConversionCtx {
 
   std::unordered_map<const torch::jit::Value*, nvinfer1::ITensor*> value_tensor_map;
   std::unordered_map<const torch::jit::Value*, torch::jit::IValue> evaluated_value_map;
+
+  // record already named ITensors to prevent rewriting another name to the same tensor
+  std::unordered_set<nvinfer1::ITensor*> seen_itensors;
 };
 
 } // namespace conversion

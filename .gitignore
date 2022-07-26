@@ -57,7 +57,11 @@ examples/int8/qat/qat
 examples/int8/training/vgg16/data/*
 examples/int8/datasets/data/*
 env/**/*
+model_manifest.json
 bazel-Torch-TensorRT-Preview
 docsrc/src/
 bazel-TensorRT
 bazel-tensorrt
+.pytest_cache
+*.cache
+*cifar-10-batches-py*

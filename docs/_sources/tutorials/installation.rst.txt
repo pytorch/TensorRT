@@ -25,14 +25,14 @@ You can install the python package using
 
 .. code-block:: sh
 
-    pip3 install torch-tensorrt -f https://github.com/NVIDIA/Torch-TensorRT/releases
+    pip3 install torch-tensorrt -f https://github.com/pytorch/TensorRT/releases
 
 .. _bin-dist:
 
 C++ Binary Distribution
 ------------------------
 
-Precompiled tarballs for releases are provided here: https://github.com/NVIDIA/Torch-TensorRT/releases
+Precompiled tarballs for releases are provided here: https://github.com/pytorch/TensorRT/releases
 
 .. _compile-from-source:
 

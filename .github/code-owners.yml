@@ -1,0 +1,126 @@
+"component: api [C++]":
+  - "narendasan"
+
+"component: api [Python]":
+  - "narendasan"
+
+"component: api":
+  - "narendasan"
+
+"component: build system":
+  - "narendasan"
+  - "andi4191"
+
+"component: conversion":
+  - "narendasan"
+  - "peri044"
+
+"component: converters":
+  - "peri044"
+  - "bowang007"
+
+"component: core":
+  - "narendasan"
+  - "peri044"
+  - "bowang007"
+
+"component: evaluators":
+  - "narendasan"
+  - "peri044"
+
+"component: execution":
+  - "andi4191"
+  - "narendasan"
+
+"component: lowering":
+  - "peri044"
+  - "narendasan"
+
+"component: partitioning":
+  - "bowang007"
+  - "peri044"
+
+"component: plugins":
+  - "peri044"
+  - "andi4191"
+
+"component: quantization":
+  - "peri044"
+
+"component: runtime":
+  - "andi4191"
+  - "narendasan"
+
+"component: tests":
+  - "andi4191"
+  - "narendasan"
+
+"component: torchtrtc":
+  - "andi4191"
+  - "narendasan"
+
+"component: dependencies":
+  # Work RE: upgrading dependencies in the compiler / testing new versions
+  - "peri044"
+  - "bowang007"
+  - "narendasan"
+
+"documentation":
+  - "narendasan"
+
+"examples":
+  # Sample applications and notebooks on how to use TorchTRT features
+  - "peri044"
+  - "tanayvarshney"
+
+"infrastructre":
+  - "andi4191"
+  - "narendasan"
+
+"component: packaging":
+  - "narendasan"
+  - "andi4191"
+  - "peri044"
+
+"channel: NGC":
+  - "andi4191"
+  - "peri044"
+
+"channel: linux-x86":
+  - "narendasan"
+  - "peri044"
+
+"channel: linux-sbsa":
+  - "andi4191"
+  - "bowang007"
+
+"channel: windows":
+  - "narendasan"
+
+"channel: linux-jetpack":
+  - "narendasan"
+  - "bowang007"
+
+"component: tooling":
+  - "andi4191"
+  - "narendasan"
+
+"performance":
+  - "andi4191"
+  - "peri044"
+  - "bowang007"
+
+"channel: docker":
+  - "andi4191"
+  - "narendasan"
+
+"ux":
+  # Issues related to the user experience including debugging and installation
+  - "narendasan"
+  - "peri044"
+
+"component: fx":
+  - "frank-wei"
+  - "yinghai"
+  - "842974287"
+  - "wushirong"

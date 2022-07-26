@@ -139,11 +139,11 @@ This will build a binary named `ptq` in `bazel-out/k8-<opt|dbg>/bin/cpp/int8/ptq
 
 ## Compilation using Makefile
 
-1) Download releases of <a href="https://pytorch.org">LibTorch</a>, <a href="https://github.com/NVIDIA/Torch-TensorRT/releases">Torch-TensorRT </a>and <a href="https://developer.nvidia.com/nvidia-tensorrt-download">TensorRT</a> and unpack them in the deps directory.
+1) Download releases of <a href="https://pytorch.org">LibTorch</a>, <a href="https://github.com/pytorch/TensorRT/releases">Torch-TensorRT </a>and <a href="https://developer.nvidia.com/nvidia-tensorrt-download">TensorRT</a> and unpack them in the deps directory.
 
 ```sh
 cd examples/torch_tensorrtrt_example/deps
-# Download latest Torch-TensorRT release tar file (libtorch_tensorrt.tar.gz) from https://github.com/NVIDIA/Torch-TensorRT/releases
+# Download latest Torch-TensorRT release tar file (libtorch_tensorrt.tar.gz) from https://github.com/pytorch/TensorRT/releases
 tar -xvzf libtorch_tensorrt.tar.gz
 # unzip libtorch downloaded from pytorch.org
 unzip libtorch.zip

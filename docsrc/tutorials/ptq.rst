@@ -130,15 +130,13 @@ Then all thats required to setup the module for INT8 calibration is to set the f
     compile_spec.enabled_precisions.insert(torch::kI8);
     /// Use the TensorRT Entropy Calibrator
     compile_spec.ptq_calibrator = calibrator;
-    /// Set a larger workspace (you may get better performace from doing so)
-    compile_spec.workspace_size = 1 << 28;
 
     auto trt_mod = torch_tensorrt::CompileGraph(mod, compile_spec);
 
 If you have an existing Calibrator implementation for TensorRT you may directly set the ``ptq_calibrator`` field with a pointer to your calibrator and it will work as well.
 From here not much changes in terms of how to execution works. You are still able to fully use LibTorch as the sole interface for inference. Data should remain
 in FP32 precision when it's passed into `trt_mod.forward`. There exists an example application in the Torch-TensorRT demo that takes you from training a VGG16 network on
-CIFAR10 to deploying in INT8 with Torch-TensorRT here: https://github.com/NVIDIA/Torch-TensorRT/tree/master/cpp/ptq
+CIFAR10 to deploying in INT8 with Torch-TensorRT here: https://github.com/pytorch/TensorRT/tree/master/cpp/ptq
 
 .. _writing_ptq_python:
 
@@ -199,8 +197,8 @@ to use ``CacheCalibrator`` to use in INT8 mode.
   trt_mod = torch_tensorrt.compile(model, compile_settings)
 
 If you already have an existing calibrator class (implemented directly using TensorRT API), you can directly set the calibrator field to your class which can be very convenient.
-For a demo on how PTQ can be performed on a VGG network using Torch-TensorRT API, you can refer to https://github.com/NVIDIA/Torch-TensorRT/blob/master/tests/py/test_ptq_dataloader_calibrator.py
-and https://github.com/NVIDIA/Torch-TensorRT/blob/master/tests/py/test_ptq_trt_calibrator.py
+For a demo on how PTQ can be performed on a VGG network using Torch-TensorRT API, you can refer to https://github.com/pytorch/TensorRT/blob/master/tests/py/test_ptq_dataloader_calibrator.py
+and https://github.com/pytorch/TensorRT/blob/master/tests/py/test_ptq_trt_calibrator.py
 
 Citations
 ^^^^^^^^^^^

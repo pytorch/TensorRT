@@ -56,7 +56,6 @@ int main(int argc, const char* argv[]) {
   }
 
   auto compile_spec = trtorch::CompileSpec(dims);
-  compile_spec.workspace_size = 1 << 24;
 
   std::cout << "Checking operator support" << std::endl;
   if (!trtorch::CheckMethodOperatorSupport(mod, "forward")) {

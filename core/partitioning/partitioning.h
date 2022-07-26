@@ -16,12 +16,30 @@ namespace partitioning {
 
 typedef std::vector<SegmentedBlock> PartitionedGraph;
 
-PartitionedGraph segment_graph(torch::jit::Block* block, const PartitionInfo& partition_info);
+enum FallbackNodeType {
+  /// Node is not supported by TensorRT
+  kUNSUPPORTED,
+  /// Node is explicitly forced to fallback to Pytorch due to operator fallback
+  kOPERATOR_FALLBACK,
+  /// Node is explicitly forced to fallback to Pytorch due to module fallback
+  kMODULE_FALLBACK,
+  /// This node is in a TRT segment which does not satisfy min_block_size
+  /// and hence is forced to fallback.
+  kMIN_BLOCK_FALLBACK,
+  /// This node produces/consumes non-tensor inputs
+  kNON_TENSOR,
+};
+
+PartitionedGraph segment_graph(
+    torch::jit::Block* block,
+    const PartitionInfo& partition_info,
+    std::unordered_map<torch::jit::Node*, int>& fallback_nodes);
 
 PartitionedGraph Partition(
     torch::jit::Block* block,
     std::unordered_map<const torch::jit::Value*, torch::jit::IValue>& example_tensor_map,
-    const PartitionInfo& partition_info);
+    const PartitionInfo& partition_info,
+    std::unordered_map<torch::jit::Node*, int>& fallback_nodes);
 
 std::ostream& operator<<(std::ostream& os, const PartitionedGraph& g);
 
