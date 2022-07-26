@@ -400,15 +400,9 @@ PartitionedGraph segment_graph(
     if (n->kind() == torch::jit::prim::Constant) {
       continue;
     }
-<<<<<<< HEAD
-
-    if (check_node_fallback(n, global_fallback_nodes)) {
-      in_prog_trt_blk_nodes.push_back(n);
-=======
     // the outputs of trt subgraph shouldn't be collections
     if (should_run_in_trt(n, forced_fallback_ops) && !(in_prog_trt_blk_nodes.size() == 0 && is_collection(n))) {
       in_prog_trt_blk_nodes.insert(in_prog_trt_blk_nodes.begin(), n);
->>>>>>> feat: support for grouped inputs
 
       // If there is an active PyTorch block and we have passed the threshold for a valid TRT
       // block then segment and reset the active PyTorch block

@@ -322,7 +322,7 @@ void MapInputsAndDetermineDTypes(
         est_type_opt = first_use_type_map.find(in)->second;
       }
       // traverse elements in est_type_out and spec
-      for (int i = 0; i < est_type_opt.size(); i++) {
+      for (size_t i = 0; i < est_type_opt.size(); i++) {
         if (est_type_opt[i] && !spec[i].dtype_is_user_defined) {
           // If we can calculate the type from the graph and the type was not defined by the user then use the calculated
           // type

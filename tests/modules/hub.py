@@ -128,10 +128,10 @@ models = {
         "model": cm.ListInputTupleOutput(),
         "path": "script"
     },
-    #"bert_base_uncased": {
-    #    "model": cm.BertModule(),
-    #    "path": "trace"
-    #}
+    "bert_base_uncased": {
+        "model": cm.BertModule(),
+        "path": "trace"
+    }
 }
 
 

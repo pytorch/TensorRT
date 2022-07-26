@@ -5,7 +5,7 @@ namespace torch_tensorrt {
 namespace core {
 namespace ir {
 
-void flatten_dfs(std::vector<torch_tensorrt::core::ir::Input>& flattened_inputs, std::vector<std::vector<torch_tensorrt::core::ir::Input>>& collection_inputs, 
+void flatten_dfs(std::vector<torch_tensorrt::core::ir::Input>& flattened_inputs, std::vector<std::vector<torch_tensorrt::core::ir::Input>>& collection_inputs,
                  torch::jit::IValue input_ivalue, int level, int index) {
     if (input_ivalue.isTuple()) {
       auto input_tuple = input_ivalue.toTuple();
@@ -53,7 +53,7 @@ GraphInputs::GraphInputs(std::vector<ir::Input> inputs_) {
     LOG_DEBUG("Construct GraphInput with ir::Input");
     inputs = inputs_;
     collection_inputs.resize(inputs_.size());
-    for (int i = 0; i < inputs_.size(); i++) {
+    for (size_t i = 0; i < inputs_.size(); i++) {
         collection_inputs[i].push_back(inputs_[i]);
     }
 }
