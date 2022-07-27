@@ -1,11 +1,14 @@
 # Owner(s): ["oncall: gpu_enablement"]
 import functools
+import logging
 import typing as t
 from contextlib import contextmanager
 from unittest import TestCase
 
 import torch_tensorrt.fx.observer as ob
 from torch_tensorrt.fx.observer import observable
+
+_LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
 def set_observer_callback_rethrow(fn):
@@ -36,7 +39,7 @@ class ObserverTests(TestCase):
 
             @verify_execution
             def log_pre(ctx: ob.ObserveContext) -> None:
-                print(f"calling log: {ctx}")
+                _LOGGER.info(f"calling log: {ctx}")
                 assert ctx.callable is foo.orig_func
                 assert ctx.args == (1, 2)
                 assert ctx.kwargs == {"z": 3}
@@ -44,7 +47,7 @@ class ObserverTests(TestCase):
 
             @verify_execution
             def log_post(ctx: ob.ObserveContext) -> None:
-                print(f"calling log: {ctx}")
+                _LOGGER.info(f"calling log: {ctx}")
                 assert ctx.callable is foo.orig_func
                 assert ctx.args == (1, 2)
                 assert ctx.kwargs == {"z": 3}
@@ -57,11 +60,11 @@ class ObserverTests(TestCase):
 
             @verify_execution
             def log_pre(ctx: ob.ObserveContext) -> None:
-                print(f"calling log: {ctx}")
+                _LOGGER.info(f"calling log: {ctx}")
 
             @verify_execution
             def log_post(ctx: ob.ObserveContext) -> None:
-                print(f"calling log: {ctx}")
+                _LOGGER.info(f"calling log: {ctx}")
 
             foo.observers.pre.add(log_pre)
             foo.observers.post.add(log_post)
@@ -71,11 +74,11 @@ class ObserverTests(TestCase):
 
             @verify_execution
             def f1(ctx: ob.ObserveContext) -> None:
-                print(f"calling f1: {ctx}")
+                _LOGGER.info(f"calling f1: {ctx}")
 
             @verify_execution
             def f2(ctx: ob.ObserveContext) -> None:
-                print(f"calling f2: {ctx}")
+                _LOGGER.info(f"calling f2: {ctx}")
 
             # Test that we can register the same observation point twice
             with foo.observers.pre.add(f1):
@@ -91,7 +94,7 @@ class ObserverTests(TestCase):
 
             @verify_execution
             def log_pre(ctx: ob.ObserveContext) -> None:
-                print(f"calling log: {ctx}")
+                _LOGGER.info(f"calling log: {ctx}")
                 raise CallbackError("TEST CALLBACK EXCEPTION")
 
             with foo.observers.pre.add(log_pre):

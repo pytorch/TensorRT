@@ -1,3 +1,4 @@
+import logging
 from typing import Any, Callable, Tuple
 
 import torch
@@ -5,6 +6,8 @@ import torch.fx.passes.net_min_base as net_min_base
 from torch.fx.passes.tools_common import Tensors
 
 from .. import InputTensorSpec, TRTInterpreter, TRTModule
+
+_LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
 def lower_mod_default(
@@ -64,5 +67,5 @@ class TensorRTMinimizer(net_min_base._MinimizerBase):
     def get_nodes(self, start=None, end=None, enable_print=False):
         nodes = self._collect_nodes(start, end)
         if enable_print:
-            print(f"Nodes fetched from start {start} to end {end} as: {nodes}")
+            _LOGGER.info(f"Nodes fetched from start {start} to end {end} as: {nodes}")
         return nodes

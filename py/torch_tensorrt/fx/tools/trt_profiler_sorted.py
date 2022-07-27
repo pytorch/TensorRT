@@ -1,4 +1,5 @@
 import json
+import logging
 import operator
 from typing import List, Mapping, Optional
 
@@ -6,6 +7,8 @@ import tensorrt as trt
 import torch
 
 from .. import TRTModule
+
+_LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
 class SortedTRTProfiler(trt.IProfiler):
@@ -22,7 +25,7 @@ class SortedTRTProfiler(trt.IProfiler):
         additional_info = {} if additional_info is None else additional_info
         for k, v in sorted(self.layers.items(), key=operator.itemgetter(1)):
             additional_str = additional_info.get(k, "")
-            print(f"{k} {additional_str}: {v}ms")
+            _LOGGER.info(f"{k} {additional_str}: {v}ms")
 
 
 def profile_trt_module(
