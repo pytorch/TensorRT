@@ -308,7 +308,7 @@ setup(
     long_description=long_description,
     ext_modules=ext_modules,
     install_requires=[
-        'torch>=1.13.0,<1.14.0',
+        'torch>=1.12.0,<1.14.0',
     ],
     setup_requires=[],
     cmdclass={
