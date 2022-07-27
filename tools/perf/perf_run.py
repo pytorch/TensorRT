@@ -15,7 +15,11 @@ import pandas as pd
 # Importing supported Backends
 import torch
 import torch_tensorrt as torchtrt
+import torch_tensorrt.fx.tracer.acc_tracer.acc_tracer as acc_tracer
+from torch_tensorrt.fx import InputTensorSpec, TRTInterpreter
+from torch_tensorrt.fx import TRTModule
 import tensorrt as trt
+from utils import parse_inputs, parse_backends, precision_to_dtype, BENCHMARK_MODELS
 
 WARMUP_ITER = 10
 results = []
@@ -71,7 +75,7 @@ def run_torch(model, input_tensors, params, precision, batch_size):
 
 # Runs inference using Torch-TensorRT backend
 def run_torch_tensorrt(model, input_tensors, params, precision, truncate_long_and_double, batch_size):
-    print("Running Torch-TensorRT")
+    print("Running Torch-TensorRT for precision: ", precision)
     # Compiling Torch-TensorRT model
     compile_settings = {
        "inputs": input_tensors,
@@ -82,8 +86,8 @@ def run_torch_tensorrt(model, input_tensors, params, precision, truncate_long_an
     if precision == 'int8':
         compile_settings.update({"calib": params.get('calibration_cache')})
 
-
-    model = torchtrt.compile(model, **compile_settings)
+    with torchtrt.logging.errors():
+        model = torchtrt.compile(model, **compile_settings)
 
     iters = params.get('iterations', 20)
     # Warm up
@@ -105,6 +109,55 @@ def run_torch_tensorrt(model, input_tensors, params, precision, truncate_long_an
             print("Iteration {}: {:.6f} s".format(i, end_time - start_time))
 
     printStats("Torch-TensorRT", timings, precision, batch_size)
+
+# Runs inference using FX2TRT backend
+def run_fx2trt(model, input_tensors, params, precision, batch_size):
+    print("Running FX2TRT for precision: ", precision)
+
+    # Trace the model with acc_tracer.
+    acc_mod = acc_tracer.trace(model, input_tensors)
+    # Generate input specs
+    input_specs = InputTensorSpec.from_tensors(input_tensors)
+    # Build a TRT interpreter. Set explicit_batch_dimension accordingly.
+    interpreter = TRTInterpreter(
+        acc_mod, input_specs, explicit_batch_dimension=True
+    )
+    trt_interpreter_result = interpreter.run(
+    max_batch_size=batch_size,
+    lower_precision=precision,
+    max_workspace_size=1 << 25,
+    sparse_weights=False,
+    force_fp32_output=False,
+    strict_type_constraints=False,
+    algorithm_selector=None,
+    timing_cache=None,
+    profiling_verbosity=None)
+
+    model = TRTModule(
+        trt_interpreter_result.engine,
+        trt_interpreter_result.input_names,
+        trt_interpreter_result.output_names)
+
+    iters = params.get('iterations', 20)
+    # Warm up
+    with torch.no_grad():
+        for _ in range(WARMUP_ITER):
+            features = model(*input_tensors)
+
+    torch.cuda.synchronize()
+
+    timings = []
+    with torch.no_grad():
+        for i in range(iters):
+            start_time = timeit.default_timer()
+            features = model(*input_tensors)
+            torch.cuda.synchronize()
+            end_time = timeit.default_timer()
+            meas_time = end_time - start_time
+            timings.append(meas_time)
+            print("Iteration {}: {:.6f} s".format(i, end_time - start_time))
+
+    printStats("FX-TensorRT", timings, precision, batch_size)
 
 def torch_dtype_from_trt(dtype):
     if dtype == trt.int8:
@@ -141,19 +194,18 @@ def run_tensorrt(model, input_tensors, params, precision, is_trt_engine=False, b
         }
 
         print("Converting method to TensorRT engine...")
-        with torch.no_grad():
+        with torch.no_grad(), torchtrt.logging.errors():
             model = torchtrt.ts.convert_method_to_trt_engine(model, "forward", **compile_settings)
 
     # Deserialize the TensorRT engine
     with trt.Logger() as logger, trt.Runtime(logger) as runtime:
         engine = runtime.deserialize_cuda_engine(model)
 
-    print("Running TensorRT")
+    print("Running TensorRT for precision: ", precision)
     iters = params.get('iterations', 20)
 
     # Compiling the bindings
     bindings = engine.num_bindings * [None]
-    # import pdb; pdb.set_trace()
     k = 0
     for idx,_ in enumerate(bindings):
         dtype = torch_dtype_from_trt(engine.get_binding_dtype(idx))
@@ -171,12 +223,12 @@ def run_tensorrt(model, input_tensors, params, precision, is_trt_engine=False, b
     timings = []
     with engine.create_execution_context() as context:
         for i in range(WARMUP_ITER):
-            context.execute_async(1, bindings, torch.cuda.current_stream().cuda_stream)
+            context.execute_async_v2(bindings, torch.cuda.current_stream().cuda_stream)
             torch.cuda.synchronize()
 
         for i in range(iters):
             start_time = timeit.default_timer()
-            context.execute_async(1, bindings, torch.cuda.current_stream().cuda_stream)
+            context.execute_async_v2(bindings, torch.cuda.current_stream().cuda_stream)
             torch.cuda.synchronize()
             end_time = timeit.default_timer()
             meas_time = end_time - start_time
@@ -186,9 +238,8 @@ def run_tensorrt(model, input_tensors, params, precision, is_trt_engine=False, b
     printStats("TensorRT", timings, precision, batch_size)
 
 # Deploys inference run for different backend configurations
-def run(model, input_tensors, params, precision, truncate_long_and_double = False, batch_size = 1, is_trt_engine = False):
-    for backend in params.get('backend'):
-
+def run(model, backends, input_tensors, params, precision, truncate_long_and_double = False, batch_size = 1, is_trt_engine = False):
+    for backend in backends:
         if precision == 'int8':
             if backend == 'all' or backend == 'torch':
                 print("int8 precision is not supported for torch runtime in this script yet")
@@ -201,7 +252,6 @@ def run(model, input_tensors, params, precision, truncate_long_and_double = Fals
         if backend == 'all':
             run_torch(model, input_tensors, params, precision, batch_size)
             run_torch_tensorrt(model, input_tensors, params, precision, truncate_long_and_double, batch_size)
-            # import pdb; pdb.set_trace()
             run_tensorrt(model, input_tensors, params, precision, is_trt_engine, batch_size)
 
         elif backend == "torch":
@@ -209,6 +259,9 @@ def run(model, input_tensors, params, precision, truncate_long_and_double = Fals
 
         elif backend == "torch_tensorrt":
             run_torch_tensorrt(model, input_tensors, params, precision, truncate_long_and_double, batch_size)
+
+        elif backend == "fx2trt":
+            run_fx2trt(model, input_tensors, params, precision, batch_size)
 
         elif backend == "tensorrt":
             run_tensorrt(model, input_tensors, params, precision, is_trt_engine, batch_size)
@@ -246,14 +299,6 @@ def printStats(backend, timings, precision, batch_size = 1):
     }
     results.append(meas)
 
-def precision_to_dtype(pr):
-    if pr == 'fp32':
-        return torch.float
-    elif pr == 'fp16' or pr == 'half':
-        return torch.half
-    else:
-        return torch.int8
-
 def load_model(params):
     model = None
     is_trt_engine = False
@@ -272,47 +317,68 @@ def load_model(params):
 
 if __name__ == '__main__':
     arg_parser = argparse.ArgumentParser(description="Run inference on a model with random input values")
-    arg_parser.add_argument("--config", help="Load YAML based configuration file to run the inference. If this is used other params will be ignored")
+    arg_parser.add_argument("--config", type=str, help="Load YAML based configuration file to run the inference. If this is used other params will be ignored")
+    # The following options are manual user provided settings
+    arg_parser.add_argument("--backends", type=str, help="Comma separated string of backends. Eg: torch,torch_tensorrt,tensorrt")
+    arg_parser.add_argument("--model", type=str, help="Name of the model file")
+    arg_parser.add_argument("--inputs", type=str, help="List of input shapes. Eg: (1, 3, 224, 224)@fp32 for Resnet or (1, 128)@int32;(1, 128)@int32 for BERT")
+    arg_parser.add_argument("--batch_size", type=int, default=1, help="Batch size")
+    arg_parser.add_argument("--precision", default="fp32", type=str, help="Precision of TensorRT engine")
+    arg_parser.add_argument("--device", type=int, help="device id")
+    arg_parser.add_argument("--truncate", action='store_true', help="Truncate long and double weights in the network")
+    arg_parser.add_argument("--is_trt_engine", action='store_true', help="Boolean flag to determine if the user provided model is a TRT engine or not")
     args = arg_parser.parse_args()
 
-    parser = ConfigParser(args.config)
-    # Load YAML params
-    params = parser.read_config()
-    print("Loading model: ", params.get('model').get('filename'))
-
-    model = None
-
-    # Default device is set to 0. Configurable using yaml config file.
-    torch.cuda.set_device(params.get('runtime').get('device', 0))
-
-    # Load the model file from disk. If the loaded file is TensorRT engine then is_trt_engine is returned as True
-    model, is_trt_engine = load_model(params)
     cudnn.benchmark = True
-
     # Create random input tensor of certain size
     torch.manual_seed(12345)
 
-    num_input = params.get('input').get('num_inputs')
-    truncate_long_and_double = params.get('runtime').get('truncate_long_and_double', False)
-    batch_size = params.get('input').get('batch_size', 1)
-    for precision in params.get('runtime').get('precision', 'fp32'):
-        input_tensors = []
-        num_input = params.get('input').get('num_inputs', 1)
-        for i in range(num_input):
-            inp_tensor = params.get('input').get('input' + str(i))
-            input_tensors.append(torch.randint(0, 2, tuple(d for d in inp_tensor), dtype=precision_to_dtype(precision)).cuda())
+    if args.config:
+        parser = ConfigParser(args.config)
+        # Load YAML params
+        params = parser.read_config()
+        print("Loading model: ", params.get('model').get('filename'))
+        model_file = params.get('model').get('filename')
+        # Default device is set to 0. Configurable using yaml config file.
+        torch.cuda.set_device(params.get('runtime').get('device', 0))
 
-        if is_trt_engine:
-            print("Warning, TensorRT engine file is configured. Please make sure the precision matches with the TRT engine for reliable results")
+        num_input = params.get('input').get('num_inputs')
+        truncate_long_and_double = params.get('runtime').get('truncate_long_and_double', False)
+        batch_size = params.get('input').get('batch_size', 1)
+        for precision in params.get('runtime').get('precision', 'fp32'):
+            input_tensors = []
+            num_input = params.get('input').get('num_inputs', 1)
+            for i in range(num_input):
+                inp_tensor = params.get('input').get('input' + str(i))
+                input_tensors.append(torch.randint(0, 2, tuple(d for d in inp_tensor), dtype=precision_to_dtype(precision)).cuda())
 
-        if not is_trt_engine and precision == "fp16" or precision == "half":
-            # If model is TensorRT serialized engine then model.half will report failure
-            model = model.half()
+            if is_trt_engine:
+                print("Warning, TensorRT engine file is configured. Please make sure the precision matches with the TRT engine for reliable results")
 
+            if not is_trt_engine and precision == "fp16" or precision == "half":
+                # If model is TensorRT serialized engine then model.half will report failure
+                model = model.half()
+        backends = params.get('backend')
         # Run inference
-        status = run(model, input_tensors, params, precision, truncate_long_and_double, batch_size, is_trt_engine)
-        if status == False:
-            continue
+        status = run(model, backends, input_tensors, params, precision, truncate_long_and_double, batch_size, is_trt_engine)
+    else:
+        params = vars(args)
+        model_name = params['model']
+        if os.path.exists(model_name):
+            print("Loading user provided model: ", model_name)
+            model = torch.jit.load(model_name).cuda().eval()
+        elif model_name in BENCHMARK_MODELS:
+            model = BENCHMARK_MODELS[model_name]['model'].eval().cuda()
+        else:
+            raise ValueError("Invalid model name. Please provide a torchscript model file or model name (among the following options vgg16|resnet50|efficientnet_b0|vit)")
+        precision = params['precision']
+        input_tensors = parse_inputs(params['inputs'])
+        backends = parse_backends(params['backends'])
+        truncate_long_and_double = params.get('truncate', False)
+        batch_size = params['batch_size']
+        is_trt_engine = params['is_trt_engine']
+        # Run inference
+        status = run(model, backends, input_tensors, params, precision, truncate_long_and_double, batch_size, is_trt_engine)
 
     # Generate report
     print('Model Summary:')
