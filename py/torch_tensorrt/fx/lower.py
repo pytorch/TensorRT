@@ -197,6 +197,7 @@ class Lowerer:
         cls,
         lower_setting: LowerSetting,
         interpreter_builder: Callable = create_lower_trt_interpreter,
+        split_func: Callable = default_split_function,
     ) -> "Lowerer":
         """Instantiate a `Lowerer` instance."""
 
@@ -209,7 +210,7 @@ class Lowerer:
                     ast_rewriter_allow_list=lower_setting.ast_rewriter_allow_list,
                     leaf_module_list=lower_setting.leaf_module_list,
                 ),
-                split_func=default_split_function,
+                split_func=split_func,
                 lower_func=default_lower_pass(interpreter_builder),
             )
         )

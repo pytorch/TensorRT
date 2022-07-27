@@ -528,6 +528,7 @@ def stack_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
         return cat_node
 
 
+@register_acc_op_properties(AccOpProperty.pointwise)
 @register_acc_op_mapping(op_and_target=("call_function", torch.clamp))
 @register_acc_op_mapping(op_and_target=("call_method", "clamp"))
 @register_acc_op
@@ -724,6 +725,13 @@ def square_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
         return new_node
 
 
+@register_acc_op_mapping(
+    op_and_target=("call_method", "mm"),
+    arg_replacement_tuples=[
+        ("input", "input"),
+        ("mat2", "other"),
+    ],
+)
 @register_acc_op_mapping(
     op_and_target=("call_function", operator.matmul),
     arg_replacement_tuples=[

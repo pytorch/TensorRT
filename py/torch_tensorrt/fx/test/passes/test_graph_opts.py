@@ -1,3 +1,4 @@
+import logging
 import unittest
 from collections import Counter
 from typing import Callable, Dict, List
@@ -8,13 +9,16 @@ import torch_tensorrt.fx.tracer.acc_tracer.acc_tracer as acc_tracer
 from torch_tensorrt.fx.passes.graph_opts import common_subexpression_elimination
 
 
+_LOGGER: logging.Logger = logging.getLogger(__name__)
+
+
 def debug_print_graph_module(mod_graph: torch.fx.GraphModule) -> None:
     """
     Helper func to print model's graph in plain and tabular format, also print code.
     """
-    print(mod_graph.graph)
+    _LOGGER.info(mod_graph.graph)
     mod_graph.graph.print_tabular()
-    print(mod_graph.code)
+    _LOGGER.info(mod_graph.code)
 
 
 @torch.fx.wrap
@@ -46,7 +50,7 @@ class GraphOptsTest(unittest.TestCase):
         before_results = module(*inputs)
         mod_traced = acc_tracer.trace(module, inputs)
         before_node_list = list(mod_traced.graph.nodes)
-        print("Model before opt.")
+        _LOGGER.info("Model before opt.")
         debug_print_graph_module(mod_traced)
 
         # Apply Opt
@@ -55,7 +59,7 @@ class GraphOptsTest(unittest.TestCase):
         # After Opt
         after_results = mod_traced(*inputs)
         after_node_list = list(mod_traced.graph.nodes)
-        print("Model after opt.")
+        _LOGGER.info("Model after opt.")
         mod_traced.recompile()
         debug_print_graph_module(mod_traced)
 

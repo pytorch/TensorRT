@@ -1,5 +1,6 @@
 import inspect
 import json
+import logging
 import os
 import re
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -11,6 +12,8 @@ from torch.fx.immutable_collections import immutable_list
 from torch.fx.node import _get_qualified_name
 from torch.fx.passes import graph_drawer
 from torch.fx.passes.shape_prop import TensorMetadata
+
+_LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
 def get_target_from_module(mod: torch.nn.Module, target: str):
@@ -92,13 +95,13 @@ def draw_graph(traced: torch.fx.GraphModule, fname: str, figname: str = "fx_grap
     base, ext = os.path.splitext(fname)
     if not ext:
         ext = ".svg"
-    print(f"Writing FX graph to file: {base}{ext}")
+    _LOGGER.info(f"Writing FX graph to file: {base}{ext}")
     g = graph_drawer.FxGraphDrawer(traced, figname)
     x = g.get_main_dot_graph()
     try:
         getattr(x, "write_" + ext.lstrip("."))(fname)
     except OSError as e:
-        print(f"Failed to write the FX graph due to: {e}")
+        _LOGGER.error(f"Failed to write the FX graph due to: {e}")
 
 
 def get_model_info_str(gm: torch.fx.GraphModule, header: Optional[str] = None):

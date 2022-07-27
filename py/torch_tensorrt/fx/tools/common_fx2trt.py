@@ -1,3 +1,4 @@
+import logging
 import time
 import unittest
 from typing import Callable, List, Tuple
@@ -12,6 +13,8 @@ from torch.testing._internal.common_utils import TestCase
 from torch_tensorrt.fx import InputTensorSpec, TRTInterpreter, TRTModule
 from torch_tensorrt.fx.passes.pass_utils import chain_passes
 from torch_tensorrt.fx.utils import LowerPrecision
+
+_LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
 def fetch_attr(mod, target):
@@ -65,7 +68,7 @@ class TRTTestCase(TestCase):
             start = time.perf_counter()
             interpreter_result = interpreter.run(lower_precision=precision)
             sec = time.perf_counter() - start
-            print("Interpreter run time(s):", sec)
+            _LOGGER.info(f"Interpreter run time(s): {sec}")
             trt_mod = TRTModule(
                 interpreter_result.engine,
                 interpreter_result.input_names,
@@ -81,7 +84,9 @@ class TRTTestCase(TestCase):
             outputs = trt_mod(*cuda_inputs)
             end_event.record()
             torch.cuda.synchronize()
-            print("TRT run time(s)=", (start_event.elapsed_time(end_event) * 1.0e-3))
+            _LOGGER.info(
+                f"TRT run time(s)= {(start_event.elapsed_time(end_event) * 1.0e-3)}"
+            )
 
             if isinstance(outputs, torch.Tensor):
                 ref_outputs = [ref_outputs]

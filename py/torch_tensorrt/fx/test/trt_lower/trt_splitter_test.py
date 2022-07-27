@@ -10,7 +10,7 @@ import torch.fx.passes.shape_prop as shape_prop
 import torch_tensorrt.fx.tracer.acc_tracer.acc_ops as acc_ops
 from torch.fx.passes import splitter_base
 from torch.testing._internal.common_utils import run_tests, TestCase
-from torch_tensorrt.fx.tools.trt_splitter import TRTSplitter
+from torch_tensorrt.fx.tools.trt_splitter import TRTSplitter, TRTSplitterSetting
 from torch_tensorrt.fx.tracer.acc_tracer import acc_tracer
 
 
@@ -1125,6 +1125,47 @@ class TestAccFusionsFinder(TestCase):
             assert modules[2][0] == "_run_on_gpu_1"
 
         test_splitter(splitter)
+
+    def test_exclude_support_node_by_name(self):
+        class TestModule(torch.nn.Module):
+            def forward(self, a):
+                b = torch.sin(a)
+                c = torch.relu(b)
+                d = torch.cos(c)
+                e = torch.sigmoid(d)
+                f = torch.tanh(e)
+                return f
+
+        mod = acc_tracer.trace(TestModule(), [torch.randn(2, 3)])
+
+        # Set sin, cos and tanh as acc node and split with settings
+        class CustomOpSupport(op_support.OperatorSupport):
+            _support_dict = {
+                "acc_ops.sin": None,
+                "acc_ops.cos": None,
+                "acc_ops.relu": None,
+                "acc_ops.sigmoid": None,
+                "acc_ops.tanh": None,
+            }
+
+        # For unsupport relu node, this would cut graph into acc_0, gpu_1 and acc_2
+        # as three sub graphs.
+        settings = TRTSplitterSetting()
+        settings.exclude_support_node_name = {"relu"}
+        splitter = TRTSplitter(
+            mod,
+            (torch.randn(2, 3),),
+            op_support_with_support_dict(
+                {
+                    "acc_ops.sin": None,
+                    "acc_ops.cos": None,
+                    "acc_ops.relu": None,
+                }
+            ),
+            settings,
+        )
+        res = splitter.generate_split_results()
+        self.assertTrue(len(res), 3)
 
 
 def op_support_with_support_dict(support_dict: dict) -> op_support.OperatorSupportBase:

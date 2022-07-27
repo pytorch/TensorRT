@@ -1,6 +1,7 @@
 # Owner(s): ["oncall: gpu_enablement"]
 import functools
 import glob
+import logging
 import os
 import shutil
 import tempfile
@@ -8,6 +9,9 @@ from typing import Union
 from unittest import TestCase
 
 import torch_tensorrt.fx.diagnostics as diag
+
+
+_LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
 def reset_diag(fn):
@@ -53,7 +57,7 @@ class Fx2trtDiagnosticsTest(TestCase):
         zip_fn = collector._last_zip_path_for_test
         assert os.path.exists(zip_fn)
         with tempfile.TemporaryDirectory() as tempdir:
-            print(f"Unpacking into {tempdir}")
+            _LOGGER.info(f"Unpacking into {tempdir}")
             shutil.unpack_archive(zip_fn, tempdir)
             _check_file(tempdir, "aaa", "hello")
             _check_file(tempdir, "bbb", "world")
@@ -78,7 +82,7 @@ class Fx2trtDiagnosticsTest(TestCase):
         zip_fn = collector._last_zip_path_for_test
         assert os.path.exists(zip_fn)
         with tempfile.TemporaryDirectory() as tempdir:
-            print(f"Unpacking into {tempdir}")
+            _LOGGER.info(f"Unpacking into {tempdir}")
             shutil.unpack_archive(zip_fn, tempdir)
             _check_file(tempdir, "aaa", "hello")
 
@@ -160,7 +164,7 @@ def _test_cond(
     if should_collect:
         assert os.path.exists(zip_fn)
         with tempfile.TemporaryDirectory() as tempdir:
-            print(f"Unpacking into {tempdir}")
+            _LOGGER.info(f"Unpacking into {tempdir}")
             shutil.unpack_archive(zip_fn, tempdir)
             _check_file(tempdir, "aaa", "hello")
     else:
