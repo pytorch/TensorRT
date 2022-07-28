@@ -21,10 +21,6 @@ inline bool isTensor(torch::jit::Value* val) {
   return val->type()->isSubtypeOf(torch::jit::TensorType::get());
 }
 
-inline bool isListOrTuple(torch::jit::Value* val) {
-  return val->type()->kind() == torch::jit::TypeKind::TupleType || val->type()->kind() == torch::jit::TypeKind::ListType;
-}
-
 bool containNonTensorOutputs(torch::jit::Node* n) {
   for (auto output : n->outputs()) {
     if (!isTensor(output)) {
@@ -109,8 +105,6 @@ void find_all_fallback_nodes(
     auto cur_node = q.front();
     q.pop();
     // for every node that produces this fallback node's NonTensor input, they should fallback too
-    // Even collection feature is supported, since TRT List/Tuple output is not supported yet, the nodes
-    // that produce List/Tuple still cannot be in TRT segment
     for (auto input : cur_node->inputs()) {
       if (!isTensor(input) && input->node()->kind() != torch::jit::prim::Constant &&
           global_fallback_nodes.insert({input->node(), FallbackNodeType::kNON_TENSOR}).second) {
@@ -118,13 +112,12 @@ void find_all_fallback_nodes(
       }
     }
     // for every node that consumes this fallback node's NonTensor output, they should fallback too
-    // Since collection feature is supported, we can have List/Tuple input for TRT segment, so we only
-    // fallback the nodes that take inputs which are not Tensor/List/Tuple
     for (auto output : cur_node->outputs()) {
-      if (!isTensor(output) && !isListOrTuple(output)) {
+      if (!isTensor(output)) {
         for (auto use : output->uses()) {
           auto node = use.user;
-          if (node->kind() != torch::jit::prim::Constant && global_fallback_nodes.insert({node, FallbackNodeType::kNON_TENSOR}).second) {
+          if (node->kind() != torch::jit::prim::Constant &&
+              global_fallback_nodes.insert({node, FallbackNodeType::kNON_TENSOR}).second) {
             q.push(node);
           }
         }
