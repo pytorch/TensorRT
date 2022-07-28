@@ -103,121 +103,118 @@ nvinfer1::ITensor* roll(
 
 auto select_registrations TORCHTRT_UNUSED =
     RegisterNodeConversionPatterns()
-        .pattern(
-            {"aten::select.int(Tensor(a) self, int dim, int index) -> (Tensor(a))",
-             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-               auto in = args[0].ITensorOrFreeze(ctx);
-               auto maxDim = static_cast<int64_t>(in->getDimensions().nbDims);
-               auto dim = args[1].unwrapToInt();
-               // Handle negative axis by refering to nbDims of input Tensor
-               dim = dim < 0 ? dim + maxDim : dim;
-               auto ind = (int32_t)args[2].unwrapToInt();
-               // Along the specified dimension, handle negative index by subtracting along length of dimension.
-               ind = ind < 0 ? ind + in->getDimensions().d[dim] : ind;
-               LOG_DEBUG("Gather input dimensions: " << in->getDimensions());
-               LOG_DEBUG("Dimension to select: " << dim);
-               LOG_DEBUG("Index: " << ind);
+        .pattern({"aten::select.int(Tensor(a) self, int dim, int index) -> (Tensor(a))",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    auto in = args[0].ITensorOrFreeze(ctx);
+                    auto maxDim = static_cast<int64_t>(in->getDimensions().nbDims);
+                    auto dim = args[1].unwrapToInt();
+                    // Handle negative axis by refering to nbDims of input Tensor
+                    dim = dim < 0 ? dim + maxDim : dim;
+                    auto ind = (int32_t)args[2].unwrapToInt();
+                    // Along the specified dimension, handle negative index by subtracting along length of dimension.
+                    ind = ind < 0 ? ind + in->getDimensions().d[dim] : ind;
+                    LOG_DEBUG("Gather input dimensions: " << in->getDimensions());
+                    LOG_DEBUG("Dimension to select: " << dim);
+                    LOG_DEBUG("Index: " << ind);
 
-               // index to access needs to be an at::Tensor
-               at::Tensor indices = torch::tensor({ind}).to(torch::kI32);
-               auto const_out = tensor_to_const(ctx, indices);
+                    // index to access needs to be an at::Tensor
+                    at::Tensor indices = torch::tensor({ind}).to(torch::kI32);
+                    auto const_out = tensor_to_const(ctx, indices);
 
-               // IGatherLayer takes in input tensor, the indices, and the axis
-               // of input tensor to take indices from
-               auto gather_layer = ctx->net->addGather(*in, *const_out, dim);
-               TORCHTRT_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
-               auto out = gather_layer->getOutput(0);
+                    // IGatherLayer takes in input tensor, the indices, and the axis
+                    // of input tensor to take indices from
+                    auto gather_layer = ctx->net->addGather(*in, *const_out, dim);
+                    TORCHTRT_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
+                    auto out = gather_layer->getOutput(0);
 
-               LOG_DEBUG("Gather tensor shape: " << out->getDimensions());
+                    LOG_DEBUG("Gather tensor shape: " << out->getDimensions());
 
-               if (out->getDimensions().nbDims != 1) {
-                 // IShuffleLayer removes redundant dimensions
-                 auto shuffle_layer = ctx->net->addShuffle(*out);
-                 TORCHTRT_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
-                 shuffle_layer->setReshapeDimensions(util::squeezeDims(out->getDimensions(), dim));
-                 shuffle_layer->setName(util::node_info(n).c_str());
-                 out = shuffle_layer->getOutput(0);
-               }
+                    if (out->getDimensions().nbDims != 1) {
+                      // IShuffleLayer removes redundant dimensions
+                      auto shuffle_layer = ctx->net->addShuffle(*out);
+                      TORCHTRT_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
+                      shuffle_layer->setReshapeDimensions(util::squeezeDims(out->getDimensions(), dim));
+                      shuffle_layer->setName(util::node_info(n).c_str());
+                      out = shuffle_layer->getOutput(0);
+                    }
 
-               out = ctx->AssociateValueAndTensor(n->outputs()[0], out);
+                    out = ctx->AssociateValueAndTensor(n->outputs()[0], out);
 
-               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+                    LOG_DEBUG("Output tensor shape: " << out->getDimensions());
 
-               return true;
-             }})
-        .pattern(
-            {"aten::narrow(Tensor(a) self, int dim, int start, int length) -> Tensor(a)",
-             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-               auto in = args[0].ITensor();
-               auto axis = args[1].unwrapToInt();
-               auto start = (int32_t)args[2].unwrapToInt();
-               auto length = (int32_t)args[3].unwrapToInt();
+                    return true;
+                  }})
+        .pattern({"aten::narrow(Tensor(a) self, int dim, int start, int length) -> Tensor(a)",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    auto in = args[0].ITensor();
+                    auto axis = args[1].unwrapToInt();
+                    auto start = (int32_t)args[2].unwrapToInt();
+                    auto length = (int32_t)args[3].unwrapToInt();
 
-               // index to access needs to be an at::Tensor
-               at::Tensor indices = torch::arange(start, start + length, 1).to(torch::kI32);
-               auto weights = Weights(ctx, indices);
+                    // index to access needs to be an at::Tensor
+                    at::Tensor indices = torch::arange(start, start + length, 1).to(torch::kI32);
+                    auto weights = Weights(ctx, indices);
 
-               // IConstantLayer to convert indices from Weights to ITensor
-               auto const_layer = ctx->net->addConstant(weights.shape, weights.data);
-               TORCHTRT_CHECK(const_layer, "Unable to create constant layer from node: " << *n);
-               auto const_out = const_layer->getOutput(0);
+                    // IConstantLayer to convert indices from Weights to ITensor
+                    auto const_layer = ctx->net->addConstant(weights.shape, weights.data);
+                    TORCHTRT_CHECK(const_layer, "Unable to create constant layer from node: " << *n);
+                    auto const_out = const_layer->getOutput(0);
 
-               // IGatherLayer takes in input tensor, the indices, and the axis
-               // of input tensor to take indices from
-               auto gather_layer = ctx->net->addGather(*in, *const_out, axis);
-               TORCHTRT_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
-               auto gather_out = gather_layer->getOutput(0);
+                    // IGatherLayer takes in input tensor, the indices, and the axis
+                    // of input tensor to take indices from
+                    auto gather_layer = ctx->net->addGather(*in, *const_out, axis);
+                    TORCHTRT_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
+                    auto gather_out = gather_layer->getOutput(0);
 
-               // IShuffleLayer removes redundant dimensions
-               auto shuffle_layer = ctx->net->addShuffle(*gather_out);
-               TORCHTRT_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
-               shuffle_layer->setReshapeDimensions(util::unpadDims(gather_out->getDimensions()));
-               shuffle_layer->setName(util::node_info(n).c_str());
-               auto shuffle_out = shuffle_layer->getOutput(0);
+                    // IShuffleLayer removes redundant dimensions
+                    auto shuffle_layer = ctx->net->addShuffle(*gather_out);
+                    TORCHTRT_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
+                    shuffle_layer->setReshapeDimensions(util::unpadDims(gather_out->getDimensions()));
+                    shuffle_layer->setName(util::node_info(n).c_str());
+                    auto shuffle_out = shuffle_layer->getOutput(0);
 
-               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], shuffle_out);
+                    auto out = ctx->AssociateValueAndTensor(n->outputs()[0], shuffle_out);
 
-               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+                    LOG_DEBUG("Output tensor shape: " << out->getDimensions());
 
-               return true;
-             }})
-        .pattern(
-            {"aten::narrow.Tensor(Tensor(a) self, int dim, Tensor start, int length) -> Tensor(a)",
-             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-               auto in = args[0].ITensor();
-               auto axis = args[1].unwrapToInt();
-               torch::Tensor start = args[2].IValue()->toTensor().to(torch::kI32);
-               int32_t startIdx = start.item().to<int32_t>();
-               auto length = (int32_t)args[3].unwrapToInt();
+                    return true;
+                  }})
+        .pattern({"aten::narrow.Tensor(Tensor(a) self, int dim, Tensor start, int length) -> Tensor(a)",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    auto in = args[0].ITensor();
+                    auto axis = args[1].unwrapToInt();
+                    torch::Tensor start = args[2].IValue()->toTensor().to(torch::kI32);
+                    int32_t startIdx = start.item().to<int32_t>();
+                    auto length = (int32_t)args[3].unwrapToInt();
 
-               // index to access needs to be an at::Tensor
-               at::Tensor indices = torch::arange(startIdx, startIdx + length, 1).to(torch::kI32);
-               auto weights = Weights(ctx, indices);
+                    // index to access needs to be an at::Tensor
+                    at::Tensor indices = torch::arange(startIdx, startIdx + length, 1).to(torch::kI32);
+                    auto weights = Weights(ctx, indices);
 
-               // IConstantLayer to convert indices from Weights to ITensor
-               auto const_layer = ctx->net->addConstant(weights.shape, weights.data);
-               TORCHTRT_CHECK(const_layer, "Unable to create constant layer from node: " << *n);
-               auto const_out = const_layer->getOutput(0);
+                    // IConstantLayer to convert indices from Weights to ITensor
+                    auto const_layer = ctx->net->addConstant(weights.shape, weights.data);
+                    TORCHTRT_CHECK(const_layer, "Unable to create constant layer from node: " << *n);
+                    auto const_out = const_layer->getOutput(0);
 
-               // IGatherLayer takes in input tensor, the indices, and the axis
-               // of input tensor to take indices from
-               auto gather_layer = ctx->net->addGather(*in, *const_out, axis);
-               TORCHTRT_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
-               auto gather_out = gather_layer->getOutput(0);
+                    // IGatherLayer takes in input tensor, the indices, and the axis
+                    // of input tensor to take indices from
+                    auto gather_layer = ctx->net->addGather(*in, *const_out, axis);
+                    TORCHTRT_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
+                    auto gather_out = gather_layer->getOutput(0);
 
-               // IShuffleLayer removes redundant dimensions
-               auto shuffle_layer = ctx->net->addShuffle(*gather_out);
-               TORCHTRT_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
-               shuffle_layer->setReshapeDimensions(util::unpadDims(gather_out->getDimensions()));
-               shuffle_layer->setName(util::node_info(n).c_str());
-               auto shuffle_out = shuffle_layer->getOutput(0);
+                    // IShuffleLayer removes redundant dimensions
+                    auto shuffle_layer = ctx->net->addShuffle(*gather_out);
+                    TORCHTRT_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
+                    shuffle_layer->setReshapeDimensions(util::unpadDims(gather_out->getDimensions()));
+                    shuffle_layer->setName(util::node_info(n).c_str());
+                    auto shuffle_out = shuffle_layer->getOutput(0);
 
-               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], shuffle_out);
+                    auto out = ctx->AssociateValueAndTensor(n->outputs()[0], shuffle_out);
 
-               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+                    LOG_DEBUG("Output tensor shape: " << out->getDimensions());
 
-               return true;
-             }})
+                    return true;
+                  }})
         .pattern(
             {"aten::embedding(Tensor weight, Tensor indices, int padding_idx=-1, bool scale_grad_by_freq=False, bool sparse=False) -> (Tensor)",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
@@ -239,30 +236,29 @@ auto select_registrations TORCHTRT_UNUSED =
 
                return true;
              }})
-        .pattern(
-            {"aten::roll(Tensor self, int[1] shifts, int[1] dims=[]) -> (Tensor)",
-             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-               auto in = args[0].ITensor();
-               auto shifts = args[1].unwrapToIntList().vec();
-               auto dims = args[2].unwrapToIntList().vec();
+        .pattern({"aten::roll(Tensor self, int[1] shifts, int[1] dims=[]) -> (Tensor)",
+                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+                    auto in = args[0].ITensor();
+                    auto shifts = args[1].unwrapToIntList().vec();
+                    auto dims = args[2].unwrapToIntList().vec();
 
-               TORCHTRT_CHECK(dims.size() == shifts.size(), "dims.size() should be equal to shifts.size()");
-               if (ctx->input_is_dynamic) {
-                 TORCHTRT_THROW_ERROR("aten::roll is currently not support in dynamic input shape compilation");
-               } else {
-                 auto in_shape = util::toVec(in->getDimensions());
-                 for (size_t i = 0; i < dims.size(); i++) {
-                   auto dim = dims[i] < 0 ? (in_shape.size() + dims[i]) : dims[i];
-                   TORCHTRT_CHECK(dim < in_shape.size(), "Dimension out of range");
-                   in = roll(ctx, in, shifts[i], dim, in_shape);
-                 }
-                 auto out = ctx->AssociateValueAndTensor(n->outputs()[0], in);
+                    TORCHTRT_CHECK(dims.size() == shifts.size(), "dims.size() should be equal to shifts.size()");
+                    if (ctx->input_is_dynamic) {
+                      TORCHTRT_THROW_ERROR("aten::roll is currently not support in dynamic input shape compilation");
+                    } else {
+                      auto in_shape = util::toVec(in->getDimensions());
+                      for (size_t i = 0; i < dims.size(); i++) {
+                        auto dim = dims[i] < 0 ? (in_shape.size() + dims[i]) : dims[i];
+                        TORCHTRT_CHECK(dim < in_shape.size(), "Dimension out of range");
+                        in = roll(ctx, in, shifts[i], dim, in_shape);
+                      }
+                      auto out = ctx->AssociateValueAndTensor(n->outputs()[0], in);
 
-                 LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+                      LOG_DEBUG("Output tensor shape: " << out->getDimensions());
 
-                 return true;
-               }
-             }})
+                      return true;
+                    }
+                  }})
         .pattern(
             {"aten::index.Tensor(Tensor self, Tensor?[] indices) -> (Tensor)",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
@@ -319,7 +315,8 @@ auto select_registrations TORCHTRT_UNUSED =
                int startIdx = 0;
                auto startIdxIVal = args[2].IValue();
                if (!startIdxIVal->isNone()) {
-                 startIdx = startIdxIVal->toInt() > std::numeric_limits<int32_t>::max() ? maxDim : startIdxIVal->toInt();
+                 startIdx =
+                     startIdxIVal->toInt() > std::numeric_limits<int32_t>::max() ? maxDim : startIdxIVal->toInt();
                  startIdx = maxDim == -1 ? startIdx : std::min(startIdx, maxDim);
                }
                // Handle case when given tensor index is negative
@@ -331,7 +328,8 @@ auto select_registrations TORCHTRT_UNUSED =
                int endIdx = maxDim; // -1 for dynamic shape
                auto endIdxIVal = args[3].IValue();
                if (!endIdxIVal->isNone()) {
-                 int truncate_value = endIdxIVal->toInt() > std::numeric_limits<int32_t>::max() ? maxDim : endIdxIVal->toInt();
+                 int truncate_value =
+                     endIdxIVal->toInt() > std::numeric_limits<int32_t>::max() ? maxDim : endIdxIVal->toInt();
                  endIdx = maxDim == -1 ? truncate_value : std::min(truncate_value, maxDim);
                }
                if (maxDim > 0) {
@@ -385,7 +383,8 @@ auto select_registrations TORCHTRT_UNUSED =
                  // update start and end
                  nvinfer1::ITensor* out_start;
                  nvinfer1::ITensor* out_end;
-                 auto start_end = normalize_start_and_end(ctx, ishape_tensor, start_itensor, end_itensor, nbdims, node_name);
+                 auto start_end =
+                     normalize_start_and_end(ctx, ishape_tensor, start_itensor, end_itensor, nbdims, node_name);
                  out_start = start_end[0];
                  out_end = start_end[1];
 
@@ -397,7 +396,7 @@ auto select_registrations TORCHTRT_UNUSED =
                  slice_layer->setInput(2, *size_itensor); // size, must be set if input is dynamic
                }
                auto slice_out = slice_layer->getOutput(0);
-               
+
                auto out = ctx->AssociateValueAndTensor(n->outputs()[0], slice_out);
                LOG_DEBUG("Slice layer output shape: " << out->getDimensions());
 

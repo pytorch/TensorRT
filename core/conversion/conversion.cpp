@@ -135,12 +135,10 @@ void AddLayer(ConversionCtx* ctx, const torch::jit::Node* n) {
                        << "please report this error to https://www.github.com/NVIDIA/Torch-TensorRT/issues");
 }
 
-void AddInputs(
-    ConversionCtx* ctx,
-    c10::ArrayRef<const torch::jit::Value*> inputs,
-    ConversionInfo& conversion_info) {
+void AddInputs(ConversionCtx* ctx, c10::ArrayRef<const torch::jit::Value*> inputs, ConversionInfo& conversion_info) {
   std::unordered_map<const torch::jit::Value*, ir::Input>& input_specs = conversion_info.inputs;
-  std::unordered_map<const torch::jit::Value*, std::vector<ir::Input>> collection_input_spec = conversion_info.collection_input_spec_map;
+  std::unordered_map<const torch::jit::Value*, std::vector<ir::Input>> collection_input_spec =
+      conversion_info.collection_input_spec_map;
 
   std::vector<const torch::jit::Value*> input_tensors;
   for (auto in : inputs) {
@@ -173,7 +171,7 @@ void AddInputs(
         "Cannot find an input spec associated with input: " << in->debugName());
     ir::Input spec;
     if (input_specs.find(in) != input_specs.end()) {
-        spec = input_specs.find(in)->second;
+      spec = input_specs.find(in)->second;
     } else {
       spec = collection_input_spec.find(in)->second[0]; // assume input is tensor
     }
@@ -559,8 +557,9 @@ std::set<std::string> ConvertableOpsInBlock(const torch::jit::Block* b) {
 }
 
 bool OutputIsCollection(const torch::jit::Block* b) {
-  for (auto out: b->outputs()) {
-    if(out->type()->kind() == torch::jit::TypeKind::TupleType || out->type()->kind() == torch::jit::TypeKind::ListType) {
+  for (auto out : b->outputs()) {
+    if (out->type()->kind() == torch::jit::TypeKind::TupleType ||
+        out->type()->kind() == torch::jit::TypeKind::ListType) {
       return true;
     }
   }

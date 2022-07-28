@@ -5,9 +5,7 @@
 #include "torch/script.h"
 #include "torch_tensorrt/torch_tensorrt.h"
 
-
 TEST(CppAPITests, TestCollectionStandardTensorInput) {
-
   std::string path = "tests/modules/standard_tensor_input_scripted.jit.pt";
   torch::Tensor in0 = torch::randn({1, 3, 512, 512}, torch::kCUDA).to(torch::kHalf);
   std::vector<at::Tensor> inputs;
@@ -23,7 +21,6 @@ TEST(CppAPITests, TestCollectionStandardTensorInput) {
   }
   mod.eval();
   mod.to(torch::kCUDA);
-
 
   std::vector<torch::jit::IValue> inputs_;
 
@@ -52,7 +49,6 @@ TEST(CppAPITests, TestCollectionStandardTensorInput) {
 }
 
 TEST(CppAPITests, TestCollectionTupleInput) {
-
   std::string path = "tests/modules/tuple_input_scripted.jit.pt";
   torch::Tensor in0 = torch::randn({1, 3, 512, 512}, torch::kCUDA).to(torch::kHalf);
 
@@ -78,13 +74,11 @@ TEST(CppAPITests, TestCollectionTupleInput) {
 
   auto input_shape_ivalue = torch::jit::IValue(std::move(c10::make_intrusive<torch_tensorrt::Input>(input_shape)));
 
-
   std::tuple<torch::jit::IValue, torch::jit::IValue> input_shape_tuple(input_shape_ivalue, input_shape_ivalue);
 
   torch::jit::IValue complex_input_shape(input_shape_tuple);
   std::tuple<torch::jit::IValue> input_tuple2(complex_input_shape);
   torch::jit::IValue complex_input_shape2(input_tuple2);
-
 
   auto compile_settings = torch_tensorrt::ts::CompileSpec(complex_input_shape2);
   compile_settings.require_full_compilation = false;
@@ -100,9 +94,7 @@ TEST(CppAPITests, TestCollectionTupleInput) {
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(out.toTensor(), trt_out.toTensor(), 1e-5));
 }
 
-
 TEST(CppAPITests, TestCollectionListInput) {
-
   std::string path = "tests/modules/list_input_scripted.jit.pt";
   torch::Tensor in0 = torch::randn({1, 3, 512, 512}, torch::kCUDA).to(torch::kHalf);
   std::vector<at::Tensor> inputs;
@@ -117,7 +109,6 @@ TEST(CppAPITests, TestCollectionListInput) {
   }
   mod.eval();
   mod.to(torch::kCUDA);
-
 
   std::vector<torch::jit::IValue> inputs_;
 
@@ -134,7 +125,6 @@ TEST(CppAPITests, TestCollectionListInput) {
 
   complex_inputs.push_back(input_list_ivalue);
 
-
   auto out = mod.forward(complex_inputs);
   LOG_DEBUG("Finish torchscirpt forward");
 
@@ -145,7 +135,6 @@ TEST(CppAPITests, TestCollectionListInput) {
   auto list = c10::impl::GenericList(elementType);
   list.push_back(input_shape_ivalue);
   list.push_back(input_shape_ivalue);
-
 
   torch::jit::IValue complex_input_shape(list);
   std::tuple<torch::jit::IValue> input_tuple2(complex_input_shape);
@@ -166,9 +155,7 @@ TEST(CppAPITests, TestCollectionListInput) {
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(out.toTensor(), trt_out.toTensor(), 1e-5));
 }
 
-
 TEST(CppAPITests, TestCollectionTupleInputOutput) {
-
   std::string path = "tests/modules/tuple_input_output_scripted.jit.pt";
 
   torch::Tensor in0 = torch::randn({1, 3, 512, 512}, torch::kCUDA).to(torch::kHalf);
@@ -183,7 +170,6 @@ TEST(CppAPITests, TestCollectionTupleInputOutput) {
   mod.eval();
   mod.to(torch::kCUDA);
 
-
   std::vector<torch::jit::IValue> complex_inputs, complex_inputs_list;
   std::tuple<torch::jit::IValue, torch::jit::IValue> input_tuple(in0, in0);
 
@@ -195,7 +181,6 @@ TEST(CppAPITests, TestCollectionTupleInputOutput) {
   auto input_shape = torch_tensorrt::Input(in0.sizes(), torch_tensorrt::DataType::kHalf);
 
   auto input_shape_ivalue = torch::jit::IValue(std::move(c10::make_intrusive<torch_tensorrt::Input>(input_shape)));
-
 
   std::tuple<torch::jit::IValue, torch::jit::IValue> input_shape_tuple(input_shape_ivalue, input_shape_ivalue);
 
@@ -217,13 +202,13 @@ TEST(CppAPITests, TestCollectionTupleInputOutput) {
   LOG_DEBUG("Finish compile");
   auto trt_out = trt_mod.forward(complex_inputs);
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(out.toTuple()->elements()[0].toTensor(), trt_out.toTuple()->elements()[0].toTensor(), 1e-5));
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(out.toTuple()->elements()[1].toTensor(), trt_out.toTuple()->elements()[1].toTensor(), 1e-5));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(
+      out.toTuple()->elements()[0].toTensor(), trt_out.toTuple()->elements()[0].toTensor(), 1e-5));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(
+      out.toTuple()->elements()[1].toTensor(), trt_out.toTuple()->elements()[1].toTensor(), 1e-5));
 }
 
-
 TEST(CppAPITests, TestCollectionListInputOutput) {
-
   std::string path = "tests/modules/list_input_output_scripted.jit.pt";
   torch::Tensor in0 = torch::randn({1, 3, 512, 512}, torch::kCUDA).to(torch::kHalf);
   std::vector<at::Tensor> inputs;
@@ -239,7 +224,6 @@ TEST(CppAPITests, TestCollectionListInputOutput) {
   mod.eval();
   mod.to(torch::kCUDA);
 
-
   std::vector<torch::jit::IValue> inputs_;
 
   for (auto in : inputs) {
@@ -255,7 +239,6 @@ TEST(CppAPITests, TestCollectionListInputOutput) {
 
   complex_inputs.push_back(input_list_ivalue);
 
-
   auto out = mod.forward(complex_inputs);
   LOG_DEBUG("Finish torchscirpt forward");
 
@@ -263,12 +246,10 @@ TEST(CppAPITests, TestCollectionListInputOutput) {
 
   auto input_shape_ivalue = torch::jit::IValue(std::move(c10::make_intrusive<torch_tensorrt::Input>(input_shape)));
 
-
   c10::TypePtr elementType = input_shape_ivalue.type();
   auto list = c10::impl::GenericList(elementType);
   list.push_back(input_shape_ivalue);
   list.push_back(input_shape_ivalue);
-
 
   torch::jit::IValue complex_input_shape(list);
   std::tuple<torch::jit::IValue> input_tuple2(complex_input_shape);
@@ -288,13 +269,13 @@ TEST(CppAPITests, TestCollectionListInputOutput) {
   LOG_DEBUG("Finish compile");
   auto trt_out = trt_mod.forward(complex_inputs);
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(out.toList().vec()[0].toTensor(), trt_out.toList().vec()[0].toTensor(), 1e-5));
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(out.toList().vec()[1].toTensor(), trt_out.toList().vec()[1].toTensor(), 1e-5));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(
+      out.toList().vec()[0].toTensor(), trt_out.toList().vec()[0].toTensor(), 1e-5));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(
+      out.toList().vec()[1].toTensor(), trt_out.toList().vec()[1].toTensor(), 1e-5));
 }
 
-
 TEST(CppAPITests, TestCollectionComplexModel) {
-
   std::string path = "tests/modules/list_input_tuple_output_scripted.jit.pt";
   torch::Tensor in0 = torch::randn({1, 3, 512, 512}, torch::kCUDA).to(torch::kHalf);
   std::vector<at::Tensor> inputs;
@@ -310,7 +291,6 @@ TEST(CppAPITests, TestCollectionComplexModel) {
   mod.eval();
   mod.to(torch::kCUDA);
 
-
   std::vector<torch::jit::IValue> inputs_;
 
   for (auto in : inputs) {
@@ -326,7 +306,6 @@ TEST(CppAPITests, TestCollectionComplexModel) {
 
   complex_inputs.push_back(input_list_ivalue);
 
-
   auto out = mod.forward(complex_inputs);
   LOG_DEBUG("Finish torchscirpt forward");
 
@@ -338,7 +317,6 @@ TEST(CppAPITests, TestCollectionComplexModel) {
   auto list = c10::impl::GenericList(elementType);
   list.push_back(input_shape_ivalue);
   list.push_back(input_shape_ivalue);
-
 
   torch::jit::IValue complex_input_shape(list);
   std::tuple<torch::jit::IValue> input_tuple2(complex_input_shape);
@@ -358,6 +336,8 @@ TEST(CppAPITests, TestCollectionComplexModel) {
   LOG_DEBUG("Finish compile");
   auto trt_out = trt_mod.forward(complex_inputs);
 
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(out.toTuple()->elements()[0].toTensor(), trt_out.toTuple()->elements()[0].toTensor(), 1e-5));
-  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(out.toTuple()->elements()[1].toTensor(), trt_out.toTuple()->elements()[1].toTensor(), 1e-5));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(
+      out.toTuple()->elements()[0].toTensor(), trt_out.toTuple()->elements()[0].toTensor(), 1e-5));
+  ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(
+      out.toTuple()->elements()[1].toTensor(), trt_out.toTuple()->elements()[1].toTensor(), 1e-5));
 }

@@ -12,7 +12,7 @@ namespace core {
 namespace ir {
 
 struct Input : torch::CustomClassHolder {
-  Input() {};
+  Input(){};
   Input(
       std::vector<int64_t> shape,
       nvinfer1::DataType dtype = nvinfer1::DataType::kFLOAT,
@@ -42,8 +42,8 @@ struct Input : torch::CustomClassHolder {
 struct GraphInputs {
   GraphInputs(std::vector<ir::Input> inputs);
   GraphInputs(torch::jit::IValue& input_signature);
-  torch::jit::IValue input_signature;  // nested Input, full input spec
-  std::vector<Input> inputs;  // flattend Input
+  torch::jit::IValue input_signature; // nested Input, full input spec
+  std::vector<Input> inputs; // flattend Input
   std::vector<std::vector<Input>> collection_inputs; // only support two layer nesting, e.g. ((a, b), [c, d], e)
 };
 
@@ -67,7 +67,9 @@ CollectionInputSpecMap associate_specs_with_collection_inputs(
     ir::GraphInputs graph_inputs,
     StaticParams& static_params);
 InputSpecMap pair_input_vals_with_specs(std::vector<const torch::jit::Value*> vals, std::vector<Input> specs);
-CollectionInputSpecMap pair_input_vals_with_specs_collection(std::vector<const torch::jit::Value*> vals, std::vector<std::vector<Input>>& specs);
+CollectionInputSpecMap pair_input_vals_with_specs_collection(
+    std::vector<const torch::jit::Value*> vals,
+    std::vector<std::vector<Input>>& specs);
 std::vector<const torch::jit::Value*> get_tensor_inputs(
     std::shared_ptr<torch::jit::Graph>& g,
     StaticParams& static_params);

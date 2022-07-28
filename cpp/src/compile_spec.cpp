@@ -29,40 +29,38 @@ CompileSpec::CompileSpec(std::vector<std::vector<int64_t>> fixed_sizes) {
 }
 
 CompileSpec::CompileSpec(std::vector<Input> inputs) {
-    graph_inputs.inputs = std::move(inputs);
+  graph_inputs.inputs = std::move(inputs);
 }
 
 CompileSpec::CompileSpec(torch::jit::IValue input_signature) {
-    graph_inputs.input_signature = input_signature;
+  graph_inputs.input_signature = input_signature;
 }
 
-
-
 void to_internal_input_signature(torch::jit::IValue input_ivalue, torch::jit::IValue& converted_ivalue) {
-    if (input_ivalue.isTuple()) {
-      auto input_tuple = input_ivalue.toTuple();
-      std::vector<torch::jit::IValue> converted_elements;
-      for (auto item: input_tuple->elements()) {
-        torch::jit::IValue converted_item;
-        to_internal_input_signature(item, converted_item);
-        converted_elements.push_back(converted_item);
-        auto tuple_ptr = c10::ivalue::Tuple::create(converted_elements);
-        converted_ivalue = torch::jit::IValue(tuple_ptr);
-      }
-    } else if(input_ivalue.isList()) {
-      auto input_list = input_ivalue.toList().vec();
-      c10::TypePtr type = input_list[0].type();
-      auto converted_elements = c10::impl::GenericList(type);
-      for (auto item: input_list) {
-        torch::jit::IValue converted_item;
-        to_internal_input_signature(item, converted_item);
-        converted_elements.push_back(converted_item);
-      }
-      converted_ivalue = torch::jit::IValue(converted_elements);
-    } else if(input_ivalue.isCustomClass()) {
-      torchtrt::core::ir::Input cur_input = to_internal_input(*(input_ivalue.toCustomClass<torchtrt::Input>()));
-      converted_ivalue = torch::jit::IValue(std::move(c10::make_intrusive<torch_tensorrt::core::ir::Input>(cur_input)));
+  if (input_ivalue.isTuple()) {
+    auto input_tuple = input_ivalue.toTuple();
+    std::vector<torch::jit::IValue> converted_elements;
+    for (auto item : input_tuple->elements()) {
+      torch::jit::IValue converted_item;
+      to_internal_input_signature(item, converted_item);
+      converted_elements.push_back(converted_item);
+      auto tuple_ptr = c10::ivalue::Tuple::create(converted_elements);
+      converted_ivalue = torch::jit::IValue(tuple_ptr);
     }
+  } else if (input_ivalue.isList()) {
+    auto input_list = input_ivalue.toList().vec();
+    c10::TypePtr type = input_list[0].type();
+    auto converted_elements = c10::impl::GenericList(type);
+    for (auto item : input_list) {
+      torch::jit::IValue converted_item;
+      to_internal_input_signature(item, converted_item);
+      converted_elements.push_back(converted_item);
+    }
+    converted_ivalue = torch::jit::IValue(converted_elements);
+  } else if (input_ivalue.isCustomClass()) {
+    torchtrt::core::ir::Input cur_input = to_internal_input(*(input_ivalue.toCustomClass<torchtrt::Input>()));
+    converted_ivalue = torch::jit::IValue(std::move(c10::make_intrusive<torch_tensorrt::core::ir::Input>(cur_input)));
+  }
 }
 
 torchtrt::core::CompileSpec init_compile_spec(CompileSpec external) {

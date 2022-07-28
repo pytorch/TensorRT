@@ -58,7 +58,7 @@ struct Input : torch::CustomClassHolder {
 };
 
 struct InputSignature : torch::CustomClassHolder {
-  torch::jit::IValue signature_ivalue;  // nested Input, full input spec
+  torch::jit::IValue signature_ivalue; // nested Input, full input spec
   ADD_FIELD_GET_SET(signature_ivalue, torch::jit::IValue);
   std::string to_str();
 };

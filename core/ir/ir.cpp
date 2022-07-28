@@ -35,7 +35,9 @@ InputSpecMap pair_input_vals_with_specs(std::vector<const torch::jit::Value*> va
   return a;
 }
 
-CollectionInputSpecMap pair_input_vals_with_specs_collection(std::vector<const torch::jit::Value*> vals, std::vector<std::vector<Input>>& specs) {
+CollectionInputSpecMap pair_input_vals_with_specs_collection(
+    std::vector<const torch::jit::Value*> vals,
+    std::vector<std::vector<Input>>& specs) {
   TORCHTRT_CHECK(
       vals.size() == specs.size(),
       "Expected dimension specifications for all input tensors"
@@ -64,7 +66,7 @@ std::vector<const torch::jit::Value*> get_tensor_inputs(
     // input.1:Tensor -> used
     if (in->type()->isSubtypeOf(c10::TensorType::get()) && static_params.find(in) == static_params.end()) {
       input_tensors.push_back(in);
-    } 
+    }
   }
   return input_tensors;
 }
@@ -80,7 +82,8 @@ std::vector<const torch::jit::Value*> get_collection_inputs(
     if (in->type()->isSubtypeOf(c10::TensorType::get()) && static_params.find(in) == static_params.end()) {
       input_tensors.push_back(in);
     } else if (in->type()->kind() == torch::jit::TypeKind::TupleType && static_params.find(in) == static_params.end()) {
-    // } else if (in->type()->isSubtypeOf(c10::TupleType::create()) && static_params.find(in) == static_params.end()) {
+      // } else if (in->type()->isSubtypeOf(c10::TupleType::create()) && static_params.find(in) == static_params.end())
+      // {
       input_tensors.push_back(in); // push original tuple
       at::ArrayRef<torch::jit::Value*> unpack_tuple = torch::jit::createTupleUnpack(in);
       LOG_DEBUG("get_collection_inputs, tuple size " << unpack_tuple.size());
@@ -190,15 +193,15 @@ TypeMap get_block_first_calc_dtypes_opt(torch::jit::Block* b) {
     if (i->type() == c10::TensorType::get()) {
       torch::jit::Value* in = i;
       types.insert({in, get_value_first_calc_dtype_opt(b, i)});
-    } else if(i->type()->cast<c10::TupleType>()) {
+    } else if (i->type()->cast<c10::TupleType>()) {
       // make sure very time get the same ptr
       at::ArrayRef<torch::jit::Value*> unpack_tuple = torch::jit::createTupleUnpack(i);
       LOG_DEBUG("Tuple size " << unpack_tuple.size());
-      for (auto item: unpack_tuple) {
+      for (auto item : unpack_tuple) {
         torch::jit::Value* in = item;
         types.insert({in, get_value_first_calc_dtype_opt(b, i)});
       }
-    } else if(i->type()->isSubtypeOf(c10::ListType::ofTensors())) {
+    } else if (i->type()->isSubtypeOf(c10::ListType::ofTensors())) {
       LOG_INFO("Unsupported type of c10::ListType::ofTensors()");
     }
   }
@@ -212,7 +215,7 @@ CollectionTypeMap get_block_first_calc_dtypes_opt_collection(torch::jit::Block* 
       torch::jit::Value* in = i;
       types.insert({in, {get_value_first_calc_dtype_opt(b, i)}});
 
-    } else if(i->type()->kind() == torch::jit::TypeKind::TupleType) {
+    } else if (i->type()->kind() == torch::jit::TypeKind::TupleType) {
       // TODO: to evaluate the data type of tuple element
       // make sure very time get the same ptr
       // c10::optional<at::ScalarType> tp = get_value_first_calc_dtype_opt(b, i);
@@ -220,9 +223,9 @@ CollectionTypeMap get_block_first_calc_dtypes_opt_collection(torch::jit::Block* 
       // TODO: calculate the tuple element type, currently we use {} as default datatype
       // std::vector<c10::optional<at::ScalarType>> dytpes(unpack_tuple.size(), tp);
       std::vector<c10::optional<at::ScalarType>> dytpes(unpack_tuple.size());
-      types.insert({i, dytpes}); // insert an empty 
+      types.insert({i, dytpes}); // insert an empty
 
-    } else if(i->type()->kind() == torch::jit::TypeKind::ListType) {
+    } else if (i->type()->kind() == torch::jit::TypeKind::ListType) {
       // TODO: to decide the size of list and type of list element
       LOG_DEBUG("get_block_first_calc_dtypes_opt ListType: use size " << i->uses().size());
       c10::optional<at::ScalarType> tp = get_value_first_calc_dtype_opt(b, i);
@@ -234,8 +237,7 @@ CollectionTypeMap get_block_first_calc_dtypes_opt_collection(torch::jit::Block* 
   return types;
 }
 
-static auto core_input_container =
-    torch::class_<Input>("_torch_tensorrt_core_ir", "Input").def(torch::init<>());
+static auto core_input_container = torch::class_<Input>("_torch_tensorrt_core_ir", "Input").def(torch::init<>());
 
 } // namespace ir
 } // namespace core

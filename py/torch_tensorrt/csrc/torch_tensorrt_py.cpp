@@ -1,8 +1,8 @@
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
 
-#include "Python.h"
 #include "ATen/core/jit_type.h"
+#include "Python.h"
 #include "core/compiler.h"
 #include "core/conversion/conversion.h"
 #include "tensorrt_classes.h"
@@ -182,7 +182,8 @@ PYBIND11_MODULE(_C, m) {
   py::class_<InputSignature>(m, "InputSignature")
       .def(pybind11::init([](py::object py_obj) {
         InputSignature input_signature;
-        input_signature.signature_ivalue = torch::jit::toIValue(std::move(py_obj), c10::PyObjectType::get(), c10::nullopt);
+        input_signature.signature_ivalue =
+            torch::jit::toIValue(std::move(py_obj), c10::PyObjectType::get(), c10::nullopt);
         return input_signature;
       }))
       .def("__str__", &InputSignature::to_str)

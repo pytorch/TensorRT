@@ -108,35 +108,35 @@ std::string sig_to_str(torch::jit::IValue input_sig) {
   if (input_sig.isTuple()) {
     auto input_tuple = input_sig.toTuple();
     std::vector<std::string> children;
-    for (auto item: input_tuple->elements()) {
+    for (auto item : input_tuple->elements()) {
       auto child = sig_to_str(item);
       children.push_back(child);
     }
     std::stringstream ss;
     ss << "(";
     for (auto i : children) {
-      ss <<  i << ", ";
+      ss << i << ", ";
     }
     ss << ")";
     return ss.str();
-  } else if(input_sig.isList()) {
+  } else if (input_sig.isList()) {
     auto input_list = input_sig.toList().vec();
     std::vector<std::string> children;
-    for (auto item: input_list) {
+    for (auto item : input_list) {
       auto child = sig_to_str(item);
       children.push_back(child);
     }
     std::stringstream ss;
     ss << "[";
     for (auto i : children) {
-      ss <<  i << ", ";
+      ss << i << ", ";
     }
     ss << "]";
     return ss.str();
-  } else if(input_sig.isCustomClass()) {
+  } else if (input_sig.isCustomClass()) {
     auto cur_input = input_sig.toCustomClass<Input>();
     return cur_input->to_str();
-  } else if(input_sig.isPyObject()) {
+  } else if (input_sig.isPyObject()) {
     auto py_object_holder = input_sig.toPyObjectHolder();
     auto infer_type = py_object_holder->tryToInferType();
     auto type = infer_type.type();
@@ -238,27 +238,27 @@ void to_internal_input_signature(torch::jit::IValue input_ivalue, torch::jit::IV
   if (input_ivalue.isTuple()) {
     auto input_tuple = input_ivalue.toTuple();
     std::vector<torch::jit::IValue> converted_elements;
-    for (auto item: input_tuple->elements()) {
+    for (auto item : input_tuple->elements()) {
       torch::jit::IValue converted_item;
       to_internal_input_signature(item, converted_item);
       converted_elements.push_back(converted_item);
       auto tuple_ptr = c10::ivalue::Tuple::create(converted_elements);
       converted_ivalue = torch::jit::IValue(tuple_ptr);
     }
-  } else if(input_ivalue.isList()) {
+  } else if (input_ivalue.isList()) {
     auto input_list = input_ivalue.toList().vec();
     c10::TypePtr type = input_list[0].type();
     auto converted_elements = c10::impl::GenericList(type);
-    for (auto item: input_list) {
+    for (auto item : input_list) {
       torch::jit::IValue converted_item;
       to_internal_input_signature(item, converted_item);
       converted_elements.push_back(converted_item);
     }
     converted_ivalue = torch::jit::IValue(converted_elements);
-  } else if(input_ivalue.isCustomClass()) {
+  } else if (input_ivalue.isCustomClass()) {
     core::ir::Input cur_input = (*(input_ivalue.toCustomClass<Input>())).toInternalInput();
     converted_ivalue = torch::jit::IValue(std::move(c10::make_intrusive<core::ir::Input>(cur_input)));
-  } else if(input_ivalue.isPyObject()) {
+  } else if (input_ivalue.isPyObject()) {
     auto py_object_holder = input_ivalue.toPyObjectHolder();
     auto infer_type = py_object_holder->tryToInferType();
     auto type = infer_type.type();
@@ -325,11 +325,17 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
   info.convert_info.engine_settings.num_avg_timing_iters = num_avg_timing_iters;
   TORCHTRT_CHECK(workspace_size >= 0, "workspace_size must be 0 or greater");
   info.convert_info.engine_settings.workspace_size = workspace_size;
-  TORCHTRT_CHECK(dla_sram_size >= 4096, "DLA managed SRAM size must be at least 4 KiB and must be a power of 2. This defaults to 1 MiB");
+  TORCHTRT_CHECK(
+      dla_sram_size >= 4096,
+      "DLA managed SRAM size must be at least 4 KiB and must be a power of 2. This defaults to 1 MiB");
   info.convert_info.engine_settings.dla_sram_size = dla_sram_size;
-  TORCHTRT_CHECK(dla_local_dram_size >= 4096, "DLA Local DRAM size must be at least 4 KiB and must be a power of 2. This defaults to 1 GiB");
+  TORCHTRT_CHECK(
+      dla_local_dram_size >= 4096,
+      "DLA Local DRAM size must be at least 4 KiB and must be a power of 2. This defaults to 1 GiB");
   info.convert_info.engine_settings.dla_local_dram_size = dla_local_dram_size;
-  TORCHTRT_CHECK(dla_global_dram_size >= 4096, "DLA Global DRAM size must be at least 4 KiB and must be a power of 2. This defaults to 512 MiB");
+  TORCHTRT_CHECK(
+      dla_global_dram_size >= 4096,
+      "DLA Global DRAM size must be at least 4 KiB and must be a power of 2. This defaults to 512 MiB");
   info.convert_info.engine_settings.dla_global_dram_size = dla_global_dram_size;
   return info;
 }
@@ -348,7 +354,7 @@ std::string CompileSpec::stringify() {
   }
   ss << "    \"Enabled Precision\": [";
   for (auto p : enabled_precisions) {
-    ss << to_str(p) << ", " ;
+    ss << to_str(p) << ", ";
   }
   ss << "]" << std::endl;
   ss << "    \"TF32 Disabled\": " << disable_tf32 << std::endl;
