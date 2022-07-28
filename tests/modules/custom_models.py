@@ -133,6 +133,7 @@ class TupleInputOutput(nn.Module):
     def forward(self, z: Tuple[torch.Tensor, torch.Tensor]):
         r1 = z[0] + z[1]
         r2 = z[0] - z[1]
+        r1 = r1 * 10
         r = (r1, r2)
         return r
 

@@ -104,10 +104,54 @@ std::string Input::to_str() {
   return ss.str();
 }
 
+std::string sig_to_str(torch::jit::IValue input_sig) {
+  if (input_sig.isTuple()) {
+    auto input_tuple = input_sig.toTuple();
+    std::vector<std::string> children;
+    for (auto item: input_tuple->elements()) {
+      auto child = sig_to_str(item);
+      children.push_back(child);
+    }
+    std::stringstream ss;
+    ss << "(";
+    for (auto i : children) {
+      ss <<  i << ", ";
+    }
+    ss << ")";
+    return ss.str();
+  } else if(input_sig.isList()) {
+    auto input_list = input_sig.toList().vec();
+    std::vector<std::string> children;
+    for (auto item: input_list) {
+      auto child = sig_to_str(item);
+      children.push_back(child);
+    }
+    std::stringstream ss;
+    ss << "[";
+    for (auto i : children) {
+      ss <<  i << ", ";
+    }
+    ss << "]";
+    return ss.str();
+  } else if(input_sig.isCustomClass()) {
+    auto cur_input = input_sig.toCustomClass<Input>();
+    return cur_input->to_str();
+  } else if(input_sig.isPyObject()) {
+    auto py_object_holder = input_sig.toPyObjectHolder();
+    auto infer_type = py_object_holder->tryToInferType();
+    auto type = infer_type.type();
+    torch::jit::IValue ival = py_object_holder->toIValue(type);
+    torch::jit::IValue converted_item;
+    return sig_to_str(ival);
+  } else {
+    LOG_ERROR("Unknown input spec type");
+    return "";
+  }
+}
+
 std::string InputSignature::to_str() {
   std::stringstream ss;
-  ss << signature_ivalue;
-  return ss.str();
+  return sig_to_str(signature_ivalue);
 }
 
 std::string to_str(DeviceType value) {
@@ -191,40 +235,40 @@ std::string TorchFallback::to_str() {
 }
 
 void to_internal_input_signature(torch::jit::IValue input_ivalue, torch::jit::IValue& converted_ivalue) {
-    if (input_ivalue.isTuple()) {
-      auto input_tuple = input_ivalue.toTuple();
-      std::vector<torch::jit::IValue> converted_elements;
-      for (auto item: input_tuple->elements()) {
-        torch::jit::IValue converted_item;
-        to_internal_input_signature(item, converted_item);
-        converted_elements.push_back(converted_item);
-        auto tuple_ptr = c10::ivalue::Tuple::create(converted_elements);
-        converted_ivalue = torch::jit::IValue(tuple_ptr);
-      }
-    } else if(input_ivalue.isList()) {
-      auto input_list = input_ivalue.toList().vec();
-      c10::TypePtr type = input_list[0].type();
-      auto converted_elements = c10::impl::GenericList(type);
-      for (auto item: input_list) {
-        torch::jit::IValue converted_item;
-        to_internal_input_signature(item, converted_item);
-        converted_elements.push_back(converted_item);
-      }
-      converted_ivalue = torch::jit::IValue(converted_elements);
-    } else if(input_ivalue.isCustomClass()) {
-      core::ir::Input cur_input = (*(input_ivalue.toCustomClass<Input>())).toInternalInput();
-      converted_ivalue = torch::jit::IValue(std::move(c10::make_intrusive<core::ir::Input>(cur_input)));
-    } else if(input_ivalue.isPyObject()) {
-      auto py_object_holder = input_ivalue.toPyObjectHolder();
-      auto infer_type = py_object_holder->tryToInferType();
-      auto type = infer_type.type();
-      torch::jit::IValue ival = py_object_holder->toIValue(type);
+  if (input_ivalue.isTuple()) {
+    auto input_tuple = input_ivalue.toTuple();
+    std::vector<torch::jit::IValue> converted_elements;
+    for (auto item: input_tuple->elements()) {
       torch::jit::IValue converted_item;
-      to_internal_input_signature(ival, converted_item);
-      converted_ivalue = torch::jit::IValue(converted_item);
-    } else {
-      LOG_ERROR("Unknown input spec type");
+      to_internal_input_signature(item, converted_item);
+      converted_elements.push_back(converted_item);
+      auto tuple_ptr = c10::ivalue::Tuple::create(converted_elements);
+      converted_ivalue = torch::jit::IValue(tuple_ptr);
     }
+  } else if(input_ivalue.isList()) {
+    auto input_list = input_ivalue.toList().vec();
+    c10::TypePtr type = input_list[0].type();
+    auto converted_elements = c10::impl::GenericList(type);
+    for (auto item: input_list) {
+      torch::jit::IValue converted_item;
+      to_internal_input_signature(item, converted_item);
+      converted_elements.push_back(converted_item);
+    }
+    converted_ivalue = torch::jit::IValue(converted_elements);
+  } else if(input_ivalue.isCustomClass()) {
+    core::ir::Input cur_input = (*(input_ivalue.toCustomClass<Input>())).toInternalInput();
+    converted_ivalue = torch::jit::IValue(std::move(c10::make_intrusive<core::ir::Input>(cur_input)));
+  } else if(input_ivalue.isPyObject()) {
+    auto py_object_holder = input_ivalue.toPyObjectHolder();
+    auto infer_type = py_object_holder->tryToInferType();
+    auto type = infer_type.type();
+    torch::jit::IValue ival = py_object_holder->toIValue(type);
+    torch::jit::IValue converted_item;
+    to_internal_input_signature(ival, converted_item);
+    converted_ivalue = torch::jit::IValue(converted_item);
+  } else {
+    LOG_ERROR("Unknown input spec type");
+  }
 }
 
 core::CompileSpec init_compile_spec(CompileSpec external) {
