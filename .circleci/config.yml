@@ -662,9 +662,6 @@ jobs:
 
   package-jetson:
     parameters:
-      enabled:
-        type: boolean
-        default: false
       torch-build:
         type: string
       jetpack-version:
@@ -812,7 +809,6 @@ workflows:
           python-version: 3.8.10
 
 
-
       - build-x86_64-pyt-release:
           torch-build: << pipeline.parameters.torch-release-build >>
           torch-build-index: << pipeline.parameters.torch-release-build-index >>
@@ -837,7 +833,7 @@ workflows:
           requires:
             - build-x86_64-pyt-release
 
-      - test-py-ts-x86_64:
+      - test-py-fx-x86_64:
           name: test-py-fx-x86_64-pyt-release
           channel: "release"
           torch-build: << pipeline.parameters.torch-release-build >>
@@ -845,7 +841,6 @@ workflows:
           trt-version-long: << pipeline.parameters.trt-release-version-long >>
           requires:
             - build-x86_64-pyt-release
-
 
 
       - build-x86_64-pyt-nightly:
@@ -880,6 +875,7 @@ workflows:
           trt-version-long: << pipeline.parameters.trt-nightly-version-long >>
           requires:
             - build-x86_64-pyt-nightly
+            
   release:
     when: << pipeline.parameters.packaging-enabled >>
     jobs:
@@ -891,6 +887,7 @@ workflows:
       - build-x86_64-pyt-release:
           torch-build: << pipeline.parameters.torch-release-build >>
           torch-build-index: << pipeline.parameters.torch-release-build-index >>
+
 
       - test-core-cpp-x86_64:
           name: test-core-cpp-x86_64-pyt-release
@@ -912,7 +909,7 @@ workflows:
           requires:
             - build-x86_64-pyt-release
 
-      - test-py-ts-x86_64:
+      - test-py-fx-x86_64:
           name: test-py-fx-x86_64-pyt-release
           channel: "release"
           torch-build: << pipeline.parameters.torch-release-build >>
@@ -920,6 +917,7 @@ workflows:
           trt-version-long: << pipeline.parameters.trt-release-version-long >>
           requires:
             - build-x86_64-pyt-release
+
 
       - package-x86_64:
           name: package-release-x86_64
@@ -937,7 +935,6 @@ workflows:
           torch-build: << pipeline.parameters.torch-jetson-build >>
           jetpack-version: << pipeline.parameters.jetpack-version >>
           python-version: 3.8.10
-
           requires:
             - build-aarch64-pyt-jetson
 
@@ -947,7 +944,6 @@ workflows:
           torch-build: << pipeline.parameters.torch-jetson-build >>
           jetpack-version: << pipeline.parameters.jetpack-version >>
           python-version: 3.8.10
-
 
 
       - build-x86_64-pyt-release:
@@ -974,7 +970,7 @@ workflows:
           requires:
             - build-x86_64-pyt-release
 
-      - test-py-ts-x86_64:
+      - test-py-fx-x86_64:
           name: test-py-fx-x86_64-pyt-release
           channel: "release"
           torch-build: << pipeline.parameters.torch-release-build >>
@@ -982,14 +978,6 @@ workflows:
           trt-version-long: << pipeline.parameters.trt-release-version-long >>
           requires:
             - build-x86_64-pyt-release
-
-      - deploy-py-x86_64:
-          name: deploy-release-x86_86-py
-          torch-build: << pipeline.parameters.torch-release-build >>
-          torch-build-index: << pipeline.parameters.torch-release-build-index >>
-          trt-version-short: << pipeline.parameters.trt-release-version-short >>
-          trt-version-long: << pipeline.parameters.trt-release-version-long >>
-
 
 
       - build-x86_64-pyt-nightly:
@@ -1024,4 +1012,3 @@ workflows:
           trt-version-long: << pipeline.parameters.trt-nightly-version-long >>
           requires:
             - build-x86_64-pyt-nightly
-
