@@ -24,10 +24,14 @@ JETPACK_VERSION = None
 
 FX_ONLY = False
 
+RELEASE = False
+
+CI_RELEASE = False
+
 __version__ = '1.2.0a0'
 __cuda_version__ = '11.3'
-__cudnn_version__ = '8.2'
-__tensorrt_version__ = '8.2'
+__cudnn_version__ = '8.4'
+__tensorrt_version__ = '8.4'
 
 def get_git_revision_short_hash() -> str:
     return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode('ascii').strip()
@@ -39,7 +43,13 @@ if "--fx-only" in sys.argv:
 if "--release" not in sys.argv:
     __version__ = __version__ + "+" + get_git_revision_short_hash()
 else:
+    RELEASE = True
     sys.argv.remove("--release")
+
+if "--ci" in sys.argv:
+    sys.argv.remove("--ci")
+    if RELEASE:
+        CI_RELEASE = True
 
 if "--use-cxx11-abi" in sys.argv:
     sys.argv.remove("--use-cxx11-abi")
@@ -110,6 +120,10 @@ def build_libtorchtrt_pre_cxx11_abi(develop=True, use_dist_dir=True, cxx11_abi=F
     elif JETPACK_VERSION == "4.6":
         cmd.append("--platforms=//toolchains:jetpack_4.6")
         print("Jetpack version: >=4.6")
+
+    if CI_RELEASE:
+        cmd.append("--platforms=//toolchains:ci_rhel_x86_64_linux")
+        print("CI based build")
 
     print("building libtorchtrt")
     status_code = subprocess.run(cmd).returncode
