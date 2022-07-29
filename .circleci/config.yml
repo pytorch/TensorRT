@@ -662,6 +662,9 @@ jobs:
 
   package-jetson:
     parameters:
+      enabled:
+        type: boolean
+        default: false
       torch-build:
         type: string
       jetpack-version:
@@ -676,63 +679,72 @@ jobs:
       image: ubuntu-2004:202201-02
     resource_class: arm.xlarge
     steps:
-      - checkout
-      #- run:
-      #    name: Upgrade base
-      #    command: |
-      #      sudo apt clean
-      #      sudo apt update
-      #      sudo apt upgrade
-      #      sudo apt install software-properties-common
-      - install-cuda:
-          os: "ubuntu2004"
-          platform: "sbsa"
-          cuda-pkg-name: "cuda-toolkit-11-4"
-      - run:
-          name: Install openblas
-          command: sudo apt install libopenblas-dev
-      - create-env:
-          os: "ubuntu2004"
-          platform: "sbsa"
-          cudnn-version: << pipeline.parameters.cudnn-jetson-version >>
-          trt-version-short:  << pipeline.parameters.trt-jetson-version-short >>
-          bazel-version: "5.1.1"
-          bazel-platform: "arm64"
-      - run:
-          name: Set python version
-          command: |
-            pyenv install << parameters.python-version >>
-            pyenv global << parameters.python-version >>
-      - run:
-          name: Install NGC Torch
-          environment:
-            TORCH_INSTALL: https://developer.download.nvidia.com/compute/redist/jp/v<< parameters.jetpack-version >>/pytorch/<< parameters.torch-build >>
-          command: |
-            set -e
-            python3 -m pip install --upgrade pip; python3 -m pip install setuptools wheel; python3 -m pip install expecttest xmlrunner hypothesis aiohttp numpy=='1.19.4' pyyaml scipy=='1.5.3' ninja cython typing_extensions protobuf; export "LD_LIBRARY_PATH=/usr/lib/llvm-8/lib:$LD_LIBRARY_PATH"; python3 -m pip install --upgrade protobuf; python3 -m pip install --no-cache $TORCH_INSTALL
-      - build-py-cxx11-abi:
-          platform: "sbsa"
-          release: true
-      - run:
-          name: Build cxx11-abi tarball
-          command: |
-            set -e
-            bazel build //:libtorchtrt -c opt
-            CUDA_VERSION=$(cd torch_tensorrt && python3 -c "from _version import __cuda_version__;print(__cuda_version__)")
-            TORCHTRT_VERSION=$(cd torch_tensorrt && python3 -c "from _version import __version__;print(__version__)")
-            TRT_VERSION=$(cd torch_tensorrt && python3 -c "from _version import __tensorrt_version__;print(__tensorrt_version__)")
-            CUDNN_VERSION=$(cd torch_tensorrt && python3 -c "from _version import __cudnn_version__;print(__cudnn_version__)")
-            pip3 install -r ~/project/py/requirements.txt
-            TORCH_VERSION=$(python3 -c "from torch import __version__;print(__version__.split('+')[0])")
-            cp ~/project/bazel-bin/libtorchtrt.tar.gz ~/project/py/dist/libtorchtrt-${TORCHTRT_VERSION}-cudnn${CUDNN_VERSION}-tensorrt${TRT_VERSION}-cuda${CUDA_VERSION}-libtorch-${TORCH_VERSION}.tar.gz
-      - run:
-          name: Move to release dir
-          command: |
-            mkdir -p /tmp/dist/jetson
-            cp -r ~/project/py/dist/* /tmp/dist/jetson
-      - store_artifacts:
-          path: /tmp/dist/jetson
-          destination: aarch64-release-pkgs
+      - when:
+          condition: << parameters.enabled >>
+          steps:
+            - checkout
+            #- run:
+            #    name: Upgrade base
+            #    command: |
+            #      sudo apt clean
+            #      sudo apt update
+            #      sudo apt upgrade
+            #      sudo apt install software-properties-common
+            - install-cuda:
+                os: "ubuntu2004"
+                platform: "sbsa"
+                cuda-pkg-name: "cuda-toolkit-11-4"
+            - run:
+                name: Install openblas
+                command: sudo apt install libopenblas-dev
+            - create-env:
+                os: "ubuntu2004"
+                platform: "sbsa"
+                cudnn-version: << pipeline.parameters.cudnn-jetson-version >>
+                trt-version-short:  << pipeline.parameters.trt-jetson-version-short >>
+                bazel-version: "5.1.1"
+                bazel-platform: "arm64"
+            - run:
+                name: Set python version
+                command: |
+                  pyenv install << parameters.python-version >>
+                  pyenv global << parameters.python-version >>
+            - run:
+                name: Install NGC Torch
+                environment:
+                  TORCH_INSTALL: https://developer.download.nvidia.com/compute/redist/jp/v<< parameters.jetpack-version >>/pytorch/<< parameters.torch-build >>
+                command: |
+                  set -e
+                  python3 -m pip install --upgrade pip; python3 -m pip install setuptools wheel; python3 -m pip install expecttest xmlrunner hypothesis aiohttp numpy=='1.19.4' pyyaml scipy=='1.5.3' ninja cython typing_extensions protobuf; export "LD_LIBRARY_PATH=/usr/lib/llvm-8/lib:$LD_LIBRARY_PATH"; python3 -m pip install --upgrade protobuf; python3 -m pip install --no-cache $TORCH_INSTALL
+            - build-py-cxx11-abi:
+                platform: "sbsa"
+                release: true
+            - run:
+                name: Build cxx11-abi tarball
+                command: |
+                  set -e
+                  bazel build //:libtorchtrt -c opt
+                  CUDA_VERSION=$(cd torch_tensorrt && python3 -c "from _version import __cuda_version__;print(__cuda_version__)")
+                  TORCHTRT_VERSION=$(cd torch_tensorrt && python3 -c "from _version import __version__;print(__version__)")
+                  TRT_VERSION=$(cd torch_tensorrt && python3 -c "from _version import __tensorrt_version__;print(__tensorrt_version__)")
+                  CUDNN_VERSION=$(cd torch_tensorrt && python3 -c "from _version import __cudnn_version__;print(__cudnn_version__)")
+                  pip3 install -r ~/project/py/requirements.txt
+                  TORCH_VERSION=$(python3 -c "from torch import __version__;print(__version__.split('+')[0])")
+                  cp ~/project/bazel-bin/libtorchtrt.tar.gz ~/project/py/dist/libtorchtrt-${TORCHTRT_VERSION}-cudnn${CUDNN_VERSION}-tensorrt${TRT_VERSION}-cuda${CUDA_VERSION}-libtorch-${TORCH_VERSION}.tar.gz
+            - run:
+                name: Move to release dir
+                command: |
+                  mkdir -p /tmp/dist/jetson
+                  cp -r ~/project/py/dist/* /tmp/dist/jetson
+            - store_artifacts:
+                path: /tmp/dist/jetson
+                destination: aarch64-release-pkgs
+      - unless:
+          condition: << parameters.enabled >>
+          steps:
+            - run:
+                name: Skipped packaging
+                command: echo -e "Packaging stage not enabled"
 
 
 parameters:
@@ -809,6 +821,7 @@ workflows:
           python-version: 3.8.10
 
 
+
       - build-x86_64-pyt-release:
           torch-build: << pipeline.parameters.torch-release-build >>
           torch-build-index: << pipeline.parameters.torch-release-build-index >>
@@ -833,7 +846,7 @@ workflows:
           requires:
             - build-x86_64-pyt-release
 
-      - test-py-fx-x86_64:
+      - test-py-ts-x86_64:
           name: test-py-fx-x86_64-pyt-release
           channel: "release"
           torch-build: << pipeline.parameters.torch-release-build >>
@@ -841,6 +854,7 @@ workflows:
           trt-version-long: << pipeline.parameters.trt-release-version-long >>
           requires:
             - build-x86_64-pyt-release
+
 
 
       - build-x86_64-pyt-nightly:
@@ -875,7 +889,6 @@ workflows:
           trt-version-long: << pipeline.parameters.trt-nightly-version-long >>
           requires:
             - build-x86_64-pyt-nightly
-            
   release:
     when: << pipeline.parameters.packaging-enabled >>
     jobs:
@@ -887,7 +900,6 @@ workflows:
       - build-x86_64-pyt-release:
           torch-build: << pipeline.parameters.torch-release-build >>
           torch-build-index: << pipeline.parameters.torch-release-build-index >>
-
 
       - test-core-cpp-x86_64:
           name: test-core-cpp-x86_64-pyt-release
@@ -909,7 +921,7 @@ workflows:
           requires:
             - build-x86_64-pyt-release
 
-      - test-py-fx-x86_64:
+      - test-py-ts-x86_64:
           name: test-py-fx-x86_64-pyt-release
           channel: "release"
           torch-build: << pipeline.parameters.torch-release-build >>
@@ -917,7 +929,6 @@ workflows:
           trt-version-long: << pipeline.parameters.trt-release-version-long >>
           requires:
             - build-x86_64-pyt-release
-
 
       - package-x86_64:
           name: package-release-x86_64
@@ -935,6 +946,7 @@ workflows:
           torch-build: << pipeline.parameters.torch-jetson-build >>
           jetpack-version: << pipeline.parameters.jetpack-version >>
           python-version: 3.8.10
+
           requires:
             - build-aarch64-pyt-jetson
 
@@ -944,6 +956,7 @@ workflows:
           torch-build: << pipeline.parameters.torch-jetson-build >>
           jetpack-version: << pipeline.parameters.jetpack-version >>
           python-version: 3.8.10
+
 
 
       - build-x86_64-pyt-release:
@@ -970,7 +983,7 @@ workflows:
           requires:
             - build-x86_64-pyt-release
 
-      - test-py-fx-x86_64:
+      - test-py-ts-x86_64:
           name: test-py-fx-x86_64-pyt-release
           channel: "release"
           torch-build: << pipeline.parameters.torch-release-build >>
@@ -978,6 +991,14 @@ workflows:
           trt-version-long: << pipeline.parameters.trt-release-version-long >>
           requires:
             - build-x86_64-pyt-release
+
+      - deploy-py-x86_64:
+          name: deploy-release-x86_86-py
+          torch-build: << pipeline.parameters.torch-release-build >>
+          torch-build-index: << pipeline.parameters.torch-release-build-index >>
+          trt-version-short: << pipeline.parameters.trt-release-version-short >>
+          trt-version-long: << pipeline.parameters.trt-release-version-long >>
+
 
 
       - build-x86_64-pyt-nightly:
