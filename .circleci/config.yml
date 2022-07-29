@@ -662,6 +662,9 @@ jobs:
 
   package-jetson:
     parameters:
+      enabled:
+        type: boolean
+        default: true
       torch-build:
         type: string
       jetpack-version:
@@ -802,6 +805,7 @@ workflows:
             branches:
               only:
                 - master
+                - release/**/*
     jobs:
       - build-aarch64-pyt-jetson:
           torch-build: << pipeline.parameters.torch-jetson-build >>
@@ -875,7 +879,7 @@ workflows:
           trt-version-long: << pipeline.parameters.trt-nightly-version-long >>
           requires:
             - build-x86_64-pyt-nightly
-            
+
   release:
     when: << pipeline.parameters.packaging-enabled >>
     jobs:
