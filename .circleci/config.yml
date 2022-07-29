@@ -662,6 +662,9 @@ jobs:
 
   package-jetson:
     parameters:
+      enabled:
+        type: boolean
+        default: false
       torch-build:
         type: string
       jetpack-version:
