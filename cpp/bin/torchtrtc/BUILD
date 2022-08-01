@@ -19,6 +19,9 @@ cc_binary(
         "parser_util.h",
         "parser_util.cpp"
     ],
+    linkopts = [
+        "-l:libdl.so"
+    ],
     deps = [
         "//third_party/args",
         "//cpp:torch_tensorrt",

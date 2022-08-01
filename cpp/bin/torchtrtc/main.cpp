@@ -15,6 +15,47 @@
 #include "luts.h"
 #include "parser_util.h"
 
+#if defined(_WIN32)
+#include <windows.h>
+#else
+#include <dlfcn.h>
+#endif
+
+void load_library(std::string& plugin, std::string option, void* handle) {
+#if defined(_WIN32)
+  handle = LoadLibrary(plugin.c_str());
+#else
+  handle = dlopen(plugin.c_str(), RTLD_LAZY);
+#endif
+  if (handle == nullptr) {
+    torchtrt::logging::log(
+        torchtrt::logging::Level::kERROR, std::string("Could not load custom library " + plugin + " for " + option));
+  } else {
+    torchtrt::logging::log(
+        torchtrt::logging::Level::kINFO, std::string("Loaded custom library " + plugin + " for " + option));
+  }
+}
+
+void unload_library(void* custom_lib, std::string& name) {
+#if defined(_WIN32)
+  auto status = FreeLibrary(custom_lib);
+  // Return status non-zero for success
+  if (status) {
+    torchtrt::logging::log(torchtrt::logging::Level::kINFO, std::string("Unloaded custom library " + name));
+  } else {
+    torchtrt::logging::log(torchtrt::logging::Level::kERROR, std::string("Could not unload custom library " + name));
+  }
+#else
+  auto status = dlclose(custom_lib);
+  // Return status 0 for success
+  if (!status) {
+    torchtrt::logging::log(torchtrt::logging::Level::kINFO, std::string("Unloaded custom library " + name));
+  } else {
+    torchtrt::logging::log(torchtrt::logging::Level::kERROR, std::string("Could not unload custom library " + name));
+  }
+#endif
+}
+
 int main(int argc, char** argv) {
   torchtrt::logging::set_is_colored_output_on(true);
   torchtrt::logging::set_reportable_log_level(torchtrt::logging::Level::kWARNING);
@@ -117,8 +158,7 @@ int main(int argc, char** argv) {
       parser, "num_iters", "Number of averaging timing iterations used to select kernels", {"num-avg-timing-iters"});
   args::ValueFlag<uint64_t> workspace_size(
       parser, "workspace_size", "Maximum size of workspace given to TensorRT", {"workspace-size"});
-  args::ValueFlag<uint64_t> dla_sram_size(
-      parser, "dla_sram_size", "DLA managed SRAM size", {"dla-sram-size"});
+  args::ValueFlag<uint64_t> dla_sram_size(parser, "dla_sram_size", "DLA managed SRAM size", {"dla-sram-size"});
   args::ValueFlag<uint64_t> dla_local_dram_size(
       parser, "dla_local_dram_size", "DLA Local DRAM size", {"dla-local-dram-size"});
   args::ValueFlag<uint64_t> dla_global_dram_size(
@@ -147,6 +187,12 @@ int main(int argc, char** argv) {
       "save_engine",
       "Instead of compiling a full a TorchScript program, save the created engine to the path specified as the output path",
       {"save-engine"});
+  args::ValueFlagList<std::string> custom_torch_ops(
+      parser, "custom-torch-ops", "Shared object/DLL containing custom torch operator", {"custom-torch-ops"});
+
+  args::ValueFlagList<std::string> custom_converters(
+      parser, "custom-converters", "Shared object/DLL containing custom converters", {"custom-converters"});
+
   args::Positional<std::string> input_path(parser, "input_file_path", "Path to input TorchScript file");
   args::Positional<std::string> output_path(
       parser, "output_file_path", "Path for compiled TorchScript (or TensorRT engine) file");
@@ -172,6 +218,23 @@ int main(int argc, char** argv) {
     torchtrt::logging::set_reportable_log_level(torchtrt::logging::Level::kINFO);
   } else if (warning) {
     torchtrt::logging::set_reportable_log_level(torchtrt::logging::Level::kERROR);
+  }
+
+  std::vector<std::pair<std::string, void*>> custom_torch_op, custom_converter_op;
+  if (custom_torch_ops) {
+    for (auto& op : args::get(custom_torch_ops)) {
+      void* handle{nullptr};
+      load_library(op, "custom_torch_ops", handle);
+      custom_torch_op.push_back({op, handle});
+    }
+  }
+
+  if (custom_converters) {
+    for (auto& op : args::get(custom_converters)) {
+      void* handle{nullptr};
+      load_library(op, "custom_converters", handle);
+      custom_converter_op.push_back({op, handle});
+    }
   }
 
   auto real_input_path = torchtrtc::fileio::resolve_path(args::get(input_path));
@@ -475,6 +538,18 @@ int main(int argc, char** argv) {
     }
 
     trt_mod.save(real_output_path);
+  }
+
+  if (custom_torch_ops) {
+    for (auto& p : custom_torch_op) {
+      unload_library(p.second, p.first);
+    }
+  }
+
+  if (custom_converters) {
+    for (auto& p : custom_converter_op) {
+      unload_library(p.second, p.first);
+    }
   }
 
   return 0;
