@@ -88,7 +88,8 @@ class TestConvolutionConverter(AccTestCase):
             ("tuple_parameters", 1, (1, 1), (1, 1)),
             param("non_zero_padding", 1, padding=1),
             param("dilation", 1, dilation=2),
-            param("groups", 1, groups=3),
+            # TODO TRT 8.4.1 will trigger issue with this test. T127981773
+            # param("groups", 1, groups=3),
         ]
     )
     def test_conv2d(
