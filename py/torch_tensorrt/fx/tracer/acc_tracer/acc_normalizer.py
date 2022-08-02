@@ -1,4 +1,5 @@
 import inspect
+import logging
 import re
 from typing import Any, Callable, Dict, List, NamedTuple, Optional, Set, Tuple, Union
 
@@ -8,6 +9,7 @@ from torch.fx.node import _get_qualified_name
 
 from . import acc_utils
 
+_LOGGER: logging.Logger = logging.getLogger(__name__)
 # Need to keep up-to-date with https://fburl.com/codesearch/7r2hhh53
 ALIAS_MAP = {
     "input": ("input", "x", "a", "x1"),
@@ -417,7 +419,7 @@ def normalize(mod: torch.fx.GraphModule, expect_nodes_have_shapes: bool = False)
                     node, normalization_info.arg_replacement_tuples
                 )
             except Exception:
-                print(
+                _LOGGER.error(
                     f"Error during kwarg normalization for: {node.format_node()}; "
                     f"arg_replacement_tuples={normalization_info.arg_replacement_tuples}"
                 )
@@ -441,7 +443,7 @@ def normalize(mod: torch.fx.GraphModule, expect_nodes_have_shapes: bool = False)
                 node, normalization_info, normalized_args, normalized_kwargs
             )
         except Exception:
-            print(f"Error during normalization for node: {node.format_node()}")
+            _LOGGER.error(f"Error during normalization for node: {node.format_node()}")
             raise
 
     # If there are any dead nodes left after normalization, eliminate them now.

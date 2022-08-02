@@ -1,4 +1,5 @@
 # flake8: noqa
+import logging
 import math
 import operator
 import warnings
@@ -20,6 +21,9 @@ from torch.fx.node import Argument, Target
 from ..utils import get_dynamic_dims, torch_dtype_from_trt, torch_dtype_to_trt
 
 from .converter_utils import *  # noqa: F403
+
+
+_LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
 @tensorrt_converter(acc_ops.conv1d)
@@ -641,7 +645,7 @@ def acc_ops_layer_norm(network, target, args, kwargs, name):
     try:
         normalized_shape = np.array(kwargs["normalized_shape"], dtype=np.int32)
     except TypeError:
-        print("Unable to convert normalized_shape to a field, fall back to []")
+        _LOGGER.error("Unable to convert normalized_shape to a field, fall back to []")
         normalized_shape = np.array([], dtype=np.int32)
 
     normalized_shape_filed = trt.PluginField(
@@ -657,7 +661,9 @@ def acc_ops_layer_norm(network, target, args, kwargs, name):
         else:
             plugin = get_trt_plugin("LayerNormDynamic", field_collection, "1", "fx2trt")
     except AssertionError:
-        print("Unable to find layer norm plugin, fall back to TensorRT implementation.")
+        _LOGGER.error(
+            "Unable to find layer norm plugin, fall back to TensorRT implementation."
+        )
         return layer_norm(network, target, args, kwargs, name)
     layer = network.add_plugin_v2([input_val], plugin)
     layer.name = name

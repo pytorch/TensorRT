@@ -1,5 +1,5 @@
 # Owner(s): ["oncall: fx"]
-
+import logging
 import unittest
 from typing import Callable, List
 
@@ -15,6 +15,8 @@ import torchvision
 from parameterized import param, parameterized
 
 torch.manual_seed(0)
+
+_LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
 class AccTracerTest(unittest.TestCase):
@@ -258,7 +260,7 @@ class AccTracerTest(unittest.TestCase):
             torch.randn(1, 3, 1, 1), scale=0.01, zero_point=3, dtype=torch.quint8
         )
         traced = acc_tracer.trace(m, [input])
-        print(traced.graph)
+        _LOGGER.info(traced.graph)
         ph = weight_attr = bias_attr = conv = None
         for node in traced.graph.nodes:
             if node.op == "placeholder":
@@ -626,7 +628,7 @@ class AccTracerTest(unittest.TestCase):
             )
 
             traced = acc_tracer.trace(m, inputs)
-            print(traced.graph)
+            _LOGGER.info(traced.graph)
 
             expected_target = (
                 acc_ops.embedding_bag_4bit_rowwise_offsets
