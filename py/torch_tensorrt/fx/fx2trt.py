@@ -163,6 +163,7 @@ class TRTInterpreter(torch.fx.Interpreter):
         algorithm_selector=None,
         timing_cache=None,
         profiling_verbosity=None,
+        tactic_sources=None,
     ) -> TRTInterpreterResult:
         """
         Build TensorRT engine with some configs.
@@ -244,6 +245,9 @@ class TRTInterpreter(torch.fx.Interpreter):
         if algorithm_selector:
             builder_config.set_flag(trt.BuilderFlag.DISABLE_TIMING_CACHE)
             builder_config.algorithm_selector = algorithm_selector
+
+        if tactic_sources is not None:
+            builder_config.set_tactic_sources(tactic_sources=tactic_sources)
 
         engine = self.builder.build_engine(self.network, builder_config)
         assert engine

@@ -120,6 +120,7 @@ class LowerTrtInterpreter:
             profiling_verbosity=trt.ProfilingVerbosity.DETAILED
             if self.lower_setting.verbose_profile
             else trt.ProfilingVerbosity.LAYER_NAMES_ONLY,
+            tactic_sources=self.lower_setting.tactic_sources,
         )
 
         # Update timing cache file if needed

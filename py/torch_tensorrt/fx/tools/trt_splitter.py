@@ -49,7 +49,7 @@ class TRTSplitterSetting(splitter_base._SplitterSettingBase):
         # During split, we'll split out the operators that
         # don't support the batch dim.
         self.use_implicit_batch_dim: bool = True
-        self.exclude_support_node_name: set = set()
+        self.exclude_support_node_name: set = set(self.op_lowering_disallow_list)
 
 
 class TRTSplitter(splitter_base._SplitterBase):
