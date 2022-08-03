@@ -37,7 +37,7 @@ def test(model, dataloader, crit):
 
 
 PARSER = argparse.ArgumentParser(description="Export trained VGG")
-PARSER.add_argument('ckpt', type=str, help="Path to saved checkpoint")
+PARSER.add_argument("ckpt", type=str, help="Path to saved checkpoint")
 
 args = PARSER.parse_args()
 model = vgg16(num_classes=10, init_weights=False)
@@ -48,6 +48,7 @@ weights = ckpt["model_state_dict"]
 
 if torch.cuda.device_count() > 1:
     from collections import OrderedDict
+
     new_state_dict = OrderedDict()
     for k, v in weights.items():
         name = k[7:]  # remove `module.`
@@ -57,18 +58,22 @@ if torch.cuda.device_count() > 1:
 model.load_state_dict(weights)
 
 # Setting eval here causes both JIT and TRT accuracy to tank in LibTorch will follow up with PyTorch Team
-#model.eval()
+# model.eval()
 
 jit_model = torch.jit.trace(model, torch.rand([32, 3, 32, 32]).to("cuda"))
 jit_model.eval()
 
-testing_dataset = datasets.CIFAR10(root='./data',
-                                   train=False,
-                                   download=True,
-                                   transform=transforms.Compose([
-                                       transforms.ToTensor(),
-                                       transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
-                                   ]))
+testing_dataset = datasets.CIFAR10(
+    root="./data",
+    train=False,
+    download=True,
+    transform=transforms.Compose(
+        [
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        ]
+    ),
+)
 
 testing_dataloader = torch.utils.data.DataLoader(testing_dataset, batch_size=32, shuffle=False, num_workers=2)
 

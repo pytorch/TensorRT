@@ -40,8 +40,12 @@ def test(model, dataloader, crit):
 
 
 PARSER = argparse.ArgumentParser(description="Export trained VGG")
-PARSER.add_argument('ckpt', type=str, help="Path to saved checkpoint")
-PARSER.add_argument('--enable_qat', action="store_true", help="Enable quantization aware training. This is recommended to perform on a pre-trained model.")
+PARSER.add_argument("ckpt", type=str, help="Path to saved checkpoint")
+PARSER.add_argument(
+    "--enable_qat",
+    action="store_true",
+    help="Enable quantization aware training. This is recommended to perform on a pre-trained model.",
+)
 
 args = PARSER.parse_args()
 
@@ -55,13 +59,17 @@ weights = ckpt["model_state_dict"]
 model.load_state_dict(weights)
 model.eval()
 
-testing_dataset = datasets.CIFAR10(root='./data',
-                                   train=False,
-                                   download=True,
-                                   transform=transforms.Compose([
-                                       transforms.ToTensor(),
-                                       transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
-                                   ]))
+testing_dataset = datasets.CIFAR10(
+    root="./data",
+    train=False,
+    download=True,
+    transform=transforms.Compose(
+        [
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        ]
+    ),
+)
 
 testing_dataloader = torch.utils.data.DataLoader(testing_dataset, batch_size=32, shuffle=False, num_workers=2)
 
@@ -79,11 +87,12 @@ test_loss, test_acc = test(jit_model, testing_dataloader, crit)
 print("[JIT] Test Loss: {:.5f} Test Acc: {:.2f}%".format(test_loss, 100 * test_acc))
 
 import torch_tensorrt as torchtrt
+
 compile_settings = {
     "inputs": [torchtrt.Input([1, 3, 32, 32])],
-    "enabled_precisions": {torch.float, torch.half, torch.int8} # Run with FP16
+    "enabled_precisions": {torch.float, torch.half, torch.int8},  # Run with FP16
 }
-new_mod = torch.jit.load('trained_vgg16_qat.jit.pt')
+new_mod = torch.jit.load("trained_vgg16_qat.jit.pt")
 trt_ts_module = torchtrt.compile(new_mod, **compile_settings)
 testing_dataloader = torch.utils.data.DataLoader(testing_dataset, batch_size=1, shuffle=False, num_workers=2)
 test_loss, test_acc = test(trt_ts_module, testing_dataloader, crit)

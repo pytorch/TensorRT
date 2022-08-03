@@ -19,8 +19,8 @@ template <typename T>
 py::function getOverload(const T* self, const std::string& overloadName) {
   py::function overload = py::get_override(self, overloadName.c_str());
   if (!overload) {
-    std::string msg{"Method: " + overloadName +
-                    " was not overriden. Please provide an implementation for this method."};
+    std::string msg{
+        "Method: " + overloadName + " was not overriden. Please provide an implementation for this method."};
     LOG_ERROR(msg);
   }
   return overload;

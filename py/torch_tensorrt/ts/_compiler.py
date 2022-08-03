@@ -99,7 +99,8 @@ def compile(module: torch.jit.ScriptModule,
 
     if isinstance(module, torch.jit.ScriptFunction):
         raise TypeError(
-            "torch.jit.ScriptFunction currently is not directly supported, wrap the function in a module to compile")
+            "torch.jit.ScriptFunction currently is not directly supported, wrap the function in a module to compile"
+        )
 
     if require_full_compilation and (len(torch_executed_modules) > 0 or len(torch_executed_ops) > 0):
         raise ValueError(
@@ -110,7 +111,7 @@ def compile(module: torch.jit.ScriptModule,
         "input_signature": input_signature,
         "device": device,
         "disable_tf32": disable_tf32,  # Force FP32 layers to use traditional as FP32 format
-        "sparse_weights": sparse_weights,  #Enable sparsity for convolution and fully connected layers.
+        "sparse_weights": sparse_weights,  # Enable sparsity for convolution and fully connected layers.
         "enabled_precisions": enabled_precisions,  # Enabling FP16 kernels
         "refit": refit,  # enable refit
         "debug": debug,  # enable debuggable engine
@@ -123,8 +124,8 @@ def compile(module: torch.jit.ScriptModule,
             "enabled": not require_full_compilation,
             "forced_fallback_ops": torch_executed_ops,
             "forced_fallback_modules": torch_executed_modules,
-            "min_block_size": min_block_size
-        }
+            "min_block_size": min_block_size,
+        },
     }
 
     compiled_cpp_mod = _C.compile_graph(module._c, _parse_compile_spec(spec))
@@ -132,23 +133,25 @@ def compile(module: torch.jit.ScriptModule,
     return compiled_module
 
 
-def convert_method_to_trt_engine(module: torch.jit.ScriptModule,
-                                 method_name: str,
-                                 inputs=[],
-                                 device=Device._current_device(),
-                                 disable_tf32=False,
-                                 sparse_weights=False,
-                                 enabled_precisions=set(),
-                                 refit=False,
-                                 debug=False,
-                                 capability=_enums.EngineCapability.default,
-                                 num_avg_timing_iters=1,
-                                 workspace_size=0,
-                                 dla_sram_size=1048576,
-                                 dla_local_dram_size=1073741824,
-                                 dla_global_dram_size=536870912,
-                                 truncate_long_and_double=False,
-                                 calibrator=None) -> str:
+def convert_method_to_trt_engine(
+    module: torch.jit.ScriptModule,
+    method_name: str,
+    inputs=[],
+    device=Device._current_device(),
+    disable_tf32=False,
+    sparse_weights=False,
+    enabled_precisions=set(),
+    refit=False,
+    debug=False,
+    capability=_enums.EngineCapability.default,
+    num_avg_timing_iters=1,
+    workspace_size=0,
+    dla_sram_size=1048576,
+    dla_local_dram_size=1073741824,
+    dla_global_dram_size=536870912,
+    truncate_long_and_double=False,
+    calibrator=None,
+) -> str:
     """Convert a TorchScript module method to a serialized TensorRT engine
 
     Converts a specified method of a module to a serialized TensorRT engine given a dictionary of conversion settings
@@ -212,14 +215,14 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule,
     """
     if isinstance(module, torch.jit.ScriptFunction):
         raise TypeError(
-            "torch.jit.ScriptFunctions currently are not directly supported, wrap the function in a module to compile")
+            "torch.jit.ScriptFunctions currently are not directly supported, wrap the function in a module to compile"
+        )
 
     compile_spec = {
         "inputs": inputs,
         "device": device,
-        "disable_tf32":
-            disable_tf32,  # Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
-        "sparse_weights": sparse_weights,  #Enable sparsity for convolution and fully connected layers.
+        "disable_tf32": disable_tf32,  # Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
+        "sparse_weights": sparse_weights,  # Enable sparsity for convolution and fully connected layers.
         "enabled_precisions": enabled_precisions,  # Enabling FP16 kernels
         "refit": refit,  # enable refit
         "debug": debug,  # enable debuggable engine
@@ -227,7 +230,7 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule,
         "num_avg_timing_iters": num_avg_timing_iters,  # Number of averaging timing iterations used to select kernels
         "workspace_size": workspace_size,  # Maximum size of workspace given to TensorRT
         "calibrator": calibrator,
-        "truncate_long_and_double": truncate_long_and_double
+        "truncate_long_and_double": truncate_long_and_double,
     }
 
     return _C.convert_graph_to_trt_engine(module._c, method_name, _parse_compile_spec(compile_spec))

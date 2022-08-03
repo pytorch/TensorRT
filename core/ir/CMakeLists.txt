@@ -1,14 +1,14 @@
 set(lib_name "core_ir")
 add_library(${lib_name} OBJECT)
 
-target_sources(${lib_name} 
+target_sources(${lib_name}
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Input.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/ir.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/StaticParams.cpp"
             $<TARGET_OBJECTS:core_util>
 )
 
-set(HEADER_FILES 
+set(HEADER_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/ir.h"
 )
 
@@ -17,10 +17,10 @@ target_include_directories(${lib_name}
         "$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>"
 )
 
-target_link_libraries(${lib_name} 
+target_link_libraries(${lib_name}
     PUBLIC
         TensorRT::nvinfer
-        torch 
+        torch
     PRIVATE
         core_util
 )

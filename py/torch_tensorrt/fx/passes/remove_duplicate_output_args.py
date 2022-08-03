@@ -7,9 +7,7 @@ import typing as t
 
 import torch.fx as fx
 
-
 _LOGGER = logging.getLogger(__name__)
-
 
 RemoveDuplicateOutputArgsFunc = t.Callable[
     [
@@ -99,9 +97,7 @@ def _ensure_proper_output_use(user: fx.Node, target_node: fx.Node) -> int:
 
 def _remove_duplicate_output_args(gm: fx.GraphModule) -> RemoveDuplicateResult:
     output_nodes = [n for n in gm.graph.nodes if n.op == "output"]
-    assert (
-        len(output_nodes) == 1
-    ), f"Expecting exactly one `output` node, but got {len(output_nodes)}"
+    assert len(output_nodes) == 1, f"Expecting exactly one `output` node, but got {len(output_nodes)}"
 
     changed = False
     # arg node name to its index in the new output args tuple
@@ -130,10 +126,7 @@ def _remove_duplicate_output_args(gm: fx.GraphModule) -> RemoveDuplicateResult:
             name_to_idx[a.name] = len(args_new) - 1
         else:
             changed = True
-            _LOGGER.warning(
-                f"Replaced duplicate output arg '{a.name}': "
-                f"{idx} -> {name_to_idx[a.name]}"
-            )
+            _LOGGER.warning(f"Replaced duplicate output arg '{a.name}': " f"{idx} -> {name_to_idx[a.name]}")
         replacement_map[idx] = name_to_idx[a.name]
 
     output_node.args = (tuple(args_new),)

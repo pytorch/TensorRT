@@ -5,20 +5,22 @@ from torch_tensorrt import logging
 import torch
 import torch.fx
 from enum import Enum
-#import torch_tensorrt.fx
-#from torch_tensorrt.fx.lower import lower_to_trt
-#from torch_tensorrt.fx.utils import LowerPrecision
+
+# import torch_tensorrt.fx
+# from torch_tensorrt.fx.lower import lower_to_trt
+# from torch_tensorrt.fx.utils import LowerPrecision
+
 
 class _IRType(Enum):
-    """Enum to set the minimum required logging level to print a message to stdout
-    """
+    """Enum to set the minimum required logging level to print a message to stdout"""
+
     ts = 0
     fx = 1
 
 
 class _ModuleType(Enum):
-    """Enum to set the minimum required logging level to print a message to stdout
-    """
+    """Enum to set the minimum required logging level to print a message to stdout"""
+
     nn = 0
     ts = 1
     fx = 2
@@ -54,8 +56,8 @@ def _get_target_ir(module_type: _ModuleType, ir: str) -> _IRType:
                 return _IRType.ts
             elif module_is_fxable:
                 raise ValueError("Was given a torch.fx.GraphModule, fx is not currently supported by Torch-TensorRT")
-                #logging.log(logging.Level.Info, "ir was set to default, using TorchScript as fx")
-                #return _IRType.fx
+                # logging.log(logging.Level.Info, "ir was set to default, using TorchScript as fx")
+                # return _IRType.fx
             else:
                 raise ValueError("Module was provided with in an unsupported format")
         else:
@@ -105,7 +107,7 @@ def compile(module: Any, ir="default", inputs=[], enabled_precisions=set([_enums
         if module_type == _ModuleType.nn:
             logging.log(
                 logging.Level.Info,
-                "Module was provided as a torch.nn.Module, trying to script the module with torch.jit.script. In the event of a failure please preconvert your module to TorchScript"
+                "Module was provided as a torch.nn.Module, trying to script the module with torch.jit.script. In the event of a failure please preconvert your module to TorchScript",
             )
             ts_mod = torch.jit.script(module)
         return torch_tensorrt.ts.compile(ts_mod, inputs=inputs, enabled_precisions=enabled_precisions, **kwargs)
@@ -117,17 +119,21 @@ def compile(module: Any, ir="default", inputs=[], enabled_precisions=set([_enums
         else:
             raise ValueError(f"Precision {enabled_precisions} not supported on FX")
 
-        return lower_to_trt(module, inputs, lower_precision=lower_precision, max_batch_size=inputs[0].size(0), explicit_batch_dimension=True, dynamic_batch=False)
+        return lower_to_trt(
+            module,
+            inputs,
+            lower_precision=lower_precision,
+            max_batch_size=inputs[0].size(0),
+            explicit_batch_dimension=True,
+            dynamic_batch=False,
+        )
     else:
         raise RuntimeError("Module is an unknown format or the ir requested is unknown")
 
 
-def convert_method_to_trt_engine(module: Any,
-                                 method_name: str,
-                                 ir="default",
-                                 inputs=[],
-                                 enabled_precisions=set([_enums.dtype.float]),
-                                 **kwargs):
+def convert_method_to_trt_engine(
+    module: Any, method_name: str, ir="default", inputs=[], enabled_precisions=set([_enums.dtype.float]), **kwargs
+):
     """Convert a TorchScript module method to a serialized TensorRT engine
 
     Converts a specified method of a module to a serialized TensorRT engine given a dictionary of conversion settings
@@ -165,14 +171,12 @@ def convert_method_to_trt_engine(module: Any,
         if module_type == _ModuleType.nn:
             logging.log(
                 logging.Level.Info,
-                "Module was provided as a torch.nn.Module, trying to script the module with torch.jit.script. In the event of a failure please preconvert your module to TorchScript"
+                "Module was provided as a torch.nn.Module, trying to script the module with torch.jit.script. In the event of a failure please preconvert your module to TorchScript",
             )
             ts_mod = torch.jit.script(module)
-        return torch_tensorrt.ts.convert_method_to_trt_engine(ts_mod,
-                                                              method_name,
-                                                              inputs=inputs,
-                                                              enabled_precisions=enabled_precisions,
-                                                              **kwargs)
+        return torch_tensorrt.ts.convert_method_to_trt_engine(
+            ts_mod, method_name, inputs=inputs, enabled_precisions=enabled_precisions, **kwargs
+        )
     elif target_ir == _IRType.fx:
         raise RuntimeError("fx is currently not supported")
     else:

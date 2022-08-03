@@ -64,9 +64,7 @@ class TestLogicalOrMethodSimpleConverterWithDynamicShape(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(
-            LogicalOr(), input_specs, expected_ops={acc_ops.logical_or}
-        )
+        self.run_test_with_dynamic_shape(LogicalOr(), input_specs, expected_ops={acc_ops.logical_or})
 
 
 class TestLogicalOrFunctionSimpleConverter(AccTestCase):
@@ -128,9 +126,7 @@ class TestLogicalOrFunctionSimpleConverterWithDynamicShape(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(
-            LogicalOr(), input_specs, expected_ops={acc_ops.logical_or}
-        )
+        self.run_test_with_dynamic_shape(LogicalOr(), input_specs, expected_ops={acc_ops.logical_or})
 
 
 class TestLogicalOrOperatorSimpleConverter(AccTestCase):
@@ -192,9 +188,7 @@ class TestLogicalOrOperatorSimpleConverterWithDynamicShape(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(
-            LogicalOr(), input_specs, expected_ops={acc_ops.logical_or}
-        )
+        self.run_test_with_dynamic_shape(LogicalOr(), input_specs, expected_ops={acc_ops.logical_or})
 
 
 if __name__ == "__main__":

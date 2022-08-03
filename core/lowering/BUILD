@@ -1,3 +1,6 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_pkg//:pkg.bzl", "pkg_tar")
+
 package(default_visibility = ["//visibility:public"])
 
 config_setting(
@@ -10,10 +13,10 @@ config_setting(
 cc_library(
     name = "lowering",
     srcs = [
+        "LowerInfo.cpp",
         "drop_unused_nodes.cpp",
         "lowering.cpp",
         "register_trt_placeholder_ops.cpp",
-        "LowerInfo.cpp"
     ],
     hdrs = [
         "lowering.h",
@@ -27,8 +30,6 @@ cc_library(
     }),
     alwayslink = True,
 )
-
-load("@rules_pkg//:pkg.bzl", "pkg_tar")
 
 pkg_tar(
     name = "include",

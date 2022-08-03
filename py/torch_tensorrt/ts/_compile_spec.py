@@ -32,7 +32,8 @@ def _supported_input_size_type(input_size: Any) -> bool:
     else:
         raise TypeError(
             "Input sizes for inputs are required to be a List, tuple or torch.Size or a Dict of three sizes (min, opt, max), found type: "
-            + str(type(input_size)))
+            + str(type(input_size))
+        )
 
 
 def _parse_input_ranges(input_sizes: List) -> List:
@@ -45,14 +46,16 @@ def _parse_input_ranges(input_sizes: List) -> List:
         if isinstance(i, dict):
             if all(k in i for k in ["min", "opt", "min"]):
                 parsed_input_sizes.append(
-                    Input(min_shape=i["min"], opt_shape=i["opt"], max_shape=i["max"])._to_internal())
+                    Input(min_shape=i["min"], opt_shape=i["opt"], max_shape=i["max"])._to_internal()
+                )
 
             elif "opt" in i:
                 parsed_input_sizes.append(Input(shape=i["opt"])._to_internal())
 
             else:
                 raise KeyError(
-                    "An input size must either be a static size or a range of three sizes (min, opt, max) as Dict")
+                    "An input size must either be a static size or a range of three sizes (min, opt, max) as Dict"
+                )
 
         elif isinstance(i, list):
             parsed_input_sizes.append(Input(shape=i)._to_internal())
@@ -75,15 +78,19 @@ def _parse_op_precision(precision: Any) -> _enums.dtype:
         elif precision == torch.float:
             return _enums.dtype.float
         else:
-            raise TypeError("Provided an unsupported dtype as operating precision (support: int8, half, float), got: " +
-                            str(precision))
+            raise TypeError(
+                "Provided an unsupported dtype as operating precision (support: int8, half, float), got: "
+                + str(precision)
+            )
 
     elif isinstance(precision, _enums.dtype):
         return precision
 
     else:
-        raise TypeError("Op precision type needs to be specified with a torch.dtype or a torch_tensorrt.dtype, got: " +
-                        str(type(precision)))
+        raise TypeError(
+            "Op precision type needs to be specified with a torch.dtype or a torch_tensorrt.dtype, got: "
+            + str(type(precision))
+        )
 
 
 def _parse_enabled_precisions(precisions: Any) -> Set:
@@ -98,7 +105,7 @@ def _parse_enabled_precisions(precisions: Any) -> Set:
 
 def _parse_device_type(device: Any) -> _enums.DeviceType:
     if isinstance(device, torch.device):
-        if device.type == 'cuda':
+        if device.type == "cuda":
             return _enums.DeviceType.gpu
         else:
             ValueError("Got a device type other than GPU or DLA (type: " + str(device.type) + ")")
@@ -113,8 +120,9 @@ def _parse_device_type(device: Any) -> _enums.DeviceType:
             ValueError("Got a device type other than GPU or DLA (type: " + str(device) + ")")
     else:
         raise TypeError(
-            "Device specification must be of type torch.device, string or torch_tensorrt.DeviceType, but got: " +
-            str(type(device)))
+            "Device specification must be of type torch.device, string or torch_tensorrt.DeviceType, but got: "
+            + str(type(device))
+        )
 
 
 def _parse_device(device_info: Any) -> _C.Device:
@@ -145,7 +153,8 @@ def _parse_device(device_info: Any) -> _C.Device:
         return (Device._from_torch_device(device_info))._to_internal()
     else:
         raise ValueError(
-            "Unsupported data for device specification. Expected either a dict, torch_tensorrt.Device or torch.Device")
+            "Unsupported data for device specification. Expected either a dict, torch_tensorrt.Device or torch.Device"
+        )
 
 
 def _parse_torch_fallback(fallback_info: Dict[str, Any]) -> _ts_C.TorchFallback:
@@ -196,8 +205,11 @@ def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
 
     if len(compile_spec["inputs"]) > 0:
         if not all([isinstance(i, torch.Tensor) or isinstance(i, Input) for i in compile_spec["inputs"]]):
-            raise KeyError("Input specs should be either torch_tensorrt.Input or torch.Tensor, found types: {}".format(
-                [type(i) for i in compile_spec["inputs"]]))
+            raise KeyError(
+                "Input specs should be either torch_tensorrt.Input or torch.Tensor, found types: {}".format(
+                    [type(i) for i in compile_spec["inputs"]]
+                )
+            )
 
         inputs = [Input._from_tensor(i) if isinstance(i, torch.Tensor) else i for i in compile_spec["inputs"]]
         info.inputs = [i._to_internal() for i in inputs]
@@ -350,9 +362,8 @@ def TensorRTCompileSpec(inputs=[],
         "inputs": inputs,
         #"input_signature": input_signature,
         "device": device,
-        "disable_tf32":
-            disable_tf32,  # Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
-        "sparse_weights": sparse_weights,  #Enable sparsity for convolution and fully connected layers.
+        "disable_tf32": disable_tf32,  # Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
+        "sparse_weights": sparse_weights,  # Enable sparsity for convolution and fully connected layers.
         "enabled_precisions": enabled_precisions,  # Enabling FP16 kernels
         "refit": refit,  # enable refit
         "debug": debug,  # enable debuggable engine
@@ -363,7 +374,7 @@ def TensorRTCompileSpec(inputs=[],
         "dla_local_dram_size": dla_local_dram_size,  # Host RAM used by DLA to share intermediate tensor data across operations
         "dla_global_dram_size": dla_global_dram_size,  # Host RAM used by DLA to store weights and metadata for execution
         "calibrator": calibrator,
-        "truncate_long_and_double": truncate_long_and_double
+        "truncate_long_and_double": truncate_long_and_double,
     }
 
     parsed_spec = _parse_compile_spec(compile_spec)

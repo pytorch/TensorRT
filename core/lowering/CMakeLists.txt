@@ -1,7 +1,7 @@
 set(lib_name "core_lowering")
 add_library(${lib_name} OBJECT)
 
-set(CXX_SRCS 
+set(CXX_SRCS
     "${CMAKE_CURRENT_SOURCE_DIR}/drop_unused_nodes.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/lowering.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/register_trt_placeholder_ops.cpp"
@@ -12,18 +12,18 @@ set(HEADER_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/lowering.h"
 )
 
-target_sources(${lib_name} 
-    PRIVATE 
+target_sources(${lib_name}
+    PRIVATE
         ${CXX_SRCS}
         $<TARGET_OBJECTS:core_util>
 )
 
-target_include_directories(${lib_name} 
+target_include_directories(${lib_name}
     PRIVATE
         "$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>"
 )
 
-target_link_libraries(${lib_name} 
+target_link_libraries(${lib_name}
     PUBLIC
         torch
     PRIVATE

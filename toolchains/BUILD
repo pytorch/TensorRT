@@ -13,8 +13,8 @@ platform(
     constraint_values = [
         "@platforms//os:linux",
         "@platforms//cpu:aarch64",
-        "@//toolchains/jetpack:4.5"
-    ]
+        "@//toolchains/jetpack:4.5",
+    ],
 )
 
 platform(
@@ -22,8 +22,8 @@ platform(
     constraint_values = [
         "@platforms//os:linux",
         "@platforms//cpu:aarch64",
-        "@//toolchains/jetpack:4.6"
-    ]
+        "@//toolchains/jetpack:4.6",
+    ],
 )
 
 platform(

@@ -10,12 +10,8 @@ from .. import InputTensorSpec, TRTInterpreter, TRTModule
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-def lower_mod_default(
-    mod: torch.fx.GraphModule, inputs: Tensors, batch_size: Any = 2048
-) -> TRTModule:
-    interp = TRTInterpreter(
-        mod, InputTensorSpec.from_tensors(inputs), explicit_batch_dimension=True
-    )
+def lower_mod_default(mod: torch.fx.GraphModule, inputs: Tensors, batch_size: Any = 2048) -> TRTModule:
+    interp = TRTInterpreter(mod, InputTensorSpec.from_tensors(inputs), explicit_batch_dimension=True)
     interpreter_result = interp.run(max_batch_size=batch_size)
     res_mod = TRTModule(
         interpreter_result.engine,
@@ -39,9 +35,7 @@ class TensorRTMinimizer(net_min_base._MinimizerBase):
         compare_fn: Callable[[Any, Any, Any], Tuple[float, bool]],
         settings: TensorRTMinizerSetting = TensorRTMinizerSetting(),
         max_batch_size: Any = 2048,
-        lower_fn: Callable[
-            [torch.fx.GraphModule, Tensors, Any], TRTModule
-        ] = lower_mod_default,
+        lower_fn: Callable[[torch.fx.GraphModule, Tensors, Any], TRTModule] = lower_mod_default,
     ):
         self.lower_fn = lower_fn
         self.max_batch_size = max_batch_size
@@ -58,9 +52,7 @@ class TensorRTMinimizer(net_min_base._MinimizerBase):
             mod = self.lower_fn(mod, inputs, self.max_batch_size)
             output = mod(*inputs)
         except RuntimeError as e:
-            raise net_min_base.FxNetMinimizerRunFuncError(
-                f"Encounter an error when processing \n{mod.graph}\n {e}"
-            )
+            raise net_min_base.FxNetMinimizerRunFuncError(f"Encounter an error when processing \n{mod.graph}\n {e}")
         else:
             return output
 

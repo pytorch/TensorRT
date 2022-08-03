@@ -25,9 +25,7 @@ class TestNarrowConverterWithDynamicShape(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(
-            Narrow(), input_specs, expected_ops={acc_ops.slice_tensor}
-        )
+        self.run_test_with_dynamic_shape(Narrow(), input_specs, expected_ops={acc_ops.slice_tensor})
 
 
 class TestNarrowConverter(AccTestCase):

@@ -32,8 +32,8 @@ at the documentation for the Torch-TensorRT ``TensorRTCompileSpec`` API.
 .. code-block:: python
 
     spec = {
-        "forward":
-            torch_tensorrt.ts.TensorRTCompileSpec({
+        "forward": torch_tensorrt.ts.TensorRTCompileSpec(
+            {
                 "inputs": [torch_tensorrt.Input([1, 3, 300, 300])],
                 "enabled_precisions": {torch.float, torch.half},
                 "refit": False,
@@ -42,12 +42,13 @@ at the documentation for the Torch-TensorRT ``TensorRTCompileSpec`` API.
                     "device_type": torch_tensorrt.DeviceType.GPU,
                     "gpu_id": 0,
                     "dla_core": 0,
-                    "allow_gpu_fallback": True
+                    "allow_gpu_fallback": True,
                 },
                 "capability": torch_tensorrt.EngineCapability.default,
                 "num_avg_timing_iters": 1,
-            })
-        }
+            }
+        )
+    }
 
 Now to compile with Torch-TensorRT, provide the target module objects and the spec dictionary to ``torch._C._jit_to_backend("tensorrt", ...)``
 

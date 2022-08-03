@@ -1,3 +1,5 @@
+load("@rules_cc//cc:defs.bzl", "cc_import", "cc_library")
+
 package(default_visibility = ["//visibility:public"])
 
 config_setting(
@@ -27,7 +29,6 @@ config_setting(
 cc_library(
     name = "cudnn_headers",
     hdrs = ["include/cudnn.h"] + glob([
-        "include/cudnn+.h",
         "include/cudnn_*.h",
     ]),
     includes = ["include/"],

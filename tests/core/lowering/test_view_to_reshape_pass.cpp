@@ -37,24 +37,24 @@ TEST(LoweringPasses, ViewToReshapeCorrectly) {
 TEST(LoweringPasses, ViewToReshapeResultsCorrectly) {
   std::string graph = R"IR(
     graph(%x.1 : Tensor):
-        %1 : int = prim::Constant[value=0]() 
+        %1 : int = prim::Constant[value=0]()
         %2 : int[] = prim::Constant[value=[1, 0, 3, 2]]()
-        %5 : int = prim::Constant[value=0]() 
+        %5 : int = prim::Constant[value=0]()
         %p.1 : Tensor = aten::permute(%x.1, %2)
         %28 : int = prim::Constant[value=1]()
         %29 : int = prim::Constant[value=2]()
         %30 : int = prim::Constant[value=3]()
         %31 : int = prim::Constant[value=-1]()
-        %size.1 : int[] = aten::size(%x.1) 
-        %33 : int = aten::__getitem__(%size.1, %5) 
+        %size.1 : int[] = aten::size(%x.1)
+        %33 : int = aten::__getitem__(%size.1, %5)
         %34 : int = aten::__getitem__(%size.1, %28)
-        %35 : int = aten::mul(%33, %34) 
-        %36 : int = aten::__getitem__(%size.1, %29) 
-        %37 : int = aten::__getitem__(%size.1, %30)  
-        %38 : int = aten::mul(%36, %37) 
+        %35 : int = aten::mul(%33, %34)
+        %36 : int = aten::__getitem__(%size.1, %29)
+        %37 : int = aten::__getitem__(%size.1, %30)
+        %38 : int = aten::mul(%36, %37)
         %39 : int[] = prim::ListConstruct(%31, %35, %38)
         %c : Tensor = aten::contiguous(%p.1, %1)
-        %v.1 : Tensor = aten::view(%c, %39) 
+        %v.1 : Tensor = aten::view(%c, %39)
         return (%v.1))IR";
 
   torch_tensorrt::core::util::logging::get_logger().set_reportable_log_level(

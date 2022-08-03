@@ -8,7 +8,11 @@ import numpy as np
 import pandas as pd
 import torch
 from transformers import AutoConfig
-from transformers import AutoModelForCausalLM, AutoModelForMaskedLM, AutoModelForSeq2SeqLM
+from transformers import (
+    AutoModelForCausalLM,
+    AutoModelForMaskedLM,
+    AutoModelForSeq2SeqLM,
+)
 from transformers import BertConfig, ReformerConfig, XLNetModel, XLNetConfig
 
 import torchdynamo
@@ -32,49 +36,123 @@ benchmarks = [
     #     (2, 1024),
     #     [torch.bfloat16], # trilu not implemented for bfloat16
     # ),
-    #(ReformerConfig(), AutoModelForMaskedLM, (8, 4096), []), # Reformer is not suitable for torch_tensorrt-fx
-    #(BigBirdConfig(attention_type="block_sparse"), AutoModelForMaskedLM, (2, 1024), []), # Birdbird is not suitable for torch_tensorrt-fx
-    #(AutoConfig.from_pretrained("google/fnet-base"), AutoModelForMaskedLM, (4, 512), []), #  not supported by torch_tensorrt-fx
-
+    # (ReformerConfig(), AutoModelForMaskedLM, (8, 4096), []), # Reformer is not suitable for torch_tensorrt-fx
+    # (BigBirdConfig(attention_type="block_sparse"), AutoModelForMaskedLM, (2, 1024), []), # Birdbird is not suitable for torch_tensorrt-fx
+    # (AutoConfig.from_pretrained("google/fnet-base"), AutoModelForMaskedLM, (4, 512), []), #  not supported by torch_tensorrt-fx
     # batch size = 1
     (BertConfig(), AutoModelForMaskedLM, (1, 512), []),
     (AutoConfig.from_pretrained("albert-base-v2"), AutoModelForMaskedLM, (1, 512), []),
     (AutoConfig.from_pretrained("gpt2"), AutoModelForCausalLM, (1, 512), []),
     (AutoConfig.from_pretrained("t5-small"), AutoModelForSeq2SeqLM, (1, 512), []),
-    (AutoConfig.from_pretrained("distilbert-base-uncased"),  AutoModelForMaskedLM, (1, 512), []),
-    (AutoConfig.from_pretrained("roberta-base"),  AutoModelForMaskedLM, (1, 512), []),
+    (
+        AutoConfig.from_pretrained("distilbert-base-uncased"),
+        AutoModelForMaskedLM,
+        (1, 512),
+        [],
+    ),
+    (AutoConfig.from_pretrained("roberta-base"), AutoModelForMaskedLM, (1, 512), []),
     (AutoConfig.from_pretrained("distilgpt2"), AutoModelForCausalLM, (1, 512), []),
-    (AutoConfig.from_pretrained("google/electra-base-discriminator"), AutoModelForMaskedLM, (1, 512), []),
-    (AutoConfig.from_pretrained("YituTech/conv-bert-base"), AutoModelForMaskedLM, (1, 512), []),
-    (AutoConfig.from_pretrained("google/mobilebert-uncased"), AutoModelForMaskedLM, (1, 512), []),
+    (
+        AutoConfig.from_pretrained("google/electra-base-discriminator"),
+        AutoModelForMaskedLM,
+        (1, 512),
+        [],
+    ),
+    (
+        AutoConfig.from_pretrained("YituTech/conv-bert-base"),
+        AutoModelForMaskedLM,
+        (1, 512),
+        [],
+    ),
+    (
+        AutoConfig.from_pretrained("google/mobilebert-uncased"),
+        AutoModelForMaskedLM,
+        (1, 512),
+        [],
+    ),
     (AutoConfig.from_pretrained("camembert-base"), AutoModelForMaskedLM, (1, 512), []),
-    (AutoConfig.from_pretrained("microsoft/layoutlm-base-uncased"), AutoModelForMaskedLM, (1, 512), []),
+    (
+        AutoConfig.from_pretrained("microsoft/layoutlm-base-uncased"),
+        AutoModelForMaskedLM,
+        (1, 512),
+        [],
+    ),
     # batch size = 4
     (BertConfig(), AutoModelForMaskedLM, (4, 512), []),
     (AutoConfig.from_pretrained("albert-base-v2"), AutoModelForMaskedLM, (4, 512), []),
     (AutoConfig.from_pretrained("gpt2"), AutoModelForCausalLM, (4, 512), []),
     (AutoConfig.from_pretrained("t5-small"), AutoModelForSeq2SeqLM, (4, 512), []),
-    (AutoConfig.from_pretrained("distilbert-base-uncased"),  AutoModelForMaskedLM, (4, 512), []),
-    (AutoConfig.from_pretrained("roberta-base"),  AutoModelForMaskedLM, (4, 512), []),
+    (
+        AutoConfig.from_pretrained("distilbert-base-uncased"),
+        AutoModelForMaskedLM,
+        (4, 512),
+        [],
+    ),
+    (AutoConfig.from_pretrained("roberta-base"), AutoModelForMaskedLM, (4, 512), []),
     (AutoConfig.from_pretrained("distilgpt2"), AutoModelForCausalLM, (4, 512), []),
-    (AutoConfig.from_pretrained("google/electra-base-discriminator"), AutoModelForMaskedLM, (4, 512), []),
-    (AutoConfig.from_pretrained("YituTech/conv-bert-base"), AutoModelForMaskedLM, (4, 512), []),
-    (AutoConfig.from_pretrained("google/mobilebert-uncased"), AutoModelForMaskedLM, (4, 512), []),
+    (
+        AutoConfig.from_pretrained("google/electra-base-discriminator"),
+        AutoModelForMaskedLM,
+        (4, 512),
+        [],
+    ),
+    (
+        AutoConfig.from_pretrained("YituTech/conv-bert-base"),
+        AutoModelForMaskedLM,
+        (4, 512),
+        [],
+    ),
+    (
+        AutoConfig.from_pretrained("google/mobilebert-uncased"),
+        AutoModelForMaskedLM,
+        (4, 512),
+        [],
+    ),
     (AutoConfig.from_pretrained("camembert-base"), AutoModelForMaskedLM, (4, 512), []),
-    (AutoConfig.from_pretrained("microsoft/layoutlm-base-uncased"), AutoModelForMaskedLM, (4, 512), []),
+    (
+        AutoConfig.from_pretrained("microsoft/layoutlm-base-uncased"),
+        AutoModelForMaskedLM,
+        (4, 512),
+        [],
+    ),
     # batch size = 8
     (BertConfig(), AutoModelForMaskedLM, (8, 512), []),
     (AutoConfig.from_pretrained("albert-base-v2"), AutoModelForMaskedLM, (8, 512), []),
     (AutoConfig.from_pretrained("gpt2"), AutoModelForCausalLM, (8, 512), []),
     (AutoConfig.from_pretrained("t5-small"), AutoModelForSeq2SeqLM, (8, 512), []),
-    (AutoConfig.from_pretrained("distilbert-base-uncased"),  AutoModelForMaskedLM, (8, 512), []),
-    (AutoConfig.from_pretrained("roberta-base"),  AutoModelForMaskedLM, (8, 512), []),
+    (
+        AutoConfig.from_pretrained("distilbert-base-uncased"),
+        AutoModelForMaskedLM,
+        (8, 512),
+        [],
+    ),
+    (AutoConfig.from_pretrained("roberta-base"), AutoModelForMaskedLM, (8, 512), []),
     (AutoConfig.from_pretrained("distilgpt2"), AutoModelForCausalLM, (8, 512), []),
-    (AutoConfig.from_pretrained("google/electra-base-discriminator"), AutoModelForMaskedLM, (8, 512), []),
-    (AutoConfig.from_pretrained("YituTech/conv-bert-base"), AutoModelForMaskedLM, (8, 512), []),
-    (AutoConfig.from_pretrained("google/mobilebert-uncased"), AutoModelForMaskedLM, (8, 512), []),
+    (
+        AutoConfig.from_pretrained("google/electra-base-discriminator"),
+        AutoModelForMaskedLM,
+        (8, 512),
+        [],
+    ),
+    (
+        AutoConfig.from_pretrained("YituTech/conv-bert-base"),
+        AutoModelForMaskedLM,
+        (8, 512),
+        [],
+    ),
+    (
+        AutoConfig.from_pretrained("google/mobilebert-uncased"),
+        AutoModelForMaskedLM,
+        (8, 512),
+        [],
+    ),
     (AutoConfig.from_pretrained("camembert-base"), AutoModelForMaskedLM, (8, 512), []),
-    (AutoConfig.from_pretrained("microsoft/layoutlm-base-uncased"), AutoModelForMaskedLM, (8, 512), []),
+    (
+        AutoConfig.from_pretrained("microsoft/layoutlm-base-uncased"),
+        AutoModelForMaskedLM,
+        (8, 512),
+        [],
+    ),
 ]
 
 device = "cuda"
@@ -103,6 +181,7 @@ def get_cur_memory():
 @torchdynamo.skip
 def forward_pass(mod, inputs, collect_outputs=True):
     return mod(*inputs)
+
 
 # correctness function to compare with eager mode
 @torchdynamo.skip
@@ -151,6 +230,7 @@ def timed(model, model_iter_fn, train_inputs, timings=1, return_result=False):
     t1 = time.perf_counter()
     # print("===timed=", t1-t0)
     return (t1 - t0, result) if return_result else t1 - t0
+
 
 # benchmark functions for repeated run of hugging face models after tracing by torchdynamo and lowered through torch_tensorrt-fx
 @torchdynamo.skip
@@ -223,7 +303,7 @@ def create_record(model_name, dtype, is_accurate, name, t, m):
         acc: is_accurate,
         nh: name,
         th: t,
-        mh: m / 2 ** 30,
+        mh: m / 2**30,
     }
 
 
@@ -265,7 +345,10 @@ def run_all_eval(args, optimize_ctx, optimize_name, dtype):
 
         if model_type.__name__ == "AutoModelForSeq2SeqLM":
             model = ArgsToKwargsWrapper(model)
-            eval_inputs = (input_ids, input_ids, )
+            eval_inputs = (
+                input_ids,
+                input_ids,
+            )
         else:
             eval_inputs = (input_ids,)
 
@@ -316,14 +399,10 @@ def main():
         optimize_ctx = torchdynamo.optimize("eager")
         optimize_name = "dynamo_eager"
     elif args.run_dynamo_fx2trt_fp16:
-        optimize_ctx = torchdynamo.optimize(
-            backends.fx2trt_compiler_fp16
-        )
+        optimize_ctx = torchdynamo.optimize(backends.fx2trt_compiler_fp16)
         optimize_name = "dynamo_fx2trt_fp16"
     elif args.run_dynamo_fx2trt_fp32:
-        optimize_ctx = torchdynamo.optimize(
-            backends.fx2trt_compiler
-        )
+        optimize_ctx = torchdynamo.optimize(backends.fx2trt_compiler)
         optimize_name = "dynamo_fx2trt_fp32"
 
     experiment = run_all_eval

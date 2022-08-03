@@ -56,7 +56,6 @@ class TestPadConverter(AccTestCase):
     # Testing with (-1, 3, 3, 3) results into following error:
     # test_pad_with_dynamic_shape_four_dimensions_0_2d (deeplearning.trt.torch_tensorrt.py.torch_tensorrt.fx.test.converters.acc_op.test_pad.TestPadConverter) ... [07/15/2022-09:23:18] [TRT] [E] 2: [intInterval.cpp::max::26] Error Code 2: Internal Error (Assertion !empty() failed. )
     # Segmentation fault (core dumped)
-
     """
     def test_pad_with_dynamic_shape_four_dimensions(self):
         class Pad(nn.Module):

@@ -46,9 +46,7 @@ def lower_to_trt(model, inputs, shape_ranges):
         )
     ]
 
-    interp = TRTInterpreter(
-        model, input_specs, explicit_batch_dimension=True, explicit_precision=True
-    )
+    interp = TRTInterpreter(model, input_specs, explicit_batch_dimension=True, explicit_precision=True)
     result = interp.run(lower_precision=LowerPrecision.INT8)
     trt_mod = TRTModule(result.engine, result.input_names, result.output_names)
     return trt_mod
@@ -65,9 +63,7 @@ class TestConvertFxDoNotUse(QuantizationTestCase):
         )
         self.trt_backend_config_dict = get_tensorrt_backend_config_dict()
 
-    def _test_quantized_inputs_outputs(
-        self, prepare_custom_config_dict, prepare_count_check, convert_count_check
-    ):
+    def _test_quantized_inputs_outputs(self, prepare_custom_config_dict, prepare_count_check, convert_count_check):
         """
         Test the option to have inputs and outputs of the graph quantized
         """
@@ -96,9 +92,7 @@ class TestConvertFxDoNotUse(QuantizationTestCase):
         )
         self.checkGraphModuleNodes(mp, expected_node_occurrence=prepare_count_check)
         mp(torch.randn(1, 1, 4, 4))
-        mq = convert_to_reference_fx(
-            mp, backend_config_dict=self.trt_backend_config_dict
-        )
+        mq = convert_to_reference_fx(mp, backend_config_dict=self.trt_backend_config_dict)
         self.checkGraphModuleNodes(mq, expected_node_occurrence=convert_count_check)
 
     def test_quantized_input_quantized_output(self):
@@ -115,9 +109,7 @@ class TestConvertFxDoNotUse(QuantizationTestCase):
             # input of ref conv1 and input of ref conv2
             ns.call_method("dequantize"): 2,
         }
-        self._test_quantized_inputs_outputs(
-            prepare_custom_config_dict, prepare_count_check, convert_count_check
-        )
+        self._test_quantized_inputs_outputs(prepare_custom_config_dict, prepare_count_check, convert_count_check)
 
     def test_fp32_input_quantized_output(self):
         prepare_custom_config_dict = {"output_quantized_idxs": [0]}
@@ -130,9 +122,7 @@ class TestConvertFxDoNotUse(QuantizationTestCase):
             # input of conv1, conv2
             ns.call_method("dequantize"): 2,
         }
-        self._test_quantized_inputs_outputs(
-            prepare_custom_config_dict, prepare_count_check, convert_count_check
-        )
+        self._test_quantized_inputs_outputs(prepare_custom_config_dict, prepare_count_check, convert_count_check)
 
     def test_quantized_input_fp32_output(self):
         prepare_custom_config_dict = {"input_quantized_idxs": [0]}
@@ -145,9 +135,7 @@ class TestConvertFxDoNotUse(QuantizationTestCase):
             # input of ref conv1, input of ref conv2, final output
             ns.call_method("dequantize"): 3,
         }
-        self._test_quantized_inputs_outputs(
-            prepare_custom_config_dict, prepare_count_check, convert_count_check
-        )
+        self._test_quantized_inputs_outputs(prepare_custom_config_dict, prepare_count_check, convert_count_check)
 
     def test_fp32_input_fp32_output(self):
         prepare_custom_config_dict = {}
@@ -158,9 +146,7 @@ class TestConvertFxDoNotUse(QuantizationTestCase):
             ns.call_function(torch.quantize_per_tensor): 3,
             ns.call_method("dequantize"): 3,
         }
-        self._test_quantized_inputs_outputs(
-            prepare_custom_config_dict, prepare_count_check, convert_count_check
-        )
+        self._test_quantized_inputs_outputs(prepare_custom_config_dict, prepare_count_check, convert_count_check)
 
     def _test_standalone_module(
         self,
@@ -215,16 +201,10 @@ class TestConvertFxDoNotUse(QuantizationTestCase):
         # instantiate M and RefM and align the parameters
         original_m = M().eval()
         original_ref_m = RefM().eval()
-        original_ref_m.conv1.weight = torch.nn.Parameter(
-            original_m.conv.weight.detach()
-        )
+        original_ref_m.conv1.weight = torch.nn.Parameter(original_m.conv.weight.detach())
         original_ref_m.conv1.bias = torch.nn.Parameter(original_m.conv.bias.detach())
-        original_ref_m.conv2.weight = torch.nn.Parameter(
-            original_m.standalone.conv.weight.detach()
-        )
-        original_ref_m.conv2.bias = torch.nn.Parameter(
-            original_m.standalone.conv.bias.detach()
-        )
+        original_ref_m.conv2.weight = torch.nn.Parameter(original_m.standalone.conv.weight.detach())
+        original_ref_m.conv2.bias = torch.nn.Parameter(original_m.standalone.conv.bias.detach())
 
         sm_example_inputs = (data,)
         prepare_config = {
@@ -255,16 +235,12 @@ class TestConvertFxDoNotUse(QuantizationTestCase):
         # calibration
         m(data)
         self.checkGraphModuleNodes(m, expected_node_occurrence=prepare_count_check)
-        self.checkGraphModuleNodes(
-            m.standalone, expected_node_occurrence=standalone_prepare_count_check
-        )
+        self.checkGraphModuleNodes(m.standalone, expected_node_occurrence=standalone_prepare_count_check)
 
         # check converted/quantized model
         m = convert_to_reference_fx(m, backend_config_dict=backend_config_dict)
         self.checkGraphModuleNodes(m, expected_node_occurrence=convert_count_check)
-        self.checkGraphModuleNodes(
-            m.standalone, expected_node_occurrence=standalone_convert_count_check
-        )
+        self.checkGraphModuleNodes(m.standalone, expected_node_occurrence=standalone_convert_count_check)
         res = m(data)
 
         # quantize the reference model
@@ -287,13 +263,9 @@ class TestConvertFxDoNotUse(QuantizationTestCase):
         interface_config = float_interface_config
         # input and output of first conv, observer for standalone module
         # will be inserted in the standalone module itself
-        prepare_count_check = {
-            ns.call_module(torch.ao.quantization.HistogramObserver): 2
-        }
+        prepare_count_check = {ns.call_module(torch.ao.quantization.HistogramObserver): 2}
         # for input and output of conv in the standalone module
-        standalone_prepare_count_check = {
-            ns.call_module(torch.ao.quantization.HistogramObserver): 2
-        }
+        standalone_prepare_count_check = {ns.call_module(torch.ao.quantization.HistogramObserver): 2}
         convert_count_check = {
             # input and output of reference conv
             ns.call_function(torch.quantize_per_tensor): 2,
@@ -353,13 +325,9 @@ class TestConvertFxDoNotUse(QuantizationTestCase):
         }
         custom_backend_config_dict = {"configs": [conv_module_config]}
         # observer for input and output of first conv
-        prepare_count_check = {
-            ns.call_module(torch.ao.quantization.HistogramObserver): 2
-        }
+        prepare_count_check = {ns.call_module(torch.ao.quantization.HistogramObserver): 2}
         # for output of conv in the standalone module
-        standalone_prepare_count_check = {
-            ns.call_module(torch.ao.quantization.HistogramObserver): 1
-        }
+        standalone_prepare_count_check = {ns.call_module(torch.ao.quantization.HistogramObserver): 1}
         convert_count_check = {
             # quantizing input/output for reference conv
             ns.call_function(torch.quantize_per_tensor): 2,
@@ -402,9 +370,7 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
         )
         self.trt_backend_config_dict = get_tensorrt_backend_config_dict()
 
-    def _test_module(
-        self, m, inputs, shape_ranges, no_prepare=None, no_convert=None, is_qat=False
-    ):
+    def _test_module(self, m, inputs, shape_ranges, no_prepare=None, no_convert=None, is_qat=False):
         """
         Args:
           m: the float module we want to test
@@ -470,9 +436,7 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
                 return self.relu(self.conv(x))
 
         # just testing conv2d since conv1d and conv3d are not supported in fx2trt
-        for dim, has_relu, f_relu, is_qat in itertools.product(
-            [1, 2], [True, False], [True, False], [True, False]
-        ):
+        for dim, has_relu, f_relu, is_qat in itertools.product([1, 2], [True, False], [True, False], [True, False]):
             # when has_relu=False, we have torch.nn.Identity, which would introduce
             # extra quant-dequat pair
             no_convert = {
@@ -512,9 +476,7 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
         linear_input = torch.rand(8, 5)
 
         shape_ranges = [((1, 5), (5, 5), (10, 5))]
-        for has_relu, f_relu, is_qat in itertools.product(
-            [True, False], [True, False], [True, False]
-        ):
+        for has_relu, f_relu, is_qat in itertools.product([True, False], [True, False], [True, False]):
             # when has_relu=False, we have torch.nn.Identity, which would introduce
             # extra quant-dequat pair
             no_convert = {
@@ -664,9 +626,7 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
         }
         self.checkGraphModuleNodes(quantized, expected_node_occurrence=node_occurrence)
 
-    @unittest.skip(
-        "This is not supported yet, we can enable the test after it's supported"
-    )
+    @unittest.skip("This is not supported yet, we can enable the test after it's supported")
     def test_conv_add(self):
         class M(torch.nn.Module):
             def __init__(self):
@@ -830,9 +790,7 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
             # output of the standalone module
             ns.call_module(torch.ao.quantization.HistogramObserver): 1,
         }
-        self.checkGraphModuleNodes(
-            m.standalone, expected_node_occurrence=standalone_node_occurrence
-        )
+        self.checkGraphModuleNodes(m.standalone, expected_node_occurrence=standalone_node_occurrence)
         m = convert_to_reference_fx(m, backend_config_dict=backend_config_dict)
         node_occurrence = {
             # two inputs for standalone module
@@ -849,9 +807,7 @@ class TestQuantizeFxTRTOps(QuantizationTestCase):
             # two input and one output for the pattern in standalone module
             ns.call_method("dequantize"): 3,
         }
-        self.checkGraphModuleNodes(
-            m.standalone, expected_node_occurrence=standalone_node_occurrence
-        )
+        self.checkGraphModuleNodes(m.standalone, expected_node_occurrence=standalone_node_occurrence)
 
     def test_quant_dequant_not_fold(self):
         class LinearModule(torch.nn.Module):

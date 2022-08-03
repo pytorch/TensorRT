@@ -98,10 +98,7 @@ class DispatchTracerTest(unittest.TestCase):
         # through the op registration method, the module is defined in a call_function
         call_function_node = None
         for node in gm.graph.nodes:
-            if (
-                node.op == "call_function"
-                and node.target == torch.ops.wrap.wrapped_leaf
-            ):
+            if node.op == "call_function" and node.target == torch.ops.wrap.wrapped_leaf:
                 call_function_node = node
         self.assertIsNotNone(call_function_node)
 

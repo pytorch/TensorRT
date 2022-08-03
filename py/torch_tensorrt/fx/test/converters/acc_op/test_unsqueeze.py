@@ -51,9 +51,7 @@ class TestUnsqueeze(AccTestCase):
                 shape_ranges=[((1, 2, 3), (2, 2, 3), (3, 2, 3))],
             ),
         ]
-        self.run_test_with_dynamic_shape(
-            Unsqueeze(dim), input_specs, expected_ops={acc_ops.unsqueeze}
-        )
+        self.run_test_with_dynamic_shape(Unsqueeze(dim), input_specs, expected_ops={acc_ops.unsqueeze})
 
 
 if __name__ == "__main__":

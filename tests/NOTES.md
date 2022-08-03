@@ -2,7 +2,7 @@
 
 ## Lists of Tests disabled for DLFW CI
 
-Following tests have been disabled due to flaky output issues with DLFW integration CI. These test cases will remain disabled until fixed for integration with DLFW. 
+Following tests have been disabled due to flaky output issues with DLFW integration CI. These test cases will remain disabled until fixed for integration with DLFW.
 
 ```
 1. MobileNet_v2 model TestCompile test (test_api.py)
@@ -17,7 +17,7 @@ Following tests have been disabled due to flaky output issues with DLFW integrat
    e. ATenLSTMCellConvertsCorrectlyWithoutBiasCheckHidden
    f. ATenLSTMCellConvertsCorrectlyWithoutBiasCheckCell
 
-4. Softmax tests (test_softmax.cpp) 
+4. Softmax tests (test_softmax.cpp)
    a. ATenSoftmax1DConvertsCorrectly
    b. ATenSoftmaxNDConvertsCorrectlySub3DIndex
    c. ATenSoftmaxNDConvertsCorrectlyAbove3DIndex

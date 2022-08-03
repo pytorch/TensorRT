@@ -7,5 +7,5 @@
 -                inputs, scale.data, torch.zeros_like(scale, dtype=torch.long).data, quant_dim,
 +                inputs, scale.data, torch.zeros_like(scale, dtype=torch.int32).data, quant_dim,
                  -bound - 1 if not self._unsigned else 0, bound)
- 
+
          return outputs

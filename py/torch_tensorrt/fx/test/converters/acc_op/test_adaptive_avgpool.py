@@ -44,9 +44,7 @@ class TestAdaptiveAvgPoolConverter(AccTestCase):
                 shape_ranges=[((1, 1, 256, 256), (3, 3, 256, 256), (5, 5, 256, 256))],
             ),
         ]
-        self.run_test_with_dynamic_shape(
-            TestModule(), input_specs, expected_ops={acc_ops.adaptive_avg_pool2d}
-        )
+        self.run_test_with_dynamic_shape(TestModule(), input_specs, expected_ops={acc_ops.adaptive_avg_pool2d})
 
     @parameterized.expand(
         [
@@ -83,14 +81,10 @@ class TestAdaptiveAvgPoolConverter(AccTestCase):
             InputTensorSpec(
                 shape=(-1, -1, 32, 64, 64),
                 dtype=torch.float32,
-                shape_ranges=[
-                    ((1, 1, 32, 64, 64), (3, 3, 32, 64, 64), (5, 5, 32, 64, 64))
-                ],
+                shape_ranges=[((1, 1, 32, 64, 64), (3, 3, 32, 64, 64), (5, 5, 32, 64, 64))],
             ),
         ]
-        self.run_test_with_dynamic_shape(
-            TestModule(), input_specs, expected_ops={acc_ops.adaptive_avg_pool3d}
-        )
+        self.run_test_with_dynamic_shape(TestModule(), input_specs, expected_ops={acc_ops.adaptive_avg_pool3d})
 
     #  Testing with shape(-1, -1, -1, -1) results into error: "AdaptiveAvgPool2d and AdaptiveAvgPool3d currently doesn't support dynamic shapes for last two dims."
 

@@ -37,9 +37,7 @@ class TestTRTModule(TestCase):
     def test_from_tensors_with_dynamic_batch_size(self):
         tensors = [torch.randn(1, 2, 3), torch.randn(1, 4)]
         batch_size_range = [2, 3, 4]
-        specs = InputTensorSpec.from_tensors_with_dynamic_batch_size(
-            tensors, batch_size_range
-        )
+        specs = InputTensorSpec.from_tensors_with_dynamic_batch_size(tensors, batch_size_range)
         for spec, tensor in zip(specs, tensors):
             self._validate_spec(spec, tensor, dynamic_dims=[0])
 
@@ -50,9 +48,7 @@ class TestTRTModule(TestCase):
     def test_from_tensors_with_dynamic_batch_size_different_batch_dims(self):
         tensors = [torch.randn(1, 2, 3), torch.randn(2, 1, 4)]
         batch_size_range = [2, 3, 4]
-        specs = InputTensorSpec.from_tensors_with_dynamic_batch_size(
-            tensors, batch_size_range, batch_dims=[0, 1]
-        )
+        specs = InputTensorSpec.from_tensors_with_dynamic_batch_size(tensors, batch_size_range, batch_dims=[0, 1])
         for i, spec_and_tensor in enumerate(zip(specs, tensors)):
             spec, tensor = spec_and_tensor
             self._validate_spec(spec, tensor, dynamic_dims=[i])
@@ -64,9 +60,7 @@ class TestTRTModule(TestCase):
                 self.assertSequenceEqual(tensor_shape, shape)
 
     def test_generate_input_specs(self):
-        lower_setting = LowerSetting(
-            explicit_batch_dimension=False, max_batch_size=256, opt_profile_replica=2
-        )
+        lower_setting = LowerSetting(explicit_batch_dimension=False, max_batch_size=256, opt_profile_replica=2)
 
         # Implicit batch dim.
         inputs = [torch.randn(1, 2, 3)]

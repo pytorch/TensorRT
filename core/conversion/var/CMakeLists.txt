@@ -1,10 +1,10 @@
 set(sub_lib_name "var")
 
-target_sources(${lib_name} 
+target_sources(${lib_name}
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Var.cpp"
 )
 
-set(HEADER_FILES 
+set(HEADER_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/Var.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/Var_inl.h"
 )

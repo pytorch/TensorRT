@@ -14,10 +14,7 @@ def adaptive_avgpool2d(network, submod, args, kwargs, name):
     input_val = kwargs["input"]
 
     if not isinstance(input_val, trt.tensorrt.ITensor):
-        raise RuntimeError(
-            f"AdaptiveAvgPool2d received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"AdaptiveAvgPool2d received input {input_val} that is not part " "of the TensorRT region!")
 
     output_size = extend_mod_attr_to_tuple(submod, "output_size", 2)
     stride = (
@@ -25,9 +22,7 @@ def adaptive_avgpool2d(network, submod, args, kwargs, name):
         input_val.shape[-1] // output_size[-1],
     )
     kernel_size = stride
-    layer = network.add_pooling(
-        input=input_val, type=trt.PoolingType.AVERAGE, window_size=kernel_size
-    )
+    layer = network.add_pooling(input=input_val, type=trt.PoolingType.AVERAGE, window_size=kernel_size)
     layer.stride = stride
     layer.name = name
 

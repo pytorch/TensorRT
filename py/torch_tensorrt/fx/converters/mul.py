@@ -20,9 +20,7 @@ def mul(network, target, args, kwargs, layer_name):
         lhs_val, rhs_val = kwargs["input"], kwargs["other"]
 
     if not all(isinstance(arg, trt.tensorrt.ITensor) for arg in [lhs_val, rhs_val]):
-        raise RuntimeError(
-            "mul() received an input that is not part of the TensorRT region!"
-        )
+        raise RuntimeError("mul() received an input that is not part of the TensorRT region!")
 
     layer = network.add_elementwise(lhs_val, rhs_val, trt.ElementWiseOperation.PROD)
     layer.name = layer_name
@@ -36,9 +34,7 @@ def quantized_mul(network, target, args, kwargs, layer_name):
     lhs_val, rhs_val = kwargs["qa"], kwargs["qb"]
 
     if not all(isinstance(i, trt.tensorrt.ITensor) for i in [lhs_val, rhs_val]):
-        raise RuntimeError(
-            "Quantized mul received an input that is not part of the TensorRT region!"
-        )
+        raise RuntimeError("Quantized mul received an input that is not part of the TensorRT region!")
 
     layer = network.add_elementwise(lhs_val, rhs_val, trt.ElementWiseOperation.PROD)
     layer.name = layer_name

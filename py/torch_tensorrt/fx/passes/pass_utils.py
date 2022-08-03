@@ -70,14 +70,10 @@ def validate_inference(rtol=None, atol=None, suppress_accuracy_check_failure=Fal
                         f"Pass {pass_} failed correctness check, get original model output as {x} and processed model output as {y} for output {kk}."
                     )
                     if suppress_accuracy_check_failure:
-                        _LOGGER.error(
-                            f"Pass {pass_} failed correctness check due to output {kk}."
-                        )
+                        _LOGGER.error(f"Pass {pass_} failed correctness check due to output {kk}.")
                         return processed_module
                     else:
-                        raise RuntimeError(
-                            f"Pass {pass_} failed correctness check due to output {kk}"
-                        )
+                        raise RuntimeError(f"Pass {pass_} failed correctness check due to output {kk}")
             return processed_module
 
         return pass_with_validation
@@ -108,9 +104,7 @@ def log_before_after(pass_: PassFunc) -> PassFunc:
     """
 
     @wraps(pass_)
-    def pass_with_before_after_log(
-        module: fx.GraphModule, input: Input
-    ) -> fx.GraphModule:
+    def pass_with_before_after_log(module: fx.GraphModule, input: Input) -> fx.GraphModule:
         with tempfile.NamedTemporaryFile(
             mode="w",
             encoding="utf-8",

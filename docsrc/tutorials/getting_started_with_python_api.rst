@@ -16,19 +16,23 @@ to load in a deployment application. In order to load a TensorRT/TorchScript mod
 
     ...
 
-    model = MyModel().eval() # torch module needs to be in eval (not training) mode
+    model = MyModel().eval()  # torch module needs to be in eval (not training) mode
 
-    inputs = [torch_tensorrt.Input(
-                min_shape=[1, 1, 16, 16],
-                opt_shape=[1, 1, 32, 32],
-                max_shape=[1, 1, 64, 64],
-                dtype=torch.half,
-            )]
-    enabled_precisions = {torch.float, torch.half} # Run with fp16
+    inputs = [
+        torch_tensorrt.Input(
+            min_shape=[1, 1, 16, 16],
+            opt_shape=[1, 1, 32, 32],
+            max_shape=[1, 1, 64, 64],
+            dtype=torch.half,
+        )
+    ]
+    enabled_precisions = {torch.float, torch.half}  # Run with fp16
 
-    trt_ts_module = torch_tensorrt.compile(model, inputs=inputs, enabled_precisions=enabled_precisions)
+    trt_ts_module = torch_tensorrt.compile(
+        model, inputs=inputs, enabled_precisions=enabled_precisions
+    )
 
-    input_data = input_data.to('cuda').half()
+    input_data = input_data.to("cuda").half()
     result = trt_ts_module(input_data)
     torch.jit.save(trt_ts_module, "trt_ts_module.ts")
 
@@ -39,7 +43,7 @@ to load in a deployment application. In order to load a TensorRT/TorchScript mod
     import torch_tensorrt
 
     trt_ts_module = torch.jit.load("trt_ts_module.ts")
-    input_data = input_data.to('cuda').half()
+    input_data = input_data.to("cuda").half()
     result = trt_ts_module(input_data)
 
 Torch-TensorRT python API also provides ``torch_tensorrt.ts.compile`` which accepts a TorchScript module as input.

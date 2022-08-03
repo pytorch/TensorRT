@@ -111,9 +111,7 @@ def fuse_sparse_matmul_add(gm: torch.fx.GraphModule, input: Input):
     return gm
 
 
-def trt_transposed_matmul(
-    lhs: torch.Tensor, rhs: torch.Tensor, lhs_transposed: bool, rhs_transposed: bool
-):
+def trt_transposed_matmul(lhs: torch.Tensor, rhs: torch.Tensor, lhs_transposed: bool, rhs_transposed: bool):
     if lhs_transposed:
         lhs = lhs.transpose(-1, -2)
     if rhs_transposed:
@@ -121,9 +119,7 @@ def trt_transposed_matmul(
     return torch.matmul(lhs, rhs)
 
 
-def trt_transposed_linear(
-    input: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor
-):
+def trt_transposed_linear(input: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor):
     return torch.matmul(input.transpose(-1, -2), weight.t()) + bias
 
 
@@ -151,9 +147,7 @@ def fuse_permute_linear(gm: torch.fx.GraphModule, input: Input):
                 weight = node.kwargs["weight"]
                 bias = node.kwargs["bias"]
                 with gm.graph.inserting_before(node):
-                    fused_node = gm.graph.call_function(
-                        trt_transposed_linear, args=(inp, weight, bias)
-                    )
+                    fused_node = gm.graph.call_function(trt_transposed_linear, args=(inp, weight, bias))
                     node.replace_all_uses_with(fused_node)
 
     gm.graph.eliminate_dead_code()
@@ -221,13 +215,9 @@ else:
             rhs = get_trt_tensor(network, rhs, f"{name}_rhs")
         layer = network.add_matrix_multiply(
             lhs,
-            trt.MatrixOperation.TRANSPOSE
-            if lhs_transposed
-            else trt.MatrixOperation.NONE,
+            trt.MatrixOperation.TRANSPOSE if lhs_transposed else trt.MatrixOperation.NONE,
             rhs,
-            trt.MatrixOperation.TRANSPOSE
-            if rhs_transposed
-            else trt.MatrixOperation.NONE,
+            trt.MatrixOperation.TRANSPOSE if rhs_transposed else trt.MatrixOperation.NONE,
         )
         set_layer_name(layer, target, name)
         return layer.get_output(0)
@@ -290,30 +280,22 @@ def slice_list(sli: slice, dim: int, size: int):
             return [slice_all, slice_all, slice_all, sli]
 
 
-def split_across(
-    gm: torch.fx.GraphModule, sli: slice, input_node: torch.fx.Node, dim: int, size: int
-):
+def split_across(gm: torch.fx.GraphModule, sli: slice, input_node: torch.fx.Node, dim: int, size: int):
     start_node = end_node = mid_node = None
     if sli.start is None and sli.stop is None:
         return (start_node, input_node, end_node)
     if sli.start is not None:
         st_sli = slice(0, sli.start, None)
         slice_list_gen = slice_list(st_sli, dim, size)
-        start_node = gm.graph.call_function(
-            operator.getitem, args=(input_node, slice_list_gen)
-        )
+        start_node = gm.graph.call_function(operator.getitem, args=(input_node, slice_list_gen))
     if sli.stop is not None:
         end_sli = slice(sli.stop, None, None)
         slice_list_gen = slice_list(end_sli, dim, size)
-        end_node = gm.graph.call_function(
-            operator.getitem, args=(input_node, slice_list_gen)
-        )
+        end_node = gm.graph.call_function(operator.getitem, args=(input_node, slice_list_gen))
     if dim != size - 1:
         mid_sli = slice(sli.start, sli.stop, None)
         slice_list_gen = slice_list(mid_sli, dim, size)
-        mid_node = gm.graph.call_function(
-            operator.getitem, args=(input_node, slice_list_gen)
-        )
+        mid_node = gm.graph.call_function(operator.getitem, args=(input_node, slice_list_gen))
     return (start_node, mid_node, end_node)
 
 
@@ -370,9 +352,7 @@ def transform_setitem(gm: torch.fx.GraphModule, input: Input):
 
                 if inp_flag:
                     with gm.graph.inserting_before(inp):
-                        new_node = gm.graph.call_function(
-                            operator.getitem, args=(inp.args[0], new_args)
-                        )
+                        new_node = gm.graph.call_function(operator.getitem, args=(inp.args[0], new_args))
                         inp.replace_all_uses_with(new_node)
                     inp = new_node
 
@@ -393,61 +373,29 @@ def transform_setitem(gm: torch.fx.GraphModule, input: Input):
             dimension = len(sli)
             with gm.graph.inserting_before(node):
                 if dimension == 1:
-                    start_node_0, _, end_node_0 = split_across(
-                        gm, sli[0], input_node, dim=0, size=1
-                    )
+                    start_node_0, _, end_node_0 = split_across(gm, sli[0], input_node, dim=0, size=1)
                     concat_node_0 = list_gen(start_node_0, end_node_0, inp, gm, 0)
                 elif dimension == 2:
-                    start_node_0, mid_node_0, end_node_0 = split_across(
-                        gm, sli[0], input_node, dim=0, size=2
-                    )
-                    start_node_1, _, end_node_1 = split_across(
-                        gm, sli[1], mid_node_0, dim=1, size=2
-                    )
+                    start_node_0, mid_node_0, end_node_0 = split_across(gm, sli[0], input_node, dim=0, size=2)
+                    start_node_1, _, end_node_1 = split_across(gm, sli[1], mid_node_0, dim=1, size=2)
                     concat_node_1 = list_gen(start_node_1, end_node_1, inp, gm, 1)
-                    concat_node_0 = list_gen(
-                        start_node_0, end_node_0, concat_node_1, gm, 0
-                    )
+                    concat_node_0 = list_gen(start_node_0, end_node_0, concat_node_1, gm, 0)
                 elif dimension == 3:
-                    start_node_0, mid_node_0, end_node_0 = split_across(
-                        gm, sli[0], input_node, dim=0, size=3
-                    )
-                    start_node_1, mid_node_1, end_node_1 = split_across(
-                        gm, sli[1], mid_node_0, dim=1, size=3
-                    )
-                    start_node_2, _, end_node_2 = split_across(
-                        gm, sli[2], mid_node_1, dim=2, size=3
-                    )
+                    start_node_0, mid_node_0, end_node_0 = split_across(gm, sli[0], input_node, dim=0, size=3)
+                    start_node_1, mid_node_1, end_node_1 = split_across(gm, sli[1], mid_node_0, dim=1, size=3)
+                    start_node_2, _, end_node_2 = split_across(gm, sli[2], mid_node_1, dim=2, size=3)
                     concat_node_2 = list_gen(start_node_2, end_node_2, inp, gm, 2)
-                    concat_node_1 = list_gen(
-                        start_node_1, end_node_1, concat_node_2, gm, 1
-                    )
-                    concat_node_0 = list_gen(
-                        start_node_0, end_node_0, concat_node_1, gm, 0
-                    )
+                    concat_node_1 = list_gen(start_node_1, end_node_1, concat_node_2, gm, 1)
+                    concat_node_0 = list_gen(start_node_0, end_node_0, concat_node_1, gm, 0)
                 elif dimension == 4:
-                    start_node_0, mid_node_0, end_node_0 = split_across(
-                        gm, sli[0], input_node, dim=0, size=4
-                    )
-                    start_node_1, mid_node_1, end_node_1 = split_across(
-                        gm, sli[1], mid_node_0, dim=1, size=4
-                    )
-                    start_node_2, mid_node_2, end_node_2 = split_across(
-                        gm, sli[2], mid_node_1, dim=2, size=4
-                    )
-                    start_node_3, _, end_node_3 = split_across(
-                        gm, sli[3], mid_node_2, dim=3, size=4
-                    )
+                    start_node_0, mid_node_0, end_node_0 = split_across(gm, sli[0], input_node, dim=0, size=4)
+                    start_node_1, mid_node_1, end_node_1 = split_across(gm, sli[1], mid_node_0, dim=1, size=4)
+                    start_node_2, mid_node_2, end_node_2 = split_across(gm, sli[2], mid_node_1, dim=2, size=4)
+                    start_node_3, _, end_node_3 = split_across(gm, sli[3], mid_node_2, dim=3, size=4)
                     concat_node_3 = list_gen(start_node_3, end_node_3, inp, gm, 3)
-                    concat_node_2 = list_gen(
-                        start_node_2, end_node_2, concat_node_3, gm, 2
-                    )
-                    concat_node_1 = list_gen(
-                        start_node_1, end_node_1, concat_node_2, gm, 1
-                    )
-                    concat_node_0 = list_gen(
-                        start_node_0, end_node_0, concat_node_1, gm, 0
-                    )
+                    concat_node_2 = list_gen(start_node_2, end_node_2, concat_node_3, gm, 2)
+                    concat_node_1 = list_gen(start_node_1, end_node_1, concat_node_2, gm, 1)
+                    concat_node_0 = list_gen(start_node_0, end_node_0, concat_node_1, gm, 0)
                 else:
                     warnings.warn(f"setitem does not support dimension={dimension}")
                     continue

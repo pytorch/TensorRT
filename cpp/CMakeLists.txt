@@ -23,7 +23,7 @@ target_sources(${lib_name}
 )
 
 target_link_libraries(${lib_name}
-    PUBLIC 
+    PUBLIC
         torch
         TensorRT::nvinfer
         core
@@ -77,7 +77,7 @@ target_link_libraries(${torchtrt_lib_name}
         core
 )
 
-target_include_directories(${torchtrt_lib_name} 
+target_include_directories(${torchtrt_lib_name}
     PUBLIC
         # enable include from core from the tests
         "$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>"
@@ -112,7 +112,7 @@ target_link_libraries(${runtime_lib_name}
     PUBLIC
         TensorRT::TensorRT
         torch
-    PRIVATE 
+    PRIVATE
         core_runtime
         core_plugins
 )
@@ -139,7 +139,7 @@ target_link_libraries(${plugins_lib_name}
     PUBLIC
         TensorRT::TensorRT
     PRIVATE
-        core_plugins 
+        core_plugins
 )
 
 install(

@@ -21,9 +21,7 @@ class TestInfConverter(AccTestCase):
         inputs = [
             input,
         ]
-        self.run_test(
-            Test(), inputs, expected_ops={acc_ops.isinf}, test_implicit_batch_dim=False
-        )
+        self.run_test(Test(), inputs, expected_ops={acc_ops.isinf}, test_implicit_batch_dim=False)
 
     def test_isinf_large(self):
         class Test(torch.nn.Module):
@@ -37,9 +35,7 @@ class TestInfConverter(AccTestCase):
         inputs = [
             input,
         ]
-        self.run_test(
-            Test(), inputs, expected_ops={acc_ops.isinf}, test_implicit_batch_dim=False
-        )
+        self.run_test(Test(), inputs, expected_ops={acc_ops.isinf}, test_implicit_batch_dim=False)
 
     def test_isinf_large_with_dynamic_shape_four_dimensions(self):
         class Test(torch.nn.Module):
@@ -54,9 +50,7 @@ class TestInfConverter(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(
-            Test(), input_specs, expected_ops={acc_ops.isinf}
-        )
+        self.run_test_with_dynamic_shape(Test(), input_specs, expected_ops={acc_ops.isinf})
 
 
 if __name__ == "__main__":

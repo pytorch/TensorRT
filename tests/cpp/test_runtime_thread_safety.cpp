@@ -44,10 +44,11 @@ TEST(CppAPITests, RuntimeThreadSafety) {
 
   std::vector<torch_tensorrt::Input> input_ranges;
   for (auto in : inputs_trt) {
-    input_ranges.push_back({std::vector<int64_t>{1, 3, 224, 224},
-                            std::vector<int64_t>{1, 3, 224, 224},
-                            std::vector<int64_t>{16, 3, 224, 224},
-                            torch::kFloat});
+    input_ranges.push_back(
+        {std::vector<int64_t>{1, 3, 224, 224},
+         std::vector<int64_t>{1, 3, 224, 224},
+         std::vector<int64_t>{16, 3, 224, 224},
+         torch::kFloat});
   }
   auto compile_settings = torch_tensorrt::ts::CompileSpec(input_ranges);
 

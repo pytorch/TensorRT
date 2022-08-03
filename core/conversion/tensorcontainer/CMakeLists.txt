@@ -1,10 +1,10 @@
 set(sub_lib_name "tensorcontainer")
 
-target_sources(${lib_name} 
+target_sources(${lib_name}
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/TensorContainer.cpp"
 )
 
-set(HEADER_FILES 
+set(HEADER_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/TensorContainer.h"
 )
 
