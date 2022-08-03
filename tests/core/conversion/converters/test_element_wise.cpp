@@ -12,40 +12,29 @@ void pointwise_test_helper(
     std::vector<int64_t> shape1 = {5},
     std::vector<int64_t> shape2 = {5},
     bool negative_input = false,
-    bool int_tensors = false,
-    bool float_int_tensors = false,
-    bool int_float_tensors = false) {
+    at::ScalarType type1 = at::kFloat,
+    at::ScalarType type2 = at::kFloat) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph_ir, g.get());
 
   // singleInput case is enabled when elementwise operation is performed
   // with an input and a constant embedded in graph
   std::vector<at::Tensor> torch_inputs;
-  if (negative_input) {
-    torch_inputs.push_back(at::randint(-5, 5, shape1, {at::kCUDA}));
-  } else {
-    torch_inputs.push_back(at::randint(1, 5, shape1, {at::kCUDA}));
+  int first_min = negative_input ? -5 : 1;
+  int first_max = 5;
+  int second_min = 1;
+  int second_max = 5;
+  if(type1 == at::kBool){
+    first_min = 0;
+    first_max = 1;
   }
+  if(type2 == at::kBool){
+    second_min = 0;
+    second_max = 1;
+  }
+  torch_inputs.push_back(at::randint(first_min, first_max, shape1, at::TensorOptions(at::kCUDA).dtype(type1)));
   if (!singleInput) {
-    torch_inputs.push_back(at::randint(1, 5, shape2, {at::kCUDA}));
-  }
-
-  TORCHTRT_CHECK(
-      !((int_tensors && (float_int_tensors || int_float_tensors)) || (float_int_tensors && int_float_tensors)),
-      "Invalid test configuration, only one of int_tensors, float_int_tensors, int_float_tensors can be true");
-
-  if (int_tensors) {
-    for (size_t i = 0UL; i < torch_inputs.size(); ++i) {
-      torch_inputs[i] = torch_inputs[i].to(at::kInt);
-    }
-  } else if (float_int_tensors) {
-    TORCHTRT_CHECK(!singleInput, "float_int_tensors tests require two inputs");
-    torch_inputs[0] = torch_inputs[0].to(at::kFloat);
-    torch_inputs[1] = torch_inputs[1].to(at::kInt);
-  } else if (int_float_tensors) {
-    TORCHTRT_CHECK(!singleInput, "int_float_tensors tests require two inputs");
-    torch_inputs[0] = torch_inputs[0].to(at::kInt);
-    torch_inputs[1] = torch_inputs[1].to(at::kFloat);
+    torch_inputs.push_back(at::randint(second_min, second_max, shape2, at::TensorOptions(at::kCUDA).dtype(type2)));
   }
 
   auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
@@ -78,8 +67,6 @@ TEST(Converters, ATenAddConvertsCorrectly) {
   pointwise_test_helper(graph, false, false, {4}, {3, 4});
   pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3});
   pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3});
-  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, true);
-  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, false, true);
 }
 
 TEST(Converters, ATenAddWithAlphaConvertsCorrectly) {
@@ -93,8 +80,8 @@ TEST(Converters, ATenAddWithAlphaConvertsCorrectly) {
   pointwise_test_helper(graph, false, false, {4}, {3, 4});
   pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3});
   pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3});
-  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, true);
-  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, false, true);
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, at::kFloat, at::kInt);
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, at::kInt, at::kFloat);
 }
 
 TEST(Converters, ATenAddInplaceWithAlphaConvertsCorrectly) {
@@ -106,6 +93,17 @@ TEST(Converters, ATenAddInplaceWithAlphaConvertsCorrectly) {
   pointwise_test_helper(graph, false);
   pointwise_test_helper(graph, false, false, {3, 4}, {4});
   pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3});
+  pointwise_test_helper(graph, false, false, {3, 4, 3}, {4, 3}, false, at::kFloat, at::kInt);
+}
+
+TEST(Converters, ATenAddImplicitWithIntAlphaConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor, %1 : Tensor):
+        %2 : int = prim::Constant[value=42]()
+        %3 : Tensor = aten::add_(%0, %1, %2)
+        return (%3))IR";
+  pointwise_test_helper(graph, false, false, {2, 2}, {2, 2}, false, at::kInt, at::kInt);
+  pointwise_test_helper(graph, false, false, {3, 4, 3}, {4, 3}, false, at::kInt, at::kInt);
 }
 
 TEST(Converters, ATenAddWithScalarConvertsCorrectly) {
@@ -129,8 +127,8 @@ TEST(Converters, ATenSubConvertsCorrectly) {
   pointwise_test_helper(graph, false, false, {4}, {3, 4});
   pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3});
   pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3});
-  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, true);
-  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, false, true);
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, at::kFloat, at::kInt);
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, at::kInt, at::kFloat);
 }
 
 TEST(Converters, ATenMulConvertsCorrectly) {
@@ -143,8 +141,8 @@ TEST(Converters, ATenMulConvertsCorrectly) {
   pointwise_test_helper(graph, false, false, {4}, {3, 4});
   pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3});
   pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3});
-  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, true);
-  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, false, true);
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, at::kFloat, at::kInt);
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, at::kInt, at::kFloat);
 }
 
 TEST(Converters, ATenMulWithScalarConvertsCorrectly) {
@@ -162,7 +160,7 @@ TEST(Converters, ATenMulWithIntScalarConvertsCorrectly) {
         %scalar : int = prim::Constant[value=2]()
         %1 : Tensor = aten::mul(%0, %scalar)
         return (%1))IR";
-  pointwise_test_helper(graph, true, false, {5}, {5}, false, true);
+  pointwise_test_helper(graph, true, false, {5}, {5}, false, at::kInt);
 }
 
 TEST(Converters, ATenDivConvertsCorrectly) {
@@ -175,8 +173,6 @@ TEST(Converters, ATenDivConvertsCorrectly) {
   pointwise_test_helper(graph, false, false, {4}, {3, 4});
   pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3});
   pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3});
-  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, true);
-  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, false, true);
 }
 
 TEST(Converters, ATenDivWithScalarConvertsCorrectly) {
@@ -199,8 +195,8 @@ TEST(Converters, ATenDivRoundingFloorConvertsCorrectly) {
   pointwise_test_helper(graph, false, false, {4}, {3, 4}, true);
   pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3}, true);
   pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3}, true);
-  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, true);
-  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, false, true);
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, at::kFloat, at::kInt);
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, at::kInt, at::kFloat);
 }
 
 TEST(Converters, ATenDivRoundingTruncConvertsCorrectly) {
@@ -214,8 +210,8 @@ TEST(Converters, ATenDivRoundingTruncConvertsCorrectly) {
   pointwise_test_helper(graph, false, false, {4}, {3, 4}, true);
   pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3}, true);
   pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3}, true);
-  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, true);
-  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, false, true);
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, at::kFloat, at::kInt);
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, at::kInt, at::kFloat);
 }
 
 TEST(Converters, ATenDivRoundingNoneConvertsCorrectly) {
@@ -241,8 +237,8 @@ TEST(Converters, ATenPowTensorConvertsCorrectly) {
   pointwise_test_helper(graph, false, false, {4}, {3, 4});
   pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3});
   pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3});
-  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, true);
-  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, false, true);
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, at::kFloat, at::kInt);
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, at::kInt, at::kFloat);
 }
 
 TEST(Converters, ATenPowScalarConvertsCorrectly) {
@@ -283,8 +279,8 @@ TEST(Converters, ATenFloorDivideConvertsCorrectly) {
   pointwise_test_helper(graph, false, false, {4}, {3, 4});
   pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3});
   pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3});
-  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, true);
-  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, false, true);
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, at::kFloat, at::kInt);
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, at::kInt, at::kFloat);
 }
 
 TEST(Converters, ATenFloorDivideWithScalarConvertsCorrectly) {
@@ -329,6 +325,8 @@ TEST(Converters, ATenRsubWithTensorConvertsCorrectly) {
   pointwise_test_helper(graph, false, false, {3, 4}, {4});
   pointwise_test_helper(graph, false, false, {4}, {3, 4});
   pointwise_test_helper(graph, false, true, {4, 3, 3, 3}, {4, 3, 3, 3});
+  pointwise_test_helper(graph, false, false, {4, 3, 3, 3}, {4, 3, 3, 3}, false, at::kInt, at::kFloat);
+  pointwise_test_helper(graph, false, false, {4, 3, 3, 3}, {4, 3, 3, 3}, false, at::kInt, at::kInt);
 }
 
 TEST(Converters, ATenRsubWithScalarConvertsCorrectly) {
@@ -339,6 +337,46 @@ TEST(Converters, ATenRsubWithScalarConvertsCorrectly) {
         %3 : Tensor = aten::rsub(%0, %scalar, %2)
         return (%3))IR";
   pointwise_test_helper(graph, true, false, {4, 3, 3, 3});
+}
+
+TEST(Converters, ATenRsubWithIntScalarConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor):
+        %2 : int = prim::Constant[value=2]()
+        %scalar : int = prim::Constant[value=8]()
+        %3 : Tensor = aten::rsub(%0, %scalar, %2)
+        return (%3))IR";
+  pointwise_test_helper(graph, true, false, {4, 3, 3, 3}, {}, false, at::kInt);
+}
+
+TEST(Converters, ATenClipMinConvertsCorrectly) {
+  const auto graph = R"IR(
+  graph(%x.1 : Tensor):
+          %2 : float = prim::Constant[value=1.5]()
+          %3 : None = prim::Constant()
+          %4 : Tensor = aten::clip(%x.1, %2, %3)
+          return (%4))IR";
+  pointwise_test_helper(graph, true);
+}
+
+TEST(Converters, ATenClipMaxConvertsCorrectly) {
+  const auto graph = R"IR(
+  graph(%x.1 : Tensor):
+          %2 : float = prim::Constant[value=3.5]()
+          %3 : None = prim::Constant()
+          %4 : Tensor = aten::clip(%x.1, %3, %2)
+          return (%4))IR";
+  pointwise_test_helper(graph, true);
+}
+
+TEST(Converters, ATenClipMinMaxConvertsCorrectly) {
+  const auto graph = R"IR(
+  graph(%x.1 : Tensor):
+          %2 : float = prim::Constant[value=3.5]()
+          %3 : float = prim::Constant[value=1.5]()
+          %4 : Tensor = aten::clip(%x.1, %3, %2)
+          return (%4))IR";
+  pointwise_test_helper(graph, true);
 }
 
 TEST(Converters, ATenClampMinConvertsCorrectly) {
