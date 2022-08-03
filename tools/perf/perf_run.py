@@ -15,9 +15,12 @@ import pandas as pd
 # Importing supported Backends
 import torch
 import torch_tensorrt as torchtrt
-import torch_tensorrt.fx.tracer.acc_tracer.acc_tracer as acc_tracer
-from torch_tensorrt.fx import InputTensorSpec, TRTInterpreter
-from torch_tensorrt.fx import TRTModule
+# import torch_tensorrt.fx.tracer.acc_tracer.acc_tracer as acc_tracer
+# from torch_tensorrt.fx import InputTensorSpec, TRTInterpreter
+# from torch_tensorrt.fx import TRTModule
+from torch_tensorrt.fx.lower import lower_to_trt
+from torch_tensorrt.fx.utils import LowerPrecision
+
 import tensorrt as trt
 from utils import parse_inputs, parse_backends, precision_to_dtype, BENCHMARK_MODELS
 
@@ -113,30 +116,18 @@ def run_torch_tensorrt(model, input_tensors, params, precision, truncate_long_an
 # Runs inference using FX2TRT backend
 def run_fx2trt(model, input_tensors, params, precision, batch_size):
     print("Running FX2TRT for precision: ", precision)
-
-    # Trace the model with acc_tracer.
-    acc_mod = acc_tracer.trace(model, input_tensors)
-    # Generate input specs
-    input_specs = InputTensorSpec.from_tensors(input_tensors)
-    # Build a TRT interpreter. Set explicit_batch_dimension accordingly.
-    interpreter = TRTInterpreter(
-        acc_mod, input_specs, explicit_batch_dimension=True
+    if precision == "fp32":
+        precision = LowerPrecision.FP32
+    elif precision == "fp16":
+        precision = LowerPrecision.FP16
+    # Run lowering eager mode benchmark
+    model = lower_to_trt(
+        model,
+        input_tensors,
+        max_batch_size=batch_size,
+        lower_precision=precision,
+        verbose_log=True,
     )
-    trt_interpreter_result = interpreter.run(
-    max_batch_size=batch_size,
-    lower_precision=precision,
-    max_workspace_size=1 << 25,
-    sparse_weights=False,
-    force_fp32_output=False,
-    strict_type_constraints=False,
-    algorithm_selector=None,
-    timing_cache=None,
-    profiling_verbosity=None)
-
-    model = TRTModule(
-        trt_interpreter_result.engine,
-        trt_interpreter_result.input_names,
-        trt_interpreter_result.output_names)
 
     iters = params.get('iterations', 20)
     # Warm up
