@@ -29,20 +29,18 @@ TEST(CppAPITests, TestCollectionStandardTensorInput) {
   }
 
   auto out = mod.forward(inputs_);
-  LOG_DEBUG("Finish torchscirpt forward");
 
   std::vector<torch_tensorrt::Input> input_range;
   input_range.push_back({in0.sizes(), torch::kF16});
   input_range.push_back({in0.sizes(), torch::kF16});
   torch_tensorrt::ts::CompileSpec compile_settings(input_range);
   compile_settings.require_full_compilation = true;
-  compile_settings.min_block_size = 3;
+  compile_settings.min_block_size = 1;
 
   // // FP16 execution
   compile_settings.enabled_precisions = {torch::kHalf};
   // // Compile module
   auto trt_mod = torch_tensorrt::torchscript::compile(mod, compile_settings);
-  LOG_DEBUG("Finish compile");
   auto trt_out = trt_mod.forward(inputs_);
 
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(out.toTensor(), trt_out.toTensor(), 1e-5));
@@ -68,7 +66,6 @@ TEST(CppAPITests, TestCollectionTupleInput) {
   complex_inputs.push_back(input_tuple);
 
   auto out = mod.forward(complex_inputs);
-  LOG_DEBUG("Finish torchscirpt forward");
 
   auto input_shape = torch_tensorrt::Input(in0.sizes(), torch_tensorrt::DataType::kHalf);
 
@@ -81,14 +78,13 @@ TEST(CppAPITests, TestCollectionTupleInput) {
   torch::jit::IValue complex_input_shape2(input_tuple2);
 
   auto compile_settings = torch_tensorrt::ts::CompileSpec(complex_input_shape2);
-  compile_settings.require_full_compilation = false;
-  compile_settings.min_block_size = 3;
+  compile_settings.require_full_compilation = true;
+  compile_settings.min_block_size = 1;
 
   // // FP16 execution
   compile_settings.enabled_precisions = {torch::kHalf};
   // // Compile module
   auto trt_mod = torch_tensorrt::torchscript::compile(mod, compile_settings);
-  LOG_DEBUG("Finish compile");
   auto trt_out = trt_mod.forward(complex_inputs);
 
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(out.toTensor(), trt_out.toTensor(), 1e-5));
@@ -126,7 +122,6 @@ TEST(CppAPITests, TestCollectionListInput) {
   complex_inputs.push_back(input_list_ivalue);
 
   auto out = mod.forward(complex_inputs);
-  LOG_DEBUG("Finish torchscirpt forward");
 
   auto input_shape = torch_tensorrt::Input(in0.sizes(), torch_tensorrt::DataType::kHalf);
   auto input_shape_ivalue = torch::jit::IValue(std::move(c10::make_intrusive<torch_tensorrt::Input>(input_shape)));
@@ -141,9 +136,9 @@ TEST(CppAPITests, TestCollectionListInput) {
   torch::jit::IValue complex_input_shape2(input_tuple2);
 
   auto compile_settings = torch_tensorrt::ts::CompileSpec(complex_input_shape2);
-  compile_settings.require_full_compilation = false;
-  compile_settings.min_block_size = 3;
-  compile_settings.torch_executed_ops.push_back("aten::__getitem__");
+  compile_settings.require_full_compilation = true;
+  compile_settings.min_block_size = 1;
+  //compile_settings.torch_executed_ops.push_back("aten::__getitem__");
 
   // // FP16 execution
   compile_settings.enabled_precisions = {torch::kHalf};
@@ -176,7 +171,6 @@ TEST(CppAPITests, TestCollectionTupleInputOutput) {
   complex_inputs.push_back(input_tuple);
 
   auto out = mod.forward(complex_inputs);
-  LOG_DEBUG("Finish torchscirpt forward");
 
   auto input_shape = torch_tensorrt::Input(in0.sizes(), torch_tensorrt::DataType::kHalf);
 
@@ -190,8 +184,8 @@ TEST(CppAPITests, TestCollectionTupleInputOutput) {
   // torch::jit::IValue complex_input_shape(list);
 
   auto compile_settings = torch_tensorrt::ts::CompileSpec(complex_input_shape2);
-  compile_settings.require_full_compilation = false;
-  compile_settings.min_block_size = 3;
+  compile_settings.require_full_compilation = true;
+  compile_settings.min_block_size = 1;
 
   // compile_settings.torch_executed_ops.push_back("prim::TupleConstruct");
 
@@ -199,7 +193,6 @@ TEST(CppAPITests, TestCollectionTupleInputOutput) {
   compile_settings.enabled_precisions = {torch::kHalf};
   // // Compile module
   auto trt_mod = torch_tensorrt::torchscript::compile(mod, compile_settings);
-  LOG_DEBUG("Finish compile");
   auto trt_out = trt_mod.forward(complex_inputs);
 
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(
@@ -240,7 +233,6 @@ TEST(CppAPITests, TestCollectionListInputOutput) {
   complex_inputs.push_back(input_list_ivalue);
 
   auto out = mod.forward(complex_inputs);
-  LOG_DEBUG("Finish torchscirpt forward");
 
   auto input_shape = torch_tensorrt::Input(in0.sizes(), torch_tensorrt::DataType::kHalf);
 
@@ -256,17 +248,16 @@ TEST(CppAPITests, TestCollectionListInputOutput) {
   torch::jit::IValue complex_input_shape2(input_tuple2);
 
   auto compile_settings = torch_tensorrt::ts::CompileSpec(complex_input_shape2);
-  compile_settings.require_full_compilation = false;
-  compile_settings.min_block_size = 3;
+  compile_settings.require_full_compilation = true;
+  compile_settings.min_block_size = 1;
 
   // Need to skip the conversion of __getitem__ and ListConstruct
-  compile_settings.torch_executed_ops.push_back("aten::__getitem__");
+  //compile_settings.torch_executed_ops.push_back("aten::__getitem__");
 
   // // FP16 execution
   compile_settings.enabled_precisions = {torch::kHalf};
   // // Compile module
   auto trt_mod = torch_tensorrt::torchscript::compile(mod, compile_settings);
-  LOG_DEBUG("Finish compile");
   auto trt_out = trt_mod.forward(complex_inputs);
 
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(
@@ -307,7 +298,6 @@ TEST(CppAPITests, TestCollectionComplexModel) {
   complex_inputs.push_back(input_list_ivalue);
 
   auto out = mod.forward(complex_inputs);
-  LOG_DEBUG("Finish torchscirpt forward");
 
   auto input_shape = torch_tensorrt::Input(in0.sizes(), torch_tensorrt::DataType::kHalf);
 
@@ -323,17 +313,16 @@ TEST(CppAPITests, TestCollectionComplexModel) {
   torch::jit::IValue complex_input_shape2(input_tuple2);
 
   auto compile_settings = torch_tensorrt::ts::CompileSpec(complex_input_shape2);
-  compile_settings.require_full_compilation = false;
-  compile_settings.min_block_size = 3;
+  compile_settings.require_full_compilation = true;
+  compile_settings.min_block_size = 1;
 
   // Need to skip the conversion of __getitem__ and ListConstruct
-  compile_settings.torch_executed_ops.push_back("aten::__getitem__");
+  //compile_settings.torch_executed_ops.push_back("aten::__getitem__");
 
   // // FP16 execution
   compile_settings.enabled_precisions = {torch::kHalf};
   // // Compile module
   auto trt_mod = torch_tensorrt::torchscript::compile(mod, compile_settings);
-  LOG_DEBUG("Finish compile");
   auto trt_out = trt_mod.forward(complex_inputs);
 
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(

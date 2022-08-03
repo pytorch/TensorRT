@@ -58,6 +58,19 @@ def compile(module: torch.jit.ScriptModule,
                     torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
                 ]
 
+        input_signature Union(List, Tuple, torch_tensorrt.Input, torch.Tensor): A formatted collection of input specifications for the module. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
+            torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum to select device type. **This API should be considered beta-level stable and may change in the future** ::
+
+                input_signature=([
+                    torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
+                    torch_tensorrt.Input(
+                        min_shape=(1, 224, 224, 3),
+                        opt_shape=(1, 512, 512, 3),
+                        max_shape=(1, 1024, 1024, 3),
+                        dtype=torch.int32
+                        format=torch.channel_last
+                    ), # Dynamic input shape for input #2
+                ], torch.randn((1, 3, 224, 244))) # Use an example tensor and let torch_tensorrt infer settings for input #3
         device (Union(torch_tensorrt.Device, torch.device, dict)): Target device for TensorRT engines to run on ::
 
             device=torch_tensorrt.Device("dla:1", allow_gpu_fallback=True)
@@ -162,6 +175,20 @@ def convert_method_to_trt_engine(module: torch.jit.ScriptModule,
                     ), # Dynamic input shape for input #2
                     torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
                 ]
+
+        input_signature Union(List, Tuple, torch_tensorrt.Input, torch.Tensor): A formatted collection of input specifications for the module. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
+            torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum to select device type. **This API should be considered beta-level stable and may change in the future** ::
+
+                input_signature=([
+                    torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
+                    torch_tensorrt.Input(
+                        min_shape=(1, 224, 224, 3),
+                        opt_shape=(1, 512, 512, 3),
+                        max_shape=(1, 1024, 1024, 3),
+                        dtype=torch.int32
+                        format=torch.channel_last
+                    ), # Dynamic input shape for input #2
+                ], torch.randn((1, 3, 224, 244))) # Use an example tensor and let torch_tensorrt infer settings for input #3
 
         device (Union(torch_tensorrt.Device, torch.device, dict)): Target device for TensorRT engines to run on ::
 

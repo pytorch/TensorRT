@@ -19,14 +19,6 @@ namespace conversion {
 namespace evaluators {
 namespace {
 
-int64_t normalizeIndex(int64_t idx, int64_t list_size) {
-  if (idx < 0) {
-    // Handle negative indexing
-    idx = list_size + idx;
-  }
-  return idx;
-}
-
 DEFINE_GENERIC_TWO_INPUT_EVALUATOR(
     eq,
     "aten::eq",

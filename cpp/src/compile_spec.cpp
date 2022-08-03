@@ -69,6 +69,7 @@ torchtrt::core::CompileSpec init_compile_spec(CompileSpec external) {
     return internal;
   } else {
     torch::jit::IValue converted_input_signature;
+    LOG_WARNING( "Input signature parsing is an experimental feature, behavior and APIs may change");
     to_internal_input_signature(external.graph_inputs.input_signature, converted_input_signature);
     torchtrt::core::CompileSpec internal(converted_input_signature);
     return internal;

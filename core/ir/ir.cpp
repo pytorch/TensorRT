@@ -29,7 +29,7 @@ InputSpecMap pair_input_vals_with_specs(std::vector<const torch::jit::Value*> va
 
   std::unordered_map<const torch::jit::Value*, core::ir::Input> a;
   for (size_t i = 0; i < vals.size(); i++) {
-    LOG_DEBUG("Pairing " << i << ": " << vals[i]->debugName() << " : " << specs[i]);
+    LOG_DEBUG("Pairing " << i << ": " << vals[i]->debugName() << ": " << specs[i]);
     a.insert({vals[i], specs[i]});
   }
   return a;
@@ -56,7 +56,7 @@ std::vector<const torch::jit::Value*> get_tensor_inputs(
     StaticParams& static_params) {
   std::vector<const torch::jit::Value*> input_tensors;
   auto inputs = g->inputs();
-  LOG_DEBUG("Raw inputs size of get_tensor_inputs: " << inputs.size());
+  LOG_DEBUG("Found " << inputs.size() << " inputs to graph");
   for (auto in : inputs) {
     LOG_DEBUG("Handle input of debug name: " << in->debugName());
     // Disregarding inputs that are not tensors or are static
@@ -76,7 +76,7 @@ std::vector<const torch::jit::Value*> get_collection_inputs(
     StaticParams& static_params) {
   std::vector<const torch::jit::Value*> input_tensors;
   auto inputs = g->inputs();
-  LOG_DEBUG("Raw inputs size of get_collection_inputs: " << inputs.size());
+  LOG_DEBUG("Found " << inputs.size() << " inputs to graph");
   for (auto in : inputs) {
     LOG_DEBUG("Handle input of debug name: " << in->debugName());
     if (in->type()->isSubtypeOf(c10::TensorType::get()) && static_params.find(in) == static_params.end()) {
@@ -86,9 +86,9 @@ std::vector<const torch::jit::Value*> get_collection_inputs(
       // {
       input_tensors.push_back(in); // push original tuple
       at::ArrayRef<torch::jit::Value*> unpack_tuple = torch::jit::createTupleUnpack(in);
-      LOG_DEBUG("get_collection_inputs, tuple size " << unpack_tuple.size());
+      LOG_DEBUG("Input tuple size " << unpack_tuple.size());
     } else if (in->type()->kind() == torch::jit::TypeKind::ListType && static_params.find(in) == static_params.end()) {
-      LOG_DEBUG("get_collection_inputs, list use size " << in->uses().size());
+      LOG_DEBUG("Input list use size " << in->uses().size());
       input_tensors.push_back(in); // push original list
     }
   }
@@ -227,7 +227,7 @@ CollectionTypeMap get_block_first_calc_dtypes_opt_collection(torch::jit::Block* 
 
     } else if (i->type()->kind() == torch::jit::TypeKind::ListType) {
       // TODO: to decide the size of list and type of list element
-      LOG_DEBUG("get_block_first_calc_dtypes_opt ListType: use size " << i->uses().size());
+      LOG_DEBUG("Number of list uses " << i->uses().size());
       c10::optional<at::ScalarType> tp = get_value_first_calc_dtype_opt(b, i);
       // std::vector<c10::optional<at::ScalarType>> dytpes(i->uses().size());
       std::vector<c10::optional<at::ScalarType>> dytpes(i->uses().size(), tp);

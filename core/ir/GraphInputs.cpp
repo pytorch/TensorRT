@@ -54,7 +54,6 @@ void flatten_dfs(
 }
 
 GraphInputs::GraphInputs(std::vector<ir::Input> inputs_) {
-  LOG_DEBUG("Construct GraphInput with ir::Input");
   inputs = inputs_;
   collection_inputs.resize(inputs_.size());
   for (size_t i = 0; i < inputs_.size(); i++) {
@@ -63,8 +62,6 @@ GraphInputs::GraphInputs(std::vector<ir::Input> inputs_) {
 }
 
 GraphInputs::GraphInputs(torch::jit::IValue& input_signature_) {
-  LOG_DEBUG("Construct GraphInput with IValue");
-
   std::vector<torch_tensorrt::core::ir::Input> flattened_inputs;
   std::vector<std::vector<torch_tensorrt::core::ir::Input>> collection_inputs_;
 
