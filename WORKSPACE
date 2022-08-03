@@ -79,8 +79,7 @@ http_archive(
     sha256 = "7f3fbe6201708de409532a32d647af6b4bdb10d7f045d557270549e286487289",
     strip_prefix = "cudnn-linux-x86_64-8.4.1.114_cuda11.4-archive",
     urls = [
-        "http://cuda-repo/release-candidates/kitbundles/cudnn/v8.4_cuda_11.4/8.4.1.114/redist/cudnn/cudnn/linux-x86_64/cudnn-linux-x86_64-8.4.1.114_cuda11.4-archive.tar.xz",
-        #"https://developer.nvidia.com/compute/cudnn/secure/8.4.1/local_installers/11.6/cudnn-linux-x86_64-8.4.1.50_cuda11.6-archive.tar.xz",
+        "https://developer.nvidia.com/compute/cudnn/secure/8.4.1/local_installers/11.6/cudnn-linux-x86_64-8.4.1.50_cuda11.6-archive.tar.xz",
     ],
 )
 
@@ -90,8 +89,7 @@ http_archive(
     sha256 = "8107861af218694130f170e071f49814fa3e27f1386ce7cb6d807ac05a7fcf0e",
     strip_prefix = "TensorRT-8.4.1.5",
     urls = [
-        "http://cuda-repo/release-candidates/Libraries/TensorRT/v8.4/8.4.1.5-01a2da81/11.6-r510/Linux-x64-agnostic/tar/TensorRT-8.4.1.5.Linux.x86_64-gnu.cuda-11.6.cudnn8.4.tar.gz",
-        #"https://developer.nvidia.com/compute/machine-learning/tensorrt/secure/8.4.1/tars/tensorrt-8.4.1.5.linux.x86_64-gnu.cuda-11.6.cudnn8.4.tar.gz",
+        "https://developer.nvidia.com/compute/machine-learning/tensorrt/secure/8.4.1/tars/tensorrt-8.4.1.5.linux.x86_64-gnu.cuda-11.6.cudnn8.4.tar.gz",
     ],
 )
 
@@ -130,20 +128,11 @@ http_archive(
 #   build_file = "@//third_party/tensorrt/local:BUILD"
 #)
 
-# #########################################################################
-# # Testing Dependencies (optional - comment out on aarch64)
-# #########################################################################
-# pip_install(
-#     name = "torch_tensorrt_py_deps",
-#     requirements = "//py:requirements.txt",
-# )
-
-# pip_install(
-#     name = "py_test_deps",
-#     requirements = "//tests/py:requirements.txt",
-# )
+#########################################################################
+# Development Dependencies (optional - comment out on aarch64)
+#########################################################################
 
 pip_install(
-    name = "pylinter_deps",
-    requirements = "//tools/linter:requirements.txt",
+    name = "devtools_deps",
+    requirements = "//:requirements-dev.txt",
 )
