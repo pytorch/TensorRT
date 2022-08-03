@@ -41,7 +41,7 @@ local_repository(
 new_local_repository(
     name = "cuda",
     build_file = "@//third_party/cuda:BUILD",
-    path = "/usr/local/cuda/",
+    path = "/usr/local/cuda",
 )
 
 new_local_repository(
@@ -49,29 +49,29 @@ new_local_repository(
     build_file = "@//third_party/cublas:BUILD",
     path = "/usr",
 )
+#############################################################################################################
+# Tarballs and fetched dependencies (default - use in cases when building from precompiled bin and tarballs)
+#############################################################################################################
+
+http_archive(
+    name = "libtorch",
+    build_file = "@//third_party/libtorch:BUILD",
+    sha256 = "80f089939de20e68e3fcad4dfa72a26c8bf91b5e77b11042f671f39ebac35865",
+    strip_prefix = "libtorch",
+    urls = ["https://download.pytorch.org/libtorch/cu113/libtorch-cxx11-abi-shared-with-deps-1.12.0%2Bcu113.zip"],
+)
+
+http_archive(
+    name = "libtorch_pre_cxx11_abi",
+    build_file = "@//third_party/libtorch:BUILD",
+    sha256 = "8e35371403f7052d9e9b43bcff383980dbde4df028986dc1dab539953481d55f",
+    strip_prefix = "libtorch",
+    urls = ["https://download.pytorch.org/libtorch/cu113/libtorch-shared-with-deps-1.12.0%2Bcu113.zip"],
+)
 
 ####################################################################################
 # Locally installed dependencies (use in cases of custom dependencies or aarch64)
 ####################################################################################
-
-# NOTE: In the case you are using just the pre-cxx11-abi path or just the cxx11 abi path
-# with your local libtorch, just point deps at the same path to satisfy bazel.
-
-# NOTE: NVIDIA's aarch64 PyTorch (python) wheel file uses the CXX11 ABI unlike PyTorch's standard
-# x86_64 python distribution. If using NVIDIA's version just point to the root of the package
-# for both versions here and do not use --config=pre-cxx11-abi
-
-new_local_repository(
-    name = "libtorch",
-    path = "/opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/site-packages/torch",
-    build_file = "third_party/libtorch/BUILD"
-)
-
-new_local_repository(
-    name = "libtorch_pre_cxx11_abi",
-    path = "/opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/site-packages/torch",
-    build_file = "third_party/libtorch/BUILD"
-)
 
 new_local_repository(
     name = "cudnn",
@@ -84,6 +84,10 @@ new_local_repository(
    path = "/usr/",
    build_file = "@//third_party/tensorrt/local:BUILD"
 )
+
+# #########################################################################
+# # Testing Dependencies (optional - comment out on aarch64)
+# #########################################################################
 
 pip_install(
     name = "pylinter_deps",

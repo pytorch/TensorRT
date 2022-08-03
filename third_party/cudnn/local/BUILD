@@ -9,6 +9,15 @@ config_setting(
 )
 
 config_setting(
+    name = "ci_rhel_x86_64_linux",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+        "@//toolchains/distro:ci_rhel"
+    ]
+)
+
+config_setting(
     name = "windows",
     constraint_values = [
         "@platforms//os:windows",
@@ -30,6 +39,7 @@ cc_import(
     shared_library = select({
         ":aarch64_linux": "lib/aarch64-linux-gnu/libcudnn.so",
         ":windows": "bin/cudnn64_7.dll",  #Need to configure specific version for windows
+        ":ci_rhel_x86_64_linux": "lib64/libcudnn.so",
         "//conditions:default": "lib/x86_64-linux-gnu/libcudnn.so",
     }),
     visibility = ["//visibility:private"],
