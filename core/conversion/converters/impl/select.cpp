@@ -22,6 +22,8 @@ bool add_split(ConversionCtx* ctx, const torch::jit::Node* n, args& args, bool s
 
   if (unbind) {
     axis = args[1].unwrapToInt();
+    auto maxDim = static_cast<int64_t>(in->getDimensions().nbDims);
+    axis = axis < 0 ? axis + maxDim : axis;
     numOutputs = in->getDimensions().d[axis];
     sizes.insert(sizes.end(), numOutputs, 1);
   } else {
