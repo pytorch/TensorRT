@@ -48,8 +48,7 @@ class TestTupleInput(unittest.TestCase):
             "input_signature": ((torchtrt.Input(self.input.shape), torchtrt.Input(self.input.shape)),),
             "device": torchtrt.Device("gpu:0"),
             "enabled_precisions": {torch.float},
-            "require_full_compilation": False,
-            "min_block_size": 3
+            "min_block_size": 1
         }
 
         trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
@@ -69,8 +68,7 @@ class TestListInput(unittest.TestCase):
             "input_signature": ([torchtrt.Input(self.input.shape), torchtrt.Input(self.input.shape)],),
             "device": torchtrt.Device("gpu:0"),
             "enabled_precisions": {torch.float},
-            "require_full_compilation": False,
-            "min_block_size": 3
+            "min_block_size": 1
         }
 
         trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
@@ -89,8 +87,7 @@ class TestTupleInputOutput(unittest.TestCase):
             "input_signature": ((torchtrt.Input(self.input.shape), torchtrt.Input(self.input.shape)),),
             "device": torchtrt.Device("gpu:0"),
             "enabled_precisions": {torch.float},
-            "require_full_compilation": False,
-            "min_block_size": 3
+            "min_block_size": 1
         }
 
         trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
@@ -111,8 +108,7 @@ class TestListInputOutput(unittest.TestCase):
             "input_signature": ([torchtrt.Input(self.input.shape), torchtrt.Input(self.input.shape)],),
             "device": torchtrt.Device("gpu:0"),
             "enabled_precisions": {torch.float},
-            "require_full_compilation": False,
-            "min_block_size": 3
+            "min_block_size": 1
         }
 
         trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
@@ -134,8 +130,7 @@ class TestListInputTupleOutput(unittest.TestCase):
             "input_signature": ([torchtrt.Input(self.input.shape), torchtrt.Input(self.input.shape)],),
             "device": torchtrt.Device("gpu:0"),
             "enabled_precisions": {torch.float},
-            "require_full_compilation": False,
-            "min_block_size": 3
+            "min_block_size": 1
         }
 
         trt_mod = torchtrt.ts.compile(self.model, **compile_spec)

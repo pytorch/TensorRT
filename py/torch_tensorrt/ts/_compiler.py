@@ -103,8 +103,7 @@ def compile(module: torch.jit.ScriptModule,
 
     if require_full_compilation and (len(torch_executed_modules) > 0 or len(torch_executed_ops) > 0):
         raise ValueError(
-            "require_full_compilation is enabled however the list of modules and ops to run in torch is not empty. Found: torch_executed_ops: "
-            + torch_executed_ops + ", torch_executed_modules: " + torch_executed_modules)
+            f"require_full_compilation is enabled however the list of modules and ops to run in torch is not empty. Found: torch_executed_ops: {torch_executed_ops}, torch_executed_modules: {torch_executed_modules}")
 
     spec = {
         "inputs": inputs,

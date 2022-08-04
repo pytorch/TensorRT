@@ -8,6 +8,7 @@ from torch_tensorrt._Device import Device
 from torch_tensorrt.logging import Level, log
 from typing import Tuple, List, Dict
 import warnings
+from copy import deepcopy
 
 
 def _internal_input_to_torch_class_input(i: _C.Input) -> torch.classes.tensorrt._Input:
@@ -188,7 +189,9 @@ def _parse_input_signature(input_signature: Any):
     else:
         raise KeyError("Input signature contains an unsupported type {}".format(type(input_signature)))
 
-def _parse_compile_spec(compile_spec: Dict[str, Any]) -> _ts_C.CompileSpec:
+def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
+    # TODO: Remove deep copy once collections does not need partial compilation
+    compile_spec = deepcopy(compile_spec_)
     info = _ts_C.CompileSpec()
 
     if len(compile_spec["inputs"]) > 0:
@@ -203,6 +206,25 @@ def _parse_compile_spec(compile_spec: Dict[str, Any]) -> _ts_C.CompileSpec:
         log(Level.Warning, "Input signature parsing is an experimental feature, behavior and APIs may change")
         signature = _parse_input_signature(compile_spec["input_signature"])
         info.input_signature = _C.InputSignature(signature) # py_object
+
+        if not compile_spec["torch_fallback"]["enabled"]:
+            raise ValueError("Grouped inputs currently requires partial compilation to be enabled, this restriction will be relaxed in a future release")
+
+        log(Level.Debug, "Grouped inputs currently requires additional settings to enable the feature")
+        log(Level.Debug, """Adding the following ops to torch_executed_ops:
+    - aten::__getitem__
+    - prim::ListConstruct
+    - prim::ListUnpack
+    - prim::TupleIndex
+    - prim::TupleConstruct
+    - prim::TupleUnpack
+""")
+        compile_spec["torch_fallback"]["forced_fallback_ops"].append("aten::__getitem__")
+        compile_spec["torch_fallback"]["forced_fallback_ops"].append("prim::ListConstruct")
+        compile_spec["torch_fallback"]["forced_fallback_ops"].append("prim::ListUnpack")
+        compile_spec["torch_fallback"]["forced_fallback_ops"].append("prim::TupleIndex")
+        compile_spec["torch_fallback"]["forced_fallback_ops"].append("prim::TupleConstruct")
+        compile_spec["torch_fallback"]["forced_fallback_ops"].append("prim::TupleUnpack")
 
     else:
         raise KeyError(
