@@ -1,5 +1,5 @@
 import dataclasses as dc
-from typing import List, Optional, Sequence, Set, Type
+from typing import List, Optional, Set, Type
 
 from torch import nn
 from torch.fx.passes.pass_manager import PassManager
@@ -68,6 +68,8 @@ class LowerSetting(LowerSettingBasic):
     opt_profile_replica (int): the number of opt profile set for TensorRT engine, this field is
     only used by explicit batch dim with dynamic shape mode.
     dynamic_batch: enable the dynamic shape in TRT with dim=-1 for the 1st dimension.
+    tactic_sources: tactic sources for TensorRT kernel selection. Default to None,
+    meaning all possible tactic sources.
     """
 
     input_specs: List[InputTensorSpec] = dc.field(default_factory=list)
@@ -87,3 +89,4 @@ class LowerSetting(LowerSettingBasic):
     preset_lowerer: str = ""
     opt_profile_replica: int = 1
     dynamic_batch: bool = True
+    tactic_sources: Optional[int] = None

@@ -1,4 +1,5 @@
 import datetime
+import logging
 from functools import partial, wraps
 from typing import Any, Callable, Optional, Sequence
 
@@ -16,6 +17,10 @@ from ..passes.remove_duplicate_output_args import remove_duplicate_output_args
 from .graph_opts import common_subexpression_elimination
 
 from .lower_basic_pass import run_const_fold
+
+
+_LOGGER: logging.Logger = logging.getLogger(__name__)
+
 
 Input = Sequence[Any]
 
@@ -143,7 +148,7 @@ class LowerPassManagerBuilder:
 
                 # Only acc submodules will be lowered.
                 if not submod_name.startswith(split_result.non_acc_submodule_prefix):
-                    print("Now lowering submodule", submod_name)
+                    _LOGGER.info(f"Now lowering submodule {submod_name}")
                     lowering_start_time = datetime.datetime.now()
 
                     self.lower_setting.input_specs = generate_input_specs(
@@ -160,9 +165,8 @@ class LowerPassManagerBuilder:
                     LOWER_SPLIT_POST_OBSERVER.observe(
                         submod_name, lowered_module, submod_inputs
                     )
-                    print(
-                        f"Lowering submodule {submod_name} elapsed time",
-                        datetime.datetime.now() - lowering_start_time,
+                    _LOGGER.info(
+                        f"Lowering submodule {submod_name} elapsed time {datetime.datetime.now() - lowering_start_time}"
                     )
 
             return split_result.split_module
@@ -179,7 +183,7 @@ class LowerPassManagerBuilder:
 
                 # Only acc submodules will be lowered.
                 if not submod_name.startswith(split_result.non_acc_submodule_prefix):
-                    print("Now lowering submodule", submod_name)
+                    _LOGGER.info(f"Now lowering submodule {submod_name}")
                     lowering_start_time = datetime.datetime.now()
 
                     lowered_module = self._lower_func(
@@ -189,9 +193,8 @@ class LowerPassManagerBuilder:
                     LOWER_SPLIT_POST_OBSERVER.observe(
                         submod_name, lowered_module, submod_inputs
                     )
-                    print(
-                        f"Lowering submodule {submod_name} elapsed time",
-                        datetime.datetime.now() - lowering_start_time,
+                    _LOGGER.info(
+                        f"Lowering submodule {submod_name} elapsed time {datetime.datetime.now() - lowering_start_time}"
                     )
 
             return split_result.split_module

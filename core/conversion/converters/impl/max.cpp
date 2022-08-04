@@ -29,8 +29,8 @@ auto max_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns().patter
        TORCHTRT_CHECK(topk_layer, "Unable to create max layer from node: " << *n);
        auto topk_dims = util::toVec(topk_layer->getOutput(0)->getDimensions());
 
-       nvinfer1::ITensor* out0;
-       nvinfer1::ITensor* out1;
+       nvinfer1::ITensor* out0 = nullptr;
+       nvinfer1::ITensor* out1 = nullptr;
        if (!keep_dims) {
          if (topk_dims[dim] == 1) {
            auto squeeze_layer = ctx->net->addShuffle(*topk_layer->getOutput(0));

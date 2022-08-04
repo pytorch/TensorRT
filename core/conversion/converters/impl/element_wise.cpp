@@ -425,8 +425,7 @@ auto element_wise_registrations TORCHTRT_UNUSED =
                   [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                     // TODO: Remove with functionalization
                     auto self = args[0].ITensorOrFreeze(ctx);
-                    auto otherScalar = args[1].unwrapToScalar().to<float>();
-                    auto other = tensor_to_const(ctx, torch::tensor({otherScalar}));
+                    auto other = scalar_to_tensor(ctx, args[1].unwrapToScalar());
                     auto mul =
                         add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPROD, self, other, util::node_info(n));
                     TORCHTRT_CHECK(mul, "Unable to create mul layer from node: " << *n);

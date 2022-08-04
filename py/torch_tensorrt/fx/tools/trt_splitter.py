@@ -16,7 +16,10 @@ from .. import (
 from ..tools.trt_minimizer import TensorRTMinimizer
 
 
-def create_trt_operator_support(use_implicit_batch_dim=True) -> ops.OperatorSupportBase:
+def create_trt_operator_support(
+    use_implicit_batch_dim=True,
+    exclude_support_node_name: set = (),
+) -> ops.OperatorSupportBase:
     """Creates an `OperatorSupportBase` instance used for TRT splitting purpose."""
     # Create an `OperatorSupport` that declares a node supported if it
     # finds a registered TRT converter.
@@ -30,6 +33,7 @@ def create_trt_operator_support(use_implicit_batch_dim=True) -> ops.OperatorSupp
     supported_if_converter_registered = ops.OperatorSupport(support_dict=support_dict)
 
     return ops.chain(
+        ops.OpSupports.decline_if_node_in_names(exclude_support_node_name),
         # 1. Node is not supported if it has args with int64 dtype:
         ops.OpSupports.decline_if_input_dtype(torch.int64),
         # 2. Node is supported if it has TRT converter:
@@ -45,6 +49,7 @@ class TRTSplitterSetting(splitter_base._SplitterSettingBase):
         # During split, we'll split out the operators that
         # don't support the batch dim.
         self.use_implicit_batch_dim: bool = True
+        self.exclude_support_node_name: set = set(self.op_lowering_disallow_list)
 
 
 class TRTSplitter(splitter_base._SplitterBase):
@@ -59,7 +64,7 @@ class TRTSplitter(splitter_base._SplitterBase):
             settings = TRTSplitterSetting()
         if not operator_support:
             operator_support = create_trt_operator_support(
-                settings.use_implicit_batch_dim
+                settings.use_implicit_batch_dim, settings.exclude_support_node_name
             )
         super().__init__(
             module,

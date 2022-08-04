@@ -116,7 +116,7 @@ def log_before_after(pass_: PassFunc) -> PassFunc:
             encoding="utf-8",
             delete=False,
         ) as f:
-            print(f"== Log pass {pass_} before/after graph to {f.name}")
+            _LOGGER.info(f"== Log pass {pass_} before/after graph to {f.name}")
             print(f"[{pass_}] Before:\n{module.graph}", file=f)
             module = pass_(module, input)
             print(f"[{pass_}] After:\n{module.graph}", file=f)
