@@ -148,7 +148,7 @@ class LowerPassManagerBuilder:
 
                 # Only acc submodules will be lowered.
                 if not submod_name.startswith(split_result.non_acc_submodule_prefix):
-                    _LOGGER.info("Now lowering submodule", submod_name)
+                    _LOGGER.info(f"Now lowering submodule {submod_name}")
                     lowering_start_time = datetime.datetime.now()
 
                     self.lower_setting.input_specs = generate_input_specs(
@@ -166,8 +166,7 @@ class LowerPassManagerBuilder:
                         submod_name, lowered_module, submod_inputs
                     )
                     _LOGGER.info(
-                        f"Lowering submodule {submod_name} elapsed time",
-                        datetime.datetime.now() - lowering_start_time,
+                        f"Lowering submodule {submod_name} elapsed time {datetime.datetime.now() - lowering_start_time}"
                     )
 
             return split_result.split_module
@@ -184,7 +183,7 @@ class LowerPassManagerBuilder:
 
                 # Only acc submodules will be lowered.
                 if not submod_name.startswith(split_result.non_acc_submodule_prefix):
-                    _LOGGER.info("Now lowering submodule", submod_name)
+                    _LOGGER.info(f"Now lowering submodule {submod_name}")
                     lowering_start_time = datetime.datetime.now()
 
                     lowered_module = self._lower_func(
@@ -195,8 +194,7 @@ class LowerPassManagerBuilder:
                         submod_name, lowered_module, submod_inputs
                     )
                     _LOGGER.info(
-                        f"Lowering submodule {submod_name} elapsed time",
-                        datetime.datetime.now() - lowering_start_time,
+                        f"Lowering submodule {submod_name} elapsed time {datetime.datetime.now() - lowering_start_time}"
                     )
 
             return split_result.split_module
