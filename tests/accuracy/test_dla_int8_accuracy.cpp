@@ -25,8 +25,6 @@ TEST_P(AccuracyTests, DLAINT8AccuracyIsClose) {
   compile_spec.enabled_precisions = {torch::kF16, torch::kI8};
   // Use the TensorRT Entropy Calibrator
   compile_spec.ptq_calibrator = calibrator;
-  // Set a larger workspace
-  compile_spec.workspace_size = 1 << 28;
 
   compile_spec.device.device_type = torch_tensorrt::Device::DeviceType::kDLA;
   compile_spec.device.gpu_id = 0;

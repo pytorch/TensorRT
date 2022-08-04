@@ -80,7 +80,7 @@ models = {
         "model": timm.create_model('vit_base_patch16_224', pretrained=True),
         "path": "script"
     },
-    "pool": {
+    "pooling": {
         "model": cm.Pool(),
         "path": "trace"
     },
@@ -88,15 +88,23 @@ models = {
         "model": cm.ModuleFallbackMain(),
         "path": "script"
     },
-    "loop_fallback": {
+    "loop_fallback_eval": {
         "model": cm.LoopFallbackEval(),
+        "path": "script"
+    },
+    "loop_fallback_no_eval": {
+        "model": cm.LoopFallbackNoEval(),
         "path": "script"
     },
     "conditional": {
         "model": cm.FallbackIf(),
         "path": "script"
     },
-    "bert-base-uncased": {
+    "inplace_op_if": {
+        "model": cm.FallbackInplaceOPIf(),
+        "path": "script"
+    },
+    "bert_base_uncased": {
         "model": cm.BertModule(),
         "path": "trace"
     }

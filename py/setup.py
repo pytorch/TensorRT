@@ -22,17 +22,34 @@ CXX11_ABI = False
 
 JETPACK_VERSION = None
 
-__version__ = '1.2.0a0'
+FX_ONLY = False
 
+RELEASE = False
+
+CI_RELEASE = False
+
+__version__ = '1.2.0a0'
+__cuda_version__ = '11.3'
+__cudnn_version__ = '8.4'
+__tensorrt_version__ = '8.4'
 
 def get_git_revision_short_hash() -> str:
     return subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode('ascii').strip()
 
+if "--fx-only" in sys.argv:
+    FX_ONLY = True
+    sys.argv.remove("--fx-only")
 
 if "--release" not in sys.argv:
     __version__ = __version__ + "+" + get_git_revision_short_hash()
 else:
+    RELEASE = True
     sys.argv.remove("--release")
+
+if "--ci" in sys.argv:
+    sys.argv.remove("--ci")
+    if RELEASE:
+        CI_RELEASE = True
 
 if "--use-cxx11-abi" in sys.argv:
     sys.argv.remove("--use-cxx11-abi")
@@ -48,8 +65,10 @@ if platform.uname().processor == "aarch64":
             JETPACK_VERSION = "4.5"
         elif version == "4.6":
             JETPACK_VERSION = "4.6"
+        elif version == "5.0":
+            JETPACK_VERSION = "4.6"
     if not JETPACK_VERSION:
-        warnings.warn("Assuming jetpack version to be 4.6, if not use the --jetpack-version option")
+        warnings.warn("Assuming jetpack version to be 4.6 or greater, if not use the --jetpack-version option")
         JETPACK_VERSION = "4.6"
 
 
@@ -71,13 +90,14 @@ def which(program):
 
     return None
 
+BAZEL_EXE = None
+if not FX_ONLY:
+    BAZEL_EXE = which("bazelisk")
 
-BAZEL_EXE = which("bazelisk")
-
-if BAZEL_EXE is None:
-    BAZEL_EXE = which("bazel")
     if BAZEL_EXE is None:
-        sys.exit("Could not find bazel in PATH")
+        BAZEL_EXE = which("bazel")
+        if BAZEL_EXE is None:
+            sys.exit("Could not find bazel in PATH")
 
 
 def build_libtorchtrt_pre_cxx11_abi(develop=True, use_dist_dir=True, cxx11_abi=False):
@@ -99,7 +119,11 @@ def build_libtorchtrt_pre_cxx11_abi(develop=True, use_dist_dir=True, cxx11_abi=F
         print("Jetpack version: 4.5")
     elif JETPACK_VERSION == "4.6":
         cmd.append("--platforms=//toolchains:jetpack_4.6")
-        print("Jetpack version: 4.6")
+        print("Jetpack version: >=4.6")
+
+    if CI_RELEASE:
+        cmd.append("--platforms=//toolchains:ci_rhel_x86_64_linux")
+        print("CI based build")
 
     print("building libtorchtrt")
     status_code = subprocess.run(cmd).returncode
@@ -114,7 +138,10 @@ def gen_version_file():
 
     with open(dir_path + '/torch_tensorrt/_version.py', 'w') as f:
         print("creating version file")
-        f.write("__version__ = \"" + __version__ + '\"')
+        f.write("__version__ = \"" + __version__ + '\"\n')
+        f.write("__cuda_version__ = \"" + __cuda_version__ + '\"\n')
+        f.write("__cudnn_version__ = \"" + __cudnn_version__ + '\"\n')
+        f.write("__tensorrt_version__ = \"" + __tensorrt_version__ + '\"\n')
 
 
 def copy_libtorchtrt(multilinux=False):
@@ -138,11 +165,15 @@ class DevelopCommand(develop):
         develop.finalize_options(self)
 
     def run(self):
-        global CXX11_ABI
-        build_libtorchtrt_pre_cxx11_abi(develop=True, cxx11_abi=CXX11_ABI)
-        gen_version_file()
-        copy_libtorchtrt()
-        develop.run(self)
+        if FX_ONLY:
+            gen_version_file()
+            develop.run(self)
+        else:
+            global CXX11_ABI
+            build_libtorchtrt_pre_cxx11_abi(develop=True, cxx11_abi=CXX11_ABI)
+            gen_version_file()
+            copy_libtorchtrt()
+            develop.run(self)
 
 
 class InstallCommand(install):
@@ -155,11 +186,15 @@ class InstallCommand(install):
         install.finalize_options(self)
 
     def run(self):
-        global CXX11_ABI
-        build_libtorchtrt_pre_cxx11_abi(develop=False, cxx11_abi=CXX11_ABI)
-        gen_version_file()
-        copy_libtorchtrt()
-        install.run(self)
+        if FX_ONLY:
+            gen_version_file()
+            install.run(self)
+        else:
+            global CXX11_ABI
+            build_libtorchtrt_pre_cxx11_abi(develop=False, cxx11_abi=CXX11_ABI)
+            gen_version_file()
+            copy_libtorchtrt()
+            install.run(self)
 
 
 class BdistCommand(bdist_wheel):
@@ -254,6 +289,23 @@ ext_modules = [
         ] + (["-D_GLIBCXX_USE_CXX11_ABI=1"] if CXX11_ABI else ["-D_GLIBCXX_USE_CXX11_ABI=0"]),
         undef_macros=["NDEBUG"])
 ]
+if FX_ONLY:
+    ext_modules=None
+    packages=[
+        "torch_tensorrt.fx",
+        "torch_tensorrt.fx.converters",
+        "torch_tensorrt.fx.passes",
+        "torch_tensorrt.fx.tools",
+        "torch_tensorrt.fx.tracer.acc_tracer",
+    ]
+    package_dir={
+        "torch_tensorrt.fx": "torch_tensorrt/fx",
+        "torch_tensorrt.fx.converters": "torch_tensorrt/fx/converters",
+        "torch_tensorrt.fx.passes": "torch_tensorrt/fx/passes",
+        "torch_tensorrt.fx.tools": "torch_tensorrt/fx/tools",
+        "torch_tensorrt.fx.tracer.acc_tracer": "torch_tensorrt/fx/tracer/acc_tracer",
+    }
+
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
@@ -270,7 +322,7 @@ setup(
     long_description=long_description,
     ext_modules=ext_modules,
     install_requires=[
-        'torch>=1.11.0+cu113<1.12.0',
+        'torch>=1.12.0+cu113,<1.13.0',
     ],
     setup_requires=[],
     cmdclass={
@@ -282,7 +334,8 @@ setup(
     },
     zip_safe=False,
     license="BSD",
-    packages=find_packages(),
+    packages=packages if FX_ONLY else find_packages(),
+    package_dir=package_dir if FX_ONLY else {},
     classifiers=[
         "Development Status :: 5 - Stable", "Environment :: GPU :: NVIDIA CUDA",
         "License :: OSI Approved :: BSD License", "Intended Audience :: Developers",

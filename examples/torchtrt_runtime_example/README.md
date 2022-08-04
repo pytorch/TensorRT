@@ -21,7 +21,7 @@ The main goal is to use Torch-TensorRT runtime library `libtorchtrt_runtime.so`,
 
 ```sh
 cd examples/torch_tensorrtrt_example/deps
-// Download latest Torch-TensorRT release tar file (libtorch_tensorrt.tar.gz) from https://github.com/NVIDIA/Torch-TensorRT/releases
+// Download latest Torch-TensorRT release tar file (libtorch_tensorrt.tar.gz) from https://github.com/pytorch/TensorRT/releases
 tar -xvzf libtorch_tensorrt.tar.gz
 unzip libtorch-cxx11-abi-shared-with-deps-[PYTORCH_VERSION].zip
 ```

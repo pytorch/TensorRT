@@ -82,17 +82,23 @@ torchtrtc [input_file_path] [output_file_path]
                                         serialized TensorRT engine and embed it
                                         into a TorchScript module (device spec
                                         must be provided)
-      --num-min-timing-iter=[num_iters] Number of minimization timing iterations
-                                        used to select kernels
       --num-avg-timing-iters=[num_iters]
                                         Number of averaging timing iterations
                                         used to select kernels
       --workspace-size=[workspace_size] Maximum size of workspace given to
                                         TensorRT
-      -t[threshold],
-      --threshold=[threshold]           Maximum acceptable numerical deviation
-                                        from standard torchscript output
-                                        (default 2e-5)
+      --dla-sram-size=[dla_sram_size]   Fast software managed RAM used by DLA
+                                        to communicate within a layer.
+      --dla-local-dram-size=[dla_local_dram_size]  Host RAM used by DLA to share
+                                        intermediate tensor data across operations.
+      --dla-global-dram-size=[dla_global_dram_size] Host RAM used by DLA to store
+                                        weights and metadata for execution
+      --atol=[atol]                     Absolute tolerance threshold for acceptable
+                                        numerical deviation from standard torchscript
+                                        output (default 1e-8)
+      --rtol=[rtol]                     Relative tolerance threshold for acceptable
+                                        numerical deviation from standard torchscript
+                                        output  (default 1e-5)
       --no-threshold-check              Skip checking threshold compliance
       --truncate-long-double,
       --truncate, --truncate-64bit      Truncate weights that are provided in

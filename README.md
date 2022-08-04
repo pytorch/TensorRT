@@ -2,13 +2,14 @@
 
 [![Documentation](https://img.shields.io/badge/docs-master-brightgreen)](https://nvidia.github.io/Torch-TensorRT/)
 
-> Ahead of Time (AOT) compiling for PyTorch JIT
+> Ahead of Time (AOT) compiling for PyTorch JIT and FX
 
-Torch-TensorRT is a compiler for PyTorch/TorchScript, targeting NVIDIA GPUs via NVIDIA's TensorRT Deep Learning Optimizer and Runtime. Unlike PyTorch's Just-In-Time (JIT) compiler, Torch-TensorRT is an Ahead-of-Time (AOT) compiler, meaning that before you deploy your TorchScript code, you go through an explicit compile step to convert a standard TorchScript program into an module targeting a TensorRT engine. Torch-TensorRT operates as a PyTorch extention and compiles modules that integrate into the JIT runtime seamlessly. After compilation using the optimized graph should feel no different than running a TorchScript module. You also have access to TensorRT's suite of configurations at compile time, so you are able to specify operating precision (FP32/FP16/INT8) and other settings for your module.
+Torch-TensorRT is a compiler for PyTorch/TorchScript/FX, targeting NVIDIA GPUs via NVIDIA's TensorRT Deep Learning Optimizer and Runtime. Unlike PyTorch's Just-In-Time (JIT) compiler, Torch-TensorRT is an Ahead-of-Time (AOT) compiler, meaning that before you deploy your TorchScript code, you go through an explicit compile step to convert a standard TorchScript or FX program into an module targeting a TensorRT engine. Torch-TensorRT operates as a PyTorch extention and compiles modules that integrate into the JIT runtime seamlessly. After compilation using the optimized graph should feel no different than running a TorchScript module. You also have access to TensorRT's suite of configurations at compile time, so you are able to specify operating precision (FP32/FP16/INT8) and other settings for your module.
 
 Resources:
 - [Documentation](https://nvidia.github.io/Torch-TensorRT/)
-- [Torch-TensorRT Explained in 2 minutes!](https://www.youtube.com/watch?v=TU5BMU6iYZ0&ab_channel=NVIDIADeveloper)
+- [FX path Documentation](https://github.com/pytorch/TensorRT/blob/master/docsrc/tutorials/getting_started_with_fx_path.rst)
+- [Torch-TensorRT Explained in 2 minutes!](https://www.youtube.com/watch?v=TU5BMU6iYZ0&ab_channel=NVIDIADeveloper) 
 - [Comprehensive Discusion (GTC Event)](https://www.nvidia.com/en-us/on-demand/session/gtcfall21-a31107/)
 - [Pre-built Docker Container](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch). To use this container, make an NGC account and sign in to NVIDIA's registry with an API key. Refer to [this guide](https://docs.nvidia.com/ngc/ngc-catalog-user-guide/index.html#registering-activating-ngc-account) for the same.
 
@@ -111,14 +112,14 @@ torch.jit.save(trt_ts_module, "trt_torchscript_module.ts") # save the TRT embedd
 These are the following dependencies used to verify the testcases. Torch-TensorRT can work with other versions, but the tests are not guaranteed to pass.
 
 - Bazel 5.1.1
-- Libtorch 1.11.0 (built with CUDA 11.3)
+- Libtorch 1.12.0 (built with CUDA 11.3)
 - CUDA 11.3
-- cuDNN 8.2.1
-- TensorRT 8.2.4.2
+- cuDNN 8.4.1
+- TensorRT 8.4.1.5
 
 ## Prebuilt Binaries and Wheel files
 
-Releases: https://github.com/NVIDIA/Torch-TensorRT/releases
+Releases: https://github.com/pytorch/TensorRT/releases
 
 ## Compiling Torch-TensorRT
 
@@ -212,6 +213,12 @@ new_local_repository(
 bazel build //:libtorchtrt --compilation_mode opt
 ```
 
+### FX path (Python only) installation
+If the user plans to try FX path (Python only) and would like to avoid bazel build. Please follow the steps below.
+``` shell
+cd py && python3 setup.py install --fx-only
+```
+
 ### Debug build
 
 ``` shell
@@ -250,11 +257,48 @@ docker run -it -v$(pwd)/..:/workspace/Torch-TensorRT build_torch_tensorrt_wheel 
 
 Python compilation expects using the tarball based compilation strategy from above.
 
+
+## Testing using Python backend
+
+Torch-TensorRT supports testing in Python using [nox](https://nox.thea.codes/en/stable)
+
+To install the nox using python-pip
+
+```
+python3 -m pip install --upgrade nox
+```
+
+To list supported nox sessions:
+
+```
+nox --session -l
+```
+
+Environment variables supported by nox
+
+```
+PYT_PATH          - To use different PYTHONPATH than system installed Python packages
+TOP_DIR           - To set the root directory of the noxfile
+USE_CXX11         - To use cxx11_abi (Defaults to 0)
+USE_HOST_DEPS     - To use host dependencies for tests (Defaults to 0)
+```
+
+Usage example
+
+```
+nox --session l0_api_tests
+```
+
+Supported Python versions:
+```
+["3.7", "3.8", "3.9", "3.10"]
+```
+
 ## How do I add support for a new op...
 
 ### In Torch-TensorRT?
 
-Thanks for wanting to contribute! There are two main ways to handle supporting a new op. Either you can write a converter for the op from scratch and register it in the NodeConverterRegistry or if you can map the op to a set of ops that already have converters you can write a graph rewrite pass which will replace your new op with an equivalent subgraph of supported ops. Its preferred to use graph rewriting because then we do not need to maintain a large library of op converters. Also do look at the various op support trackers in the [issues](https://github.com/NVIDIA/Torch-TensorRT/issues) for information on the support status of various operators.
+Thanks for wanting to contribute! There are two main ways to handle supporting a new op. Either you can write a converter for the op from scratch and register it in the NodeConverterRegistry or if you can map the op to a set of ops that already have converters you can write a graph rewrite pass which will replace your new op with an equivalent subgraph of supported ops. Its preferred to use graph rewriting because then we do not need to maintain a large library of op converters. Also do look at the various op support trackers in the [issues](https://github.com/pytorch/TensorRT/issues) for information on the support status of various operators.
 
 ### In my application?
 

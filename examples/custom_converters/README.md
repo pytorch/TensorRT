@@ -66,7 +66,7 @@ from torch.utils import cpp_extension
 
 
 # library_dirs should point to the libtorch_tensorrt.so, include_dirs should point to the dir that include the headers
-# 1) download the latest package from https://github.com/NVIDIA/Torch-TensorRT/releases/
+# 1) download the latest package from https://github.com/pytorch/TensorRT/releases/
 # 2) Extract the file from downloaded package, we will get the "torch_tensorrt" directory
 # 3) Set torch_tensorrt_path to that directory
 torch_tensorrt_path = <PATH TO TRTORCH>
@@ -87,7 +87,7 @@ setup(
 ```
 Make sure to include the path for header files in `include_dirs` and the path
 for dependent libraries in `library_dirs`. Generally speaking, you should download
-the latest package from [here](https://github.com/NVIDIA/Torch-TensorRT/releases), extract
+the latest package from [here](https://github.com/pytorch/TensorRT/releases), extract
 the files, and the set the `torch_tensorrt_path` to it. You could also add other compilation
 flags in cpp_extension if you need. Then, run above python scripts as:
 ```shell

@@ -7,6 +7,9 @@
  */
 #pragma once
 
+#if defined(USE_CMAKE_GENERATED_EXPORT_HEADER)
+#include <torch_tensorrt_export.h>
+#else
 #if defined(__GNUC__)
 #define TORCHTRT_API __attribute__((__visibility__("default")))
 #define TORCHTRT_HIDDEN __attribute__((__visibility__("hidden")))
@@ -14,6 +17,7 @@
 #define TORCHTRT_API
 #define TORCHTRT_HIDDEN
 #endif // defined(__GNUC__)
+#endif // defined(USE_CMAKE_GENERATED_EXPORT_HEADER)
 
 // Does this need to be gaurded or something?
 #define XSTR(x) #x

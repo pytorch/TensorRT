@@ -26,6 +26,8 @@ struct CudaDevice {
   CudaDevice();
   CudaDevice(int64_t gpu_id, nvinfer1::DeviceType device_type);
   CudaDevice(std::string serialized_device_info);
+  ~CudaDevice() = default;
+  CudaDevice(const CudaDevice& other) = default;
   CudaDevice& operator=(const CudaDevice& other);
   std::string serialize();
   std::string getSMCapability() const;

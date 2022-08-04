@@ -123,7 +123,7 @@ html_theme_options = {
     "logo_icon": "&#xe86f",
 
     # Set the repo location to get a badge with stats
-    'repo_url': 'https://github.com/nvidia/Torch-TensorRT/',
+    'repo_url': 'https://github.com/pytorch/TensorRT/',
     'repo_name': 'Torch-TensorRT',
 
     # Visible levels of the global TOC; -1 means unlimited

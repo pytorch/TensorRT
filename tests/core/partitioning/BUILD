@@ -13,7 +13,8 @@ filegroup(
             "//tests/modules:mobilenet_v2_traced.jit.pt",
             "//tests/modules:conditional_scripted.jit.pt",
             "//tests/modules:loop_fallback_eval_scripted.jit.pt",
-            "//tests/modules:loop_fallback_no_eval_scripted.jit.pt"]
+            "//tests/modules:loop_fallback_no_eval_scripted.jit.pt",
+            "//tests/modules:inplace_op_if_scripted.jit.pt"]
 )
 
 partitioning_test(
@@ -34,6 +35,21 @@ partitioning_test(
 
 partitioning_test(
   name = "test_resolve_nontensor_inputs",
+)
+
+cc_test(
+  name = "test_loading_model",
+  srcs = ["test_loading_model.cpp"],
+  deps = [
+      "//tests/util",
+      "@googletest//:gtest_main",
+  ] + select({
+      ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
+      "//conditions:default":  ["@libtorch//:libtorch"],
+  }),
+  data = [
+      ":jit_models"
+  ]
 )
 
 cc_test(
@@ -91,6 +107,7 @@ test_suite(
         ":test_fallback_graph_output",
         ":test_loop_fallback",
         ":test_conditionals",
-        ":test_resolve_nontensor_inputs"
+        ":test_resolve_nontensor_inputs",
+        ":test_loading_model"
     ]
 )

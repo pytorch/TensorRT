@@ -15,6 +15,8 @@
 #include <string>
 #include <vector>
 
+#include "torch_tensorrt/macros.h"
+
 // Just include the .h?
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
 namespace torch {
@@ -36,7 +38,6 @@ class IInt8Calibrator;
 }
 #endif // DOXYGEN_SHOULD_SKIP_THIS
 
-#include "torch_tensorrt/macros.h"
 namespace torch_tensorrt {
 /**
  * Supported Data Types that can be used with TensorRT engines
@@ -45,7 +46,7 @@ namespace torch_tensorrt {
  * support) so there should not be a reason that you need to use this type
  * explictly.
  */
-class TORCHTRT_API DataType {
+class DataType {
  public:
   /**
    * Underlying enum class to support the DataType Class
@@ -85,7 +86,7 @@ class TORCHTRT_API DataType {
    *
    * @param t
    */
-  DataType(c10::ScalarType t);
+  TORCHTRT_API DataType(c10::ScalarType t);
   /**
    * @brief Get the enum value of the DataType object
    *
@@ -137,7 +138,7 @@ class TORCHTRT_API DataType {
   }
 
  private:
-  friend std::ostream& operator<<(std::ostream& os, const DataType& dtype);
+  friend TORCHTRT_API std::ostream& operator<<(std::ostream& os, const DataType& dtype);
   Value value;
 };
 
@@ -265,7 +266,7 @@ enum class EngineCapability : int8_t {
 /**
  * @brief TensorFormat is an enum class which defines the memeory layout used to store Tensor Data
  * */
-class TORCHTRT_API TensorFormat {
+class TensorFormat {
  public:
   /**
    * Underlying enum class to support the TensorFormat Class
@@ -299,7 +300,7 @@ class TORCHTRT_API TensorFormat {
    *
    * @param t
    */
-  TensorFormat(at::MemoryFormat t);
+  TORCHTRT_API TensorFormat(at::MemoryFormat t);
   /**
    * @brief Get the enum value of the TensorFormat object
    *
@@ -351,7 +352,7 @@ class TORCHTRT_API TensorFormat {
   }
 
  private:
-  friend std::ostream& operator<<(std::ostream& os, const TensorFormat& format);
+  friend TORCHTRT_API std::ostream& operator<<(std::ostream& os, const TensorFormat& format);
   Value value;
 };
 
@@ -363,7 +364,7 @@ class TORCHTRT_API TensorFormat {
  * signifying a static input shape or a set of three input shapes representing
  * the min, optiminal and max input shapes allowed for the engine.
  */
-struct TORCHTRT_API Input {
+struct Input {
   /// Minimum acceptable input size into the engine
   std::vector<int64_t> min_shape;
   /// Optimal input size into the engine (size optimized for given kernels accept any size in min max range)
@@ -387,7 +388,7 @@ struct TORCHTRT_API Input {
    * @param shape Input tensor shape
    * @param format Expected tensor format for the input (Defaults to contiguous)
    */
-  Input(std::vector<int64_t> shape, TensorFormat format = TensorFormat::kContiguous);
+  TORCHTRT_API Input(std::vector<int64_t> shape, TensorFormat format = TensorFormat::kContiguous);
 
   /**
    * @brief Construct a new Input spec object for static input size from
@@ -399,7 +400,7 @@ struct TORCHTRT_API Input {
    * calculation if detectable else Float32)
    * @param format Expected tensor format for the input (Defaults to contiguous)
    */
-  Input(std::vector<int64_t> shape, DataType dtype, TensorFormat format = TensorFormat::kContiguous);
+  TORCHTRT_API Input(std::vector<int64_t> shape, DataType dtype, TensorFormat format = TensorFormat::kContiguous);
 
   /**
    * @brief Construct a new Input spec object for static input size from
@@ -411,7 +412,7 @@ struct TORCHTRT_API Input {
    * @param shape Input tensor shape
    * @param format Expected tensor format for the input (Defaults to contiguous)
    */
-  Input(c10::ArrayRef<int64_t> shape, TensorFormat format = TensorFormat::kContiguous);
+  TORCHTRT_API Input(c10::ArrayRef<int64_t> shape, TensorFormat format = TensorFormat::kContiguous);
 
   /**
    * @brief Construct a new Input spec object for static input size from
@@ -423,7 +424,7 @@ struct TORCHTRT_API Input {
    * calculation if detectable else Float32)
    * @param format Expected tensor format for the input (Defaults to contiguous)
    */
-  Input(c10::ArrayRef<int64_t> shape, DataType dtype, TensorFormat format = TensorFormat::kContiguous);
+  TORCHTRT_API Input(c10::ArrayRef<int64_t> shape, DataType dtype, TensorFormat format = TensorFormat::kContiguous);
 
   /**
    * @brief Construct a new Input spec object dynamic input size from
@@ -436,7 +437,7 @@ struct TORCHTRT_API Input {
    * @param max_shape Maximum acceptible shape for input tensor
    * @param format Expected tensor format for the input (Defaults to contiguous)
    */
-  Input(
+  TORCHTRT_API Input(
       std::vector<int64_t> min_shape,
       std::vector<int64_t> opt_shape,
       std::vector<int64_t> max_shape,
@@ -454,7 +455,7 @@ struct TORCHTRT_API Input {
    * calculation if detectable else Float32)
    * @param format Expected tensor format for the input (Defaults to contiguous)
    */
-  Input(
+  TORCHTRT_API Input(
       std::vector<int64_t> min_shape,
       std::vector<int64_t> opt_shape,
       std::vector<int64_t> max_shape,
@@ -472,7 +473,7 @@ struct TORCHTRT_API Input {
    * @param max_shape Maximum acceptible shape for input tensor
    * @param format Expected tensor format for the input (Defaults to contiguous)
    */
-  Input(
+  TORCHTRT_API Input(
       c10::ArrayRef<int64_t> min_shape,
       c10::ArrayRef<int64_t> opt_shape,
       c10::ArrayRef<int64_t> max_shape,
@@ -490,7 +491,7 @@ struct TORCHTRT_API Input {
    * calculation if detectable else Float32)
    * @param format Expected tensor format for the input (Defaults to contiguous)
    */
-  Input(
+  TORCHTRT_API Input(
       c10::ArrayRef<int64_t> min_shape,
       c10::ArrayRef<int64_t> opt_shape,
       c10::ArrayRef<int64_t> max_shape,
@@ -505,10 +506,10 @@ struct TORCHTRT_API Input {
    *
    * @param tensor Reference tensor to set shape, type and layout
    */
-  Input(at::Tensor tensor);
+  TORCHTRT_API Input(at::Tensor tensor);
 
  private:
-  friend std::ostream& operator<<(std::ostream& os, const Input& input);
+  friend TORCHTRT_API std::ostream& operator<<(std::ostream& os, const Input& input);
   bool input_is_dynamic;
 };
 
@@ -541,7 +542,7 @@ namespace torchscript {
  * Settings data structure for Torch-TensorRT TorchScript compilation
  *
  */
-struct TORCHTRT_API CompileSpec {
+struct CompileSpec {
   /**
    * @brief Construct a new Compile Spec object
    * Convienence constructor to set fixed input size from vectors describing
@@ -554,7 +555,7 @@ struct TORCHTRT_API CompileSpec {
    *
    * @param fixed_sizes
    */
-  CompileSpec(std::vector<std::vector<int64_t>> fixed_sizes);
+  TORCHTRT_API CompileSpec(std::vector<std::vector<int64_t>> fixed_sizes);
 
   /**
    * @brief Construct a new Extra Info object
@@ -568,7 +569,7 @@ struct TORCHTRT_API CompileSpec {
    *
    * @param fixed_sizes
    */
-  CompileSpec(std::vector<c10::ArrayRef<int64_t>> fixed_sizes);
+  TORCHTRT_API CompileSpec(std::vector<c10::ArrayRef<int64_t>> fixed_sizes);
 
   /**
    * @brief Construct a new Extra Info object from input ranges.
@@ -637,10 +638,6 @@ struct TORCHTRT_API CompileSpec {
   EngineCapability capability = EngineCapability::kSTANDARD;
 
   /**
-   * Number of minimization timing iterations used to select kernels
-   */
-  uint64_t num_min_timing_iters = 2;
-  /**
    * Number of averaging timing iterations used to select kernels
    */
   uint64_t num_avg_timing_iters = 1;
@@ -649,6 +646,21 @@ struct TORCHTRT_API CompileSpec {
    * Maximum size of workspace given to TensorRT
    */
   uint64_t workspace_size = 0;
+
+  /**
+   * Fast software managed RAM used by DLA to communicate within a layer.
+   */
+  uint64_t dla_sram_size = 1048576;
+
+  /**
+   * Host RAM used by DLA to share intermediate tensor data across operations
+   */
+  uint64_t dla_local_dram_size = 1073741824;
+
+  /**
+   * host RAM used by DLA to store weights and metadata for execution
+   */
+  uint64_t dla_global_dram_size = 536870912;
 
   /**
    * Calibration dataloaders for each input for post training quantizatiom

@@ -28,6 +28,8 @@ Getting Started
 * :ref:`use_from_pytorch`
 * :ref:`runtime`
 * :ref:`using_dla`
+* :ref:`serving_torch_tensorrt_with_triton`
+* :ref:`user_guide`
 
 .. toctree::
    :caption: Getting Started
@@ -43,6 +45,8 @@ Getting Started
    tutorials/use_from_pytorch
    tutorials/runtime
    tutorials/using_dla
+   tutorials/serving_torch_tensorrt_with_triton
+   tutorials/getting_started_with_fx_path
 
 .. toctree::
    :caption: Notebooks
