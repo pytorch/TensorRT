@@ -440,10 +440,6 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
         auto graph_and_mapping = ConstructFallbackGraph(
             new_mod, g->block(), collection_input_ivalues_map, cfg, static_params, fallback_nodes);
         new_g = graph_and_mapping.first;
-        // renaming the input name of graph after fallback to ensure pytorch deserialize it correctly
-        for (size_t i = 0; i < new_g->inputs().size(); ++i) {
-          new_g->inputs()[i]->setDebugName(std::string("input_") + std::to_string(i));
-        }
         LOG_INFO(*new_g << "(GraphAfterFallback)");
 
         // if there is no tensorrt engine self in fallback graph, there is no conversion, we just return the initial
@@ -459,6 +455,14 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
         // TODO find the right
         auto engine = conversion::ConvertBlockToEngine(g->block(), cfg.convert_info, static_params);
         AddEngineToGraph(new_mod, new_g, engine, cuda_device);
+      }
+      // renaming the input name of graph after fallback to ensure pytorch deserialize it correctly
+      int input_offset = new_g->inputs().size() == g->inputs().size() ? 0 : 1;
+      for (size_t i = 0; i < g->inputs().size(); ++i) {
+        auto old_g_name = g->inputs()[i]->debugName();
+        auto pos = old_g_name.find('.');
+        auto new_name = pos == std::string::npos ? old_g_name : old_g_name.substr(0, pos);
+        new_g->inputs()[i + input_offset]->setDebugName(new_name);
       }
       auto new_method = new_mod._ivalue()->compilation_unit()->create_function(method.name(), new_g);
       auto schema = util::GenerateGraphSchema(new_method->name(), new_g);
