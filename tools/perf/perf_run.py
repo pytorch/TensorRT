@@ -120,13 +120,15 @@ def run_fx2trt(model, input_tensors, params, precision, batch_size):
         precision = LowerPrecision.FP32
     elif precision == "fp16":
         precision = LowerPrecision.FP16
+        model.half()
+        input_tensors = [tensor.half() for tensor in input_tensors]
     # Run lowering eager mode benchmark
     model = lower_to_trt(
         model,
         input_tensors,
         max_batch_size=batch_size,
         lower_precision=precision,
-        verbose_log=True,
+        verbose_log=False,
     )
 
     iters = params.get('iterations', 20)
