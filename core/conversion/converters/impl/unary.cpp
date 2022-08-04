@@ -1,7 +1,7 @@
 #include "core/conversion/converters/converters.h"
 #include "core/util/prelude.h"
 
-#include <torch/torch.h>
+#include "torch/torch.h"
 
 namespace torch_tensorrt {
 namespace core {
