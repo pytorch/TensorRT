@@ -28,7 +28,7 @@
 namespace torch_tensorrt {
 namespace core {
 
-void AssociateInputSignature(torch::jit::Graph* g, torch::jit::Graph* new_g) {
+void AssociateInputSignature(std::shared_ptr<torch::jit::Graph>& g, std::shared_ptr<torch::jit::Graph> new_g) {
   int input_offset = new_g->inputs().size() == g->inputs().size() ? 0 : 1;
   for (size_t i = 0; i < g->inputs().size(); ++i) {
     auto old_g_name = g->inputs()[i]->debugName();
