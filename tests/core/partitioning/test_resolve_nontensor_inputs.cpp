@@ -116,11 +116,11 @@ TEST(Partitioning, ResolveNonTensorInputsCorrectly) {
   inputs.push_back(torch_tensorrt::core::ir::Input({16, 3, 3, 3}));
   inputs.push_back(torch_tensorrt::core::ir::Input({16}));
 
-  torch_tensorrt::core::ir::CollectionInputSpecMap inputs_map;
-  std::unordered_map<const torch::jit::Value*, std::vector<c10::optional<at::ScalarType>>> input_types;
+  std::unordered_map<const torch::jit::Value*, torch_tensorrt::core::ir::Input> inputs_map;
+  std::unordered_map<const torch::jit::Value*, c10::optional<at::ScalarType>> input_types;
   for (size_t i = 0; i < g->inputs().size(); ++i) {
-    inputs_map.insert({g->inputs()[i], {inputs[i]}});
-    input_types.insert({g->inputs()[i], {{at::kFloat}}});
+    inputs_map.insert({g->inputs()[i], inputs[i]});
+    input_types.insert({g->inputs()[i], {at::kFloat}});
   }
   auto input_ivalues_map = torch_tensorrt::core::partitioning::generateRandomInputs(inputs_map, input_types);
   std::unordered_map<torch::jit::Node*, int> fallback_nodes;
@@ -175,11 +175,11 @@ TEST(Partitioning, ResolveTensorListInputsInTrtCorrectly) {
   inputs.push_back(torch_tensorrt::core::ir::Input({16, 6, 3, 3}));
   inputs.push_back(torch_tensorrt::core::ir::Input({16}));
 
-  std::unordered_map<const torch::jit::Value*, std::vector<torch_tensorrt::core::ir::Input>> inputs_map;
-  std::unordered_map<const torch::jit::Value*, std::vector<c10::optional<at::ScalarType>>> input_types;
+  std::unordered_map<const torch::jit::Value*, torch_tensorrt::core::ir::Input> inputs_map;
+  std::unordered_map<const torch::jit::Value*, c10::optional<at::ScalarType>> input_types;
   for (size_t i = 0; i < g->inputs().size(); ++i) {
-    inputs_map.insert({g->inputs()[i], {inputs[i]}});
-    input_types.insert({g->inputs()[i], {{at::kFloat}}});
+    inputs_map.insert({g->inputs()[i], inputs[i]});
+    input_types.insert({g->inputs()[i], {at::kFloat}});
   }
   auto input_ivalues_map = torch_tensorrt::core::partitioning::generateRandomInputs(inputs_map, input_types);
   std::unordered_map<torch::jit::Node*, int> fallback_nodes;
@@ -206,7 +206,7 @@ TEST(Partitioning, ResolveTensorListInputsInTrtCorrectly) {
 
 TEST(Partitioning, ConvertForTensorListInputsInFallbackCorrectly) {
   const auto graph = R"IR(
-          graph(%0 : Float(1, 3, 16, 16, strides=[768, 256, 16, 1]),
+          graph(%a : Float(1, 3, 16, 16, strides=[768, 256, 16, 1]),
                 %1 : Float(16, 6, 3, 3, strides=[54, 9, 3, 1]),
                 %2 : Float(16, strides=[1])):
             %3 : int[] = prim::Constant[value=[0, 0]]()
@@ -215,8 +215,8 @@ TEST(Partitioning, ConvertForTensorListInputsInFallbackCorrectly) {
             %6 : bool = prim::Constant[value=1]()
             %7 : int = prim::Constant[value=1]()
             %8 : int = prim::Constant[value=0]()
-            %9 : Tensor[] = prim::ListConstruct(%0, %0)
-            %11 : Tensor = aten::log_sigmoid(%0)
+            %9 : Tensor[] = prim::ListConstruct(%a, %a)
+            %11 : Tensor = aten::log_sigmoid(%a)
             %12 : Tensor = aten::cat(%9, %7)
             %13 : Tensor = aten::_convolution(%12, %1, %2, %4, %3, %4, %5, %3, %7, %5, %5, %6, %6)
             %14 : Tensor = aten::relu(%13)
@@ -367,11 +367,11 @@ TEST(Partitioning, ResolveOnlyNeccessaryNonTensorInputs) {
   inputs.push_back(torch_tensorrt::core::ir::Input({4, 4}));
   inputs.push_back(torch_tensorrt::core::ir::Input({4, 4}));
 
-  torch_tensorrt::core::ir::CollectionInputSpecMap inputs_map;
-  std::unordered_map<const torch::jit::Value*, std::vector<c10::optional<at::ScalarType>>> input_types;
+  std::unordered_map<const torch::jit::Value*, torch_tensorrt::core::ir::Input> inputs_map;
+  std::unordered_map<const torch::jit::Value*, c10::optional<at::ScalarType>> input_types;
   for (size_t i = 0; i < g->inputs().size(); ++i) {
-    inputs_map.insert({g->inputs()[i], {inputs[i]}});
-    input_types.insert({g->inputs()[i], {{at::kFloat}}});
+    inputs_map.insert({g->inputs()[i], inputs[i]});
+    input_types.insert({g->inputs()[i], {at::kFloat}});
   }
   auto input_ivalues_map = torch_tensorrt::core::partitioning::generateRandomInputs(inputs_map, input_types);
   std::unordered_map<torch::jit::Node*, int> fallback_nodes;

@@ -28,6 +28,16 @@
 namespace torch_tensorrt {
 namespace core {
 
+void AssociateInputSignature(torch::jit::Graph* g, torch::jit::Graph* new_g) {
+  int input_offset = new_g->inputs().size() == g->inputs().size() ? 0 : 1;
+  for (size_t i = 0; i < g->inputs().size(); ++i) {
+    auto old_g_name = g->inputs()[i]->debugName();
+    auto pos = old_g_name.find('.');
+    auto new_name = pos == std::string::npos ? old_g_name : old_g_name.substr(0, pos);
+    new_g->inputs()[i + input_offset]->setDebugName(new_name);
+  }
+}
+
 void AddEngineToGraph(
     torch::jit::script::Module mod,
     std::shared_ptr<torch::jit::Graph>& g,
@@ -457,13 +467,9 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
         AddEngineToGraph(new_mod, new_g, engine, cuda_device);
       }
       // renaming the input name of graph after fallback to ensure pytorch deserialize it correctly
-      int input_offset = new_g->inputs().size() == g->inputs().size() ? 0 : 1;
-      for (size_t i = 0; i < g->inputs().size(); ++i) {
-        auto old_g_name = g->inputs()[i]->debugName();
-        auto pos = old_g_name.find('.');
-        auto new_name = pos == std::string::npos ? old_g_name : old_g_name.substr(0, pos);
-        new_g->inputs()[i + input_offset]->setDebugName(new_name);
-      }
+      // also, change the new_g input names to be the same with the loweredGraph
+      AssociateInputSignature(g, new_g);
+
       auto new_method = new_mod._ivalue()->compilation_unit()->create_function(method.name(), new_g);
       auto schema = util::GenerateGraphSchema(new_method->name(), new_g);
       new_mod.type()->addMethod(new_method);

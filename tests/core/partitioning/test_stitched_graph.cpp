@@ -26,7 +26,7 @@ bool checkAllInputsExistInStitchedGraph(std::shared_ptr<torch::jit::Graph> g) {
 
 TEST(Partitioning, StitchSequentialModelSegmentedBlockCorrectly) {
   const auto graph = R"IR(
-          graph(%0 : Tensor,
+          graph(%a : Tensor,
                 %w1 : Float(32, 3, 3, 3, strides=[27, 9, 3, 1]),
                 %b1 : Float(32),
                 %w2 : Float(16, 32, 3, 3, strides=[288, 9, 3, 1]),
@@ -37,7 +37,7 @@ TEST(Partitioning, StitchSequentialModelSegmentedBlockCorrectly) {
             %3 : int = prim::Constant[value=1]()
             %10 : bool = prim::Constant[value=0]()
             %11 : int[] = prim::Constant[value=[0, 0]]()
-            %12: Tensor = aten::_convolution(%0, %w1, %b1, %2, %2, %2, %10, %11, %3, %10, %10, %10, %10)
+            %12: Tensor = aten::_convolution(%a, %w1, %b1, %2, %2, %2, %10, %11, %3, %10, %10, %10, %10)
             %13 : Tensor = aten::relu(%12)
             %14 : Tensor = aten::_convolution(%13, %w2, %b2, %2, %2, %2, %10, %11, %3, %10, %10, %10, %10)
             %15 : Tensor = aten::log_sigmoid(%14)
@@ -83,7 +83,7 @@ TEST(Partitioning, StitchSequentialModelSegmentedBlockCorrectly) {
 
 TEST(Partitioning, StitchBranchModelSegmentedBlockCorrectly) {
   const auto graph = R"IR(
-                  graph(%0 : Tensor,
+                  graph(%a : Tensor,
                         %1 : Float(32, 3, 3, 3, strides=[27, 9, 3, 1]),
                         %2 : Float(32),
                         %3 : Float(16, 32, 3, 3, strides=[288, 9, 3, 1]),
@@ -93,7 +93,7 @@ TEST(Partitioning, StitchBranchModelSegmentedBlockCorrectly) {
                     %7 : bool = prim::Constant[value=0]()
                     %8 : int[] = prim::Constant[value=[1, 1]]()
                     %9 : int = prim::Constant[value=1]()
-                    %10: Tensor = aten::_convolution(%0, %1, %2, %8, %8, %8, %7, %5, %9, %7, %7, %7, %7)
+                    %10: Tensor = aten::_convolution(%a, %1, %2, %8, %8, %8, %7, %5, %9, %7, %7, %7, %7)
                     %11 : Tensor = aten::_convolution(%10, %3, %4, %8, %8, %8, %7, %5, %9, %7, %7, %7, %7)
                     %12: Tensor = aten::log_sigmoid(%10)
                     %13 : Tensor = aten::_convolution(%12, %3, %4,  %8, %8, %8, %7, %5, %9, %7, %7, %7, %7)
