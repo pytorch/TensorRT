@@ -319,7 +319,8 @@ auto select_registrations TORCHTRT_UNUSED =
                int startIdx = 0;
                auto startIdxIVal = args[2].IValue();
                if (!startIdxIVal->isNone()) {
-                 startIdx = startIdxIVal->toInt() > std::numeric_limits<int32_t>::max() ? maxDim : startIdxIVal->toInt();
+                 startIdx =
+                     startIdxIVal->toInt() > std::numeric_limits<int32_t>::max() ? maxDim : startIdxIVal->toInt();
                  startIdx = maxDim == -1 ? startIdx : std::min(startIdx, maxDim);
                }
                // Handle case when given tensor index is negative
@@ -331,7 +332,8 @@ auto select_registrations TORCHTRT_UNUSED =
                int endIdx = maxDim; // -1 for dynamic shape
                auto endIdxIVal = args[3].IValue();
                if (!endIdxIVal->isNone()) {
-                 int truncate_value = endIdxIVal->toInt() > std::numeric_limits<int32_t>::max() ? maxDim : endIdxIVal->toInt();
+                 int truncate_value =
+                     endIdxIVal->toInt() > std::numeric_limits<int32_t>::max() ? maxDim : endIdxIVal->toInt();
                  endIdx = maxDim == -1 ? truncate_value : std::min(truncate_value, maxDim);
                }
                if (maxDim > 0) {
@@ -385,7 +387,8 @@ auto select_registrations TORCHTRT_UNUSED =
                  // update start and end
                  nvinfer1::ITensor* out_start;
                  nvinfer1::ITensor* out_end;
-                 auto start_end = normalize_start_and_end(ctx, ishape_tensor, start_itensor, end_itensor, nbdims, node_name);
+                 auto start_end =
+                     normalize_start_and_end(ctx, ishape_tensor, start_itensor, end_itensor, nbdims, node_name);
                  out_start = start_end[0];
                  out_end = start_end[1];
 
@@ -397,63 +400,69 @@ auto select_registrations TORCHTRT_UNUSED =
                  slice_layer->setInput(2, *size_itensor); // size, must be set if input is dynamic
                }
                auto slice_out = slice_layer->getOutput(0);
-               
+
                auto out = ctx->AssociateValueAndTensor(n->outputs()[0], slice_out);
                LOG_DEBUG("Slice layer output shape: " << out->getDimensions());
 
                return true;
              }})
-        .pattern({"aten::split(Tensor self, int[] split_sizes, int dim=0) -> (Tensor[])",
-                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    add_split(ctx, n, args, true, false);
-                    LOG_DEBUG("Converted split op into a list of IValues");
-                    return true;
-                  }})
-        .pattern({"aten::split.sizes(Tensor(a -> *) self, int[] split_size, int dim=0) -> (Tensor[])",
-                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    add_split(ctx, n, args, true, false);
-                    LOG_DEBUG("Converted split op into a list of IValues");
-                    return true;
-                  }})
-        .pattern({"aten::split.Tensor(Tensor(a) self, int split_size, int dim=0) -> (Tensor[])",
-                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    add_split(ctx, n, args, false, false);
-                    LOG_DEBUG("Converted split op into a list of IValues");
-                    return true;
-                  }})
-        .pattern({"aten::split_with_sizes(Tensor(a) self, int[] split_sizes, int dim=0) -> (Tensor[])",
-                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    add_split(ctx, n, args, true, false);
-                    LOG_DEBUG("Converted split op into a list of IValues");
-                    return true;
-                  }})
-        .pattern({"aten::unbind.int(Tensor(a -> *) self, int dim=0) -> (Tensor[])",
-                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    add_split(ctx, n, args, false, true);
-                    LOG_DEBUG("Converted split op into a list of IValues");
-                    return true;
-                  }})
-        .pattern({"aten::masked_fill.Scalar(Tensor self, Tensor mask, Scalar value) -> (Tensor)",
-                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    auto self = args[0].ITensorOrFreeze(ctx);
-                    auto mask = args[1].ITensorOrFreeze(ctx);
-                    mask = addPadding(ctx, n, mask, self->getDimensions().nbDims, false, true);
-                    auto val = args[2].unwrapToScalar().to<float>();
-                    auto val_t = tensor_to_const(ctx, torch::full(util::toVec(self->getDimensions()), val));
+        .pattern(
+            {"aten::split(Tensor self, int[] split_sizes, int dim=0) -> (Tensor[])",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               add_split(ctx, n, args, true, false);
+               LOG_DEBUG("Converted split op into a list of IValues");
+               return true;
+             }})
+        .pattern(
+            {"aten::split.sizes(Tensor(a -> *) self, int[] split_size, int dim=0) -> (Tensor[])",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               add_split(ctx, n, args, true, false);
+               LOG_DEBUG("Converted split op into a list of IValues");
+               return true;
+             }})
+        .pattern(
+            {"aten::split.Tensor(Tensor(a) self, int split_size, int dim=0) -> (Tensor[])",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               add_split(ctx, n, args, false, false);
+               LOG_DEBUG("Converted split op into a list of IValues");
+               return true;
+             }})
+        .pattern(
+            {"aten::split_with_sizes(Tensor(a) self, int[] split_sizes, int dim=0) -> (Tensor[])",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               add_split(ctx, n, args, true, false);
+               LOG_DEBUG("Converted split op into a list of IValues");
+               return true;
+             }})
+        .pattern(
+            {"aten::unbind.int(Tensor(a -> *) self, int dim=0) -> (Tensor[])",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               add_split(ctx, n, args, false, true);
+               LOG_DEBUG("Converted split op into a list of IValues");
+               return true;
+             }})
+        .pattern(
+            {"aten::masked_fill.Scalar(Tensor self, Tensor mask, Scalar value) -> (Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               auto self = args[0].ITensorOrFreeze(ctx);
+               auto mask = args[1].ITensorOrFreeze(ctx);
+               mask = addPadding(ctx, n, mask, self->getDimensions().nbDims, false, true);
+               auto val = args[2].unwrapToScalar().to<float>();
+               auto val_t = tensor_to_const(ctx, torch::full(util::toVec(self->getDimensions()), val));
 
-                    TORCHTRT_CHECK(
-                        util::broadcastable(self->getDimensions(), mask->getDimensions(), /*multidirectional=*/false),
-                        "Self and mask tensors are not broadcastable");
+               TORCHTRT_CHECK(
+                   util::broadcastable(self->getDimensions(), mask->getDimensions(), /*multidirectional=*/false),
+                   "Self and mask tensors are not broadcastable");
 
-                    auto new_layer = ctx->net->addSelect(*mask, *val_t, *self);
-                    TORCHTRT_CHECK(new_layer, "Unable to create layer for aten::masked_fill");
+               auto new_layer = ctx->net->addSelect(*mask, *val_t, *self);
+               TORCHTRT_CHECK(new_layer, "Unable to create layer for aten::masked_fill");
 
-                    new_layer->setName(util::node_info(n).c_str());
+               new_layer->setName(util::node_info(n).c_str());
 
-                    auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
-                    LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
-                    return true;
-                  }});
+               auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
+               LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+               return true;
+             }});
 
 } // namespace
 } // namespace impl

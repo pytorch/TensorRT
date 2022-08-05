@@ -225,11 +225,17 @@ core::CompileSpec CompileSpec::toInternalCompileSpec() {
   info.convert_info.engine_settings.num_avg_timing_iters = num_avg_timing_iters;
   TORCHTRT_CHECK(workspace_size >= 0, "workspace_size must be 0 or greater");
   info.convert_info.engine_settings.workspace_size = workspace_size;
-  TORCHTRT_CHECK(dla_sram_size >= 4096, "DLA managed SRAM size must be at least 4 KiB and must be a power of 2. This defaults to 1 MiB");
+  TORCHTRT_CHECK(
+      dla_sram_size >= 4096,
+      "DLA managed SRAM size must be at least 4 KiB and must be a power of 2. This defaults to 1 MiB");
   info.convert_info.engine_settings.dla_sram_size = dla_sram_size;
-  TORCHTRT_CHECK(dla_local_dram_size >= 4096, "DLA Local DRAM size must be at least 4 KiB and must be a power of 2. This defaults to 1 GiB");
+  TORCHTRT_CHECK(
+      dla_local_dram_size >= 4096,
+      "DLA Local DRAM size must be at least 4 KiB and must be a power of 2. This defaults to 1 GiB");
   info.convert_info.engine_settings.dla_local_dram_size = dla_local_dram_size;
-  TORCHTRT_CHECK(dla_global_dram_size >= 4096, "DLA Global DRAM size must be at least 4 KiB and must be a power of 2. This defaults to 512 MiB");
+  TORCHTRT_CHECK(
+      dla_global_dram_size >= 4096,
+      "DLA Global DRAM size must be at least 4 KiB and must be a power of 2. This defaults to 512 MiB");
   info.convert_info.engine_settings.dla_global_dram_size = dla_global_dram_size;
   return info;
 }

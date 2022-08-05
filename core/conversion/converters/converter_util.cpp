@@ -207,13 +207,13 @@ nvinfer1::ITensor* clamp(
     nvinfer1::ITensor* lower_bound,
     nvinfer1::ITensor* upper_bound,
     std::string const& name) {
-
   auto max_layer = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kMAX, x, lower_bound, "max layer for " + name);
   TORCHTRT_CHECK(max_layer, "Unable to create max layer for clamp");
   LOG_DEBUG(ctx->logger, "Create " << max_layer->getName() << " for clamp");
   auto max_itensor = max_layer->getOutput(0);
 
-  auto min_layer = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kMIN, max_itensor, upper_bound, "min layer for " + name);
+  auto min_layer =
+      add_elementwise(ctx, nvinfer1::ElementWiseOperation::kMIN, max_itensor, upper_bound, "min layer for " + name);
   TORCHTRT_CHECK(min_layer, "Unable to create min layer for clamp");
   LOG_DEBUG(ctx->logger, "Create " << min_layer->getName() << " for clamp");
   auto min_itensor = min_layer->getOutput(0);
@@ -227,13 +227,13 @@ nvinfer1::ITensor* clamp_to_input_dim(
     nvinfer1::ITensor* input_dim,
     int nbdims,
     std::string const& name) {
-
   auto zero = torch::zeros({nbdims}).to(torch::kI32);
   auto zero_itensor = tensor_to_const(ctx, zero);
   auto one = torch::ones({nbdims}).to(torch::kI32);
   auto one_itensor = tensor_to_const(ctx, one);
 
-  auto upper_bound_layer = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUB, input_dim, one_itensor, "sub layer for " + name);
+  auto upper_bound_layer =
+      add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUB, input_dim, one_itensor, "sub layer for " + name);
   TORCHTRT_CHECK(upper_bound_layer, "Unable to create sub layer for clamp to inputDim");
   LOG_DEBUG(ctx->logger, "Create " << upper_bound_layer->getName() << " for clamp to inputDim");
   auto upper_bound = upper_bound_layer->getOutput(0);
@@ -243,7 +243,8 @@ nvinfer1::ITensor* clamp_to_input_dim(
   LOG_DEBUG(ctx->logger, "Create " << max_layer->getName() << " for clamp to inputDim");
   auto max_itensor = max_layer->getOutput(0);
 
-  auto min_layer = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kMIN, max_itensor, upper_bound, "min layer for " + name);
+  auto min_layer =
+      add_elementwise(ctx, nvinfer1::ElementWiseOperation::kMIN, max_itensor, upper_bound, "min layer for " + name);
   TORCHTRT_CHECK(min_layer, "Unable to create min_layer for clamp to inputDim");
   LOG_DEBUG(ctx->logger, "Create " << min_layer->getName() << " for clamp to inputDim");
   auto min_itensor = min_layer->getOutput(0);
@@ -257,7 +258,6 @@ nvinfer1::ITensor* normalize_indices(
     nvinfer1::ITensor* indices,
     int nbdims,
     std::string const& name) {
-
   auto zero = torch::zeros({nbdims}).to(torch::kI32);
   auto neg = -torch::ones({nbdims}).to(torch::kI32);
   auto zero_itensor = tensor_to_const(ctx, zero);
@@ -307,17 +307,20 @@ nvinfer1::ITensor* get_slice_size(
   at::Tensor one_tensor = torch::ones({nbdims}).to(torch::kI32);
   auto one_itensor = tensor_to_const(ctx, one_tensor);
 
-  auto sub_layer = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUB, end, start, "get_slice_size sub layer for " + name);
+  auto sub_layer =
+      add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUB, end, start, "get_slice_size sub layer for " + name);
   TORCHTRT_CHECK(sub_layer, "Unable to create sub layer in calculate_output_size");
   LOG_DEBUG(ctx->logger, "Create " << sub_layer->getName() << " for calculate_output_size");
   auto sub_itensor = sub_layer->getOutput(0);
 
-  auto div_layer = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kDIV, sub_itensor, stride, "get_slice_size div layer for " + name);
+  auto div_layer = add_elementwise(
+      ctx, nvinfer1::ElementWiseOperation::kDIV, sub_itensor, stride, "get_slice_size div layer for " + name);
   TORCHTRT_CHECK(div_layer, "Unable to create div layer in calculate_output_size");
   LOG_DEBUG(ctx->logger, "Create " << div_layer->getName() << " for calculate_output_size");
   auto div_itensor = div_layer->getOutput(0);
 
-  auto add_layer = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kSUM, div_itensor, one_itensor, "get_slice_size sum layer for " + name);
+  auto add_layer = add_elementwise(
+      ctx, nvinfer1::ElementWiseOperation::kSUM, div_itensor, one_itensor, "get_slice_size sum layer for " + name);
   TORCHTRT_CHECK(add_layer, "Unable to create add layer in calculate_output_size");
   LOG_DEBUG(ctx->logger, "Create " << add_layer->getName() << " for calculate_output_size");
   auto size_itensor = add_layer->getOutput(0);
