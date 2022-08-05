@@ -1,5 +1,5 @@
 #include <string>
-#include <torch/torch.h>
+#include "torch/torch.h"
 #include "core/compiler.h"
 #include "gtest/gtest.h"
 #include "tests/util/util.h"
