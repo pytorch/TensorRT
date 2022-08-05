@@ -124,7 +124,8 @@ void find_all_fallback_nodes(
       if (!isTensor(output)) {
         for (auto use : output->uses()) {
           auto node = use.user;
-          if (node->kind() != torch::jit::prim::Constant && global_fallback_nodes.insert({node, FallbackNodeType::kNON_TENSOR}).second) {
+          if (node->kind() != torch::jit::prim::Constant &&
+              global_fallback_nodes.insert({node, FallbackNodeType::kNON_TENSOR}).second) {
             q.push(node);
           }
         }

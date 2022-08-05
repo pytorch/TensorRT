@@ -135,7 +135,6 @@ TEST(Converters, ATenBoolToINT32TensorConvertsCorrectly) {
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
 
-
 TEST(Converters, ATenToSingleConvertsCorrectly) {
   const auto graph = R"IR(
     graph(%y.1 : Tensor):
@@ -163,7 +162,6 @@ TEST(Converters, ATenToSingleConvertsCorrectly) {
   ASSERT_TRUE(jit_results[0].scalar_type() == trt.scalar_type());
   ASSERT_TRUE(torch_tensorrt::tests::util::almostEqual(jit_results[0], trt, 2e-6));
 }
-
 
 TEST(Converters, ATenTypeAsConvertsCorrectly) {
   const auto graph = R"IR(
