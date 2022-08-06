@@ -327,20 +327,6 @@ def TensorRTCompileSpec(inputs=[],
                     torch.randn((1, 3, 224, 244)) # Use an example tensor and let torch_tensorrt infer settings
                 ]
 
-        input_signature Union(List, Tuple, torch_tensorrt.Input, torch.Tensor): A formatted collection of input specifications for the module. Input Sizes can be specified as torch sizes, tuples or lists. dtypes can be specified using
-            torch datatypes or torch_tensorrt datatypes and you can use either torch devices or the torch_tensorrt device type enum to select device type. **This API should be considered beta-level stable and may change in the future** ::
-
-                input_signature=([
-                    torch_tensorrt.Input((1, 3, 224, 224)), # Static NCHW input shape for input #1
-                    torch_tensorrt.Input(
-                        min_shape=(1, 224, 224, 3),
-                        opt_shape=(1, 512, 512, 3),
-                        max_shape=(1, 1024, 1024, 3),
-                        dtype=torch.int32
-                        format=torch.channel_last
-                    ), # Dynamic input shape for input #2
-                ], torch.randn((1, 3, 224, 244))) # Use an example tensor and let torch_tensorrt infer settings for input #3
-
         device (Union(torch_tensorrt.Device, torch.device, dict)): Target device for TensorRT engines to run on ::
 
             device=torch_tensorrt.Device("dla:1", allow_gpu_fallback=True)
@@ -362,7 +348,7 @@ def TensorRTCompileSpec(inputs=[],
 
     compile_spec = {
         "inputs": inputs,
-        "input_signature": input_signature,
+        #"input_signature": input_signature,
         "device": device,
         "disable_tf32":
             disable_tf32,  # Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
@@ -384,11 +370,12 @@ def TensorRTCompileSpec(inputs=[],
 
     backend_spec = torch.classes.tensorrt.CompileSpec()
 
+    if input_signature is not None:
+        raise ValueError("Input signature parsing is not currently supported in the TorchScript backend integration")
+
     for i in parsed_spec.inputs:
         clone = _internal_input_to_torch_class_input(i)
         backend_spec._append_input(clone)
-
-    backend_spec._set_input_signature(parsed_spec.input_signature)
 
     d = torch.classes.tensorrt._Device()
     d._set_device_type(int(parsed_spec.device.device_type))
