@@ -176,7 +176,7 @@ int main(int argc, char** argv) {
   args::ValueFlagList<std::string> custom_torch_ops(
       parser,
       "custom-torch-ops",
-      "(repeatable) Shared object/DLL containing custom torch operator",
+      "(repeatable) Shared object/DLL containing custom torch operators",
       {"custom-torch-ops"});
 
   args::ValueFlagList<std::string> custom_converters(

@@ -111,6 +111,8 @@ to standard TorchScript. Load with ``torch.jit.load()`` and run like you would r
                                           TorchScript program, save the created
                                           engine to the path specified as the
                                           output path
+        --custom-torch-ops                (repeatable) Shared object/DLL containing custom torch operators
+        --custom-converters               (repeatable) Shared object/DLL containing custom converters
         input_file_path                   Path to input TorchScript file
         output_file_path                  Path for compiled TorchScript (or
                                           TensorRT engine) file
@@ -132,3 +134,13 @@ e.g.
 .. code-block:: shell
 
     torchtrtc tests/modules/ssd_traced.jit.pt ssd_trt.ts "[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@f16%contiguous" -p f16
+
+
+To run with custom torch operators
+.. code-block:: shell
+torchtrtc tests/modules/ssd_traced.jit.pt ssd_trt.ts --custom-torch-ops=<path to custom library> "[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@fp16%contiguous" -p f16
+
+
+To run with custom converters
+.. code-block:: shell
+torchtrtc tests/modules/ssd_traced.jit.pt ssd_trt.ts --custom-converters=<path to custom library> "[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@fp16%contiguous" -p f16
