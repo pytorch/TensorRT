@@ -116,6 +116,11 @@ nvinfer1::ILayer* add_elementwise(
     std::swap(self, other);
     swapSelfOther = false;
   }
+  if (self->getType() > other->getType()) {
+    self = castITensor(ctx, self, other->getType());
+  } else if (self->getType() < other->getType()) {
+    other = castITensor(ctx, other, self->getType());
+  }
   auto ele = ctx->net->addElementWise(*self, *other, op);
   ele->setName(name.c_str());
   return ele;
