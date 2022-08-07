@@ -116,10 +116,16 @@ nvinfer1::ILayer* add_elementwise(
     std::swap(self, other);
     swapSelfOther = false;
   }
-  if (self->getType() > other->getType()) {
-    self = castITensor(ctx, self, other->getType());
-  } else if (self->getType() < other->getType()) {
-    other = castITensor(ctx, other, self->getType());
+
+  // Two types are compatible if they are the same type or are both in the set {kFLOAT, kHALF}
+  auto fp32_and_fp16 = (self->getType() == nvinfer1::DataType::kFLOAT) && (other->getType() == nvinfer1::DataType::kHALF);
+  auto fp16_and_fp32 = (other->getType() == nvinfer1::DataType::kFLOAT) && (self->getType() == nvinfer1::DataType::kHALF);
+  if (!fp32_and_fp16 && !fp16_and_fp32){
+    if (self->getType() > other->getType()) {
+      self = castITensor(ctx, self, other->getType());
+    } else if (self->getType() < other->getType()) {
+      other = castITensor(ctx, other, self->getType());
+    }
   }
   auto ele = ctx->net->addElementWise(*self, *other, op);
   ele->setName(name.c_str());
