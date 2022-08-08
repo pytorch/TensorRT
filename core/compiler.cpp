@@ -394,7 +394,6 @@ std::string ConvertGraphToTRTEngine(const torch::jit::script::Module& mod, std::
   auto params = graph_and_parameters.second;
   auto static_params = ir::get_static_params(g->inputs(), params);
   // Infer the type of an input from the weights of the calculation
-  // auto first_use_types = ir::get_block_first_calc_dtypes_opt(g->block());
   auto first_use_types = ir::get_block_first_calc_dtypes_opt_collection(g->block());
 
   MapInputsAndDetermineDTypes(cfg, g, static_params, first_use_types);
