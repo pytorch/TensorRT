@@ -132,12 +132,34 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
 
   nvinfer1::ILayer* new_layer;
   if (transposed) {
+    // Refer to
+    // https://github.com/onnx/onnx-tensorrt/blob/c3cfcbc8248c6bd007e6630af2085df5e4834b42/builtin_op_importers.cpp#L734
+    nvinfer1::Dims begPadding = padding;
+    bool hasOutputPadding = false;
+    int nbSpatialDims = out_padding.nbDims;
+    // When there is out_padding, if padding is larger than out_padding, just adjust padding Or reduce out_padding as
+    // minimum as possible.
+    for (int i = 0; i < nbSpatialDims; ++i) {
+      if (padding.d[i] - out_padding.d[i] >= 0) {
+        padding.d[i] -= out_padding.d[i];
+        out_padding.d[i] = 0;
+      } else {
+        // Reduce out_padding as possible.
+        out_padding.d[i] -= padding.d[i];
+        padding.d[i] = 0;
+        hasOutputPadding = true;
+      }
+    }
+
     // shape of deconvolution's weight: [in, out/groups, ...]
-    auto deconv = ctx->net->addDeconvolutionNd(*in, w.shape.d[1] * groups, w.kernel_shape, w.data, bias.data);
+    // If there is still output padding, remove the bias. Bias will be added below.
+    auto deconv = ctx->net->addDeconvolutionNd(
+        *in, w.shape.d[1] * groups, w.kernel_shape, w.data, hasOutputPadding ? nvinfer1::Weights{} : bias.data);
     TORCHTRT_CHECK(deconv, "Unable to create deconvolution layer from node: " << *n);
 
     deconv->setStrideNd(stride);
-    deconv->setPaddingNd(padding);
+    deconv->setPrePadding(begPadding);
+    deconv->setPostPadding(padding);
 #if NV_TENSORRT_MAJOR > 7 || (NV_TENSORRT_MAJOR == 7 && NV_TENSORRT_MINOR >= 1)
     deconv->setDilationNd(dilation);
     deconv->setNbGroups(groups);
@@ -147,7 +169,56 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
       TORCHTRT_CHECK(dilation.d[idx] == 1, "for deconv with dilation > 1, require TensorRT version >= 7.1");
     }
 #endif
-    new_layer = deconv;
+    if (hasOutputPadding) {
+      LOG_DEBUG("Padding output deconvolution tensor with:" << out_padding);
+
+      // Add padding layer
+      nvinfer1::ITensor* start;
+      nvinfer1::ITensor* totalPadding;
+      auto in_nbDims = orig_dims.nbDims;
+      std::vector<int32_t> startVec(in_nbDims, 0);
+      std::vector<int32_t> totalPaddingVec(in_nbDims, 0);
+      int32_t diff = in_nbDims - out_padding.nbDims;
+      for (int32_t i = diff; i < in_nbDims; i++) {
+        int32_t idx = i - diff;
+        startVec[i] = 0; // Don't need begin padding, only post padding
+        totalPaddingVec[i] = out_padding.d[idx];
+      }
+      start = tensor_to_const(ctx, torch::tensor(startVec, torch::kInt32));
+      totalPadding = tensor_to_const(ctx, torch::tensor(totalPaddingVec, torch::kInt32));
+
+      nvinfer1::ITensor* tensorPtr = deconv->getOutput(0);
+      nvinfer1::ITensor* deconvOutShape = ctx->net->addShape(*tensorPtr)->getOutput(0);
+      const auto size =
+          ctx->net->addElementWise(*deconvOutShape, *totalPadding, nvinfer1::ElementWiseOperation::kSUM)->getOutput(0);
+
+      nvinfer1::Dims stride;
+      stride.nbDims = in_nbDims;
+      for (size_t i = 0; i < in_nbDims; i++) {
+        stride.d[i] = 1;
+      }
+      const auto& dummy = stride;
+      auto* sliceLayer = ctx->net->addSlice(*tensorPtr, dummy, dummy, stride);
+      sliceLayer->setInput(1, *start);
+      sliceLayer->setInput(2, *size);
+      sliceLayer->setMode(nvinfer1::SliceMode::kFILL);
+      tensorPtr = sliceLayer->getOutput(0);
+
+      nvinfer1::Dims constantDims;
+      constantDims.nbDims = in_nbDims;
+      for (size_t i = 0; i < in_nbDims; i++) {
+        constantDims.d[i] = 1;
+      }
+      constantDims.d[diff - 1] =
+          bias.shape.d[0]; // Set C dimension to bias dim and other dimensions to 1 to enable broadcast
+      auto const_layer = ctx->net->addConstant(constantDims, bias.data);
+      auto add_bias_layer =
+          ctx->net->addElementWise(*tensorPtr, *const_layer->getOutput(0), nvinfer1::ElementWiseOperation::kSUM);
+
+      new_layer = add_bias_layer;
+    } else {
+      new_layer = deconv;
+    }
   } else {
     // shape of convolution's weight: [out, in/groups, ...]
     auto conv = ctx->net->addConvolutionNd(*in, w.shape.d[0], w.kernel_shape, w.data, bias.data);
