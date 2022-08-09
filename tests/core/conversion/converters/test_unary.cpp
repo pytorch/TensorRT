@@ -1,9 +1,9 @@
 #include <string>
-#include "torch/torch.h"
 #include "core/compiler.h"
 #include "gtest/gtest.h"
 #include "tests/util/util.h"
 #include "torch/csrc/jit/ir/irparser.h"
+#include "torch/torch.h"
 
 namespace {
 std::string gen_test_graph(const std::string& unary) {
@@ -22,7 +22,7 @@ TEST(Converters, ATenAbsIntConvertsCorrectly) {
 
   auto in = at::tensor({-1, 1, -2, 2, -3, 3}, {at::kCUDA}).to(torch::kInt32);
   auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
-  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});  
+  auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, {in});
 
   in = at::clone(in);
   params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});

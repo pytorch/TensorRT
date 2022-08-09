@@ -15,7 +15,7 @@ auto quantization_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns
   .pattern({"aten::fake_quantize_per_tensor_affine(Tensor self, float scale, int zero_point, int quant_min, int quant_max) -> (Tensor)",
             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
               // This aten operator is generated from torch.fake_quantize_per_tensor_affine op in Pytorch python API.
-              // Example usage: https://github.com/pytorch/pytorch/blob/master/torch/quantization/fake_quantize.py#L145
+              // Example usage: https://github.com/pytorch/pytorch/blob/3139722679a9813ac8e60a07e577cd85c4b06a84/torch/quantization/fake_quantize.py#L145
               auto input = args[0].ITensorOrFreeze(ctx);
               auto scale = args[1].unwrapToScalar().to<float>();
               auto scaleTensor = tensor_to_const(ctx, torch::tensor({scale}));
@@ -35,7 +35,7 @@ auto quantization_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns
   .pattern({"aten::fake_quantize_per_channel_affine(Tensor self, Tensor scale, Tensor zero_point, int axis, int quant_min, int quant_max) -> (Tensor)",
             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
               // This aten operator is generated from torch.fake_quantize_per_channel_affine op in Pytorch python API.
-              // Example usage: https://github.com/pytorch/pytorch/blob/master/torch/quantization/fake_quantize.py#L141
+              // Example usage: https://github.com/pytorch/pytorch/blob/3139722679a9813ac8e60a07e577cd85c4b06a84/torch/quantization/fake_quantize.py#L145
               auto input = args[0].ITensorOrFreeze(ctx);
               auto scale = args[1].ITensorOrFreeze(ctx);
               int64_t axis = args[3].unwrapToScalar().to<int64_t>();

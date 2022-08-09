@@ -5,8 +5,8 @@ import torchvision.models as models
 import copy
 from typing import Dict
 
-class TestDevice(unittest.TestCase):
 
+class TestDevice(unittest.TestCase):
     def test_from_string_constructor(self):
         device = torchtrt.Device("cuda:0")
         self.assertEqual(device.device_type, torchtrt.DeviceType.GPU)
@@ -53,7 +53,6 @@ class TestDevice(unittest.TestCase):
 
 
 class TestInput(unittest.TestCase):
-
     def _verify_correctness(self, struct: torchtrt.Input, target: Dict) -> bool:
         internal = struct._to_internal()
 
@@ -71,8 +70,12 @@ class TestInput(unittest.TestCase):
         opt_ = field_is_correct("opt", list_eq, internal.opt, target["opt"])
         max_ = field_is_correct("max", list_eq, internal.max, target["max"])
         is_dynamic_ = field_is_correct("is_dynamic", eq, internal.input_is_dynamic, target["input_is_dynamic"])
-        explicit_set_dtype_ = field_is_correct("explicit_dtype", eq, internal._explicit_set_dtype,
-                                               target["explicit_set_dtype"])
+        explicit_set_dtype_ = field_is_correct(
+            "explicit_dtype",
+            eq,
+            internal._explicit_set_dtype,
+            target["explicit_set_dtype"],
+        )
         dtype_ = field_is_correct("dtype", eq, int(internal.dtype), int(target["dtype"]))
         format_ = field_is_correct("format", eq, int(internal.format), int(target["format"]))
 
@@ -87,7 +90,7 @@ class TestInput(unittest.TestCase):
             "input_is_dynamic": False,
             "dtype": torchtrt.dtype.half,
             "format": torchtrt.TensorFormat.contiguous,
-            "explicit_set_dtype": True
+            "explicit_set_dtype": True,
         }
 
         example_tensor = torch.randn(shape).half()
@@ -103,7 +106,7 @@ class TestInput(unittest.TestCase):
             "input_is_dynamic": False,
             "dtype": torchtrt.dtype.unknown,
             "format": torchtrt.TensorFormat.contiguous,
-            "explicit_set_dtype": False
+            "explicit_set_dtype": False,
         }
 
         i = torchtrt.Input(shape)
@@ -133,7 +136,7 @@ class TestInput(unittest.TestCase):
             "input_is_dynamic": False,
             "dtype": torchtrt.dtype.half,
             "format": torchtrt.TensorFormat.contiguous,
-            "explicit_set_dtype": True
+            "explicit_set_dtype": True,
         }
 
         i = torchtrt.Input(shape, dtype=torchtrt.dtype.half)
@@ -151,7 +154,7 @@ class TestInput(unittest.TestCase):
             "input_is_dynamic": False,
             "dtype": torchtrt.dtype.unknown,
             "format": torchtrt.TensorFormat.channels_last,
-            "explicit_set_dtype": False
+            "explicit_set_dtype": False,
         }
 
         i = torchtrt.Input(shape, format=torchtrt.TensorFormat.channels_last)
@@ -171,20 +174,27 @@ class TestInput(unittest.TestCase):
             "input_is_dynamic": True,
             "dtype": torchtrt.dtype.unknown,
             "format": torchtrt.TensorFormat.contiguous,
-            "explicit_set_dtype": False
+            "explicit_set_dtype": False,
         }
 
         i = torchtrt.Input(min_shape=min_shape, opt_shape=opt_shape, max_shape=max_shape)
         self.assertTrue(self._verify_correctness(i, target))
 
-        i = torchtrt.Input(min_shape=tuple(min_shape), opt_shape=tuple(opt_shape), max_shape=tuple(max_shape))
+        i = torchtrt.Input(
+            min_shape=tuple(min_shape),
+            opt_shape=tuple(opt_shape),
+            max_shape=tuple(max_shape),
+        )
         self.assertTrue(self._verify_correctness(i, target))
 
         tensor_shape = lambda shape: torch.randn(shape).shape
-        i = torchtrt.Input(min_shape=tensor_shape(min_shape),
-                           opt_shape=tensor_shape(opt_shape),
-                           max_shape=tensor_shape(max_shape))
+        i = torchtrt.Input(
+            min_shape=tensor_shape(min_shape),
+            opt_shape=tensor_shape(opt_shape),
+            max_shape=tensor_shape(max_shape),
+        )
         self.assertTrue(self._verify_correctness(i, target))
+
 
 if __name__ == "__main__":
     unittest.main()

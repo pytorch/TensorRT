@@ -96,21 +96,24 @@ bool replication_padXd(ConversionCtx* ctx, const torch::jit::Node* n, args& args
 
 auto replication_pad_registrations TORCHTRT_UNUSED =
     RegisterNodeConversionPatterns()
-        .pattern({"aten::replication_pad1d(Tensor self, int[2] padding) -> (Tensor)",
-                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    replication_padXd(ctx, n, args, 1);
-                    return true;
-                  }})
-        .pattern({"aten::replication_pad2d(Tensor self, int[4] padding) -> (Tensor)",
-                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    replication_padXd(ctx, n, args, 2);
-                    return true;
-                  }})
-        .pattern({"aten::replication_pad3d(Tensor self, int[6] padding) -> (Tensor)",
-                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    replication_padXd(ctx, n, args, 3);
-                    return true;
-                  }});
+        .pattern(
+            {"aten::replication_pad1d(Tensor self, int[2] padding) -> (Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               replication_padXd(ctx, n, args, 1);
+               return true;
+             }})
+        .pattern(
+            {"aten::replication_pad2d(Tensor self, int[4] padding) -> (Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               replication_padXd(ctx, n, args, 2);
+               return true;
+             }})
+        .pattern(
+            {"aten::replication_pad3d(Tensor self, int[6] padding) -> (Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               replication_padXd(ctx, n, args, 3);
+               return true;
+             }});
 
 } // namespace
 } // namespace impl

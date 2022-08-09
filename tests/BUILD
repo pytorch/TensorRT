@@ -33,8 +33,8 @@ test_suite(
 test_suite(
     name = "cpp_api_tests",
     tests = [
-        "//tests/cpp:api_tests"
-    ]
+        "//tests/cpp:api_tests",
+    ],
 )
 
 test_suite(

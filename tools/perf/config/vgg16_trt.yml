@@ -1,20 +1,20 @@
---- 
-backend: 
+---
+backend:
   - tensorrt
-input: 
-  input0: 
+input:
+  input0:
     - 3
     - 224
     - 224
   num_inputs: 1
-model: 
+model:
   filename: models/model.plan
   name: vgg16
 calibration_cache:
   - vgg16.cache
-runtime: 
+runtime:
   device: 0
-  precision: 
+  precision:
     - fp32
     - fp16
     - int8

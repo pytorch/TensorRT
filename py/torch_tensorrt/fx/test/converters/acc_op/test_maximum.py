@@ -36,9 +36,7 @@ class TestMaximumConverterWithDynamicShape(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(
-            Maximum(), input_specs, expected_ops={acc_ops.maximum}
-        )
+        self.run_test_with_dynamic_shape(Maximum(), input_specs, expected_ops={acc_ops.maximum})
 
 
 class TestMaximumMethodConverter(AccTestCase):
@@ -73,9 +71,7 @@ class TestMaximumMethodConverterWithDynamicShape(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(
-            Maximum(), input_specs, expected_ops={acc_ops.maximum}
-        )
+        self.run_test_with_dynamic_shape(Maximum(), input_specs, expected_ops={acc_ops.maximum})
 
 
 if __name__ == "__main__":

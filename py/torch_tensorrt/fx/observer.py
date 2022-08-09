@@ -6,7 +6,6 @@ import typing as t
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 
-
 _LOGGER = logging.getLogger(__name__)
 
 # A context variable to hold registered callbacks for all the observers for the
@@ -14,9 +13,7 @@ _LOGGER = logging.getLogger(__name__)
 # variable on the observer instance, however, contextvars document advice
 # against creating context variables not at module-global level.
 # https://docs.python.org/3/library/contextvars.html#contextvars.ContextVar
-_CALLBACKS: ContextVar[t.Dict["Observer", t.List[t.Callable]]] = ContextVar(
-    "_CALLBACKS", default=None
-)
+_CALLBACKS: ContextVar[t.Dict["Observer", t.List[t.Callable]]] = ContextVar("_CALLBACKS", default=None)
 
 TObserverCallback = t.TypeVar("TObserverCallback", bound=t.Callable[..., t.Any])
 
@@ -66,9 +63,7 @@ class Observer(t.Generic[TObserverCallback]):
 
     def observe(self, *args, **kwargs) -> None:
         for callback in self._get_callbacks():
-            with _log_error(
-                "Error calling observer callback", rethrow=RETHROW_CALLBACK_EXCEPTION
-            ):
+            with _log_error("Error calling observer callback", rethrow=RETHROW_CALLBACK_EXCEPTION):
                 callback(*args, **kwargs)
 
     def _get_callbacks(self) -> t.List[t.Callable]:
@@ -174,9 +169,7 @@ def _make_observable(orig_func: t.Callable) -> ObservedCallable:
             return_value = orig_func(*args, **kwargs)
             return return_value
         finally:
-            observers.post.observe(
-                ObserveContext(orig_func, args, kwargs, return_value)
-            )
+            observers.post.observe(ObserveContext(orig_func, args, kwargs, return_value))
 
     observed_func.orig_func = orig_func
     observed_func.observers = observers

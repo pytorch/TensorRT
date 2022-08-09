@@ -1,4 +1,5 @@
-load("@pylinter_deps//:requirements.bzl", "requirement")
+load("@devtools_deps//:requirements.bzl", "requirement")
+load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 
 py_binary(
     name = "cpplint",
@@ -6,7 +7,10 @@ py_binary(
     python_version = "PY3",
     srcs_version = "PY3",
     visibility = ["//visibility:public"],
-    deps = [":utils"],
+    deps = [
+        ":utils",
+        requirement("clang-format"),
+    ],
 )
 
 py_binary(
@@ -15,7 +19,10 @@ py_binary(
     python_version = "PY3",
     srcs_version = "PY3",
     visibility = ["//visibility:public"],
-    deps = [":utils"],
+    deps = [
+        ":utils",
+        requirement("clang-format"),
+    ],
 )
 
 py_binary(
@@ -26,7 +33,7 @@ py_binary(
     visibility = ["//visibility:public"],
     deps = [
         ":utils",
-        requirement("yapf"),
+        requirement("black"),
     ],
 )
 
@@ -38,7 +45,7 @@ py_binary(
     visibility = ["//visibility:public"],
     deps = [
         ":utils",
-        requirement("yapf"),
+        requirement("black"),
     ],
 )
 

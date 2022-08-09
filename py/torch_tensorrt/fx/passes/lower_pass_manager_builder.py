@@ -18,12 +18,9 @@ from .graph_opts import common_subexpression_elimination
 
 from .lower_basic_pass import run_const_fold
 
-
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
-
 Input = Sequence[Any]
-
 
 # ----------------------------------------------------------------------
 # OBSERVERS
@@ -37,19 +34,13 @@ Input = Sequence[Any]
 # >>>     lower(module, sample_input)
 
 # Observer for the model after the fuse passes.
-FUSE_PASSES_POST_OBSERVER: Observer[Callable[[nn.Module, Input], None]] = Observer(
-    "FUSE_PASSES_POST_OBSERVER"
-)
+FUSE_PASSES_POST_OBSERVER: Observer[Callable[[nn.Module, Input], None]] = Observer("FUSE_PASSES_POST_OBSERVER")
 
 # Observer for the TRT split submodules before lowering
-LOWER_SPLIT_PRE_OBSERVER: Observer[Callable[[str, nn.Module, Input], None]] = Observer(
-    "LOWER_SPLIT_PRE_OBSERVER"
-)
+LOWER_SPLIT_PRE_OBSERVER: Observer[Callable[[str, nn.Module, Input], None]] = Observer("LOWER_SPLIT_PRE_OBSERVER")
 
 # Observer for the TRT split submodules after lowering
-LOWER_SPLIT_POST_OBSERVER: Observer[Callable[[str, nn.Module, Input], None]] = Observer(
-    "LOWER_SPLIT_POST_OBSERVER"
-)
+LOWER_SPLIT_POST_OBSERVER: Observer[Callable[[str, nn.Module, Input], None]] = Observer("LOWER_SPLIT_POST_OBSERVER")
 # ----------------------------------------------------------------------
 
 
@@ -105,18 +96,12 @@ class LowerPassManagerBuilder:
             passes.append(wrapper(p, self._input))
 
         passes.append(inplace_wrapper(common_subexpression_elimination))
-        passes.append(
-            inplace_wrapper(lambda m: FUSE_PASSES_POST_OBSERVER.observe(m, self._input))
-        )
+        passes.append(inplace_wrapper(lambda m: FUSE_PASSES_POST_OBSERVER.observe(m, self._input)))
 
         return PassManager.build_from_passlist(passes)
 
     def _split_pass(self) -> PassManager:
-        passes = [
-            partial(
-                self._split_func, inputs=self._input, lower_setting=self.lower_setting
-            )
-        ]
+        passes = [partial(self._split_func, inputs=self._input, lower_setting=self.lower_setting)]
         passes.append(
             inplace_wrapper(
                 lambda split_result: remove_duplicate_output_args(
@@ -154,17 +139,11 @@ class LowerPassManagerBuilder:
                     self.lower_setting.input_specs = generate_input_specs(
                         submod_inputs,
                         self.lower_setting,
-                        additional_submodule_inputs[submod_name]
-                        if additional_submodule_inputs
-                        else None,
+                        additional_submodule_inputs[submod_name] if additional_submodule_inputs else None,
                     )
-                    lowered_module = self._lower_func(
-                        submod, submod_inputs, self.lower_setting, submod_name
-                    )
+                    lowered_module = self._lower_func(submod, submod_inputs, self.lower_setting, submod_name)
                     setattr(split_result.split_module, submod_name, lowered_module)
-                    LOWER_SPLIT_POST_OBSERVER.observe(
-                        submod_name, lowered_module, submod_inputs
-                    )
+                    LOWER_SPLIT_POST_OBSERVER.observe(submod_name, lowered_module, submod_inputs)
                     _LOGGER.info(
                         f"Lowering submodule {submod_name} elapsed time {datetime.datetime.now() - lowering_start_time}"
                     )
@@ -186,13 +165,9 @@ class LowerPassManagerBuilder:
                     _LOGGER.info(f"Now lowering submodule {submod_name}")
                     lowering_start_time = datetime.datetime.now()
 
-                    lowered_module = self._lower_func(
-                        submod, submod_inputs, self.lower_setting, submod_name
-                    )
+                    lowered_module = self._lower_func(submod, submod_inputs, self.lower_setting, submod_name)
                     setattr(split_result.split_module, submod_name, lowered_module)
-                    LOWER_SPLIT_POST_OBSERVER.observe(
-                        submod_name, lowered_module, submod_inputs
-                    )
+                    LOWER_SPLIT_POST_OBSERVER.observe(submod_name, lowered_module, submod_inputs)
                     _LOGGER.info(
                         f"Lowering submodule {submod_name} elapsed time {datetime.datetime.now() - lowering_start_time}"
                     )
@@ -201,9 +176,7 @@ class LowerPassManagerBuilder:
 
         return PassManager.build_from_passlist([lower_func])
 
-    def build_trt_lower_pipeline(
-        self, input: Input, additional_input: Optional[Input] = None
-    ) -> PassManager:
+    def build_trt_lower_pipeline(self, input: Input, additional_input: Optional[Input] = None) -> PassManager:
         self._input = input
         self._additional_input = additional_input
         passes = []
@@ -216,9 +189,7 @@ class LowerPassManagerBuilder:
         pm = PassManager.build_from_passlist(passes)
         return pm
 
-    def build_default_lower_pipeline(
-        self, input: Input, additional_input: Optional[Input] = None
-    ) -> PassManager:
+    def build_default_lower_pipeline(self, input: Input, additional_input: Optional[Input] = None) -> PassManager:
         self._input = input
         self._additional_input = additional_input
         passes = []

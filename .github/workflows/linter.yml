@@ -39,7 +39,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Install dependencies
-        run: docker exec cpplinter bash -c "pip3 install -r /workspace/.github/scripts/requirements.txt"
+        run: |
+          docker exec cpplinter bash -c "pip3 install -r /workspace/.github/scripts/requirements.txt"
+          docker exec cpplinter bash -c "pip3 install -r /workspace/requirements-dev.txt"
       - name: Lint C++
         run: docker exec cpplinter bash -c "cd /workspace && python3 /workspace/.github/scripts/run_cpp_linter.py"
 
@@ -79,6 +81,6 @@ jobs:
       - name: Install dependencies
         run: |
           docker exec pylinter bash -c "pip3 install -r /workspace/.github/scripts/requirements.txt"
-          docker exec pylinter bash -c "pip3 install -r /workspace/tools/linter/requirements.txt"
+          docker exec pylinter bash -c "pip3 install -r /workspace/requirements-dev.txt"
       - name: Lint Python
         run: docker exec pylinter bash -c "cd /workspace && python3 /workspace/.github/scripts/run_py_linter.py"

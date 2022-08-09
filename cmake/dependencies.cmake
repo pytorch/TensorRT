@@ -13,7 +13,7 @@ install(FILES "${CMAKE_SOURCE_DIR}/cmake/Modules/FindcuDNN.cmake" DESTINATION "$
 find_package(CUDAToolkit REQUIRED)
 find_package(cuDNN REQUIRED) # Headers are needed somewhere
 
-# libtorch 
+# libtorch
 find_package(Torch REQUIRED)
 find_package(Threads REQUIRED)
 

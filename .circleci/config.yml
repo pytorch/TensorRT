@@ -11,7 +11,7 @@ commands:
         default: "x86_64"
       version:
         type: string
-        default: "5.1.1"
+        default: "5.2.0"
     steps:
       - run:
           name: Install bazel
@@ -67,7 +67,7 @@ commands:
         default: "8.2.4"
       bazel-version:
         type: string
-        default: "5.1.1"
+        default: "5.2.0"
       bazel-platform:
         type: string
         default: "x86_64"
@@ -374,7 +374,7 @@ jobs:
           platform: "sbsa"
           cudnn-version: << pipeline.parameters.cudnn-jetson-version >>
           trt-version-short:  << pipeline.parameters.trt-jetson-version-short >>
-          bazel-version: "5.1.1"
+          bazel-version: << pipeline.parameters.bazel-version >>
           bazel-platform: "arm64"
       - run:
           name: Set python version
@@ -430,7 +430,7 @@ jobs:
           platform: "x86_64"
           cudnn-version: << pipeline.parameters.cudnn-release-version >>
           trt-version-short:  << pipeline.parameters.trt-release-version-short >>
-          bazel-version: "5.1.1"
+          bazel-version: << pipeline.parameters.bazel-version >>
           bazel-platform: "x86_64"
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
@@ -475,7 +475,7 @@ jobs:
           platform: "x86_64"
           cudnn-version: << pipeline.parameters.cudnn-nightly-version >>
           trt-version-short:  << pipeline.parameters.trt-nightly-version-short >>
-          bazel-version: "5.1.1"
+          bazel-version: << pipeline.parameters.bazel-version >>
           bazel-platform: "x86_64"
       - install-torch-from-index:
           torch-build:  << parameters.torch-build >>
@@ -526,7 +526,7 @@ jobs:
           platform: "x86_64"
           cudnn-version: << parameters.cudnn-version >>
           trt-version-short:  << parameters.trt-version-short >>
-          bazel-version: "5.1.1"
+          bazel-version: << pipeline.parameters.bazel-version >>
           bazel-platform: "x86_64"
       - create-py-env:
           trt-version-long: << parameters.trt-version-long >>
@@ -744,6 +744,10 @@ jobs:
 
 
 parameters:
+  bazel-version:
+    type: string
+    default: "5.2.0"
+
   # Nightly platform config
   torch-nightly-build:
     type: string

@@ -1,3 +1,4 @@
+load("@rules_cc//cc:defs.bzl", "cc_test")
 load("//tests/core/lowering:lowering_test.bzl", "lowering_test")
 
 config_setting(
@@ -12,18 +13,18 @@ lowering_test(
 )
 
 cc_test(
-  name = "test_module_fallback_passes",
-  srcs = ["test_module_fallback_passes.cpp"],
-  deps = [
-      "//tests/util",
-      "@googletest//:gtest_main",
-  ] + select({
-      ":use_pre_cxx11_abi":  ["@libtorch_pre_cxx11_abi//:libtorch"],
-      "//conditions:default":  ["@libtorch//:libtorch"],
-  }),
-  data = [
-      "//tests/modules:jit_models"
-  ]
+    name = "test_module_fallback_passes",
+    srcs = ["test_module_fallback_passes.cpp"],
+    data = [
+        "//tests/modules:jit_models",
+    ],
+    deps = [
+        "//tests/util",
+        "@googletest//:gtest_main",
+    ] + select({
+        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
+        "//conditions:default": ["@libtorch//:libtorch"],
+    }),
 )
 
 lowering_test(
@@ -90,15 +91,15 @@ test_suite(
         ":test_linear_to_addmm",
         ":test_module_fallback_passes",
         ":test_operator_aliasing_pass",
+        ":test_reduce_gelu",
+        ":test_reduce_remainder",
+        ":test_reduce_to_pass",
         ":test_remove_contiguous_pass",
         ":test_remove_detach_pass",
-        ":test_view_to_reshape_pass",
         ":test_remove_dropout_pass",
         ":test_remove_unnecessary_casts",
-        ":test_reduce_to_pass",
-        ":test_reduce_remainder",
-        ":test_reduce_gelu",
         ":test_unpack_hardswish",
-        ":test_unpack_reduce_ops"
+        ":test_unpack_reduce_ops",
+        ":test_view_to_reshape_pass",
     ],
 )

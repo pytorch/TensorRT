@@ -1,3 +1,5 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
@@ -7,7 +9,7 @@ cc_library(
         "src/logging.cpp",
         "src/ptq.cpp",
         "src/torch_tensorrt.cpp",
-        "src/types.cpp"
+        "src/types.cpp",
     ],
     hdrs = [
         "include/torch_tensorrt/logging.h",

@@ -18,7 +18,6 @@ Usage:
     python torch_tensorrt.fx/tools/engine_layer_visualize.py --log_file aaa --profile_file bbb
 """
 
-
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "--log_file",
@@ -54,9 +53,7 @@ class LayerInfo(NamedTuple):
         )[0]
 
         if kernel_name != "Constant":
-            inputs = re.findall(
-                "[, ]*(.+?)\\[([Half|Float|Int8]+\\(\\d[,\\d]*\\))\\]", inputs
-            )
+            inputs = re.findall("[, ]*(.+?)\\[([Half|Float|Int8]+\\(\\d[,\\d]*\\))\\]", inputs)
             for input_name, input_type in inputs:
                 input_names.append(input_name)
                 input_types.append(input_type)
@@ -158,9 +155,7 @@ if args.log_file != "":
                 tactic_names = {}
 
         if tactic_name_start and "Set Tactic Name:" in line:
-            layer_name, kernel_name, _ = re.findall(
-                "VERBOSE: (.*) Set Tactic Name: (.*) Tactic: (.*)$", line
-            )[0]
+            layer_name, kernel_name, _ = re.findall("VERBOSE: (.*) Set Tactic Name: (.*) Tactic: (.*)$", line)[0]
             tactic_names[layer_name] = kernel_name
 
         # Some reformat layers aren't displayed in Engine Layer Information
@@ -198,9 +193,7 @@ if args.log_file != "":
             layer_name2node[layer.layer_name] = node
 
         for layer in layers:
-            build_edge(
-                layer, dot_graph, reformat_layers, output_name2node, layer_name2node
-            )
+            build_edge(layer, dot_graph, reformat_layers, output_name2node, layer_name2node)
 
         dot_graph.write_raw(f"EngineLayers_{i}.dot")
         i += 1

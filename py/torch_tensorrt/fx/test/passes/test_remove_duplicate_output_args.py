@@ -8,7 +8,6 @@ import torch.nn as nn
 import torch_tensorrt.fx.passes.remove_duplicate_output_args as dedup
 from torch.testing._internal.common_utils import run_tests, TestCase
 
-
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -55,9 +54,7 @@ graph():
     %add : [#users=1] = call_function[target=operator.add](args = (%getitem, %getitem_1), kwargs = {})
     return add
 """.strip()
-        assert (
-            ttop_graph_expected == ttop_graph_actual
-        ), f"Unexpected ttop graph: {ttop_graph_actual}"
+        assert ttop_graph_expected == ttop_graph_actual, f"Unexpected ttop graph: {ttop_graph_actual}"
 
         ttop_a_graph_actual = str(ttop.a.graph).strip()
         ttop_a_graph_expected = """
@@ -65,9 +62,7 @@ graph():
     %x : [#users=1] = placeholder[target=x]
     return (x,)
 """.strip()
-        assert (
-            ttop_a_graph_expected == ttop_a_graph_actual
-        ), f"Unexpected ttop.a graph: {ttop_a_graph_actual}"
+        assert ttop_a_graph_expected == ttop_a_graph_actual, f"Unexpected ttop.a graph: {ttop_a_graph_actual}"
 
 
 if __name__ == "__main__":

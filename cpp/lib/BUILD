@@ -1,13 +1,15 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary")
+
 package(default_visibility = ["//visibility:public"])
 
 cc_binary(
     name = "libtorchtrt_plugins.so",
     srcs = [],
-    deps = [
-        "//core/plugins:torch_tensorrt_plugins"
-    ],
+    linkshared = True,
     linkstatic = True,
-    linkshared = True
+    deps = [
+        "//core/plugins:torch_tensorrt_plugins",
+    ],
 )
 
 cc_binary(
@@ -16,8 +18,8 @@ cc_binary(
     linkshared = True,
     linkstatic = True,
     deps = [
-        "//core/runtime:runtime",
-        "//core/plugins:torch_tensorrt_plugins"
+        "//core/plugins:torch_tensorrt_plugins",
+        "//core/runtime",
     ],
 )
 

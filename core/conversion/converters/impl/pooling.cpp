@@ -229,33 +229,36 @@ auto pooling_registrations TORCHTRT_UNUSED =
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                return PoolingConverter(ctx, n, args, nvinfer1::PoolingType::kAVERAGE);
              }})
-        .pattern({"aten::adaptive_avg_pool1d(Tensor self, int[1] output_size) -> (Tensor)",
-                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    return AdaptivePoolingConverter(
-                        ctx, n, args, nvinfer1::PoolingType::kAVERAGE, "adaptive_avg_pool1d");
-                  }})
-        .pattern({"aten::adaptive_max_pool1d(Tensor self, int[2] output_size) -> (Tensor, Tensor)",
-                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    return AdaptivePoolingConverter(ctx, n, args, nvinfer1::PoolingType::kMAX, "adaptive_max_pool1d");
-                  }})
-        .pattern({"aten::adaptive_avg_pool2d(Tensor self, int[2] output_size) -> (Tensor)",
-                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    return AdaptivePoolingConverter(
-                        ctx, n, args, nvinfer1::PoolingType::kAVERAGE, "adaptive_avg_pool2d");
-                  }})
-        .pattern({"aten::adaptive_max_pool2d(Tensor self, int[2] output_size) -> (Tensor, Tensor)",
-                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    return AdaptivePoolingConverter(ctx, n, args, nvinfer1::PoolingType::kMAX, "adaptive_max_pool2d");
-                  }})
-        .pattern({"aten::adaptive_avg_pool3d(Tensor self, int[3] output_size) -> (Tensor)",
-                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    return AdaptivePoolingConverter(
-                        ctx, n, args, nvinfer1::PoolingType::kAVERAGE, "adaptive_avg_pool3d");
-                  }})
-        .pattern({"aten::adaptive_max_pool3d(Tensor self, int[3] output_size) -> (Tensor, Tensor)",
-                  [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
-                    return AdaptivePoolingConverter(ctx, n, args, nvinfer1::PoolingType::kMAX, "adaptive_max_pool3d");
-                  }});
+        .pattern(
+            {"aten::adaptive_avg_pool1d(Tensor self, int[1] output_size) -> (Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               return AdaptivePoolingConverter(ctx, n, args, nvinfer1::PoolingType::kAVERAGE, "adaptive_avg_pool1d");
+             }})
+        .pattern(
+            {"aten::adaptive_max_pool1d(Tensor self, int[2] output_size) -> (Tensor, Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               return AdaptivePoolingConverter(ctx, n, args, nvinfer1::PoolingType::kMAX, "adaptive_max_pool1d");
+             }})
+        .pattern(
+            {"aten::adaptive_avg_pool2d(Tensor self, int[2] output_size) -> (Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               return AdaptivePoolingConverter(ctx, n, args, nvinfer1::PoolingType::kAVERAGE, "adaptive_avg_pool2d");
+             }})
+        .pattern(
+            {"aten::adaptive_max_pool2d(Tensor self, int[2] output_size) -> (Tensor, Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               return AdaptivePoolingConverter(ctx, n, args, nvinfer1::PoolingType::kMAX, "adaptive_max_pool2d");
+             }})
+        .pattern(
+            {"aten::adaptive_avg_pool3d(Tensor self, int[3] output_size) -> (Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               return AdaptivePoolingConverter(ctx, n, args, nvinfer1::PoolingType::kAVERAGE, "adaptive_avg_pool3d");
+             }})
+        .pattern(
+            {"aten::adaptive_max_pool3d(Tensor self, int[3] output_size) -> (Tensor, Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               return AdaptivePoolingConverter(ctx, n, args, nvinfer1::PoolingType::kMAX, "adaptive_max_pool3d");
+             }});
 } // namespace
 } // namespace impl
 } // namespace converters

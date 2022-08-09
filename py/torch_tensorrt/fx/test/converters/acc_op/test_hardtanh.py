@@ -17,9 +17,7 @@ class TestHardtanhConverter(AccTestCase):
     def test_hardtanh(self, test_min_value, test_max_value):
         class Hardtanh(nn.Module):
             def forward(self, x):
-                return nn.functional.hardtanh(
-                    x, min_val=test_min_value, max_val=test_max_value
-                )
+                return nn.functional.hardtanh(x, min_val=test_min_value, max_val=test_max_value)
 
         inputs = [torch.randn(2, 10, 10, 10)]
         self.run_test(Hardtanh(), inputs, expected_ops={acc_ops.hardtanh})
@@ -36,9 +34,7 @@ class TestHardtanhConverterWithDynamicShape(AccTestCase):
     def test_hardtanh(self, test_min_value, test_max_value):
         class Hardtanh(nn.Module):
             def forward(self, x):
-                return nn.functional.hardtanh(
-                    x, min_val=test_min_value, max_val=test_max_value
-                )
+                return nn.functional.hardtanh(x, min_val=test_min_value, max_val=test_max_value)
 
         input_specs = [
             InputTensorSpec(
@@ -48,9 +44,7 @@ class TestHardtanhConverterWithDynamicShape(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(
-            Hardtanh(), input_specs, expected_ops={acc_ops.hardtanh}
-        )
+        self.run_test_with_dynamic_shape(Hardtanh(), input_specs, expected_ops={acc_ops.hardtanh})
 
 
 if __name__ == "__main__":

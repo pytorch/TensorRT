@@ -34,9 +34,7 @@ class TestBatchNormConverter(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(
-            TestModule(), input_specs, expected_ops={acc_ops.batch_norm}
-        )
+        self.run_test_with_dynamic_shape(TestModule(), input_specs, expected_ops={acc_ops.batch_norm})
 
     def test_batchnorm_with_dynamic_shape(self):
         class TestModule(torch.nn.Module):
@@ -55,9 +53,7 @@ class TestBatchNormConverter(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(
-            TestModule(), input_specs, expected_ops={acc_ops.batch_norm}
-        )
+        self.run_test_with_dynamic_shape(TestModule(), input_specs, expected_ops={acc_ops.batch_norm})
 
     # Testing with shape=(-1, -1, -1, -1) results in AssertionError: Channel dim can't be dynamic for batch norm.
 

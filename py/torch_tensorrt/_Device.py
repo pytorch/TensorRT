@@ -24,7 +24,7 @@ class Device(object):
     allow_gpu_fallback = False  #: (bool) Whether falling back to GPU if DLA cannot support an op should be allowed
 
     def __init__(self, *args, **kwargs):
-        """ __init__ Method for torch_tensorrt.Device
+        """__init__ Method for torch_tensorrt.Device
 
         Device accepts one of a few construction patterns
 
@@ -54,8 +54,10 @@ class Device(object):
                 else:
                     self.dla_core = id
                     self.gpu_id = 0
-                    logging.log(logging.Level.Warning,
-                                "Setting GPU id to 0 for device because device 0 manages DLA on Xavier")
+                    logging.log(
+                        logging.Level.Warning,
+                        "Setting GPU id to 0 for device because device 0 manages DLA on Xavier",
+                    )
 
         elif len(args) == 0:
             if "gpu_id" in kwargs or "dla_core" in kwargs:
@@ -66,8 +68,10 @@ class Device(object):
                         self.gpu_id = kwargs["gpu_id"]
                     else:
                         self.gpu_id = 0
-                        logging.log(logging.Level.Warning,
-                                    "Setting GPU id to 0 for device because device 0 manages DLA on Xavier")
+                        logging.log(
+                            logging.Level.Warning,
+                            "Setting GPU id to 0 for device because device 0 manages DLA on Xavier",
+                        )
                 else:
                     self.gpu_id = kwargs["gpu_id"]
                     self.device_type = _enums.DeviceType.GPU
@@ -78,8 +82,10 @@ class Device(object):
 
         else:
             raise ValueError(
-                "Unexpected number of positional arguments for class Device \n    Found {} arguments, expected either zero or a single positional arguments"
-                .format(len(args)))
+                "Unexpected number of positional arguments for class Device \n    Found {} arguments, expected either zero or a single positional arguments".format(
+                    len(args)
+                )
+            )
 
         if "allow_gpu_fallback" in kwargs:
             if not isinstance(kwargs["allow_gpu_fallback"], bool):
@@ -87,8 +93,11 @@ class Device(object):
             self.allow_gpu_fallback = kwargs["allow_gpu_fallback"]
 
     def __str__(self) -> str:
-        return "Device(type={}, gpu_id={}".format(self.device_type, self.gpu_id) \
-            + ")" if self.device_type == _enums.DeviceType.GPU else ", dla_core={}, allow_gpu_fallback={}".format(self.dla_core, self.allow_gpu_fallback)
+        return (
+            "Device(type={}, gpu_id={}".format(self.device_type, self.gpu_id) + ")"
+            if self.device_type == _enums.DeviceType.GPU
+            else ", dla_core={}, allow_gpu_fallback={}".format(self.dla_core, self.allow_gpu_fallback)
+        )
 
     def _to_internal(self) -> _C.Device:
         internal_dev = _C.Device()
@@ -100,8 +109,8 @@ class Device(object):
 
     @classmethod
     def _from_torch_device(cls, torch_dev: torch.device):
-        if torch_dev.type != 'cuda':
-            raise ValueError("Torch Device specs must have type \"cuda\"")
+        if torch_dev.type != "cuda":
+            raise ValueError('Torch Device specs must have type "cuda"')
         gpu_id = torch_dev.index
         return cls(gpu_id=gpu_id)
 
@@ -117,7 +126,7 @@ class Device(object):
     @staticmethod
     def _parse_device_str(s):
         s = s.lower()
-        spec = s.split(':')
+        spec = s.split(":")
         if spec[0] == "gpu" or spec[0] == "cuda":
             return (_enums.DeviceType.GPU, int(spec[1]))
         elif spec[0] == "dla":

@@ -1,7 +1,7 @@
 set(lib_name "core_partitioning")
 add_library(${lib_name} OBJECT)
 
-target_sources(${lib_name} 
+target_sources(${lib_name}
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/SegmentedBlock.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/shape_analysis.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/partitioning.cpp"
@@ -11,7 +11,7 @@ target_sources(${lib_name}
             $<TARGET_OBJECTS:core_util>
 )
 
-set(HEADER_FILES 
+set(HEADER_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/SegmentedBlock.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/shape_analysis.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/PartitionInfo.h"
@@ -19,9 +19,9 @@ set(HEADER_FILES
 )
 
 target_include_directories(${lib_name} PUBLIC "$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>")
-target_link_libraries(${lib_name} 
+target_link_libraries(${lib_name}
     PUBLIC
-        torch 
+        torch
         TensorRT::nvinfer
         core_ir
         core_util

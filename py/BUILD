@@ -1,6 +1,7 @@
-package(default_visibility = ["//visibility:public"])
-
+load("@rules_python//python:defs.bzl", "py_library")
 load("@torch_tensorrt_py_deps//:requirements.bzl", "requirement")
+
+package(default_visibility = ["//visibility:public"])
 
 # Exposes the library for testing
 py_library(

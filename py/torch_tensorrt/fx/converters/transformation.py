@@ -14,18 +14,13 @@ def torch_flatten(network, target, args, kwargs, name):
     input_val = kwargs["input"]
 
     if not isinstance(input_val, trt.tensorrt.ITensor):
-        raise RuntimeError(
-            f"Flatten received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"Flatten received input {input_val} that is not part " "of the TensorRT region!")
 
     # For trt shape we don't have batch dim
     start_dim = kwargs["start_dim"] - 1
     end_dim = len(input_val.shape) if kwargs["end_dim"] == -1 else kwargs["end_dim"] - 1
 
-    assert (
-        start_dim >= 0
-    ), "Expect non negtive start_dim, this probably due to flatten batch dim."
+    assert start_dim >= 0, "Expect non negtive start_dim, this probably due to flatten batch dim."
 
     new_shape = []
     flatten_dim = 1

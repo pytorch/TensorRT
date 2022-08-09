@@ -38,7 +38,8 @@ torch::jit::Module compile_int8_model(const std::string& data_dir, torch::jit::M
 
   std::string calibration_cache_file = "/tmp/vgg16_TRT_ptq_calibration.cache";
 
-  auto calibrator = torch_tensorrt::ptq::make_int8_calibrator(std::move(calibration_dataloader), calibration_cache_file, true);
+  auto calibrator =
+      torch_tensorrt::ptq::make_int8_calibrator(std::move(calibration_dataloader), calibration_cache_file, true);
 
   std::vector<torch_tensorrt::Input> inputs = {
       torch_tensorrt::Input(std::vector<int64_t>({32, 3, 32, 32}), torch_tensorrt::DataType::kFloat)};

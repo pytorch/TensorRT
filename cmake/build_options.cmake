@@ -24,5 +24,3 @@ if(NOT CMAKE_CONFIGURATION_TYPES)
                                                      ${VALID_BUILD_TYPES})
     endif()
 endif()
-
-

@@ -248,9 +248,7 @@ class TestTransformSetitem(AccTestCase):
             ("c2", (3, 2, 4), (5, 2, 6), 1, 4, 1, 5),
         ]
     )
-    def test_setitem3d_2v_ext(
-        self, name, x_shape, y_shape, start_0, end_0, start_2, end_2
-    ):
+    def test_setitem3d_2v_ext(self, name, x_shape, y_shape, start_0, end_0, start_2, end_2):
         class TestModule(torch.nn.Module):
             def __init__(self):
                 super().__init__()
@@ -283,9 +281,7 @@ class TestTransformSetitem(AccTestCase):
             ("c2", (2, 3, 4), (4, 5, 6), 1, 3, 1, 4, 1, 5),
         ]
     )
-    def test_setitem3d_3v(
-        self, name, x_shape, y_shape, start_0, end_0, start_1, end_1, start_2, end_2
-    ):
+    def test_setitem3d_3v(self, name, x_shape, y_shape, start_0, end_0, start_1, end_1, start_2, end_2):
         class TestModule(torch.nn.Module):
             def __init__(self):
                 super().__init__()
@@ -352,9 +348,7 @@ class TestTransformSetitem(AccTestCase):
             ("c2", (2, 3, 4, 5), (2, 5, 4, 7), 1, 4, 1, 6),
         ]
     )
-    def test_setitem4d_2v_ext(
-        self, name, x_shape, y_shape, start_1, end_1, start_3, end_3
-    ):
+    def test_setitem4d_2v_ext(self, name, x_shape, y_shape, start_1, end_1, start_3, end_3):
         class TestModule(torch.nn.Module):
             def __init__(self):
                 super().__init__()
@@ -387,9 +381,7 @@ class TestTransformSetitem(AccTestCase):
             ("c2", (2, 3, 4, 5), (2, 5, 6, 7), 1, 4, 1, 5, 1, 6),
         ]
     )
-    def test_setitem4d_3v(
-        self, name, x_shape, y_shape, start_1, end_1, start_2, end_2, start_3, end_3
-    ):
+    def test_setitem4d_3v(self, name, x_shape, y_shape, start_1, end_1, start_2, end_2, start_3, end_3):
         class TestModule(torch.nn.Module):
             def __init__(self):
                 super().__init__()

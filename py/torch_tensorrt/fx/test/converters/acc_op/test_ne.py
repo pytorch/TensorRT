@@ -50,9 +50,7 @@ class TestNeFunctionConverter(AccTestCase):
             input,
             other,
         ]
-        self.run_test(
-            Ne(), inputs, expected_ops={acc_ops.ne}, test_implicit_batch_dim=False
-        )
+        self.run_test(Ne(), inputs, expected_ops={acc_ops.ne}, test_implicit_batch_dim=False)
 
 
 class TestNeFunctionConverterWithDynamicShape(AccTestCase):
@@ -122,9 +120,7 @@ class TestNeMethodConverter(AccTestCase):
             input,
             other,
         ]
-        self.run_test(
-            Ne(), inputs, expected_ops={acc_ops.ne}, test_implicit_batch_dim=False
-        )
+        self.run_test(Ne(), inputs, expected_ops={acc_ops.ne}, test_implicit_batch_dim=False)
 
 
 class TestNeMethodConverterWithDynamicShape(AccTestCase):
@@ -194,9 +190,7 @@ class TestNeOperatorConverter(AccTestCase):
             input,
             other,
         ]
-        self.run_test(
-            Ne(), inputs, expected_ops={acc_ops.ne}, test_implicit_batch_dim=False
-        )
+        self.run_test(Ne(), inputs, expected_ops={acc_ops.ne}, test_implicit_batch_dim=False)
 
 
 class TestNeOperatorConverterWithDynamicShape(AccTestCase):
@@ -257,9 +251,7 @@ class TestNeOperatorConstantConverter(AccTestCase):
         inputs = [
             input,
         ]
-        self.run_test(
-            Ne(), inputs, expected_ops={acc_ops.ne}, test_implicit_batch_dim=False
-        )
+        self.run_test(Ne(), inputs, expected_ops={acc_ops.ne}, test_implicit_batch_dim=False)
 
 
 class TestConstInputConverter(AccTestCase):
@@ -275,9 +267,7 @@ class TestConstInputConverter(AccTestCase):
         inputs = [
             input,
         ]
-        self.run_test(
-            Ne(), inputs, expected_ops={acc_ops.ne}, test_implicit_batch_dim=False
-        )
+        self.run_test(Ne(), inputs, expected_ops={acc_ops.ne}, test_implicit_batch_dim=False)
 
 
 class TestConstInputConverterWithDynamicShape(AccTestCase):

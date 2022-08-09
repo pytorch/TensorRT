@@ -17,7 +17,7 @@ else()
                    LINK_FLAGS "-Wl,--disable-new-dtags")
 endif()
 
-target_include_directories(${executable_name} 
+target_include_directories(${executable_name}
     PUBLIC
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>"
 )

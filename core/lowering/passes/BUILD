@@ -1,3 +1,6 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_pkg//:pkg.bzl", "pkg_tar")
+
 package(default_visibility = ["//visibility:public"])
 
 config_setting(
@@ -16,22 +19,22 @@ cc_library(
         "linear_to_addmm.cpp",
         "module_fallback.cpp",
         "op_aliasing.cpp",
-        "reduce_to.cpp",
         "reduce_gelu.cpp",
         "reduce_remainder.cpp",
+        "reduce_to.cpp",
         "remove_bn_dim_check.cpp",
         "remove_contiguous.cpp",
-        "view_to_reshape.cpp",
         "remove_dropout.cpp",
         "remove_nops.cpp",
         "remove_unnecessary_casts.cpp",
         "silu_to_sigmoid_multiplication.cpp",
         "unpack_addmm.cpp",
         "unpack_batch_norm.cpp",
-        "unpack_log_softmax.cpp",
         "unpack_hardswish.cpp",
+        "unpack_log_softmax.cpp",
         "unpack_std.cpp",
         "unpack_var.cpp",
+        "view_to_reshape.cpp",
     ],
     hdrs = [
         "passes.h",
@@ -43,8 +46,6 @@ cc_library(
         "//conditions:default": ["@libtorch//:libtorch"],
     }),
 )
-
-load("@rules_pkg//:pkg.bzl", "pkg_tar")
 
 pkg_tar(
     name = "include",

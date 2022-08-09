@@ -4,11 +4,32 @@ import glob
 import subprocess
 
 BLACKLISTED_BAZEL_TARGETS = [
-    "//experiments", "//tools", "//docker",  "//third_party", "//bazel-bin", "//bazel-genfiles",
-    "//bazel-out", "//bazel-TRTorch", "//bazel-Torch-TensorRT", "//bazel-torch-tensorrt", "//bazel-workspace",
-    "//bazel-tensorrt", "bazel-TensorRT", "//bazel-testlogs", "//py/build",
-    "//py/dist", "//py/trtorch.egg-info", "//py/wheelhouse", "//examples", "//docsrc", "//docs"
+    "//experiments",
+    "//tools",
+    "//docker",
+    "//third_party",
+    "//bazel-bin",
+    "//bazel-genfiles",
+    "//bazel-out",
+    "//bazel-TRTorch",
+    "//bazel-Torch-TensorRT",
+    "//bazel-torch-tensorrt",
+    "//bazel-workspace",
+    "//bazel-tensorrt",
+    "//bazel-TensorRT",
+    "//bazel-testlogs",
+    "//py/build",
+    "//bazel-project",
+    "//py/dist",
+    "//py/trtorch.egg-info",
+    "//py/wheelhouse",
+    "//examples",
+    "//docsrc",
+    "//docs",
 ]
+
+VALID_CPP_FILE_TYPES = [".cpp", ".cc", ".c", ".cu", ".hpp", ".h", ".cuh"]
+VALID_PY_FILE_TYPES = [".py"]
 
 
 def CHECK_PROJECTS(projs):

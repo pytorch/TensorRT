@@ -39,9 +39,7 @@ class TestQuantizePerTensorConverter(AccTestCase):
                 shape_ranges=[((1, 1, 1), (1, 2, 3), (3, 3, 3))],
             ),
         ]
-        self.run_test_with_dynamic_shape(
-            TestModule(), input_specs, expected_ops={acc_ops.quantize_per_tensor}
-        )
+        self.run_test_with_dynamic_shape(TestModule(), input_specs, expected_ops={acc_ops.quantize_per_tensor})
 
     def test_quantize_per_tensor_with_dynamic_shape_four_dimensions(self):
         class TestModule(nn.Module):
@@ -56,9 +54,7 @@ class TestQuantizePerTensorConverter(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(
-            TestModule(), input_specs, expected_ops={acc_ops.quantize_per_tensor}
-        )
+        self.run_test_with_dynamic_shape(TestModule(), input_specs, expected_ops={acc_ops.quantize_per_tensor})
 
 
 if __name__ == "__main__":

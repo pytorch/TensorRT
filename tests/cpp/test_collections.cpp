@@ -135,7 +135,7 @@ TEST(CppAPITests, TestCollectionListInput) {
 
   auto compile_settings = torch_tensorrt::ts::CompileSpec(complex_input_shape2);
   compile_settings.min_block_size = 1;
-  //compile_settings.torch_executed_ops.push_back("aten::__getitem__");
+  // compile_settings.torch_executed_ops.push_back("aten::__getitem__");
 
   // // FP16 execution
   compile_settings.enabled_precisions = {torch::kHalf};
