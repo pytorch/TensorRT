@@ -1,6 +1,7 @@
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
 
+#include "ATen/core/jit_type.h"
 #include "Python.h"
 #include "core/compiler.h"
 #include "core/conversion/conversion.h"
@@ -178,6 +179,16 @@ PYBIND11_MODULE(_C, m) {
       .def_readwrite("dtype", &Input::dtype)
       .def_readwrite("format", &Input::format);
 
+  py::class_<InputSignature>(m, "InputSignature")
+      .def(pybind11::init([](py::object py_obj) {
+        InputSignature input_signature;
+        input_signature.signature_ivalue =
+            torch::jit::toIValue(std::move(py_obj), c10::PyObjectType::get(), c10::nullopt);
+        return input_signature;
+      }))
+      .def("__str__", &InputSignature::to_str)
+      .def_readwrite("_signature_ivalue", &InputSignature::signature_ivalue);
+
   py::enum_<DataType>(m, "dtype", "Enum to specifiy operating precision for engine execution")
       .value("float", DataType::kFloat, "32 bit floating point number")
       .value("float32", DataType::kFloat, "32 bit floating point number")
@@ -292,6 +303,7 @@ PYBIND11_MODULE(_C, m) {
       .def("__str__", &torch_tensorrt::pyapi::CompileSpec::stringify)
       .def("_get_calibrator_handle", &CompileSpec::getPTQCalibratorHandle, "[Internal] gets a handle from a calibrator")
       .def_readwrite("inputs", &CompileSpec::inputs)
+      .def_readwrite("input_signature", &CompileSpec::input_signature)
       .def_readwrite("enabled_precisions", &CompileSpec::enabled_precisions)
       .def_readwrite("ptq_calibrator", &CompileSpec::ptq_calibrator)
       .def_readwrite("refit", &CompileSpec::refit)

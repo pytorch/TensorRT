@@ -104,6 +104,30 @@ models = {
         "model": cm.FallbackInplaceOPIf(),
         "path": "script"
     },
+    "standard_tensor_input": {
+        "model": cm.StandardTensorInput(),
+        "path": "script"
+    },
+    "tuple_input": {
+        "model": cm.TupleInput(),
+        "path": "script"
+    },
+    "list_input": {
+        "model": cm.ListInput(),
+        "path": "script"
+    },
+    "tuple_input_output": {
+        "model": cm.TupleInputOutput(),
+        "path": "script"
+    },
+    "list_input_output": {
+        "model": cm.ListInputOutput(),
+        "path": "script"
+    },
+    "list_input_tuple_output": {
+        "model": cm.ListInputTupleOutput(),
+        "path": "script"
+    },
     "bert_base_uncased": {
         "model": cm.BertModule(),
         "path": "trace"
@@ -193,5 +217,5 @@ def main():
         f.write(record)
         f.truncate()
 
-
-main()
+if __name__ == "__main__":
+    main()

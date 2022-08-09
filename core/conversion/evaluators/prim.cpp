@@ -259,6 +259,56 @@ auto prim_registrations =
                       }
                     },
                     EvalOptions().validSchemas({"prim::shape(Tensor a) -> (int[])"})})
+        .evaluator({torch::jit::prim::TupleConstruct,
+                  [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+                    auto num_inputs = n->inputs().size();
+                    c10::IValue tuple = c10::ivalue::Tuple::create();
+                    switch (num_inputs) {
+                      case 0:
+                        tuple = c10::ivalue::Tuple::create();
+                        break;
+                      case 1:
+                        tuple = c10::ivalue::Tuple::create(std::move((*args.at(n->input(0)).IValue())));
+                        break;
+                      case 2: {
+                        tuple = c10::ivalue::Tuple::create(
+                            std::move(*(args.at(n->input(0)).IValue())),
+                            std::move(*(args.at(n->input(1)).IValue())));
+                        break;
+                      }
+                      case 3: {
+                        tuple = c10::ivalue::Tuple::create(
+                            std::move(*(args.at(n->input(0)).IValue())),
+                            std::move(*(args.at(n->input(1)).IValue())),
+                            std::move(*(args.at(n->input(2)).IValue())));
+                        break;
+                      }
+                      default: {
+                        std::vector<c10::IValue> elems;
+                        for (size_t i = 0; i < num_inputs; i++) {
+                          elems.push_back(*(args.at(n->input(i)).IValue()));
+                        }
+                        tuple = c10::ivalue::Tuple::create(std::move(elems));
+                        break;
+                      }
+                    }
+                    return c10::optional<torch::jit::IValue>(std::move(tuple));
+                  }})
+        .evaluator({torch::jit::prim::TupleIndex,
+                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+                      // Outputs is an IValue which has list of tensors which can be found in ctx->evaluated_value_map
+                      auto tuple = args.at(n->input(0)).IValue()->toTuple();
+                      int64_t idx = args.at(n->input(1)).IValue()->toInt();
+                      int64_t norm_idx = normalizeIndex(idx, tuple->elements().size());
+                      return c10::optional<torch::jit::IValue>(std::move(tuple->elements()[norm_idx]));
+                    },
+                    EvalOptions().validSchemas({"prim::TupleIndex(Any tup, int i) -> (Any)"})})
+        .evaluator({torch::jit::prim::TupleUnpack,
+                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+                      // Outputs is an IValue which has list of tensors which can be found in ctx->evaluated_value_map
+                      auto output = args.at(n->input()).IValue()->toTuple();
+                      return c10::optional<torch::jit::IValue>(std::move(output));
+                    }})
         .evaluator({c10::Symbol::fromQualString("prim::unchecked_cast"),
                     [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                       return *(args.at(n->input(0)).IValue());

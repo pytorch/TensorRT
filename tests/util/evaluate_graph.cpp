@@ -28,7 +28,7 @@ std::vector<torch::jit::IValue> EvaluateGraph(const torch::jit::Block* b, std::v
         "Test graph contains non evaluatable nodes: " << *n);
     auto eval = core::conversion::EvaluateNode(ctx, n);
     if (eval) {
-      if (eval.value().isTuple()) {
+      if (eval.value().isTuple() && n->outputs().size() > 1) {
         auto eval_list = eval.value().toTuple();
         for (size_t i = 0; i < eval_list->elements().size(); i++) {
           auto eval_output = eval_list.get()->elements()[i];

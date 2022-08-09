@@ -412,6 +412,7 @@ auto element_wise_registrations TORCHTRT_UNUSED =
                     // Should implement self * other
                     auto self = args[0].ITensorOrFreeze(ctx);
                     auto other = args[1].ITensorOrFreeze(ctx);
+
                     auto mul =
                         add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPROD, self, other, util::node_info(n));
                     TORCHTRT_CHECK(mul, "Unable to create mul layer from node: " << *n);
@@ -426,6 +427,7 @@ auto element_wise_registrations TORCHTRT_UNUSED =
                     // TODO: Remove with functionalization
                     auto self = args[0].ITensorOrFreeze(ctx);
                     auto other = scalar_to_tensor(ctx, args[1].unwrapToScalar());
+
                     auto mul =
                         add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPROD, self, other, util::node_info(n));
                     TORCHTRT_CHECK(mul, "Unable to create mul layer from node: " << *n);

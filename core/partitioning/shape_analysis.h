@@ -7,8 +7,8 @@ namespace core {
 namespace partitioning {
 
 std::unordered_map<const torch::jit::Value*, torch::jit::IValue> generateRandomInputs(
-    std::unordered_map<const torch::jit::Value*, ir::Input>& input_ranges,
-    std::unordered_map<const torch::jit::Value*, c10::optional<at::ScalarType>>& input_types);
+    std::unordered_map<const torch::jit::Value*, std::vector<ir::Input>>& input_ranges,
+    std::unordered_map<const torch::jit::Value*, std::vector<c10::optional<at::ScalarType>>>& input_types);
 
 void runShapeAnalysis(
     std::vector<SegmentedBlock>& segmented_blocks,

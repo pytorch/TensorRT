@@ -17,22 +17,13 @@ struct usage_info {
   std::vector<size_t> tensorrt_use_id; // ids of segmented blocks which are of type TensorRT
 };
 
-inline bool isTensorOrTensorList(torch::jit::Value* val) {
-  return val->type()->isSubtypeOf(torch::jit::TensorType::get()) ||
-      val->type()->isSubtypeOf(torch::jit::ListType::ofTensors());
-}
-
-inline bool isTensorList(torch::jit::Value* val) {
-  return val->type()->isSubtypeOf(torch::jit::ListType::ofTensors());
-}
-
 inline bool isTensor(torch::jit::Value* val) {
   return val->type()->isSubtypeOf(torch::jit::TensorType::get());
 }
 
 bool containNonTensorOutputs(torch::jit::Node* n) {
   for (auto output : n->outputs()) {
-    if (!isTensorOrTensorList(output)) {
+    if (!isTensor(output)) {
       return true;
     }
   }
@@ -68,6 +59,7 @@ std::vector<torch::jit::Node*> findModifyingNodes(
   return modifying_nodes;
 }
 
+// this function is only used when a TRT segment produces nonTensor values which are used by later TRT segment
 std::vector<torch::jit::Node*> getDependencyNodes(
     const std::vector<torch::jit::Value*>& vals,
     const SegmentedBlock& seg_block) {
@@ -88,7 +80,7 @@ std::vector<torch::jit::Node*> getDependencyNodes(
       stk.insert(stk.end(), modifying_nodes.rbegin(), modifying_nodes.rend());
       stk.push_back(node);
       for (auto input : node->inputs()) {
-        if (!isTensorOrTensorList(input)) {
+        if (!isTensor(input)) {
           q.push(input);
         }
       }
@@ -96,6 +88,28 @@ std::vector<torch::jit::Node*> getDependencyNodes(
   }
   std::reverse(stk.begin(), stk.end());
   return stk;
+}
+
+// check if the input and output of the graph is Tensor after collection is enabled. If it is, then fallback related
+// nodes
+void fallback_graph_nontensor_in_out(
+    torch::jit::Block* block,
+    std::unordered_map<torch::jit::Node*, int>& global_fallback_nodes) {
+  // fallback nodes that produce entire graph's nonTensor output
+  for (auto i : block->outputs()) {
+    if (!isTensor(i)) {
+      global_fallback_nodes.insert({i->node(), FallbackNodeType::kNON_TENSOR});
+    }
+  }
+
+  // fallback nodes that consume entire graph's nonTensor input
+  for (auto i : block->inputs()) {
+    if (!isTensor(i)) {
+      for (auto use : i->uses()) {
+        global_fallback_nodes.insert({use.user, FallbackNodeType::kNON_TENSOR});
+      }
+    }
+  }
 }
 
 void find_all_fallback_nodes(
@@ -177,7 +191,7 @@ void registerSegmentsOutputs(PartitionedGraph& segmented_blocks, torch::jit::Blo
       if (std::find(seg_block.raw_inputs().begin(), seg_block.raw_inputs().end(), mini_graph_input) ==
               seg_block.raw_inputs().end() &&
           seg_block.contain_raw_value(mini_graph_input)) {
-        if (!isTensorOrTensorList(mini_graph_input) && seg_block.target() == SegmentedBlock::kTensorRT)
+        if (!isTensor(mini_graph_input) && seg_block.target() == SegmentedBlock::kTensorRT)
           continue;
         seg_block.registerOutput(mini_graph_input);
       }
@@ -200,6 +214,7 @@ void registerSegmentsOutputs(PartitionedGraph& segmented_blocks, torch::jit::Blo
       }
     }
   }
+
   std::for_each(segmented_blocks.begin(), segmented_blocks.end(), [](SegmentedBlock& seg_block) {
     torch::jit::EliminateDeadCode(seg_block.g());
   });
@@ -361,7 +376,6 @@ PartitionedGraph segment_graph(
   find_min_block_size_fallback_nodes(block, global_fallback_nodes, min_block_size);
 
   auto nodes = block->nodes();
-
   PartitionedGraph segmented_blocks;
 
   // segment the nodes
@@ -371,7 +385,7 @@ PartitionedGraph segment_graph(
     if (n->kind() == torch::jit::prim::Constant) {
       continue;
     }
-
+    // the outputs of trt subgraph shouldn't be collections
     if (check_node_fallback(n, global_fallback_nodes)) {
       in_prog_trt_blk_nodes.push_back(n);
 
@@ -430,7 +444,6 @@ PartitionedGraph segment_graph(
         in_prog_pyt_blk_nodes.end(), in_prog_trt_blk_nodes.begin(), in_prog_trt_blk_nodes.end());
     finalize_block(segmented_blocks, SegmentedBlock::kTorch, in_prog_pyt_blk_nodes);
   }
-
   return segmented_blocks;
 }
 
@@ -440,6 +453,10 @@ PartitionedGraph Partition(
     const PartitionInfo& partition_info,
     std::unordered_map<torch::jit::Node*, int>& global_fallback_nodes) {
   LOG_DEBUG(partition_info);
+  // if there is nonTensor input/output for the entire graph, fallback the node that consumes/produces this nonTensor
+  // output
+  fallback_graph_nontensor_in_out(block, global_fallback_nodes);
+
   // segment lowering global graph into blocks
   LOG_DEBUG("Parititioning source module into PyTorch and TensorRT sub blocks");
   PartitionedGraph segmented_blocks = segment_graph(block, partition_info, global_fallback_nodes);

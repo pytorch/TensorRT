@@ -1,2 +1,1 @@
-torchvision==0.13.0+cu113
--f https://download.pytorch.org/whl/torch_stable.html
+torchvision
