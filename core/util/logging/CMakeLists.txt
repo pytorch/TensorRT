@@ -6,11 +6,11 @@ target_sources(${lib_name}
         "${CMAKE_CURRENT_SOURCE_DIR}/TorchTRTLogger.cpp"
 )
 
-set(HEADER_FILES 
+set(HEADER_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/TorchTRTLogger.h"
 )
 
-target_include_directories(${lib_name} 
+target_include_directories(${lib_name}
     PRIVATE
         "$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>"
 )

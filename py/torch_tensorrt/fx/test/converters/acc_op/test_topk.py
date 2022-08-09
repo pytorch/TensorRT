@@ -26,9 +26,7 @@ class TestTopKConverter(AccTestCase):
 
             def forward(self, x):
                 if self.dim is not None:
-                    out = torch.topk(
-                        x, k=self.k, dim=self.dim, largest=self.largest, sorted=False
-                    )
+                    out = torch.topk(x, k=self.k, dim=self.dim, largest=self.largest, sorted=False)
                 else:
                     out = torch.topk(x, k=self.k, largest=self.largest, sorted=False)
                 return out[0], out[1]
@@ -60,9 +58,7 @@ class TestTopKConverter(AccTestCase):
 
             def forward(self, x):
                 if self.dim is not None:
-                    out = torch.topk(
-                        x, k=self.k, dim=self.dim, largest=self.largest, sorted=False
-                    )
+                    out = torch.topk(x, k=self.k, dim=self.dim, largest=self.largest, sorted=False)
                 else:
                     out = torch.topk(x, k=self.k, largest=self.largest, sorted=False)
                 return out[0], out[1]
@@ -75,9 +71,7 @@ class TestTopKConverter(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(
-            TopK(k, dim), input_specs, expected_ops={acc_ops.topk}
-        )
+        self.run_test_with_dynamic_shape(TopK(k, dim), input_specs, expected_ops={acc_ops.topk})
 
 
 if __name__ == "__main__":

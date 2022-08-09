@@ -26,7 +26,6 @@ struct Resize : public torch::data::transforms::TensorTransform<torch::Tensor> {
 };
 
 torch::jit::Module compile_int8_qat_model(const std::string& data_dir, torch::jit::Module& mod) {
-
   std::vector<torch_tensorrt::Input> inputs = {
       torch_tensorrt::Input(std::vector<int64_t>({32, 3, 32, 32}), torch_tensorrt::DataType::kFloat)};
   /// Configure settings for compilation

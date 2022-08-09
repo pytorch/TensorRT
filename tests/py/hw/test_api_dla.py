@@ -5,8 +5,7 @@ import torchvision.models as models
 
 
 class ModelTestCaseOnDLA(unittest.TestCase):
-
-    def __init__(self, methodName='runTest', model=None):
+    def __init__(self, methodName="runTest", model=None):
         super(ModelTestCaseOnDLA, self).__init__(methodName)
         self.model = model.half()
         self.model.eval().to("cuda").half()
@@ -22,7 +21,6 @@ class ModelTestCaseOnDLA(unittest.TestCase):
 
 
 class TestCompile(ModelTestCaseOnDLA):
-
     def setUp(self):
         self.input = torch.randn((1, 3, 224, 224)).to("cuda").half()
         self.traced_model = torch.jit.trace(self.model, [self.input]).half()
@@ -35,9 +33,9 @@ class TestCompile(ModelTestCaseOnDLA):
                 "device_type": torchtrt.DeviceType.DLA,
                 "gpu_id": 0,
                 "dla_core": 0,
-                "allow_gpu_fallback": True
+                "allow_gpu_fallback": True,
             },
-            "enabled_precisions": {torch.half}
+            "enabled_precisions": {torch.half},
         }
 
         trt_mod = torchtrt.ts.compile(self.traced_model, **compile_spec)
@@ -51,9 +49,9 @@ class TestCompile(ModelTestCaseOnDLA):
                 "device_type": torchtrt.DeviceType.DLA,
                 "gpu_id": 0,
                 "dla_core": 0,
-                "allow_gpu_fallback": True
+                "allow_gpu_fallback": True,
             },
-            "enabled_precisions": {torch.half}
+            "enabled_precisions": {torch.half},
         }
 
         trt_mod = torchtrt.ts.compile(self.scripted_model, **compile_spec)

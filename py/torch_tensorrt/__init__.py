@@ -4,22 +4,24 @@ import os
 import sys
 import platform
 import warnings
-from torch_tensorrt._version import __version__, __cuda_version__, __cudnn_version__, __tensorrt_version__
-
+from torch_tensorrt._version import (
+    __version__,
+    __cuda_version__,
+    __cudnn_version__,
+    __tensorrt_version__,
+)
 
 if sys.version_info < (3,):
     raise Exception("Python 2 has reached end-of-life and is not supported by Torch-TensorRT")
+
 
 def _parse_semver(version):
     split = version.split(".")
     if len(split) < 3:
         split.append("")
 
-    return {
-        "major": split[0],
-        "minor": split[1],
-        "patch": split[2]
-    }
+    return {"major": split[0], "minor": split[1], "patch": split[2]}
+
 
 def _find_lib(name, paths):
     for path in paths:
@@ -27,9 +29,8 @@ def _find_lib(name, paths):
         if os.path.isfile(libpath):
             return libpath
 
-    raise FileNotFoundError(
-        f"Could not find {name}\n  Search paths: {paths}"
-    )
+    raise FileNotFoundError(f"Could not find {name}\n  Search paths: {paths}")
+
 
 try:
     import tensorrt
@@ -50,7 +51,6 @@ except:
 
         WIN_PATHS = os.environ["PATH"].split(os.path.pathsep)
 
-
         for lib in WIN_LIBS:
             ctypes.CDLL(_find_lib(lib, WIN_PATHS))
 
@@ -68,9 +68,7 @@ except:
             ]
 
         elif platform.uname().processor == "aarch64":
-            LINUX_PATHS += [
-                "/usr/lib/aarch64-linux-gnu"
-            ]
+            LINUX_PATHS += ["/usr/lib/aarch64-linux-gnu"]
 
         LINUX_LIBS = [
             f"libnvinfer.so.{TENSORRT_MAJOR}",
@@ -93,9 +91,10 @@ from torch_tensorrt._Device import Device
 
 from torch_tensorrt import fx
 
+
 def _register_with_torch():
     trtorch_dir = os.path.dirname(__file__)
-    torch.ops.load_library(trtorch_dir + '/lib/libtorchtrt.so')
+    torch.ops.load_library(trtorch_dir + "/lib/libtorchtrt.so")
 
 
 _register_with_torch()

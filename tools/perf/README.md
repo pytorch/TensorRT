@@ -40,7 +40,7 @@ python perf_run.py --config=config/vgg16.yml
 
 ## Configuration
 
-There are two sample configuration files added. 
+There are two sample configuration files added.
 
 * vgg16.yml demonstrates a configuration with all the supported backends (Torch, Torch-TensorRT, TensorRT)
 * vgg16_trt.yml demonstrates how to use an external TensorRT serialized engine file directly.
@@ -54,13 +54,13 @@ There are two sample configuration files added.
 | input | - | Input binding names. Expected to list shapes of each input bindings |
 | model | - | Configure the model filename and name |
 | filename | - | Model file name to load from disk. |
-| name | - | Model name | 
-| runtime | - | Runtime configurations | 
+| name | - | Model name |
+| runtime | - | Runtime configurations |
 | device | 0 | Target device ID to run inference. Range depends on available GPUs |
 | precision | fp32, fp16 or half, int8 | Target precision to run inference. int8 cannot be used with 'all' backend |
 | calibration_cache | - | Calibration cache file expected for torch_tensorrt runtime in int8 precision |
 
-Note: 
+Note:
 1. Please note that torch runtime perf is not supported for int8 yet.
 2. Torchscript module filename should end with .jit.pt otherwise it will be treated as a TensorRT engine.
 
@@ -69,22 +69,22 @@ Note:
 Additional sample use case:
 
 ```
-backend: 
+backend:
   - torch
   - torch_tensorrt
   - tensorrt
-input: 
-  input0: 
+input:
+  input0:
     - 3
     - 224
     - 224
   num_inputs: 1
-model: 
+model:
   filename: model.plan
   name: vgg16
-runtime: 
+runtime:
   device: 0
-  precision: 
+  precision:
     - fp32
     - fp16
 ```

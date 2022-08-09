@@ -103,7 +103,7 @@ class TestTypeAsConverter(AccTestCase):
             expected_ops={acc_ops.to_dtype},
             precision=LowerPrecision.FP16,
         )
-        
+
     @unittest.skip("Does not pass in TRT 8.4.1 T127981773")
     def test_type_tensor_with_dynamic_shape_four_dimensions(self):
         class Type_as(torch.nn.Module):

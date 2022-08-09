@@ -1,5 +1,5 @@
-#include <iostream>
 #include <fstream>
+#include <iostream>
 #include <memory>
 #include <sstream>
 #include <vector>
@@ -7,8 +7,7 @@
 
 int main(int argc, const char* argv[]) {
   if (argc < 2) {
-    std::cerr
-        << "usage: samplertapp <path-to-pre-built-trt-ts module>\n";
+    std::cerr << "usage: samplertapp <path-to-pre-built-trt-ts module>\n";
     return -1;
   }
 

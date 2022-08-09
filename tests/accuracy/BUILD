@@ -1,3 +1,5 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library", "cc_test")
+
 filegroup(
     name = "jit_models",
     srcs = glob(["**/*.jit.pt"]),
@@ -5,7 +7,7 @@ filegroup(
 
 filegroup(
     name = "data",
-    srcs = glob(["datasets/**/*"])
+    srcs = glob(["datasets/**/*"]),
 )
 
 test_suite(
@@ -32,8 +34,8 @@ cc_test(
     name = "test_int8_accuracy",
     srcs = ["test_int8_accuracy.cpp"],
     data = [
+        ":data",
         ":jit_models",
-        ":data"
     ],
     deps = [
         ":accuracy_test",
@@ -45,8 +47,8 @@ cc_test(
     name = "test_fp16_accuracy",
     srcs = ["test_fp16_accuracy.cpp"],
     data = [
+        ":data",
         ":jit_models",
-        ":data"
     ],
     deps = [
         ":accuracy_test",
@@ -58,8 +60,8 @@ cc_test(
     name = "test_fp32_accuracy",
     srcs = ["test_fp32_accuracy.cpp"],
     data = [
+        ":data",
         ":jit_models",
-        ":data"
     ],
     deps = [
         ":accuracy_test",
@@ -71,8 +73,8 @@ cc_test(
     name = "test_dla_int8_accuracy",
     srcs = ["test_dla_int8_accuracy.cpp"],
     data = [
+        ":data",
         ":jit_models",
-        ":data"
     ],
     deps = [
         ":accuracy_test",
@@ -84,8 +86,8 @@ cc_test(
     name = "test_dla_fp16_accuracy",
     srcs = ["test_dla_fp16_accuracy.cpp"],
     data = [
+        ":data",
         ":jit_models",
-        ":data"
     ],
     deps = [
         ":accuracy_test",

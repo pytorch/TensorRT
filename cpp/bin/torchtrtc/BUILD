@@ -1,3 +1,5 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary")
+
 package(default_visibility = ["//visibility:public"])
 
 config_setting(
@@ -10,17 +12,17 @@ config_setting(
 cc_binary(
     name = "torchtrtc",
     srcs = [
-        "accuracy.h",
         "accuracy.cpp",
-        "fileio.h",
+        "accuracy.h",
         "fileio.cpp",
+        "fileio.h",
         "luts.h",
         "main.cpp",
+        "parser_util.cpp",
         "parser_util.h",
-        "parser_util.cpp"
     ],
     linkopts = [
-        "-l:libdl.so"
+        "-l:libdl.so",
     ],
     deps = [
         "//third_party/args",

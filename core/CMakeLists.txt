@@ -9,7 +9,7 @@ set(HEADER_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/compiler.h"
 )
 
-target_sources(${lib_name} 
+target_sources(${lib_name}
     PRIVATE
         ${CXX_SRCS}
     PUBLIC
@@ -31,7 +31,7 @@ target_link_libraries(${lib_name}
         core_util_logging
 )
 
-target_include_directories(${lib_name} 
+target_include_directories(${lib_name}
     PRIVATE
         "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>"
 )

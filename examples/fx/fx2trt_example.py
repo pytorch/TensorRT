@@ -34,7 +34,7 @@ class Model(nn.Module):
         return x
 
 
-inputs = [torch.randn((1, 10), device=torch.device('cuda'))]
+inputs = [torch.randn((1, 10), device=torch.device("cuda"))]
 model = Model().cuda().eval()
 
 # acc_tracer is a custom fx tracer that maps nodes whose targets are PyTorch operators
@@ -100,6 +100,7 @@ graph():
     return relu_3
 """
 
+
 def get_submod_inputs(mod, submod, inputs):
     acc_inputs = None
 
@@ -111,6 +112,7 @@ def get_submod_inputs(mod, submod, inputs):
     mod(*inputs)
     handle.remove()
     return acc_inputs
+
 
 # Since the model is splitted into three segments. We need to lower each TRT eligible segment.
 # If we know the model can be fully lowered, we can skip the splitter part.
@@ -139,6 +141,4 @@ reload_model_output = reload_trt_mod(*inputs)
 
 # Make sure the results match
 regular_model_output = model(*inputs)
-torch.testing.assert_close(
-    reload_model_output, regular_model_output, atol=3e-3, rtol=1e-2
-)
+torch.testing.assert_close(reload_model_output, regular_model_output, atol=3e-3, rtol=1e-2)

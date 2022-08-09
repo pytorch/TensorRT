@@ -78,9 +78,7 @@ class LowerSetting(LowerSettingBasic):
     max_workspace_size: int = 1 << 30
     strict_type_constraints: bool = False
     customized_fuse_pass: PassManager = PassManager.build_from_passlist([])
-    lower_basic_fuse_pass: PassManager = PassManager.build_from_passlist(
-        [fuse_permute_matmul, fuse_permute_linear]
-    )
+    lower_basic_fuse_pass: PassManager = PassManager.build_from_passlist([fuse_permute_matmul, fuse_permute_linear])
     verbose_log: bool = False
     algo_selector = None
     timing_cache_prefix: str = ""

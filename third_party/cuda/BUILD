@@ -1,3 +1,5 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
 package(default_visibility = ["//visibility:public"])
 
 config_setting(
@@ -59,9 +61,9 @@ cc_library(
 cc_library(
     name = "cublas",
     srcs = select({
-        ":windows": glob([
+        ":windows": [
             "lib/x64/cublas.lib",
-        ]),
+        ],
         "//conditions:default": glob([
             "lib64/**/*libcublas.so",
         ]),

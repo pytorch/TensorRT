@@ -20,7 +20,6 @@ int64_t normalizeIndex(int64_t idx, int64_t list_size) {
   return idx;
 }
 
-
 // TODO: Switch back to PyTorch canonical implimentation
 c10::optional<torch::jit::IValue> toIValue(const torch::jit::Value* v) {
   if (v->node()->kind() != torch::jit::prim::Constant || v->type()->cast<c10::FunctionType>()) {

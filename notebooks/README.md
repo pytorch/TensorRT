@@ -19,21 +19,21 @@ cd Torch-TensorRT
 
 ### a. Using the NGC PyTorch container
 
-At this point, we recommend pulling the [PyTorch container](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch) 
-from [NVIDIA GPU Cloud](https://catalog.ngc.nvidia.com/) as follows: 
+At this point, we recommend pulling the [PyTorch container](https://catalog.ngc.nvidia.com/orgs/nvidia/containers/pytorch)
+from [NVIDIA GPU Cloud](https://catalog.ngc.nvidia.com/) as follows:
 
 ```
 docker pull nvcr.io/nvidia/pytorch:22.05-py3
 ```
 
-Replace ```22.05``` with a different string in the form ```yy.mm```, 
-where ```yy``` indicates the last two numbers of a calendar year, and 
-```mm``` indicates the month in two-digit numerical form, if you wish 
-to pull a different version of the container. 
+Replace ```22.05``` with a different string in the form ```yy.mm```,
+where ```yy``` indicates the last two numbers of a calendar year, and
+```mm``` indicates the month in two-digit numerical form, if you wish
+to pull a different version of the container.
 
-The NGC PyTorch container ships with the Torch-TensorRT tutorial notebooks. 
-Therefore, you can run the container and the notebooks therein without 
-mounting the repo to the container. To do so, run 
+The NGC PyTorch container ships with the Torch-TensorRT tutorial notebooks.
+Therefore, you can run the container and the notebooks therein without
+mounting the repo to the container. To do so, run
 
 ```
 docker run --gpus=all --rm -it --net=host --ipc=host \
@@ -41,8 +41,8 @@ docker run --gpus=all --rm -it --net=host --ipc=host \
 nvcr.io/nvidia/pytorch:22.05-py3 bash
 ```
 
-If, however, you wish for your work in the notebooks to persist, use the 
-```-v``` flag to mount the repo to the container as follows: 
+If, however, you wish for your work in the notebooks to persist, use the
+```-v``` flag to mount the repo to the container as follows:
 
 ```
 docker run --gpus=all --rm -it -v $PWD:/Torch-TensorRT \
@@ -52,13 +52,13 @@ nvcr.io/nvidia/pytorch:22.05-py3 bash
 
 ### b. Building a Torch-TensorRT container from source
 
-Alternatively, to build the container from source, run 
+Alternatively, to build the container from source, run
 
 ```
 docker build -t torch_tensorrt -f ./docker/Dockerfile .
 ```
 
-To run this container, enter the following command:  
+To run this container, enter the following command:
 
 ```
 docker run --gpus=all --rm -it -v $PWD:/Torch-TensorRT \
@@ -68,14 +68,14 @@ torch_tensorrt:latest bash
 
 ### c. Running the notebooks inside the container
 
-Within the docker interactive bash session, proceed to the notebooks. 
-To use the notebooks which ship with the container, run 
+Within the docker interactive bash session, proceed to the notebooks.
+To use the notebooks which ship with the container, run
 
 ```
 cd /workspace/examples/torch_tensorrt/notebooks
 ```
 
-If, however, you mounted the repo to the container, run 
+If, however, you mounted the repo to the container, run
 
 ```
 cd /Torch-TensorRT/notebooks

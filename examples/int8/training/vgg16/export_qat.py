@@ -40,7 +40,7 @@ def test(model, dataloader, crit):
 
 
 PARSER = argparse.ArgumentParser(description="Export trained VGG")
-PARSER.add_argument('ckpt', type=str, help="Path to saved checkpoint")
+PARSER.add_argument("ckpt", type=str, help="Path to saved checkpoint")
 
 args = PARSER.parse_args()
 
@@ -52,7 +52,7 @@ ckpt = torch.load(args.ckpt)
 weights = {}
 for key, val in ckpt["model_state_dict"].items():
     # Remove 'module.' from the key names
-    if key.startswith('module'):
+    if key.startswith("module"):
         weights[key[7:]] = val
     else:
         weights[key] = val
@@ -60,13 +60,17 @@ for key, val in ckpt["model_state_dict"].items():
 model.load_state_dict(weights)
 model.eval()
 
-testing_dataset = datasets.CIFAR10(root='./data',
-                                   train=False,
-                                   download=True,
-                                   transform=transforms.Compose([
-                                       transforms.ToTensor(),
-                                       transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
-                                   ]))
+testing_dataset = datasets.CIFAR10(
+    root="./data",
+    train=False,
+    download=True,
+    transform=transforms.Compose(
+        [
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        ]
+    ),
+)
 
 testing_dataloader = torch.utils.data.DataLoader(testing_dataset, batch_size=32, shuffle=False, num_workers=2)
 

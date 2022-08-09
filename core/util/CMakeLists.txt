@@ -1,7 +1,7 @@
 set(lib_name "core_util")
 add_library(${lib_name} OBJECT)
 
-set(CXX_SRCS 
+set(CXX_SRCS
     "${CMAKE_CURRENT_SOURCE_DIR}/Exception.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/trt_util.cpp"
 )
@@ -22,7 +22,7 @@ target_sources(${lib_name}
         "$<TARGET_OBJECTS:core_util_logging>"
 )
 
-target_include_directories(${lib_name} 
+target_include_directories(${lib_name}
     PUBLIC
         "$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>"
 )

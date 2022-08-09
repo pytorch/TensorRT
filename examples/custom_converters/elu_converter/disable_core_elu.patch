@@ -22,5 +22,5 @@ index 64edeed..5279413 100644
 -                    LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
 -                    return true;
                    }});
- 
+
  } // namespace

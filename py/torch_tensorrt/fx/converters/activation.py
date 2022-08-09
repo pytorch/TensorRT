@@ -9,9 +9,7 @@ from ..converter_registry import tensorrt_converter
 from .converter_utils import mark_as_int8_layer
 
 
-def common_activation(
-    network, mod, input_val, activation_type, activation_dyn_range_fn, layer_name
-):
+def common_activation(network, mod, input_val, activation_type, activation_dyn_range_fn, layer_name):
     layer = network.add_activation(input=input_val, type=activation_type)
     layer.name = layer_name
 
@@ -30,10 +28,7 @@ def relu(network, submod, args, kwargs, layer_name):
     input_val = kwargs["input"]
 
     if not isinstance(input_val, trt.tensorrt.ITensor):
-        raise RuntimeError(
-            f"ReLU received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"ReLU received input {input_val} that is not part " "of the TensorRT region!")
 
     def activation_dyn_range_fn(dyn_range):
         return max(0, dyn_range[0]), max(0, dyn_range[1])
@@ -55,10 +50,7 @@ def sigmoid(network, submod, args, kwargs, layer_name):
     input_val = kwargs["input"]
 
     if not isinstance(input_val, trt.tensorrt.ITensor):
-        raise RuntimeError(
-            f"Sigmoid received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"Sigmoid received input {input_val} that is not part " "of the TensorRT region!")
 
     def activation_dyn_range_fn(dyn_range):
         def sigmoid_fn(x):

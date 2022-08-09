@@ -1,3 +1,6 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_pkg//:pkg.bzl", "pkg_tar")
+
 package(default_visibility = ["//visibility:public"])
 
 config_setting(
@@ -28,7 +31,7 @@ cc_library(
         "jit_util.h",
     ],
     deps = [
-        ":macros"
+        ":macros",
     ] + select({
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default": ["@libtorch//:libtorch"],
@@ -86,8 +89,6 @@ cc_library(
         "//conditions:default": ["@libtorch//:libtorch"],
     }),
 )
-
-load("@rules_pkg//:pkg.bzl", "pkg_tar")
 
 pkg_tar(
     name = "include",

@@ -1,3 +1,6 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_pkg//:pkg.bzl", "pkg_tar")
+
 package(default_visibility = ["//visibility:public"])
 
 config_setting(
@@ -12,10 +15,10 @@ cc_library(
     srcs = [
         "CudaDevice.cpp",
         "DeviceList.cpp",
-        "execute_engine.cpp",
         "TRTEngine.cpp",
+        "execute_engine.cpp",
         "register_jit_hooks.cpp",
-        "runtime.cpp"
+        "runtime.cpp",
     ],
     hdrs = [
         "runtime.h",
@@ -23,15 +26,13 @@ cc_library(
     deps = [
         "@tensorrt//:nvinfer",
         "//core/util:prelude",
-        "//core/plugins:torch_tensorrt_plugins"
+        "//core/plugins:torch_tensorrt_plugins",
     ] + select({
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default": ["@libtorch//:libtorch"],
     }),
     alwayslink = True,
 )
-
-load("@rules_pkg//:pkg.bzl", "pkg_tar")
 
 pkg_tar(
     name = "include",

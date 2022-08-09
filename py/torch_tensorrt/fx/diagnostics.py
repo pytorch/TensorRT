@@ -11,19 +11,14 @@ import typing as t
 from contextvars import ContextVar
 from dataclasses import dataclass
 
-
 TWrite = t.Union[str, bytes]
 WriteObj = t.Union[TWrite, t.Callable[[], TWrite]]
 
 _CURRENT_WRITER: ContextVar["DiagnosticsWriter"] = ContextVar("_CURRENT_WRITER")
-_CURRENT_COLLECTOR: ContextVar["DiagnosticsCollector"] = ContextVar(
-    "_CURRENT_COLLECTOR"
-)
+_CURRENT_COLLECTOR: ContextVar["DiagnosticsCollector"] = ContextVar("_CURRENT_COLLECTOR")
 # Allows a collector to indicate subsequent collections should be suppressed to
 # avoid duplicate collections.
-_SUBSEQUENT_COLLECT_SUPPRESSED_BY: ContextVar[object] = ContextVar(
-    "_SUBSEQUENT_COLLECT_SUPPRESSED_BY"
-)
+_SUBSEQUENT_COLLECT_SUPPRESSED_BY: ContextVar[object] = ContextVar("_SUBSEQUENT_COLLECT_SUPPRESSED_BY")
 # Indicates current execution context is within a context manager by
 # `collect_when`. Only when it's set do we actually write diagnostics.
 _IS_IN_COLLECT_CONTEXT: ContextVar[bool] = ContextVar("_IS_IN_COLLECT_CONTEXT")
@@ -38,9 +33,7 @@ class CollectionConditionContext:
 CollectionCondition = t.Callable[[CollectionConditionContext], bool]
 
 
-def collect_when(
-    condition: "CollectionCondition", supress_subsequent_collect: bool = True
-):
+def collect_when(condition: "CollectionCondition", supress_subsequent_collect: bool = True):
     """See `DiagnosticsCollector.collect_when`"""
     return get_current_collector().collect_when(condition, supress_subsequent_collect)
 
@@ -158,9 +151,7 @@ class CollectionConditions:
         return lambda ctx: ctx.exception is not None
 
     @classmethod
-    def when_called_by_function(
-        cls, func_name: str, match_prefix: bool = False
-    ) -> "CollectionCondition":
+    def when_called_by_function(cls, func_name: str, match_prefix: bool = False) -> "CollectionCondition":
         def _when_called_by_function(ctx: CollectionConditionContext) -> bool:
             frames = inspect.stack()
             for frame in frames:
@@ -176,16 +167,12 @@ class CollectionConditions:
 
     @classmethod
     def when_not_in_tests(cls) -> CollectionCondition:
-        return CollectionConditions.not_(
-            CollectionConditions.when_called_by_function("test_", match_prefix=True)
-        )
+        return CollectionConditions.not_(CollectionConditions.when_called_by_function("test_", match_prefix=True))
 
 
 class DiagnosticsCollector:
     @contextlib.contextmanager
-    def collect_when(
-        self, condition: "CollectionCondition", supress_subsequent_collect: bool = True
-    ):
+    def collect_when(self, condition: "CollectionCondition", supress_subsequent_collect: bool = True):
         """
         Context manager to collect diagnostics when the enclosed code completes
         and *any* of the given condition is met.
@@ -246,9 +233,7 @@ class DiagnosticsCollector:
         return ""
 
     @classmethod
-    def _test_condition(
-        cls, cond: CollectionCondition, ctx: CollectionConditionContext
-    ) -> bool:
+    def _test_condition(cls, cond: CollectionCondition, ctx: CollectionConditionContext) -> bool:
         try:
             return cond(ctx)
         except Exception as e:
@@ -277,10 +262,7 @@ def _res_or_err(data: WriteObj) -> t.Tuple[TWrite, str]:
     if isinstance(data, (str, bytes)):
         return data, ""
     if not callable(data):
-        raise TypeError(
-            f"data must be a callable that returns actual data to"
-            f"write, but got {type(data)}"
-        )
+        raise TypeError(f"data must be a callable that returns actual data to" f"write, but got {type(data)}")
     try:
         return data(), ""
     except Exception as e:

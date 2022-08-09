@@ -1,3 +1,5 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
 package(default_visibility = ["//visibility:public"])
 
 config_setting(
@@ -9,9 +11,9 @@ config_setting(
 
 config_setting(
     name = "ci_build_testing",
-    values  = {
-        "define": "torchtrt_src=prebuilt"
-    }
+    values = {
+        "define": "torchtrt_src=prebuilt",
+    },
 )
 
 cc_library(
@@ -40,12 +42,12 @@ cc_library(
     }) + select({
         ":ci_build_testing": [
             "@torch_tensorrt//:torch_tensorrt",
-            "@torch_tensorrt//:torch_tensorrt_core_hdrs"
+            "@torch_tensorrt//:torch_tensorrt_core_hdrs",
         ],
         "//conditions:default": [
             "//cpp:torch_tensorrt",
             "//core/conversion",
-            "//core/util:prelude"
-        ]
+            "//core/util:prelude",
+        ],
     }),
 )

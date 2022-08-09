@@ -15,9 +15,9 @@ pkg_tar(
         "//core/conversion:include",
         "//core/conversion/conversionctx:include",
         "//core/conversion/converters:include",
-        "//core/conversion/var:include",
-        "//core/conversion/tensorcontainer:include",
         "//core/conversion/evaluators:include",
+        "//core/conversion/tensorcontainer:include",
+        "//core/conversion/var:include",
         "//core/ir:include",
         "//core/lowering:include",
         "//core/lowering/passes:include",
@@ -66,7 +66,7 @@ pkg_tar(
     srcs = [
         "//:LICENSE",
         "//bzl_def:BUILD",
-        "//bzl_def:WORKSPACE"
+        "//bzl_def:WORKSPACE",
     ],
     extension = "tar.gz",
     package_dir = "torch_tensorrt",

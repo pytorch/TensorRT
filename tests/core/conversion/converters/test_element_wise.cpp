@@ -30,14 +30,15 @@ void pointwise_test_helper(
     torch_inputs.push_back(at::randint(1, 5, shape2, {at::kCUDA}));
   }
 
-  TORCHTRT_CHECK(!((int_tensors && (float_int_tensors || int_float_tensors)) || (float_int_tensors && int_float_tensors)),
-    "Invalid test configuration, only one of int_tensors, float_int_tensors, int_float_tensors can be true");
+  TORCHTRT_CHECK(
+      !((int_tensors && (float_int_tensors || int_float_tensors)) || (float_int_tensors && int_float_tensors)),
+      "Invalid test configuration, only one of int_tensors, float_int_tensors, int_float_tensors can be true");
 
-  if(int_tensors){
-    for(size_t i = 0UL; i < torch_inputs.size(); ++i){
+  if (int_tensors) {
+    for (size_t i = 0UL; i < torch_inputs.size(); ++i) {
       torch_inputs[i] = torch_inputs[i].to(at::kInt);
     }
-  } else if(float_int_tensors) {
+  } else if (float_int_tensors) {
     TORCHTRT_CHECK(!singleInput, "float_int_tensors tests require two inputs");
     torch_inputs[0] = torch_inputs[0].to(at::kFloat);
     torch_inputs[1] = torch_inputs[1].to(at::kInt);

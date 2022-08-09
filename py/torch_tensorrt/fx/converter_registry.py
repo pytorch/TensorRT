@@ -2,7 +2,6 @@ from typing import Any, Callable, Dict
 
 from torch.fx.node import Target
 
-
 CONVERTERS: Dict[Target, Any] = {}
 NO_IMPLICIT_BATCH_DIM_SUPPORT = {}
 NO_EXPLICIT_BATCH_DIM_SUPPORT = {}

@@ -28,10 +28,7 @@ class TestTile(AccTestCase):
             Tile(dims),
             inputs,
             expected_ops={acc_ops.tile},
-            test_implicit_batch_dim=(
-                len(input_shape) > len(dims)
-                or (len(input_shape) == len(dims) and dims[0] == 1)
-            ),
+            test_implicit_batch_dim=(len(input_shape) > len(dims) or (len(input_shape) == len(dims) and dims[0] == 1)),
         )
 
     @parameterized.expand(
@@ -64,9 +61,7 @@ class TestTile(AccTestCase):
                 ],
             ),
         ]
-        self.run_test_with_dynamic_shape(
-            Tile(dims), input_specs, expected_ops={acc_ops.tile}
-        )
+        self.run_test_with_dynamic_shape(Tile(dims), input_specs, expected_ops={acc_ops.tile})
 
     @parameterized.expand(
         [
@@ -90,9 +85,7 @@ class TestTile(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(
-            Tile(dims), input_specs, expected_ops={acc_ops.tile}
-        )
+        self.run_test_with_dynamic_shape(Tile(dims), input_specs, expected_ops={acc_ops.tile})
 
     def test_tile_non_int_dims(self):
         class Tile(nn.Module):
@@ -105,9 +98,7 @@ class TestTile(AccTestCase):
 
         inputs = [torch.randn(2, 2, 3), torch.randn(2, 2, 3)]
         batch_size_range = (1, 2, 3)
-        input_specs = InputTensorSpec.from_tensors_with_dynamic_batch_size(
-            inputs, batch_size_range
-        )
+        input_specs = InputTensorSpec.from_tensors_with_dynamic_batch_size(inputs, batch_size_range)
         self.run_test_with_dynamic_shape(
             Tile(),
             input_specs,
@@ -136,9 +127,7 @@ class TestTile(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(
-            Tile(), input_specs, expected_ops={acc_ops.tile}
-        )
+        self.run_test_with_dynamic_shape(Tile(), input_specs, expected_ops={acc_ops.tile})
 
 
 if __name__ == "__main__":

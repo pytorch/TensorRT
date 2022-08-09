@@ -194,7 +194,7 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
 
       nvinfer1::Dims stride;
       stride.nbDims = in_nbDims;
-      for (size_t i = 0; i < in_nbDims; i++) {
+      for (int64_t i = 0; i < in_nbDims; i++) {
         stride.d[i] = 1;
       }
       const auto& dummy = stride;
@@ -206,7 +206,7 @@ bool add_conv_deconv(ConversionCtx* ctx, const torch::jit::Node* n, args& args) 
 
       nvinfer1::Dims constantDims;
       constantDims.nbDims = in_nbDims;
-      for (size_t i = 0; i < in_nbDims; i++) {
+      for (int64_t i = 0; i < in_nbDims; i++) {
         constantDims.d[i] = 1;
       }
       constantDims.d[diff - 1] =

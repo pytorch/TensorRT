@@ -38,7 +38,7 @@ torch.jit.save(trt_ts_module, "trt_torchscript_module.ts") # save the TRT embedd
 
 For Linux x86_64 platform, Pytorch libraries default to pre cxx11 abi. So, please use `python3 setup.py install`.
 
-On Jetson platforms, NVIDIA hosts <a href="https://forums.developer.nvidia.com/t/pytorch-for-jetson-version-1-10-now-available/72048">pre-built Pytorch wheel files</a>. These wheel files are built with CXX11 ABI. So on jetson platforms, please use `python3 setup.py install --jetpack-version 4.6 --use-cxx11-abi`   
+On Jetson platforms, NVIDIA hosts <a href="https://forums.developer.nvidia.com/t/pytorch-for-jetson-version-1-10-now-available/72048">pre-built Pytorch wheel files</a>. These wheel files are built with CXX11 ABI. So on jetson platforms, please use `python3 setup.py install --jetpack-version 4.6 --use-cxx11-abi`
 
 ## Under the Hood
 

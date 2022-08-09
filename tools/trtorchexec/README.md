@@ -1,6 +1,6 @@
 # trtorchexec
 
-This is a short example application that shows how to use TRTorch in a program. It also lets you quickly test if your TorchScript program is currently supported or if you may need to create some converters 
+This is a short example application that shows how to use TRTorch in a program. It also lets you quickly test if your TorchScript program is currently supported or if you may need to create some converters
 
 ## Compilation
 
@@ -14,7 +14,7 @@ If you want insight into what is going under the hood or need debug symbols
 bazel build //cpp/trtorchexec --compilation_mode=dbg
 ```
 
-## Usage 
+## Usage
 
 ``` shell
 trtorchexec <path-to-exported-script-module> <input-size>

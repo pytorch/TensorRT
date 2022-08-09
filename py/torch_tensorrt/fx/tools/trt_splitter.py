@@ -74,9 +74,7 @@ class TRTSplitter(splitter_base._SplitterBase):
             non_acc_submodule_name="_run_on_gpu_",
         )
 
-    def _lower_model_to_backend(
-        self, mod: torch.fx.GraphModule, inputs: Iterable[torch.Tensor]
-    ):
+    def _lower_model_to_backend(self, mod: torch.fx.GraphModule, inputs: Iterable[torch.Tensor]):
         """
         Lower a GraphModule `mod` to TensorRT with `inputs`.
         """
