@@ -349,36 +349,6 @@ TEST(Converters, ATenRsubWithIntScalarConvertsCorrectly) {
   pointwise_test_helper(graph, true, false, {4, 3, 3, 3}, {}, false, at::kInt);
 }
 
-TEST(Converters, ATenClipMinConvertsCorrectly) {
-  const auto graph = R"IR(
-  graph(%x.1 : Tensor):
-          %2 : float = prim::Constant[value=1.5]()
-          %3 : None = prim::Constant()
-          %4 : Tensor = aten::clip(%x.1, %2, %3)
-          return (%4))IR";
-  pointwise_test_helper(graph, true);
-}
-
-TEST(Converters, ATenClipMaxConvertsCorrectly) {
-  const auto graph = R"IR(
-  graph(%x.1 : Tensor):
-          %2 : float = prim::Constant[value=3.5]()
-          %3 : None = prim::Constant()
-          %4 : Tensor = aten::clip(%x.1, %3, %2)
-          return (%4))IR";
-  pointwise_test_helper(graph, true);
-}
-
-TEST(Converters, ATenClipMinMaxConvertsCorrectly) {
-  const auto graph = R"IR(
-  graph(%x.1 : Tensor):
-          %2 : float = prim::Constant[value=3.5]()
-          %3 : float = prim::Constant[value=1.5]()
-          %4 : Tensor = aten::clip(%x.1, %3, %2)
-          return (%4))IR";
-  pointwise_test_helper(graph, true);
-}
-
 TEST(Converters, ATenClampMinConvertsCorrectly) {
   const auto graph = R"IR(
   graph(%x.1 : Tensor):
