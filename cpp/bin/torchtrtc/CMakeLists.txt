@@ -10,7 +10,7 @@ add_executable(${executable_name}
 if (MSVC)
     target_link_libraries(${executable_name} PRIVATE torch torchtrt)
 else()
-    target_link_libraries(${executable_name} PRIVATE torch "-Wl,--no-as-needed" torchtrt "-Wl,--as-needed")
+    target_link_libraries(${executable_name} PRIVATE torch "-Wl,--no-as-needed -ldl" torchtrt "-Wl,--as-needed")
     set_target_properties(
         ${executable_name}
         PROPERTIES INSTALL_RPATH_USE_LINK_PATH FALSE #
