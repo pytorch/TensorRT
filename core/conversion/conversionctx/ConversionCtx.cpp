@@ -124,13 +124,13 @@ ConversionCtx::ConversionCtx(BuilderSettings build_settings)
         settings.enabled_precisions.find(nvinfer1::DataType::kFLOAT) == settings.enabled_precisions.end(),
         "DLA supports only fp16 or int8 precision");
     cfg->setDLACore(settings.device.dla_core);
-    if (settings.dla_sram_size != 1048576) {
+    if (settings.dla_sram_size != DLA_SRAM_SIZE) {
       cfg->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kDLA_MANAGED_SRAM, settings.dla_sram_size);
     }
-    if (settings.dla_local_dram_size != 1073741824) {
+    if (settings.dla_local_dram_size != DLA_LOCAL_DRAM_SIZE) {
       cfg->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kDLA_LOCAL_DRAM, settings.dla_local_dram_size);
     }
-    if (settings.dla_global_dram_size != 536870912) {
+    if (settings.dla_global_dram_size != DLA_GLOBAL_DRAM_SIZE) {
       cfg->setMemoryPoolLimit(nvinfer1::MemoryPoolType::kDLA_GLOBAL_DRAM, settings.dla_global_dram_size);
     }
   }
