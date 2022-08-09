@@ -188,6 +188,48 @@ commands:
                   mkdir -p /tmp/dist/builds
                   cp dist/* /tmp/dist/builds
 
+  build-py-cxx11-abi-without-fx:
+    description: "Build the torch-tensorrt python release (cxx11-abi)"
+    parameters:
+      platform:
+        type: string
+        default: "x86_64"
+      release:
+        type: boolean
+        default: false
+    steps:
+      - run:
+          name: Build setup
+          command: |
+            mv ~/project/toolchains/ci_workspaces/WORKSPACE.<< parameters.platform >> ~/project/WORKSPACE
+            python3 -m pip install wheel setuptools
+            python3 -m pip install pybind11==2.6.2
+      - when:
+          condition: << parameters.release >>
+          steps:
+            - run:
+                name: Build torch-tensorrt python release package
+                command: |
+                  cd ~/project/py
+                  sed -i "s/import torch.fx//g" ~/project/py/torch_tensorrt/_compile.py
+                  sed -i "s/from torch_tensorrt import fx//g" ~/project/py/torch_tensorrt/__init__.py
+                  python3 setup.py bdist_wheel --use-cxx11-abi --release
+                  python3 setup.py install --use-cxx11-abi --release
+                  mkdir -p /tmp/dist/builds
+                  cp dist/* /tmp/dist/builds
+      - unless:
+          condition: << parameters.release >>
+          steps:
+            - run:
+                name: Build torch-tensorrt python package
+                command: |
+                  cd ~/project/py
+                  sed -i "s/import torch.fx//g" ~/project/py/torch_tensorrt/_compile.py
+                  sed -i "s/from torch_tensorrt import fx//g" ~/project/py/torch_tensorrt/__init__.py
+                  python3 setup.py bdist_wheel --use-cxx11-abi
+                  python3 setup.py install --use-cxx11-abi
+                  mkdir -p /tmp/dist/builds
+                  cp dist/* /tmp/dist/builds
   build-py-fx-only:
     description: "Build the torch-tensorrt python release with only the fx backend"
     parameters:
@@ -391,7 +433,7 @@ jobs:
       - when:
           condition: << parameters.cxx11-abi >>
           steps:
-            - build-py-cxx11-abi:
+            - build-py-cxx11-abi-without-fx:
                 platform: "sbsa"
       - unless:
           condition: << parameters.cxx11-abi >>
@@ -717,7 +759,7 @@ jobs:
           command: |
             set -e
             python3 -m pip install --upgrade pip; python3 -m pip install setuptools wheel; python3 -m pip install expecttest xmlrunner hypothesis aiohttp numpy=='1.19.4' pyyaml scipy=='1.5.3' ninja cython typing_extensions protobuf; export "LD_LIBRARY_PATH=/usr/lib/llvm-8/lib:$LD_LIBRARY_PATH"; python3 -m pip install --upgrade protobuf; python3 -m pip install --no-cache $TORCH_INSTALL
-      - build-py-cxx11-abi:
+      - build-py-cxx11-abi-without-fx:
           platform: "sbsa"
           release: true
       - run:
