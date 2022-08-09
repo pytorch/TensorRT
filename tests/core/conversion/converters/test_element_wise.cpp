@@ -11,7 +11,10 @@ void pointwise_test_helper(
     bool dynamicInput = false,
     std::vector<int64_t> shape1 = {5},
     std::vector<int64_t> shape2 = {5},
-    bool negative_input = false) {
+    bool negative_input = false,
+    bool int_tensors = false,
+    bool float_int_tensors = false,
+    bool int_float_tensors = false) {
   auto g = std::make_shared<torch::jit::Graph>();
   torch::jit::parseIR(graph_ir, g.get());
 
@@ -26,6 +29,25 @@ void pointwise_test_helper(
   if (!singleInput) {
     torch_inputs.push_back(at::randint(1, 5, shape2, {at::kCUDA}));
   }
+
+  TORCHTRT_CHECK(
+      !((int_tensors && (float_int_tensors || int_float_tensors)) || (float_int_tensors && int_float_tensors)),
+      "Invalid test configuration, only one of int_tensors, float_int_tensors, int_float_tensors can be true");
+
+  if (int_tensors) {
+    for (size_t i = 0UL; i < torch_inputs.size(); ++i) {
+      torch_inputs[i] = torch_inputs[i].to(at::kInt);
+    }
+  } else if (float_int_tensors) {
+    TORCHTRT_CHECK(!singleInput, "float_int_tensors tests require two inputs");
+    torch_inputs[0] = torch_inputs[0].to(at::kFloat);
+    torch_inputs[1] = torch_inputs[1].to(at::kInt);
+  } else if (int_float_tensors) {
+    TORCHTRT_CHECK(!singleInput, "int_float_tensors tests require two inputs");
+    torch_inputs[0] = torch_inputs[0].to(at::kInt);
+    torch_inputs[1] = torch_inputs[1].to(at::kFloat);
+  }
+
   auto params = torch_tensorrt::core::ir::get_static_params(g->inputs(), {});
   auto jit_results = torch_tensorrt::tests::util::RunGraph(g, params, torch_inputs);
 
@@ -56,6 +78,8 @@ TEST(Converters, ATenAddConvertsCorrectly) {
   pointwise_test_helper(graph, false, false, {4}, {3, 4});
   pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3});
   pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3});
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, true);
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, false, true);
 }
 
 TEST(Converters, ATenAddWithAlphaConvertsCorrectly) {
@@ -69,9 +93,11 @@ TEST(Converters, ATenAddWithAlphaConvertsCorrectly) {
   pointwise_test_helper(graph, false, false, {4}, {3, 4});
   pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3});
   pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3});
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, true);
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, false, true);
 }
 
-TEST(Converters, ATenAddImplicitWithAlphaConvertsCorrectly) {
+TEST(Converters, ATenAddInplaceWithAlphaConvertsCorrectly) {
   const auto graph = R"IR(
       graph(%0 : Tensor, %1 : Tensor):
         %2 : float = prim::Constant[value=7.6]()
@@ -103,6 +129,8 @@ TEST(Converters, ATenSubConvertsCorrectly) {
   pointwise_test_helper(graph, false, false, {4}, {3, 4});
   pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3});
   pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3});
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, true);
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, false, true);
 }
 
 TEST(Converters, ATenMulConvertsCorrectly) {
@@ -115,6 +143,8 @@ TEST(Converters, ATenMulConvertsCorrectly) {
   pointwise_test_helper(graph, false, false, {4}, {3, 4});
   pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3});
   pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3});
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, true);
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, false, true);
 }
 
 TEST(Converters, ATenMulWithScalarConvertsCorrectly) {
@@ -124,6 +154,15 @@ TEST(Converters, ATenMulWithScalarConvertsCorrectly) {
         %1 : Tensor = aten::mul(%0, %scalar)
         return (%1))IR";
   pointwise_test_helper(graph, true);
+}
+
+TEST(Converters, ATenMulWithIntScalarConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor):
+        %scalar : int = prim::Constant[value=2]()
+        %1 : Tensor = aten::mul(%0, %scalar)
+        return (%1))IR";
+  pointwise_test_helper(graph, true, false, {5}, {5}, false, true);
 }
 
 TEST(Converters, ATenDivConvertsCorrectly) {
@@ -136,6 +175,8 @@ TEST(Converters, ATenDivConvertsCorrectly) {
   pointwise_test_helper(graph, false, false, {4}, {3, 4});
   pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3});
   pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3});
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, true);
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, false, true);
 }
 
 TEST(Converters, ATenDivWithScalarConvertsCorrectly) {
@@ -158,6 +199,8 @@ TEST(Converters, ATenDivRoundingFloorConvertsCorrectly) {
   pointwise_test_helper(graph, false, false, {4}, {3, 4}, true);
   pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3}, true);
   pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3}, true);
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, true);
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, false, true);
 }
 
 TEST(Converters, ATenDivRoundingTruncConvertsCorrectly) {
@@ -171,6 +214,8 @@ TEST(Converters, ATenDivRoundingTruncConvertsCorrectly) {
   pointwise_test_helper(graph, false, false, {4}, {3, 4}, true);
   pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3}, true);
   pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3}, true);
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, true);
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, false, true);
 }
 
 TEST(Converters, ATenDivRoundingNoneConvertsCorrectly) {
@@ -196,6 +241,8 @@ TEST(Converters, ATenPowTensorConvertsCorrectly) {
   pointwise_test_helper(graph, false, false, {4}, {3, 4});
   pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3});
   pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3});
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, true);
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, false, true);
 }
 
 TEST(Converters, ATenPowScalarConvertsCorrectly) {
@@ -236,6 +283,8 @@ TEST(Converters, ATenFloorDivideConvertsCorrectly) {
   pointwise_test_helper(graph, false, false, {4}, {3, 4});
   pointwise_test_helper(graph, false, true, {3, 4, 3}, {4, 3});
   pointwise_test_helper(graph, false, true, {4, 3}, {3, 4, 3});
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, true);
+  pointwise_test_helper(graph, false, true, {5}, {5}, false, false, false, true);
 }
 
 TEST(Converters, ATenFloorDivideWithScalarConvertsCorrectly) {

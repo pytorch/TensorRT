@@ -1,6 +1,6 @@
 set(sub_lib_name "converters")
 
-target_sources(${lib_name} 
+target_sources(${lib_name}
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/NodeConverterRegistry.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/converter_util.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/Weights.cpp"
@@ -18,8 +18,8 @@ target_sources(${lib_name}
             "${CMAKE_CURRENT_SOURCE_DIR}/impl/layer_norm.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/impl/linear.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/impl/lstm_cell.cpp"
-            "${CMAKE_CURRENT_SOURCE_DIR}/impl/matrix_multiply.cpp" 
-            "${CMAKE_CURRENT_SOURCE_DIR}/impl/max.cpp" 
+            "${CMAKE_CURRENT_SOURCE_DIR}/impl/matrix_multiply.cpp"
+            "${CMAKE_CURRENT_SOURCE_DIR}/impl/max.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/impl/normalize.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/impl/pooling.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/impl/quantization.cpp"
@@ -36,7 +36,7 @@ target_sources(${lib_name}
             "${CMAKE_CURRENT_SOURCE_DIR}/impl/unsqueeze.cpp"
 )
 
-set(HEADER_FILES 
+set(HEADER_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/Weights.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/converters.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/converter_util.h"

@@ -5,8 +5,7 @@ import torch
 
 
 def dump_build_info():
-    """Prints build information about the torch_tensorrt distribution to stdout
-    """
+    """Prints build information about the torch_tensorrt distribution to stdout"""
     print(get_build_info())
 
 
@@ -17,9 +16,15 @@ def get_build_info() -> str:
         str: String containing the build information for torch_tensorrt distribution
     """
     build_info = _C.get_build_info()
-    build_info = "Torch-TensorRT Version: " + str(__version__) + '\n' \
-        + "Using PyTorch Version: " + str(torch.__version__) + '\n' \
+    build_info = (
+        "Torch-TensorRT Version: "
+        + str(__version__)
+        + "\n"
+        + "Using PyTorch Version: "
+        + str(torch.__version__)
+        + "\n"
         + build_info
+    )
     return build_info
 
 

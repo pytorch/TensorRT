@@ -15,9 +15,6 @@ import pandas as pd
 # Importing supported Backends
 import torch
 import torch_tensorrt as torchtrt
-# import torch_tensorrt.fx.tracer.acc_tracer.acc_tracer as acc_tracer
-# from torch_tensorrt.fx import InputTensorSpec, TRTInterpreter
-# from torch_tensorrt.fx import TRTModule
 from torch_tensorrt.fx.lower import lower_to_trt
 from torch_tensorrt.fx.utils import LowerPrecision
 

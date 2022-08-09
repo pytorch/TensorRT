@@ -5,8 +5,8 @@ import torchvision.models as models
 import copy
 from typing import Dict
 
-class TestLoggingAPIs(unittest.TestCase):
 
+class TestLoggingAPIs(unittest.TestCase):
     def test_logging_prefix(self):
         new_prefix = "Python API Test: "
         torchtrt.logging.set_logging_prefix(new_prefix)
@@ -67,6 +67,7 @@ class TestLoggingAPIs(unittest.TestCase):
 
         lvl = torchtrt.logging.get_reportable_log_level()
         self.assertEqual(base_lvl, lvl)
+
 
 if __name__ == "__main__":
     unittest.main()

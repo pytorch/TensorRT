@@ -3,18 +3,17 @@ import sys
 import glob
 import subprocess
 import utils
-
-VALID_CPP_FILE_TYPES = [".cpp", ".cc", ".c", ".cu", ".hpp", ".h", ".cuh"]
+import clang_format
 
 
 def lint(target_files, color=True):
     failure = False
     for f in target_files:
         with open("/tmp/changes.txt", "w") as changes:
-            subprocess.run(['clang-format', f], stdout=changes)
+            subprocess.run([clang_format._get_executable("clang-format"), f], stdout=changes)
         args = ["git", "diff", "-u", "--exit-code"]
         if color:
-            args += ['--color']
+            args += ["--color"]
         args += [f, "/tmp/changes.txt"]
         output = subprocess.run(args)
         if output.returncode != 0:
@@ -31,15 +30,15 @@ if __name__ == "__main__":
 
     projects = utils.CHECK_PROJECTS(sys.argv[1:])
     if "//..." in projects:
-        projects = [p.replace(BAZEL_ROOT, "/")[:-1] for p in glob.glob(BAZEL_ROOT + '/*/')]
+        projects = [p.replace(BAZEL_ROOT, "/")[:-1] for p in glob.glob(BAZEL_ROOT + "/*/")]
         projects = [p for p in projects if p not in utils.BLACKLISTED_BAZEL_TARGETS]
 
     failure = False
     for p in projects:
         if p.endswith("/..."):
             p = p[:-4]
-        path = BAZEL_ROOT + '/' + p[2:]
-        files = utils.glob_files(path, VALID_CPP_FILE_TYPES)
+        path = BAZEL_ROOT + "/" + p[2:]
+        files = utils.glob_files(path, utils.VALID_CPP_FILE_TYPES)
         if files != []:
             if lint(files, color):
                 failure = True

@@ -4,12 +4,11 @@ import glob
 import subprocess
 import utils
 import pwd
-
-VALID_CPP_FILE_TYPES = [".cpp", ".cc", ".c", ".cu", ".hpp", ".h", ".cuh"]
+import clang_format
 
 
 def lint(user, target_files, change_file=True):
-    cmd = ['clang-format']
+    cmd = [clang_format._get_executable("clang-format")]
     if change_file:
         cmd.append("-i")
         print(
@@ -19,7 +18,7 @@ def lint(user, target_files, change_file=True):
         cmd.append(f)
         subprocess.run(cmd)
         subprocess.run(["chown", user + ":" + user, f])
-        subprocess.run(["chmod", "u+rw,g+rw", f])
+        subprocess.run(["chmod", "644", f])
 
 
 if __name__ == "__main__":
@@ -27,13 +26,13 @@ if __name__ == "__main__":
     USER = pwd.getpwuid(os.getuid())[0]
     projects = utils.CHECK_PROJECTS(sys.argv[1:])
     if "//..." in projects:
-        projects = [p.replace(BAZEL_ROOT, "/")[:-1] for p in glob.glob(BAZEL_ROOT + '/*/')]
+        projects = [p.replace(BAZEL_ROOT, "/")[:-1] for p in glob.glob(BAZEL_ROOT + "/*/")]
         projects = [p for p in projects if p not in utils.BLACKLISTED_BAZEL_TARGETS]
 
     for p in projects:
         if p.endswith("/..."):
             p = p[:-4]
-        path = BAZEL_ROOT + '/' + p[2:]
-        files = utils.glob_files(path, VALID_CPP_FILE_TYPES)
+        path = BAZEL_ROOT + "/" + p[2:]
+        files = utils.glob_files(path, utils.VALID_CPP_FILE_TYPES)
         if files != []:
             lint(USER, files)

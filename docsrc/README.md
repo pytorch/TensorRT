@@ -29,5 +29,3 @@ the new version documentation in the dropdown.
 `make clean` will only delete the master documentation, not any of the version documentation
 
 To clean version documentation use `make clean VERSION=v0.0.1`
-
-

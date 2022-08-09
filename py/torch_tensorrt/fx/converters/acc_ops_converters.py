@@ -22,7 +22,6 @@ from ..utils import get_dynamic_dims, torch_dtype_from_trt, torch_dtype_to_trt
 
 from .converter_utils import *  # noqa: F403
 
-
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
@@ -36,10 +35,7 @@ def acc_ops_conv1d(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"Conv received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"Conv received input {input_val} that is not part " "of the TensorRT region!")
 
     # Process 1d input with unsqueeze -> conv2d -> squeeze to calculated conv1d
     unsqueeze_layer = network.add_shuffle(input=input_val)
@@ -54,9 +50,7 @@ def acc_ops_conv1d(
     # and bias being ITensor is not supported in TensorRT api
     # right now
     if kwargs["bias"] is not None and not isinstance(kwargs["bias"], torch.Tensor):
-        raise RuntimeError(
-            f"linear {name} has bias of type {type(kwargs['bias'])}, Expect Optional[Tenosr]"
-        )
+        raise RuntimeError(f"linear {name} has bias of type {type(kwargs['bias'])}, Expect Optional[Tenosr]")
     bias = to_numpy(kwargs["bias"])  # type: ignore[arg-type]
     if bias is not None:
         bias = bias[None]
@@ -84,9 +78,7 @@ def acc_ops_conv1d(
         layer.set_input(1, weight)
     else:
         if not isinstance(kwargs["weight"], torch.Tensor):
-            raise RuntimeError(
-                f"linear {name} has weight of type {type(kwargs['weight'])}, Expect Optional[Tenosr]"
-            )
+            raise RuntimeError(f"linear {name} has weight of type {type(kwargs['weight'])}, Expect Optional[Tenosr]")
         weight = to_numpy(weight)
         weight = np.expand_dims(weight, -1)
         layer = network.add_convolution_nd(
@@ -128,10 +120,7 @@ def acc_ops_convnd(
     input_val = kwargs["input"]
 
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"Conv received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"Conv received input {input_val} that is not part " "of the TensorRT region!")
 
     if has_dynamic_shape(input_val.shape):
         assert input_val.shape[1] != -1, "Channel dim can't be dynamic for convolution."
@@ -140,9 +129,7 @@ def acc_ops_convnd(
     # and bias being ITensor is not supported in TensorRT api
     # right now
     if kwargs["bias"] is not None and not isinstance(kwargs["bias"], torch.Tensor):
-        raise RuntimeError(
-            f"linear {name} has bias of type {type(kwargs['bias'])}, Expect Optional[Tenosr]"
-        )
+        raise RuntimeError(f"linear {name} has bias of type {type(kwargs['bias'])}, Expect Optional[Tenosr]")
     bias = to_numpy(kwargs["bias"])  # type: ignore[arg-type]
 
     if network.has_explicit_precision:
@@ -162,9 +149,7 @@ def acc_ops_convnd(
         layer.set_input(1, weight)
     else:
         if not isinstance(kwargs["weight"], torch.Tensor):
-            raise RuntimeError(
-                f"linear {name} has weight of type {type(kwargs['weight'])}, Expect Optional[Tenosr]"
-            )
+            raise RuntimeError(f"linear {name} has weight of type {type(kwargs['weight'])}, Expect Optional[Tenosr]")
         weight = to_numpy(kwargs["weight"])
         layer = network.add_convolution_nd(
             input=input_val,
@@ -196,23 +181,16 @@ def acc_ops_conv_transposend(
     input_val = kwargs["input"]
 
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"Transpose conv received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"Transpose conv received input {input_val} that is not part " "of the TensorRT region!")
 
     if has_dynamic_shape(input_val.shape):
-        assert (
-            input_val.shape[1] != -1
-        ), "Channel dim can't be dynamic for transpose convolution."
+        assert input_val.shape[1] != -1, "Channel dim can't be dynamic for transpose convolution."
 
     # for now we'll assume bias is constant Tensor or None,
     # and bias being ITensor is not supported in TensorRT api
     # right now
     if kwargs["bias"] is not None and not isinstance(kwargs["bias"], torch.Tensor):
-        raise RuntimeError(
-            f"ConvTranspose {name} has bias of type {type(kwargs['bias'])}, Expect Optional[Tensor]"
-        )
+        raise RuntimeError(f"ConvTranspose {name} has bias of type {type(kwargs['bias'])}, Expect Optional[Tensor]")
     bias = to_numpy(kwargs["bias"])  # type: ignore[arg-type]
 
     if network.has_explicit_precision:
@@ -234,9 +212,7 @@ def acc_ops_conv_transposend(
         layer.set_input(1, weight)
     else:
         if not isinstance(kwargs["weight"], torch.Tensor):
-            raise RuntimeError(
-                f"conv {name} has weight of type {type(kwargs['weight'])}, Expect Optional[Tensor]"
-            )
+            raise RuntimeError(f"conv {name} has weight of type {type(kwargs['weight'])}, Expect Optional[Tensor]")
         weight = to_numpy(kwargs["weight"])
         # nn.ConvTranspose2d/3d weight size is (in_channels, out_channels/groups, kernel_0, kernel_1, [kernel_2])
         layer = network.add_deconvolution_nd(
@@ -272,25 +248,16 @@ def acc_ops_pad_with_padding_layer(
     rank = len(input_val.shape)  # type: ignore[union-attr]
 
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"pad received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"pad received input {input_val} that is not part " "of the TensorRT region!")
 
     if mode != "constant":
-        raise RuntimeError(
-            f"Currently we only support constant mode for pad, got {mode}."
-        )
+        raise RuntimeError(f"Currently we only support constant mode for pad, got {mode}.")
 
     if len(pad) / 2 > rank:
-        raise RuntimeError(
-            f"Trying to pad last {len(pad) / 2} dimension but the input only has {rank} dimension."
-        )
+        raise RuntimeError(f"Trying to pad last {len(pad) / 2} dimension but the input only has {rank} dimension.")
 
     if value != 0:
-        raise RuntimeError(
-            f"Currently we only support padding value of 0, got {value}."
-        )
+        raise RuntimeError(f"Currently we only support padding value of 0, got {value}.")
 
     if len(pad) > 4:
         raise RuntimeError("Currently we only support padding last two dimensions.")
@@ -322,34 +289,24 @@ def acc_ops_pad_with_slice_layer(
     rank = len(input_val.shape)  # type: ignore[union-attr]
 
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"pad received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"pad received input {input_val} that is not part " "of the TensorRT region!")
 
     if mode != "constant":
-        raise RuntimeError(
-            f"Currently we only support constant mode for pad, got {mode}."
-        )
+        raise RuntimeError(f"Currently we only support constant mode for pad, got {mode}.")
 
     if len(pad) / 2 > rank:
-        raise RuntimeError(
-            f"Trying to pad last {len(pad) / 2} dimension but the input only has {rank} dimension."
-        )
+        raise RuntimeError(f"Trying to pad last {len(pad) / 2} dimension but the input only has {rank} dimension.")
 
     # cast value to TRTensor
     dt = torch_dtype_from_trt(input_val.dtype)
     value = 0 if value == None else value
-    value_const = get_trt_tensor(
-        network, torch.tensor([value], dtype=dt), f"{name}_value"
-    )
+    value_const = get_trt_tensor(network, torch.tensor([value], dtype=dt), f"{name}_value")
 
     input_shape = input_val.shape
     pre_start = tuple(i - 1 for i in input_shape)
     prefix_len = len(input_shape) - len(pad) // 2
     pre_shape = tuple(
-        input_shape[i] + (pad[-(i - prefix_len) * 2 - 2] if i >= prefix_len else 0)
-        for i in range(0, len(input_shape))
+        input_shape[i] + (pad[-(i - prefix_len) * 2 - 2] if i >= prefix_len else 0) for i in range(0, len(input_shape))
     )
     pre_stride = [-1] * len(input_shape)
 
@@ -376,8 +333,7 @@ def acc_ops_pad_with_slice_layer(
     shape = transpose_output.shape
     post_start = tuple([0] * len(shape))
     post_shape = tuple(
-        shape[i] + (pad[-(i - prefix_len) * 2 - 1] if i >= prefix_len else 0)
-        for i in range(0, len(shape))
+        shape[i] + (pad[-(i - prefix_len) * 2 - 1] if i >= prefix_len else 0) for i in range(0, len(shape))
     )
     post_stride = tuple([1] * len(shape))
 
@@ -399,18 +355,11 @@ def acc_ops_flatten(
     input_val = kwargs["input"]
 
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"flatten received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"flatten received input {input_val} that is not part " "of the TensorRT region!")
 
     num_dims = len(input_val.shape) + (1 if network.has_implicit_batch_dimension else 0)
-    start_dim = get_positive_dim(
-        cast(int, kwargs["start_dim"] if "start_dim" in kwargs else 0), num_dims
-    )
-    end_dim = get_positive_dim(
-        cast(int, kwargs["end_dim"] if "end_dim" in kwargs else -1), num_dims
-    )
+    start_dim = get_positive_dim(cast(int, kwargs["start_dim"] if "start_dim" in kwargs else 0), num_dims)
+    end_dim = get_positive_dim(cast(int, kwargs["end_dim"] if "end_dim" in kwargs else -1), num_dims)
 
     if network.has_implicit_batch_dimension:
         assert start_dim != 0, "Can't flatten batch dimension when it's implicit."
@@ -513,20 +462,14 @@ def acc_ops_size(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_t = kwargs["input"]
     if type(input_t) == torch.nn.Parameter or type(input_t) == torch.Tensor:
-        if (
-            not has_dynamic_shape(input_t.shape)
-            and network.has_implicit_batch_dimension
-        ):
+        if not has_dynamic_shape(input_t.shape) and network.has_implicit_batch_dimension:
             return torch.Size((IMPLICIT_BATCH_DIM,) + tuple(input_t.shape))
         return input_t.shape
 
     # input_val = get_trt_tensor(network, input_t, f"{name}_input_t")
     input_val = input_t
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"size received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"size received input {input_val} that is not part " "of the TensorRT region!")
 
     if not has_dynamic_shape(input_val.shape):
         if network.has_implicit_batch_dimension:
@@ -549,10 +492,7 @@ def acc_ops_numel(
     input_val = kwargs["input"]
 
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"size received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"size received input {input_val} that is not part " "of the TensorRT region!")
 
     if has_dynamic_shape(input_val.shape):
         raise RuntimeError(f"numel does not support dynamic shapes.")
@@ -574,25 +514,16 @@ def acc_ops_batch_norm(
     input_val = kwargs["input"]
 
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"BatchNorm2d received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"BatchNorm2d received input {input_val} that is not part " "of the TensorRT region!")
 
     if has_dynamic_shape(input_val.shape):
         assert input_val.shape[1] != -1, "Channel dim can't be dynamic for batch norm."
 
-    scale = cast(
-        torch.Tensor, to_numpy(cast(torch.Tensor, kwargs["weight"]))
-    ) / np.sqrt(
-        cast(torch.Tensor, to_numpy(cast(torch.Tensor, kwargs["running_var"])))
-        + cast(float, kwargs["eps"])
+    scale = cast(torch.Tensor, to_numpy(cast(torch.Tensor, kwargs["weight"]))) / np.sqrt(
+        cast(torch.Tensor, to_numpy(cast(torch.Tensor, kwargs["running_var"]))) + cast(float, kwargs["eps"])
     )
 
-    bias = (
-        to_numpy(cast(torch.Tensor, kwargs["bias"]))
-        - to_numpy(cast(torch.Tensor, kwargs["running_mean"])) * scale
-    )
+    bias = to_numpy(cast(torch.Tensor, kwargs["bias"])) - to_numpy(cast(torch.Tensor, kwargs["running_mean"])) * scale
     power = np.ones_like(scale)
 
     # For BatchNorm1d, reshape 1d to 2d
@@ -630,30 +561,21 @@ def acc_ops_layer_norm(network, target, args, kwargs, name):
     input_val = kwargs["input"]
 
     if not isinstance(input_val, trt.tensorrt.ITensor):
-        raise RuntimeError(
-            f"LayerNorm received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"LayerNorm received input {input_val} that is not part " "of the TensorRT region!")
 
     gamma = kwargs["weight"].detach().cpu().float().numpy()
     gamma_field = trt.PluginField("gamma", gamma, trt.PluginFieldType.FLOAT32)
     beta = kwargs["bias"].detach().cpu().float().numpy()
     beta_field = trt.PluginField("beta", beta, trt.PluginFieldType.FLOAT32)
-    eps_field = trt.PluginField(
-        "eps", np.array([kwargs["eps"]], dtype=np.float32), trt.PluginFieldType.FLOAT32
-    )
+    eps_field = trt.PluginField("eps", np.array([kwargs["eps"]], dtype=np.float32), trt.PluginFieldType.FLOAT32)
     try:
         normalized_shape = np.array(kwargs["normalized_shape"], dtype=np.int32)
     except TypeError:
         _LOGGER.error("Unable to convert normalized_shape to a field, fall back to []")
         normalized_shape = np.array([], dtype=np.int32)
 
-    normalized_shape_filed = trt.PluginField(
-        "normalized_shape", normalized_shape, trt.PluginFieldType.INT32
-    )
-    field_collection = trt.PluginFieldCollection(
-        [gamma_field, beta_field, eps_field, normalized_shape_filed]
-    )
+    normalized_shape_filed = trt.PluginField("normalized_shape", normalized_shape, trt.PluginFieldType.INT32)
+    field_collection = trt.PluginFieldCollection([gamma_field, beta_field, eps_field, normalized_shape_filed])
 
     try:
         if network.has_implicit_batch_dimension:
@@ -661,9 +583,7 @@ def acc_ops_layer_norm(network, target, args, kwargs, name):
         else:
             plugin = get_trt_plugin("LayerNormDynamic", field_collection, "1", "fx2trt")
     except AssertionError:
-        _LOGGER.error(
-            "Unable to find layer norm plugin, fall back to TensorRT implementation."
-        )
+        _LOGGER.error("Unable to find layer norm plugin, fall back to TensorRT implementation.")
         return layer_norm(network, target, args, kwargs, name)
     layer = network.add_plugin_v2([input_val], plugin)
     layer.name = name
@@ -680,10 +600,7 @@ def layer_norm(
     input_val = kwargs["input"]
 
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"LayerNorm received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"LayerNorm received input {input_val} that is not part " "of the TensorRT region!")
 
     shape = kwargs["weight"].shape  # type: ignore[union-attr]
     broadcasted_shape = (1,) * (len(input_val.shape) - len(shape)) + shape
@@ -696,9 +613,7 @@ def layer_norm(
         axes |= 1 << (len(input_val.shape) - d - 1)
 
     # E[x]
-    mean_expected_layer = network.add_reduce(
-        input_val, trt.ReduceOperation.AVG, axes, keep_dims=True
-    )
+    mean_expected_layer = network.add_reduce(input_val, trt.ReduceOperation.AVG, axes, keep_dims=True)
     set_layer_name(mean_expected_layer, target, f"{name}_mean_expected")
 
     # X-E[x]
@@ -724,9 +639,7 @@ def layer_norm(
         target,
         f"{name}_pow_var",
     )
-    mean_trt_layer = network.add_reduce(
-        pow_var, trt.ReduceOperation.AVG, axes, keep_dims=True
-    )
+    mean_trt_layer = network.add_reduce(pow_var, trt.ReduceOperation.AVG, axes, keep_dims=True)
     set_layer_name(mean_trt_layer, target, f"{name}_mean")
     # Variance + eps
     eps_tensor = network.add_constant(
@@ -743,9 +656,7 @@ def layer_norm(
         f"{name}_add",
     )
     # SQRT((Var + eps))
-    sqrt_trt = add_unary_layer(
-        network, add_trt, trt.UnaryOperation.SQRT, target, f"{name}_sqrt"
-    )
+    sqrt_trt = add_unary_layer(network, add_trt, trt.UnaryOperation.SQRT, target, f"{name}_sqrt")
     # (x - E[x]) / sqrt((var + eps))
     div_trt = add_binary_elementwise_layer(
         network,
@@ -757,10 +668,14 @@ def layer_norm(
     )
 
     assert gamma is not None
-    gamma_tensor = network.add_constant(gamma.shape, trt.Weights(np.ascontiguousarray(gamma)))  # type: ignore[attr-defined]
+    gamma_tensor = network.add_constant(
+        gamma.shape, trt.Weights(np.ascontiguousarray(gamma))
+    )  # type: ignore[attr-defined]
     gamma_tensor.name = f"{name}_gamma"
     assert beta is not None
-    beta_tensor = network.add_constant(gamma.shape, trt.Weights(np.ascontiguousarray(beta)))  # type: ignore[attr-defined]
+    beta_tensor = network.add_constant(
+        gamma.shape, trt.Weights(np.ascontiguousarray(beta))
+    )  # type: ignore[attr-defined]
     beta_tensor.name = f"{name}_beta"
     # y * gamma + beta
     scale_layer = add_binary_elementwise_layer(
@@ -793,10 +708,7 @@ def acc_ops_softmax(
     input_ranks = len(input_val.shape) + (1 if network.has_implicit_batch_dimension else 0)  # type: ignore[union-attr]
 
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"softmax received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"softmax received input {input_val} that is not part " "of the TensorRT region!")
 
     # Used to get dim when dim is None. Copied from PyTorch softmax implementation.
     def get_softmax_dim(ndim: int) -> int:
@@ -834,9 +746,7 @@ def acc_ops_tile(
     input_val = get_trt_tensor(network, input_t, f"{name}_input")
 
     dims = tuple(cast(Sequence[int], kwargs["dims"]))
-    n_input_dims = len(input_val.shape) + (
-        1 if network.has_implicit_batch_dimension else 0
-    )
+    n_input_dims = len(input_val.shape) + (1 if network.has_implicit_batch_dimension else 0)
 
     if len(dims) > n_input_dims:
         assert not network.has_implicit_batch_dimension
@@ -851,16 +761,12 @@ def acc_ops_tile(
                 (num_preceding_ones,),
                 np.ascontiguousarray([1] * num_preceding_ones, np.int32),
             ).get_output(0)
-            reshape_layer = network.add_concatenation(
-                [preceding_ones, input_shape_layer.get_output(0)]
-            )
+            reshape_layer = network.add_concatenation([preceding_ones, input_shape_layer.get_output(0)])
             reshape_layer.axis = 0
             reshape_layer.name = f"{name}_reshape_dims"
             layer.set_input(1, reshape_layer.get_output(0))
         else:
-            layer.reshape_dims = (1,) * (len(dims) - n_input_dims) + tuple(
-                input_val.shape
-            )
+            layer.reshape_dims = (1,) * (len(dims) - n_input_dims) + tuple(input_val.shape)
         input_val = layer.get_output(0)
     else:
         dims = (1,) * (n_input_dims - len(dims)) + dims
@@ -900,13 +806,11 @@ def acc_ops_tile(
     set_layer_name(layer, target, name)
 
     if has_dynamic_shape(input_val.shape):  # type: ignore[union-attr]
-        starts_tensor = network.add_constant(
-            (len(dims),), np.ascontiguousarray([0] * len(dims), np.int32)
-        ).get_output(0)
+        starts_tensor = network.add_constant((len(dims),), np.ascontiguousarray([0] * len(dims), np.int32)).get_output(
+            0
+        )
         if all(isinstance(d, int) for d in dims):
-            dims_tensor = network.add_constant(
-                (len(dims),), np.ascontiguousarray(dims, np.int32)
-            ).get_output(0)
+            dims_tensor = network.add_constant((len(dims),), np.ascontiguousarray(dims, np.int32)).get_output(0)
         else:
             assert all(isinstance(d, TRTTensor) for d in dims)
             concat_dims_layer = network.add_concatenation(inputs=dims)
@@ -971,9 +875,7 @@ def acc_ops_leaky_relu(
     input_val = kwargs["input"]
     negative_slope = kwargs["negative_slope"]
     operation_type = trt.ActivationType.LEAKY_RELU
-    return add_activation_layer(
-        network, input_val, operation_type, target, name, negative_slope
-    )
+    return add_activation_layer(network, input_val, operation_type, target, name, negative_slope)
 
 
 @tensorrt_converter(acc_ops.elu)
@@ -1245,9 +1147,7 @@ def acc_ops_sum(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> TRTTensor:
-    return add_reduce_layer(
-        network, target, args, kwargs, trt.ReduceOperation.SUM, name
-    )
+    return add_reduce_layer(network, target, args, kwargs, trt.ReduceOperation.SUM, name)
 
 
 @tensorrt_converter(acc_ops.prod)
@@ -1258,9 +1158,7 @@ def acc_ops_prod(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> TRTTensor:
-    return add_reduce_layer(
-        network, target, args, kwargs, trt.ReduceOperation.PROD, name
-    )
+    return add_reduce_layer(network, target, args, kwargs, trt.ReduceOperation.PROD, name)
 
 
 @tensorrt_converter(acc_ops.mean)
@@ -1271,21 +1169,14 @@ def acc_ops_mean(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> TRTTensor:
-    return add_reduce_layer(
-        network, target, args, kwargs, trt.ReduceOperation.AVG, name
-    )
+    return add_reduce_layer(network, target, args, kwargs, trt.ReduceOperation.AVG, name)
 
 
 def add_acc_ops_full_reduce(network, target, args, kwargs, name, reduce_op):
     input_val = kwargs["input"]
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"max received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
-    assert (
-        not network.has_implicit_batch_dimension
-    ), "Do not support max over all the elements for implicit batch."
+        raise RuntimeError(f"max received input {input_val} that is not part " "of the TensorRT region!")
+    assert not network.has_implicit_batch_dimension, "Do not support max over all the elements for implicit batch."
 
     dim = range(len(input_val.shape))
 
@@ -1309,9 +1200,7 @@ def add_acc_ops_dim_reduce(network, target, args, kwargs, name, reduce_op):
         new_kwargs["largest"] = False
     new_kwargs["sorted"] = False
 
-    topk_out0, topk_out1 = acc_ops_topk(
-        network, target, args, new_kwargs, name + "_topk"
-    )
+    topk_out0, topk_out1 = acc_ops_topk(network, target, args, new_kwargs, name + "_topk")
 
     topk_out0.name = f"{name}_topk0"
     topk_out1.name = f"{name}_topk1"
@@ -1321,9 +1210,7 @@ def add_acc_ops_dim_reduce(network, target, args, kwargs, name, reduce_op):
 
     dim = new_kwargs["dim"]
     if network.has_implicit_batch_dimension:
-        assert (
-            dim != 0
-        ), "can't reduce on dim == 0 when network has implicit batch dimension"
+        assert dim != 0, "can't reduce on dim == 0 when network has implicit batch dimension"
         # we remove the first dim in the shape tuple when it is implicit
         dim -= 1
     input_val = topk_out0
@@ -1357,9 +1244,7 @@ def acc_ops_max_full_reduce(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return add_acc_ops_full_reduce(
-        network, target, args, kwargs, name, trt.ReduceOperation.MAX
-    )
+    return add_acc_ops_full_reduce(network, target, args, kwargs, name, trt.ReduceOperation.MAX)
 
 
 @tensorrt_converter(acc_ops.min_full_reduce, no_implicit_batch_dim=True)
@@ -1370,9 +1255,7 @@ def acc_ops_min_full_reduce(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return add_acc_ops_full_reduce(
-        network, target, args, kwargs, name, trt.ReduceOperation.MIN
-    )
+    return add_acc_ops_full_reduce(network, target, args, kwargs, name, trt.ReduceOperation.MIN)
 
 
 @tensorrt_converter(acc_ops.max_dim_reduce)
@@ -1383,9 +1266,7 @@ def acc_ops_max_dim_reduce(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return add_acc_ops_dim_reduce(
-        network, target, args, kwargs, name, trt.ReduceOperation.MAX
-    )
+    return add_acc_ops_dim_reduce(network, target, args, kwargs, name, trt.ReduceOperation.MAX)
 
 
 @tensorrt_converter(acc_ops.min_dim_reduce)
@@ -1396,9 +1277,7 @@ def acc_ops_min_dim_reduce(
     kwargs: Dict[str, Argument],
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
-    return add_acc_ops_dim_reduce(
-        network, target, args, kwargs, name, trt.ReduceOperation.MIN
-    )
+    return add_acc_ops_dim_reduce(network, target, args, kwargs, name, trt.ReduceOperation.MIN)
 
 
 @tensorrt_converter(acc_ops.maximum)
@@ -1505,9 +1384,7 @@ def acc_ops_logical_and(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     if network.has_implicit_batch_dimension:
-        raise RuntimeError(
-            "The `logical_and` function should be called with explicit batch dimension."
-        )
+        raise RuntimeError("The `logical_and` function should be called with explicit batch dimension.")
 
     input_t = kwargs["input"]
     other_t = kwargs["other"]
@@ -1516,17 +1393,11 @@ def acc_ops_logical_and(
 
         def check_is_bool(input_t):
             if isinstance(input_t, TRTTensor):
-                assert (
-                    input_t.dtype == trt.bool
-                ), "We currently do not support input is non-bool"
+                assert input_t.dtype == trt.bool, "We currently do not support input is non-bool"
             elif isinstance(input_t, torch.Tensor):
-                assert (
-                    input_t.dtype == torch.bool
-                ), "We currently do not support input is non-bool"
+                assert input_t.dtype == torch.bool, "We currently do not support input is non-bool"
             else:
-                assert isinstance(
-                    input_t.bool
-                ), "We currently do not support input is non-bool"
+                assert isinstance(input_t.bool), "We currently do not support input is non-bool"
 
         check_is_bool(input_t)
         check_is_bool(other_t)
@@ -1538,9 +1409,7 @@ def acc_ops_logical_and(
         input_t = type_cast(network, target, f"{name}_input", input_t, trt.bool)
     if other_t.dtype != trt.bool:
         other_t = type_cast(network, target, f"{name}_other", other_t, trt.bool)
-    return add_binary_elementwise_layer(
-        network, input_t, other_t, trt.ElementWiseOperation.AND, target, name
-    )
+    return add_binary_elementwise_layer(network, input_t, other_t, trt.ElementWiseOperation.AND, target, name)
 
 
 @tensorrt_converter(acc_ops.ne, no_implicit_batch_dim=True)
@@ -1552,9 +1421,7 @@ def acc_ops_ne(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     if network.has_implicit_batch_dimension:
-        raise RuntimeError(
-            "The `ne` function should be called with explicit batch dimension."
-        )
+        raise RuntimeError("The `ne` function should be called with explicit batch dimension.")
 
     input_t = kwargs["input"]
     other_t = kwargs["other"]
@@ -1563,9 +1430,7 @@ def acc_ops_ne(
     other_t = get_trt_tensor(network, other_t, f"{name}_other_t")
 
     input_t, other_t = dtype_uniform(network, target, name, input_t, other_t)
-    eq_t = add_binary_elementwise_layer(
-        network, input_t, other_t, trt.ElementWiseOperation.EQUAL, target, name
-    )
+    eq_t = add_binary_elementwise_layer(network, input_t, other_t, trt.ElementWiseOperation.EQUAL, target, name)
 
     return add_unary_layer(network, eq_t, trt.UnaryOperation.NOT, target, name)
 
@@ -1579,9 +1444,7 @@ def acc_ops_eq(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     if network.has_implicit_batch_dimension:
-        raise RuntimeError(
-            "The `eq` function should be called with explicit batch dimension."
-        )
+        raise RuntimeError("The `eq` function should be called with explicit batch dimension.")
 
     input_t = kwargs["input"]
     other_t = kwargs["other"]
@@ -1590,9 +1453,7 @@ def acc_ops_eq(
     other_t = get_trt_tensor(network, other_t, f"{name}_other_t")
 
     input_t, other_t = dtype_uniform(network, target, name, input_t, other_t)
-    return add_binary_elementwise_layer(
-        network, input_t, other_t, trt.ElementWiseOperation.EQUAL, target, name
-    )
+    return add_binary_elementwise_layer(network, input_t, other_t, trt.ElementWiseOperation.EQUAL, target, name)
 
 
 @tensorrt_converter(acc_ops.gt, no_implicit_batch_dim=True)
@@ -1604,9 +1465,7 @@ def acc_ops_gt(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     if network.has_implicit_batch_dimension:
-        raise RuntimeError(
-            "The `gt` function should be called with explicit batch dimension."
-        )
+        raise RuntimeError("The `gt` function should be called with explicit batch dimension.")
 
     input_t = kwargs["input"]
     other_t = kwargs["other"]
@@ -1615,9 +1474,7 @@ def acc_ops_gt(
     other_t = get_trt_tensor(network, other_t, f"{name}_other_t")
 
     input_t, other_t = dtype_uniform(network, target, name, input_t, other_t)
-    return add_binary_elementwise_layer(
-        network, input_t, other_t, trt.ElementWiseOperation.GREATER, target, name
-    )
+    return add_binary_elementwise_layer(network, input_t, other_t, trt.ElementWiseOperation.GREATER, target, name)
 
 
 @tensorrt_converter(acc_ops.lt, no_implicit_batch_dim=True)
@@ -1629,9 +1486,7 @@ def acc_ops_lt(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     if network.has_implicit_batch_dimension:
-        raise RuntimeError(
-            "The `le` function should be called with explicit batch dimension."
-        )
+        raise RuntimeError("The `le` function should be called with explicit batch dimension.")
 
     input_t = kwargs["input"]
     other_t = kwargs["other"]
@@ -1640,9 +1495,7 @@ def acc_ops_lt(
     other_t = get_trt_tensor(network, other_t, f"{name}_other_t")
 
     input_t, other_t = dtype_uniform(network, target, name, input_t, other_t)
-    return add_binary_elementwise_layer(
-        network, input_t, other_t, trt.ElementWiseOperation.LESS, target, name
-    )
+    return add_binary_elementwise_layer(network, input_t, other_t, trt.ElementWiseOperation.LESS, target, name)
 
 
 @tensorrt_converter(acc_ops.logical_or, no_implicit_batch_dim=True)
@@ -1654,9 +1507,7 @@ def acc_ops_logical_or(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     if network.has_implicit_batch_dimension:
-        raise RuntimeError(
-            "The `logical_or` function should be called with explicit batch dimension."
-        )
+        raise RuntimeError("The `logical_or` function should be called with explicit batch dimension.")
 
     input_t = kwargs["input"]
     other_t = kwargs["other"]
@@ -1677,9 +1528,7 @@ def acc_ops_logical_or(
         set_layer_name(layer_o, target, f"{name}_other_dtype_change")
         other_t = layer_o.get_output(0)
 
-    return add_binary_elementwise_layer(
-        network, input_t, other_t, trt.ElementWiseOperation.OR, target, name
-    )
+    return add_binary_elementwise_layer(network, input_t, other_t, trt.ElementWiseOperation.OR, target, name)
 
 
 @tensorrt_converter(acc_ops.logical_xor, no_implicit_batch_dim=True)
@@ -1691,9 +1540,7 @@ def acc_ops_logical_xor(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     if network.has_implicit_batch_dimension:
-        raise RuntimeError(
-            "The `logical_xor` function should be called with explicit batch dimension."
-        )
+        raise RuntimeError("The `logical_xor` function should be called with explicit batch dimension.")
 
     input_t = kwargs["input"]
     other_t = kwargs["other"]
@@ -1714,9 +1561,7 @@ def acc_ops_logical_xor(
         set_layer_name(layer_o, target, f"{name}_other_dtype_change")
         other_t = layer_o.get_output(0)
 
-    return add_binary_elementwise_layer(
-        network, input_t, other_t, trt.ElementWiseOperation.XOR, target, name
-    )
+    return add_binary_elementwise_layer(network, input_t, other_t, trt.ElementWiseOperation.XOR, target, name)
 
 
 # T113156424 Have some accuracy problems in hf_T5.
@@ -1766,22 +1611,15 @@ def acc_ops_any(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_t = kwargs["input"]
     if not isinstance(input_t, TRTTensor):
-        raise RuntimeError(
-            f"isinf received input {input_t} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"isinf received input {input_t} that is not part " "of the TensorRT region!")
 
     if input_t.dtype in (trt.float32, trt.float16, trt.int32):
-        comp_t = torch.zeros(tuple([*input_t.shape])).to(
-            torch_dtype_from_trt(input_t.dtype)
-        )
+        comp_t = torch.zeros(tuple([*input_t.shape])).to(torch_dtype_from_trt(input_t.dtype))
         comp_t = get_trt_tensor(network, comp_t, f"{name}_comp_t")
         kwargs_new = {"input": input_t, "other": comp_t}
         eq_output = acc_ops_eq(network, target, None, kwargs_new, name + "_eq")
         kwargs_new = {"input": eq_output}
-        not_output = acc_ops_logical_not(
-            network, target, None, kwargs_new, name + "_not"
-        )
+        not_output = acc_ops_logical_not(network, target, None, kwargs_new, name + "_not")
     else:
         not_output = input_t
     # cast bool result to int
@@ -1811,9 +1649,7 @@ def acc_ops_fmod(
     name: str,
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     # NOTE: TRT doesnt currently implement fmod so we need multiple operations to perform it
-    trunc_div_value = trunc_div(
-        kwargs["input"], kwargs["other"], network, target, name + "_trunc_div"
-    )
+    trunc_div_value = trunc_div(kwargs["input"], kwargs["other"], network, target, name + "_trunc_div")
     prod_value = add_binary_elementwise_layer(
         network,
         trunc_div_value,
@@ -1909,10 +1745,7 @@ def acc_ops_max_pool1d(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_trt = kwargs["input"]
     if not isinstance(input_trt, TRTTensor):
-        raise RuntimeError(
-            f"Max_pool1d received input {input_trt} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"Max_pool1d received input {input_trt} that is not part " "of the TensorRT region!")
 
     # adds unsqueeze layer -> max pool 2d -> squeeze layer to emulate max pool 1d.
     unsqueeze_layer = network.add_shuffle(input=input_trt)
@@ -1931,21 +1764,12 @@ def acc_ops_max_pool1d(
     if len(stride) == 0 or stride[0] == None:
         stride = kernel_size
 
-    if any(
-        [
-            not isinstance(param, int)
-            for param in [kernel_size[0], stride[0], padding[0], dilation[0]]
-        ]
-    ):
-        raise RuntimeError(
-            f"Parameters kernel_size, stride, padding, and dilation should be of type int."
-        )
+    if any([not isinstance(param, int) for param in [kernel_size[0], stride[0], padding[0], dilation[0]]]):
+        raise RuntimeError(f"Parameters kernel_size, stride, padding, and dilation should be of type int.")
     if dilation[0] != 1:
         raise RuntimeError(f"Only support dilation=1 for maxpool, but got {dilation}")
 
-    max_pooling_layer = network.add_pooling(
-        input=input_trt, type=trt.PoolingType.MAX, window_size=(kernel_size[0], 1)
-    )
+    max_pooling_layer = network.add_pooling(input=input_trt, type=trt.PoolingType.MAX, window_size=(kernel_size[0], 1))
     max_pooling_layer.stride_nd = stride + (1,)
     max_pooling_layer.padding_nd = padding + (0,)
     set_layer_name(max_pooling_layer, target, name)
@@ -1971,10 +1795,7 @@ def acc_ops_max_poolnd(
     input_val = kwargs["input"]
 
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"MaxPool2d received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"MaxPool2d received input {input_val} that is not part " "of the TensorRT region!")
     extend_len = 2 if target == acc_ops.max_pool2d else 3
     kernel_size = extend_attr_to_tuple(kwargs["kernel_size"], extend_len)
     stride = extend_attr_to_tuple(kwargs["stride"], extend_len)
@@ -1987,13 +1808,9 @@ def acc_ops_max_poolnd(
 
     ones = (1,) * extend_len
     if dilation != ones:
-        raise RuntimeError(
-            f"Only support dilation=(1, 1) for maxpool, but got {dilation}"
-        )
+        raise RuntimeError(f"Only support dilation=(1, 1) for maxpool, but got {dilation}")
 
-    layer = network.add_pooling_nd(
-        input=input_val, type=trt.PoolingType.MAX, window_size=kernel_size
-    )
+    layer = network.add_pooling_nd(input=input_val, type=trt.PoolingType.MAX, window_size=kernel_size)
     layer.stride_nd = stride
     layer.padding_nd = padding
     set_layer_name(layer, target, name)
@@ -2015,19 +1832,14 @@ def acc_ops_squeeze(
     input_val = kwargs["input"]
 
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"squeeze received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"squeeze received input {input_val} that is not part " "of the TensorRT region!")
 
     dim = cast(Optional[int], kwargs["dim"] if "dim" in kwargs else None)
     # Squeeze with dim=None would only work in explicit batch dim mode without any dynamic
     # dim, which is a very rare case. For now we just claim not supporting dim=None.
     assert dim is not None, "We don't support dim=None right now for squeeze."
 
-    dim = get_positive_dim(
-        dim, len(input_val.shape) + (1 if network.has_implicit_batch_dimension else 0)
-    )
+    dim = get_positive_dim(dim, len(input_val.shape) + (1 if network.has_implicit_batch_dimension else 0))
     if network.has_implicit_batch_dimension:
         assert dim != 0, "We don't support squeeze batch dim when it's implicit."
         dim -= 1
@@ -2178,18 +1990,11 @@ def acc_ops_unsqueeze(
     input_t = kwargs["input"]
     input_val = get_trt_tensor(network, input_t, f"{name}_input_t")
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"unsqueeze received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"unsqueeze received input {input_val} that is not part " "of the TensorRT region!")
 
     dim = cast(int, kwargs["dim"])
     input_shape = input_val.shape
-    input_shape_size = (
-        len(input_val.shape) + 1
-        if network.has_implicit_batch_dimension
-        else len(input_val.shape)
-    )
+    input_shape_size = len(input_val.shape) + 1 if network.has_implicit_batch_dimension else len(input_val.shape)
     dim = get_positive_dim(dim, input_shape_size + 1)
 
     if network.has_implicit_batch_dimension:
@@ -2200,9 +2005,7 @@ def acc_ops_unsqueeze(
         len(get_dynamic_dims(input_val.shape)) <= 1
     ), "Currently we don't support unsqueeze with more than one dynamic dims."
     layer = network.add_shuffle(input_val)
-    layer.reshape_dims = (
-        tuple(input_val.shape)[:dim] + (1,) + tuple(input_val.shape)[dim:]
-    )
+    layer.reshape_dims = tuple(input_val.shape)[:dim] + (1,) + tuple(input_val.shape)[dim:]
     set_layer_name(layer, target, name)
     return layer.get_output(0)
 
@@ -2218,10 +2021,7 @@ def acc_ops_topk(
     input_val = kwargs["input"]
 
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"topk received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"topk received input {input_val} that is not part " "of the TensorRT region!")
 
     if kwargs["sorted"] and kwargs["k"] != 1:
         raise RuntimeError("Currently we don't support sorted=True in topk.")
@@ -2255,19 +2055,14 @@ def acc_ops_adaptive_avg_poolnd(
     input_val = kwargs["input"]
 
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"AdaptiveAvgPool2d received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"AdaptiveAvgPool2d received input {input_val} that is not part " "of the TensorRT region!")
 
     extend_len = 2 if target == acc_ops.adaptive_avg_pool2d else 3
     assert all(
         input_val.shape[-(i + 1)] != -1 for i in range(extend_len)
     ), "AdaptiveAvgPool2d and AdaptiveAvgPool3d currently doesn't support dynamic shapes for last two dims."
 
-    output_size = cast(
-        Sequence[int], extend_attr_to_tuple(kwargs["output_size"], extend_len)
-    )
+    output_size = cast(Sequence[int], extend_attr_to_tuple(kwargs["output_size"], extend_len))
     for input_dim, output_dim in zip(input_val.shape[-extend_len:], output_size):
         if input_dim % output_dim != 0:
             raise RuntimeError(
@@ -2275,16 +2070,9 @@ def acc_ops_adaptive_avg_poolnd(
                 f"Got input dim {input_dim}, output dim {output_dim}"
             )
 
-    stride = tuple(
-        input_val.shape[-extend_len + i] // output_size[i] for i in range(extend_len)
-    )
-    kernel_size = tuple(
-        input_val.shape[-extend_len + i] - (output_size[i] - 1) * stride[i]
-        for i in range(extend_len)
-    )
-    layer = network.add_pooling_nd(
-        input=input_val, type=trt.PoolingType.AVERAGE, window_size=kernel_size
-    )
+    stride = tuple(input_val.shape[-extend_len + i] // output_size[i] for i in range(extend_len))
+    kernel_size = tuple(input_val.shape[-extend_len + i] - (output_size[i] - 1) * stride[i] for i in range(extend_len))
+    layer = network.add_pooling_nd(input=input_val, type=trt.PoolingType.AVERAGE, window_size=kernel_size)
     layer.stride_nd = stride
     set_layer_name(layer, target, name)
 
@@ -2302,10 +2090,7 @@ def acc_ops_avg_pool1d(
     input_val = kwargs["input"]
 
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"AvgPool1d received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"AvgPool1d received input {input_val} that is not part " "of the TensorRT region!")
 
     kernel_size = extend_attr_to_tuple(kwargs["kernel_size"], 1)
     stride = extend_attr_to_tuple(kwargs["stride"], 1)
@@ -2321,9 +2106,7 @@ def acc_ops_avg_pool1d(
     set_layer_name(shuffle_layer, target, name + "_shuffle1")
     shuffle_out = shuffle_layer.get_output(0)
 
-    layer = network.add_pooling_nd(
-        input=shuffle_out, type=trt.PoolingType.AVERAGE, window_size=(kernel_size[0], 1)
-    )
+    layer = network.add_pooling_nd(input=shuffle_out, type=trt.PoolingType.AVERAGE, window_size=(kernel_size[0], 1))
 
     layer.stride_nd = stride + (1,)
     layer.padding_nd = padding + (0,)
@@ -2351,10 +2134,7 @@ def acc_ops_avg_pool2d(
     input_val = kwargs["input"]
 
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"AvgPool2d received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"AvgPool2d received input {input_val} that is not part " "of the TensorRT region!")
 
     kernel_size = extend_attr_to_tuple(kwargs["kernel_size"], 2)
     stride = extend_attr_to_tuple(kwargs["stride"], 2)
@@ -2369,9 +2149,7 @@ def acc_ops_avg_pool2d(
     if divisor_override:
         raise RuntimeError("TensorRT does not support divisor_override.")
 
-    layer = network.add_pooling(
-        input=input_val, type=trt.PoolingType.AVERAGE, window_size=kernel_size
-    )
+    layer = network.add_pooling(input=input_val, type=trt.PoolingType.AVERAGE, window_size=kernel_size)
     layer.stride = stride
     layer.padding = padding
     layer.average_count_excludes_padding = False if count_include_pad else True
@@ -2435,19 +2213,14 @@ def acc_ops_slice_tensor(
     input_val = kwargs["input"]
 
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"slice_tensor received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"slice_tensor received input {input_val} that is not part " "of the TensorRT region!")
 
     ranks = len(input_val.shape) + (1 if network.has_implicit_batch_dimension else 0)
     dim = get_positive_dim(cast(int, kwargs["dim"]), ranks)
     dynamic_shape = has_dynamic_shape(input_val.shape)
     if network.has_implicit_batch_dimension:
         if dim == 0:
-            raise RuntimeError(
-                f"We do not support slice_tensor at batch dim when it's implicit, got {dim}!"
-            )
+            raise RuntimeError(f"We do not support slice_tensor at batch dim when it's implicit, got {dim}!")
         dim = dim - 1
     else:
         if dynamic_shape:
@@ -2465,9 +2238,7 @@ def acc_ops_slice_tensor(
     output_shape[dim] = (stop_int - start_int) // step_int
 
     if dynamic_shape > 0:
-        output_shape = get_shape_with_dynamic_shape(
-            network, output_shape, input_val, target, name
-        )
+        output_shape = get_shape_with_dynamic_shape(network, output_shape, input_val, target, name)
     layer = network.add_slice(
         input_val,
         start=start,
@@ -2504,9 +2275,7 @@ def acc_ops_expand_tensor(
     inshape = tuple(input_val.shape)
     shape = tuple(shape)
     start = tuple([0] * ranks)
-    stride = tuple(
-        [int(i == o) for i, o in zip(inshape, shape)]
-    )  # stride == 1 if dimensions match, 0 otherwise
+    stride = tuple([int(i == o) for i, o in zip(inshape, shape)])  # stride == 1 if dimensions match, 0 otherwise
     layer = network.add_slice(input_val, start=start, shape=shape, stride=stride)
     set_layer_name(layer, target, name)
     return layer.get_output(0)
@@ -2617,9 +2386,7 @@ def acc_ops_masked_fill_tensor(
     mask_t = kwargs["mask"]
     value_t = kwargs["value"]
     if network.has_implicit_batch_dimension:
-        raise RuntimeError(
-            "We don't support masked_fill with implicit batch dimension due to select layer!"
-        )
+        raise RuntimeError("We don't support masked_fill with implicit batch dimension due to select layer!")
 
     shape = list(input_t.shape)
     mask_shape = list(mask_t.shape)
@@ -2676,10 +2443,7 @@ def acc_ops_split(
     input_val = kwargs["input"]
 
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"split received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"split received input {input_val} that is not part " "of the TensorRT region!")
 
     dim = cast(int, kwargs["dim"])
     dynamic_shape = has_dynamic_shape(input_val.shape)
@@ -2697,9 +2461,7 @@ def acc_ops_split(
     offset = 0
     num_splits = (input_val.shape[dim] + split_size - 1) // split_size
     if num_splits < 1:
-        raise RuntimeError(
-            f"Invalid split: {input_val.shape[dim]} with split_size={split_size}"
-        )
+        raise RuntimeError(f"Invalid split: {input_val.shape[dim]} with split_size={split_size}")
 
     max_offset = input_val.shape[dim]
     # add slice layers
@@ -2709,12 +2471,8 @@ def acc_ops_split(
         shape[dim] = min(split_size, cast(int, max_offset - offset))
         start[dim] = offset
         if dynamic_shape:
-            shape = get_shape_with_dynamic_shape(
-                network, shape, input_val, target, f"{name}_shape_{i}"
-            )
-        layer = network.add_slice(
-            input_val, start=start, shape=[] if dynamic_shape else shape, stride=stride
-        )
+            shape = get_shape_with_dynamic_shape(network, shape, input_val, target, f"{name}_shape_{i}")
+        layer = network.add_slice(input_val, start=start, shape=[] if dynamic_shape else shape, stride=stride)
         if dynamic_shape:
             layer.set_input(2, shape)
         offset += split_size
@@ -2734,15 +2492,11 @@ def acc_ops_linear(
     input_val = kwargs["input"]
 
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"Linear received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"Linear received input {input_val} that is not part " "of the TensorRT region!")
 
     dynamic_dims = get_dynamic_dims(input_val.shape)
     assert len(dynamic_dims) < 2 and input_val.shape[-1] != -1, (
-        "Currently we only support one dynmaic "
-        "dim for linear and it can't be the last dim."
+        "Currently we only support one dynmaic " "dim for linear and it can't be the last dim."
     )
 
     if isinstance(kwargs["weight"], torch.Tensor):
@@ -2762,9 +2516,7 @@ def acc_ops_linear(
     else:
         input_op = trt.MatrixOperation.NONE
 
-    input_val, weight = broadcast(
-        network, input_val, weight, f"{name}_input", f"{name}_weight", preset_diff
-    )
+    input_val, weight = broadcast(network, input_val, weight, f"{name}_input", f"{name}_weight", preset_diff)
     matmul_layer = network.add_matrix_multiply(input_val, input_op, weight, weight_op)
     set_layer_name(matmul_layer, target, f"{name}_matmul")
     res = matmul_layer.get_output(0)
@@ -2784,12 +2536,7 @@ def acc_ops_linear(
 
 def add_clamp(network, input, val, op):
     acc_ops_clamp_shape = (1,) * len(input.shape)  # broadcast all dimensions
-    acc_ops_clamp_tensor = (
-        val
-        * torch.ones(acc_ops_clamp_shape, dtype=torch_dtype_from_trt(input.dtype))
-        .cpu()
-        .numpy()
-    )
+    acc_ops_clamp_tensor = val * torch.ones(acc_ops_clamp_shape, dtype=torch_dtype_from_trt(input.dtype)).cpu().numpy()
     acc_ops_clamp_trt = network.add_constant(acc_ops_clamp_shape, acc_ops_clamp_tensor)
     layer = network.add_elementwise(input, acc_ops_clamp_trt.get_output(0), op)
 
@@ -2809,21 +2556,14 @@ def acc_ops_clamp(
     max_val = kwargs["max"]
 
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"Clamp received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"Clamp received input {input_val} that is not part " "of the TensorRT region!")
 
     if min_val is not None:
-        clamp_min_layer = add_clamp(
-            network, input_val, min_val, trt.ElementWiseOperation.MAX
-        )
+        clamp_min_layer = add_clamp(network, input_val, min_val, trt.ElementWiseOperation.MAX)
         set_layer_name(clamp_min_layer, target, f"{name}_clamp_min")
         input_val = clamp_min_layer.get_output(0)
     if max_val is not None:
-        clamp_max_layer = add_clamp(
-            network, input_val, max_val, trt.ElementWiseOperation.MIN
-        )
+        clamp_max_layer = add_clamp(network, input_val, max_val, trt.ElementWiseOperation.MIN)
         set_layer_name(clamp_max_layer, target, f"{name}_clamp_max")
         input_val = clamp_max_layer.get_output(0)
 
@@ -2885,15 +2625,9 @@ def acc_ops_getitem(
         """
         Convert python slice to TensorRT slice layer parameters.
         """
-        start = (
-            get_positive_dim(py_slice.start, dim_size) if py_slice.start != None else 0
-        )
+        start = get_positive_dim(py_slice.start, dim_size) if py_slice.start != None else 0
         stride = py_slice.step if py_slice.step != None else 1
-        stop = (
-            get_positive_dim(py_slice.stop, dim_size)
-            if py_slice.stop != None
-            else dim_size
-        )
+        stop = get_positive_dim(py_slice.stop, dim_size) if py_slice.stop != None else dim_size
         size = math.ceil((stop - start) * 1.0 / stride)
         return start, size, stride
 
@@ -2902,9 +2636,7 @@ def acc_ops_getitem(
         # slice(None, None, None).
         batch_subscript = slices[0]
         if batch_subscript not in [slice(None, None, None), slice(0, None, None)]:
-            raise RuntimeError(
-                f"{name}: Can't subscript batch dimension when it's implicit. Got {slices}"
-            )
+            raise RuntimeError(f"{name}: Can't subscript batch dimension when it's implicit. Got {slices}")
 
         # Remove batch_dim subscript
         slices = slices[1:]
@@ -2997,9 +2729,7 @@ def acc_ops_cat(
     dim = kwargs["dim"]
 
     if any(not isinstance(t, TRTTensor) for t in tensors):  # type: ignore[union-attr]
-        raise RuntimeError(
-            f"cat received inputs {tensors} that is not part " "of the TensorRT region!"
-        )
+        raise RuntimeError(f"cat received inputs {tensors} that is not part " "of the TensorRT region!")
     layer = network.add_concatenation(inputs=tensors)
     if dim < 0:
         if network.has_implicit_batch_dimension:
@@ -3025,9 +2755,7 @@ def acc_ops_matmul(
 
     for i in [input_val, other_val]:
         if not isinstance(i, TRTTensor):
-            raise RuntimeError(
-                f"matmul received input {i} that is not part of the TensorRT region!"
-            )
+            raise RuntimeError(f"matmul received input {i} that is not part of the TensorRT region!")
 
     input_matrix_op = other_matrix_op = trt.MatrixOperation.NONE
     preset_diff = 0
@@ -3040,12 +2768,8 @@ def acc_ops_matmul(
         preset_diff += 1
         other_matrix_op = trt.MatrixOperation.VECTOR
 
-    input_val, other_val = broadcast(
-        network, input_val, other_val, f"{name}_input", f"{name}_other", preset_diff
-    )
-    layer = network.add_matrix_multiply(
-        input_val, input_matrix_op, other_val, other_matrix_op
-    )
+    input_val, other_val = broadcast(network, input_val, other_val, f"{name}_input", f"{name}_other", preset_diff)
+    layer = network.add_matrix_multiply(input_val, input_matrix_op, other_val, other_matrix_op)
     set_layer_name(layer, target, name)
     return layer.get_output(0)
 
@@ -3061,10 +2785,7 @@ def acc_ops_hard_sigmoid(
     input_val = kwargs["input"]
 
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"Hard sigmoid received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"Hard sigmoid received input {input_val} that is not part " "of the TensorRT region!")
 
     return add_activation_layer(
         network,
@@ -3088,14 +2809,9 @@ def acc_ops_sigmoid(
     input_val = kwargs["input"]
 
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"Sigmoid received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"Sigmoid received input {input_val} that is not part " "of the TensorRT region!")
 
-    return add_activation_layer(
-        network, input_val, trt.ActivationType.SIGMOID, target, name
-    )
+    return add_activation_layer(network, input_val, trt.ActivationType.SIGMOID, target, name)
 
 
 @tensorrt_converter(acc_ops.permute)
@@ -3115,10 +2831,7 @@ def acc_ops_permute(
     permutation = [get_positive_dim(i, ranks) for i in cast(Sequence[int], index)]
 
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"permute received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"permute received input {input_val} that is not part " "of the TensorRT region!")
 
     if network.has_implicit_batch_dimension:
         assert permutation[0] == 0, "Can't permute batch dimension when it's implicit."
@@ -3141,10 +2854,7 @@ def acc_ops_quantize_per_tensor(
     input_val = get_trt_tensor(network, kwargs["input"], f"{name}_input")
 
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"{name} received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"{name} received input {input_val} that is not part " "of the TensorRT region!")
 
     qparams = kwargs["acc_out_ty"].qparams  # type: ignore[misc]
     q_scale = qparams["scale"]
@@ -3159,9 +2869,7 @@ def acc_ops_quantize_per_tensor(
     if q_zero_point != 0:
         raise RuntimeError(f"Only support zero_point == 0, get {q_zero_point}")
 
-    scale_layer = network.add_constant(
-        (1,), trt.Weights(np.ascontiguousarray([float(q_scale)], dtype=np.float32))
-    )
+    scale_layer = network.add_constant((1,), trt.Weights(np.ascontiguousarray([float(q_scale)], dtype=np.float32)))
     scale_layer.name = input_val.name + ".per_tensor_quant.scale"
     scale = scale_layer.get_output(0)
     # assert trt.__version__ > "8.0", "Explicit quantize op is only supported in "
@@ -3183,10 +2891,7 @@ def acc_ops_quantize_per_channel(
     input_val = get_trt_tensor(network, kwargs["input"], f"{name}_input")
 
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"{name} received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"{name} received input {input_val} that is not part " "of the TensorRT region!")
 
     qparams = kwargs["acc_out_ty"].qparams  # type: ignore[misc]
     q_per_channel_scales = qparams["scale"]
@@ -3203,13 +2908,9 @@ def acc_ops_quantize_per_channel(
     # is supported in TensorRT
     if not torch.equal(
         q_per_channel_zero_points,
-        torch.zeros(
-            q_per_channel_zero_points.shape, dtype=q_per_channel_zero_points.dtype
-        ),
+        torch.zeros(q_per_channel_zero_points.shape, dtype=q_per_channel_zero_points.dtype),
     ):
-        raise RuntimeError(
-            f"Only support zero_point == 0, get {q_per_channel_zero_points}"
-        )
+        raise RuntimeError(f"Only support zero_point == 0, get {q_per_channel_zero_points}")
 
     if not torch.all(torch.ge(q_per_channel_scales, 0)):
         raise RuntimeError(f"All scale values must be >= 0, get {q_per_channel_scales}")
@@ -3240,10 +2941,7 @@ def acc_ops_dequantize(
     input_val_tensor_meta = kwargs["_itensor_to_tensor_meta"][input_val]  # type: ignore[index]
 
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"{name} received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"{name} received input {input_val} that is not part " "of the TensorRT region!")
 
     qparams = input_val_tensor_meta.qparams  # type: ignore[misc]
     qscheme = qparams["qscheme"]
@@ -3258,9 +2956,7 @@ def acc_ops_dequantize(
         q_scale = qparams["scale"]
         q_zero_point = qparams["zero_point"]
         q_axis = qparams["axis"]
-        assert isinstance(
-            q_scale, immutable_list
-        ), "expected q_scale to be immutable_list got {}".format(type(q_scale))
+        assert isinstance(q_scale, immutable_list), "expected q_scale to be immutable_list got {}".format(type(q_scale))
         scale_shape = (len(q_scale),)
         if any(x != 0 for x in q_zero_point):
             raise RuntimeError(f"Only support zero_point == 0, get {q_zero_point}")
@@ -3271,13 +2967,10 @@ def acc_ops_dequantize(
 
     if dtype not in (torch.quint8, torch.qint8, torch.qint32):
         raise RuntimeError(
-            "Only support (torch.quint8, torch.qint8, torch.qint32) "
-            f"quantized type in dequantize, get {dtype}."
+            "Only support (torch.quint8, torch.qint8, torch.qint32) " f"quantized type in dequantize, get {dtype}."
         )
 
-    scale_layer = network.add_constant(
-        scale_shape, trt.Weights(np.ascontiguousarray(q_scale, dtype=np.float32))
-    )
+    scale_layer = network.add_constant(scale_shape, trt.Weights(np.ascontiguousarray(q_scale, dtype=np.float32)))
     scale_layer.name = input_val.name + ".dequant.scale"
     scale = scale_layer.get_output(0)
     # assert trt.__version__ > "8.0", "Explicit dequantize op is only supported in "
@@ -3298,20 +2991,13 @@ def acc_ops_gelu(
 ) -> Union[TRTTensor, Sequence[TRTTensor]]:
     input_val = kwargs["input"]
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"GELU received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"GELU received input {input_val} that is not part " "of the TensorRT region!")
     if network.has_implicit_batch_dimension:
-        raise RuntimeError(
-            "GeLU converter currently doesn't support implicit batch dimension"
-        )
+        raise RuntimeError("GeLU converter currently doesn't support implicit batch dimension")
 
     plugin_name = "CustomGeluPluginDynamic"
     # type_id 0 for float32, 1 for  float16
-    type_id = trt.PluginField(
-        "type_id", np.array(0, dtype=np.int32), trt.PluginFieldType.INT32
-    )
+    type_id = trt.PluginField("type_id", np.array(0, dtype=np.int32), trt.PluginFieldType.INT32)
     field_collection = TRTPluginFieldCollection([type_id])
     plugin_version = "1"
 
@@ -3336,10 +3022,7 @@ def acc_ops_chunk(
     input_dim_size = len(input_val.shape)  # type: ignore[union-attr]
 
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"chunk received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"chunk received input {input_val} that is not part " "of the TensorRT region!")
 
     dynamic_shape = has_dynamic_shape(input_val.shape)
     if network.has_implicit_batch_dimension:
@@ -3373,13 +3056,9 @@ def acc_ops_chunk(
         shape = list(input_val.shape)
         shape[dim] = min(split_size, max_offset - offset)
         if dynamic_shape:
-            shape = get_shape_with_dynamic_shape(
-                network, shape, input_val, target, f"{name}_{i}"
-            )
+            shape = get_shape_with_dynamic_shape(network, shape, input_val, target, f"{name}_{i}")
         start[dim] = offset
-        layer = network.add_slice(
-            input_val, start=start, shape=[] if dynamic_shape else shape, stride=stride
-        )
+        layer = network.add_slice(input_val, start=start, shape=[] if dynamic_shape else shape, stride=stride)
         if dynamic_shape:
             layer.set_input(2, shape)
         offset += split_size
@@ -3402,14 +3081,9 @@ def acc_ops_cumsum(
     input_dim_size = len(input_val.shape)  # type: ignore[union-attr]
 
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"cumsum received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"cumsum received input {input_val} that is not part " "of the TensorRT region!")
     if network.has_implicit_batch_dimension:
-        raise RuntimeError(
-            "cumsum converter currently doesn't support implicit batch dimension"
-        )
+        raise RuntimeError("cumsum converter currently doesn't support implicit batch dimension")
     dim = get_positive_dim(dim, input_dim_size)
     loop = network.add_loop()
     trip_limit = None
@@ -3429,9 +3103,7 @@ def acc_ops_cumsum(
     data = iterator.get_output(0)
     new_dims = tuple(data.shape)
     zero_tensor = torch.zeros(new_dims, dtype=trt_dtype_to_torch_dtype(input_val.dtype))
-    zero_tensor = network.add_constant(
-        zero_tensor.shape, to_numpy(zero_tensor)
-    ).get_output(0)
+    zero_tensor = network.add_constant(zero_tensor.shape, to_numpy(zero_tensor)).get_output(0)
 
     running_sum = loop.add_recurrence(zero_tensor)
     set_layer_name(running_sum, target, f"{name}_running_sum_1")
@@ -3478,10 +3150,7 @@ def acc_ops_hardtanh(
     input_val = kwargs["input"]
 
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"hardtanh received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"hardtanh received input {input_val} that is not part " "of the TensorRT region!")
 
     return add_activation_layer(
         network,
@@ -3509,22 +3178,15 @@ def acc_ops_interpolate(
     align_corners = kwargs["align_corners"]
 
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"interpolate received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"interpolate received input {input_val} that is not part " "of the TensorRT region!")
 
     dim = input_val.shape
     ranks = len(input_val.shape)
     if network.has_implicit_batch_dimension:
-        assert (
-            ranks >= 2 and ranks <= 4
-        ), "Interpolate expects inputs are 3D,4D,5D in shape"
+        assert ranks >= 2 and ranks <= 4, "Interpolate expects inputs are 3D,4D,5D in shape"
         ranks = ranks - 1
     else:
-        assert (
-            ranks >= 3 and ranks <= 5
-        ), "Interpolate expects inputs are 3D,4D,5D in shape"
+        assert ranks >= 3 and ranks <= 5, "Interpolate expects inputs are 3D,4D,5D in shape"
         ranks = ranks - 2
 
     layer = network.add_resize(input_val)
@@ -3557,9 +3219,7 @@ def acc_ops_interpolate(
         layer.resize_mode = trt.ResizeMode.NEAREST
 
     if align_corners != None:
-        layer.coordinate_transformation = (
-            trt.ResizeCoordinateTransformation.ALIGN_CORNERS
-        )
+        layer.coordinate_transformation = trt.ResizeCoordinateTransformation.ALIGN_CORNERS
 
     set_layer_name(layer, target, name)
     return layer.get_output(0)
@@ -3581,9 +3241,7 @@ def acc_ops_new_ones(
         dtype_val = torch_dtype_from_trt(dtype_val)
 
     device_val = kwargs.get("device")
-    assert (
-        device_val == "cuda" or device_val == None
-    ), f"device is not `cuda` but {device_val}"
+    assert device_val == "cuda" or device_val == None, f"device is not `cuda` but {device_val}"
 
     weight = torch.ones(size_val, dtype=dtype_val)
     return get_trt_tensor(network, weight, f"{name}_weight")
@@ -3605,9 +3263,7 @@ def acc_ops_new_empty(
         dtype_val = torch_dtype_from_trt(dtype_val)
 
     device_val = kwargs.get("device")
-    assert (
-        device_val == "cuda" or device_val == None
-    ), f"device is not `cuda` but {device_val}"
+    assert device_val == "cuda" or device_val == None, f"device is not `cuda` but {device_val}"
 
     weight = torch.zeros(size_val, dtype=dtype_val)
     return get_trt_tensor(network, weight, f"{name}_weight")
@@ -3636,9 +3292,7 @@ def acc_ops_einsum(
     if const_flag:
         for i, input_source in enumerate(input_val):
             if input_source.dtype != trt.float32:
-                input_val[i] = type_cast(
-                    network, target, f"{name}_input_cast{i}", input_source, trt.float32
-                )
+                input_val[i] = type_cast(network, target, f"{name}_input_cast{i}", input_source, trt.float32)
     einsum_layer = network.add_einsum(inputs=input_val, equation=equation)
     return einsum_layer.get_output(0)
 

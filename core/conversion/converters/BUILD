@@ -1,3 +1,6 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_pkg//:pkg.bzl", "pkg_tar")
+
 package(default_visibility = ["//visibility:public"])
 
 config_setting(
@@ -26,14 +29,13 @@ cc_library(
     alwayslink = True,
 )
 
-
 cc_library(
     name = "converter_util",
     srcs = [
-        "converter_util.cpp"
+        "converter_util.cpp",
     ],
     hdrs = [
-        "converter_util.h"
+        "converter_util.h",
     ],
     deps = [
         ":weights",
@@ -46,7 +48,6 @@ cc_library(
     }),
     alwayslink = True,
 )
-
 
 cc_library(
     name = "converters",
@@ -68,6 +69,7 @@ cc_library(
         "impl/linear.cpp",
         "impl/lstm_cell.cpp",
         "impl/matrix_multiply.cpp",
+        "impl/max.cpp",
         "impl/normalize.cpp",
         "impl/pooling.cpp",
         "impl/quantization.cpp",
@@ -80,7 +82,6 @@ cc_library(
         "impl/squeeze.cpp",
         "impl/stack.cpp",
         "impl/topk.cpp",
-        "impl/max.cpp",
         "impl/unary.cpp",
         "impl/unsqueeze.cpp",
     ],
@@ -94,7 +95,7 @@ cc_library(
         "//core/conversion/tensorcontainer",
         "//core/conversion/conversionctx",
         "//core/plugins:torch_tensorrt_plugins",
-        ":converter_util"
+        ":converter_util",
     ] + select({
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default": ["@libtorch//:libtorch"],
@@ -102,14 +103,12 @@ cc_library(
     alwayslink = True,
 )
 
-load("@rules_pkg//:pkg.bzl", "pkg_tar")
-
 pkg_tar(
     name = "include",
     srcs = [
         "Weights.h",
+        "converter_util.h",
         "converters.h",
-        "converter_util.h"
     ],
     package_dir = "core/conversion/converters/",
 )

@@ -1,7 +1,7 @@
 set(lib_name "core_conversion")
 add_library(${lib_name} OBJECT)
 
-set(CXX_SRCS 
+set(CXX_SRCS
     "${CMAKE_CURRENT_SOURCE_DIR}/conversion.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/conversion_ignorelist.cpp"
 )
@@ -10,7 +10,7 @@ set(HEADER_FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/conversion.h"
 )
 
-target_sources(${lib_name} 
+target_sources(${lib_name}
     PRIVATE
         ${CXX_SRCS}
     PUBLIC
@@ -18,14 +18,14 @@ target_sources(${lib_name}
         $<TARGET_OBJECTS:core_util>
 )
 
-target_link_libraries(${lib_name} 
+target_link_libraries(${lib_name}
     PUBLIC
         TensorRT::nvinfer
         torch
         core_ir
         core_util
 )
-target_include_directories(${lib_name} 
+target_include_directories(${lib_name}
     PUBLIC  "$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>"
 )
 

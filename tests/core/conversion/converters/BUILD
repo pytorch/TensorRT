@@ -36,7 +36,7 @@ converter_test(
 )
 
 converter_test(
-    name = "test_constant_pad"
+    name = "test_constant_pad",
 )
 
 converter_test(
@@ -48,7 +48,7 @@ converter_test(
 )
 
 converter_test(
-    name = "test_cumsum"
+    name = "test_cumsum",
 )
 
 converter_test(
@@ -72,7 +72,7 @@ converter_test(
 )
 
 converter_test(
-    name = "test_normalize"
+    name = "test_normalize",
 )
 
 converter_test(
@@ -141,7 +141,6 @@ test_suite(
         ":test_activation",
         ":test_batch_norm",
         ":test_bitwise",
-        ":test_instance_norm",
         ":test_cast",
         ":test_clone",
         ":test_concat",
@@ -151,6 +150,7 @@ test_suite(
         ":test_cumsum",
         ":test_element_wise",
         ":test_expand",
+        ":test_instance_norm",
         ":test_interpolate",
         ":test_layer_norm",
         ":test_linear",

@@ -19,7 +19,6 @@ from torch.fx.passes import shape_prop
 
 from . import acc_normalizer, acc_ops, acc_shape_prop, acc_utils  # noqa: F401
 
-
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -43,9 +42,7 @@ class Acc_Rewriter(ast.NodeTransformer):
         self.exceptions_rewritten: Set[Type[Exception]] = set()
         self.exceptions_bool_rewritten: Set[Type[Exception]] = set()
 
-    def rewrite(
-        self, fn: FunctionType
-    ) -> Tuple[FunctionType, Set[Type[Exception]], Set[Type[Exception]]]:
+    def rewrite(self, fn: FunctionType) -> Tuple[FunctionType, Set[Type[Exception]], Set[Type[Exception]]]:
 
         # Normalize the source lines
         sourcelines, _ = inspect.getsourcelines(fn)
@@ -141,8 +138,7 @@ class Acc_Rewriter(ast.NodeTransformer):
         # Check that we actually have a builtin exception.
         if (
             not issubclass(exc_type, Exception)
-            or getattr(getattr(exc_type, "__class__", None), "__module__", None)
-            != "builtins"
+            or getattr(getattr(exc_type, "__class__", None), "__module__", None) != "builtins"
         ):
             return if_node
 
@@ -158,19 +154,13 @@ class Acc_Rewriter(ast.NodeTransformer):
         # module is safe because the RewrittenModule will add it as an attr
         # based on the returned exceptions_rewritten, and we assume we are
         # currently modifying the AST of a method from a RewrittenModule.
-        exc_wrapper_node = ast.parse(
-            f"self.{_get_exception_wrapper_attr_name(exc_type)}()", mode="eval"
-        )
+        exc_wrapper_node = ast.parse(f"self.{_get_exception_wrapper_attr_name(exc_type)}()", mode="eval")
         assert isinstance(exc_wrapper_node, ast.Expression)
         exc_wrapper_call_node = exc_wrapper_node.body
         assert isinstance(exc_wrapper_call_node, ast.Call)
-        if isinstance(if_node.test, ast.BoolOp) and isinstance(
-            if_node.test.op, ast.And
-        ):
+        if isinstance(if_node.test, ast.BoolOp) and isinstance(if_node.test.op, ast.And):
             self.exceptions_bool_rewritten.add(exc_type)
-            bool_wrapper_node = ast.parse(
-                f"self.{_get_exception_wrapper_attr_name(exc_type)}_bool()", mode="eval"
-            )
+            bool_wrapper_node = ast.parse(f"self.{_get_exception_wrapper_attr_name(exc_type)}_bool()", mode="eval")
             assert isinstance(exc_wrapper_node, ast.Expression)
             bool_wrapper_call_node = bool_wrapper_node.body
             assert isinstance(exc_wrapper_call_node, ast.Call)
@@ -325,9 +315,7 @@ class AccRewritingTracer(Tracer):
             and not (name_target in allow_list)
             and kind != "placeholder"
         ):
-            raise RuntimeError(
-                f"Tried to trace mutable operation {name_target}. FX only supports functional code"
-            )
+            raise RuntimeError(f"Tried to trace mutable operation {name_target}. FX only supports functional code")
 
         return self.graph.create_node(kind, target, args, kwargs, name, type_expr)
 
@@ -386,9 +374,7 @@ def _rewrite(
             for method_name in dir(base_class):
                 method = getattr(base_class, method_name, None)
                 if method is None and method_name not in {"__doc__"}:
-                    _LOGGER.warning(
-                        f"{__qualname__} does not have attribute {method_name}"
-                    )
+                    _LOGGER.warning(f"{__qualname__} does not have attribute {method_name}")
 
                 if builtins.type(method) is not FunctionType:
                     continue
@@ -438,10 +424,10 @@ def _rewrite(
                 for k, v in orig.__dict__.items():
                     if k == "_modules":
                         for mod_k, mod_v in v.items():
-                            if getattr(mod_v, "_base_class_origin", type(mod_v)) in leaf_module_list:  # type: ignore[operator]
-                                _LOGGER.info(
-                                    f"Skip rewriting leaf module {type(mod_v)}"
-                                )
+                            if (
+                                getattr(mod_v, "_base_class_origin", type(mod_v)) in leaf_module_list
+                            ):  # type: ignore[operator]
+                                _LOGGER.info(f"Skip rewriting leaf module {type(mod_v)}")
                                 self._modules[mod_k] = mod_v
                             else:
                                 self._modules[mod_k] = rewrite_module(mod_v)
@@ -477,9 +463,7 @@ def _remove_exceptions(gm: torch.fx.GraphModule) -> bool:
     for node in reversed(gm.graph.nodes):
         if node.op == "call_module" and (
             isinstance(gm.get_submodule(node.target), ConditionalExceptionWrapper)
-            or isinstance(
-                gm.get_submodule(node.target), ConditionalExceptionBoolCondWrapper
-            )
+            or isinstance(gm.get_submodule(node.target), ConditionalExceptionBoolCondWrapper)
         ):
             gm.graph.erase_node(node)
             changed = True
@@ -489,9 +473,7 @@ def _remove_exceptions(gm: torch.fx.GraphModule) -> bool:
 def _replace_tensor_meta_with_rank(gm: torch.fx.GraphModule):
     for node in gm.graph.nodes:
         if node.op != "output" and "tensor_meta" in node.meta:
-            node.meta["tensor_rank"] = acc_utils.map_tensor_metadata(
-                node.meta["tensor_meta"], lambda x: len(x.shape)
-            )
+            node.meta["tensor_rank"] = acc_utils.map_tensor_metadata(node.meta["tensor_meta"], lambda x: len(x.shape))
             del node.meta["tensor_meta"]
 
 

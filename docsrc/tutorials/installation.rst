@@ -170,21 +170,23 @@ In WORKSPACE comment out:
 
     # Downloaded distributions to use with --distdir
     http_archive(
-        name = "cudnn",
-        urls = ["<URL>",],
-
-        build_file = "@//third_party/cudnn/archive:BUILD",
-        sha256 = "<TAR SHA256>",
-        strip_prefix = "cuda"
+        name="cudnn",
+        urls=[
+            "<URL>",
+        ],
+        build_file="@//third_party/cudnn/archive:BUILD",
+        sha256="<TAR SHA256>",
+        strip_prefix="cuda",
     )
 
     http_archive(
-        name = "tensorrt",
-        urls = ["<URL>",],
-
-        build_file = "@//third_party/tensorrt/archive:BUILD",
-        sha256 = "<TAR SHA256>",
-        strip_prefix = "TensorRT-<VERSION>"
+        name="tensorrt",
+        urls=[
+            "<URL>",
+        ],
+        build_file="@//third_party/tensorrt/archive:BUILD",
+        sha256="<TAR SHA256>",
+        strip_prefix="TensorRT-<VERSION>",
     )
 
 and uncomment
@@ -193,15 +195,11 @@ and uncomment
 
     # Locally installed dependencies
     new_local_repository(
-        name = "cudnn",
-        path = "/usr/",
-        build_file = "@//third_party/cudnn/local:BUILD"
+        name="cudnn", path="/usr/", build_file="@//third_party/cudnn/local:BUILD"
     )
 
     new_local_repository(
-    name = "tensorrt",
-    path = "/usr/",
-    build_file = "@//third_party/tensorrt/local:BUILD"
+        name="tensorrt", path="/usr/", build_file="@//third_party/tensorrt/local:BUILD"
     )
 
 Release Build
@@ -245,14 +243,14 @@ It is possible to build the API libraries (in cpp/) and the torchtrtc executable
 Currently, the python API and the tests cannot be built with CMake.
 Begin by installing CMake.
 
-    * Latest releases of CMake and instructions on how to install are available for different platforms 
+    * Latest releases of CMake and instructions on how to install are available for different platforms
       [on their website](https://cmake.org/download/).
 
 A few useful CMake options include:
 
     * CMake finders for TensorRT and cuDNN are provided in `cmake/Modules`. In order for CMake to use them, pass
       `-DCMAKE_MODULE_PATH=cmake/Modules` when configuring the project with CMake.
-    * Libtorch provides its own CMake finder. In case CMake doesn't find it, pass the path to your install of 
+    * Libtorch provides its own CMake finder. In case CMake doesn't find it, pass the path to your install of
       libtorch with `-DTorch_DIR=<path to libtorch>/share/cmake/Torch`
     * If TensorRT is not found with the provided cmake finder, specify `-DTensorRT_ROOT=<path to TensorRT>`
     * Finally, configure and build the project in a build directory of your choice with the following command

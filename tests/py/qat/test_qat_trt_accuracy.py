@@ -9,6 +9,7 @@ import torchvision.transforms as transforms
 import os
 import sys
 
+
 def find_repo_root(max_depth=10):
     dir_path = os.path.dirname(os.path.realpath(__file__))
     for i in range(max_depth):
@@ -19,6 +20,7 @@ def find_repo_root(max_depth=10):
             dir_path = os.path.dirname(dir_path)
 
     raise RuntimeError("Could not find repo root")
+
 
 MODULE_DIR = find_repo_root() + "/tests/modules"
 
@@ -31,7 +33,7 @@ def compute_accuracy(testing_dataloader, model):
     loss = 0.0
     class_probs = []
     class_preds = []
-    device = torch.device('cuda:0')
+    device = torch.device("cuda:0")
     with torch.no_grad():
         idx = 0
         for data, labels in testing_dataloader:
@@ -48,23 +50,25 @@ def compute_accuracy(testing_dataloader, model):
     test_preds = torch.cat(class_preds)
     return correct / total
 
-class TestAccuracy(unittest.TestCase):
 
+class TestAccuracy(unittest.TestCase):
     def test_compile_script(self):
         self.model = torch.jit.load(MODULE_DIR + "/trained_vgg16_qat.jit.pt").eval().to("cuda")
-        self.testing_dataset = torchvision.datasets.CIFAR10(root='./data',
-                                                            train=False,
-                                                            download=True,
-                                                            transform=transforms.Compose([
-                                                                transforms.ToTensor(),
-                                                                transforms.Normalize((0.4914, 0.4822, 0.4465),
-                                                                                     (0.2023, 0.1994, 0.2010))
-                                                            ]))
+        self.testing_dataset = torchvision.datasets.CIFAR10(
+            root="./data",
+            train=False,
+            download=True,
+            transform=transforms.Compose(
+                [
+                    transforms.ToTensor(),
+                    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+                ]
+            ),
+        )
 
-        self.testing_dataloader = torch.utils.data.DataLoader(self.testing_dataset,
-                                                              batch_size=16,
-                                                              shuffle=False,
-                                                              num_workers=1)
+        self.testing_dataloader = torch.utils.data.DataLoader(
+            self.testing_dataset, batch_size=16, shuffle=False, num_workers=1
+        )
 
         fp32_test_acc = compute_accuracy(self.testing_dataloader, self.model)
         log(Level.Info, "[Pyt FP32] Test Acc: {:.2f}%".format(100 * fp32_test_acc))
@@ -80,6 +84,7 @@ class TestAccuracy(unittest.TestCase):
         log(Level.Info, "[TRT QAT INT8] Test Acc: {:.2f}%".format(100 * int8_test_acc))
         acc_diff = fp32_test_acc - int8_test_acc
         self.assertTrue(abs(acc_diff) < 3)
+
 
 if __name__ == "__main__":
     unittest.main()

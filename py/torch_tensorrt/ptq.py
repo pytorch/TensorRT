@@ -30,7 +30,7 @@ def get_batch(self, names):
 
     batch = self.dataset_iterator.next()
     self.current_batch_idx += self.batch_size
-    inputs_gpu=[]
+    inputs_gpu = []
     if isinstance(batch, list):
         for example in batch:
             inputs_gpu.append(example.to(self.device).data_ptr())
@@ -79,46 +79,54 @@ class DataLoaderCalibrator(object):
         device = kwargs.get("device", torch.device("cuda:0"))
 
         if not isinstance(dataloader, torch.utils.data.DataLoader):
-            log(Level.Error,
-                "Dataloader : {} is not a valid instance of torch.utils.data.DataLoader".format(dataloader))
+            log(
+                Level.Error,
+                "Dataloader : {} is not a valid instance of torch.utils.data.DataLoader".format(dataloader),
+            )
 
         if not cache_file:
             if use_cache:
-                log(Level.Debug, "Using existing cache_file {} for calibration".format(cache_file))
+                log(
+                    Level.Debug,
+                    "Using existing cache_file {} for calibration".format(cache_file),
+                )
             else:
                 log(Level.Debug, "Overwriting existing calibration cache file.")
         else:
             if use_cache:
-                log(Level.Error, "Input cache file is None but use_cache is set to True in INT8 mode.")
+                log(
+                    Level.Error,
+                    "Input cache file is None but use_cache is set to True in INT8 mode.",
+                )
 
         # Define attributes and member functions for the calibrator class
         attribute_mapping = {
-            'data_loader': dataloader,
-            'current_batch_idx': 0,
-            'batch_size': dataloader.batch_size,
-            'dataset_iterator': iter(dataloader),
-            'cache_file': cache_file,
-            'device': device,
-            'use_cache': use_cache,
-            'get_batch_size': get_batch_size,
-            'get_batch': get_cache_mode_batch if use_cache else get_batch,
-            'read_calibration_cache': read_calibration_cache,
-            'write_calibration_cache': write_calibration_cache
+            "data_loader": dataloader,
+            "current_batch_idx": 0,
+            "batch_size": dataloader.batch_size,
+            "dataset_iterator": iter(dataloader),
+            "cache_file": cache_file,
+            "device": device,
+            "use_cache": use_cache,
+            "get_batch_size": get_batch_size,
+            "get_batch": get_cache_mode_batch if use_cache else get_batch,
+            "read_calibration_cache": read_calibration_cache,
+            "write_calibration_cache": write_calibration_cache,
         }
 
         # Using type metaclass to construct calibrator class based on algorithm type
         if algo_type == CalibrationAlgo.ENTROPY_CALIBRATION:
-            return type('DataLoaderCalibrator', (_C.IInt8EntropyCalibrator,), attribute_mapping)()
+            return type("DataLoaderCalibrator", (_C.IInt8EntropyCalibrator,), attribute_mapping)()
         elif algo_type == CalibrationAlgo.ENTROPY_CALIBRATION_2:
-            return type('DataLoaderCalibrator', (_C.IInt8MinMaxCalibrator,), attribute_mapping)()
+            return type("DataLoaderCalibrator", (_C.IInt8MinMaxCalibrator,), attribute_mapping)()
         elif algo_type == CalibrationAlgo.LEGACY_CALIBRATION:
-            return type('DataLoaderCalibrator', (_C.IInt8LegacyCalibrator,), attribute_mapping)()
+            return type("DataLoaderCalibrator", (_C.IInt8LegacyCalibrator,), attribute_mapping)()
         elif algo_type == CalibrationAlgo.MINMAX_CALIBRATION:
-            return type('DataLoaderCalibrator', (_C.IInt8MinMaxCalibrator,), attribute_mapping)()
+            return type("DataLoaderCalibrator", (_C.IInt8MinMaxCalibrator,), attribute_mapping)()
         else:
             log(
                 Level.Error,
-                "Invalid calibration algorithm type. Please select among ENTROPY_CALIBRATION, ENTROPY_CALIBRATION, LEGACY_CALIBRATION or MINMAX_CALIBRATION"
+                "Invalid calibration algorithm type. Please select among ENTROPY_CALIBRATION, ENTROPY_CALIBRATION, LEGACY_CALIBRATION or MINMAX_CALIBRATION",
             )
 
 
@@ -138,30 +146,33 @@ class CacheCalibrator(object):
         algo_type = kwargs.get("algo_type", CalibrationAlgo.ENTROPY_CALIBRATION_2)
 
         if os.path.isfile(cache_file):
-            log(Level.Debug, "Using existing cache_file {} for calibration".format(cache_file))
+            log(
+                Level.Debug,
+                "Using existing cache_file {} for calibration".format(cache_file),
+            )
         else:
             log(Level.Error, "Invalid calibration cache file.")
 
         # Define attributes and member functions for the calibrator class
         attribute_mapping = {
-            'use_cache': True,
-            'cache_file': cache_file,
-            'get_batch_size': get_batch_size,
-            'get_batch': get_cache_mode_batch,
-            'read_calibration_cache': read_calibration_cache,
-            'write_calibration_cache': write_calibration_cache
+            "use_cache": True,
+            "cache_file": cache_file,
+            "get_batch_size": get_batch_size,
+            "get_batch": get_cache_mode_batch,
+            "read_calibration_cache": read_calibration_cache,
+            "write_calibration_cache": write_calibration_cache,
         }
         # Using type metaclass to construct calibrator class based on algorithm type
         if algo_type == CalibrationAlgo.ENTROPY_CALIBRATION:
-            return type('DataLoaderCalibrator', (_C.IInt8EntropyCalibrator,), attribute_mapping)()
+            return type("DataLoaderCalibrator", (_C.IInt8EntropyCalibrator,), attribute_mapping)()
         elif algo_type == CalibrationAlgo.ENTROPY_CALIBRATION_2:
-            return type('DataLoaderCalibrator', (_C.IInt8MinMaxCalibrator,), attribute_mapping)()
+            return type("DataLoaderCalibrator", (_C.IInt8MinMaxCalibrator,), attribute_mapping)()
         elif algo_type == CalibrationAlgo.LEGACY_CALIBRATION:
-            return type('DataLoaderCalibrator', (_C.IInt8LegacyCalibrator,), attribute_mapping)()
+            return type("DataLoaderCalibrator", (_C.IInt8LegacyCalibrator,), attribute_mapping)()
         elif algo_type == CalibrationAlgo.MINMAX_CALIBRATION:
-            return type('DataLoaderCalibrator', (_C.IInt8MinMaxCalibrator,), attribute_mapping)()
+            return type("DataLoaderCalibrator", (_C.IInt8MinMaxCalibrator,), attribute_mapping)()
         else:
             log(
                 Level.Error,
-                "Invalid calibration algorithm type. Please select among ENTROPY_CALIBRATION, ENTROPY_CALIBRATION, LEGACY_CALIBRATION or MINMAX_CALIBRATION"
+                "Invalid calibration algorithm type. Please select among ENTROPY_CALIBRATION, ENTROPY_CALIBRATION, LEGACY_CALIBRATION or MINMAX_CALIBRATION",
             )

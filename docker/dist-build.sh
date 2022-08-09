@@ -20,4 +20,3 @@ pip3 install timm
 
 # test install
 pip3 uninstall -y torch_tensorrt && pip3 install ${TOP_DIR}/py/dist/*.whl
-

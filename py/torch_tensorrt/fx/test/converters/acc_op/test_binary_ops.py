@@ -58,9 +58,7 @@ class TestBinaryOpConverters(AccTestCase):
         self.run_test(m, inputs, expected_ops={expected_op})
 
     @parameterized.expand([(op[1].__name__, op[0], op[1]) for op in elementwise_ops])
-    def test_elementwise_ops_with_one_constant(
-        self, name, orig_op: Callable, expected_op
-    ):
+    def test_elementwise_ops_with_one_constant(self, name, orig_op: Callable, expected_op):
         class TestModule(nn.Module):
             def __init__(self, orig_op):
                 super().__init__()
@@ -75,12 +73,8 @@ class TestBinaryOpConverters(AccTestCase):
         inputs = [torch.randn(2, 2)]
         self.run_test(m, inputs, expected_ops={expected_op})
 
-    @parameterized.expand(
-        [(op[1].__name__, op[0], op[1]) for op in elementwise_ops if op[2]]
-    )
-    def test_elementwise_op_with_both_constants(
-        self, name, orig_op: Callable, expected_op
-    ):
+    @parameterized.expand([(op[1].__name__, op[0], op[1]) for op in elementwise_ops if op[2]])
+    def test_elementwise_op_with_both_constants(self, name, orig_op: Callable, expected_op):
         class TestModule(nn.Module):
             def __init__(self, orig_op):
                 super().__init__()
@@ -162,9 +156,7 @@ class TestBinaryOpConverters(AccTestCase):
             for op in elementwise_ops
         ]
     )
-    def test_elementwise_op_with_dynamic_shape_four_dimensions(
-        self, _, orig_op, expected_op
-    ):
+    def test_elementwise_op_with_dynamic_shape_four_dimensions(self, _, orig_op, expected_op):
         class Op(nn.Module):
             def forward(self, x, y):
                 return orig_op(x, y)

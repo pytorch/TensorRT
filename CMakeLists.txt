@@ -2,7 +2,7 @@
 cmake_minimum_required(VERSION 3.17)
 project(Torch-TensorRT LANGUAGES CXX)
 
-# use c++17 
+# use c++17
 set(CMAKE_CXX_STANDARD 17)
 
 # Build the libraries with -fPIC
@@ -22,7 +22,7 @@ if(MSVC)
   string(REPLACE "/Zi" "/Z7" CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}")
 endif()
 # -----------------------------------------
-#  compilation 
+#  compilation
 # -----------------------------------------
 add_subdirectory(core)
 add_subdirectory(cpp)

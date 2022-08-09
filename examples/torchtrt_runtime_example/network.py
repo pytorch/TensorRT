@@ -11,6 +11,7 @@ class Norm(torch.nn.Module):
     def forward(self, x):
         return torch.norm(x, 2, None, False)
 
+
 # Create a sample network with a conv and gelu node.
 # Gelu layer in Torch-TensorRT is converted to CustomGeluPluginDynamic from TensorRT plugin registry.
 class ConvGelu(torch.nn.Module):
@@ -24,6 +25,7 @@ class ConvGelu(torch.nn.Module):
         x = self.gelu(x)
         return x
 
+
 def main():
 
     model = ConvGelu().eval().cuda()
@@ -31,17 +33,18 @@ def main():
 
     compile_settings = {
         "inputs": [torchtrt.Input([1, 3, 5, 5])],
-        "enabled_precisions": {torch.float32}
+        "enabled_precisions": {torch.float32},
     }
 
     trt_ts_module = torchtrt.compile(scripted_model, **compile_settings)
-    torch.jit.save(trt_ts_module, 'conv_gelu.jit')
+    torch.jit.save(trt_ts_module, "conv_gelu.jit")
 
     norm_model = Norm().eval().cuda()
     norm_ts_module = torch.jit.script(norm_model)
     norm_trt_ts = torchtrt.compile(norm_ts_module, **compile_settings)
-    torch.jit.save(norm_trt_ts, 'norm.jit')
+    torch.jit.save(norm_trt_ts, "norm.jit")
     print("Generated Torchscript-TRT models.")
+
 
 if __name__ == "__main__":
     main()

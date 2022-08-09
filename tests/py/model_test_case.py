@@ -1,11 +1,13 @@
 import unittest
 import torch
 import torchvision.models as models
+import os
+
+REPO_ROOT = os.path.abspath(os.getcwd()) + "/../../"
 
 
 class ModelTestCase(unittest.TestCase):
-
-    def __init__(self, methodName='runTest', model=None):
+    def __init__(self, methodName="runTest", model=None):
         super(ModelTestCase, self).__init__(methodName)
         self.model = model
         self.model.eval().to("cuda")

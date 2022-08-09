@@ -31,7 +31,14 @@ build_py310() {
     #auditwheel repair --plat manylinux2014_x86_64
 }
 
+#build_py311() {
+#    /opt/python/cp311-cp311/bin/python -m pip install -r requirements.txt
+#    /opt/python/cp311-cp311/bin/python setup.py bdist_wheel --release
+    #auditwheel repair --plat manylinux2014_x86_64
+#}
+
 build_py37
 build_py38
 build_py39
 build_py310
+#build_py311

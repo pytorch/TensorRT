@@ -49,50 +49,6 @@ new_local_repository(
     build_file = "@//third_party/cublas:BUILD",
     path = "/usr",
 )
-#############################################################################################################
-# Tarballs and fetched dependencies (default - use in cases when building from precompiled bin and tarballs)
-#############################################################################################################
-
-#http_archive(
-#    name = "libtorch",
-#    build_file = "@//third_party/libtorch:BUILD",
-#    sha256 = "8d9e829ce9478db4f35bdb7943308cf02e8a2f58cf9bb10f742462c1d57bf287",
-#    strip_prefix = "libtorch",
-#    urls = ["https://download.pytorch.org/libtorch/cu113/libtorch-cxx11-abi-shared-with-deps-1.11.0%2Bcu113.zip"],
-#)
-#
-#http_archive(
-#    name = "libtorch_pre_cxx11_abi",
-#    build_file = "@//third_party/libtorch:BUILD",
-#    sha256 = "90159ecce3ff451f3ef3f657493b6c7c96759c3b74bbd70c1695f2ea2f81e1ad",
-#    strip_prefix = "libtorch",
-#    urls = ["https://download.pytorch.org/libtorch/cu113/libtorch-shared-with-deps-1.11.0%2Bcu113.zip"],
-#)
-
-# Download these tarballs manually from the NVIDIA website
-# Either place them in the distdir directory in third_party and use the --distdir flag
-# or modify the urls to "file:///<PATH TO TARBALL>/<TARBALL NAME>.tar.gz
-
-#http_archive(
-#    name = "cudnn",
-#    build_file = "@//third_party/cudnn/archive:BUILD",
-#    sha256 = "0e5d2df890b9967efa6619da421310d97323565a79f05a1a8cb9b7165baad0d7",
-#    strip_prefix = "cuda",
-#    urls = [
-#        "https://developer.nvidia.com/compute/machine-learning/cudnn/secure/8.2.4/11.4_20210831/cudnn-11.4-linux-x64-v8.2.4.15.tgz",
-#    ],
-#)
-#
-#http_archive(
-#    name = "tensorrt",
-#    build_file = "@//third_party/tensorrt/archive:BUILD",
-#    sha256 = "826180eaaecdf9a7e76116855b9f1f3400ea9b06e66b06a3f6a0747ba6f863ad",
-#    strip_prefix = "TensorRT-8.2.4.2",
-#    urls = [
-#        "https://developer.nvidia.com/compute/machine-learning/tensorrt/secure/8.2.4/tars/tensorrt-8.2.4.2.linux.x86_64-gnu.cuda-11.4.cudnn8.2.tar.gz",
-#    ],
-#)
-
 ####################################################################################
 # Locally installed dependencies (use in cases of custom dependencies or aarch64)
 ####################################################################################
@@ -127,19 +83,6 @@ new_local_repository(
    path = "/usr/",
    build_file = "@//third_party/tensorrt/local:BUILD"
 )
-
-# #########################################################################
-# # Testing Dependencies (optional - comment out on aarch64)
-# #########################################################################
-# pip_install(
-#     name = "torch_tensorrt_py_deps",
-#     requirements = "//py:requirements.txt",
-# )
-
-# pip_install(
-#     name = "py_test_deps",
-#     requirements = "//tests/py:requirements.txt",
-# )
 
 pip_install(
     name = "pylinter_deps",

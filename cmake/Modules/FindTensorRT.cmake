@@ -88,14 +88,14 @@ if(TensorRT_FOUND)
           PATH_SUFFIXES bin
         )
       endforeach()
-      
+
       set_target_properties(TensorRT::nvinfer PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES "${TensorRT_INCLUDE_DIRS}"
         IMPORTED_LOCATION "${TensorRT_LIBRARY_DLL}"
         IMPORTED_IMPLIB "${TensorRT_LIBRARY}"
       )
     else()
-      set_target_properties(TensorRT::nvinfer PROPERTIES 
+      set_target_properties(TensorRT::nvinfer PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES "${TensorRT_INCLUDE_DIRS}"
         IMPORTED_LOCATION "${TensorRT_LIBRARY}"
       )
@@ -114,13 +114,13 @@ if(TensorRT_FOUND)
         )
       endforeach()
 
-      set_target_properties(TensorRT::nvinfer_plugin PROPERTIES 
+      set_target_properties(TensorRT::nvinfer_plugin PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES "${TensorRT_INCLUDE_DIRS}"
         IMPORTED_LOCATION "${TensorRT_nvinfer_plugin_LIBRARY_DLL}"
         IMPORTED_IMPLIB "${TensorRT_nvinfer_plugin_LIBRARY}"
       )
     else()
-      set_target_properties(TensorRT::nvinfer_plugin PROPERTIES 
+      set_target_properties(TensorRT::nvinfer_plugin PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES "${TensorRT_INCLUDE_DIRS}"
         IMPORTED_LOCATION "${TensorRT_nvinfer_plugin_LIBRARY}"
       )

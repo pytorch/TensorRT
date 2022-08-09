@@ -79,9 +79,7 @@ class LowerTrtInterpreter:
 
     @classmethod
     def create(cls, lower_setting):
-        timing_cache_manager = TimingCacheManager(
-            lower_setting.timing_cache_prefix, lower_setting.save_timing_cache
-        )
+        timing_cache_manager = TimingCacheManager(lower_setting.timing_cache_prefix, lower_setting.save_timing_cache)
         return LowerTrtInterpreter(lower_setting, timing_cache_manager)
 
     def __call__(self, mod, input, split_name) -> TRTInterpreterResult:
@@ -105,9 +103,7 @@ class LowerTrtInterpreter:
             input_specs=self.lower_setting.input_specs,
             explicit_batch_dimension=self.lower_setting.explicit_batch_dimension,
             explicit_precision=self.lower_setting.explicit_precision,
-            logger_level=trt.Logger.VERBOSE
-            if self.lower_setting.verbose_log
-            else trt.Logger.WARNING,
+            logger_level=trt.Logger.VERBOSE if self.lower_setting.verbose_log else trt.Logger.WARNING,
         )
 
         interp_result: TRTInterpreterResult = interpreter.run(
@@ -120,6 +116,7 @@ class LowerTrtInterpreter:
             profiling_verbosity=trt.ProfilingVerbosity.DETAILED
             if self.lower_setting.verbose_profile
             else trt.ProfilingVerbosity.LAYER_NAMES_ONLY,
+            tactic_sources=self.lower_setting.tactic_sources,
         )
 
         # Update timing cache file if needed
@@ -130,9 +127,7 @@ class LowerTrtInterpreter:
         return interp_result
 
 
-def default_split_function(
-    model: fx.GraphModule, inputs: Input, lower_setting: LowerSetting
-) -> SplitResult:
+def default_split_function(model: fx.GraphModule, inputs: Input, lower_setting: LowerSetting) -> SplitResult:
     splitter_setting = TRTSplitterSetting()
     splitter_setting.use_implicit_batch_dim = not lower_setting.explicit_batch_dimension
     splitter_setting.min_acc_module_size = lower_setting.min_acc_module_size
@@ -148,9 +143,7 @@ def create_lower_trt_interpreter(lower_setting: LowerSetting) -> LowerTrtInterpr
 def default_lower_pass(
     create_trt_interpreter: Callable[[LowerSetting], LowerTrtInterpreter],
 ) -> PassFunc:
-    def lower_pass(
-        mod: nn.Module, input: Input, lower_setting: LowerSetting, module_name: str
-    ) -> nn.Module:
+    def lower_pass(mod: nn.Module, input: Input, lower_setting: LowerSetting, module_name: str) -> nn.Module:
         """
         Create a module transformation pass which lowers an `fx.GraphModule` into a
         `TRTModule`
@@ -224,18 +217,10 @@ class Lowerer:
     ) -> nn.Module:
         module.eval()
 
-        if (
-            self.lower_pass_manager_builder.lower_setting.lower_precision
-            == LowerPrecision.FP16
-        ):
+        if self.lower_pass_manager_builder.lower_setting.lower_precision == LowerPrecision.FP16:
             module.half()
-            inputs = tuple(
-                x.half() if x is not None and x.dtype == torch.float32 else x
-                for x in inputs
-            )
-        pm = self.lower_pass_manager_builder.build_trt_lower_pipeline(
-            inputs, additional_inputs
-        )
+            inputs = tuple(x.half() if x is not None and x.dtype == torch.float32 else x for x in inputs)
+        pm = self.lower_pass_manager_builder.build_trt_lower_pipeline(inputs, additional_inputs)
 
         lower_result = pm(module)
 

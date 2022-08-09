@@ -10,14 +10,14 @@ add_executable(${executable_name}
 if (MSVC)
     target_link_libraries(${executable_name} PRIVATE torch torchtrt)
 else()
-    target_link_libraries(${executable_name} PRIVATE torch "-Wl,--no-as-needed" torchtrt "-Wl,--as-needed")
+    target_link_libraries(${executable_name} PRIVATE torch "-Wl,--no-as-needed -ldl" torchtrt "-Wl,--as-needed")
     set_target_properties(
         ${executable_name}
         PROPERTIES INSTALL_RPATH_USE_LINK_PATH FALSE #
                    LINK_FLAGS "-Wl,--disable-new-dtags")
 endif()
 
-target_include_directories(${executable_name} 
+target_include_directories(${executable_name}
     PUBLIC
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>"
 )

@@ -47,13 +47,9 @@ def get_trt_plugin(
     #     print(plugin_creator.name)
 
     plugin_registry = trt.get_plugin_registry()
-    plugin_creator = plugin_registry.get_plugin_creator(
-        plugin_name, version, plugin_namespace
-    )
+    plugin_creator = plugin_registry.get_plugin_creator(plugin_name, version, plugin_namespace)
     assert plugin_creator, f"Unabled to find plugin creator with name {plugin_name}"
-    plugin = plugin_creator.create_plugin(
-        name=plugin_name, field_collection=field_collection
-    )
+    plugin = plugin_creator.create_plugin(name=plugin_name, field_collection=field_collection)
 
     assert plugin is not None, f"Plugin: {plugin_name} could not be fetched"
     return plugin
@@ -133,9 +129,7 @@ def to_numpy(tensor: Optional[torch.Tensor]) -> Optional[np.ndarray]:
     if tensor is None:
         return tensor
 
-    assert isinstance(
-        tensor, torch.Tensor
-    ), f"to_numpy can only be called on None or a torch.Tensor, got: {tensor}"
+    assert isinstance(tensor, torch.Tensor), f"to_numpy can only be called on None or a torch.Tensor, got: {tensor}"
     if tensor.is_quantized:
         tensor = tensor.dequantize()
 
@@ -224,9 +218,7 @@ def create_constant(
     return constant.get_output(0)
 
 
-def get_trt_tensor(
-    network: TRTNetwork, input_val: Any, name: str, dtype: Optional[torch.dtype] = None
-) -> TRTTensor:
+def get_trt_tensor(network: TRTNetwork, input_val: Any, name: str, dtype: Optional[torch.dtype] = None) -> TRTTensor:
     """
     Given a value of random type, we try to convert it to a TensorRT ITensor.
     An runtime error is raised if we're not able to do that.
@@ -257,10 +249,7 @@ def get_trt_tensor(
     if isinstance(input_val, (torch.Tensor, int, float)):
         return create_constant(network, input_val, name, dtype)
     elif not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"Received input {input_val} of name {name} that "
-            "is not part of the TensorRT region!"
-        )
+        raise RuntimeError(f"Received input {input_val} of name {name} that " "is not part of the TensorRT region!")
     else:
         return input_val
 
@@ -293,9 +282,7 @@ def prepend_ones(
     if has_dynamic_shape(tensor.shape):
         tensor_shape_layer = network.add_shape(tensor)
         tensor_shape_layer.name = f"{name}_broadcast_orig_shape"
-        prepend_shape_layer = network.add_constant(
-            (num_prepend_ones,), np.ones((num_prepend_ones,), dtype=np.int32)
-        )
+        prepend_shape_layer = network.add_constant((num_prepend_ones,), np.ones((num_prepend_ones,), dtype=np.int32))
         prepend_shape_layer.name = f"{name}_broadcast_prepend_ones"
         reshape_dim_layer = network.add_concatenation(
             [prepend_shape_layer.get_output(0), tensor_shape_layer.get_output(0)]
@@ -382,16 +369,12 @@ def get_shape_with_dynamic_shape(
     # Ger real shape info for input_val
     input_shape = network.add_shape(input_val).get_output(0)
 
-    scale_layer = network.add_constant(
-        input_shape.shape, np.ascontiguousarray(shape, dtype=np.int32)
-    )
+    scale_layer = network.add_constant(input_shape.shape, np.ascontiguousarray(shape, dtype=np.int32))
     set_layer_name(scale_layer, target, f"{name}_scale")
     scale_res = scale_layer.get_output(0)
 
     length = input_shape.shape[0]
-    zero_layer = network.add_constant(
-        input_shape.shape, to_numpy(torch.zeros((length), dtype=torch.int32))
-    )
+    zero_layer = network.add_constant(input_shape.shape, to_numpy(torch.zeros((length), dtype=torch.int32)))
     set_layer_name(zero_layer, target, f"{name}_zeros")
 
     condition_val = add_binary_elementwise_layer(
@@ -497,17 +480,11 @@ def add_binary_elementwise_layer(
     # Check the limitation in the doc string.
     if network.has_implicit_batch_dimension:
         if is_lhs_trt_tensor and not is_rhs_trt_tensor:
-            assert len(lhs_val.shape) >= len(
-                rhs_val.shape
-            ), f"{lhs_val.shape} >= {rhs_val.shape}"
+            assert len(lhs_val.shape) >= len(rhs_val.shape), f"{lhs_val.shape} >= {rhs_val.shape}"
         elif not is_lhs_trt_tensor and is_rhs_trt_tensor:
-            assert len(rhs_val.shape) >= len(
-                lhs_val.shape
-            ), f"{rhs_val.shape} >= {lhs_val.shape}"
+            assert len(rhs_val.shape) >= len(lhs_val.shape), f"{rhs_val.shape} >= {lhs_val.shape}"
 
-    lhs_val, rhs_val = broadcast(
-        network, lhs_val, rhs_val, f"{name}_lhs", f"{name}_rhs"
-    )
+    lhs_val, rhs_val = broadcast(network, lhs_val, rhs_val, f"{name}_lhs", f"{name}_rhs")
     layer = network.add_elementwise(lhs_val, rhs_val, op_type)
     set_layer_name(layer, target, name)
     output = layer.get_output(0)
@@ -547,10 +524,7 @@ def add_unary_layer(
         The output of TensorRT Unary layer.
     """
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"{operation_type} received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"{operation_type} received input {input_val} that is not part " "of the TensorRT region!")
     layer = network.add_unary(input_val, operation_type)
     set_layer_name(layer, target, name)
     output = layer.get_output(0)
@@ -587,10 +561,7 @@ def add_activation_layer(
         The output of TensorRT Activation layer.
     """
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"{operation_type} received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"{operation_type} received input {input_val} that is not part " "of the TensorRT region!")
     layer = network.add_activation(input_val, operation_type)
     if alpha is not None:
         layer.alpha = alpha
@@ -625,10 +596,7 @@ def add_reduce_layer(
     """
     input_val = kwargs["input"]
     if not isinstance(input_val, TRTTensor):
-        raise RuntimeError(
-            f"{name} received input {input_val} that is not part "
-            "of the TensorRT region!"
-        )
+        raise RuntimeError(f"{name} received input {input_val} that is not part " "of the TensorRT region!")
 
     # If dim is specified, then the op is reducing over certain dimensions.
     # Otherwise, it's reducing over all elements, which is only supported in
@@ -704,9 +672,7 @@ def get_inputs_from_args_and_kwargs(args, kwargs, input_names):
     return inputs
 
 
-def sign(
-    network: TRTNetwork, input_val: TRTTensor, target: Target, name: str
-) -> TRTTensor:
+def sign(network: TRTNetwork, input_val: TRTTensor, target: Target, name: str) -> TRTTensor:
     """
     Sign is calculated as below:
        x = input
@@ -724,12 +690,8 @@ def sign(
     Returns:
         A TensorRT tensor represent the result of sign operator.
     """
-    input_exp_output = add_unary_layer(
-        network, input_val, trt.UnaryOperation.EXP, target, f"{name}_prod_exp"
-    )
-    input_abs_output = add_unary_layer(
-        network, input_val, trt.UnaryOperation.ABS, target, f"{name}_prod_abs"
-    )
+    input_exp_output = add_unary_layer(network, input_val, trt.UnaryOperation.EXP, target, f"{name}_prod_exp")
+    input_abs_output = add_unary_layer(network, input_val, trt.UnaryOperation.ABS, target, f"{name}_prod_abs")
     input_abs_exp_output = add_unary_layer(
         network,
         input_abs_output,
@@ -763,9 +725,7 @@ def sign(
     )
 
 
-def trunc_div(
-    input: TRTTensor, other: TRTTensor, network: TRTNetwork, target: Target, name: str
-) -> TRTTensor:
+def trunc_div(input: TRTTensor, other: TRTTensor, network: TRTNetwork, target: Target, name: str) -> TRTTensor:
     """
     Perform trunc divide on Tensor, result of divide will be round toward zero.
     This means for positive number, it will be floor round; for negative number,
@@ -790,16 +750,10 @@ def trunc_div(
     if not isinstance(input, trt.tensorrt.ITensor):
         input = get_trt_tensor(network, input, f"{name}_input")
     if not isinstance(other, trt.tensorrt.ITensor):
-        other = get_trt_tensor(
-            network, other, f"{name}_other", dtype=torch_dtype_from_trt(input.dtype)
-        )
+        other = get_trt_tensor(network, other, f"{name}_other", dtype=torch_dtype_from_trt(input.dtype))
 
-    abs_input_output = add_unary_layer(
-        network, input, trt.UnaryOperation.ABS, target, f"{name}_abs_input"
-    )
-    abs_other_output = add_unary_layer(
-        network, other, trt.UnaryOperation.ABS, target, f"{name}_abs_other"
-    )
+    abs_input_output = add_unary_layer(network, input, trt.UnaryOperation.ABS, target, f"{name}_abs_input")
+    abs_other_output = add_unary_layer(network, other, trt.UnaryOperation.ABS, target, f"{name}_abs_other")
     abs_floor_output = add_binary_elementwise_layer(
         network,
         abs_input_output,
@@ -837,9 +791,7 @@ def get_python_op_from_trt_elementwise_op(
         raise RuntimeError(f"{trt_op} is not supported yet!")
 
 
-def dtype_uniform(
-    network: TRTNetwork, target: Target, name: str, input: TRTTensor, other: TRTTensor
-):
+def dtype_uniform(network: TRTNetwork, target: Target, name: str, input: TRTTensor, other: TRTTensor):
     table = {trt.bool: 0, trt.int32: 1, trt.float16: 2, trt.float32: 3}
     input_dtype = input.dtype
     other_dtype = other.dtype

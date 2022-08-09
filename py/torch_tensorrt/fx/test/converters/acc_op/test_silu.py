@@ -26,9 +26,7 @@ class TestSilu(AccTestCase):
                 shape_ranges=[((1, 1, 1), (1, 2, 3), (3, 3, 3))],
             ),
         ]
-        self.run_test_with_dynamic_shape(
-            Silu(), input_specs, expected_ops={acc_ops.sigmoid, acc_ops.mul}
-        )
+        self.run_test_with_dynamic_shape(Silu(), input_specs, expected_ops={acc_ops.sigmoid, acc_ops.mul})
 
     def test_silu_with_dynamic_shape_four_dimensions(self):
         class Silu(nn.Module):
@@ -43,9 +41,7 @@ class TestSilu(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(
-            Silu(), input_specs, expected_ops={acc_ops.sigmoid, acc_ops.mul}
-        )
+        self.run_test_with_dynamic_shape(Silu(), input_specs, expected_ops={acc_ops.sigmoid, acc_ops.mul})
 
 
 if __name__ == "__main__":

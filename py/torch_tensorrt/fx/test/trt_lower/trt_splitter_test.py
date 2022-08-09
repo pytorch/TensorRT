@@ -13,10 +13,10 @@ from torch.testing._internal.common_utils import run_tests, TestCase
 from torch_tensorrt.fx.tools.trt_splitter import TRTSplitter, TRTSplitterSetting
 from torch_tensorrt.fx.tracer.acc_tracer import acc_tracer
 
-
 ERROR_MSG_NO_ACC_MODULE = "FX split failed: Did not find any ACC submodule!"
 ERROR_MSG_MULTI_ACC_MODULES = "FX split failed: Found more than one ACC submodules!"
 ACC_SUBMODULE_PREFIX = "_run_on_acc_"
+
 
 # Check if the split result has expected number of ACC submodule. If not, raise runtime error;
 def verify_split_model(
@@ -40,9 +40,7 @@ def find_inputs(module):
 
 
 def find_fun_calls(module, target):
-    return [
-        n for n in module.graph.nodes if n.op == "call_function" and n.target == target
-    ]
+    return [n for n in module.graph.nodes if n.op == "call_function" and n.target == target]
 
 
 def find_output(module):
@@ -148,19 +146,11 @@ class TestSplit(TestCase):
             st_split = splitter()
             verify_split_model(st_split)
             # Should be "a", "conv.weight", "conv.bias".
-            get_attr_nodes = [
-                node.target
-                for node in st_split._run_on_gpu_0.graph.nodes
-                if node.op == "get_attr"
-            ]
+            get_attr_nodes = [node.target for node in st_split._run_on_gpu_0.graph.nodes if node.op == "get_attr"]
             assert len(get_attr_nodes) == 3 and "a" in get_attr_nodes
 
             # Should be "b", "conv.weight", "conv.bias".
-            get_attr_nodes = [
-                node.target
-                for node in st_split._run_on_acc_1.graph.nodes
-                if node.op == "get_attr"
-            ]
+            get_attr_nodes = [node.target for node in st_split._run_on_acc_1.graph.nodes if node.op == "get_attr"]
             assert len(get_attr_nodes) == 3 and "b" in get_attr_nodes
 
         test_splitter(splitter)
@@ -214,14 +204,10 @@ class TestSplit(TestCase):
             self.assertEqual(arg.name, topk.kwargs["input"].name)
             self.assertEqual(3, topk.kwargs["k"])
 
-            [topk_res1, topk_res2] = find_fun_calls(
-                st_split._run_on_acc_0, acc_ops.getitem
-            )
+            [topk_res1, topk_res2] = find_fun_calls(st_split._run_on_acc_0, acc_ops.getitem)
 
             [sigmoid] = find_fun_calls(st_split._run_on_acc_0, acc_ops.sigmoid)
-            self.assertIn(
-                sigmoid.kwargs["input"].name, {topk_res1.name, topk_res2.name}
-            )
+            self.assertIn(sigmoid.kwargs["input"].name, {topk_res1.name, topk_res2.name})
 
             # Main graph returns a tuple
             output = find_output(st_split._run_on_acc_0)
@@ -260,9 +246,7 @@ class TestSplit(TestCase):
             def forward(self, x):
                 return self.relu_module(x) + self.sin_module(x)
 
-        mod = acc_tracer.trace(
-            TestModule3(ReluModule(), SinModule()), [torch.randn(2, 3)]
-        )
+        mod = acc_tracer.trace(TestModule3(ReluModule(), SinModule()), [torch.randn(2, 3)])
 
         # Making sin(x) run on ACC
         splitter = TRTSplitter(
@@ -788,13 +772,9 @@ class TestSplitNonTensorEdges(TestCase):
             except RuntimeError as err:
                 self.assertEqual(str(err), ERROR_MSG_MULTI_ACC_MODULES)
 
-            self.assertEqual(
-                {acc_ops.relu}, find_call_targets(module_fx_split._run_on_acc_0)
-            )
+            self.assertEqual({acc_ops.relu}, find_call_targets(module_fx_split._run_on_acc_0))
 
-            self.assertEqual(
-                {acc_ops.cos}, find_call_targets(module_fx_split._run_on_gpu_1)
-            )
+            self.assertEqual({acc_ops.cos}, find_call_targets(module_fx_split._run_on_gpu_1))
 
             self.assertEqual(
                 {acc_ops.size, acc_ops.getitem, acc_ops.add, acc_ops.sigmoid},
@@ -1031,11 +1011,7 @@ class TestAccFusionsFinder(TestCase):
         module_fx = torch.fx.symbolic_trace(module_nn)
         shape_prop.ShapeProp(module_fx).propagate(torch.randn(1, 1, 1))
 
-        acc_node = {
-            node
-            for node in module_fx.graph.nodes
-            if node.op in torch.fx.passes.tools_common.CALLABLE_NODE_OPS
-        }
+        acc_node = {node for node in module_fx.graph.nodes if node.op in torch.fx.passes.tools_common.CALLABLE_NODE_OPS}
 
         fusions_finder = torch.fx.passes.splitter_base.FxNetAccFusionsFinder(
             module_fx,
@@ -1057,9 +1033,7 @@ class TestAccFusionsFinder(TestCase):
         module_fx = torch.fx.symbolic_trace(module_nn)
         shape_prop.ShapeProp(module_fx).propagate(torch.randn(1, 1, 1))
 
-        acc_node = {
-            node for node in module_fx.graph.nodes if node.target == operator.add
-        }
+        acc_node = {node for node in module_fx.graph.nodes if node.target == operator.add}
         fusions_finder = torch.fx.passes.splitter_base.FxNetAccFusionsFinder(
             module_fx,
             acc_node,

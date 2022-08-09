@@ -73,11 +73,7 @@ class TestMatMulConverter(AccTestCase):
                 return torch.matmul(input, other)
 
         inputs = [torch.randn(*input_shape), torch.randn(*other_shape)]
-        test_implicit_batch_dim = (
-            input_shape[0] == other_shape[0]
-            and len(input_shape) > 2
-            and len(other_shape) > 2
-        )
+        test_implicit_batch_dim = input_shape[0] == other_shape[0] and len(input_shape) > 2 and len(other_shape) > 2
         self.run_test(
             MatMul(),
             inputs,
@@ -108,9 +104,7 @@ class TestMatMulConverter(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(
-            Matmul(), input_specs, expected_ops={acc_ops.matmul}
-        )
+        self.run_test_with_dynamic_shape(Matmul(), input_specs, expected_ops={acc_ops.matmul})
 
 
 if __name__ == "__main__":

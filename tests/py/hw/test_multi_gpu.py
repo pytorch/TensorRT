@@ -7,7 +7,6 @@ from model_test_case import ModelTestCase
 
 
 class TestMultiGpuSwitching(ModelTestCase):
-
     def setUp(self):
         if torch.cuda.device_count() < 2:
             self.fail("Test is not relevant for this platform since number of available CUDA devices is less than 2")
@@ -28,8 +27,8 @@ class TestMultiGpuSwitching(ModelTestCase):
                 "gpu_id": self.target_gpu,
                 "dla_core": 0,
                 "allow_gpu_fallback": False,
-                "disable_tf32": False
-            }
+                "disable_tf32": False,
+            },
         }
 
         trt_mod = torchtrt.ts.compile(self.traced_model, **compile_spec)
@@ -47,8 +46,8 @@ class TestMultiGpuSwitching(ModelTestCase):
                 "gpu_id": self.target_gpu,
                 "dla_core": 0,
                 "allow_gpu_fallback": False,
-                "disable_tf32": False
-            }
+                "disable_tf32": False,
+            },
         }
 
         trt_mod = torchtrt.ts.compile(self.scripted_model, **compile_spec)
@@ -59,7 +58,6 @@ class TestMultiGpuSwitching(ModelTestCase):
 
 
 class TestMultiGpuSerializeDeserializeSwitching(ModelTestCase):
-
     def setUp(self):
         if torch.cuda.device_count() < 2:
             self.fail("Test is not relevant for this platform since number of available CUDA devices is less than 2")
@@ -80,8 +78,8 @@ class TestMultiGpuSerializeDeserializeSwitching(ModelTestCase):
                 "gpu_id": self.target_gpu,
                 "dla_core": 0,
                 "allow_gpu_fallback": False,
-                "disable_tf32": False
-            }
+                "disable_tf32": False,
+            },
         }
 
         trt_mod = torchtrt.ts.compile(self.traced_model, **compile_spec)
@@ -99,8 +97,8 @@ class TestMultiGpuSerializeDeserializeSwitching(ModelTestCase):
                 "gpu_id": self.target_gpu,
                 "dla_core": 0,
                 "allow_gpu_fallback": False,
-                "disable_tf32": False
-            }
+                "disable_tf32": False,
+            },
         }
 
         trt_mod = torchtrt.ts.compile(self.scripted_model, **compile_spec)
@@ -114,8 +112,10 @@ def test_suite():
     suite = unittest.TestSuite()
     suite.addTest(TestMultiGpuSwitching.parametrize(TestMultiGpuSwitching, model=models.resnet18(pretrained=True)))
     suite.addTest(
-        TestMultiGpuSerializeDeserializeSwitching.parametrize(TestMultiGpuSwitching,
-                                                              model=models.resnet18(pretrained=True)))
+        TestMultiGpuSerializeDeserializeSwitching.parametrize(
+            TestMultiGpuSwitching, model=models.resnet18(pretrained=True)
+        )
+    )
 
     return suite
 

@@ -41,7 +41,7 @@ Using DLA in a python application
     compile_spec = {
         "inputs": [torch_tensorrt.Input(self.input.shape)],
         "device": torch_tensorrt.Device("dla:0", allow_gpu_fallback=True),
-        "enalbed_precisions": {torch.half}
+        "enalbed_precisions": {torch.half},
     }
 
     trt_mod = torch_tensorrt.compile(self.scripted_model, compile_spec)

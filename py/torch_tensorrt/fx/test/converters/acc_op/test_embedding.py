@@ -8,9 +8,7 @@ from torch.testing._internal.common_utils import run_tests
 from torch_tensorrt.fx.tools.common_fx2trt import AccTestCase, InputTensorSpec
 
 
-@unittest.skip(
-    "Current implementation is limited. All implementations in hf use int64. T113156424"
-)
+@unittest.skip("Current implementation is limited. All implementations in hf use int64. T113156424")
 class TestEmbeddingConverter(AccTestCase):
     @parameterized.expand(
         [
@@ -98,9 +96,7 @@ class TestEmbeddingConverter(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(
-            TestEmbedding(), input_specs, expected_ops={acc_ops.embedding}
-        )
+        self.run_test_with_dynamic_shape(TestEmbedding(), input_specs, expected_ops={acc_ops.embedding})
 
 
 if __name__ == "__main__":

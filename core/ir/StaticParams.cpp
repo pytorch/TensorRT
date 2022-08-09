@@ -11,7 +11,9 @@ StaticParams get_static_params(c10::ArrayRef<torch::jit::Value*> inputs, std::ve
   StaticParams static_params;
   auto param_it = params.begin();
   for (auto in : inputs) {
-    if (in->type() != c10::TensorType::get() && param_it != params.end()) {
+    // handle TensorType, TupleType and ListType
+    if (in->type() != c10::TensorType::get() && in->type()->kind() != torch::jit::TypeKind::TupleType &&
+        in->type()->kind() != torch::jit::TypeKind::ListType && param_it != params.end()) {
       static_params[in] = *param_it;
       ++param_it;
     }

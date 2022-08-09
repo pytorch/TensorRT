@@ -26,9 +26,7 @@ class TestSigmoid(AccTestCase):
                 shape_ranges=[((1, 1, 1, 1), (1, 2, 3, 3), (3, 3, 3, 3))],
             ),
         ]
-        self.run_test_with_dynamic_shape(
-            Sigmoid(), input_specs, expected_ops={acc_ops.sigmoid}
-        )
+        self.run_test_with_dynamic_shape(Sigmoid(), input_specs, expected_ops={acc_ops.sigmoid})
 
 
 if __name__ == "__main__":

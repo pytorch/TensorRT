@@ -23,6 +23,19 @@ void RegisterTRTCompileSpec() {
   ADD_FIELD_GET_SET_REGISTRATION(TRTInputRangeTSRegistration, torch_tensorrt::pyapi::Input, input_is_dynamic);
   ADD_FIELD_GET_SET_REGISTRATION(TRTInputRangeTSRegistration, torch_tensorrt::pyapi::Input, explicit_set_dtype);
 
+  static auto TORCHTRT_UNUSED TRTInputSignatureTSRegistration =
+      torch::class_<torch_tensorrt::pyapi::InputSignature>("tensorrt", "_InputSignature")
+          .def(torch::init<>())
+          .def(
+              "_set_signature_ivalue_torchbind",
+              [](const c10::intrusive_ptr<torch_tensorrt::pyapi::InputSignature>& self, torch::jit::IValue ival) {
+                self->signature_ivalue = ival;
+              })
+          .def("__str__", &torch_tensorrt::pyapi::InputSignature::to_str);
+
+  ADD_FIELD_GET_SET_REGISTRATION(
+      TRTInputSignatureTSRegistration, torch_tensorrt::pyapi::InputSignature, signature_ivalue);
+
   static auto TORCHTRT_UNUSED TRTDeviceTSRegistration =
       torch::class_<torch_tensorrt::pyapi::Device>("tensorrt", "_Device")
           .def(torch::init<>())
@@ -49,6 +62,7 @@ void RegisterTRTCompileSpec() {
       torch::class_<torch_tensorrt::pyapi::CompileSpec>("tensorrt", "CompileSpec")
           .def(torch::init<>())
           .def("_append_input", &torch_tensorrt::pyapi::CompileSpec::appendInput)
+          .def("_set_input_signature", &torch_tensorrt::pyapi::CompileSpec::setInputSignature)
           .def("_set_precisions", &torch_tensorrt::pyapi::CompileSpec::setPrecisions)
           .def("_set_device", &torch_tensorrt::pyapi::CompileSpec::setDeviceIntrusive)
           .def("_set_torch_fallback", &torch_tensorrt::pyapi::CompileSpec::setTorchFallbackIntrusive)
@@ -65,7 +79,8 @@ void RegisterTRTCompileSpec() {
   ADD_FIELD_GET_SET_REGISTRATION(TRTCompileSpecTSRegistration, torch_tensorrt::pyapi::CompileSpec, workspace_size);
   ADD_FIELD_GET_SET_REGISTRATION(TRTCompileSpecTSRegistration, torch_tensorrt::pyapi::CompileSpec, dla_sram_size);
   ADD_FIELD_GET_SET_REGISTRATION(TRTCompileSpecTSRegistration, torch_tensorrt::pyapi::CompileSpec, dla_local_dram_size);
-  ADD_FIELD_GET_SET_REGISTRATION(TRTCompileSpecTSRegistration, torch_tensorrt::pyapi::CompileSpec, dla_global_dram_size);
+  ADD_FIELD_GET_SET_REGISTRATION(
+      TRTCompileSpecTSRegistration, torch_tensorrt::pyapi::CompileSpec, dla_global_dram_size);
   ADD_FIELD_GET_SET_REGISTRATION(
       TRTCompileSpecTSRegistration, torch_tensorrt::pyapi::CompileSpec, truncate_long_and_double);
 }

@@ -49,9 +49,7 @@ class TestMinimumConverterWithDynamicShape(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(
-            Minimum(), input_specs, expected_ops={acc_ops.minimum}
-        )
+        self.run_test_with_dynamic_shape(Minimum(), input_specs, expected_ops={acc_ops.minimum})
 
 
 class TestMinimumMethodConverterWithDynamicShape(AccTestCase):
@@ -73,9 +71,7 @@ class TestMinimumMethodConverterWithDynamicShape(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(
-            Minimum(), input_specs, expected_ops={acc_ops.minimum}
-        )
+        self.run_test_with_dynamic_shape(Minimum(), input_specs, expected_ops={acc_ops.minimum})
 
 
 if __name__ == "__main__":

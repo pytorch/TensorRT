@@ -1,5 +1,17 @@
+"""
+Converter test macros
+"""
+
+load("@rules_cc//cc:defs.bzl", "cc_test")
+
 def converter_test(name, visibility = None):
-    native.cc_test(
+    """Macro to define a test for a converter
+
+    Args:
+        name: Name of test file
+        visibility: Visibility of the test target
+    """
+    cc_test(
         name = name,
         srcs = [name + ".cpp"],
         visibility = visibility,
