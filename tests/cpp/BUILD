@@ -18,7 +18,8 @@ test_suite(
         ":test_multiple_registered_engines",
         ":test_serialization",
         ":test_module_fallback",
-        ":test_example_tensors"
+        ":test_example_tensors",
+        ":test_collections"
     ],
 )
 
@@ -32,7 +33,8 @@ test_suite(
         ":test_multiple_registered_engines",
         ":test_serialization",
         ":test_module_fallback",
-        ":test_example_tensors"
+        ":test_example_tensors",
+        ":test_collections"
     ],
 )
 
@@ -122,6 +124,20 @@ cc_test(
     })
 )
 
+cc_test(
+    name = "test_collections",
+    srcs = ["test_collections.cpp"],
+    data = [
+        "//tests/modules:jit_models",
+    ],
+    deps = [
+        "//tests/util",
+        "@googletest//:gtest_main",
+    ] + select({
+        ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
+        "//conditions:default": ["@libtorch//:libtorch"],
+    })
+)
 cc_test(
     name = "test_compiled_modules",
     srcs = ["test_compiled_modules.cpp"],

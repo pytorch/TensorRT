@@ -65,6 +65,13 @@ nvinfer1::ILayer* add_elementwise(
     nvinfer1::ITensor* self,
     nvinfer1::ITensor* other,
     const std::string& name) {
+  if (self->getType() == nvinfer1::DataType::kFLOAT && other->getType() == nvinfer1::DataType::kINT32) {
+    LOG_DEBUG("Type mismatch, casting other to " << self->getType());
+    other = castITensor(ctx, other, self->getType());
+  } else if (self->getType() == nvinfer1::DataType::kINT32 && other->getType() == nvinfer1::DataType::kFLOAT) {
+    LOG_DEBUG("Type mismatch, casting self to " << other->getType());
+    self = castITensor(ctx, self, other->getType());
+  }
   // ensure self to have larger number of dimension
   bool swapSelfOther = false;
   if (self->getDimensions().nbDims < other->getDimensions().nbDims) {

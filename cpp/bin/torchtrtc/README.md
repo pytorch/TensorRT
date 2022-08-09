@@ -108,6 +108,8 @@ torchtrtc [input_file_path] [output_file_path]
                                         TorchScript program, save the created
                                         engine to the path specified as the
                                         output path
+      --custom-torch-ops=[lib]          (repeatable) Shared object/DLL containing custom torch operators
+      --custom-converters=[lib]         (repeatable) Shared object/DLL containing custom converters
       input_file_path                   Path to input TorchScript file
       output_file_path                  Path for compiled TorchScript (or
                                         TensorRT engine) file
@@ -130,4 +132,15 @@ e.g.
 
 ```
 torchtrtc tests/modules/ssd_traced.jit.pt ssd_trt.ts "[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@fp16%contiguous" -p f16
+```
+
+
+To run with custom torch operators
+```
+torchtrtc tests/modules/ssd_traced.jit.pt ssd_trt.ts --custom-torch-ops=<path to custom library> "[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@fp16%contiguous" -p f16
+```
+
+To run with custom converters
+```
+torchtrtc tests/modules/ssd_traced.jit.pt ssd_trt.ts --custom-converters=<path to custom library> "[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@fp16%contiguous" -p f16
 ```

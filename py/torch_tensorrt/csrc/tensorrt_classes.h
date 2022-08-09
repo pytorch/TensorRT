@@ -57,6 +57,12 @@ struct Input : torch::CustomClassHolder {
   std::string to_str();
 };
 
+struct InputSignature : torch::CustomClassHolder {
+  torch::jit::IValue signature_ivalue; // nested Input, full input spec
+  ADD_FIELD_GET_SET(signature_ivalue, torch::jit::IValue);
+  std::string to_str();
+};
+
 enum DeviceType : int8_t {
   kGPU,
   kDLA,
@@ -119,6 +125,10 @@ struct CompileSpec : torch::CustomClassHolder {
     inputs.push_back(*ir);
   }
 
+  void setInputSignature(const c10::intrusive_ptr<InputSignature>& is) {
+    input_signature = *is;
+  }
+
   void setPrecisions(const std::vector<int64_t>& precisions_raw) {
     for (auto p : precisions_raw) {
       TORCHTRT_CHECK(p >= 0 && p <= static_cast<int64_t>(DataType::kBool), "Invalid enum value for field");
@@ -158,6 +168,7 @@ struct CompileSpec : torch::CustomClassHolder {
   ADD_FIELD_GET_SET(ptq_calibrator, nvinfer1::IInt8Calibrator*);
 
   std::vector<Input> inputs;
+  InputSignature input_signature;
   nvinfer1::IInt8Calibrator* ptq_calibrator = nullptr;
   std::set<DataType> enabled_precisions = {};
   bool sparse_weights = false;

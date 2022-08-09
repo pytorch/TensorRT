@@ -15,6 +15,33 @@
 #include "luts.h"
 #include "parser_util.h"
 
+#if defined(_WIN32)
+#include <windows.h>
+#else
+#include <dlfcn.h>
+#endif
+
+void* load_library(std::string& custom_lib) {
+  void* handle = {nullptr};
+#if defined(_WIN32)
+  handle = LoadLibrary(custom_lib.c_str());
+#else
+  handle = dlopen(custom_lib.c_str(), RTLD_LAZY);
+#endif
+  return handle;
+}
+
+bool unload_library(void* custom_lib) {
+  bool success = false;
+#if defined(_WIN32)
+  // Returns status non-zero for success
+  success = FreeLibrary(custom_lib) ? true : false;
+#else
+  success = dlclose(custom_lib) ? false : true;
+#endif
+  return success;
+}
+
 int main(int argc, char** argv) {
   torchtrt::logging::set_is_colored_output_on(true);
   torchtrt::logging::set_reportable_log_level(torchtrt::logging::Level::kWARNING);
@@ -146,6 +173,18 @@ int main(int argc, char** argv) {
       "save_engine",
       "Instead of compiling a full a TorchScript program, save the created engine to the path specified as the output path",
       {"save-engine"});
+  args::ValueFlagList<std::string> custom_torch_ops(
+      parser,
+      "custom-torch-ops",
+      "(repeatable) Shared object/DLL containing custom torch operators",
+      {"custom-torch-ops"});
+
+  args::ValueFlagList<std::string> custom_converters(
+      parser,
+      "custom-converters",
+      "(repeatable) Shared object/DLL containing custom converters",
+      {"custom-converters"});
+
   args::Positional<std::string> input_path(parser, "input_file_path", "Path to input TorchScript file");
   args::Positional<std::string> output_path(
       parser, "output_file_path", "Path for compiled TorchScript (or TensorRT engine) file");
@@ -173,6 +212,34 @@ int main(int argc, char** argv) {
     torchtrt::logging::set_reportable_log_level(torchtrt::logging::Level::kERROR);
   }
 
+  std::vector<std::pair<std::string, void*>> custom_torch_op, custom_converter_op;
+  if (custom_torch_ops) {
+    for (auto& op : args::get(custom_torch_ops)) {
+      auto* handle = load_library(op);
+      if (handle == nullptr) {
+        torchtrt::logging::log(
+            torchtrt::logging::Level::kERROR, std::string("Could not load custom_torch_ops library " + op));
+      } else {
+        torchtrt::logging::log(torchtrt::logging::Level::kINFO, std::string("Loaded custom_torch_ops library " + op));
+
+        custom_torch_op.push_back({op, handle});
+      }
+    }
+  }
+
+  if (custom_converters) {
+    for (auto& op : args::get(custom_converters)) {
+      auto* handle = load_library(op);
+      if (handle == nullptr) {
+        torchtrt::logging::log(
+            torchtrt::logging::Level::kERROR, std::string("Could not load custom_converter library " + op));
+      } else {
+        torchtrt::logging::log(torchtrt::logging::Level::kINFO, std::string("Loaded custom_converter library " + op));
+        custom_converter_op.push_back({op, handle});
+      }
+    }
+  }
+
   auto real_input_path = torchtrtc::fileio::resolve_path(args::get(input_path));
 
   if (check_method_op_support) {
@@ -188,7 +255,7 @@ int main(int argc, char** argv) {
     auto method = args::get(check_method_op_support);
     auto result = torchtrt::ts::check_method_operator_support(mod, method);
     if (result) {
-      std::cout << "The method is supported end to end by Torch-TensorRT" << std::endl;
+      torchtrt::logging::log(torchtrt::logging::Level::kINFO, "The method is supported end to end by Torch-TensorRT");
       return 0;
     } else {
       torchtrt::logging::log(torchtrt::logging::Level::kERROR, "Method is not currently supported by Torch-TensorRT");
@@ -474,6 +541,30 @@ int main(int argc, char** argv) {
     }
 
     trt_mod.save(real_output_path);
+  }
+
+  if (custom_torch_ops) {
+    for (auto& p : custom_torch_op) {
+      auto status = unload_library(p.second);
+      if (status) {
+        torchtrt::logging::log(torchtrt::logging::Level::kINFO, std::string("Unloaded custom library " + p.first));
+      } else {
+        torchtrt::logging::log(
+            torchtrt::logging::Level::kERROR, std::string("Could not unload custom library " + p.first));
+      }
+    }
+  }
+
+  if (custom_converters) {
+    for (auto& p : custom_converter_op) {
+      auto status = unload_library(p.second);
+      if (status) {
+        torchtrt::logging::log(torchtrt::logging::Level::kINFO, std::string("Unloaded custom library " + p.first));
+      } else {
+        torchtrt::logging::log(
+            torchtrt::logging::Level::kERROR, std::string("Could not unload custom library " + p.first));
+      }
+    }
   }
 
   return 0;

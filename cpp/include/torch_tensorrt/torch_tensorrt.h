@@ -14,6 +14,7 @@
 #include <set>
 #include <string>
 #include <vector>
+#include "torch/custom_class.h"
 
 #include "torch_tensorrt/macros.h"
 
@@ -364,7 +365,7 @@ class TensorFormat {
  * signifying a static input shape or a set of three input shapes representing
  * the min, optiminal and max input shapes allowed for the engine.
  */
-struct Input {
+struct TORCHTRT_API Input : torch::CustomClassHolder {
   /// Minimum acceptable input size into the engine
   std::vector<int64_t> min_shape;
   /// Optimal input size into the engine (size optimized for given kernels accept any size in min max range)
@@ -379,6 +380,7 @@ struct Input {
   /// Expected tensor format for the input
   TensorFormat format;
 
+  Input() {}
   /**
    * @brief Construct a new Input spec object for static input size from
    * vector, optional arguments allow the user to configure expected input shape
@@ -514,6 +516,16 @@ struct Input {
 };
 
 /**
+ * @brief A struct to hold complex inputs
+ *
+ * This struct can either hold a complex inputs of shape or a flattened one,
+ */
+struct TORCHTRT_API GraphInputs {
+  torch::jit::IValue input_signature; // nested Input, full input spec
+  std::vector<Input> inputs; // flatten input spec
+};
+
+/**
  * @brief Get the build information for the library including the dependency
  * versions
  *
@@ -558,7 +570,7 @@ struct CompileSpec {
   TORCHTRT_API CompileSpec(std::vector<std::vector<int64_t>> fixed_sizes);
 
   /**
-   * @brief Construct a new Extra Info object
+   * @brief Construct a new Compile Spec object
    * Convienence constructor to set fixed input size from c10::ArrayRef's (the
    * output of tensor.sizes()) describing size of input tensors. Each entry in
    * the vector represents a input and should be provided in call order.
@@ -572,7 +584,7 @@ struct CompileSpec {
   TORCHTRT_API CompileSpec(std::vector<c10::ArrayRef<int64_t>> fixed_sizes);
 
   /**
-   * @brief Construct a new Extra Info object from input ranges.
+   * @brief Construct a new Compile Spec object from input ranges.
    * Each entry in the vector represents a input and should be provided in call
    * order.
    *
@@ -580,18 +592,21 @@ struct CompileSpec {
    *
    * @param inputs
    */
-  CompileSpec(std::vector<Input> inputs) : inputs(std::move(inputs)) {}
+  CompileSpec(std::vector<Input> inputs);
 
+  /**
+   * @brief Construct a new Compile Spec  object from IValue which represents the nesting of input tensors for a module.
+   *
+   * @param input_signature
+   */
+  CompileSpec(torch::jit::IValue input_signature);
   // Defaults should reflect TensorRT defaults for BuilderConfig
 
   /**
-   * @brief Specifications for inputs to the engine, can either be a single size or a range defined by min, opt and max
-   * sizes Users can also specify expected input type as well as tensor memory format
-   *
-   * Order in vector should match call order for the function
+   * @brief Specifications for inputs to the engine, can store a IValue which has stored complex Input
+   *  or a flatened Input
    */
-  std::vector<Input> inputs;
-
+  GraphInputs graph_inputs;
   /**
    * @brief The set of precisions TensorRT is allowed to use for kernels during compilation
    *

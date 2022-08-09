@@ -18,18 +18,85 @@ torchtrt::core::runtime::CudaDevice to_internal_cuda_device(Device device);
 namespace torchscript {
 CompileSpec::CompileSpec(std::vector<c10::ArrayRef<int64_t>> fixed_sizes) {
   for (auto in : fixed_sizes) {
-    inputs.push_back(Input(in));
+    graph_inputs.inputs.push_back(Input(in));
   }
 }
 
 CompileSpec::CompileSpec(std::vector<std::vector<int64_t>> fixed_sizes) {
   for (auto in : fixed_sizes) {
-    inputs.push_back(Input(in));
+    graph_inputs.inputs.push_back(Input(in));
+  }
+}
+
+CompileSpec::CompileSpec(std::vector<Input> inputs) {
+  graph_inputs.inputs = std::move(inputs);
+}
+
+CompileSpec::CompileSpec(torch::jit::IValue input_signature) {
+  graph_inputs.input_signature = input_signature;
+}
+
+void to_internal_input_signature(torch::jit::IValue input_ivalue, torch::jit::IValue& converted_ivalue) {
+  if (input_ivalue.isTuple()) {
+    auto input_tuple = input_ivalue.toTuple();
+    std::vector<torch::jit::IValue> converted_elements;
+    for (auto item : input_tuple->elements()) {
+      torch::jit::IValue converted_item;
+      to_internal_input_signature(item, converted_item);
+      converted_elements.push_back(converted_item);
+      auto tuple_ptr = c10::ivalue::Tuple::create(converted_elements);
+      converted_ivalue = torch::jit::IValue(tuple_ptr);
+    }
+  } else if (input_ivalue.isList()) {
+    auto input_list = input_ivalue.toList().vec();
+    c10::TypePtr type = input_list[0].type();
+    auto converted_elements = c10::impl::GenericList(type);
+    for (auto item : input_list) {
+      torch::jit::IValue converted_item;
+      to_internal_input_signature(item, converted_item);
+      converted_elements.push_back(converted_item);
+    }
+    converted_ivalue = torch::jit::IValue(converted_elements);
+  } else if (input_ivalue.isCustomClass()) {
+    torchtrt::core::ir::Input cur_input = to_internal_input(*(input_ivalue.toCustomClass<torchtrt::Input>()));
+    converted_ivalue = torch::jit::IValue(std::move(c10::make_intrusive<torch_tensorrt::core::ir::Input>(cur_input)));
+  }
+}
+
+torchtrt::core::CompileSpec init_compile_spec(CompileSpec& external) {
+  if (external.graph_inputs.inputs.size() > 0) {
+    torchtrt::core::CompileSpec internal(to_vec_internal_inputs(external.graph_inputs.inputs));
+    return internal;
+  } else {
+    torch::jit::IValue converted_input_signature;
+    LOG_WARNING( "Input signature parsing is an experimental feature, behavior and APIs may change");
+    to_internal_input_signature(external.graph_inputs.input_signature, converted_input_signature);
+    torchtrt::core::CompileSpec internal(converted_input_signature);
+
+    TORCHTRT_CHECK(!external.require_full_compilation, \
+      "Grouped inputs currently requires partial compilation to be enabled, \
+      this restriction will be relaxed in a future release");
+
+    LOG_DEBUG("Grouped inputs currently requires additional settings to enable the feature");
+    LOG_DEBUG("Adding the following ops to torch_executed_ops:" \
+       << std::endl << "  - aten::__getitem__" \
+       << std::endl << "  - prim::ListConstruct" \
+       << std::endl << "  - prim::ListUnpack" \
+       << std::endl << "  - prim::TupleIndex" \
+       << std::endl << "  - prim::TupleConstruct" \
+       << std::endl << "  - prim::TupleUnpack");
+    external.torch_executed_ops.push_back("aten::__getitem__");
+    external.torch_executed_ops.push_back("prim::ListConstruct");
+    external.torch_executed_ops.push_back("prim::ListUnpack");
+    external.torch_executed_ops.push_back("prim::TupleIndex");
+    external.torch_executed_ops.push_back("prim::TupleConstruct");
+    external.torch_executed_ops.push_back("prim::TupleUnpack");
+    return internal;
   }
 }
 
 torchtrt::core::CompileSpec to_internal_compile_spec(CompileSpec external) {
-  torchtrt::core::CompileSpec internal(to_vec_internal_inputs(external.inputs));
+  torchtrt::core::CompileSpec internal = init_compile_spec(external);
 
   for (auto p : external.enabled_precisions) {
     internal.convert_info.engine_settings.enabled_precisions.insert(toTRTDataType(p));

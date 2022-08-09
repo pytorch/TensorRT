@@ -1,7 +1,9 @@
 import unittest
 import torch
 import torchvision.models as models
+import os
 
+REPO_ROOT = os.path.abspath(os.getcwd()) + "/../../"
 
 class ModelTestCase(unittest.TestCase):
 

@@ -30,6 +30,7 @@ std::vector<core::ir::Input> toInputsDynamic(std::vector<at::Tensor> ten, bool d
 
   for (auto i : ten) {
     auto opt = core::util::toVec(i.sizes());
+    auto dtype = core::util::ScalarTypeToTRTDataType(i.scalar_type());
 
     if (dynamic_batch) {
       std::vector<int64_t> min_range(opt);
@@ -38,7 +39,7 @@ std::vector<core::ir::Input> toInputsDynamic(std::vector<at::Tensor> ten, bool d
       min_range[0] = ceil(opt[0] / 2.0);
       max_range[0] = 2 * opt[0];
 
-      a.push_back(core::ir::Input(min_range, opt, max_range));
+      a.push_back(core::ir::Input(min_range, opt, max_range, dtype));
     } else {
       std::vector<int64_t> min_range(opt);
       std::vector<int64_t> max_range(opt);
@@ -46,7 +47,7 @@ std::vector<core::ir::Input> toInputsDynamic(std::vector<at::Tensor> ten, bool d
       min_range[1] = ceil(opt[1] / 2.0);
       max_range[1] = 2 * opt[1];
 
-      a.push_back(core::ir::Input(min_range, opt, max_range));
+      a.push_back(core::ir::Input(min_range, opt, max_range, dtype));
     }
   }
 
