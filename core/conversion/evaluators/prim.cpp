@@ -204,132 +204,138 @@ auto prim_registrations =
                    }
                  }
 
-                        return max;
-                      } else if (n->inputs().size() == 2) {
-                        if (args.at(n->input(0)).IValue()->isInt()) {
-                          auto a = args.at(n->input(0)).unwrapToInt();
-                          if (args.at(n->input(1)).IValue()->isInt()) {
-                            auto b = args.at(n->input(1)).unwrapToInt();
-                            return a > b ? a : b;
-                          } else if (args.at(n->input(1)).IValue()->isDouble()) {
-                            auto b = args.at(n->input(1)).unwrapToDouble();
-                            return a > b ? a : b;
-                          } else {
-                            TORCHTRT_THROW_ERROR(
-                                "Unimplemented data type for " << n->kind().toQualString() << " evaluator b arg: "
-                                                               << args.at(n->input(1)).IValue()->type()->str());
-                            return {};
-                          }
-                        } else if (args.at(n->input(0)).IValue()->isDouble()) {
-                          auto a = args.at(n->input(0)).unwrapToDouble();
-                          if (args.at(n->input(1)).IValue()->isInt()) {
-                            auto b = args.at(n->input(1)).unwrapToInt();
-                            return a > b ? a : b;
-                          } else if (args.at(n->input(1)).IValue()->isDouble()) {
-                            auto b = args.at(n->input(1)).unwrapToDouble();
-                            return a > b ? a : b;
-                          } else {
-                            TORCHTRT_THROW_ERROR(
-                                "Unimplemented data type for " << n->kind().toQualString() << " evaluator b arg: "
-                                                               << args.at(n->input(1)).IValue()->type()->str());
-                            return {};
-                          }
-                        } else {
-                          TORCHTRT_THROW_ERROR(
-                              "Unimplemented data type for " << n->kind().toQualString() << " evaluator a arg: "
-                                                             << args.at(n->input(0)).IValue()->type()->str());
-                          return {};
-                        }
-                      } else {
-                        TORCHTRT_THROW_ERROR("Unimplemented " << n->kind().toQualString() << " evaluator case");
-                        return {};
-                      }
-                    },
-                    EvalOptions().validSchemas({
-                        "prim::max.self_int(int[] self) -> (int)",
-                        "prim::max.bool(bool a, bool b) -> (bool)",
-                        "prim::max.int(int a, int b) -> (bool)",
-                        "prim::max.float(float a, float b) -> (bool)",
-                        "prim::max.int_float(int a, float b) -> (bool)",
-                        "prim::max.float_int(float a, int b) -> (bool)",
-                    })})
-        .evaluator({c10::Symbol::fromQualString("prim::shape"),
-                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-                      LOG_WARNING("There may be undefined behavior using dynamic shape and prim::shape");
-                      auto tensor_var = args.at(n->input(0));
-                      if (tensor_var.isITensor()) {
-                        auto tensor = tensor_var.ITensor();
-                        return util::toVec(tensor->getDimensions());
-                      } else {
-                        auto tensor = tensor_var.unwrapToTensor();
-                        return tensor.sizes();
-                      }
-                    },
-                    EvalOptions().validSchemas({"prim::shape(Tensor a) -> (int[])"})})
-        .evaluator({torch::jit::prim::TupleConstruct,
-                  [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-                    auto num_inputs = n->inputs().size();
-                    c10::IValue tuple = c10::ivalue::Tuple::create();
-                    switch (num_inputs) {
-                      case 0:
-                        tuple = c10::ivalue::Tuple::create();
-                        break;
-                      case 1:
-                        tuple = c10::ivalue::Tuple::create(std::move((*args.at(n->input(0)).IValue())));
-                        break;
-                      case 2: {
-                        tuple = c10::ivalue::Tuple::create(
-                            std::move(*(args.at(n->input(0)).IValue())),
-                            std::move(*(args.at(n->input(1)).IValue())));
-                        break;
-                      }
-                      case 3: {
-                        tuple = c10::ivalue::Tuple::create(
-                            std::move(*(args.at(n->input(0)).IValue())),
-                            std::move(*(args.at(n->input(1)).IValue())),
-                            std::move(*(args.at(n->input(2)).IValue())));
-                        break;
-                      }
-                      default: {
-                        std::vector<c10::IValue> elems;
-                        for (size_t i = 0; i < num_inputs; i++) {
-                          elems.push_back(*(args.at(n->input(i)).IValue()));
-                        }
-                        tuple = c10::ivalue::Tuple::create(std::move(elems));
-                        break;
-                      }
-                    }
-                    return c10::optional<torch::jit::IValue>(std::move(tuple));
-                  }})
-        .evaluator({torch::jit::prim::TupleIndex,
-                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-                      // Outputs is an IValue which has list of tensors which can be found in ctx->evaluated_value_map
-                      auto tuple = args.at(n->input(0)).IValue()->toTuple();
-                      int64_t idx = args.at(n->input(1)).IValue()->toInt();
-                      int64_t norm_idx = normalizeIndex(idx, tuple->elements().size());
-                      return c10::optional<torch::jit::IValue>(std::move(tuple->elements()[norm_idx]));
-                    },
-                    EvalOptions().validSchemas({"prim::TupleIndex(Any tup, int i) -> (Any)"})})
-        .evaluator({torch::jit::prim::TupleUnpack,
-                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-                      // Outputs is an IValue which has list of tensors which can be found in ctx->evaluated_value_map
-                      auto output = args.at(n->input()).IValue()->toTuple();
-                      return c10::optional<torch::jit::IValue>(std::move(output));
-                    }})
-        .evaluator({c10::Symbol::fromQualString("prim::unchecked_cast"),
-                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-                      return *(args.at(n->input(0)).IValue());
-                    }})
-        .evaluator({c10::Symbol::fromQualString("prim::Uninitialized"),
-                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-                      return c10::IValue::uninitialized();
-                    }})
-        .evaluator({c10::Symbol::fromQualString("prim::RaiseException"),
-                    [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-                      auto exception = args.at(n->input(0)).IValue();
-                      TORCHTRT_THROW_ERROR("Error from TorchScript: " << *exception);
-                      return {};
-                    }});
+                 return max;
+               } else if (n->inputs().size() == 2) {
+                 if (args.at(n->input(0)).IValue()->isInt()) {
+                   auto a = args.at(n->input(0)).unwrapToInt();
+                   if (args.at(n->input(1)).IValue()->isInt()) {
+                     auto b = args.at(n->input(1)).unwrapToInt();
+                     return a > b ? a : b;
+                   } else if (args.at(n->input(1)).IValue()->isDouble()) {
+                     auto b = args.at(n->input(1)).unwrapToDouble();
+                     return a > b ? a : b;
+                   } else {
+                     TORCHTRT_THROW_ERROR(
+                         "Unimplemented data type for " << n->kind().toQualString() << " evaluator b arg: "
+                                                        << args.at(n->input(1)).IValue()->type()->str());
+                     return {};
+                   }
+                 } else if (args.at(n->input(0)).IValue()->isDouble()) {
+                   auto a = args.at(n->input(0)).unwrapToDouble();
+                   if (args.at(n->input(1)).IValue()->isInt()) {
+                     auto b = args.at(n->input(1)).unwrapToInt();
+                     return a > b ? a : b;
+                   } else if (args.at(n->input(1)).IValue()->isDouble()) {
+                     auto b = args.at(n->input(1)).unwrapToDouble();
+                     return a > b ? a : b;
+                   } else {
+                     TORCHTRT_THROW_ERROR(
+                         "Unimplemented data type for " << n->kind().toQualString() << " evaluator b arg: "
+                                                        << args.at(n->input(1)).IValue()->type()->str());
+                     return {};
+                   }
+                 } else {
+                   TORCHTRT_THROW_ERROR(
+                       "Unimplemented data type for " << n->kind().toQualString() << " evaluator a arg: "
+                                                      << args.at(n->input(0)).IValue()->type()->str());
+                   return {};
+                 }
+               } else {
+                 TORCHTRT_THROW_ERROR("Unimplemented " << n->kind().toQualString() << " evaluator case");
+                 return {};
+               }
+             },
+             EvalOptions().validSchemas({
+                 "prim::max.self_int(int[] self) -> (int)",
+                 "prim::max.bool(bool a, bool b) -> (bool)",
+                 "prim::max.int(int a, int b) -> (bool)",
+                 "prim::max.float(float a, float b) -> (bool)",
+                 "prim::max.int_float(int a, float b) -> (bool)",
+                 "prim::max.float_int(float a, int b) -> (bool)",
+             })})
+        .evaluator(
+            {c10::Symbol::fromQualString("prim::shape"),
+             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+               LOG_WARNING("There may be undefined behavior using dynamic shape and prim::shape");
+               auto tensor_var = args.at(n->input(0));
+               if (tensor_var.isITensor()) {
+                 auto tensor = tensor_var.ITensor();
+                 return util::toVec(tensor->getDimensions());
+               } else {
+                 auto tensor = tensor_var.unwrapToTensor();
+                 return tensor.sizes();
+               }
+             },
+             EvalOptions().validSchemas({"prim::shape(Tensor a) -> (int[])"})})
+        .evaluator(
+            {torch::jit::prim::TupleConstruct,
+             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+               auto num_inputs = n->inputs().size();
+               c10::IValue tuple = c10::ivalue::Tuple::create();
+               switch (num_inputs) {
+                 case 0:
+                   tuple = c10::ivalue::Tuple::create();
+                   break;
+                 case 1:
+                   tuple = c10::ivalue::Tuple::create(std::move((*args.at(n->input(0)).IValue())));
+                   break;
+                 case 2: {
+                   tuple = c10::ivalue::Tuple::create(
+                       std::move(*(args.at(n->input(0)).IValue())), std::move(*(args.at(n->input(1)).IValue())));
+                   break;
+                 }
+                 case 3: {
+                   tuple = c10::ivalue::Tuple::create(
+                       std::move(*(args.at(n->input(0)).IValue())),
+                       std::move(*(args.at(n->input(1)).IValue())),
+                       std::move(*(args.at(n->input(2)).IValue())));
+                   break;
+                 }
+                 default: {
+                   std::vector<c10::IValue> elems;
+                   for (size_t i = 0; i < num_inputs; i++) {
+                     elems.push_back(*(args.at(n->input(i)).IValue()));
+                   }
+                   tuple = c10::ivalue::Tuple::create(std::move(elems));
+                   break;
+                 }
+               }
+               return c10::optional<torch::jit::IValue>(std::move(tuple));
+             }})
+        .evaluator(
+            {torch::jit::prim::TupleIndex,
+             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+               // Outputs is an IValue which has list of tensors which can be found in ctx->evaluated_value_map
+               auto tuple = args.at(n->input(0)).IValue()->toTuple();
+               int64_t idx = args.at(n->input(1)).IValue()->toInt();
+               int64_t norm_idx = normalizeIndex(idx, tuple->elements().size());
+               return c10::optional<torch::jit::IValue>(std::move(tuple->elements()[norm_idx]));
+             },
+             EvalOptions().validSchemas({"prim::TupleIndex(Any tup, int i) -> (Any)"})})
+        .evaluator(
+            {torch::jit::prim::TupleUnpack,
+             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+               // Outputs is an IValue which has list of tensors which can be found in ctx->evaluated_value_map
+               auto output = args.at(n->input()).IValue()->toTuple();
+               return c10::optional<torch::jit::IValue>(std::move(output));
+             }})
+        .evaluator(
+            {c10::Symbol::fromQualString("prim::unchecked_cast"),
+             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+               return *(args.at(n->input(0)).IValue());
+             }})
+        .evaluator(
+            {c10::Symbol::fromQualString("prim::Uninitialized"),
+             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+               return c10::IValue::uninitialized();
+             }})
+        .evaluator(
+            {c10::Symbol::fromQualString("prim::RaiseException"),
+             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+               auto exception = args.at(n->input(0)).IValue();
+               TORCHTRT_THROW_ERROR("Error from TorchScript: " << *exception);
+               return {};
+             }});
 }
 } // namespace evaluators
 } // namespace conversion

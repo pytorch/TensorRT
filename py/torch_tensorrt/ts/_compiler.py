@@ -9,27 +9,29 @@ from torch_tensorrt._Device import Device
 from types import FunctionType
 
 
-def compile(module: torch.jit.ScriptModule,
-            inputs=[],
-            input_signature=None,
-            device=Device._current_device(),
-            disable_tf32=False,
-            sparse_weights=False,
-            enabled_precisions=set(),
-            refit=False,
-            debug=False,
-            capability=_enums.EngineCapability.default,
-            num_avg_timing_iters=1,
-            workspace_size=0,
-            dla_sram_size=1048576,
-            dla_local_dram_size=1073741824,
-            dla_global_dram_size=536870912,
-            calibrator=None,
-            truncate_long_and_double=False,
-            require_full_compilation=False,
-            min_block_size=3,
-            torch_executed_ops=[],
-            torch_executed_modules=[]) -> torch.jit.ScriptModule:
+def compile(
+    module: torch.jit.ScriptModule,
+    inputs=[],
+    input_signature=None,
+    device=Device._current_device(),
+    disable_tf32=False,
+    sparse_weights=False,
+    enabled_precisions=set(),
+    refit=False,
+    debug=False,
+    capability=_enums.EngineCapability.default,
+    num_avg_timing_iters=1,
+    workspace_size=0,
+    dla_sram_size=1048576,
+    dla_local_dram_size=1073741824,
+    dla_global_dram_size=536870912,
+    calibrator=None,
+    truncate_long_and_double=False,
+    require_full_compilation=False,
+    min_block_size=3,
+    torch_executed_ops=[],
+    torch_executed_modules=[],
+) -> torch.jit.ScriptModule:
     """Compile a TorchScript module for NVIDIA GPUs using TensorRT
 
     Takes a existing TorchScript module and a set of settings to configure the compiler
@@ -104,7 +106,8 @@ def compile(module: torch.jit.ScriptModule,
 
     if require_full_compilation and (len(torch_executed_modules) > 0 or len(torch_executed_ops) > 0):
         raise ValueError(
-            f"require_full_compilation is enabled however the list of modules and ops to run in torch is not empty. Found: torch_executed_ops: {torch_executed_ops}, torch_executed_modules: {torch_executed_modules}")
+            f"require_full_compilation is enabled however the list of modules and ops to run in torch is not empty. Found: torch_executed_ops: {torch_executed_ops}, torch_executed_modules: {torch_executed_modules}"
+        )
 
     spec = {
         "inputs": inputs,

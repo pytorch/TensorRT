@@ -52,62 +52,20 @@ models = {
         "model": timm.create_model("efficientnet_b0", pretrained=True),
         "path": "script",
     },
-    "vit": {
-        "model": timm.create_model('vit_base_patch16_224', pretrained=True),
-        "path": "script"
-    },
-    "pooling": {
-        "model": cm.Pool(),
-        "path": "trace"
-    },
-    "module_fallback": {
-        "model": cm.ModuleFallbackMain(),
-        "path": "script"
-    },
-    "loop_fallback_eval": {
-        "model": cm.LoopFallbackEval(),
-        "path": "script"
-    },
-    "loop_fallback_no_eval": {
-        "model": cm.LoopFallbackNoEval(),
-        "path": "script"
-    },
-    "conditional": {
-        "model": cm.FallbackIf(),
-        "path": "script"
-    },
-    "inplace_op_if": {
-        "model": cm.FallbackInplaceOPIf(),
-        "path": "script"
-    },
-    "standard_tensor_input": {
-        "model": cm.StandardTensorInput(),
-        "path": "script"
-    },
-    "tuple_input": {
-        "model": cm.TupleInput(),
-        "path": "script"
-    },
-    "list_input": {
-        "model": cm.ListInput(),
-        "path": "script"
-    },
-    "tuple_input_output": {
-        "model": cm.TupleInputOutput(),
-        "path": "script"
-    },
-    "list_input_output": {
-        "model": cm.ListInputOutput(),
-        "path": "script"
-    },
-    "list_input_tuple_output": {
-        "model": cm.ListInputTupleOutput(),
-        "path": "script"
-    },
-    "bert_base_uncased": {
-        "model": cm.BertModule(),
-        "path": "trace"
-    }
+    "vit": {"model": timm.create_model("vit_base_patch16_224", pretrained=True), "path": "script"},
+    "pooling": {"model": cm.Pool(), "path": "trace"},
+    "module_fallback": {"model": cm.ModuleFallbackMain(), "path": "script"},
+    "loop_fallback_eval": {"model": cm.LoopFallbackEval(), "path": "script"},
+    "loop_fallback_no_eval": {"model": cm.LoopFallbackNoEval(), "path": "script"},
+    "conditional": {"model": cm.FallbackIf(), "path": "script"},
+    "inplace_op_if": {"model": cm.FallbackInplaceOPIf(), "path": "script"},
+    "standard_tensor_input": {"model": cm.StandardTensorInput(), "path": "script"},
+    "tuple_input": {"model": cm.TupleInput(), "path": "script"},
+    "list_input": {"model": cm.ListInput(), "path": "script"},
+    "tuple_input_output": {"model": cm.TupleInputOutput(), "path": "script"},
+    "list_input_output": {"model": cm.ListInputOutput(), "path": "script"},
+    "list_input_tuple_output": {"model": cm.ListInputTupleOutput(), "path": "script"},
+    "bert_base_uncased": {"model": cm.BertModule(), "path": "trace"},
 }
 
 
@@ -198,6 +156,7 @@ def main():
         record = json.dumps(manifest)
         f.write(record)
         f.truncate()
+
 
 if __name__ == "__main__":
     main()

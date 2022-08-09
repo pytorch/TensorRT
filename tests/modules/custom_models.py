@@ -94,6 +94,7 @@ class FallbackInplaceOPIf(nn.Module):
         z = torch.cat(mod_list)
         return z
 
+
 # Collection input/output models
 class StandardTensorInput(nn.Module):
     def __init__(self):
@@ -103,6 +104,7 @@ class StandardTensorInput(nn.Module):
         r = x + y
         return r
 
+
 class TupleInput(nn.Module):
     def __init__(self):
         super(TupleInput, self).__init__()
@@ -111,6 +113,7 @@ class TupleInput(nn.Module):
         r = z[0] + z[1]
         return r
 
+
 class ListInput(nn.Module):
     def __init__(self):
         super(ListInput, self).__init__()
@@ -118,6 +121,7 @@ class ListInput(nn.Module):
     def forward(self, z: List[torch.Tensor]):
         r = z[0] + z[1]
         return r
+
 
 class TupleInputOutput(nn.Module):
     def __init__(self):
@@ -130,6 +134,7 @@ class TupleInputOutput(nn.Module):
         r = (r1, r2)
         return r
 
+
 class ListInputOutput(nn.Module):
     def __init__(self):
         super(ListInputOutput, self).__init__()
@@ -139,6 +144,7 @@ class ListInputOutput(nn.Module):
         r2 = z[0] - z[1]
         r = [r1, r2]
         return r
+
 
 class ListInputTupleOutput(nn.Module):
     def __init__(self):
@@ -155,6 +161,7 @@ class ListInputTupleOutput(nn.Module):
         list_out = self.list_model(r4)
         r = (tuple_out[1], list_out[0])
         return r
+
 
 def BertModule():
     model_name = "bert-base-uncased"

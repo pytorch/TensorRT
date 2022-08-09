@@ -22,6 +22,7 @@ def _internal_input_to_torch_class_input(i: _C.Input) -> torch.classes.tensorrt.
     clone._set_explicit_set_dtype(i._explicit_set_dtype)
     return clone
 
+
 def _supported_input_size_type(input_size: Any) -> bool:
     if isinstance(input_size, torch.Size):
         return True
@@ -178,18 +179,19 @@ def _parse_torch_fallback(fallback_info: Dict[str, Any]) -> _ts_C.TorchFallback:
 
     return info
 
+
 def _parse_input_signature(input_signature: Any):
     if isinstance(input_signature, tuple):
         input_list = []
         for item in input_signature:
-           input = _parse_input_signature(item)
-           input_list.append(input)
+            input = _parse_input_signature(item)
+            input_list.append(input)
         return tuple(input_list)
     elif isinstance(input_signature, list):
         input_list = []
         for item in input_signature:
-           input = _parse_input_signature(item)
-           input_list.append(input)
+            input = _parse_input_signature(item)
+            input_list.append(input)
         return input_list
     elif isinstance(input_signature, Input) or isinstance(input_signature, torch.Tensor):
         i = Input._from_tensor(input_signature) if isinstance(input_signature, torch.Tensor) else input_signature
@@ -197,6 +199,7 @@ def _parse_input_signature(input_signature: Any):
         return clone
     else:
         raise KeyError("Input signature contains an unsupported type {}".format(type(input_signature)))
+
 
 def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
     # TODO: Remove deep copy once collections does not need partial compilation
@@ -217,20 +220,25 @@ def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
     elif compile_spec["input_signature"] is not None:
         log(Level.Warning, "Input signature parsing is an experimental feature, behavior and APIs may change")
         signature = _parse_input_signature(compile_spec["input_signature"])
-        info.input_signature = _C.InputSignature(signature) # py_object
+        info.input_signature = _C.InputSignature(signature)  # py_object
 
         if not compile_spec["torch_fallback"]["enabled"]:
-            raise ValueError("Grouped inputs currently requires partial compilation to be enabled, this restriction will be relaxed in a future release")
+            raise ValueError(
+                "Grouped inputs currently requires partial compilation to be enabled, this restriction will be relaxed in a future release"
+            )
 
         log(Level.Debug, "Grouped inputs currently requires additional settings to enable the feature")
-        log(Level.Debug, """Adding the following ops to torch_executed_ops:
+        log(
+            Level.Debug,
+            """Adding the following ops to torch_executed_ops:
     - aten::__getitem__
     - prim::ListConstruct
     - prim::ListUnpack
     - prim::TupleIndex
     - prim::TupleConstruct
     - prim::TupleUnpack
-""")
+""",
+        )
         compile_spec["torch_fallback"]["forced_fallback_ops"].append("aten::__getitem__")
         compile_spec["torch_fallback"]["forced_fallback_ops"].append("prim::ListConstruct")
         compile_spec["torch_fallback"]["forced_fallback_ops"].append("prim::ListUnpack")
@@ -240,7 +248,7 @@ def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
 
     else:
         raise KeyError(
-            "Module input definitions are requried to compile module. Provide a list of torch_tensorrt.Input keyed to \"inputs\" in the compile spec"
+            'Module input definitions are requried to compile module. Provide a list of torch_tensorrt.Input keyed to "inputs" in the compile spec'
         )
 
     if "enabled_precisions" in compile_spec:
@@ -304,22 +312,24 @@ def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
     return info
 
 
-def TensorRTCompileSpec(inputs=[],
-                        input_signature=None,
-                        device=Device._current_device(),
-                        disable_tf32=False,
-                        sparse_weights=False,
-                        enabled_precisions=set(),
-                        refit=False,
-                        debug=False,
-                        capability=_enums.EngineCapability.default,
-                        num_avg_timing_iters=1,
-                        workspace_size=0,
-                        dla_sram_size=1048576,
-                        dla_local_dram_size=1073741824,
-                        dla_global_dram_size=536870912,
-                        truncate_long_and_double=False,
-                        calibrator=None) -> torch.classes.tensorrt.CompileSpec:
+def TensorRTCompileSpec(
+    inputs=[],
+    input_signature=None,
+    device=Device._current_device(),
+    disable_tf32=False,
+    sparse_weights=False,
+    enabled_precisions=set(),
+    refit=False,
+    debug=False,
+    capability=_enums.EngineCapability.default,
+    num_avg_timing_iters=1,
+    workspace_size=0,
+    dla_sram_size=1048576,
+    dla_local_dram_size=1073741824,
+    dla_global_dram_size=536870912,
+    truncate_long_and_double=False,
+    calibrator=None,
+) -> torch.classes.tensorrt.CompileSpec:
     """Utility to create a formated spec dictionary for using the PyTorch TensorRT backend
 
     Keyword Args:
@@ -360,7 +370,7 @@ def TensorRTCompileSpec(inputs=[],
 
     compile_spec = {
         "inputs": inputs,
-        #"input_signature": input_signature,
+        # "input_signature": input_signature,
         "device": device,
         "disable_tf32": disable_tf32,  # Force FP32 layers to use traditional as FP32 format vs the default behavior of rounding the inputs to 10-bit mantissas before multiplying, but accumulates the sum using 23-bit mantissas
         "sparse_weights": sparse_weights,  # Enable sparsity for convolution and fully connected layers.

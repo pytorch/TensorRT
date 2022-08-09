@@ -26,11 +26,11 @@ void RegisterTRTCompileSpec() {
   static auto TORCHTRT_UNUSED TRTInputSignatureTSRegistration =
       torch::class_<torch_tensorrt::pyapi::InputSignature>("tensorrt", "_InputSignature")
           .def(torch::init<>())
-          .def("_set_signature_ivalue_torchbind",
-                [](const c10::intrusive_ptr<torch_tensorrt::pyapi::InputSignature>& self,
-                  torch::jit::IValue ival) {
-                    self->signature_ivalue = ival;
-                })
+          .def(
+              "_set_signature_ivalue_torchbind",
+              [](const c10::intrusive_ptr<torch_tensorrt::pyapi::InputSignature>& self, torch::jit::IValue ival) {
+                self->signature_ivalue = ival;
+              })
           .def("__str__", &torch_tensorrt::pyapi::InputSignature::to_str);
 
   ADD_FIELD_GET_SET_REGISTRATION(

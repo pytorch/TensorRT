@@ -10,7 +10,7 @@ def lint(user, target_files, change_file=True):
     out = subprocess.run(["black", "--check", "-q"] + target_files)
 
     if change_file and out.returncode != 0:
-        cmd = ["black"]
+        cmd = ["black", "-q"]
         print(
             "\033[93mWARNING:\033[0m This command is modifying your files with the recommended linting, you should review the changes before committing"
         )
@@ -18,6 +18,7 @@ def lint(user, target_files, change_file=True):
         cmd += target_files
 
         for f in target_files:
+            subprocess.run(cmd)
             subprocess.run(["chown", user + ":" + user, f])
             subprocess.run(["chmod", "644", f])
 

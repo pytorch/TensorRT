@@ -376,7 +376,7 @@ TEST(Converters, ATenSliceListConvertsCorrectly) {
           %slice : Tensor[] = aten::slice(%list, %1, %2, %3)
           %out.1 : Tensor, %out.2 : Tensor = prim::ListUnpack(%slice)
           return (%out.1, %out.2))IR";
-  
+
   auto g = std::make_shared<torch::jit::Graph>();
 
   torch::jit::parseIR(graph, g.get());

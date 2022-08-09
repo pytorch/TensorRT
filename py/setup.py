@@ -28,10 +28,11 @@ RELEASE = False
 
 CI_RELEASE = False
 
-__version__ = '1.2.0a0'
-__cuda_version__ = '11.3'
-__cudnn_version__ = '8.4'
-__tensorrt_version__ = '8.4'
+__version__ = "1.2.0a0"
+__cuda_version__ = "11.3"
+__cudnn_version__ = "8.4"
+__tensorrt_version__ = "8.4"
+
 
 def get_git_revision_short_hash() -> str:
     return subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).decode("ascii").strip()
