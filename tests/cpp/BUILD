@@ -12,6 +12,7 @@ config_setting(
 test_suite(
     name = "api_tests",
     tests = [
+        ":test_collections",
         ":test_compiled_modules",
         ":test_default_input_types",
         ":test_example_tensors",
@@ -20,15 +21,13 @@ test_suite(
         ":test_multiple_registered_engines",
         ":test_runtime_thread_safety",
         ":test_serialization",
-        ":test_module_fallback",
-        ":test_example_tensors",
-        ":test_collections"
     ],
 )
 
 test_suite(
     name = "aarch64_api_tests",
     tests = [
+        ":test_collections",
         ":test_compiled_modules",
         ":test_default_input_types",
         ":test_example_tensors",
@@ -37,9 +36,6 @@ test_suite(
         ":test_multiple_registered_engines",
         ":test_runtime_thread_safety",
         ":test_serialization",
-        ":test_module_fallback",
-        ":test_example_tensors",
-        ":test_collections"
     ],
 )
 
@@ -141,8 +137,9 @@ cc_test(
     ] + select({
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
         "//conditions:default": ["@libtorch//:libtorch"],
-    })
+    }),
 )
+
 cc_test(
     name = "test_compiled_modules",
     srcs = ["test_compiled_modules.cpp"],

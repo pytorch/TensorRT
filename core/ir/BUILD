@@ -13,9 +13,13 @@ config_setting(
 cc_library(
     name = "ir",
     srcs = [
+        "GraphInputs.cpp",
         "Input.cpp",
         "StaticParams.cpp",
-        "GraphInputs.cpp"
+        "ir.cpp",
+    ],
+    hdrs = [
+        "ir.h",
     ],
     deps = [
         "@tensorrt//:nvinfer",
