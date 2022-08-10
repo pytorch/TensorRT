@@ -9,7 +9,7 @@ RUN rm -rf /opt/pytorch/torch_tensorrt /usr/bin/bazel
 
 ARG ARCH="x86_64"
 ARG TARGETARCH="amd64"
-ARG BAZEL_VERSION=5.1.1
+ARG BAZEL_VERSION=5.2.0
 
 RUN [[ "$TARGETARCH" == "amd64" ]] && ARCH="x86_64" || ARCH="${TARGETARCH}" \
  && wget -q https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-linux-${ARCH} -O /usr/bin/bazel \
