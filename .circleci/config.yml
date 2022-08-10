@@ -785,7 +785,7 @@ parameters:
   # Jetson platform config
   torch-jetson-build:
     type: string
-    default: "torch-1.12.0a0+84d1cb9.nv22.4-cp38-cp38-linux_aarch64.whl"
+    default: "torch-1.13.0a0+340c4120.nv22.06-cp38-cp38-linux_aarch64.whl"
   jetpack-version:
     type: string
     default: "50"
