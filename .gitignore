@@ -66,3 +66,4 @@ bazel-tensorrt
 *.cache
 *cifar-10-batches-py*
 bazel-project
+build/
