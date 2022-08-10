@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Download the Torchscript models
-# python hub.py
+python hub.py
 
 batch_sizes=(1 2 4 8 16 32 64 128 256)
 
