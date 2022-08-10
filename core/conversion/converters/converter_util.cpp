@@ -59,7 +59,7 @@ nvinfer1::ITensor* addUnpadding(
   }
 }
 
-nvinfer1::DataType promote_types(nvinfer1::DataType type_a, nvinfer1::DataType type_b){
+nvinfer1::DataType promote_types(nvinfer1::DataType type_a, nvinfer1::DataType type_b) {
   auto torch_type_a = util::TRTDataTypeToScalarType(type_a);
   auto torch_type_b = util::TRTDataTypeToScalarType(type_b);
   auto promo_type = at::promote_types(torch_type_a, torch_type_b);
@@ -87,15 +87,21 @@ nvinfer1::ILayer* add_elementwise(
     swapSelfOther = true;
   }
 
-  if(self->getType() != other->getType()){
-    LOG_DEBUG("Type mismatch for inputs in element-wise operation " << name << ": " << self->getType() << ", " << other->getType());
+  if (self->getType() != other->getType()) {
+    LOG_DEBUG(
+        "Type mismatch for inputs in element-wise operation " << name << ": " << self->getType() << ", "
+                                                              << other->getType());
     auto promo_type = promote_types(self->getType(), other->getType());
-    if(self->getType() != promo_type){
-      LOG_DEBUG("Element-wise op type promotion adding cast from " << self->getType() << " to " << promo_type << " for layer " << name);
+    if (self->getType() != promo_type) {
+      LOG_DEBUG(
+          "Element-wise op type promotion adding cast from " << self->getType() << " to " << promo_type << " for layer "
+                                                             << name);
       self = castITensor(ctx, self, promo_type);
     }
-    if(other->getType() != promo_type){
-      LOG_DEBUG("Element-wise op type promotion adding cast from " << other->getType() << " to " << promo_type << " for layer " << name);
+    if (other->getType() != promo_type) {
+      LOG_DEBUG(
+          "Element-wise op type promotion adding cast from " << other->getType() << " to " << promo_type
+                                                             << " for layer " << name);
       other = castITensor(ctx, other, promo_type);
     }
   }

@@ -24,11 +24,11 @@ void pointwise_test_helper(
   int first_max = 5;
   int second_min = 1;
   int second_max = 5;
-  if(type1 == at::kBool){
+  if (type1 == at::kBool) {
     first_min = 0;
     first_max = 1;
   }
-  if(type2 == at::kBool){
+  if (type2 == at::kBool) {
     second_min = 0;
     second_max = 1;
   }
