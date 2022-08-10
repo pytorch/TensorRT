@@ -11,10 +11,6 @@
 #include <cuda_runtime.h>
 #include "core/util/prelude.h"
 
-#define DLA_SRAM_SIZE 1048576
-#define DLA_LOCAL_DRAM_SIZE 1073741824
-#define DLA_GLOBAL_DRAM_SIZE 536870912
-
 namespace torch_tensorrt {
 namespace core {
 namespace conversion {
