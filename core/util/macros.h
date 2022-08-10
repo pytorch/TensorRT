@@ -4,6 +4,11 @@
 
 #define GET_MACRO(_1, _2, NAME, ...) NAME
 
+// DLA Memory related macros
+#define DLA_SRAM_SIZE 1048576
+#define DLA_LOCAL_DRAM_SIZE 1073741824
+#define DLA_GLOBAL_DRAM_SIZE 536870912
+
 #define TORCHTRT_LOG(l, sev, msg) \
   do {                            \
     std::stringstream ss{};       \

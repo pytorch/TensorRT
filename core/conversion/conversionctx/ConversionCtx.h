@@ -35,9 +35,9 @@ struct BuilderSettings {
   nvinfer1::IInt8Calibrator* calibrator = nullptr;
   uint64_t num_avg_timing_iters = 1;
   uint64_t workspace_size = 0;
-  uint64_t dla_sram_size = 1048576;
-  uint64_t dla_local_dram_size = 1073741824;
-  uint64_t dla_global_dram_size = 536870912;
+  uint64_t dla_sram_size = DLA_SRAM_SIZE;
+  uint64_t dla_local_dram_size = DLA_LOCAL_DRAM_SIZE;
+  uint64_t dla_global_dram_size = DLA_GLOBAL_DRAM_SIZE;
 
   BuilderSettings() = default;
   BuilderSettings(const BuilderSettings& other) = default;
