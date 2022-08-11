@@ -464,6 +464,53 @@ auto select_registrations TORCHTRT_UNUSED =
                auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
                LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
                return true;
+             }})
+        .pattern(
+            {"aten::scatter.value(Tensor self, int dim, Tensor index, Scalar value) -> (Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               auto self = args[0].ITensorOrFreeze(ctx);
+               int dim = args[1].unwrapToInt();
+               auto index = args[2].ITensorOrFreeze(ctx);
+               auto index_dim = index->getDimensions();
+               std::vector<int64_t> dim_vec;
+               for (int i = 0; i < index_dim.nbDims; i++) {
+                 dim_vec.push_back(index_dim.d[i]);
+               }
+               auto value = args[3].unwrapToScalar() * torch::ones(dim_vec);
+               auto value_tensor = tensor_to_const(ctx, value, "");
+               if (self->getType() != value_tensor->getType()) {
+                 value_tensor = castITensor(ctx, value_tensor, self->getType());
+               }
+
+               auto layer = ctx->net->addScatter(*self, *index, *value_tensor, nvinfer1::ScatterMode::kELEMENT);
+               layer->setAxis(dim);
+               
+               TORCHTRT_CHECK(layer, "Unable to create layer for aten::scatter.value");
+
+               layer->setName(util::node_info(n).c_str());
+
+               auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], layer->getOutput(0));
+               LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+               return true;
+             }})
+        .pattern(
+            {"aten::scatter.src(Tensor self, int dim, Tensor index, Tensor src) -> (Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               auto self = args[0].ITensorOrFreeze(ctx);
+               int dim = args[1].unwrapToInt();
+               auto index = args[2].ITensorOrFreeze(ctx);
+               auto src = args[3].ITensorOrFreeze(ctx);
+
+               auto layer = ctx->net->addScatter(*self, *index, *src, nvinfer1::ScatterMode::kELEMENT);
+               layer->setAxis(dim);
+               
+               TORCHTRT_CHECK(layer, "Unable to create layer for aten::scatter.src");
+
+               layer->setName(util::node_info(n).c_str());
+
+               auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], layer->getOutput(0));
+               LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+               return true;
              }});
 
 } // namespace

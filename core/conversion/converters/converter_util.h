@@ -80,6 +80,8 @@ nvinfer1::ITensor* get_slice_size(
     int nbdims,
     std::string const& name);
 
+nvinfer1::ITensor* scalar_to_tensor(ConversionCtx* ctx, at::Scalar s);
+
 } // namespace converters
 } // namespace conversion
 } // namespace core
