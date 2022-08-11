@@ -797,3 +797,21 @@ TEST(Evaluators, PowFloatIntEvaluatesCorrectly) {
 
   ASSERT_TRUE(jit_results[0] == trt_results[0]);
 }
+
+TEST(Evaluators, DeriveIndexEvaluatesCorrectly) {
+  const auto graph = R"IR(
+      graph():
+        %1 : int = prim::Constant[value=9]()
+        %2 : int = prim::Constant[value=4]()
+        %3 : int = prim::Constant[value=2]()
+        %4 : int = aten::__derive_index(%1, %2, %3)
+        return (%4))IR";
+
+  auto g = std::make_shared<torch::jit::Graph>();
+  torch::jit::parseIR(graph, g.get());
+
+  auto jit_results = torch_tensorrt::tests::util::EvaluateGraphJIT(g, {});
+  auto trt_results = torch_tensorrt::tests::util::EvaluateGraph(g->block(), {});
+
+  ASSERT_TRUE(jit_results[0] == trt_results[0]);
+}

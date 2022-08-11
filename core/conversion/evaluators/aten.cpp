@@ -806,7 +806,16 @@ auto aten_registrations TORCHTRT_UNUSED =
                  return 0;
                }
              },
-             EvalOptions().validSchemas({"aten::__range_length(int lo, int hi, int step) -> int"})});
+             EvalOptions().validSchemas({"aten::__range_length(int lo, int hi, int step) -> int"})})
+        .evaluator(
+            {c10::Symbol::fromQualString("aten::__derive_index"),
+             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+               auto idx = args.at(n->input(0)).unwrapToInt();
+               auto start = args.at(n->input(1)).unwrapToInt();
+               auto step = args.at(n->input(2)).unwrapToInt();
+               return start + idx * step;
+             }});
+
 } // namespace
 } // namespace evaluators
 } // namespace conversion
