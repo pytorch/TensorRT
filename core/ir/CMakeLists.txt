@@ -5,6 +5,7 @@ target_sources(${lib_name}
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Input.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/ir.cpp"
             "${CMAKE_CURRENT_SOURCE_DIR}/StaticParams.cpp"
+            "${CMAKE_CURRENT_SOURCE_DIR}/GraphInputs.cpp"
             $<TARGET_OBJECTS:core_util>
 )
 
