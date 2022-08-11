@@ -39,7 +39,9 @@ bool isModifyingNodes(torch::jit::Node* node, torch::jit::Value* val) {
     if (node->inputs()[i] == val) {
       const at::AliasInfo* formal = schema->arguments()[i].alias_info();
       if (formal && formal->isWrite()) {
-        LOG_GRAPH("<Whatever is doing the modifying> Is modifying node " << util::node_info(node));
+        LOG_GRAPH(
+            util::node_info(node) << " is a modifying node for value " << val->debugName()
+                                  << ", add it to the dependency graph.");
         return true;
       }
     }
