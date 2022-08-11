@@ -108,8 +108,8 @@ Note:
 
 Here are the list of `CompileSpec` options that can be provided directly to compile the pytorch module
 
-* `--backends` : Comma separated string of backends. Eg: torch,torch_tensorrt,tensorrt
-* `--model` : Name of the model file (Can be a torchscript module or a tensorrt engine (ending in `.plan` extension))
+* `--backends` : Comma separated string of backends. Eg: torch,torch_tensorrt, tensorrt or fx2trt
+* `--model` : Name of the model file (Can be a torchscript module or a tensorrt engine (ending in `.plan` extension)). If the backend is `fx2trt`, the input should be a Pytorch module (instead of a torchscript module) and the options for model are (`vgg16` | `resnet50` | `efficientnet_b0`)
 * `--inputs` : List of input shapes & dtypes. Eg: (1, 3, 224, 224)@fp32 for Resnet or (1, 128)@int32;(1, 128)@int32 for BERT
 * `--batch_size` : Batch size
 * `--precision` : Comma separated list of precisions to build TensorRT engine Eg: fp32,fp16

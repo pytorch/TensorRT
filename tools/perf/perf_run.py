@@ -303,7 +303,7 @@ if __name__ == '__main__':
     arg_parser = argparse.ArgumentParser(description="Run inference on a model with random input values")
     arg_parser.add_argument("--config", type=str, help="Load YAML based configuration file to run the inference. If this is used other params will be ignored")
     # The following options are manual user provided settings
-    arg_parser.add_argument("--backends", type=str, help="Comma separated string of backends. Eg: torch,torch_tensorrt,tensorrt")
+    arg_parser.add_argument("--backends", type=str, help="Comma separated string of backends. Eg: torch,torch_tensorrt,fx2trt,tensorrt")
     arg_parser.add_argument("--model", type=str, help="Name of the model file")
     arg_parser.add_argument("--inputs", type=str, help="List of input shapes. Eg: (1, 3, 224, 224)@fp32 for Resnet or (1, 128)@int32;(1, 128)@int32 for BERT")
     arg_parser.add_argument("--batch_size", type=int, default=1, help="Batch size to build and run")
