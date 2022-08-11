@@ -40,7 +40,7 @@ Benchmark scripts depends on following Python packages in addition to requiremen
 * `models` - Model directory
 * `perf_run.py` - Performance benchmarking script which supports torch, torch_tensorrt, fx2trt, tensorrt backends
 * `hub.py` - Script to download torchscript models for VGG16, Resnet50, EfficientNet-B0, VIT, HF-BERT
-* `custom_models.py` - Script which includes custom models other than torchvision and timm (eg: HF BERT)  
+* `custom_models.py` - Script which includes custom models other than torchvision and timm (eg: HF BERT)
 * `utils.py` - utility functions script
 * `benchmark.sh` - This is used for internal performance testing of VGG16, Resnet50, EfficientNet-B0, VIT, HF-BERT.
 
