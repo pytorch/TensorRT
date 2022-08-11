@@ -86,7 +86,7 @@ def run_torch_tensorrt(model, input_tensors, params, precision, truncate_long_an
     if precision == 'int8':
         compile_settings.update({"calib": params.get('calibration_cache')})
 
-    with torchtrt.logging.debug():
+    with torchtrt.logging.errors():
         model = torchtrt.compile(model, **compile_settings)
 
     iters = params.get('iterations', 20)
@@ -307,9 +307,10 @@ if __name__ == '__main__':
     arg_parser.add_argument("--model", type=str, help="Name of the model file")
     arg_parser.add_argument("--inputs", type=str, help="List of input shapes. Eg: (1, 3, 224, 224)@fp32 for Resnet or (1, 128)@int32;(1, 128)@int32 for BERT")
     arg_parser.add_argument("--batch_size", type=int, default=1, help="Batch size to build and run")
-    arg_parser.add_argument("--precision", default="fp32", type=str, help="Precision of TensorRT engine")
+    arg_parser.add_argument("--precision", default="fp32", type=str, help="Comma separated list of precisions to build TensorRT engine Eg: fp32,fp16")
+    arg_parser.add_argument("--calibration_cache", type=str, help="Name of the calibration cache file")
     arg_parser.add_argument("--device", type=int, help="device id")
-    arg_parser.add_argument("--truncate", action='store_true', help="Truncate long and double weights in the network")
+    arg_parser.add_argument("--truncate", action='store_true', help="Truncate long and double weights in the network  in Torch-TensorRT")
     arg_parser.add_argument("--is_trt_engine", action='store_true', help="Boolean flag to determine if the user provided model is a TRT engine or not")
     arg_parser.add_argument("--report", type=str, help="Path of the output file where performance summary is written.")
     args = arg_parser.parse_args()
