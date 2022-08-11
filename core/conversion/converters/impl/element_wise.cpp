@@ -58,7 +58,7 @@ auto element_wise_registrations TORCHTRT_UNUSED =
                auto scalar = args[2].unwrapToScalar();
 
                if (1 != scalar.to<float>()) {
-                 auto alphaTensor = impl::scalar_to_tensor(ctx, scalar);
+                 auto alphaTensor = scalar_to_tensor(ctx, scalar);
                  auto scaleLayer = add_elementwise(
                      ctx,
                      nvinfer1::ElementWiseOperation::kPROD,
@@ -87,7 +87,7 @@ auto element_wise_registrations TORCHTRT_UNUSED =
                auto scalar = args[2].unwrapToScalar();
 
                if (1 != scalar.to<float>()) {
-                 auto alphaTensor = impl::scalar_to_tensor(ctx, scalar);
+                 auto alphaTensor = scalar_to_tensor(ctx, scalar);
                  auto scaleLayer = add_elementwise(
                      ctx,
                      nvinfer1::ElementWiseOperation::kPROD,
@@ -262,11 +262,11 @@ auto element_wise_registrations TORCHTRT_UNUSED =
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                // Should implement other - alpha * self
                auto self = args[0].ITensorOrFreeze(ctx);
-               auto other = impl::scalar_to_tensor(ctx, args[1].unwrapToScalar());
+               auto other = scalar_to_tensor(ctx, args[1].unwrapToScalar());
                auto scalar = args[2].unwrapToScalar();
 
                if (1 != scalar.to<float>()) {
-                 auto alphaTensor = impl::scalar_to_tensor(ctx, scalar);
+                 auto alphaTensor = scalar_to_tensor(ctx, scalar);
                  auto scaleLayer = add_elementwise(
                      ctx,
                      nvinfer1::ElementWiseOperation::kPROD,
@@ -294,7 +294,7 @@ auto element_wise_registrations TORCHTRT_UNUSED =
                auto scalar = args[2].unwrapToScalar();
 
                if (1 != scalar.to<float>()) {
-                 auto alphaTensor = impl::scalar_to_tensor(ctx, scalar);
+                 auto alphaTensor = scalar_to_tensor(ctx, scalar);
                  auto scaleLayer = add_elementwise(
                      ctx,
                      nvinfer1::ElementWiseOperation::kPROD,
