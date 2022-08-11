@@ -55,10 +55,10 @@ auto element_wise_registrations TORCHTRT_UNUSED =
                // Should implement self + alpha * other
                auto self = args[0].ITensorOrFreeze(ctx);
                auto other = args[1].ITensorOrFreeze(ctx);
-               auto scalar = args[2].unwrapToScalar().to<float>();
+               auto scalar = args[2].unwrapToScalar();
 
-               if (1 != scalar) {
-                 auto alphaTensor = tensor_to_const(ctx, torch::tensor({scalar}));
+               if (1 != scalar.to<float>()) {
+                 auto alphaTensor = scalar_to_tensor(ctx, scalar);
                  auto scaleLayer = add_elementwise(
                      ctx,
                      nvinfer1::ElementWiseOperation::kPROD,
@@ -84,10 +84,10 @@ auto element_wise_registrations TORCHTRT_UNUSED =
                // Should implement self + alpha * other
                auto self = args[0].ITensorOrFreeze(ctx);
                auto other = args[1].ITensorOrFreeze(ctx);
-               auto scalar = args[2].unwrapToScalar().to<float>();
+               auto scalar = args[2].unwrapToScalar();
 
-               if (1 != scalar) {
-                 auto alphaTensor = tensor_to_const(ctx, torch::tensor({scalar}));
+               if (1 != scalar.to<float>()) {
+                 auto alphaTensor = scalar_to_tensor(ctx, scalar);
                  auto scaleLayer = add_elementwise(
                      ctx,
                      nvinfer1::ElementWiseOperation::kPROD,
@@ -262,12 +262,11 @@ auto element_wise_registrations TORCHTRT_UNUSED =
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                // Should implement other - alpha * self
                auto self = args[0].ITensorOrFreeze(ctx);
-               auto otherScalar = args[1].unwrapToScalar().to<float>();
-               auto other = tensor_to_const(ctx, torch::tensor({otherScalar}));
-               auto scalar = args[2].unwrapToScalar().to<float>();
+               auto other = scalar_to_tensor(ctx, args[1].unwrapToScalar());
+               auto scalar = args[2].unwrapToScalar();
 
-               if (1 != scalar) {
-                 auto alphaTensor = tensor_to_const(ctx, torch::tensor({scalar}));
+               if (1 != scalar.to<float>()) {
+                 auto alphaTensor = scalar_to_tensor(ctx, scalar);
                  auto scaleLayer = add_elementwise(
                      ctx,
                      nvinfer1::ElementWiseOperation::kPROD,
@@ -292,10 +291,10 @@ auto element_wise_registrations TORCHTRT_UNUSED =
                // Should implement other - alpha * self
                auto self = args[0].ITensorOrFreeze(ctx);
                auto other = args[1].ITensorOrFreeze(ctx);
-               auto scalar = args[2].unwrapToScalar().to<float>();
+               auto scalar = args[2].unwrapToScalar();
 
-               if (1 != scalar) {
-                 auto alphaTensor = tensor_to_const(ctx, torch::tensor({scalar}));
+               if (1 != scalar.to<float>()) {
+                 auto alphaTensor = scalar_to_tensor(ctx, scalar);
                  auto scaleLayer = add_elementwise(
                      ctx,
                      nvinfer1::ElementWiseOperation::kPROD,
@@ -418,7 +417,6 @@ auto element_wise_registrations TORCHTRT_UNUSED =
                // Should implement self * other
                auto self = args[0].ITensorOrFreeze(ctx);
                auto other = args[1].ITensorOrFreeze(ctx);
-
                auto mul = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPROD, self, other, util::node_info(n));
                TORCHTRT_CHECK(mul, "Unable to create mul layer from node: " << *n);
 
@@ -433,7 +431,6 @@ auto element_wise_registrations TORCHTRT_UNUSED =
                // TODO: Remove with functionalization
                auto self = args[0].ITensorOrFreeze(ctx);
                auto other = scalar_to_tensor(ctx, args[1].unwrapToScalar());
-
                auto mul = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPROD, self, other, util::node_info(n));
                TORCHTRT_CHECK(mul, "Unable to create mul layer from node: " << *n);
 
