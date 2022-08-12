@@ -34,7 +34,9 @@ class TestHardSigmoid(AccTestCase):
                 shape_ranges=[((1, 1, 1), (1, 2, 3), (3, 3, 3))],
             ),
         ]
-        self.run_test_with_dynamic_shape(Hardsigmoid(), input_specs, expected_ops={acc_ops.hardsigmoid})
+        self.run_test_with_dynamic_shape(
+            Hardsigmoid(), input_specs, expected_ops={acc_ops.hardsigmoid}
+        )
 
     def test_hardsigmoid_with_dynamic_shape_four_dimensions(self):
         class Hardsigmoid(nn.Module):
@@ -48,7 +50,9 @@ class TestHardSigmoid(AccTestCase):
                 shape_ranges=[((1, 1, 1, 1), (1, 2, 3, 3), (3, 3, 3, 3))],
             ),
         ]
-        self.run_test_with_dynamic_shape(Hardsigmoid(), input_specs, expected_ops={acc_ops.hardsigmoid})
+        self.run_test_with_dynamic_shape(
+            Hardsigmoid(), input_specs, expected_ops={acc_ops.hardsigmoid}
+        )
 
 
 if __name__ == "__main__":

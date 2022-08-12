@@ -11,6 +11,9 @@ from torch_tensorrt.fx.passes.graph_opts import common_subexpression_elimination
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
+_LOGGER: logging.Logger = logging.getLogger(__name__)
+
+
 def debug_print_graph_module(mod_graph: torch.fx.GraphModule) -> None:
     """
     Helper func to print model's graph in plain and tabular format, also print code.

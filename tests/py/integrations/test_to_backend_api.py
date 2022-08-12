@@ -31,7 +31,9 @@ class TestToBackendLowering(unittest.TestCase):
 
     def test_to_backend_lowering(self):
         trt_mod = torch._C._jit_to_backend("tensorrt", self.scripted_model, self.spec)
-        same = (trt_mod.forward(self.input) - self.scripted_model(self.input)).abs().max()
+        same = (
+            (trt_mod.forward(self.input) - self.scripted_model(self.input)).abs().max()
+        )
         self.assertTrue(same < 2e-3)
 
 

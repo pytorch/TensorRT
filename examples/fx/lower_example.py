@@ -125,7 +125,10 @@ def benchmark(
         ),
     ]
 
-    results = [run_configuration_benchmark(deepcopy(model), inputs, conf_) for conf_ in configurations]
+    results = [
+        run_configuration_benchmark(deepcopy(model), inputs, conf_)
+        for conf_ in configurations
+    ]
 
     for res in results:
         print(res.format())

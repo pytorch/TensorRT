@@ -72,7 +72,9 @@ testing_dataset = datasets.CIFAR10(
     ),
 )
 
-testing_dataloader = torch.utils.data.DataLoader(testing_dataset, batch_size=32, shuffle=False, num_workers=2)
+testing_dataloader = torch.utils.data.DataLoader(
+    testing_dataset, batch_size=32, shuffle=False, num_workers=2
+)
 
 crit = torch.nn.CrossEntropyLoss()
 

@@ -104,7 +104,9 @@ def compile(
             "torch.jit.ScriptFunction currently is not directly supported, wrap the function in a module to compile"
         )
 
-    if require_full_compilation and (len(torch_executed_modules) > 0 or len(torch_executed_ops) > 0):
+    if require_full_compilation and (
+        len(torch_executed_modules) > 0 or len(torch_executed_ops) > 0
+    ):
         raise ValueError(
             f"require_full_compilation is enabled however the list of modules and ops to run in torch is not empty. Found: torch_executed_ops: {torch_executed_ops}, torch_executed_modules: {torch_executed_modules}"
         )
@@ -236,10 +238,14 @@ def convert_method_to_trt_engine(
         "truncate_long_and_double": truncate_long_and_double,
     }
 
-    return _C.convert_graph_to_trt_engine(module._c, method_name, _parse_compile_spec(compile_spec))
+    return _C.convert_graph_to_trt_engine(
+        module._c, method_name, _parse_compile_spec(compile_spec)
+    )
 
 
-def embed_engine_in_new_module(serialized_engine: bytes, device=Device._current_device()) -> torch.jit.ScriptModule:
+def embed_engine_in_new_module(
+    serialized_engine: bytes, device=Device._current_device()
+) -> torch.jit.ScriptModule:
     """Takes a pre-built serialized TensorRT engine and embeds it within a TorchScript module
 
     Takes a pre-built serialied TensorRT engine (as bytes) and embeds it within a TorchScript module.

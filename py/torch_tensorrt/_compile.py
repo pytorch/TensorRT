@@ -6,9 +6,9 @@ import torch
 import torch.fx
 from enum import Enum
 
-# import torch_tensorrt.fx
-# from torch_tensorrt.fx.lower import lower_to_trt
-# from torch_tensorrt.fx.utils import LowerPrecision
+import torch_tensorrt.fx
+from torch_tensorrt.fx.lower import lower_to_trt
+from torch_tensorrt.fx.utils import LowerPrecision
 
 
 class _IRType(Enum):
@@ -27,7 +27,10 @@ class _ModuleType(Enum):
 
 
 def _parse_module_type(module: Any) -> _ModuleType:
-    if any(isinstance(module, t) for t in [torch.jit.ScriptModule, torch.jit.ScriptFunction]):
+    if any(
+        isinstance(module, t)
+        for t in [torch.jit.ScriptModule, torch.jit.ScriptFunction]
+    ):
         return _ModuleType.ts
     elif isinstance(module, torch.fx.GraphModule):
         return _ModuleType.fx
@@ -52,10 +55,14 @@ def _get_target_ir(module_type: _ModuleType, ir: str) -> _IRType:
         if ir == "default":
             # Options are listed in order of preference
             if module_is_tsable:
-                logging.log(logging.Level.Info, "ir was set to default, using TorchScript as ir")
+                logging.log(
+                    logging.Level.Info, "ir was set to default, using TorchScript as ir"
+                )
                 return _IRType.ts
             elif module_is_fxable:
-                raise ValueError("Was given a torch.fx.GraphModule, fx is not currently supported by Torch-TensorRT")
+                raise ValueError(
+                    "Was given a torch.fx.GraphModule, fx is not currently supported by Torch-TensorRT"
+                )
                 # logging.log(logging.Level.Info, "ir was set to default, using TorchScript as fx")
                 # return _IRType.fx
             else:
@@ -64,7 +71,13 @@ def _get_target_ir(module_type: _ModuleType, ir: str) -> _IRType:
             raise ValueError("Unknown ir was requested")
 
 
-def compile(module: Any, ir="default", inputs=[], enabled_precisions=set([_enums.dtype.float]), **kwargs):
+def compile(
+    module: Any,
+    ir="default",
+    inputs=[],
+    enabled_precisions=set([_enums.dtype.float]),
+    **kwargs,
+):
     """Compile a PyTorch module for NVIDIA GPUs using TensorRT
 
     Takes a existing PyTorch module and a set of settings to configure the compiler
@@ -110,11 +123,19 @@ def compile(module: Any, ir="default", inputs=[], enabled_precisions=set([_enums
                 "Module was provided as a torch.nn.Module, trying to script the module with torch.jit.script. In the event of a failure please preconvert your module to TorchScript",
             )
             ts_mod = torch.jit.script(module)
-        return torch_tensorrt.ts.compile(ts_mod, inputs=inputs, enabled_precisions=enabled_precisions, **kwargs)
+        return torch_tensorrt.ts.compile(
+            ts_mod, inputs=inputs, enabled_precisions=enabled_precisions, **kwargs
+        )
     elif target_ir == _IRType.fx:
-        if torch.float16 in enabled_precisions or torch_tensorrt.dtype.half in enabled_precisions:
+        if (
+            torch.float16 in enabled_precisions
+            or torch_tensorrt.dtype.half in enabled_precisions
+        ):
             lower_precision = LowerPrecision.FP16
-        elif torch.float32 in enabled_precisions or torch_tensorrt.dtype.float in enabled_precisions:
+        elif (
+            torch.float32 in enabled_precisions
+            or torch_tensorrt.dtype.float in enabled_precisions
+        ):
             lower_precision = LowerPrecision.FP32
         else:
             raise ValueError(f"Precision {enabled_precisions} not supported on FX")
@@ -132,7 +153,12 @@ def compile(module: Any, ir="default", inputs=[], enabled_precisions=set([_enums
 
 
 def convert_method_to_trt_engine(
-    module: Any, method_name: str, ir="default", inputs=[], enabled_precisions=set([_enums.dtype.float]), **kwargs
+    module: Any,
+    method_name: str,
+    ir="default",
+    inputs=[],
+    enabled_precisions=set([_enums.dtype.float]),
+    **kwargs,
 ):
     """Convert a TorchScript module method to a serialized TensorRT engine
 
@@ -175,7 +201,11 @@ def convert_method_to_trt_engine(
             )
             ts_mod = torch.jit.script(module)
         return torch_tensorrt.ts.convert_method_to_trt_engine(
-            ts_mod, method_name, inputs=inputs, enabled_precisions=enabled_precisions, **kwargs
+            ts_mod,
+            method_name,
+            inputs=inputs,
+            enabled_precisions=enabled_precisions,
+            **kwargs,
         )
     elif target_ir == _IRType.fx:
         raise RuntimeError("fx is currently not supported")

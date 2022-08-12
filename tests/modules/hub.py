@@ -14,7 +14,9 @@ torch_version = torch.__version__
 
 # Detect case of no GPU before deserialization of models on GPU
 if not torch.cuda.is_available():
-    raise Exception("No GPU found. Please check if installed torch version is compatible with CUDA version")
+    raise Exception(
+        "No GPU found. Please check if installed torch version is compatible with CUDA version"
+    )
 
 # Downloads all model files again if manifest file is not present
 MANIFEST_FILE = "model_manifest.json"
@@ -45,14 +47,19 @@ models = {
         "path": "both",
     },
     "ssd": {
-        "model": torch.hub.load("NVIDIA/DeepLearningExamples:torchhub", "nvidia_ssd", model_math="fp32"),
+        "model": torch.hub.load(
+            "NVIDIA/DeepLearningExamples:torchhub", "nvidia_ssd", model_math="fp32"
+        ),
         "path": "trace",
     },
     "efficientnet_b0": {
         "model": timm.create_model("efficientnet_b0", pretrained=True),
         "path": "script",
     },
-    "vit": {"model": timm.create_model("vit_base_patch16_224", pretrained=True), "path": "script"},
+    "vit": {
+        "model": timm.create_model("vit_base_patch16_224", pretrained=True),
+        "path": "script",
+    },
     "pooling": {"model": cm.Pool(), "path": "trace"},
     "module_fallback": {"model": cm.ModuleFallbackMain(), "path": "script"},
     "loop_fallback_eval": {"model": cm.LoopFallbackEval(), "path": "script"},
@@ -107,7 +114,11 @@ def download_models(version_matches, manifest):
             traced_filename = n + "_traced.jit.pt"
             # Check if model file exists on disk
             if (
-                (m["path"] == "both" and os.path.exists(scripted_filename) and os.path.exists(traced_filename))
+                (
+                    m["path"] == "both"
+                    and os.path.exists(scripted_filename)
+                    and os.path.exists(traced_filename)
+                )
                 or (m["path"] == "script" and os.path.exists(scripted_filename))
                 or (m["path"] == "trace" and os.path.exists(traced_filename))
             ):

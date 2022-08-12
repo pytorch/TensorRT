@@ -37,7 +37,9 @@ class TestConverter(AccTestCase):
             # TRT does not support ellipsis or diagonal operations
         ]
     )
-    def test_einsum_with_dynamic_shape_four_dimensions(self, _, equation, x_size, y_size):
+    def test_einsum_with_dynamic_shape_four_dimensions(
+        self, _, equation, x_size, y_size
+    ):
         class Einsum(nn.Module):
             def forward(self, x, y):
                 return torch.einsum(equation, x, y)
@@ -55,7 +57,9 @@ class TestConverter(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(Einsum(), input_specs, expected_ops={acc_ops.einsum})
+        self.run_test_with_dynamic_shape(
+            Einsum(), input_specs, expected_ops={acc_ops.einsum}
+        )
 
 
 if __name__ == "__main__":

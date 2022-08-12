@@ -77,7 +77,9 @@ class TestAndMethodSimpleConverterWithDynamicShape(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(And(), input_specs, expected_ops={acc_ops.logical_and})
+        self.run_test_with_dynamic_shape(
+            And(), input_specs, expected_ops={acc_ops.logical_and}
+        )
 
 
 class TestAndFunctionSimpleConverter(AccTestCase):
@@ -219,7 +221,9 @@ class TestAndFunctionSimpleConverterWithDynamicShape(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(And(), input_specs, expected_ops={acc_ops.logical_and})
+        self.run_test_with_dynamic_shape(
+            And(), input_specs, expected_ops={acc_ops.logical_and}
+        )
 
 
 if __name__ == "__main__":

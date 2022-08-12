@@ -42,7 +42,9 @@ class TestAnyConverters(AccTestCase):
                 return torch.any(x, dim, keepdim=True)
 
         inputs = [torch.randn(2, 3).to(input_dtype)]
-        self.run_test(TestModule(), inputs, expected_ops={}, test_implicit_batch_dim=False)
+        self.run_test(
+            TestModule(), inputs, expected_ops={}, test_implicit_batch_dim=False
+        )
 
     @parameterized.expand(
         [

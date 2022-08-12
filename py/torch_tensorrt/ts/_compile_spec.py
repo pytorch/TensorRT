@@ -39,15 +39,22 @@ def _supported_input_size_type(input_size: Any) -> bool:
 
 def _parse_input_ranges(input_sizes: List) -> List:
 
-    if any(not isinstance(i, dict) and not _supported_input_size_type(i) for i in input_sizes):
-        raise KeyError("An input size must either be a static size or a range of three sizes (min, opt, max) as Dict")
+    if any(
+        not isinstance(i, dict) and not _supported_input_size_type(i)
+        for i in input_sizes
+    ):
+        raise KeyError(
+            "An input size must either be a static size or a range of three sizes (min, opt, max) as Dict"
+        )
 
     parsed_input_sizes = []
     for i in input_sizes:
         if isinstance(i, dict):
             if all(k in i for k in ["min", "opt", "min"]):
                 parsed_input_sizes.append(
-                    Input(min_shape=i["min"], opt_shape=i["opt"], max_shape=i["max"])._to_internal()
+                    Input(
+                        min_shape=i["min"], opt_shape=i["opt"], max_shape=i["max"]
+                    )._to_internal()
                 )
 
             elif "opt" in i:
@@ -109,7 +116,11 @@ def _parse_device_type(device: Any) -> _enums.DeviceType:
         if device.type == "cuda":
             return _enums.DeviceType.gpu
         else:
-            ValueError("Got a device type other than GPU or DLA (type: " + str(device.type) + ")")
+            ValueError(
+                "Got a device type other than GPU or DLA (type: "
+                + str(device.type)
+                + ")"
+            )
     elif isinstance(device, _enums.DeviceType):
         return device
     elif isinstance(device, str):
@@ -118,7 +129,9 @@ def _parse_device_type(device: Any) -> _enums.DeviceType:
         elif device == "dla" or device == "DLA":
             return _enums.DeviceType.dla
         else:
-            ValueError("Got a device type other than GPU or DLA (type: " + str(device) + ")")
+            ValueError(
+                "Got a device type other than GPU or DLA (type: " + str(device) + ")"
+            )
     else:
         raise TypeError(
             "Device specification must be of type torch.device, string or torch_tensorrt.DeviceType, but got: "
@@ -193,12 +206,22 @@ def _parse_input_signature(input_signature: Any):
             input = _parse_input_signature(item)
             input_list.append(input)
         return input_list
-    elif isinstance(input_signature, Input) or isinstance(input_signature, torch.Tensor):
-        i = Input._from_tensor(input_signature) if isinstance(input_signature, torch.Tensor) else input_signature
+    elif isinstance(input_signature, Input) or isinstance(
+        input_signature, torch.Tensor
+    ):
+        i = (
+            Input._from_tensor(input_signature)
+            if isinstance(input_signature, torch.Tensor)
+            else input_signature
+        )
         clone = _internal_input_to_torch_class_input(i._to_internal())
         return clone
     else:
-        raise KeyError("Input signature contains an unsupported type {}".format(type(input_signature)))
+        raise KeyError(
+            "Input signature contains an unsupported type {}".format(
+                type(input_signature)
+            )
+        )
 
 
 def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
@@ -207,18 +230,29 @@ def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
     info = _ts_C.CompileSpec()
 
     if len(compile_spec["inputs"]) > 0:
-        if not all([isinstance(i, torch.Tensor) or isinstance(i, Input) for i in compile_spec["inputs"]]):
+        if not all(
+            [
+                isinstance(i, torch.Tensor) or isinstance(i, Input)
+                for i in compile_spec["inputs"]
+            ]
+        ):
             raise KeyError(
                 "Input specs should be either torch_tensorrt.Input or torch.Tensor, found types: {}".format(
                     [type(i) for i in compile_spec["inputs"]]
                 )
             )
 
-        inputs = [Input._from_tensor(i) if isinstance(i, torch.Tensor) else i for i in compile_spec["inputs"]]
+        inputs = [
+            Input._from_tensor(i) if isinstance(i, torch.Tensor) else i
+            for i in compile_spec["inputs"]
+        ]
         info.inputs = [i._to_internal() for i in inputs]
 
     elif compile_spec["input_signature"] is not None:
-        log(Level.Warning, "Input signature parsing is an experimental feature, behavior and APIs may change")
+        log(
+            Level.Warning,
+            "Input signature parsing is an experimental feature, behavior and APIs may change",
+        )
         signature = _parse_input_signature(compile_spec["input_signature"])
         info.input_signature = _C.InputSignature(signature)  # py_object
 
@@ -227,7 +261,10 @@ def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
                 "Grouped inputs currently requires partial compilation to be enabled, this restriction will be relaxed in a future release"
             )
 
-        log(Level.Debug, "Grouped inputs currently requires additional settings to enable the feature")
+        log(
+            Level.Debug,
+            "Grouped inputs currently requires additional settings to enable the feature",
+        )
         log(
             Level.Debug,
             """Adding the following ops to torch_executed_ops:
@@ -239,12 +276,20 @@ def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
     - prim::TupleUnpack
 """,
         )
-        compile_spec["torch_fallback"]["forced_fallback_ops"].append("aten::__getitem__")
-        compile_spec["torch_fallback"]["forced_fallback_ops"].append("prim::ListConstruct")
+        compile_spec["torch_fallback"]["forced_fallback_ops"].append(
+            "aten::__getitem__"
+        )
+        compile_spec["torch_fallback"]["forced_fallback_ops"].append(
+            "prim::ListConstruct"
+        )
         compile_spec["torch_fallback"]["forced_fallback_ops"].append("prim::ListUnpack")
         compile_spec["torch_fallback"]["forced_fallback_ops"].append("prim::TupleIndex")
-        compile_spec["torch_fallback"]["forced_fallback_ops"].append("prim::TupleConstruct")
-        compile_spec["torch_fallback"]["forced_fallback_ops"].append("prim::TupleUnpack")
+        compile_spec["torch_fallback"]["forced_fallback_ops"].append(
+            "prim::TupleConstruct"
+        )
+        compile_spec["torch_fallback"]["forced_fallback_ops"].append(
+            "prim::TupleUnpack"
+        )
 
     else:
         raise KeyError(
@@ -252,7 +297,9 @@ def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
         )
 
     if "enabled_precisions" in compile_spec:
-        info.enabled_precisions = _parse_enabled_precisions(compile_spec["enabled_precisions"])
+        info.enabled_precisions = _parse_enabled_precisions(
+            compile_spec["enabled_precisions"]
+        )
 
     if "calibrator" in compile_spec:
         info.ptq_calibrator = compile_spec["calibrator"]
@@ -392,7 +439,9 @@ def TensorRTCompileSpec(
     backend_spec = torch.classes.tensorrt.CompileSpec()
 
     if input_signature is not None:
-        raise ValueError("Input signature parsing is not currently supported in the TorchScript backend integration")
+        raise ValueError(
+            "Input signature parsing is not currently supported in the TorchScript backend integration"
+        )
 
     for i in parsed_spec.inputs:
         clone = _internal_input_to_torch_class_input(i)
@@ -412,8 +461,12 @@ def TensorRTCompileSpec(
     torch_fallback = torch.classes.tensorrt._TorchFallback()
     torch_fallback._set_enabled(parsed_spec.torch_fallback.enabled)
     torch_fallback._set_min_block_size(parsed_spec.torch_fallback.min_block_size)
-    torch_fallback._set_forced_fallback_operators(parsed_spec.torch_fallback.forced_fallback_operators)
-    torch_fallback._set_forced_fallback_modules(parsed_spec.torch_fallback.forced_fallback_modules)
+    torch_fallback._set_forced_fallback_operators(
+        parsed_spec.torch_fallback.forced_fallback_operators
+    )
+    torch_fallback._set_forced_fallback_modules(
+        parsed_spec.torch_fallback.forced_fallback_modules
+    )
 
     backend_spec._set_device(d)
     backend_spec._set_torch_fallback(torch_fallback)

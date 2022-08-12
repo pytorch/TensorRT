@@ -60,7 +60,9 @@ def is_acc_op(node_or_target: Union[Callable, torch.fx.Node]) -> bool:
     return "acc_ops" in target.__module__
 
 
-def is_acc_op_with_kwarg(node_or_target: Union[Callable, torch.fx.Node], kwarg: str) -> bool:
+def is_acc_op_with_kwarg(
+    node_or_target: Union[Callable, torch.fx.Node], kwarg: str
+) -> bool:
     """
     Helper that inspects `node_or_target` and returns whether it is an acc_op node
     (or a target for an acc_op) that has an arg signature that includes `kwarg`.
@@ -68,7 +70,11 @@ def is_acc_op_with_kwarg(node_or_target: Union[Callable, torch.fx.Node], kwarg: 
     if not is_acc_op(node_or_target):
         return False
 
-    target = node_or_target.target if isinstance(node_or_target, torch.fx.Node) else node_or_target
+    target = (
+        node_or_target.target
+        if isinstance(node_or_target, torch.fx.Node)
+        else node_or_target
+    )
     assert not isinstance(target, str)
     return kwarg in inspect.signature(inspect.unwrap(target)).parameters
 
@@ -174,7 +180,9 @@ def map_tensor_metadata(a: Any, fn: Callable):
         return fn(a)
     elif isinstance(a, tuple):
         return tuple(map_tensor_metadata(elem, fn) for elem in a)
-    assert isinstance(a, list), f"Only supporting tuple/list/TensorMetadata, but found {type(a)}"
+    assert isinstance(
+        a, list
+    ), f"Only supporting tuple/list/TensorMetadata, but found {type(a)}"
     return immutable_list(map_tensor_metadata(elem, fn) for elem in a)
 
 

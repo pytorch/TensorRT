@@ -19,14 +19,18 @@ class SortedTRTProfiler(trt.IProfiler):
     def report_layer_time(self, layer_name: str, ms: int) -> None:
         self.layers[layer_name] = ms
 
-    def print_sorted_profile(self, additional_info: Optional[Mapping[str, str]]) -> None:
+    def print_sorted_profile(
+        self, additional_info: Optional[Mapping[str, str]]
+    ) -> None:
         additional_info = {} if additional_info is None else additional_info
         for k, v in sorted(self.layers.items(), key=operator.itemgetter(1)):
             additional_str = additional_info.get(k, "")
             _LOGGER.info(f"{k} {additional_str}: {v}ms")
 
 
-def profile_trt_module(name: str, trt_mod: TRTModule, mod_input: List[torch.Tensor]) -> None:
+def profile_trt_module(
+    name: str, trt_mod: TRTModule, mod_input: List[torch.Tensor]
+) -> None:
     """
     Provide per layer timing and shape info
     """
@@ -34,8 +38,12 @@ def profile_trt_module(name: str, trt_mod: TRTModule, mod_input: List[torch.Tens
     shape_map = {}
     for layer in layer_info["Layers"]:
         name = layer["Name"]
-        input_str = ", ".join([str(x.get("Dimensions", "[]")) for x in layer.get("Inputs", [])])
-        output_str = ", ".join([str(x.get("Dimensions", "[]")) for x in layer.get("Outputs", [])])
+        input_str = ", ".join(
+            [str(x.get("Dimensions", "[]")) for x in layer.get("Inputs", [])]
+        )
+        output_str = ", ".join(
+            [str(x.get("Dimensions", "[]")) for x in layer.get("Outputs", [])]
+        )
         shape_map[name] = f"({input_str}) -> ({output_str})"
 
     trt_mod.enable_profiling(profiler=SortedTRTProfiler())  # pyre-ignore[29]

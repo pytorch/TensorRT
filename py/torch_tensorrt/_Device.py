@@ -46,7 +46,9 @@ class Device(object):
         """
         if len(args) == 1:
             if not isinstance(args[0], str):
-                raise TypeError("When specifying Device through positional argument, argument must be str")
+                raise TypeError(
+                    "When specifying Device through positional argument, argument must be str"
+                )
             else:
                 (self.device_type, id) = Device._parse_device_str(args[0])
                 if self.device_type == _enums.DeviceType.GPU:
@@ -96,7 +98,9 @@ class Device(object):
         return (
             "Device(type={}, gpu_id={}".format(self.device_type, self.gpu_id) + ")"
             if self.device_type == _enums.DeviceType.GPU
-            else ", dla_core={}, allow_gpu_fallback={}".format(self.dla_core, self.allow_gpu_fallback)
+            else ", dla_core={}, allow_gpu_fallback={}".format(
+                self.dla_core, self.allow_gpu_fallback
+            )
         )
 
     def _to_internal(self) -> _C.Device:

@@ -35,7 +35,11 @@ __tensorrt_version__ = "8.4"
 
 
 def get_git_revision_short_hash() -> str:
-    return subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).decode("ascii").strip()
+    return (
+        subprocess.check_output(["git", "rev-parse", "--short", "HEAD"])
+        .decode("ascii")
+        .strip()
+    )
 
 
 if "--fx-only" in sys.argv:
@@ -70,7 +74,9 @@ if platform.uname().processor == "aarch64":
         elif version == "5.0":
             JETPACK_VERSION = "4.6"
     if not JETPACK_VERSION:
-        warnings.warn("Assuming jetpack version to be 4.6 or greater, if not use the --jetpack-version option")
+        warnings.warn(
+            "Assuming jetpack version to be 4.6 or greater, if not use the --jetpack-version option"
+        )
         JETPACK_VERSION = "4.6"
 
 
@@ -158,7 +164,11 @@ def copy_libtorchtrt(multilinux=False):
             dir_path + "/trtorch/lib/libtrtorch.so",
         )
     else:
-        os.system("tar -xzf ../bazel-bin/libtorchtrt.tar.gz --strip-components=2 -C " + dir_path + "/torch_tensorrt")
+        os.system(
+            "tar -xzf ../bazel-bin/libtorchtrt.tar.gz --strip-components=2 -C "
+            + dir_path
+            + "/torch_tensorrt"
+        )
 
 
 class DevelopCommand(develop):
@@ -299,7 +309,11 @@ ext_modules = [
             "-Wno-deprecated",
             "-Wno-deprecated-declarations",
         ]
-        + (["-D_GLIBCXX_USE_CXX11_ABI=1"] if CXX11_ABI else ["-D_GLIBCXX_USE_CXX11_ABI=0"]),
+        + (
+            ["-D_GLIBCXX_USE_CXX11_ABI=1"]
+            if CXX11_ABI
+            else ["-D_GLIBCXX_USE_CXX11_ABI=0"]
+        ),
         extra_link_args=[
             "-Wno-deprecated",
             "-Wno-deprecated-declarations",
@@ -314,7 +328,11 @@ ext_modules = [
             "-Xlinker",
             "-export-dynamic",
         ]
-        + (["-D_GLIBCXX_USE_CXX11_ABI=1"] if CXX11_ABI else ["-D_GLIBCXX_USE_CXX11_ABI=0"]),
+        + (
+            ["-D_GLIBCXX_USE_CXX11_ABI=1"]
+            if CXX11_ABI
+            else ["-D_GLIBCXX_USE_CXX11_ABI=0"]
+        ),
         undef_macros=["NDEBUG"],
     )
 ]

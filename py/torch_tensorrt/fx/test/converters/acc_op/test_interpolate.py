@@ -133,7 +133,9 @@ class TestInterpolateConverter(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(Interpolate(), input_specs, expected_ops={acc_ops.interpolate})
+        self.run_test_with_dynamic_shape(
+            Interpolate(), input_specs, expected_ops={acc_ops.interpolate}
+        )
 
 
 if __name__ == "__main__":

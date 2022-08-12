@@ -21,14 +21,20 @@ from tqdm import tqdm
 
 from vgg16 import vgg16
 
-PARSER = argparse.ArgumentParser(description="VGG16 example to use with Torch-TensorRT PTQ")
-PARSER.add_argument("--epochs", default=100, type=int, help="Number of total epochs to train")
+PARSER = argparse.ArgumentParser(
+    description="VGG16 example to use with Torch-TensorRT PTQ"
+)
+PARSER.add_argument(
+    "--epochs", default=100, type=int, help="Number of total epochs to train"
+)
 PARSER.add_argument(
     "--enable_qat",
     action="store_true",
     help="Enable quantization aware training. This is recommended to perform on a pre-trained model.",
 )
-PARSER.add_argument("--batch-size", default=128, type=int, help="Batch size to use when training")
+PARSER.add_argument(
+    "--batch-size", default=128, type=int, help="Batch size to use when training"
+)
 PARSER.add_argument("--lr", default=0.1, type=float, help="Initial learning rate")
 PARSER.add_argument("--drop-ratio", default=0.0, type=float, help="Dropout ratio")
 PARSER.add_argument("--momentum", default=0.9, type=float, help="Momentum")
@@ -194,7 +200,9 @@ def main():
                 transforms.RandomCrop(32, padding=4),
                 transforms.RandomHorizontalFlip(),
                 transforms.ToTensor(),
-                transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+                transforms.Normalize(
+                    (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
+                ),
             ]
         ),
     )
@@ -209,7 +217,9 @@ def main():
         transform=transforms.Compose(
             [
                 transforms.ToTensor(),
-                transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+                transforms.Normalize(
+                    (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
+                ),
             ]
         ),
     )
@@ -309,9 +319,14 @@ def train(model, dataloader, crit, opt, epoch):
 
         running_loss += loss.item()
         if batch % 50 == 49:
-            writer.add_scalar("Training Loss", running_loss / 100, epoch * len(dataloader) + batch)
+            writer.add_scalar(
+                "Training Loss", running_loss / 100, epoch * len(dataloader) + batch
+            )
             writer.close()
-            print("Batch: [%5d | %5d] loss: %.3f" % (batch + 1, len(dataloader), running_loss / 100))
+            print(
+                "Batch: [%5d | %5d] loss: %.3f"
+                % (batch + 1, len(dataloader), running_loss / 100)
+            )
             running_loss = 0.0
 
 
