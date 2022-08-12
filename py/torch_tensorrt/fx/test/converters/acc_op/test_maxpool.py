@@ -28,7 +28,9 @@ class TestMaxPoolConverter(AccTestCase):
         class TestModule(torch.nn.Module):
             def __init__(self):
                 super().__init__()
-                self.max_pool = torch.nn.MaxPool1d(kernel_size, stride, padding, ceil_mode=ceil_mode, dilation=dilation)
+                self.max_pool = torch.nn.MaxPool1d(
+                    kernel_size, stride, padding, ceil_mode=ceil_mode, dilation=dilation
+                )
 
             def forward(self, x):
                 return self.max_pool(x)
@@ -86,7 +88,9 @@ class TestMaxPoolConverter(AccTestCase):
         class TestModule(torch.nn.Module):
             def __init__(self):
                 super().__init__()
-                self.max_pool = torch.nn.MaxPool2d(kernel_size, stride, padding, ceil_mode=ceil_mode)
+                self.max_pool = torch.nn.MaxPool2d(
+                    kernel_size, stride, padding, ceil_mode=ceil_mode
+                )
 
             def forward(self, x):
                 return self.max_pool(x)
@@ -112,7 +116,9 @@ class TestMaxPoolConverter(AccTestCase):
                 shape_ranges=[((1, 1, 1, 1), (1, 2, 4, 4), (2, 4, 4, 4))],
             ),
         ]
-        self.run_test_with_dynamic_shape(TestModule(), input_specs, expected_ops={acc_ops.max_pool2d})
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.max_pool2d}
+        )
 
     @parameterized.expand(
         [
@@ -134,7 +140,9 @@ class TestMaxPoolConverter(AccTestCase):
         class TestModule(torch.nn.Module):
             def __init__(self):
                 super().__init__()
-                self.max_pool = torch.nn.MaxPool3d(kernel_size, stride, padding, ceil_mode=ceil_mode)
+                self.max_pool = torch.nn.MaxPool3d(
+                    kernel_size, stride, padding, ceil_mode=ceil_mode
+                )
 
             def forward(self, x):
                 return self.max_pool(x)
@@ -158,7 +166,9 @@ class TestMaxPoolConverter(AccTestCase):
                 shape_ranges=[((1, 1, 1, 1, 1), (1, 2, 4, 4, 4), (2, 4, 4, 4, 4))],
             ),
         ]
-        self.run_test_with_dynamic_shape(TestModule(), input_specs, expected_ops={acc_ops.max_pool3d})
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.max_pool3d}
+        )
 
     @parameterized.expand(
         [
@@ -325,7 +335,9 @@ class TestMaxPoolConverter(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(TestModule(), input_specs, expected_ops={acc_ops.max_pool2d})
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.max_pool2d}
+        )
 
     @parameterized.expand(
         [
@@ -358,7 +370,9 @@ class TestMaxPoolConverter(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(TestModule(), input_specs, expected_ops={acc_ops.max_pool3d})
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.max_pool3d}
+        )
 
 
 if __name__ == "__main__":

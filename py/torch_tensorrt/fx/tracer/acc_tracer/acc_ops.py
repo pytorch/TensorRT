@@ -141,7 +141,9 @@ def max_pool2d(
 
 @register_acc_op_mapping(op_and_target=("call_function", nn.functional.max_pool3d))
 @register_acc_op
-def max_pool3d(*, input, kernel_size, stride, padding, dilation, ceil_mode, return_indices):
+def max_pool3d(
+    *, input, kernel_size, stride, padding, dilation, ceil_mode, return_indices
+):
     return nn.functional.max_pool3d(
         input=input,
         kernel_size=kernel_size,
@@ -153,13 +155,17 @@ def max_pool3d(*, input, kernel_size, stride, padding, dilation, ceil_mode, retu
     )
 
 
-@register_acc_op_mapping(op_and_target=("call_function", nn.functional.adaptive_avg_pool2d))
+@register_acc_op_mapping(
+    op_and_target=("call_function", nn.functional.adaptive_avg_pool2d)
+)
 @register_acc_op
 def adaptive_avg_pool2d(*, input, output_size):
     return nn.functional.adaptive_avg_pool2d(input=input, output_size=output_size)
 
 
-@register_acc_op_mapping(op_and_target=("call_function", nn.functional.adaptive_avg_pool3d))
+@register_acc_op_mapping(
+    op_and_target=("call_function", nn.functional.adaptive_avg_pool3d)
+)
 @register_acc_op
 def adaptive_avg_pool3d(*, input, output_size):
     return nn.functional.adaptive_avg_pool3d(input=input, output_size=output_size)
@@ -306,7 +312,9 @@ def custom_getattr_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
     input_obj = node.args[0]
     attr_name = node.args[1]
     assert isinstance(input_obj, torch.fx.Node)
-    assert input_obj.meta["type"] == torch.Tensor, f"Expected torch.Tensor type for {input_obj.meta['type']}"
+    assert (
+        input_obj.meta["type"] == torch.Tensor
+    ), f"Expected torch.Tensor type for {input_obj.meta['type']}"
     assert (
         attr_name == "shape" or attr_name == "device" or attr_name == "dtype"
     ), f"Only supporting shape, device and dtype getattr for now, not {attr_name}"
@@ -336,14 +344,18 @@ def tensor_size_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
     """
 
     with node.graph.inserting_before(node):
-        size_node = node.graph.call_function(size, kwargs={"input": node.kwargs["input"]})
+        size_node = node.graph.call_function(
+            size, kwargs={"input": node.kwargs["input"]}
+        )
 
         if "dim" not in node.kwargs:
             size_node.meta = node.meta.copy()
             return size_node
 
         size_node.meta["type"] = torch.Size
-        getitem_node = node.graph.call_function(getitem, kwargs={"input": size_node, "idx": node.kwargs["dim"]})
+        getitem_node = node.graph.call_function(
+            getitem, kwargs={"input": size_node, "idx": node.kwargs["dim"]}
+        )
         getitem_node.meta = node.meta.copy()
         return getitem_node
 
@@ -418,7 +430,9 @@ def repeat_interleave_mapper(node: torch.fx.Node, _: nn.Module):
     input_node = node.kwargs["input"]
     repeats = cast(int, node.kwargs["repeats"])
     dim = node.kwargs["dim"]
-    assert type(repeats) is int, "We currently only support `repeat_interleave` with int repeats"
+    assert (
+        type(repeats) is int
+    ), "We currently only support `repeat_interleave` with int repeats"
     rank = node.meta["tensor_rank"]
     if dim is None:
         repeat_dim = rank - 1
@@ -619,12 +633,16 @@ def addmm_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
     """
     with node.graph.inserting_before(node):
         mm_kwargs = {"input": node.kwargs["mat1"], "other": node.kwargs["mat2"]}
-        mm_node = node.graph.create_node("call_function", matmul, kwargs=mm_kwargs, name=f"{node.name}_mm")
+        mm_node = node.graph.create_node(
+            "call_function", matmul, kwargs=mm_kwargs, name=f"{node.name}_mm"
+        )
         mm_node.meta = node.meta.copy()
 
         if node.kwargs["alpha"] != 1:
             mul_kwargs = {"input": mm_node, "other": node.kwargs["alpha"]}
-            mm_node = node.graph.create_node("call_function", mul, kwargs=mul_kwargs, name=f"{mm_node.name}_mul")
+            mm_node = node.graph.create_node(
+                "call_function", mul, kwargs=mul_kwargs, name=f"{mm_node.name}_mul"
+            )
         mm_node.meta = node.meta.copy()
 
         input_node = node.kwargs["input"]
@@ -638,7 +656,9 @@ def addmm_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
             input_node = new_input_node
 
         add_kwargs = {"input": mm_node, "other": input_node}
-        add_node = node.graph.create_node("call_function", add, kwargs=add_kwargs, name=f"{node.name}_add")
+        add_node = node.graph.create_node(
+            "call_function", add, kwargs=add_kwargs, name=f"{node.name}_add"
+        )
         add_node.meta = node.meta.copy()
         return add_node
 
@@ -698,7 +718,9 @@ def permute(*, input, permutation):
 def square_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
     input_node = node.kwargs["input"]
     with node.graph.inserting_before(node):
-        new_node = node.graph.call_function(mul, kwargs={"input": input_node, "other": input_node})
+        new_node = node.graph.call_function(
+            mul, kwargs={"input": input_node, "other": input_node}
+        )
         new_node.meta = node.meta.copy()
         return new_node
 
@@ -741,7 +763,9 @@ def matmul(*, input, other):
     op_and_target=("call_function", nn.functional.dropout),
     arg_replacement_tuples=[("input", "input")],
 )
-@register_custom_acc_mapper_fn(op_and_target=("call_method", "detach"), arg_replacement_tuples=[("input", "input")])
+@register_custom_acc_mapper_fn(
+    op_and_target=("call_method", "detach"), arg_replacement_tuples=[("input", "input")]
+)
 def dropout_mapper(node: torch.fx.Node, mod: nn.Module):
     """
     Remove dropout node and directly map its input to output.
@@ -795,7 +819,9 @@ def silu(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
     with node.graph.inserting_before(node):
         sigmoid_node = node.graph.call_function(sigmoid, kwargs={"input": input_node})
         sigmoid_node.meta = node.meta.copy()
-        new_node = node.graph.call_function(mul, kwargs={"input": sigmoid_node, "other": input_node})
+        new_node = node.graph.call_function(
+            mul, kwargs={"input": sigmoid_node, "other": input_node}
+        )
         new_node.meta = node.meta.copy()
         return new_node
 
@@ -809,9 +835,13 @@ def silu(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
 def hardswish_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
     input_node = node.kwargs["input"]
     with node.graph.inserting_before(node):
-        new_sigmoid_node = node.graph.call_function(hardsigmoid, kwargs={"input": input_node})
+        new_sigmoid_node = node.graph.call_function(
+            hardsigmoid, kwargs={"input": input_node}
+        )
         new_sigmoid_node.meta = node.meta.copy()
-        new_node = node.graph.call_function(mul, kwargs={"input": new_sigmoid_node, "other": input_node})
+        new_node = node.graph.call_function(
+            mul, kwargs={"input": new_sigmoid_node, "other": input_node}
+        )
         new_node.meta = node.meta.copy()
         return new_node
 
@@ -889,7 +919,9 @@ def quantize_per_tensor(*, input, acc_out_ty=None):
     assert acc_out_ty is not None
     qparams = acc_out_ty.qparams
     dtype = acc_out_ty.dtype
-    return torch.quantize_per_tensor(input, qparams["scale"], qparams["zero_point"], dtype)
+    return torch.quantize_per_tensor(
+        input, qparams["scale"], qparams["zero_point"], dtype
+    )
 
 
 @register_acc_op_properties(AccOpProperty.unary)
@@ -931,7 +963,9 @@ def dequantize(*, input):
     return torch.dequantize(input)
 
 
-@register_acc_op_properties(AccOpProperty.pointwise, AccOpProperty.unary, AccOpProperty.quantized)
+@register_acc_op_properties(
+    AccOpProperty.pointwise, AccOpProperty.unary, AccOpProperty.quantized
+)
 @register_acc_op
 def rescale_quantize_per_tensor(*, input, acc_out_ty=None):
     assert acc_out_ty is not None
@@ -991,7 +1025,9 @@ def div_mapper(node: torch.fx.Node, mod: torch.fx.GraphModule) -> torch.fx.Node:
                 kwargs={"input": div_kwargs["input"], "other": div_kwargs["other"]},
             )
         else:
-            raise RuntimeError(f"Unhandled div rounding mode {div_kwargs['rounding_mode']}")
+            raise RuntimeError(
+                f"Unhandled div rounding mode {div_kwargs['rounding_mode']}"
+            )
         div_node.meta = node.meta.copy()
         return div_node
 
@@ -1048,10 +1084,14 @@ def relu(*, input, inplace=False):
 
 
 @register_acc_op_properties(AccOpProperty.pointwise, AccOpProperty.unary)
-@register_acc_op_mapping(op_and_target=("call_function", torch.nn.functional.leaky_relu))
+@register_acc_op_mapping(
+    op_and_target=("call_function", torch.nn.functional.leaky_relu)
+)
 @register_acc_op
 def leaky_relu(*, input, negative_slope=0.01, inplace=False):
-    return nn.functional.leaky_relu(input=input, negative_slope=negative_slope, inplace=inplace)
+    return nn.functional.leaky_relu(
+        input=input, negative_slope=negative_slope, inplace=inplace
+    )
 
 
 @register_acc_op_properties(AccOpProperty.pointwise, AccOpProperty.unary)
@@ -1092,7 +1132,9 @@ def torch_log1p_mapper(node: torch.fx.Node, _: torch.nn.Module) -> torch.fx.Node
         return log_node
 
 
-def reduce_op_mapper(node: torch.fx.Node, mod: torch.fx.GraphModule, func) -> torch.fx.Node:
+def reduce_op_mapper(
+    node: torch.fx.Node, mod: torch.fx.GraphModule, func
+) -> torch.fx.Node:
     with node.graph.inserting_before(node):
         kwargs = dict(node.kwargs)
         if "dim" in kwargs and isinstance(kwargs["dim"], int):
@@ -1230,7 +1272,9 @@ def std_mapper(node, mod):
     dim = node.kwargs.get("dim")
     keepdim = node.kwargs.get("keepdim")
     # assert unbiased is False or unbiased is None, "We currently do not support `std` with unbiased=True where n-1 is used"
-    assert dim is not None and keepdim is not None, "We currently do not support `std` with dim=None and keepdim=None"
+    assert (
+        dim is not None and keepdim is not None
+    ), "We currently do not support `std` with dim=None and keepdim=None"
 
     with node.graph.inserting_before(node):
         # mean(X)
@@ -1307,7 +1351,9 @@ def std_mapper(node, mod):
         ("keepdim", "keepdim", this_arg_is_optional),
     ],
 )
-def add_maximum_minimum_mapper(node: torch.fx.Node, mod: torch.fx.GraphModule) -> torch.fx.Node:
+def add_maximum_minimum_mapper(
+    node: torch.fx.Node, mod: torch.fx.GraphModule
+) -> torch.fx.Node:
     # there are effectively three versions of torch.max / torch.min
     # full reduce: torch.max(input) -> Tensor
     # dimensional reduce: torch.max(input, dim, keepdim=False, *, out=None) -> (Tensor, LongTensor)
@@ -1735,7 +1781,9 @@ def conv3d(*, input, weight, bias, stride, padding, dilation, groups):
     )
 
 
-@register_acc_op_mapping(op_and_target=("call_function", torch.nn.functional.conv_transpose2d))
+@register_acc_op_mapping(
+    op_and_target=("call_function", torch.nn.functional.conv_transpose2d)
+)
 @register_acc_op
 def conv_transpose2d(
     *,
@@ -1760,7 +1808,9 @@ def conv_transpose2d(
     )
 
 
-@register_acc_op_mapping(op_and_target=("call_function", torch.nn.functional.conv_transpose3d))
+@register_acc_op_mapping(
+    op_and_target=("call_function", torch.nn.functional.conv_transpose3d)
+)
 @register_acc_op
 def conv_transpose3d(
     *,
@@ -1832,7 +1882,9 @@ def argmin_max_mapper_impl(node: torch.fx.Node, largest: bool) -> torch.fx.Node:
     keepdim = node.kwargs["keepdim"]
 
     if dim is None and keepdim:
-        raise RuntimeError("We currently don't support argmin/argmax with dim=None and keepdim=True")
+        raise RuntimeError(
+            "We currently don't support argmin/argmax with dim=None and keepdim=True"
+        )
 
     with node.graph.inserting_before(node):
         if dim is None:
@@ -1951,7 +2003,9 @@ def torch_split_mapper(node: torch.fx.Node, mod: nn.Module) -> torch.fx.Node:
             slice_nodes.append(new_node)
             start += i
 
-        new_node = node.graph.call_function(tuple_construct, kwargs={"tensors": tuple(slice_nodes)})
+        new_node = node.graph.call_function(
+            tuple_construct, kwargs={"tensors": tuple(slice_nodes)}
+        )
         new_node.meta = node.meta.copy()
         return new_node
 
@@ -2218,7 +2272,9 @@ def slice_tensor(*, input, dim, start, stop, step):
     ],
 )
 def custom_narrow_mapper(node: torch.fx.Node, mod: nn.Module) -> torch.fx.Node:
-    assert isinstance(node.kwargs["start"], int) and isinstance(node.kwargs["length"], int)
+    assert isinstance(node.kwargs["start"], int) and isinstance(
+        node.kwargs["length"], int
+    )
     kwargs = {
         "input": node.kwargs["input"],
         "dim": node.kwargs["dim"],
@@ -2372,9 +2428,13 @@ def custom_tensor_to_mapper(node: torch.fx.Node, _: nn.Module):
             input_obj = node.kwargs["input"]
             other_obj = dest
             with node.graph.inserting_before(node):
-                dtype_node = node.graph.call_function(dtype, kwargs={"input": other_obj})
+                dtype_node = node.graph.call_function(
+                    dtype, kwargs={"input": other_obj}
+                )
                 dtype_node.meta["type"] = torch.dtype
-                device_node = node.graph.call_function(device, kwargs={"input": other_obj})
+                device_node = node.graph.call_function(
+                    device, kwargs={"input": other_obj}
+                )
                 device_node.meta["type"] = torch.device
                 new_kwargs = {
                     "input": input_obj,
@@ -2405,7 +2465,9 @@ def custom_tensor_to_mapper(node: torch.fx.Node, _: nn.Module):
     }
 
     with node.graph.inserting_before(node):
-        new_node = node.graph.create_node("call_function", to_dtype, kwargs=new_kwargs, name=node.name)
+        new_node = node.graph.create_node(
+            "call_function", to_dtype, kwargs=new_kwargs, name=node.name
+        )
         new_node.meta = node.meta
         return new_node
 
@@ -2446,7 +2508,9 @@ def custom_torch_add_mapper(node: torch.fx.Node, mod: nn.Module) -> torch.fx.Nod
         else:
             add_kwargs = node.kwargs
 
-        new_node = node.graph.create_node("call_function", add, kwargs=add_kwargs, name=node.name)
+        new_node = node.graph.create_node(
+            "call_function", add, kwargs=add_kwargs, name=node.name
+        )
         new_node.meta = node.meta
         return new_node
 
@@ -2457,7 +2521,9 @@ def custom_torch_add_mapper(node: torch.fx.Node, mod: nn.Module) -> torch.fx.Nod
         ("input", "input"),
     ],
 )
-def packed_quantized_linear_mapper(node: torch.fx.Node, mod: nn.Module) -> torch.fx.Node:
+def packed_quantized_linear_mapper(
+    node: torch.fx.Node, mod: nn.Module
+) -> torch.fx.Node:
     """
     Mapping from quantized_linear module to acc_op.linear. We unpack weight and bias
     in this mapper and pass them directly to linear node.
@@ -2476,12 +2542,16 @@ def packed_quantized_linear_mapper(node: torch.fx.Node, mod: nn.Module) -> torch
     with node.graph.inserting_before(node):
         # Insert get_attr nodes for weight and bias
         get_weight = node.graph.get_attr(weight_name)
-        get_weight.meta["tensor_meta"] = _extract_tensor_metadata(linear_module.weight())
+        get_weight.meta["tensor_meta"] = _extract_tensor_metadata(
+            linear_module.weight()
+        )
 
         get_bias = None
         if linear_module.bias() is not None:
             get_bias = node.graph.get_attr(bias_name)
-            get_bias.meta["tensor_meta"] = _extract_tensor_metadata(linear_module.bias())
+            get_bias.meta["tensor_meta"] = _extract_tensor_metadata(
+                linear_module.bias()
+            )
 
         qparams = {"scale": linear_module.scale, "zero_point": linear_module.zero_point}
         # Create kwargs for acc_op.quantized_linear
@@ -2503,7 +2573,9 @@ def packed_quantized_linear_mapper(node: torch.fx.Node, mod: nn.Module) -> torch
         ("input", "input"),
     ],
 )
-def packed_quantized_conv2d_mapper(node: torch.fx.Node, mod: nn.Module) -> torch.fx.Node:
+def packed_quantized_conv2d_mapper(
+    node: torch.fx.Node, mod: nn.Module
+) -> torch.fx.Node:
     """
     Mapping from quantzed Conv2d module to acc_op.conv. We unpack all the parameters
     in this mapper and pass them directly to conv2d node.
@@ -2558,7 +2630,9 @@ def packed_quantized_conv2d_mapper(node: torch.fx.Node, mod: nn.Module) -> torch
         ("zero_point", "zero_point"),
     ],
 )
-def add_relu_unfuse_mapper(node: torch.fx.Node, mod: torch.fx.GraphModule) -> torch.fx.Node:
+def add_relu_unfuse_mapper(
+    node: torch.fx.Node, mod: torch.fx.GraphModule
+) -> torch.fx.Node:
     with node.graph.inserting_before(node):
         qparams = {
             "scale": node.kwargs["scale"],
@@ -2572,7 +2646,9 @@ def add_relu_unfuse_mapper(node: torch.fx.Node, mod: torch.fx.GraphModule) -> to
         add_node = node.graph.call_function(quantized_add, kwargs=add_kwargs)
         add_node.meta = node.meta.copy()
 
-        relu_node = node.graph.call_function(relu, kwargs={"input": add_node, "inplace": False})
+        relu_node = node.graph.call_function(
+            relu, kwargs={"input": add_node, "inplace": False}
+        )
         relu_node.meta = node.meta
         return relu_node
 
@@ -2583,7 +2659,9 @@ def add_relu_unfuse_mapper(node: torch.fx.Node, mod: torch.fx.GraphModule) -> to
         ("input", "input"),
     ],
 )
-def packed_quantized_convrelu2d_mapper(node: torch.fx.Node, mod: nn.Module) -> torch.fx.Node:
+def packed_quantized_convrelu2d_mapper(
+    node: torch.fx.Node, mod: nn.Module
+) -> torch.fx.Node:
     """
     Mapping from quantized ConvReLU2d module to acc_op.relu. We use packed_quantized_conv2d_mapper to unpack all the parameters
     in this mapper and pass the returned conv2d node directly to relu node.
@@ -2594,7 +2672,9 @@ def packed_quantized_convrelu2d_mapper(node: torch.fx.Node, mod: nn.Module) -> t
         conv2d_node = packed_quantized_conv2d_mapper(node, mod)
 
         # relu op
-        relu_node = node.graph.call_function(relu, kwargs={"input": conv2d_node, "inplace": False})
+        relu_node = node.graph.call_function(
+            relu, kwargs={"input": conv2d_node, "inplace": False}
+        )
         relu_node.meta = node.meta
         return relu_node
 
@@ -2657,10 +2737,14 @@ def expand_as_mapper(node: torch.fx.Node, _: nn.Module) -> torch.fx.Node:
     Maps expand_as(other) to expand(other.size())
     """
     with node.graph.inserting_before(node):
-        size_node = node.graph.call_function(size, kwargs={"input": node.kwargs["other"]})
+        size_node = node.graph.call_function(
+            size, kwargs={"input": node.kwargs["other"]}
+        )
         size_node.meta["type"] = torch.Size
 
-        expand_node = node.graph.call_function(expand, kwargs={"input": node.kwargs["input"], "sizes": size_node})
+        expand_node = node.graph.call_function(
+            expand, kwargs={"input": node.kwargs["input"], "sizes": size_node}
+        )
         expand_node.meta = node.meta.copy()
         return expand_node
 
@@ -2752,7 +2836,8 @@ def tensor_split(*, input, indices_or_sections, dim=0):
         return torch.tensor_split(input, indices=tuple(indices_or_sections), dim=dim)
     else:
         raise RuntimeError(
-            f"Expected int, Iterable or Tensor for " f"indices_or_sections arg, got: {type(indices_or_sections)}"
+            f"Expected int, Iterable or Tensor for "
+            f"indices_or_sections arg, got: {type(indices_or_sections)}"
         )
 
 
@@ -2820,7 +2905,9 @@ def einsum(*, equation, operands):
 )
 @register_acc_op
 def as_strided(*, input, size, stride, storage_offset=0):
-    return torch.as_strided(input=input, size=size, stride=stride, storage_offset=storage_offset)
+    return torch.as_strided(
+        input=input, size=size, stride=stride, storage_offset=storage_offset
+    )
 
 
 @register_acc_op_mapping(op_and_target=("call_function", torch.var))

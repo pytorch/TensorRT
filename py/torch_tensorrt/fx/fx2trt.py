@@ -19,9 +19,9 @@ from .utils import get_dynamic_dims, LowerPrecision, torch_dtype_to_trt
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
-TRT_INTERPRETER_CALL_PRE_OBSERVER: Observer[Callable[[torch.fx.GraphModule], None]] = Observer(
-    "TRT_INTERPRETER_CALL_PRE_OBSERVER"
-)
+TRT_INTERPRETER_CALL_PRE_OBSERVER: Observer[
+    Callable[[torch.fx.GraphModule], None]
+] = Observer("TRT_INTERPRETER_CALL_PRE_OBSERVER")
 
 
 class TRTInterpreterResult(NamedTuple):
@@ -47,18 +47,23 @@ class TRTInterpreter(torch.fx.Interpreter):
 
         flag = 0
         if explicit_batch_dimension:
-            EXPLICIT_BATCH = 1 << (int)(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH)
+            EXPLICIT_BATCH = 1 << (int)(
+                trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH
+            )
             flag |= EXPLICIT_BATCH
 
         if explicit_precision:
-            EXPLICIT_PRECISION = 1 << (int)(trt.NetworkDefinitionCreationFlag.EXPLICIT_PRECISION)
+            EXPLICIT_PRECISION = 1 << (int)(
+                trt.NetworkDefinitionCreationFlag.EXPLICIT_PRECISION
+            )
             flag |= EXPLICIT_PRECISION
         self.network = self.builder.create_network(flag)
 
         missing_ops = self.validate_conversion()
         if missing_ops:
             warnings.warn(
-                "Interpretation will fail due to missing operations \n" + "\n".join(f"{i}" for i in missing_ops)
+                "Interpretation will fail due to missing operations \n"
+                + "\n".join(f"{i}" for i in missing_ops)
             )
 
         self.optimization_profiles: Optional[List] = None
@@ -68,19 +73,26 @@ class TRTInterpreter(torch.fx.Interpreter):
         self._cur_node_name: Optional[str] = None
         self._input_names: List[str] = []
         self._output_names: List[str] = []
-        self._itensor_to_tensor_meta: Dict[trt.tensorrt.ITensor, TensorMetadata] = dict()
+        self._itensor_to_tensor_meta: Dict[
+            trt.tensorrt.ITensor, TensorMetadata
+        ] = dict()
 
     def validate_input_specs(self):
         for shape, _, _, shape_ranges, has_batch_dim in self.input_specs:
             if not self.network.has_implicit_batch_dimension:
-                assert has_batch_dim, "It's required to specify batch dimension when it's explicit in TensorRT network."
+                assert (
+                    has_batch_dim
+                ), "It's required to specify batch dimension when it's explicit in TensorRT network."
 
             dynamic_dims = get_dynamic_dims(shape)
             if len(dynamic_dims):
                 assert not self.network.has_implicit_batch_dimension, (
-                    "Can't have dynamic dim when " f"batch dim is implicit, got {shape}."
+                    "Can't have dynamic dim when "
+                    f"batch dim is implicit, got {shape}."
                 )
-                assert len(shape_ranges), "shape_ranges must be provided when shape has dynamic dim."
+                assert len(
+                    shape_ranges
+                ), "shape_ranges must be provided when shape has dynamic dim."
 
                 if self.optimization_profiles:
                     assert len(shape_ranges) == len(self.optimization_profiles), (
@@ -90,11 +102,14 @@ class TRTInterpreter(torch.fx.Interpreter):
                     )
                 else:
                     self.optimization_profiles = [
-                        self.builder.create_optimization_profile() for _ in range(len(shape_ranges))
+                        self.builder.create_optimization_profile()
+                        for _ in range(len(shape_ranges))
                     ]
 
                 for shape_range in shape_ranges:
-                    assert len(shape_range) == 3, f"Expect three elements in shape_range, got {len(shape_range)}"
+                    assert (
+                        len(shape_range) == 3
+                    ), f"Expect three elements in shape_range, got {len(shape_range)}"
                     assert all(len(s) == len(shape) for s in shape_range), (
                         "Expect elements in shape_range"
                         f" {shape_range} have the same number of dimension as the provided shape {len(shape)}"
@@ -102,7 +117,10 @@ class TRTInterpreter(torch.fx.Interpreter):
 
                     for i in range(len(shape)):
                         if i in dynamic_dims:
-                            assert all(shape_range[j][i] <= shape_range[j + 1][i] for j in range(2)), (
+                            assert all(
+                                shape_range[j][i] <= shape_range[j + 1][i]
+                                for j in range(2)
+                            ), (
                                 "Expect dynamic dim"
                                 f" {i} to have incremental value for shapes in shape_range {shape_range}."
                             )
@@ -112,7 +130,9 @@ class TRTInterpreter(torch.fx.Interpreter):
                                 f" for all shapes in shape_range {shape_range}."
                             )
             else:
-                assert len(shape_ranges) == 0, "shape_ranges are provided for input that doesn't have dynamic dim."
+                assert (
+                    len(shape_ranges) == 0
+                ), "shape_ranges are provided for input that doesn't have dynamic dim."
 
     def validate_conversion(self):
         missing_converter = set()
@@ -162,18 +182,28 @@ class TRTInterpreter(torch.fx.Interpreter):
 
         # For float outputs, we set their dtype to fp16 only if lower_precision == LowerPrecision.FP16 and
         # force_fp32_output=False.
-        self.output_fp16 = not force_fp32_output and lower_precision == LowerPrecision.FP16
+        self.output_fp16 = (
+            not force_fp32_output and lower_precision == LowerPrecision.FP16
+        )
 
-        if lower_precision == LowerPrecision.INT8 and not self.builder.platform_has_fast_int8:
+        if (
+            lower_precision == LowerPrecision.INT8
+            and not self.builder.platform_has_fast_int8
+        ):
             raise RuntimeError("Current platform doesn't support fast native int8!")
 
-        if lower_precision == LowerPrecision.FP16 and not self.builder.platform_has_fast_fp16:
+        if (
+            lower_precision == LowerPrecision.FP16
+            and not self.builder.platform_has_fast_fp16
+        ):
             warnings.warn("Current platform doesn't support fast native fp16!")
 
         self.input_specs_iter = 0
         run_module_start_time = datetime.now()
         super().run()
-        _LOGGER.info(f"Run Module elapsed time: {datetime.now() - run_module_start_time}")
+        _LOGGER.info(
+            f"Run Module elapsed time: {datetime.now() - run_module_start_time}"
+        )
         build_engine_start_time = datetime.now()
 
         self.builder.max_batch_size = max_batch_size
@@ -190,7 +220,9 @@ class TRTInterpreter(torch.fx.Interpreter):
 
         if trt.__version__ >= "8.2":
             builder_config.profiling_verbosity = (
-                profiling_verbosity if profiling_verbosity else trt.ProfilingVerbosity.LAYER_NAMES_ONLY
+                profiling_verbosity
+                if profiling_verbosity
+                else trt.ProfilingVerbosity.LAYER_NAMES_ONLY
             )
         if lower_precision == LowerPrecision.FP16:
             builder_config.set_flag(trt.BuilderFlag.FP16)
@@ -218,10 +250,18 @@ class TRTInterpreter(torch.fx.Interpreter):
         engine = self.builder.build_engine(self.network, builder_config)
         assert engine
 
-        serialized_cache = bytearray(cache.serialize()) if builder_config.get_timing_cache() else bytearray()
-        _LOGGER.info(f"Build TRT engine elapsed time: {datetime.now() - build_engine_start_time}")
+        serialized_cache = (
+            bytearray(cache.serialize())
+            if builder_config.get_timing_cache()
+            else bytearray()
+        )
+        _LOGGER.info(
+            f"Build TRT engine elapsed time: {datetime.now() - build_engine_start_time}"
+        )
 
-        return TRTInterpreterResult(engine, self._input_names, self._output_names, serialized_cache)
+        return TRTInterpreterResult(
+            engine, self._input_names, self._output_names, serialized_cache
+        )
 
     def run_node(self, n):
         self._cur_node_name = str(n)
@@ -245,7 +285,9 @@ class TRTInterpreter(torch.fx.Interpreter):
 
     def placeholder(self, target, args, kwargs):
         self._input_names.append(target)
-        shape, dtype, _, shape_ranges, has_batch_dim = self.input_specs[self.input_specs_iter]
+        shape, dtype, _, shape_ranges, has_batch_dim = self.input_specs[
+            self.input_specs_iter
+        ]
         self.input_specs_iter += 1
 
         if self.network.has_implicit_batch_dimension:
@@ -256,7 +298,9 @@ class TRTInterpreter(torch.fx.Interpreter):
                 assert self.optimization_profiles
                 self.optimization_profiles[i].set_shape(target, *shape_range)
 
-        return self.network.add_input(name=target, shape=tuple(shape), dtype=torch_dtype_to_trt(dtype))
+        return self.network.add_input(
+            name=target, shape=tuple(shape), dtype=torch_dtype_to_trt(dtype)
+        )
 
     def call_module(self, target, args, kwargs):
         assert isinstance(target, str)
@@ -265,7 +309,9 @@ class TRTInterpreter(torch.fx.Interpreter):
         converter = CONVERTERS.get(submod_type)
 
         if not converter:
-            raise RuntimeError(f"Conversion of module of type {submod_type} not currently supported!")
+            raise RuntimeError(
+                f"Conversion of module of type {submod_type} not currently supported!"
+            )
 
         assert self._cur_node_name is not None
         return converter(self.network, submod, args, kwargs, self._cur_node_name)
@@ -274,7 +320,9 @@ class TRTInterpreter(torch.fx.Interpreter):
         converter = CONVERTERS.get(target)
 
         if not converter:
-            raise RuntimeError(f"Conversion of function {torch.typename(target)} not currently supported!")
+            raise RuntimeError(
+                f"Conversion of function {torch.typename(target)} not currently supported!"
+            )
 
         assert self._cur_node_name is not None
         return converter(self.network, target, args, kwargs, self._cur_node_name)
@@ -284,7 +332,9 @@ class TRTInterpreter(torch.fx.Interpreter):
         converter = CONVERTERS.get(target)
 
         if not converter:
-            raise RuntimeError(f"Conversion of method {target} not currently supported!")
+            raise RuntimeError(
+                f"Conversion of method {target} not currently supported!"
+            )
 
         assert self._cur_node_name is not None
         return converter(self.network, target, args, kwargs, self._cur_node_name)

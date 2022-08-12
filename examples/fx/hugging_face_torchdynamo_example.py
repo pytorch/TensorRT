@@ -353,14 +353,18 @@ def run_all_eval(args, optimize_ctx, optimize_name, dtype):
             eval_inputs = (input_ids,)
 
         # Correctness check
-        is_accurate = check_correctness(args, model, eval_inputs, optimize_ctx, optimize_name)
+        is_accurate = check_correctness(
+            args, model, eval_inputs, optimize_ctx, optimize_name
+        )
         # Profile eager
         t, m = bench_model_eval(args, "eager", model, eval_inputs, NullContext())
         results.append(create_record(model_name, dtype, is_accurate, "eager", t, m))
 
         # Profile Dynamo nvfuser
         t, m = bench_model_eval(args, optimize_name, model, eval_inputs, optimize_ctx)
-        results.append(create_record(model_name, dtype, is_accurate, optimize_name, t, m))
+        results.append(
+            create_record(model_name, dtype, is_accurate, optimize_name, t, m)
+        )
 
         # calculate relative improvements
         base_r = results[-2]
@@ -412,7 +416,9 @@ def main():
     if optimize_name == "dynamo_fx2trt_fp32":
         experiment = partial(experiment, dtype=torch.float32)
 
-    experiment = partial(experiment, optimize_ctx=optimize_ctx, optimize_name=optimize_name)
+    experiment = partial(
+        experiment, optimize_ctx=optimize_ctx, optimize_name=optimize_name
+    )
     experiment(args)
 
 

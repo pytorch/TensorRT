@@ -22,7 +22,11 @@ class TestSplitConverter(AccTestCase):
         self.run_test(
             Split(),
             inputs,
-            expected_ops={acc_ops.split if isinstance(split_size_or_sections, int) else acc_ops.slice_tensor},
+            expected_ops={
+                acc_ops.split
+                if isinstance(split_size_or_sections, int)
+                else acc_ops.slice_tensor
+            },
             test_explicit_batch_dim=False,
         )
 
@@ -65,7 +69,11 @@ class TestSplitConverter(AccTestCase):
         self.run_test_with_dynamic_shape(
             Split(),
             input_specs,
-            expected_ops={acc_ops.split if isinstance(split_size_or_sections, int) else acc_ops.slice_tensor},
+            expected_ops={
+                acc_ops.split
+                if isinstance(split_size_or_sections, int)
+                else acc_ops.slice_tensor
+            },
         )
 
     # Testing with (-1, -1, -1) results into following error:

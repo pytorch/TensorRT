@@ -64,7 +64,9 @@ class TestLogicalXorMethodSimpleConverterWithDynamicShape(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(LogicalXor(), input_specs, expected_ops={acc_ops.logical_xor})
+        self.run_test_with_dynamic_shape(
+            LogicalXor(), input_specs, expected_ops={acc_ops.logical_xor}
+        )
 
 
 class TestLogicalXorFunctionSimpleConverter(AccTestCase):
@@ -126,7 +128,9 @@ class TestLogicalXorFunctionSimpleConverterWithDynamicShape(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(LogicalXor(), input_specs, expected_ops={acc_ops.logical_xor})
+        self.run_test_with_dynamic_shape(
+            LogicalXor(), input_specs, expected_ops={acc_ops.logical_xor}
+        )
 
 
 class TestLogicalXorOperatorSimpleConverter(AccTestCase):
@@ -188,7 +192,9 @@ class TestLogicalXorOperatorSimpleConverterWithDynamicShape(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(LogicalXor(), input_specs, expected_ops={acc_ops.logical_xor})
+        self.run_test_with_dynamic_shape(
+            LogicalXor(), input_specs, expected_ops={acc_ops.logical_xor}
+        )
 
 
 if __name__ == "__main__":

@@ -104,13 +104,25 @@ class AccTracerTest(unittest.TestCase):
             outputs = [outputs]
             outputs_again = [outputs_again]
 
-        for ref_output, output, output_again in zip(ref_outputs, outputs, outputs_again):
+        for ref_output, output, output_again in zip(
+            ref_outputs, outputs, outputs_again
+        ):
             if enable_allclose:
-                torch.testing.assert_allclose(torch.nan_to_num(ref_output), torch.nan_to_num(output))
-                torch.testing.assert_allclose(torch.nan_to_num(ref_output), torch.nan_to_num(output_again))
+                torch.testing.assert_allclose(
+                    torch.nan_to_num(ref_output), torch.nan_to_num(output)
+                )
+                torch.testing.assert_allclose(
+                    torch.nan_to_num(ref_output), torch.nan_to_num(output_again)
+                )
             else:
-                self.assertTrue(torch.equal(torch.nan_to_num(ref_output), torch.nan_to_num(output)))
-                self.assertTrue(torch.equal(torch.nan_to_num(ref_output), torch.nan_to_num(output_again)))
+                self.assertTrue(
+                    torch.equal(torch.nan_to_num(ref_output), torch.nan_to_num(output))
+                )
+                self.assertTrue(
+                    torch.equal(
+                        torch.nan_to_num(ref_output), torch.nan_to_num(output_again)
+                    )
+                )
 
     def test_sum(self):
         self._make_acc_op_function_test(acc_ops.sum, torch.sum)
@@ -122,26 +134,40 @@ class AccTracerTest(unittest.TestCase):
 
     def test_mean(self):
         self._make_acc_op_function_test(acc_ops.mean, torch.mean)
-        self._make_acc_op_function_test(acc_ops.mean, torch.mean, dim=(1,), keepdim=True)
+        self._make_acc_op_function_test(
+            acc_ops.mean, torch.mean, dim=(1,), keepdim=True
+        )
 
     def test_pad(self):
-        self._make_acc_op_function_test(acc_ops.pad, torch.nn.functional.pad, pad=(2, 0))
+        self._make_acc_op_function_test(
+            acc_ops.pad, torch.nn.functional.pad, pad=(2, 0)
+        )
 
     def test_max(self):
         def torch_max(x, *args, **kwargs):
             return x.max(*args, **kwargs)
 
         self._make_acc_op_function_test(acc_ops.max_full_reduce, torch_max)
-        self._make_acc_op_function_test(acc_ops.max_dim_reduce, torch_max, dim=1, keepdim=True)
-        self._make_acc_op_function_test(acc_ops.max_dim_reduce, torch_max, input_shape=(1, 4), dim=1, keepdim=True)
-        self._make_acc_op_function_test(acc_ops.max_dim_reduce, torch_max, input_shape=(3, 4, 3), dim=2)
+        self._make_acc_op_function_test(
+            acc_ops.max_dim_reduce, torch_max, dim=1, keepdim=True
+        )
+        self._make_acc_op_function_test(
+            acc_ops.max_dim_reduce, torch_max, input_shape=(1, 4), dim=1, keepdim=True
+        )
+        self._make_acc_op_function_test(
+            acc_ops.max_dim_reduce, torch_max, input_shape=(3, 4, 3), dim=2
+        )
 
     @parameterized.expand(
         [
             param("max_maximum", orig_op=torch.max, expected_op=acc_ops.maximum),
-            param("maximum_maximum", orig_op=torch.maximum, expected_op=acc_ops.maximum),
+            param(
+                "maximum_maximum", orig_op=torch.maximum, expected_op=acc_ops.maximum
+            ),
             param("min_minimum", orig_op=torch.min, expected_op=acc_ops.minimum),
-            param("minimum_minimum", orig_op=torch.minimum, expected_op=acc_ops.minimum),
+            param(
+                "minimum_minimum", orig_op=torch.minimum, expected_op=acc_ops.minimum
+            ),
         ]
     )
     def test_maximum_minimum(self, _: str, orig_op, expected_op):
@@ -230,7 +256,9 @@ class AccTracerTest(unittest.TestCase):
                 return self.conv(a)
 
         m = TestModule()
-        input = torch.quantize_per_tensor(torch.randn(1, 3, 1, 1), scale=0.01, zero_point=3, dtype=torch.quint8)
+        input = torch.quantize_per_tensor(
+            torch.randn(1, 3, 1, 1), scale=0.01, zero_point=3, dtype=torch.quint8
+        )
         traced = acc_tracer.trace(m, [input])
         _LOGGER.info(traced.graph)
         ph = weight_attr = bias_attr = conv = None
@@ -265,7 +293,9 @@ class AccTracerTest(unittest.TestCase):
                 return self.conv(a)
 
         m = TestModule()
-        input = torch.quantize_per_tensor(torch.randn(1, 3, 1, 1), scale=0.01, zero_point=3, dtype=torch.quint8)
+        input = torch.quantize_per_tensor(
+            torch.randn(1, 3, 1, 1), scale=0.01, zero_point=3, dtype=torch.quint8
+        )
         traced = acc_tracer.trace(m, [input])
         ph = weight_attr = bias_attr = conv = relu = None
         for node in traced.graph.nodes:
@@ -556,7 +586,9 @@ class AccTracerTest(unittest.TestCase):
             num_lengths = 10
 
             weights = torch.from_numpy(
-                (np.random.random_sample((num_embeddings, embedding_dim)) + 1).astype(np.float32)
+                (np.random.random_sample((num_embeddings, embedding_dim)) + 1).astype(
+                    np.float32
+                )
             )
             q_weights = (
                 torch.ops.quantized.embedding_bag_4bit_prepack(weights)
@@ -566,7 +598,9 @@ class AccTracerTest(unittest.TestCase):
             np_lengths = np.random.randint(0, num_lengths, size=10).astype(np.int32)
 
             num_lengths = np.sum(np_lengths)
-            indices = torch.from_numpy(np.random.randint(low=0, high=num_embeddings, size=num_lengths)).int()
+            indices = torch.from_numpy(
+                np.random.randint(low=0, high=num_embeddings, size=num_lengths)
+            ).int()
 
             lengths = torch.from_numpy(np_lengths)
             offsets = torch.cat([torch.zeros([1]), torch.cumsum(lengths, 0)]).int()
@@ -597,7 +631,9 @@ class AccTracerTest(unittest.TestCase):
             _LOGGER.info(traced.graph)
 
             expected_target = (
-                acc_ops.embedding_bag_4bit_rowwise_offsets if is_4bit else acc_ops.embedding_bag_byte_rowwise_offsets
+                acc_ops.embedding_bag_4bit_rowwise_offsets
+                if is_4bit
+                else acc_ops.embedding_bag_byte_rowwise_offsets
             )
 
             for node in traced.graph.nodes:
@@ -642,7 +678,9 @@ class AccTracerTest(unittest.TestCase):
 
         m = TestModule()
         m.eval()
-        input = torch.quantize_per_tensor(torch.randn(1, 3, 1, 1), scale=0.01, zero_point=3, dtype=torch.quint8)
+        input = torch.quantize_per_tensor(
+            torch.randn(1, 3, 1, 1), scale=0.01, zero_point=3, dtype=torch.quint8
+        )
         traced = acc_tracer.trace(m, [input])
         ph = weight_attr = bias_attr = bn_mean = bn_var = bn = None
         for node in traced.graph.nodes:
@@ -669,7 +707,9 @@ class AccTracerTest(unittest.TestCase):
                 self.assertEqual(node.kwargs["running_mean"], bn_mean)
                 self.assertEqual(node.kwargs["running_var"], bn_var)
                 self.assertEqual(node.kwargs["acc_out_ty"][6]["scale"], bn_scale)
-                self.assertEqual(node.kwargs["acc_out_ty"][6]["zero_point"], bn_zero_point)
+                self.assertEqual(
+                    node.kwargs["acc_out_ty"][6]["zero_point"], bn_zero_point
+                )
                 bn = node
             elif node.op == "output":
                 self.assertEqual(bn, node.args[0])
@@ -727,7 +767,9 @@ class AccTracerTest(unittest.TestCase):
                 return self.linear(a)
 
         m = TestModule()
-        input = torch.quantize_per_tensor(torch.randn(2, 3), scale=0.01, zero_point=3, dtype=torch.quint8)
+        input = torch.quantize_per_tensor(
+            torch.randn(2, 3), scale=0.01, zero_point=3, dtype=torch.quint8
+        )
         traced = acc_tracer.trace(m, [input])
         ph = weight_attr = bias_attr = linear = None
         for node in traced.graph.nodes:
@@ -806,7 +848,10 @@ class AccTracerTest(unittest.TestCase):
                 self.assertEqual(node.kwargs["running_mean"], mean)
                 self.assertEqual(node.kwargs["running_var"], var)
                 bn = node
-            elif node.op == "call_module" and node.target == "bn._conditional_exception_wrapper_ValueError":
+            elif (
+                node.op == "call_module"
+                and node.target == "bn._conditional_exception_wrapper_ValueError"
+            ):
                 exception_wrapper = node
             elif node.op == "output":
                 self.assertEqual(bn, node.args[0])
@@ -982,7 +1027,9 @@ class AccTracerTest(unittest.TestCase):
                 else:
                     self.assertTrue(str(node.target) == "b")
             elif node.op == "call_module":
-                self.assertEqual(node.target, "_conditional_exception_wrapper_AssertionError")
+                self.assertEqual(
+                    node.target, "_conditional_exception_wrapper_AssertionError"
+                )
                 exception_wrapper = node
             elif node.op == "output":
                 self.assertEqual(ph_a, node.args[0])
@@ -1028,7 +1075,9 @@ class AccTracerTest(unittest.TestCase):
                 else:
                     self.assertTrue(str(node.target) == "b")
             elif node.op == "call_module":
-                self.assertEqual(node.target, "_conditional_exception_wrapper_RuntimeError")
+                self.assertEqual(
+                    node.target, "_conditional_exception_wrapper_RuntimeError"
+                )
                 exception_wrapper = node
             elif node.op == "output":
                 self.assertEqual(ph_a, node.args[0])
@@ -1123,7 +1172,9 @@ class AccTracerTest(unittest.TestCase):
                 else:
                     self.assertTrue(str(node.target) == "b")
             elif node.op == "call_module":
-                self.assertEqual(node.target, "_conditional_exception_wrapper_AssertionError")
+                self.assertEqual(
+                    node.target, "_conditional_exception_wrapper_AssertionError"
+                )
                 exception_wrapper = node
             elif node.op == "output":
                 self.assertEqual(ph_a, node.args[0])
@@ -1140,8 +1191,12 @@ class AccTracerTest(unittest.TestCase):
         class TestModule(nn.Module):
             def __init__(self):
                 super().__init__()
-                self.q_input = torch.nn.quantized.Quantize(scale=1.0 / 128, zero_point=5, dtype=torch.quint8)
-                self.q_other = torch.nn.quantized.Quantize(scale=1.0 / 128, zero_point=10, dtype=torch.quint8)
+                self.q_input = torch.nn.quantized.Quantize(
+                    scale=1.0 / 128, zero_point=5, dtype=torch.quint8
+                )
+                self.q_other = torch.nn.quantized.Quantize(
+                    scale=1.0 / 128, zero_point=10, dtype=torch.quint8
+                )
 
             def forward(self, input: torch.Tensor, other: torch.Tensor) -> torch.Tensor:
                 return torch.ops.quantized.add(
@@ -1163,7 +1218,10 @@ class AccTracerTest(unittest.TestCase):
                 else:
                     self.assertTrue(str(node.target) == "other")
                     other_ph = node
-            elif node.op == "call_function" and node.target == acc_ops.quantize_per_tensor:
+            elif (
+                node.op == "call_function"
+                and node.target == acc_ops.quantize_per_tensor
+            ):
                 qparams = {
                     "scale": 1.0 / 128,
                     "zero_point": 5,
@@ -1207,8 +1265,12 @@ class AccTracerTest(unittest.TestCase):
         class TestModule(nn.Module):
             def __init__(self):
                 super().__init__()
-                self.q_input = torch.nn.quantized.Quantize(scale=1.0 / 128, zero_point=5, dtype=torch.quint8)
-                self.q_other = torch.nn.quantized.Quantize(scale=1.0 / 128, zero_point=10, dtype=torch.quint8)
+                self.q_input = torch.nn.quantized.Quantize(
+                    scale=1.0 / 128, zero_point=5, dtype=torch.quint8
+                )
+                self.q_other = torch.nn.quantized.Quantize(
+                    scale=1.0 / 128, zero_point=10, dtype=torch.quint8
+                )
 
             def forward(self, input: torch.Tensor, other: torch.Tensor) -> torch.Tensor:
                 return torch.ops.quantized.mul(
@@ -1230,7 +1292,10 @@ class AccTracerTest(unittest.TestCase):
                 else:
                     self.assertTrue(str(node.target) == "other")
                     other_ph = node
-            elif node.op == "call_function" and node.target == acc_ops.quantize_per_tensor:
+            elif (
+                node.op == "call_function"
+                and node.target == acc_ops.quantize_per_tensor
+            ):
                 qparams = {
                     "scale": 1.0 / 128,
                     "zero_point": 5,
@@ -1323,7 +1388,9 @@ class AccTracerTest(unittest.TestCase):
         """
         Test that torch.transpose is traced correctly.
         """
-        self._make_acc_op_function_test(acc_ops.permute, lambda x: torch.transpose(x, 1, 0))
+        self._make_acc_op_function_test(
+            acc_ops.permute, lambda x: torch.transpose(x, 1, 0)
+        )
 
     def test_permute(self):
         """
@@ -1378,10 +1445,14 @@ class AccTracerTest(unittest.TestCase):
         self.assertTrue(torch.equal(m(a, b), traced(a, b)))
 
     def test_bmm(self):
-        self._make_acc_op_function_test(acc_ops.matmul, lambda x: torch.bmm(x, x), input_shape=(2, 4, 4))
+        self._make_acc_op_function_test(
+            acc_ops.matmul, lambda x: torch.bmm(x, x), input_shape=(2, 4, 4)
+        )
 
     def test_tile(self):
-        return self._make_acc_op_function_test(acc_ops.tile, lambda x: torch.tile(x, (2, 1, 2)), input_shape=(1, 2))
+        return self._make_acc_op_function_test(
+            acc_ops.tile, lambda x: torch.tile(x, (2, 1, 2)), input_shape=(1, 2)
+        )
 
     def test_dropout(self):
         self._make_acc_op_function_test(
@@ -1393,7 +1464,9 @@ class AccTracerTest(unittest.TestCase):
     def test_stochastic_depth(self):
         self._make_acc_op_function_test(
             None,
-            lambda x, p, mode, training: torchvision.ops.stochastic_depth(x, p=p, mode=mode, training=training),
+            lambda x, p, mode, training: torchvision.ops.stochastic_depth(
+                x, p=p, mode=mode, training=training
+            ),
             input_shape=(1, 2, 3),
             p=0.5,
             mode="row",
@@ -1550,7 +1623,9 @@ class AccTracerTest(unittest.TestCase):
         self._make_acc_op_function_test(acc_ops.relu, torch.relu)
 
     def test_leaky_relu(self):
-        self._make_acc_op_function_test(acc_ops.leaky_relu, torch.nn.functional.leaky_relu)
+        self._make_acc_op_function_test(
+            acc_ops.leaky_relu, torch.nn.functional.leaky_relu
+        )
 
     def test_elu(self):
         self._make_acc_op_function_test(acc_ops.elu, torch.nn.functional.elu)
@@ -1645,10 +1720,14 @@ class AccTracerTest(unittest.TestCase):
         self._make_acc_op_function_test(acc_ops.fmod, lambda x: torch.fmod(x, -0.4))
 
     def test_floor_div(self):
-        self._make_acc_op_function_test(acc_ops.floor_div, lambda x: torch.div(x, 2, rounding_mode="floor"))
+        self._make_acc_op_function_test(
+            acc_ops.floor_div, lambda x: torch.div(x, 2, rounding_mode="floor")
+        )
 
     def test_trunc_div(self):
-        self._make_acc_op_function_test(acc_ops.trunc_div, lambda x: torch.div(x, 2, rounding_mode="trunc"))
+        self._make_acc_op_function_test(
+            acc_ops.trunc_div, lambda x: torch.div(x, 2, rounding_mode="trunc")
+        )
         # does not behave the same as floor_divide
         # self._make_acc_op_function_test(
         #     acc_ops.trunc_div, lambda x: torch.floor_divide(x, 2)
@@ -1754,7 +1833,9 @@ class AccTracerTest(unittest.TestCase):
         """
         Test that torch.flatten is traced correctly.
         """
-        self._make_acc_op_function_test(acc_ops.flatten, torch.flatten, start_dim=1, end_dim=1)
+        self._make_acc_op_function_test(
+            acc_ops.flatten, torch.flatten, start_dim=1, end_dim=1
+        )
         self._make_acc_op_function_test(acc_ops.flatten, lambda x: x.flatten())
 
     def test_topk_multi_output(self):
@@ -1797,7 +1878,9 @@ class AccTracerTest(unittest.TestCase):
             def __init__(self):
                 super().__init__()
 
-            def forward(self, input: torch.Tensor, a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+            def forward(
+                self, input: torch.Tensor, a: torch.Tensor, b: torch.Tensor
+            ) -> torch.Tensor:
                 return torch.addmm(input, a, b, alpha=1.2, beta=1.1)
 
         m = TestModule()
@@ -1871,7 +1954,9 @@ class AccTracerTest(unittest.TestCase):
     @parameterized.expand([(torch.float,), (torch.float16,)])
     def test_addmm(self, dtype):
         class TestModule(torch.nn.Module):
-            def forward(self, input: torch.Tensor, a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+            def forward(
+                self, input: torch.Tensor, a: torch.Tensor, b: torch.Tensor
+            ) -> torch.Tensor:
                 return torch.addmm(input, a, b)
 
         m = TestModule()
@@ -1947,7 +2032,9 @@ class AccTracerTest(unittest.TestCase):
                     self.assertEqual(node.kwargs["input"], ph_in)
                     flatten = node
                 elif node.target == acc_ops.topk:
-                    self.assertEqual(node.kwargs["input"], flatten if flatten else ph_in)
+                    self.assertEqual(
+                        node.kwargs["input"], flatten if flatten else ph_in
+                    )
                     topk = node
                 elif node.target == acc_ops.getitem:
                     self.assertEqual(node.kwargs["input"], topk)
@@ -1970,7 +2057,9 @@ class AccTracerTest(unittest.TestCase):
         Test Tensor.t() is traced correctly.
         """
         self._make_acc_op_function_test(acc_ops.permute, lambda x: x.t())
-        self._make_acc_op_function_test(acc_ops.permute, lambda x: x.t(), input_shape=(3,))
+        self._make_acc_op_function_test(
+            acc_ops.permute, lambda x: x.t(), input_shape=(3,)
+        )
 
     def test_split_size(self):
         self._make_acc_op_function_test(
@@ -2126,7 +2215,9 @@ class AccTracerTest(unittest.TestCase):
 
     def test_cumsum(self):
         self._make_acc_op_function_test(acc_ops.cumsum, torch.cumsum, dim=1)
-        self._make_acc_op_function_test(acc_ops.cumsum, torch.cumsum, dim=1, dtype=torch.float)
+        self._make_acc_op_function_test(
+            acc_ops.cumsum, torch.cumsum, dim=1, dtype=torch.float
+        )
 
     def test_chunk(self):
         self._make_acc_op_function_test(acc_ops.chunk, torch.chunk, chunks=2, dim=0)
@@ -2291,7 +2382,9 @@ class AccTracerTest(unittest.TestCase):
         results = traced(a)
         references = m(a)
         for res, ref in zip(results, references):
-            self.assertTrue(torch.equal(ref, res), f"Tensors at don't match {ref=} {res=}")
+            self.assertTrue(
+                torch.equal(ref, res), f"Tensors at don't match {ref=} {res=}"
+            )
 
     def test_inplace_raise(self):
         """

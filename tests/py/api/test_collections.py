@@ -24,16 +24,27 @@ class TestStandardTensorInput(unittest.TestCase):
     def test_compile(self):
 
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
-        self.model = torch.jit.load(MODULE_DIR + "/standard_tensor_input_scripted.jit.pt").eval().to("cuda")
+        self.model = (
+            torch.jit.load(MODULE_DIR + "/standard_tensor_input_scripted.jit.pt")
+            .eval()
+            .to("cuda")
+        )
 
         compile_spec = {
-            "inputs": [torchtrt.Input(self.input.shape), torchtrt.Input(self.input.shape)],
+            "inputs": [
+                torchtrt.Input(self.input.shape),
+                torchtrt.Input(self.input.shape),
+            ],
             "device": torchtrt.Device("gpu:0"),
             "enabled_precisions": {torch.float},
         }
 
         trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
-        same = (trt_mod(self.input, self.input) - self.model(self.input, self.input)).abs().max()
+        same = (
+            (trt_mod(self.input, self.input) - self.model(self.input, self.input))
+            .abs()
+            .max()
+        )
         self.assertTrue(same < 2e-2)
 
 
@@ -41,17 +52,27 @@ class TestTupleInput(unittest.TestCase):
     def test_compile(self):
 
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
-        self.model = torch.jit.load(MODULE_DIR + "/tuple_input_scripted.jit.pt").eval().to("cuda")
+        self.model = (
+            torch.jit.load(MODULE_DIR + "/tuple_input_scripted.jit.pt")
+            .eval()
+            .to("cuda")
+        )
 
         compile_spec = {
-            "input_signature": ((torchtrt.Input(self.input.shape), torchtrt.Input(self.input.shape)),),
+            "input_signature": (
+                (torchtrt.Input(self.input.shape), torchtrt.Input(self.input.shape)),
+            ),
             "device": torchtrt.Device("gpu:0"),
             "enabled_precisions": {torch.float},
             "min_block_size": 1,
         }
 
         trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
-        same = (trt_mod((self.input, self.input)) - self.model((self.input, self.input))).abs().max()
+        same = (
+            (trt_mod((self.input, self.input)) - self.model((self.input, self.input)))
+            .abs()
+            .max()
+        )
         self.assertTrue(same < 2e-2)
 
 
@@ -59,17 +80,25 @@ class TestListInput(unittest.TestCase):
     def test_compile(self):
 
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
-        self.model = torch.jit.load(MODULE_DIR + "/list_input_scripted.jit.pt").eval().to("cuda")
+        self.model = (
+            torch.jit.load(MODULE_DIR + "/list_input_scripted.jit.pt").eval().to("cuda")
+        )
 
         compile_spec = {
-            "input_signature": ([torchtrt.Input(self.input.shape), torchtrt.Input(self.input.shape)],),
+            "input_signature": (
+                [torchtrt.Input(self.input.shape), torchtrt.Input(self.input.shape)],
+            ),
             "device": torchtrt.Device("gpu:0"),
             "enabled_precisions": {torch.float},
             "min_block_size": 1,
         }
 
         trt_mod = torchtrt.ts.compile(self.model, **compile_spec)
-        same = (trt_mod([self.input, self.input]) - self.model([self.input, self.input])).abs().max()
+        same = (
+            (trt_mod([self.input, self.input]) - self.model([self.input, self.input]))
+            .abs()
+            .max()
+        )
         self.assertTrue(same < 2e-2)
 
 
@@ -77,10 +106,16 @@ class TestTupleInputOutput(unittest.TestCase):
     def test_compile(self):
 
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
-        self.model = torch.jit.load(MODULE_DIR + "/tuple_input_output_scripted.jit.pt").eval().to("cuda")
+        self.model = (
+            torch.jit.load(MODULE_DIR + "/tuple_input_output_scripted.jit.pt")
+            .eval()
+            .to("cuda")
+        )
 
         compile_spec = {
-            "input_signature": ((torchtrt.Input(self.input.shape), torchtrt.Input(self.input.shape)),),
+            "input_signature": (
+                (torchtrt.Input(self.input.shape), torchtrt.Input(self.input.shape)),
+            ),
             "device": torchtrt.Device("gpu:0"),
             "enabled_precisions": {torch.float},
             "min_block_size": 1,
@@ -97,10 +132,16 @@ class TestListInputOutput(unittest.TestCase):
     def test_compile(self):
 
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
-        self.model = torch.jit.load(MODULE_DIR + "/list_input_output_scripted.jit.pt").eval().to("cuda")
+        self.model = (
+            torch.jit.load(MODULE_DIR + "/list_input_output_scripted.jit.pt")
+            .eval()
+            .to("cuda")
+        )
 
         compile_spec = {
-            "input_signature": ([torchtrt.Input(self.input.shape), torchtrt.Input(self.input.shape)],),
+            "input_signature": (
+                [torchtrt.Input(self.input.shape), torchtrt.Input(self.input.shape)],
+            ),
             "device": torchtrt.Device("gpu:0"),
             "enabled_precisions": {torch.float},
             "min_block_size": 1,
@@ -117,10 +158,16 @@ class TestListInputTupleOutput(unittest.TestCase):
     def test_compile(self):
 
         self.input = torch.randn((1, 3, 224, 224)).to("cuda")
-        self.model = torch.jit.load(MODULE_DIR + "/list_input_tuple_output_scripted.jit.pt").eval().to("cuda")
+        self.model = (
+            torch.jit.load(MODULE_DIR + "/list_input_tuple_output_scripted.jit.pt")
+            .eval()
+            .to("cuda")
+        )
 
         compile_spec = {
-            "input_signature": ([torchtrt.Input(self.input.shape), torchtrt.Input(self.input.shape)],),
+            "input_signature": (
+                [torchtrt.Input(self.input.shape), torchtrt.Input(self.input.shape)],
+            ),
             "device": torchtrt.Device("gpu:0"),
             "enabled_precisions": {torch.float},
             "min_block_size": 1,

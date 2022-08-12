@@ -69,17 +69,25 @@ class TestInput(unittest.TestCase):
         min_ = field_is_correct("min", list_eq, internal.min, target["min"])
         opt_ = field_is_correct("opt", list_eq, internal.opt, target["opt"])
         max_ = field_is_correct("max", list_eq, internal.max, target["max"])
-        is_dynamic_ = field_is_correct("is_dynamic", eq, internal.input_is_dynamic, target["input_is_dynamic"])
+        is_dynamic_ = field_is_correct(
+            "is_dynamic", eq, internal.input_is_dynamic, target["input_is_dynamic"]
+        )
         explicit_set_dtype_ = field_is_correct(
             "explicit_dtype",
             eq,
             internal._explicit_set_dtype,
             target["explicit_set_dtype"],
         )
-        dtype_ = field_is_correct("dtype", eq, int(internal.dtype), int(target["dtype"]))
-        format_ = field_is_correct("format", eq, int(internal.format), int(target["format"]))
+        dtype_ = field_is_correct(
+            "dtype", eq, int(internal.dtype), int(target["dtype"])
+        )
+        format_ = field_is_correct(
+            "format", eq, int(internal.format), int(target["format"])
+        )
 
-        return all([min_, opt_, max_, is_dynamic_, explicit_set_dtype_, dtype_, format_])
+        return all(
+            [min_, opt_, max_, is_dynamic_, explicit_set_dtype_, dtype_, format_]
+        )
 
     def test_infer_from_example_tensor(self):
         shape = [1, 3, 255, 255]
@@ -177,7 +185,9 @@ class TestInput(unittest.TestCase):
             "explicit_set_dtype": False,
         }
 
-        i = torchtrt.Input(min_shape=min_shape, opt_shape=opt_shape, max_shape=max_shape)
+        i = torchtrt.Input(
+            min_shape=min_shape, opt_shape=opt_shape, max_shape=max_shape
+        )
         self.assertTrue(self._verify_correctness(i, target))
 
         i = torchtrt.Input(

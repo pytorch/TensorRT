@@ -67,7 +67,9 @@ class TestRepeatInterLeave(AccTestCase):
                 ],
             ),
         ]
-        self.run_test_with_dynamic_shape(RepeatInterleave(dim), input_specs, expected_ops={acc_ops.tile})
+        self.run_test_with_dynamic_shape(
+            RepeatInterleave(dim), input_specs, expected_ops={acc_ops.tile}
+        )
 
 
 if __name__ == "__main__":

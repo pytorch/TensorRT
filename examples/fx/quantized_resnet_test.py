@@ -108,7 +108,9 @@ def build_int8_trt_implicit_quant(rn18):
         InputTensorSpec.from_tensors([data]),
         logger_level=trt.Logger.VERBOSE,
     )
-    interpreter_result = interp.run(lower_precision=LowerPrecision.INT8, strict_type_constraints=True)
+    interpreter_result = interp.run(
+        lower_precision=LowerPrecision.INT8, strict_type_constraints=True
+    )
     trt_mod = TRTModule(
         interpreter_result.engine,
         interpreter_result.input_names,

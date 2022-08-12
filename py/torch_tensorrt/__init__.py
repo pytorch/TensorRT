@@ -12,7 +12,9 @@ from torch_tensorrt._version import (
 )
 
 if sys.version_info < (3,):
-    raise Exception("Python 2 has reached end-of-life and is not supported by Torch-TensorRT")
+    raise Exception(
+        "Python 2 has reached end-of-life and is not supported by Torch-TensorRT"
+    )
 
 
 def _parse_semver(version):

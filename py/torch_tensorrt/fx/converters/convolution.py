@@ -54,7 +54,9 @@ def common_conv(network, mod, dimension, input_val, layer_name, is_quantized):
 
     if is_quantized:
         # Assume the dtype of activation is torch.quint8
-        mark_as_int8_layer(layer, get_dyn_range(mod.scale, mod.zero_point, torch.quint8))
+        mark_as_int8_layer(
+            layer, get_dyn_range(mod.scale, mod.zero_point, torch.quint8)
+        )
 
     result = layer.get_output(0)
     if dimension == 1:
@@ -93,7 +95,10 @@ def conv1d(network, submod, args, kwargs, layer_name):
     input_val = kwargs["input"]
 
     if not isinstance(input_val, trt.tensorrt.ITensor):
-        raise RuntimeError(f"Conv1d received input {input_val} that is not part " "of the TensorRT region!")
+        raise RuntimeError(
+            f"Conv1d received input {input_val} that is not part "
+            "of the TensorRT region!"
+        )
 
     if layer_name is None:
         raise RuntimeError("layer name is none")
@@ -114,7 +119,10 @@ def conv2d(network, submod, args, kwargs, layer_name):
     input_val = kwargs["input"]
 
     if not isinstance(input_val, trt.tensorrt.ITensor):
-        raise RuntimeError(f"Conv2d received input {input_val} that is not part " "of the TensorRT region!")
+        raise RuntimeError(
+            f"Conv2d received input {input_val} that is not part "
+            "of the TensorRT region!"
+        )
 
     return common_conv(
         network,
@@ -133,7 +141,10 @@ def conv3d(network, submod, args, kwargs, layer_name):
     input_val = kwargs["input"]
 
     if not isinstance(input_val, trt.tensorrt.ITensor):
-        raise RuntimeError(f"Conv3d received input {input_val} that is not part " "of the TensorRT region!")
+        raise RuntimeError(
+            f"Conv3d received input {input_val} that is not part "
+            "of the TensorRT region!"
+        )
 
     return common_conv(
         network,
@@ -150,7 +161,10 @@ def quantized_conv2d(network, submod, args, kwargs, layer_name):
     input_val = args[0]
 
     if not isinstance(input_val, trt.tensorrt.ITensor):
-        raise RuntimeError(f"Quantized Conv2d received input {input_val} that is not part " "of the TensorRT region!")
+        raise RuntimeError(
+            f"Quantized Conv2d received input {input_val} that is not part "
+            "of the TensorRT region!"
+        )
 
     return common_conv(
         network,
@@ -168,7 +182,8 @@ def quantized_conv_relu2d(network, submod, args, kwargs, layer_name):
 
     if not isinstance(input_val, trt.tensorrt.ITensor):
         raise RuntimeError(
-            f"Quantized ConvReLU2d received input {input_val} that is not part " "of the TensorRT region!"
+            f"Quantized ConvReLU2d received input {input_val} that is not part "
+            "of the TensorRT region!"
         )
 
     return common_conv_relu(

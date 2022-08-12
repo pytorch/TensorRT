@@ -46,7 +46,9 @@ def build_outputs(func, func_overload, args, kwargs, proxy_out, call_module=Fals
             return e
 
     if isinstance(real_out, tuple):
-        return tuple([wrap_with_proxy(e, proxy_out[idx]) for idx, e in enumerate(real_out)])
+        return tuple(
+            [wrap_with_proxy(e, proxy_out[idx]) for idx, e in enumerate(real_out)]
+        )
     elif isinstance(real_out, list):
         return [wrap_with_proxy(e, proxy_out[idx]) for idx, e in enumerate(real_out)]
     elif type(real_out) == torch.Tensor:
@@ -101,7 +103,9 @@ class DispatchTracer(Tracer):
 
     def __init__(self, leaf_module_list: Optional[Set[str]] = None):
         super().__init__()
-        self.leaf_module_list = (leaf_module_list or set()).union(DEFAULT_LEAF_MODULE_LIST)
+        self.leaf_module_list = (leaf_module_list or set()).union(
+            DEFAULT_LEAF_MODULE_LIST
+        )
 
     # User can use leaf_module_list but it won't work combine with functionalize
     def call_module(
@@ -121,9 +125,13 @@ class DispatchTracer(Tracer):
             setattr(self.root, qualname, m)
             proxy_args = pytree.tree_map(unwrap_proxy, args)
             proxy_kwargs = pytree.tree_map(unwrap_proxy, kwargs)
-            proxy_out = self.create_proxy("call_module", qualname, proxy_args, proxy_kwargs)
+            proxy_out = self.create_proxy(
+                "call_module", qualname, proxy_args, proxy_kwargs
+            )
 
-            return build_outputs(forward, forward, args, kwargs, proxy_out, call_module=True)
+            return build_outputs(
+                forward, forward, args, kwargs, proxy_out, call_module=True
+            )
         return forward(*args, **kwargs)
 
     def is_leaf_module(self, m) -> bool:
@@ -164,7 +172,9 @@ def dispatch_trace(
     leaf_module_list: Optional[Set[str]] = None,
     concrete_args=None,
 ) -> GraphModule:
-    name = root.__class__.__name__ if isinstance(root, torch.nn.Module) else root.__name__
+    name = (
+        root.__class__.__name__ if isinstance(root, torch.nn.Module) else root.__name__
+    )
     tracer = DispatchTracer(leaf_module_list)
     graph = tracer.trace(root, concrete_args=concrete_args)
     gm = GraphModule(tracer.root, graph, name)
@@ -189,7 +199,9 @@ def wrap_key(f, inps):
         out = f(*tree_args)
         flat_outs, out_spec = pytree.tree_flatten(out)
         for idx in range(len(flat_outs)):
-            if isinstance(flat_outs[idx], torch.Tensor) and isinstance(flat_outs[idx], DispatchTensor):
+            if isinstance(flat_outs[idx], torch.Tensor) and isinstance(
+                flat_outs[idx], DispatchTensor
+            ):
                 flat_outs[idx] = flat_outs[idx].proxy
         return pytree.tree_unflatten(flat_outs, out_spec)
 

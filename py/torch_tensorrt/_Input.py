@@ -30,7 +30,9 @@ class Input(object):
 
     shape_mode = None  #: (torch_tensorrt.Input._ShapeMode): Is input statically or dynamically shaped
     shape = None  #: (Tuple or Dict): Either a single Tuple or a dict of tuples defining the input shape. Static shaped inputs will have a single tuple. Dynamic inputs will have a dict of the form ``{ "min_shape": Tuple, "opt_shape": Tuple, "max_shape": Tuple }``
-    dtype = _enums.dtype.unknown  #: The expected data type of the input tensor (default: torch_tensorrt.dtype.float32)
+    dtype = (
+        _enums.dtype.unknown
+    )  #: The expected data type of the input tensor (default: torch_tensorrt.dtype.float32)
     _explicit_set_dtype = False
     format = (
         _enums.TensorFormat.contiguous
@@ -74,11 +76,15 @@ class Input(object):
             self.shape_mode = Input._ShapeMode.STATIC
 
         elif len(args) == 0:
-            if not ("shape" in kwargs) and not (all(k in kwargs for k in ["min_shape", "opt_shape", "max_shape"])):
+            if not ("shape" in kwargs) and not (
+                all(k in kwargs for k in ["min_shape", "opt_shape", "max_shape"])
+            ):
                 raise ValueError(
                     "Missing required arguments for class Input\nEither shape or all three of min_shape, opt_shape, max_shape must be defined"
                 )
-            elif ("shape" in kwargs) and all(k in kwargs for k in ["min_shape", "opt_shape", "max_shape"]):
+            elif ("shape" in kwargs) and all(
+                k in kwargs for k in ["min_shape", "opt_shape", "max_shape"]
+            ):
                 raise ValueError(
                     "Found that both shape, and one or more of min_shape, opt_shape, max_shape were specified\nclass Input expects that only either shape or all three of min_shape, opt_shape, max_shape are defined"
                 )
@@ -134,7 +140,9 @@ class Input(object):
 
     def __str__(self) -> str:
         if self.shape_mode == Input._ShapeMode.STATIC:
-            return "Input(shape={}, dtype={}, format={})".format(self.shape, str(self.dtype), str(self.format))
+            return "Input(shape={}, dtype={}, format={})".format(
+                self.shape, str(self.dtype), str(self.format)
+            )
         elif self.shape_mode == Input._ShapeMode.DYNAMIC:
             return "Input(min_shape={}, opt_shape={}, max_shape={}, dtype={}, format={})".format(
                 self.shape["min_shape"],
@@ -266,6 +274,8 @@ class Input(object):
                 "Tensor does not have a supported contiguous memory format, supported formats are contiguous or channel_last"
             )
         frmt = (
-            torch.contiguous_format if t.is_contiguous(memory_format=torch.contiguous_format) else torch.channels_last
+            torch.contiguous_format
+            if t.is_contiguous(memory_format=torch.contiguous_format)
+            else torch.channels_last
         )
         return cls(shape=t.shape, dtype=t.dtype, format=frmt)

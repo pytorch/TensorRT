@@ -10,7 +10,9 @@ def lint(target_files, color=True):
     failure = False
     for f in target_files:
         with open("/tmp/changes.txt", "w") as changes:
-            subprocess.run([clang_format._get_executable("clang-format"), f], stdout=changes)
+            subprocess.run(
+                [clang_format._get_executable("clang-format"), f], stdout=changes
+            )
         args = ["git", "diff", "-u", "--exit-code"]
         if color:
             args += ["--color"]
@@ -30,7 +32,9 @@ if __name__ == "__main__":
 
     projects = utils.CHECK_PROJECTS(sys.argv[1:])
     if "//..." in projects:
-        projects = [p.replace(BAZEL_ROOT, "/")[:-1] for p in glob.glob(BAZEL_ROOT + "/*/")]
+        projects = [
+            p.replace(BAZEL_ROOT, "/")[:-1] for p in glob.glob(BAZEL_ROOT + "/*/")
+        ]
         projects = [p for p in projects if p not in utils.BLACKLISTED_BAZEL_TARGETS]
 
     failure = False

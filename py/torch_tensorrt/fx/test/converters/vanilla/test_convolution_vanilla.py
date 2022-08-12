@@ -31,7 +31,9 @@ class TestConvolutionConverter(VanillaTestCase):
         class TestModule(torch.nn.Module):
             def __init__(self):
                 super().__init__()
-                self.conv = torch.nn.Conv1d(3, 6, kernel_size, stride, padding, dilation, groups, bias)
+                self.conv = torch.nn.Conv1d(
+                    3, 6, kernel_size, stride, padding, dilation, groups, bias
+                )
 
             def forward(self, x):
                 return self.conv(x)
@@ -62,7 +64,9 @@ class TestConvolutionConverter(VanillaTestCase):
         class TestModule(torch.nn.Module):
             def __init__(self):
                 super().__init__()
-                self.conv = torch.nn.Conv2d(3, 6, kernel_size, stride, padding, dilation, groups, bias)
+                self.conv = torch.nn.Conv2d(
+                    3, 6, kernel_size, stride, padding, dilation, groups, bias
+                )
 
             def forward(self, x):
                 return self.conv(x)
@@ -93,7 +97,9 @@ class TestConvolutionConverter(VanillaTestCase):
         class TestModule(torch.nn.Module):
             def __init__(self):
                 super().__init__()
-                self.conv = torch.nn.Conv3d(3, 6, kernel_size, stride, padding, dilation, groups, bias)
+                self.conv = torch.nn.Conv3d(
+                    3, 6, kernel_size, stride, padding, dilation, groups, bias
+                )
 
             def forward(self, x):
                 return self.conv(x)

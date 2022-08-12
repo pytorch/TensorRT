@@ -13,7 +13,11 @@ class TestCompile(unittest.TestCase):
         self.traced_model = torch.jit.trace(self.model, [self.input])
 
         compile_spec = {
-            "inputs": [torchtrt.Input(self.input.shape, dtype=torch.float, format=torch.contiguous_format)],
+            "inputs": [
+                torchtrt.Input(
+                    self.input.shape, dtype=torch.float, format=torch.contiguous_format
+                )
+            ],
             "device": {
                 "device_type": torchtrt.DeviceType.GPU,
                 "gpu_id": 0,
@@ -140,8 +144,12 @@ class TestPTtoTRTtoPT(unittest.TestCase):
             },
         }
 
-        trt_engine = torchtrt.ts.convert_method_to_trt_engine(self.ts_model, "forward", **compile_spec)
-        trt_mod = torchtrt.ts.embed_engine_in_new_module(trt_engine, torchtrt.Device("cuda:0"))
+        trt_engine = torchtrt.ts.convert_method_to_trt_engine(
+            self.ts_model, "forward", **compile_spec
+        )
+        trt_mod = torchtrt.ts.embed_engine_in_new_module(
+            trt_engine, torchtrt.Device("cuda:0")
+        )
         same = (trt_mod(self.input) - self.ts_model(self.input)).abs().max()
         self.assertTrue(same < 2e-3)
 

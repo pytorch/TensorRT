@@ -12,7 +12,9 @@ def common_maxpool(network, mod, dimension, input_val, layer_name):
     stride = extend_mod_attr_to_tuple(mod, "stride", dimension)
     padding = extend_mod_attr_to_tuple(mod, "padding", dimension)
 
-    layer = network.add_pooling(input=input_val, type=trt.PoolingType.MAX, window_size=kernel_size)
+    layer = network.add_pooling(
+        input=input_val, type=trt.PoolingType.MAX, window_size=kernel_size
+    )
 
     layer.stride = stride
     layer.padding = padding
@@ -34,6 +36,11 @@ def maxpool2d(network, submod, args, kwargs, layer_name):
     input_val = kwargs["input"]
 
     if not isinstance(input_val, trt.tensorrt.ITensor):
-        raise RuntimeError(f"MaxPool2d received input {input_val} that is not part " "of the TensorRT region!")
+        raise RuntimeError(
+            f"MaxPool2d received input {input_val} that is not part "
+            "of the TensorRT region!"
+        )
 
-    return common_maxpool(network, submod, dimension=2, input_val=input_val, layer_name=layer_name)
+    return common_maxpool(
+        network, submod, dimension=2, input_val=input_val, layer_name=layer_name
+    )
