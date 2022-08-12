@@ -270,36 +270,19 @@ auto prim_registrations =
         .evaluator(
             {torch::jit::prim::TupleConstruct,
              [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-               auto num_inputs = n->inputs().size();
                c10::IValue tuple = c10::ivalue::Tuple::create();
-               switch (num_inputs) {
-                 case 0:
-                   tuple = c10::ivalue::Tuple::create();
-                   break;
-                 case 1:
-                   tuple = c10::ivalue::Tuple::create(std::move((*args.at(n->input(0)).IValue())));
-                   break;
-                 case 2: {
-                   tuple = c10::ivalue::Tuple::create(
-                       std::move(*(args.at(n->input(0)).IValue())), std::move(*(args.at(n->input(1)).IValue())));
-                   break;
-                 }
-                 case 3: {
-                   tuple = c10::ivalue::Tuple::create(
-                       std::move(*(args.at(n->input(0)).IValue())),
-                       std::move(*(args.at(n->input(1)).IValue())),
-                       std::move(*(args.at(n->input(2)).IValue())));
-                   break;
-                 }
-                 default: {
-                   std::vector<c10::IValue> elems;
-                   for (size_t i = 0; i < num_inputs; i++) {
-                     elems.push_back(*(args.at(n->input(i)).IValue()));
-                   }
-                   tuple = c10::ivalue::Tuple::create(std::move(elems));
-                   break;
+               std::vector<c10::IValue> elems;
+               for (auto in : n->inputs()) {
+                 if (args.at(in).isITensor()) {
+                   auto tensor_holder = TensorContainer();
+                   tensor_holder.hold_tensor(args.at(in).ITensor());
+                   auto ival = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
+                   elems.push_back(std::move(ival));
+                 } else {
+                   elems.push_back(*(args.at(in).IValue()));
                  }
                }
+               tuple = c10::ivalue::Tuple::create(std::move(elems));
                return c10::optional<torch::jit::IValue>(std::move(tuple));
              }})
         .evaluator(
