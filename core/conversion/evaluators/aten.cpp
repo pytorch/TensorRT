@@ -516,7 +516,7 @@ auto aten_registrations TORCHTRT_UNUSED =
                auto self = args.at(n->input(0)).IValue();
                auto obj = args.at(n->input(1)).IValue();
 
-               return self->isSameIdentity(*obj);
+               return self->is(*obj);
              },
              EvalOptions().validSchemas({
                  "aten::__is__(t1 self, t2 obj) -> bool",
@@ -527,7 +527,7 @@ auto aten_registrations TORCHTRT_UNUSED =
                auto self = args.at(n->input(0)).IValue();
                auto obj = args.at(n->input(1)).IValue();
 
-               return !self->isSameIdentity(*obj);
+               return !self->is(*obj);
              },
              EvalOptions().validSchemas({
                  "aten::__isnot__(t1 self, t2 obj) -> bool",
@@ -806,7 +806,17 @@ auto aten_registrations TORCHTRT_UNUSED =
                  return 0;
                }
              },
-             EvalOptions().validSchemas({"aten::__range_length(int lo, int hi, int step) -> int"})});
+             EvalOptions().validSchemas({"aten::__range_length(int lo, int hi, int step) -> int"})})
+        .evaluator(
+            {c10::Symbol::fromQualString("aten::__derive_index"),
+             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+               auto idx = args.at(n->input(0)).unwrapToInt();
+               auto start = args.at(n->input(1)).unwrapToInt();
+               auto step = args.at(n->input(2)).unwrapToInt();
+               return start + idx * step;
+             },
+             EvalOptions().validSchemas({"aten::__derive_index(int idx, int start, int step) -> int"})});
+
 } // namespace
 } // namespace evaluators
 } // namespace conversion
