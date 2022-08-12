@@ -38,6 +38,7 @@ void UnpackVar(std::shared_ptr<torch::jit::Graph>& graph);
 void AliasOperators(std::shared_ptr<torch::jit::Graph>& graph);
 void SiluToSigmoidMultipication(std::shared_ptr<torch::jit::Graph>& graph);
 void UnpackHardSwish(std::shared_ptr<torch::jit::Graph>& graph);
+void UnpackHardSigmoid(std::shared_ptr<torch::jit::Graph>& graph);
 
 } // namespace passes
 } // namespace lowering
