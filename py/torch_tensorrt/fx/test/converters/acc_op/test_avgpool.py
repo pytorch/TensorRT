@@ -29,7 +29,9 @@ class TestAvgPoolConverter(AccTestCase):
         class TestModule(torch.nn.Module):
             def __init__(self):
                 super().__init__()
-                self.avg_pool = torch.nn.AvgPool1d(kernel_size, stride, padding, ceil_mode, count_include_pad)
+                self.avg_pool = torch.nn.AvgPool1d(
+                    kernel_size, stride, padding, ceil_mode, count_include_pad
+                )
 
             def forward(self, x):
                 return self.avg_pool(x)
@@ -60,7 +62,9 @@ class TestAvgPoolConverter(AccTestCase):
         class TestModule(torch.nn.Module):
             def __init__(self):
                 super().__init__()
-                self.avg_pool = torch.nn.AvgPool1d(kernel_size, stride, padding, ceil_mode, count_include_pad)
+                self.avg_pool = torch.nn.AvgPool1d(
+                    kernel_size, stride, padding, ceil_mode, count_include_pad
+                )
 
             def forward(self, x):
                 return self.avg_pool(x)
@@ -73,7 +77,9 @@ class TestAvgPoolConverter(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(TestModule(), input_specs, expected_ops={acc_ops.avg_pool1d})
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.avg_pool1d}
+        )
 
     def test_avg_pool2d_with_dynamic_shape_four_dimensions(
         self,
@@ -108,7 +114,9 @@ class TestAvgPoolConverter(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(TestModule(), input_specs, expected_ops={acc_ops.avg_pool2d})
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.avg_pool2d}
+        )
 
     @parameterized.expand(
         [
@@ -248,7 +256,9 @@ class TestAvgPoolConverter(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(TestModule(), input_specs, expected_ops={acc_ops.avg_pool2d})
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.avg_pool2d}
+        )
 
 
 if __name__ == "__main__":

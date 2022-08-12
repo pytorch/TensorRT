@@ -52,7 +52,12 @@ class TestReduceConverter(AccTestCase):
             test_implicit_batch_dim=(dim != 0),
         )
 
-    @parameterized.expand([(f"{acc_op.__name__}_no_dim_no_keepdim", op, acc_op) for op, acc_op in reduce_ops])
+    @parameterized.expand(
+        [
+            (f"{acc_op.__name__}_no_dim_no_keepdim", op, acc_op)
+            for op, acc_op in reduce_ops
+        ]
+    )
     def test_reduce_all_dims(
         self,
         test_name,
@@ -71,7 +76,12 @@ class TestReduceConverter(AccTestCase):
             test_implicit_batch_dim=False,
         )
 
-    @parameterized.expand([(f"{acc_op.__name__}_no_dim_no_keepdim", op, acc_op) for op, acc_op in reduce_ops])
+    @parameterized.expand(
+        [
+            (f"{acc_op.__name__}_no_dim_no_keepdim", op, acc_op)
+            for op, acc_op in reduce_ops
+        ]
+    )
     def test_reduce_all_dims_with_dynamic_shape_four_dimensions(
         self,
         test_name,
@@ -89,7 +99,9 @@ class TestReduceConverter(AccTestCase):
                 shape_ranges=[((1, 1, 1, 1), (3, 3, 3, 3), (3, 3, 3, 3))],
             ),
         ]
-        self.run_test_with_dynamic_shape(Reduce(), input_specs, expected_ops={expected_acc_op})
+        self.run_test_with_dynamic_shape(
+            Reduce(), input_specs, expected_ops={expected_acc_op}
+        )
 
 
 if __name__ == "__main__":

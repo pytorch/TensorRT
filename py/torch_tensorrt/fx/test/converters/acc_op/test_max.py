@@ -104,7 +104,9 @@ class TestMaxConverterWithDynamicShape(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(MaxDimReduce(), input_specs, expected_ops={acc_ops.max_dim_reduce})
+        self.run_test_with_dynamic_shape(
+            MaxDimReduce(), input_specs, expected_ops={acc_ops.max_dim_reduce}
+        )
 
     def test_max_full_reduce(
         self,
@@ -124,7 +126,9 @@ class TestMaxConverterWithDynamicShape(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(MaxFullReduce(), input_specs, expected_ops={acc_ops.max_full_reduce})
+        self.run_test_with_dynamic_shape(
+            MaxFullReduce(), input_specs, expected_ops={acc_ops.max_full_reduce}
+        )
 
     def test_max_method(self):
         class MaxMethod(torch.nn.Module):
@@ -147,7 +151,9 @@ class TestMaxConverterWithDynamicShape(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(MaxMethod(), input_specs, expected_ops={acc_ops.maximum})
+        self.run_test_with_dynamic_shape(
+            MaxMethod(), input_specs, expected_ops={acc_ops.maximum}
+        )
 
 
 if __name__ == "__main__":

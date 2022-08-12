@@ -53,7 +53,9 @@ class TestClampConverter(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(TestModule(), input_specs, expected_ops={acc_ops.clamp})
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.clamp}
+        )
 
 
 if __name__ == "__main__":

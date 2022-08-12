@@ -34,6 +34,7 @@ class TestConverter(AccTestCase):
 
     # Testing with shape (-1, 3) results into error:
     # RuntimeError: setStorage: sizes [2, 3], strides [1, 2], storage offset 0, and itemsize 8 requiring a storage size of 48 are out of bounds for storage of size 16
+
     """
     def test_as_strided_with_dynamic_shape_four_dimensions(self):
         class Stride(nn.Module):
