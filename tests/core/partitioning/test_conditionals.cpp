@@ -40,7 +40,7 @@ TEST(Partitioning, FallbackOnConditionalsCorrectly) {
 
   auto conditional_engines_count = count_trt_engines_in_conditionals(new_g);
 
-  ASSERT_TRUE(conditional_engines_count == 2);
+  ASSERT_TRUE(conditional_engines_count == 1);
 }
 
 TEST(Partitioning, FallbackInplaceOPInConditionalsCorrectly) {
