@@ -1,8 +1,9 @@
-#include "core/partitioning/shape_analysis.h"
-#include <ATen/ATen.h>
-#include "core/util/prelude.h"
+#include "ATen/ATen.h"
 #include "torch/csrc/jit/api/module.h"
 #include "torch/csrc/jit/passes/constant_pooling.h"
+
+#include "core/partitioning/partitioning.h"
+#include "core/util/prelude.h"
 
 namespace torch_tensorrt {
 namespace core {
@@ -61,7 +62,7 @@ std::unordered_map<const torch::jit::Value*, torch::jit::IValue> generateRandomI
 void getSegmentsOutputByRunning(
     SegmentedBlock& seg_block,
     std::unordered_map<const torch::jit::Value*, torch::jit::IValue>& ivalues_maps,
-    const PartitionInfo& partition_info) {
+    const PartitioningInfo& partitioning_info) {
   // create a module to run the graph
   auto g = seg_block.g();
   auto copy_g = g->copy();
@@ -151,13 +152,13 @@ void getSegmentsOutputByRunning(
       // shape inference
       auto cur_ivalue = ivalues_maps[i];
       at::ScalarType t = cur_ivalue.toTensor().scalar_type();
-      if (!partition_info.truncate_long_and_double && (t == at::kLong || t == at::kDouble)) {
+      if (!partitioning_info.truncate_long_and_double && (t == at::kLong || t == at::kDouble)) {
         TORCHTRT_THROW_ERROR(
             "Unable to process subgraph input type of at::kLong/at::kDouble, try to compile model with truncate_long_and_double enabled");
-      } else if (partition_info.truncate_long_and_double && t == at::kLong) {
+      } else if (partitioning_info.truncate_long_and_double && t == at::kLong) {
         cur_ivalue = cur_ivalue.toTensor().to(at::kInt);
         LOG_WARNING("Truncating graph input type from at::kLong to at::kInt");
-      } else if (partition_info.truncate_long_and_double && t == at::kDouble) {
+      } else if (partitioning_info.truncate_long_and_double && t == at::kDouble) {
         cur_ivalue = cur_ivalue.toTensor().to(at::kFloat);
         LOG_WARNING("Truncating graph input type from at::kDouble to at::kFloat");
       }
@@ -183,11 +184,11 @@ void getSegmentsOutputByRunning(
 void runShapeAnalysis(
     std::vector<SegmentedBlock>& segmented_blocks,
     std::unordered_map<const torch::jit::Value*, torch::jit::IValue>& example_tensor_map,
-    const PartitionInfo& partition_info) {
+    const PartitioningInfo& partitioning_info) {
   // register every segment's input shape, and it's running output IValues
   for (auto& seg_block : segmented_blocks) {
     torch::jit::ConstantPooling(seg_block.g());
-    getSegmentsOutputByRunning(seg_block, example_tensor_map, partition_info);
+    getSegmentsOutputByRunning(seg_block, example_tensor_map, partitioning_info);
   }
   return;
 }

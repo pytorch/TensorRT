@@ -2,13 +2,13 @@
 #include <sstream>
 #include <utility>
 
-#include "core/partitioning/PartitionInfo.h"
+#include "core/partitioning/partitioninginfo/PartitioningInfo.h"
 
 namespace torch_tensorrt {
 namespace core {
 namespace partitioning {
 // clang-format off
-std::ostream& operator<<(std::ostream& os, const PartitionInfo& s) {
+std::ostream& operator<<(std::ostream& os, const PartitioningInfo& s) {
   os << "Settings requested for Torch Fallback:" \
      << "\n    \"enabled\": ";
   if (s.enabled) {

@@ -1,11 +1,11 @@
-#include "partitioning.h"
-
 #include <queue>
-#include "core/conversion/conversion.h"
-#include "core/conversion/evaluators/evaluators.h"
-#include "core/partitioning/shape_analysis.h"
+
 #include "torch/csrc/jit/passes/constant_pooling.h"
 #include "torch/csrc/jit/passes/dead_code_elimination.h"
+
+#include "core/conversion/conversion.h"
+#include "core/conversion/evaluators/evaluators.h"
+#include "core/partitioning/partitioning.h"
 
 namespace torch_tensorrt {
 namespace core {
@@ -357,11 +357,11 @@ void find_min_block_size_fallback_nodes(
 
 PartitionedGraph segment_graph(
     torch::jit::Block* block,
-    const PartitionInfo& partition_info,
+    const PartitioningInfo& partitioning_info,
     std::unordered_map<torch::jit::Node*, int>& global_fallback_nodes) {
-  auto min_block_size = partition_info.min_block_size;
+  auto min_block_size = partitioning_info.min_block_size;
   std::unordered_set<std::string> forced_fallback_ops(
-      partition_info.forced_fallback_operators.begin(), partition_info.forced_fallback_operators.end());
+      partitioning_info.forced_fallback_operators.begin(), partitioning_info.forced_fallback_operators.end());
 
   // get the initial fallback nodes (nodes that are unsupported or forced fallback)
   get_fallback_nodes(block, forced_fallback_ops, global_fallback_nodes);
@@ -450,16 +450,16 @@ PartitionedGraph segment_graph(
 PartitionedGraph Partition(
     torch::jit::Block* block,
     std::unordered_map<const torch::jit::Value*, torch::jit::IValue>& example_tensor_map,
-    const PartitionInfo& partition_info,
+    const PartitioningInfo& partitioning_info,
     std::unordered_map<torch::jit::Node*, int>& global_fallback_nodes) {
-  LOG_DEBUG(partition_info);
+  LOG_DEBUG(partitioning_info);
   // if there is nonTensor input/output for the entire graph, fallback the node that consumes/produces this nonTensor
   // output
   fallback_graph_nontensor_in_out(block, global_fallback_nodes);
 
   // segment lowering global graph into blocks
   LOG_DEBUG("Parititioning source module into PyTorch and TensorRT sub blocks");
-  PartitionedGraph segmented_blocks = segment_graph(block, partition_info, global_fallback_nodes);
+  PartitionedGraph segmented_blocks = segment_graph(block, partitioning_info, global_fallback_nodes);
 
   // It's possible that some TensorRT blocks have nonTensor inputs/output because they are interleaved by Torch blocks
 
@@ -471,7 +471,7 @@ PartitionedGraph Partition(
   registerSegmentsOutputs(segmented_blocks, block);
 
   // run shape analysis on each segmented block
-  runShapeAnalysis(segmented_blocks, example_tensor_map, partition_info);
+  runShapeAnalysis(segmented_blocks, example_tensor_map, partitioning_info);
 
   for (uint64_t i = 0; i < segmented_blocks.size(); i++) {
     segmented_blocks[i].update_id(i);

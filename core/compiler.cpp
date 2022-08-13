@@ -227,11 +227,11 @@ GraphAndMapping ConstructFallbackGraph(
     ir::StaticParams static_params,
     std::unordered_map<torch::jit::Node*, int>& fallback_nodes) {
   auto convert_cfg = cfg.convert_info;
-  auto partition_info = cfg.partition_info;
+  auto partitioning_info = cfg.partitioning_info;
 
   auto new_g = std::make_shared<torch::jit::Graph>();
 
-  auto segmented_blocks = partitioning::Partition(block, example_tensor_map, partition_info, fallback_nodes);
+  auto segmented_blocks = partitioning::Partition(block, example_tensor_map, partitioning_info, fallback_nodes);
 
   // the mapping from lowering graph => fallback global graph
   std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_g;
@@ -339,7 +339,7 @@ void MapInputsAndDetermineDTypes(
             "Cannot infer input type from calcuations in graph for input "
             << in->debugName() << ". Assuming it is Float32. If not, specify input type explicity");
         spec[i].dtype = nvinfer1::DataType::kFLOAT;
-      } else if (spec[i].dtype_is_user_defined && cfg.partition_info.enabled) {
+      } else if (spec[i].dtype_is_user_defined && cfg.partitioning_info.enabled) {
         if (!est_type_opt[i]) {
           LOG_INFO("Cannot infer input tensor dtype in graph, compiler is going to use the user setting");
           std::stringstream ss;
@@ -424,15 +424,15 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
       MapInputsAndDetermineDTypes(cfg, g, static_params, first_use_types);
       auto isBlockConvertible = conversion::VerifyConverterSupportForBlock(g->block(), true);
       auto outputIsCollection = conversion::OutputIsCollection(g->block());
-      if (cfg.partition_info.enabled &&
+      if (cfg.partitioning_info.enabled &&
           (cfg.lower_info.forced_fallback_modules.size() == 0 &&
-           cfg.partition_info.forced_fallback_operators.size() == 0 && isBlockConvertible)) {
+           cfg.partitioning_info.forced_fallback_operators.size() == 0 && isBlockConvertible)) {
         LOG_INFO("Skipping partitioning since model is fully supported");
       }
 
-      if (cfg.partition_info.enabled &&
+      if (cfg.partitioning_info.enabled &&
           (!(cfg.lower_info.forced_fallback_modules.size() == 0 &&
-             cfg.partition_info.forced_fallback_operators.size() == 0 && isBlockConvertible) ||
+             cfg.partitioning_info.forced_fallback_operators.size() == 0 && isBlockConvertible) ||
            outputIsCollection)) {
         std::unordered_map<torch::jit::Node*, int> fallback_nodes;
         auto collection_input_ivalues_map =
