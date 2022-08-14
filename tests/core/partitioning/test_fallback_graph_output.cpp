@@ -28,8 +28,8 @@ TEST(Partitioning, ComputeResNet50FallbackGraphCorrectly) {
   std::vector<torch_tensorrt::core::ir::Input> input_ranges{torch_tensorrt::core::ir::Input({1, 3, 224, 224})};
 
   torch_tensorrt::core::CompileSpec cfg(input_ranges);
-  cfg.partition_info.enabled = true;
-  cfg.partition_info.forced_fallback_operators.push_back("aten::add");
+  cfg.partitioning_info.enabled = true;
+  cfg.partitioning_info.forced_fallback_operators.push_back("aten::add");
 
   auto jit_results = mod.forward(jit_inputs_ivalues).toTensor();
   auto trt_mod = torch_tensorrt::core::CompileGraph(mod, cfg);
@@ -58,8 +58,8 @@ TEST(Partitioning, ComputeMobileNetFallbackGraphCorrectly) {
   std::vector<torch_tensorrt::core::ir::Input> input_ranges{torch_tensorrt::core::ir::Input({1, 3, 224, 224})};
   auto g = mod.get_method("forward").graph();
   torch_tensorrt::core::CompileSpec cfg(input_ranges);
-  cfg.partition_info.enabled = true;
-  cfg.partition_info.forced_fallback_operators.push_back("aten::hardtanh");
+  cfg.partitioning_info.enabled = true;
+  cfg.partitioning_info.forced_fallback_operators.push_back("aten::hardtanh");
 
   auto jit_results = mod.forward(jit_inputs_ivalues).toTensor();
   auto trt_mod = torch_tensorrt::core::CompileGraph(mod, cfg);

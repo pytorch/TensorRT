@@ -32,6 +32,7 @@ target_include_directories(${lib_name}
     PUBLIC "$<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>"
 )
 
+add_subdirectory(partitioningctx)
 add_subdirectory(partitioninginfo)
 add_subdirectory(segmentedblock)
 

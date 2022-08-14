@@ -219,19 +219,16 @@ void AddIfBlockToGraph(
   return;
 }
 
-GraphAndMapping ConstructFallbackGraph(
+GraphAndMapping ConstructFallbackGraph_(
     torch::jit::script::Module& new_mod,
     torch::jit::Block* block,
-    std::unordered_map<const torch::jit::Value*, torch::jit::IValue> example_tensor_map,
-    CompileSpec cfg,
+    partitioning::PartitioningCtx* partitioning_ctx,
+    conversion::ConversionInfo convert_info,
     ir::StaticParams static_params,
-    std::unordered_map<torch::jit::Node*, int>& fallback_nodes) {
-  auto convert_cfg = cfg.convert_info;
-  auto partitioning_info = cfg.partitioning_info;
-
+    std::unordered_map<const torch::jit::Value*, torch::jit::IValue> example_tensor_map) {
   auto new_g = std::make_shared<torch::jit::Graph>();
 
-  auto segmented_blocks = partitioning::Partition(block, example_tensor_map, partitioning_info, fallback_nodes);
+  auto segmented_blocks = partitioning::partition(partitioning_ctx, block, example_tensor_map);
 
   // the mapping from lowering graph => fallback global graph
   std::unordered_map<torch::jit::Value*, torch::jit::Value*> old_to_new_g;
@@ -240,7 +237,7 @@ GraphAndMapping ConstructFallbackGraph(
   }
 
   for (auto& seg_block : segmented_blocks) {
-    LOG_INFO(seg_block << "(GraphInSegmentedBlock)\n");
+    LOG_INFO("Block segment:" << seg_block);
     std::ostringstream trt_engine_id;
     trt_engine_id << reinterpret_cast<const int*>(&seg_block);
 
@@ -254,12 +251,12 @@ GraphAndMapping ConstructFallbackGraph(
         inputs.push_back(in);
       }
       // update the input ranges for each segments
-      convert_cfg.inputs = ir::associate_specs_with_inputs(seg_block.g(), inputs, static_params);
+      convert_info.inputs = ir::associate_specs_with_inputs(seg_block.g(), inputs, static_params);
 
       // TODO mapping Inputs Ivalue to flatten one here
-      auto engine = conversion::ConvertBlockToEngine(seg_block.block(), convert_cfg, static_params);
+      auto engine = conversion::ConvertBlockToEngine(seg_block.block(), convert_info, static_params);
       auto temp_g = std::make_shared<torch::jit::Graph>();
-      auto device_spec = convert_cfg.engine_settings.device;
+      auto device_spec = convert_info.engine_settings.device;
       auto cuda_device = runtime::CudaDevice(device_spec.gpu_id, device_spec.device_type);
       AddEngineToGraph(new_mod, temp_g, engine, cuda_device, trt_engine_id.str(), true);
 
@@ -272,8 +269,8 @@ GraphAndMapping ConstructFallbackGraph(
         // convert the 2 blocks in prim::if and get the converted graph with mappings
         std::vector<GraphAndMapping> graph_and_mappings;
         for (auto cur_block : if_node->blocks()) {
-          graph_and_mappings.push_back(
-              ConstructFallbackGraph(new_mod, cur_block, example_tensor_map, cfg, static_params, fallback_nodes));
+          graph_and_mappings.push_back(ConstructFallbackGraph_(
+              new_mod, cur_block, partitioning_ctx, convert_info, static_params, example_tensor_map));
         }
         AddIfBlockToGraph(new_g, if_node, graph_and_mappings, old_to_new_g);
 
@@ -303,6 +300,23 @@ GraphAndMapping ConstructFallbackGraph(
   return {new_g, old_to_new_g};
 }
 
+GraphAndMapping ConstructFallbackGraph(
+    torch::jit::script::Module& new_mod,
+    torch::jit::Block* block,
+    CompileSpec cfg,
+    ir::StaticParams static_params,
+    ir::CollectionTypeMap first_use_types) {
+  auto convert_info = cfg.convert_info;
+  auto partitioning_info = cfg.partitioning_info;
+
+  auto partitioning_ctx = partitioning::PartitioningCtx(block, partitioning_info);
+  auto collection_input_ivalues_map =
+      partitioning::generateRandomInputs(partitioning_info.collection_input_spec_map, first_use_types);
+
+  return ConstructFallbackGraph_(
+      new_mod, block, &partitioning_ctx, convert_info, static_params, collection_input_ivalues_map);
+}
+
 void MapInputsAndDetermineDTypes(
     CompileSpec& cfg,
     std::shared_ptr<torch::jit::Graph>& g,
@@ -310,6 +324,8 @@ void MapInputsAndDetermineDTypes(
     ir::CollectionTypeMap& first_use_type_map) {
   cfg.convert_info.collection_input_spec_map =
       std::move(ir::associate_specs_with_collection_inputs(g, cfg.graph_inputs, static_params));
+  cfg.partitioning_info.collection_input_spec_map =
+      ir::CollectionInputSpecMap(cfg.convert_info.collection_input_spec_map);
 
   auto collection_inputs = ir::get_collection_inputs(g, static_params);
   LOG_DEBUG(
@@ -434,11 +450,7 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
           (!(cfg.lower_info.forced_fallback_modules.size() == 0 &&
              cfg.partitioning_info.forced_fallback_operators.size() == 0 && isBlockConvertible) ||
            outputIsCollection)) {
-        std::unordered_map<torch::jit::Node*, int> fallback_nodes;
-        auto collection_input_ivalues_map =
-            partitioning::generateRandomInputs(cfg.convert_info.collection_input_spec_map, first_use_types);
-        auto graph_and_mapping = ConstructFallbackGraph(
-            new_mod, g->block(), collection_input_ivalues_map, cfg, static_params, fallback_nodes);
+        auto graph_and_mapping = ConstructFallbackGraph(new_mod, g->block(), cfg, static_params, first_use_types);
         new_g = graph_and_mapping.first;
         // renaming the input name of graph after fallback to ensure pytorch deserialize it correctly
         for (size_t i = 0; i < new_g->inputs().size(); ++i) {

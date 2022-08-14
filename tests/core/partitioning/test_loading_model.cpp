@@ -28,7 +28,7 @@ TEST(Partitioning, ComputeResNet50FallbackGraphCorrectly) {
   std::vector<torch_tensorrt::core::ir::Input> input_ranges{torch_tensorrt::core::ir::Input({1, 3, 224, 224})};
 
   torch_tensorrt::core::CompileSpec cfg(input_ranges);
-  cfg.partition_info.enabled = true;
+  cfg.partitioning_info.enabled = true;
 
   auto jit_results = mod.forward(jit_inputs_ivalues).toTensor();
   auto trt_mod = torch_tensorrt::core::CompileGraph(mod, cfg);

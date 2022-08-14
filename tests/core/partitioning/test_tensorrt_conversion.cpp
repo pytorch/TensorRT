@@ -57,7 +57,7 @@ TEST(Partitioning, ConvertSequentialModelSegmentedBlockCorrectly) {
   std::vector<torch_tensorrt::core::ir::Input> inputs;
   inputs.push_back(torch_tensorrt::core::ir::Input({3, 3, 16, 16}));
   torch_tensorrt::core::CompileSpec cfg(inputs);
-  cfg.partition_info.enabled = true;
+  cfg.partitioning_info.enabled = true;
   torch::jit::script::Module mod(c10::QualifiedName("module"));
 
   auto self = g->insertInput(0, "self_1");
@@ -116,7 +116,7 @@ TEST(Partitioning, ConvertBranchModelSegmentedBlockCorrectly) {
   std::vector<torch_tensorrt::core::ir::Input> inputs;
   inputs.push_back(torch_tensorrt::core::ir::Input({3, 3, 16, 16}));
   torch_tensorrt::core::CompileSpec cfg(inputs);
-  cfg.partition_info.enabled = true;
+  cfg.partitioning_info.enabled = true;
   torch::jit::script::Module mod(c10::QualifiedName("module"));
 
   auto self = g->insertInput(0, "self_1");
