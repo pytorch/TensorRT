@@ -75,6 +75,7 @@ cc_library(
         "impl/quantization.cpp",
         "impl/reduce.cpp",
         "impl/reflection_pad.cpp",
+        "impl/repeat.cpp",
         "impl/replication_pad.cpp",
         "impl/select.cpp",
         "impl/shuffle.cpp",
