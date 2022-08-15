@@ -4,8 +4,12 @@ Torch-TensorRT (FX Path) User Guide
 Torch-TensorRT (FX Path) is a tool that can convert a PyTorch model through torch.FX to an TensorRT engine optimized targeting running on Nvidia GPUs. TensorRT is the inference engine developed by Nvidia which composed of various kinds of optimization including kernel fusion, graph optimization, low precision, etc..
 This tool is developed in Python environment providing most usability to researchers and engineers. There are a few stages that a user want to use this tool and we will introduce them here.
 
+
 Installation
 ------------
+Torch-TensorRT (FX Path) is in Beta phase and always recommended to work with PyTorch nightly.  
+
+
 * Method 1. Follow the instrucions for Torch-TensorRT
 * Method 2. To install FX path only (Python path) and avoid the C++ build for torchscript path
 
