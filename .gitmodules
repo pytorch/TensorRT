@@ -1,0 +1,5 @@
+[submodule "toolchains/nv_workspaces"]
+	path = toolchains/nv_workspaces
+	url = ssh://git@gitlab-master.nvidia.com:12051/torch-tensorrt/WORKSPACES.git
+	branch = master
+	ignore = dirty
