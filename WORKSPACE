@@ -69,6 +69,14 @@ http_archive(
     urls = ["https://download.pytorch.org/libtorch/cu113/libtorch-shared-with-deps-1.12.0%2Bcu113.zip"],
 )
 
+http_archive(
+    name = "libcudacxx",
+    build_file = "@//third_party/cuda:BUILD",
+    sha256 = "ea74852b7ef808cc34b0bc4af3e0bd093bf50848ee1793d1abcaf9eb36506fc7",
+    strip_prefix = "libcudacxx-1.8.0-post-release",
+    urls = ["https://github.com/NVIDIA/libcudacxx/archive/refs/tags/1.8.0-post-release.zip"]
+)
+
 # Download these tarballs manually from the NVIDIA website
 # Either place them in the distdir directory in third_party and use the --distdir flag
 # or modify the urls to "file:///<PATH TO TARBALL>/<TARBALL NAME>.tar.gz
