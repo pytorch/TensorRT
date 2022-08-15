@@ -12,6 +12,7 @@ namespace core {
 namespace conversion {
 
 struct ConversionInfo {
+  // TODO: Figure out if this can be removed
   ir::InputSpecMap inputs;
   ir::CollectionInputSpecMap collection_input_spec_map;
   BuilderSettings engine_settings;

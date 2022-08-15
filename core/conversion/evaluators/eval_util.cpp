@@ -12,6 +12,13 @@ namespace core {
 namespace conversion {
 namespace evaluators {
 
+c10::OperatorName get_schema_overload_name(const torch::jit::Node* n) {
+  auto schema = n->maybeSchema();
+  TORCHTRT_CHECK(schema, "Unable to get schema for node: " << *n);
+  auto name = schema->operator_name();
+  return name;
+}
+
 int64_t normalizeIndex(int64_t idx, int64_t list_size) {
   if (idx < 0) {
     // Handle negative indexing

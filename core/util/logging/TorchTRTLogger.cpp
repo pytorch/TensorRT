@@ -125,7 +125,7 @@ namespace {
 
 TorchTRTLogger& get_global_logger() {
 #ifndef NDEBUG
-  static TorchTRTLogger global_logger("[Torch-TensorRT - Debug Build] - ", LogLevel::kDEBUG, true);
+  static TorchTRTLogger global_logger("[Torch-TensorRT - Debug Build] - ", LogLevel::kGRAPH, true);
 #else
   static TorchTRTLogger global_logger("[Torch-TensorRT] - ", LogLevel::kWARNING, false);
 #endif

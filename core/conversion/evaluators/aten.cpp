@@ -7,6 +7,7 @@
 #include "c10/util/intrusive_ptr.h"
 #include "torch/csrc/jit/ir/constants.h"
 #include "torch/csrc/jit/ir/ir.h"
+#include "torch/csrc/jit/runtime/slice_indices_adjust.h"
 #include "torch/torch.h"
 
 #include "core/conversion/evaluators/eval_macros.h"
@@ -177,37 +178,28 @@ auto aten_registrations TORCHTRT_UNUSED =
              [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
                c10::List<c10::IValue> list = args.at(n->input(0)).IValue()->to<c10::List<c10::IValue>>();
 
-               int64_t start = 0;
-               auto startIVal = args.at(n->input(1)).IValue();
-               if (!startIVal->isNone()) {
-                 start = args.at(n->input(1)).unwrapToInt();
-               }
-               int64_t end = args.at(n->input(2)).unwrapToInt();
-               int64_t step = args.at(n->input(3)).unwrapToInt();
+               int64_t start = args.at(n->input(1)).unwrapToInt(std::numeric_limits<int64_t>::max());
+               int64_t end = args.at(n->input(2)).unwrapToInt(std::numeric_limits<int64_t>::max());
+               int64_t step = args.at(n->input(3)).unwrapToInt(1);
 
                const int64_t list_size = list.size();
 
-               // clamp start and end to the bounds of the list
-               const auto normalized_start = std::max((int64_t)0, normalizeIndex(start, list_size));
-               const auto normalized_end = std::min(list_size, normalizeIndex(end, list_size));
+               torch::jit::slice_indices_adjust(list_size, &start, &end, step);
 
-               auto sliced_list = c10::impl::GenericList(list.elementType());
-               if (normalized_end <= normalized_start) {
-                 // early exit if the slice is trivially empty
-                 return sliced_list;
-               }
+               c10::List<c10::IValue> sliced_list = c10::impl::GenericList(list.elementType());
+               const int64_t num_values = torch::jit::slice_indices_adjust(list_size, &start, &end, step);
+               sliced_list.reserve(num_values);
 
-               sliced_list.reserve(normalized_end - normalized_start);
-
-               for (auto i = normalized_start; i < normalized_end;) {
+               int64_t i = start;
+               for (const auto j : c10::irange(num_values)) {
+                 (void)j; // Suppress unused variable warning
                  sliced_list.push_back(list.get(i));
                  i += step;
                }
 
                return sliced_list;
              },
-             EvalOptions().validSchemas(
-                 {"aten::slice.t(t[] l, int start, int end=9223372036854775807, int step=1) -> (t[])"})})
+             EvalOptions().validSchemas({"aten::slice.t(t[] l, int? start=None, int? end=None, int step=1) -> t[]"})})
         .evaluator(
             {c10::Symbol::fromQualString("aten::len"),
              [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
@@ -268,17 +260,105 @@ auto aten_registrations TORCHTRT_UNUSED =
         .evaluator(
             {c10::Symbol::fromQualString("aten::__getitem__"),
              [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-               auto list = args.at(n->input(0)).IValue()->to<c10::List<c10::IValue>>();
-               auto idx = args.at(n->input(1)).unwrapToInt();
+               auto name = get_schema_overload_name(n);
+               if (c10::toString(name) == "aten::__getitem__.t") {
+                 auto list = args.at(n->input(0)).IValue()->to<c10::List<c10::IValue>>();
+                 auto idx = args.at(n->input(1)).unwrapToInt();
 
-               const int64_t list_size = list.size();
-               const int64_t normalized_idx = normalizeIndex(idx, list_size);
-               TORCHTRT_CHECK(
-                   normalized_idx >= 0 || normalized_idx < list_size, "List index out of range (aten::__getitem__)");
-               return list.get(normalized_idx);
+                 const int64_t list_size = list.size();
+                 const int64_t normalized_idx = normalizeIndex(idx, list_size);
+                 TORCHTRT_CHECK(
+                     normalized_idx >= 0 || normalized_idx < list_size, "List index out of range (aten::__getitem__)");
+                 return list.get(normalized_idx);
+               } else if (c10::toString(name) == "aten::__getitem__.str") {
+                 auto string = args.at(n->input(0)).unwrapToString();
+                 auto index = args.at(n->input(1)).unwrapToInt();
+                 auto norm_index = normalizeIndex(index, string.size());
+                 char c = string.at(norm_index);
+                 return std::string(&c, 1);
+               } else if (c10::toString(name) == "aten::__getitem__.Dict_str") {
+                 auto dict = args.at(n->input(0)).IValue()->toGenericDict();
+                 auto key = args.at(n->input(1)).unwrapToString();
+                 auto val = dict.find(key);
+                 if (val == dict.end()) {
+                   TORCHTRT_THROW_ERROR("KeyError: Unable to find " << key << " in dict " << n->input(0)->debugName());
+                 }
+                 return val->value();
+               } else if (c10::toString(name) == "aten::__getitem__.Dict_int") {
+                 auto dict = args.at(n->input(0)).IValue()->toGenericDict();
+                 auto key = args.at(n->input(1)).unwrapToInt();
+                 auto val = dict.find(key);
+                 if (val == dict.end()) {
+                   TORCHTRT_THROW_ERROR("KeyError: Unable to find " << key << " in dict " << n->input(0)->debugName());
+                 }
+                 return val->value();
+               } else {
+                 TORCHTRT_THROW_ERROR("Unsupported variant of aten::__getitem__ (" << *(n->maybeSchema()) << ")");
+                 return {};
+               }
              },
              EvalOptions().validSchemas({
                  "aten::__getitem__.t(t[](a) list, int idx) -> (t(*))",
+                 "aten::__getitem__.str(str s, int index) -> str",
+                 "aten::__getitem__.Dict_str(Dict(str, t) self, str key) -> (t(*))",
+                 "aten::__getitem__.Dict_int(Dict(int, t) self, int key) -> (t(*))",
+             })})
+        .evaluator(
+            {c10::Symbol::fromQualString("aten::_set_item"),
+             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+               auto name = get_schema_overload_name(n);
+               if (c10::toString(name) == "aten::_set_item.t") {
+                 auto list = args.at(n->input(0)).IValue()->to<c10::List<c10::IValue>>();
+                 int64_t idx = args.at(n->input(1)).unwrapToInt();
+                 idx = normalizeIndex(idx, list.size());
+                 if (args.at(n->input(2)).isITensor()) {
+                   auto tensor_holder = TensorContainer();
+                   tensor_holder.hold_tensor(args.at(n->input(2)).ITensor());
+                   auto value = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
+                   list.set(idx, std::move(value));
+                 } else {
+                   list.set(idx, std::move(*(args.at(n->input(2)).IValue())));
+                 }
+                 return {std::move(list)};
+               } else if (c10::toString(name) == "aten::_set_item.str") {
+                 LOG_DEBUG("FYI: This evaluator modifies state inplace");
+                 auto dict_ptr = args.at(n->input(0)).IValueMut();
+                 auto dict = dict_ptr->toGenericDict();
+                 std::string idx = args.at(n->input(1)).unwrapToString();
+                 if (args.at(n->input(2)).isITensor()) {
+                   auto tensor_holder = TensorContainer();
+                   tensor_holder.hold_tensor(args.at(n->input(2)).ITensor());
+                   auto value = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
+                   dict.insert_or_assign(std::move(idx), std::move(value));
+                 } else {
+                   dict.insert_or_assign(std::move(idx), std::move(*(args.at(n->input(2)).IValue())));
+                 }
+                 *dict_ptr = c10::IValue(dict);
+                 return {};
+               } else if (c10::toString(name) == "aten::_set_item.int") {
+                 LOG_DEBUG("FYI: This evaluator modifies state inplace");
+                 auto dict_ptr = args.at(n->input(0)).IValueMut();
+                 auto dict = dict_ptr->toGenericDict();
+                 int64_t idx = args.at(n->input(1)).unwrapToInt();
+                 if (args.at(n->input(2)).isITensor()) {
+                   auto tensor_holder = TensorContainer();
+                   tensor_holder.hold_tensor(args.at(n->input(2)).ITensor());
+                   auto value = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
+                   dict.insert_or_assign(std::move(idx), std::move(value));
+                 } else {
+                   dict.insert_or_assign(std::move(idx), std::move(*(args.at(n->input(2)).IValue())));
+                 }
+                 *dict_ptr = c10::IValue(dict);
+                 return {};
+               } else {
+                 TORCHTRT_THROW_ERROR("Unsupported variant of aten::_set_item (" << *(n->maybeSchema()) << ")");
+                 return {};
+               }
+             },
+             EvalOptions().validSchemas({
+                 "aten::_set_item.t(t [](a!) l, int idx, t(b -> *) el) -> t[](a!)",
+                 "aten::_set_item.str(Dict(str, t)(a!) l, str(b -> *) idx, t(c -> *) v) -> ()",
+                 "aten::_set_item.int(Dict(int, t)(a!) l, int(b -> *) idx, t(c -> *) v) -> ()",
              })})
         .evaluator(
             {c10::Symbol::fromQualString("aten::append"),
@@ -686,9 +766,7 @@ auto aten_registrations TORCHTRT_UNUSED =
         .evaluator(
             {c10::Symbol::fromQualString("aten::arange"),
              [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
-               auto schema = n->maybeSchema();
-               TORCHTRT_CHECK(schema, "Unable to get schema for node: " << *n);
-               auto name = schema->operator_name();
+               auto name = get_schema_overload_name(n);
 
                if (c10::toString(name) == "aten::arange") {
                  if (args.at(n->input(0)).IValue()->isInt()) {
@@ -815,8 +893,71 @@ auto aten_registrations TORCHTRT_UNUSED =
                auto step = args.at(n->input(2)).unwrapToInt();
                return start + idx * step;
              },
-             EvalOptions().validSchemas({"aten::__derive_index(int idx, int start, int step) -> int"})});
-
+             EvalOptions().validSchemas({"aten::__derive_index(int idx, int start, int step) -> int"})})
+        .evaluator(
+            {c10::Symbol::fromQualString("aten::dict"),
+             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+               auto name = get_schema_overload_name(n);
+               if (c10::toString(name) == "aten::dict.int") {
+                 auto dict = c10::impl::GenericDict(c10::IntType::get(), c10::TensorType::get());
+                 return dict;
+               } else {
+                 auto dict = c10::impl::GenericDict(c10::StringType::get(), c10::TensorType::get());
+                 return dict;
+               }
+             },
+             EvalOptions().validSchemas({
+                 "aten::dict() -> Dict(str, Tensor)",
+                 "aten::dict.str() -> Dict(str, Tensor)",
+                 "aten::dict.int() -> Dict(int, Tensor)",
+             })})
+        .evaluator(
+            {c10::Symbol::fromQualString("aten::list"),
+             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+               auto list = args.at(n->input(0)).IValue()->to<c10::List<c10::IValue>>();
+               return list.copy();
+             },
+             EvalOptions().validSchemas({"aten::list.t(t[] l) -> t[]"})})
+        .evaluator(
+            {c10::Symbol::fromQualString("aten::__contains__"),
+             [](const torch::jit::Node* n, kwargs& args) -> c10::optional<torch::jit::IValue> {
+               auto name = get_schema_overload_name(n);
+               if (c10::toString(name) == "aten::__contains__.int_list") {
+                 auto list = args.at(n->input(0)).unwrapToIntList();
+                 auto key = args.at(n->input(1)).unwrapToInt();
+                 for (const auto& item : list) {
+                   if (item == key) {
+                     return true;
+                   }
+                 }
+                 return false;
+               } else if (c10::toString(name) == "aten::__contains__.str_list") {
+                 auto list = args.at(n->input(0)).IValue()->to<c10::List<std::string>>();
+                 auto key = args.at(n->input(1)).unwrapToString();
+                 for (const auto& item : list) {
+                   if (item == key) {
+                     return true;
+                   }
+                 }
+                 return false;
+               } else if (c10::toString(name) == "aten::__contains__.float_list") {
+                 auto list = args.at(n->input(0)).unwrapToDoubleList();
+                 auto key = args.at(n->input(1)).unwrapToDouble();
+                 for (const auto& item : list) {
+                   if (item == key) {
+                     return true;
+                   }
+                 }
+                 return false;
+               } else {
+                 TORCHTRT_THROW_ERROR("Unsupported schema variant of aten::__contain__: " << util::node_info(n));
+                 return false;
+               }
+             },
+             EvalOptions().validSchemas(
+                 {"aten::__contains__.int_list(int[] l, int item) -> bool",
+                  "aten::__contains__.float_list(float[] l, int item) -> bool",
+                  "aten::__contains__.str_list(str[] l, str item) -> (bool)"})});
 } // namespace
 } // namespace evaluators
 } // namespace conversion

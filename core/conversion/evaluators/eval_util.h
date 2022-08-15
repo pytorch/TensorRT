@@ -7,6 +7,7 @@ namespace core {
 namespace conversion {
 namespace evaluators {
 
+c10::OperatorName get_schema_overload_name(const torch::jit::Node* n);
 c10::optional<torch::jit::IValue> toIValue(const torch::jit::Value* v);
 at::Tensor createTensorFromList(
     const torch::jit::IValue& data,
