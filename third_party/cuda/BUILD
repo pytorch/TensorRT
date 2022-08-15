@@ -10,21 +10,6 @@ config_setting(
 )
 
 cc_library(
-    name = "libcudacxx",
-    deps = [":cudacxx"],
-)
-
-cc_library(
-    name = "cudacxx",
-    hdrs = glob([
-        "include/**/*",
-        "include/nv/*"
-    ]),
-    includes = ["include"],
-    strip_include_prefix = "include",
-)
-
-cc_library(
     name = "cudart",
     srcs = select({
         ":windows": [

@@ -34,10 +34,7 @@ cc_library(
         "//core/util:prelude",
     ] + select({
         ":use_pre_cxx11_abi": ["@libtorch_pre_cxx11_abi//:libtorch"],
-        "//conditions:default": [
-            "@libtorch//:libtorch",
-            "@cuda//:libcudacxx",
-        ],
+        "//conditions:default": ["@libtorch//:libtorch"],
     }),
     alwayslink = True,
 )
