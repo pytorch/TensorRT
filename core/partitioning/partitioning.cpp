@@ -31,11 +31,17 @@ bool containNonTensorOutputs(torch::jit::Node* n) {
 }
 
 bool isModifyingNodes(torch::jit::Node* node, torch::jit::Value* val) {
-  const auto& schema = node->schema();
+  const torch::jit::FunctionSchema* schema = node->maybeSchema();
+  if (!schema) {
+    return false;
+  }
   for (size_t i = 0; i < node->inputs().size(); ++i) {
     if (node->inputs()[i] == val) {
-      const at::AliasInfo* formal = schema.arguments()[i].alias_info();
+      const at::AliasInfo* formal = schema->arguments()[i].alias_info();
       if (formal && formal->isWrite()) {
+        LOG_GRAPH(
+            util::node_info(node) << " is a modifying node for value " << val->debugName()
+                                  << ", add it to the dependency graph.");
         return true;
       }
     }
