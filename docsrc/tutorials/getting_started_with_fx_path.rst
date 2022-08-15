@@ -7,7 +7,7 @@ This tool is developed in Python environment providing most usability to researc
 
 Installation
 ------------
-Torch-TensorRT (FX Path) is in Beta phase and always recommended to work with PyTorch nightly.  
+Torch-TensorRT (FX Path) is in ``Beta`` phase and always recommended to work with PyTorch nightly.  
 
 
 * Method 1. Follow the instrucions for Torch-TensorRT
