@@ -25,8 +25,6 @@ nvinfer1::ITensor* clamp_util(
   return clamp_layer_out;
 }
 
-
-
 auto element_wise_registrations TORCHTRT_UNUSED =
     RegisterNodeConversionPatterns()
         .pattern(
