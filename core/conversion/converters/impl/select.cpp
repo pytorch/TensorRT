@@ -136,7 +136,8 @@ auto select_registrations TORCHTRT_UNUSED =
                  // IShuffleLayer removes redundant dimensions
                  auto shuffle_layer = ctx->net->addShuffle(*out);
                  TORCHTRT_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
-                 shuffle_layer->setReshapeDimensions(util::squeezeDims(out->getDimensions(), dim));
+                 shuffle_layer->setReshapeDimensions(
+                     util::squeezeDims(out->getDimensions(), dim, !ctx->input_is_dynamic));
                  shuffle_layer->setName(util::node_info(n).c_str());
                  out = shuffle_layer->getOutput(0);
                }
@@ -249,21 +250,19 @@ auto select_registrations TORCHTRT_UNUSED =
                auto dims = args[2].unwrapToIntList().vec();
 
                TORCHTRT_CHECK(dims.size() == shifts.size(), "dims.size() should be equal to shifts.size()");
-               if (ctx->input_is_dynamic) {
-                 TORCHTRT_THROW_ERROR("aten::roll is currently not support in dynamic input shape compilation");
-               } else {
-                 auto in_shape = util::toVec(in->getDimensions());
-                 for (size_t i = 0; i < dims.size(); i++) {
-                   auto dim = dims[i] < 0 ? (in_shape.size() + dims[i]) : dims[i];
-                   TORCHTRT_CHECK(dim < in_shape.size(), "Dimension out of range");
-                   in = roll(ctx, in, shifts[i], dim, in_shape);
-                 }
-                 auto out = ctx->AssociateValueAndTensor(n->outputs()[0], in);
-
-                 LOG_DEBUG("Output tensor shape: " << out->getDimensions());
-
-                 return true;
+               auto in_shape = util::toVec(in->getDimensions());
+               for (size_t i = 0; i < dims.size(); i++) {
+                 auto dim = dims[i] < 0 ? (in_shape.size() + dims[i]) : dims[i];
+                 TORCHTRT_CHECK(dim < in_shape.size(), "Dimension out of range");
+                 TORCHTRT_CHECK(
+                     in_shape[dim] != -1, "aten::roll is not supported when the targeted dimension is dynamic");
+                 in = roll(ctx, in, shifts[i], dim, in_shape);
                }
+               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], in);
+
+               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+
+               return true;
              }})
         .pattern(
             {"aten::index.Tensor(Tensor self, Tensor?[] indices) -> (Tensor)",
@@ -360,9 +359,15 @@ auto select_registrations TORCHTRT_UNUSED =
                    stride_.d[i] = 1;
                  }
                }
-               auto slice_layer = ctx->net->addSlice(*in, start_, size_, stride_);
-
-               if (dynamic_shape) { // dynamic shape
+               if (!dynamic_shape) {
+                 auto slice_layer = ctx->net->addSlice(*in, start_, size_, stride_);
+                 LOG_DEBUG("start_:" << start_);
+                 LOG_DEBUG("size_:" << size_);
+                 LOG_DEBUG("stride_:" << stride_);
+                 auto slice_out = slice_layer->getOutput(0);
+                 auto out = ctx->AssociateValueAndTensor(n->outputs()[0], slice_out);
+                 LOG_DEBUG("Slice layer output shape: " << out->getDimensions());
+               } else { // dynamic shape
                  LOG_DEBUG("Using dynamic version of slice");
                  // start tensor
                  at::Tensor start_tensor = torch::zeros({nbdims}).to(torch::kI32);
@@ -398,13 +403,13 @@ auto select_registrations TORCHTRT_UNUSED =
                  auto size_itensor = get_slice_size(ctx, out_start, out_end, stride_itensor, nbdims, node_name);
 
                  // update slice layer
+                 auto slice_layer = ctx->net->addSlice(*in, start_, size_, stride_);
                  slice_layer->setInput(1, *out_start); // start
                  slice_layer->setInput(2, *size_itensor); // size, must be set if input is dynamic
+                 auto slice_out = slice_layer->getOutput(0);
+                 auto out = ctx->AssociateValueAndTensor(n->outputs()[0], slice_out);
+                 LOG_DEBUG("Slice layer output shape: " << out->getDimensions());
                }
-               auto slice_out = slice_layer->getOutput(0);
-
-               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], slice_out);
-               LOG_DEBUG("Slice layer output shape: " << out->getDimensions());
 
                return true;
              }})
@@ -484,7 +489,7 @@ auto select_registrations TORCHTRT_UNUSED =
 
                auto layer = ctx->net->addScatter(*self, *index, *value_tensor, nvinfer1::ScatterMode::kELEMENT);
                layer->setAxis(dim);
-               
+
                TORCHTRT_CHECK(layer, "Unable to create layer for aten::scatter.value");
 
                layer->setName(util::node_info(n).c_str());
@@ -503,7 +508,7 @@ auto select_registrations TORCHTRT_UNUSED =
 
                auto layer = ctx->net->addScatter(*self, *index, *src, nvinfer1::ScatterMode::kELEMENT);
                layer->setAxis(dim);
-               
+
                TORCHTRT_CHECK(layer, "Unable to create layer for aten::scatter.src");
 
                layer->setName(util::node_info(n).c_str());

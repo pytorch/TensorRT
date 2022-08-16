@@ -19,12 +19,38 @@ static auto shuffle_registrations TORCHTRT_UNUSED =
                auto end_dim = args[2].unwrapToInt();
                auto in_shape = util::toVec(in->getDimensions());
                std::vector<int64_t> out_shape;
-               if (ctx->input_is_dynamic && in_shape[0] != -1) {
-                 out_shape = std::vector<int64_t>({in_shape[0], -1});
-               } else if (ctx->input_is_dynamic && in_shape[0] == -1) {
-                 out_shape = std::vector<int64_t>(
-                     {-1,
-                      -1 * std::accumulate(std::begin(in_shape), std::end(in_shape), 1, std::multiplies<int64_t>())});
+               if (ctx->input_is_dynamic) {
+                 end_dim = (end_dim == -1) ? in_shape.size() - 1 : end_dim;
+                 int nbDynamicFlattenedDims = 0;
+                 int nbDynamicUnflattenedDims = 0;
+                 for (int i = 0; i < (int)in_shape.size(); i++) {
+                   if (in_shape[i] == -1) {
+                     if (i >= start_dim && i <= end_dim)
+                       nbDynamicFlattenedDims++;
+                     else
+                       nbDynamicUnflattenedDims++;
+                   }
+                 }
+                 if (nbDynamicFlattenedDims > 0 && nbDynamicUnflattenedDims > 0) {
+                   TORCHTRT_THROW_ERROR(
+                       "Flatten is currently not supported when target shape contains more than one dynamic dimension");
+                 }
+                 if (nbDynamicUnflattenedDims > 1) {
+                   TORCHTRT_THROW_ERROR(
+                       "Flatten is currently not supported when target shape contains more than one dynamic dimension");
+                 }
+                 out_shape = in_shape;
+                 out_shape.erase(std::begin(out_shape) + start_dim, std::begin(out_shape) + end_dim + 1);
+                 if (nbDynamicFlattenedDims == 0) {
+                   auto flattened_dim = std::accumulate(
+                       std::begin(in_shape) + start_dim,
+                       std::begin(in_shape) + end_dim + 1,
+                       1,
+                       std::multiplies<int64_t>());
+                   out_shape.insert(std::begin(out_shape) + start_dim, flattened_dim);
+                 } else {
+                   out_shape.insert(std::begin(out_shape) + start_dim, -1);
+                 }
                } else {
                  out_shape = torch::flatten(torch::rand(in_shape), start_dim, end_dim).sizes().vec();
                }
@@ -45,7 +71,16 @@ static auto shuffle_registrations TORCHTRT_UNUSED =
                auto in_shape = util::toVec(in->getDimensions());
                std::vector<int64_t> new_shape;
                if (ctx->input_is_dynamic) {
-                 TORCHTRT_THROW_ERROR("Resize is currently not support in dynamic input shape compilation");
+                 new_shape = util::toVec(args[1].unwrapToIntList().vec());
+                 int nbDynamicDims = 0;
+                 for (size_t i = 0; i < new_shape.size(); i++) {
+                   if (in_shape[i] == -1)
+                     nbDynamicDims++;
+                 }
+                 if (nbDynamicDims > 1) {
+                   TORCHTRT_THROW_ERROR(
+                       "Resize is currently not supported when target shape contains more than one dynamic dimension");
+                 }
                } else {
                  new_shape = torch::reshape(torch::rand(in_shape), args[1].unwrapToIntList().vec()).sizes().vec();
                }
