@@ -28,7 +28,7 @@ def get_batch(self, names):
     if self.current_batch_idx + self.batch_size > len(self.data_loader.dataset):
         return None
 
-    batch = self.dataset_iterator.next()
+    batch = next(self.dataset_iterator)
     self.current_batch_idx += self.batch_size
     inputs_gpu = []
     if isinstance(batch, list):
