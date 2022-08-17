@@ -303,54 +303,13 @@ Enviorment Setup
 
 To build natively on aarch64-linux-gnu platform, configure the ``WORKSPACE`` with local available dependencies.
 
-1. Disable the rules with ``http_archive`` for x86_64 by commenting the following rules:
-
-.. code-block:: shell
-
-    #http_archive(
-    #    name = "libtorch",
-    #    build_file = "@//third_party/libtorch:BUILD",
-    #    strip_prefix = "libtorch",
-    #    urls = ["https://download.pytorch.org/libtorch/cu102/libtorch-cxx11-abi-shared-with-deps-1.5.1.zip"],
-    #    sha256 = "cf0691493d05062fe3239cf76773bae4c5124f4b039050dbdd291c652af3ab2a"
-    #)
-
-    #http_archive(
-    #    name = "libtorch_pre_cxx11_abi",
-    #    build_file = "@//third_party/libtorch:BUILD",
-    #    strip_prefix = "libtorch",
-    #    sha256 = "818977576572eadaf62c80434a25afe44dbaa32ebda3a0919e389dcbe74f8656",
-    #    urls = ["https://download.pytorch.org/libtorch/cu102/libtorch-shared-with-deps-1.5.1.zip"],
-    #)
-
-    # Download these tarballs manually from the NVIDIA website
-    # Either place them in the distdir directory in third_party and use the --distdir flag
-    # or modify the urls to "file:///<PATH TO TARBALL>/<TARBALL NAME>.tar.gz
-
-    #http_archive(
-    #    name = "cudnn",
-    #    urls = ["https://developer.nvidia.com/compute/machine-learning/cudnn/secure/8.0.1.13/10.2_20200626/cudnn-10.2-linux-x64-v8.0.1.13.tgz"],
-    #    build_file = "@//third_party/cudnn/archive:BUILD",
-    #    sha256 = "0c106ec84f199a0fbcf1199010166986da732f9b0907768c9ac5ea5b120772db",
-    #    strip_prefix = "cuda"
-    #)
-
-    #http_archive(
-    #    name = "tensorrt",
-    #    urls = ["https://developer.nvidia.com/compute/machine-learning/tensorrt/secure/7.1/tars/TensorRT-7.1.3.4.Ubuntu-18.04.x86_64-gnu.cuda-10.2.cudnn8.0.tar.gz"],
-    #    build_file = "@//third_party/tensorrt/archive:BUILD",
-    #    sha256 = "9205bed204e2ae7aafd2e01cce0f21309e281e18d5bfd7172ef8541771539d41",
-    #    strip_prefix = "TensorRT-7.1.3.4"
-    #)
-
-    NOTE: You may also need to configure the CUDA version to 10.2 by setting the path for the cuda new_local_repository
-
+1. Replace ``WORKSPACE`` with the corresponding WORKSPACE file in ``//toolchains/jp_workspaces``
 
 2. Configure the correct paths to directory roots containing local dependencies in the ``new_local_repository`` rules:
 
     NOTE: If you installed PyTorch using a pip package, the correct path is the path to the root of the python torch package.
-    In the case that you installed with ``sudo pip install`` this will be ``/usr/local/lib/python3.6/dist-packages/torch``.
-    In the case you installed with ``pip install --user`` this will be ``$HOME/.local/lib/python3.6/site-packages/torch``.
+    In the case that you installed with ``sudo pip install`` this will be ``/usr/local/lib/python3.8/dist-packages/torch``.
+    In the case you installed with ``pip install --user`` this will be ``$HOME/.local/lib/python3.8/site-packages/torch``.
 
 In the case you are using NVIDIA compiled pip packages, set the path for both libtorch sources to the same path. This is because unlike
 PyTorch on x86_64, NVIDIA aarch64 PyTorch uses the CXX11-ABI. If you compiled for source using the pre_cxx11_abi and only would like to
@@ -360,27 +319,16 @@ use that library, set the paths to the same path but when you compile make sure 
 
     new_local_repository(
         name = "libtorch",
-        path = "/usr/local/lib/python3.6/dist-packages/torch",
+        path = "/usr/local/lib/python3.8/dist-packages/torch",
         build_file = "third_party/libtorch/BUILD"
     )
 
     new_local_repository(
         name = "libtorch_pre_cxx11_abi",
-        path = "/usr/local/lib/python3.6/dist-packages/torch",
+        path = "/usr/local/lib/python3.8/dist-packages/torch",
         build_file = "third_party/libtorch/BUILD"
     )
 
-    new_local_repository(
-        name = "cudnn",
-        path = "/usr/",
-        build_file = "@//third_party/cudnn/local:BUILD"
-    )
-
-    new_local_repository(
-        name = "tensorrt",
-        path = "/usr/",
-        build_file = "@//third_party/tensorrt/local:BUILD"
-    )
 
 Compile C++ Library and Compiler CLI
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -389,19 +337,19 @@ Compile C++ Library and Compiler CLI
 
     .. code-block:: shell
 
-        --platforms //toolchains:jetpack_4.x
+        --platforms //toolchains:jetpack_x.x
 
 
 Compile Torch-TensorRT library using bazel command:
 
 .. code-block:: shell
 
-   bazel build //:libtorchtrt --platforms //toolchains:jetpack_4.6
+   bazel build //:libtorchtrt --platforms //toolchains:jetpack_5.0
 
 Compile Python API
 ^^^^^^^^^^^^^^^^^^^^
 
-    NOTE: Due to shifting dependencies locations between Jetpack 4.5 and Jetpack 4.6 there is now a flag for ``setup.py`` which sets the jetpack version (default: 4.6)
+    NOTE: Due to shifting dependencies locations between Jetpack 4.5 and newer Jetpack verisons there is now a flag for ``setup.py`` which sets the jetpack version (default: 5.0)
 
 Compile the Python API using the following command from the ``//py`` directory:
 
@@ -411,4 +359,4 @@ Compile the Python API using the following command from the ``//py`` directory:
 
 If you have a build of PyTorch that uses Pre-CXX11 ABI drop the ``--use-cxx11-abi`` flag
 
-If you are building for Jetpack 4.5 add the ``--jetpack-version 4.5`` flag
+If you are building for Jetpack 4.5 add the ``--jetpack-version 5.0`` flag
