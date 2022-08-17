@@ -72,12 +72,18 @@ if platform.uname().processor == "aarch64":
         elif version == "4.6":
             JETPACK_VERSION = "4.6"
         elif version == "5.0":
-            JETPACK_VERSION = "4.6"
+            JETPACK_VERSION = "5.0"
+
     if not JETPACK_VERSION:
         warnings.warn(
-            "Assuming jetpack version to be 4.6 or greater, if not use the --jetpack-version option"
+            "Assuming jetpack version to be 5.0, if not use the --jetpack-version option"
         )
-        JETPACK_VERSION = "4.6"
+        JETPACK_VERSION = "5.0"
+
+    if not CXX11_ABI:
+        warnings.warn(
+            "Jetson platform detected but did not see --use-cxx11-abi option, if using a pytorch distribution provided by NVIDIA include this flag"
+        )
 
 
 def which(program):
@@ -128,7 +134,10 @@ def build_libtorchtrt_pre_cxx11_abi(develop=True, use_dist_dir=True, cxx11_abi=F
         print("Jetpack version: 4.5")
     elif JETPACK_VERSION == "4.6":
         cmd.append("--platforms=//toolchains:jetpack_4.6")
-        print("Jetpack version: >=4.6")
+        print("Jetpack version: 4.6")
+    elif JETPACK_VERSION == "5.0":
+        cmd.append("--platforms=//toolchains:jetpack_5.0")
+        print("Jetpack version: 5.0")
 
     if CI_RELEASE:
         cmd.append("--platforms=//toolchains:ci_rhel_x86_64_linux")
