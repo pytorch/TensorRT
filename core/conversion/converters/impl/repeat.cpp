@@ -30,7 +30,7 @@ auto repeatinterleave TORCHTRT_UNUSED =
                 }
                 auto flatten = ctx->net->addShuffle(*self);
                 TORCHTRT_CHECK(flatten, "Unable to create shuffle layer from node: " << *n);
-                flatten.setReshapeDimensions(util::toDims(std::vector<int64_t>({size})));
+                flatten->setReshapeDimensions(util::toDims(std::vector<int64_t>({size})));
                 self = flatten->getOutput(0);
                 input_shape = self->getDimensions();
               }
@@ -43,20 +43,20 @@ auto repeatinterleave TORCHTRT_UNUSED =
               for (int j = 0; j < input_shape.nbDims; j++) {
                 repeat_shape_vec.push_back(input_shape.d[j]);
                 if (j == dim) {
-                  repeate_shape_vec.push_back(1);
+                  repeat_shape_vec.push_back(1);
                 }
               }
               auto expand = ctx->net->addShuffle(*self);
               TORCHTRT_CHECK(expand, "Unable to create shuffle layer from node: " << *n);
               auto repeat_shape = util::toDims(repeat_shape_vec);
-              expand_shape.setReshapeDimensions(repeat_shape);
+              expand->setReshapeDimensions(repeat_shape);
 
               // Expand on newly created singleton dimension
               repeat_shape.d[dim + 1] = repeats;
-              std::vector<int64_t> start_vec(expanded_shape.nbDims, 0);
+              std::vector<int64_t> start_vec(repeat_shape.nbDims, 0);
               auto start = util::toDims(start_vec);
 
-              std::vector<int64_t> strides_vec(expanded_shape.nbDims, 1);
+              std::vector<int64_t> strides_vec(repeat_shape.nbDims, 1);
               strides_vec[dim + 1] = 0;
               auto strides = util::toDims(strides_vec);
 
@@ -64,24 +64,24 @@ auto repeatinterleave TORCHTRT_UNUSED =
 
               // Collapse repeated dimension back into desired dimension
               std::vector<int64_t> collapse_shape_vec;
-              for (int k = 0; k < expand_shape.nbDim; k++) {
+              for (int k = 0; k < repeat_shape.nbDims; k++) {
                 if (k == dim) {
-                  collapse_shape_vec.push_back(expand_shape.d[k] * expand_shape.d[++k]);
+                  collapse_shape_vec.push_back(repeat_shape.d[k] * repeat_shape.d[++k]);
                 } else {
-                  collapse_shape_vec.push_back(expand_shape.d[k]);
+                  collapse_shape_vec.push_back(repeat_shape.d[k]);
                 }
               }
               auto collapse = ctx->net->addShuffle(*slice->getOutput(0));
               TORCHTRT_CHECK(collapse, "Unable to create shuffle layer from node: " << *n);
-              collapse.setReshapeDimensions(util::toDims(collapse_shape_vec));
+              collapse->setReshapeDimensions(util::toDims(collapse_shape_vec));
 
               collapse->setName(util::node_info(n).c_str());
-              auto out_tensor = ctx->AssociateValueAnTensor(n->outputs()[0], collapse->getOutput(0));
+              auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], collapse->getOutput(0));
               LOG_DEBUG("Output tensor shape: " << out_tensor->getDimensions());
 
               return true;
 
-            }
+            }});
 } // namespace impl
 } // namespace impl
 } // namespace converters
