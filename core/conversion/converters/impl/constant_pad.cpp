@@ -108,7 +108,7 @@ auto constant_pad_registrations TORCHTRT_UNUSED = RegisterNodeConversionPatterns
              // fill the right_gather_out with value
              auto fill_layer = ctx->net->addFill(nvinfer1::Dims{1, {1}}, nvinfer1::FillOperation::kLINSPACE);
              auto shape_gather_out = ctx->net->addShape(*right_gather_out)->getOutput(0);
-             fill_layer->setInput(0, *shape_gather_out);          
+             fill_layer->setInput(0, *shape_gather_out);
              fill_layer->setInput(1, *valueTensor);
              at::Tensor delta_tensor = torch::zeros(inRank, util::TRTDataTypeToScalarType(in->getType()));
              auto deltaTensor = tensor_to_const(ctx, delta_tensor);
