@@ -91,7 +91,7 @@ class pyIInt8LegacyCalibrator : public pyCalibratorTrampoline<nvinfer1::IInt8Leg
 
   const void* readHistogramCache(std::size_t& length) noexcept override {
     PYBIND11_OVERLOAD_PURE_NAME(
-        const void*, nvinfer1::IInt8LegacyCalibrator, "read_histogram_cache", readHistogramCache, length);
+        void const*, nvinfer1::IInt8LegacyCalibrator, "read_histogram_cache", readHistogramCache, length);
   }
 
   void writeHistogramCache(const void* ptr, std::size_t length) noexcept override {
