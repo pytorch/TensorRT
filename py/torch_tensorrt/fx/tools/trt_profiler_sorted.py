@@ -37,6 +37,11 @@ def profile_trt_module(
     layer_info = json.loads(trt_mod.get_layer_info())  # pyre-ignore[29]
     shape_map = {}
     for layer in layer_info["Layers"]:
+        # if type is str, it means verbose_profile is off in interpreter.run()
+        # Theorectically, we can print profiling information without shape information
+        # but we choose to not print profiling information so we can use verbose_profile to control it
+        if type(layer) is str:
+            return
         name = layer["Name"]
         input_str = ", ".join(
             [str(x.get("Dimensions", "[]")) for x in layer.get("Inputs", [])]
