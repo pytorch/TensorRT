@@ -178,7 +178,7 @@ void resolveTRTNonTensorInputs(PartitionedGraph& segmented_blocks) {
 
 void registerSegmentsOutputs(PartitionedGraph& segmented_blocks, torch::jit::Block* block) {
   // find the corresponding raw values in original global graph for this segmented block's inputs/outputs
-  auto cmp = [](torch::jit::Value* a, torch::jit::Value* b) { return a->unique() < b->unique();};
+  auto cmp = [](torch::jit::Value* a, torch::jit::Value* b) { return a->unique() < b->unique(); };
   std::set<torch::jit::Value*, decltype(cmp)> input_values(cmp);
   for (auto& seg_block : segmented_blocks) {
     for (auto& input : seg_block.raw_inputs()) {
