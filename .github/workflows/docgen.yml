@@ -26,7 +26,7 @@ jobs:
       - name: Install base deps
         run: |
           apt update
-          apt install -y software-properties-common gcc git curl wget make zlib1g-dev bzip2 libbz2-dev lzma lzma-dev libreadline-dev libsqlite3-dev libssl-dev libffi-dev doxygen pandoc
+          DEBIAN_FRONTEND=noninteractive apt install -y software-properties-common gcc git curl wget make zlib1g-dev bzip2 libbz2-dev lzma lzma-dev libreadline-dev libsqlite3-dev libssl-dev libffi-dev doxygen pandoc
       - name: Install Python
         run: |
           mkdir -p /opt/circleci
