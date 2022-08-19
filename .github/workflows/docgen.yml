@@ -26,7 +26,7 @@ jobs:
       - name: Install base deps
         run: |
           apt update
-          apt install -y gcc git curl wget make zlib1g-dev bzip2 libbz2-dev lzma lzma-dev libreadline-dev libsqlite3-dev libssl-dev libffi-dev doxygen pandoc
+          apt install -y software-properties-common gcc git curl wget make zlib1g-dev bzip2 libbz2-dev lzma lzma-dev libreadline-dev libsqlite3-dev libssl-dev libffi-dev doxygen pandoc
       - name: Install Python
         run: |
           mkdir -p /opt/circleci
@@ -52,6 +52,7 @@ jobs:
           chmod a+x /usr/bin/bazel
       - name: Install cudnn + tensorrt
         run: |
+          apt-get update
           wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin
           mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600
           apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub
