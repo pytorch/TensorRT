@@ -10,8 +10,6 @@ from unittest import TestCase
 
 import torch_tensorrt.fx.diagnostics as diag
 
-_LOGGER: logging.Logger = logging.getLogger(__name__)
-
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
