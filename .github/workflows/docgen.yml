@@ -69,16 +69,25 @@ jobs:
           apt-get install -y libnvinfer8 libnvinfer-plugin8 libnvinfer-dev libnvinfer-plugin-dev
       - name: Install Torch
         run: |
+          export PYENV_ROOT="/opt/circleci/.pyenv"
+          export PATH="$PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH"
+          pyenv global 3.9.4
           python3 -m pip install -r py/requirements.txt
       - name: Build Python Package
         run: |
           cp toolchains/ci_workspaces/WORKSPACE.x86_64 WORKSPACE
           cd py
-          pip install -e .
+          export PYENV_ROOT="/opt/circleci/.pyenv"
+          export PATH="$PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH"
+          pyenv global 3.9.4
+          python3 -m pip install -e .
           cd ..
       - name: Generate New Docs
         run: |
           cd docsrc
+          export PYENV_ROOT="/opt/circleci/.pyenv"
+          export PATH="$PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH"
+          pyenv global 3.9.4
           python3 -m pip install -r requirements.txt
           python3 -c "import torch_tensorrt; print(torch_tensorrt.__version__)"
           make html
