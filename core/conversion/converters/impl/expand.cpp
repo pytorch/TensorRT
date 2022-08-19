@@ -300,9 +300,9 @@ auto repeatinterleave TORCHTRT_UNUSED =
                 dim = 0;
 
                 // Flatten self tensor
-                int size = 0;
+                int size = 1;
                 for (int i = 0; i < input_shape.nbDims; i++) {
-                  size += input_shape.d[i];
+                  size *= input_shape.d[i];
                 }
                 auto flatten = ctx->net->addShuffle(*self);
                 TORCHTRT_CHECK(flatten, "Unable to create shuffle layer from node: " << *n);
