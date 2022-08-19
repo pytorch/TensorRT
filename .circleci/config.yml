@@ -694,8 +694,8 @@ jobs:
           command: pip3 install /tmp/dist/<< parameters.channel >>/*
       - dump-test-env
       - test-ts-core
-      
-  test-l2-x86_64-release:
+
+  test-l2-ptq-x86_64:
     parameters:
       torch-build:
         type: string
@@ -729,30 +729,81 @@ jobs:
           torch-build-index: << parameters.torch-build-index >>
       - attach_workspace:
           at: /tmp/dist
+      - pull-test-models
       - run:
           name: "Install torch-tensorrt and run L2 PTQ tests"
           command: |
             pip3 install /tmp/dist/<< parameters.channel >>/*
-
+            cd ~/project
             pip3 install pytorch-quantization --extra-index-url https://pypi.ngc.nvidia.com
-            
             # Go to examples directory for vgg16
-            pushd examples/int8/training/vgg16 > null
+            pushd ~/project/examples/int8/training/vgg16 > null
             python3 main.py --lr 0.01 --batch-size 128 --drop-ratio 0.15 --ckpt-dir $(pwd)/vgg16_ckpts --epochs 25
             python3 export_ckpt.py vgg16_ckpts/ckpt_epoch25.pth
             popd > null
-
             # Copy the model file to 
-            cp -f examples/int8/training/vgg16/trained_vgg16.jit.pt examples/int8/ptq/
-
-            pushd examples/int8/ptq > null
+            cp -f ~/project/examples/int8/training/vgg16/trained_vgg16.jit.pt ~/project/examples/int8/ptq/
+            pushd ~/project/examples/int8/ptq > null
             apt-get -y update && apt-get install -y wget
-            
             wget https://www.cs.toronto.edu/~kriz/cifar-10-binary.tar.gz
             tar -xvzf cifar-10-binary.tar.gz
             popd > null
+            bazel run //examples/int8/ptq --compilation_mode=opt ~/project/examples/int8/ptq/trained_vgg16.jit.pt ~/project/examples/int8/ptq/cifar-10-batches-bin/
 
-            bazel run //examples/int8/ptq --compilation_mode=opt examples/int8/ptq/trained_vgg16.jit.pt examples/int8/ptq/cifar-10-batches-bin/
+  test-l2-accuracy-x86_64:
+    parameters:
+      torch-build:
+        type: string
+      torch-build-index:
+        type: string
+      trt-version-short:
+        type: string
+      trt-version-long:
+        type: string
+      cudnn-version:
+        type: string
+      channel:
+        type: string
+    machine:
+      image: ubuntu-2004-cuda-11.4:202110-01
+    resource_class: gpu.nvidia.large
+    parallelism: 4
+    steps:
+      - checkout
+      - create-env:
+          os: "ubuntu2004"
+          platform: "x86_64"
+          cudnn-version: << parameters.cudnn-version >>
+          trt-version-short:  << parameters.trt-version-short >>
+          bazel-version: << pipeline.parameters.bazel-version >>
+          bazel-platform: "x86_64"
+      - create-py-env:
+          trt-version-long: << parameters.trt-version-long >>
+      - install-torch-from-index:
+          torch-build:  << parameters.torch-build >>
+          torch-build-index: << parameters.torch-build-index >>
+      - attach_workspace:
+          at: /tmp/dist
+      - pull-test-models
+      - run:
+          name: "Install torch-tensorrt and run L2 PTQ tests"
+          command: |
+            pip3 install /tmp/dist/<< parameters.channel >>/*
+            cd ~/project
+            pip3 install pytorch-quantization --extra-index-url https://pypi.ngc.nvidia.com
+            # Go to examples directory for vgg16
+            pushd ~/project/examples/int8/training/vgg16 > null
+            python3 main.py --lr 0.01 --batch-size 128 --drop-ratio 0.15 --ckpt-dir $(pwd)/vgg16_ckpts --epochs 25
+            python3 export_ckpt.py vgg16_ckpts/ckpt_epoch25.pth
+            popd > null
+            # Copy the model file to 
+            cp -f ~/project/examples/int8/training/vgg16/trained_vgg16.jit.pt ~/project/examples/int8/ptq/
+            pushd ~/project/examples/int8/ptq > null
+            apt-get -y update && apt-get install -y wget
+            wget https://www.cs.toronto.edu/~kriz/cifar-10-binary.tar.gz
+            tar -xvzf cifar-10-binary.tar.gz
+            popd > null
+            bazel run //examples/int8/ptq --compilation_mode=opt ~/project/examples/int8/ptq/trained_vgg16.jit.pt ~/project/examples/int8/ptq/cifar-10-batches-bin/
 
   test-py-ts-x86_64:
     parameters:
@@ -1244,16 +1295,6 @@ workflows:
           requires:
             - build-x86_64-pyt-release
 
-      - test-l2-x86_64:
-          name: test-l2-x86_64-pyt-release
-          channel: "release"
-          torch-build: << pipeline.parameters.torch-release-build >>
-          torch-build-index: << pipeline.parameters.torch-release-build-index >>
-          trt-version-long: << pipeline.parameters.trt-release-version-long >>
-          requires:
-            - test-py-ts-x86_64
-            - test-api-cpp-x86_64
-
       - test-py-fx-x86_64:
           name: test-py-fx-x86_64-pyt-release
           channel: "release"
@@ -1263,6 +1304,15 @@ workflows:
           requires:
             - build-x86_64-pyt-release
 
+      - test-l2-x86_64:
+          name: test-l2-x86_64-pyt-release
+          channel: "release"
+          torch-build: << pipeline.parameters.torch-release-build >>
+          torch-build-index: << pipeline.parameters.torch-release-build-index >>
+          trt-version-long: << pipeline.parameters.trt-release-version-long >>
+          requires:
+            - test-py-ts-x86_64
+            - test-api-cpp-x86_64
 
       - package-x86_64:
           name: package-release-x86_64
