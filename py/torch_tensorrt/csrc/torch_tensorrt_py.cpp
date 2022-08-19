@@ -25,11 +25,9 @@ class pyCalibratorTrampoline : public Derived {
   int getBatchSize() const noexcept override {
     try {
       PYBIND11_OVERLOAD_PURE_NAME(int, Derived, "get_batch_size", getBatchSize);
-    }
-    catch(std::exception const &e) {
+    } catch (std::exception const& e) {
       LOG_ERROR("Exception caught in get_batch_size" + std::string(e.what()));
-    }
-    catch(...) {
+    } catch (...) {
       LOG_ERROR("Exception caught in get_batch_size");
     }
     return -1;
@@ -83,11 +81,9 @@ class pyIInt8Calibrator : public pyCalibratorTrampoline<nvinfer1::IInt8Calibrato
     try {
       PYBIND11_OVERLOAD_PURE_NAME(
           nvinfer1::CalibrationAlgoType, nvinfer1::IInt8Calibrator, "get_algorithm", getAlgorithm);
-    }
-    catch(std::exception const &e) {
+    } catch (std::exception const& e) {
       LOG_ERROR("Exception caught in get_algorithm: " + std::string(e.what()));
-    }
-    catch(...) {
+    } catch (...) {
       LOG_ERROR("Exception caught in get_algorithm");
     }
     return {};
@@ -102,11 +98,9 @@ class pyIInt8LegacyCalibrator : public pyCalibratorTrampoline<nvinfer1::IInt8Leg
   double getQuantile() const noexcept override {
     try {
       PYBIND11_OVERLOAD_PURE_NAME(double, nvinfer1::IInt8LegacyCalibrator, "get_quantile", getQuantile);
-    }
-    catch(std::exception const &e) {
+    } catch (std::exception const& e) {
       LOG_ERROR("Exception caught in get_quantile: " + std::string(e.what()));
-    }
-    catch(...) {
+    } catch (...) {
       LOG_ERROR("Exception caught in get_quantile");
     }
     return -1.0;
@@ -114,12 +108,11 @@ class pyIInt8LegacyCalibrator : public pyCalibratorTrampoline<nvinfer1::IInt8Leg
 
   double getRegressionCutoff() const noexcept override {
     try {
-      PYBIND11_OVERLOAD_PURE_NAME(double, nvinfer1::IInt8LegacyCalibrator, "get_regression_cutoff", getRegressionCutoff);
-    }
-    catch(std::exception const &e) {
+      PYBIND11_OVERLOAD_PURE_NAME(
+          double, nvinfer1::IInt8LegacyCalibrator, "get_regression_cutoff", getRegressionCutoff);
+    } catch (std::exception const& e) {
       LOG_ERROR("Exception caught in get_regression_cutoff: " + std::string(e.what()));
-    }
-    catch(...) {
+    } catch (...) {
       LOG_ERROR("Exception caught in get_regression_cutoff");
     }
     return -1.0;
@@ -129,11 +122,9 @@ class pyIInt8LegacyCalibrator : public pyCalibratorTrampoline<nvinfer1::IInt8Leg
     try {
       PYBIND11_OVERLOAD_PURE_NAME(
           const char*, nvinfer1::IInt8LegacyCalibrator, "read_histogram_cache", readHistogramCache, length);
-    }
-    catch(std::exception const& e) {
+    } catch (std::exception const& e) {
       LOG_ERROR("Exception caught in read_histogram_cache" + std::string(e.what()));
-    }
-    catch(...) {
+    } catch (...) {
       LOG_ERROR("Exception caught in read_histogram_cache");
     }
     return {};
@@ -143,11 +134,9 @@ class pyIInt8LegacyCalibrator : public pyCalibratorTrampoline<nvinfer1::IInt8Leg
     try {
       PYBIND11_OVERLOAD_PURE_NAME(
           void, nvinfer1::IInt8LegacyCalibrator, "write_histogram_cache", writeHistogramCache, ptr, length);
-    }
-    catch(std::exception const& e) {
+    } catch (std::exception const& e) {
       LOG_ERROR("Exception caught in write_histogram_cache" + std::string(e.what()));
-    }
-    catch(...) {
+    } catch (...) {
       LOG_ERROR("Exception caught in write_histogram_cache");
     }
   }
