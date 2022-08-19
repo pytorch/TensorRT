@@ -27,6 +27,7 @@ jobs:
         run: |
           apt update
           DEBIAN_FRONTEND=noninteractive apt install -y software-properties-common gcc git curl wget make zlib1g-dev bzip2 libbz2-dev lzma lzma-dev libreadline-dev libsqlite3-dev libssl-dev libffi-dev doxygen pandoc
+          git config --global --add safe.directory '*'
       - name: Install Python
         run: |
           mkdir -p /opt/circleci
