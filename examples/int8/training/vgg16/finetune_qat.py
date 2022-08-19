@@ -251,7 +251,7 @@ def main():
         state = ckpt["state"]
 
     data = iter(training_dataloader)
-    images, _ = data.next()
+    images, _ = next(data)
 
     writer.add_graph(model, images.cuda())
     writer.close()
