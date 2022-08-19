@@ -12,7 +12,7 @@ jobs:
   build-docs:
     runs-on: ubuntu-20.04
     container:
-      image: nvidia/cuda:11.3.1-devel-ubuntu20.04
+      image: ghcr.io/pytorch/tensorrt/docgen:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
