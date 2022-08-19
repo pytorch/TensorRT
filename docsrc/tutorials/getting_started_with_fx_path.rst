@@ -1,42 +1,29 @@
-.. user_guide:
-Torch-TensorRT (FX Path) User Guide
+.. _getting_started_with_fx:
+
+Torch-TensorRT (FX Frontend) User Guide
 ========================
-Torch-TensorRT (FX Path) is a tool that can convert a PyTorch model through torch.FX to an TensorRT engine optimized targeting running on Nvidia GPUs. TensorRT is the inference engine developed by Nvidia which composed of various kinds of optimization including kernel fusion, graph optimization, low precision, etc..
-This tool is developed in Python environment providing most usability to researchers and engineers. There are a few stages that a user want to use this tool and we will introduce them here.
+Torch-TensorRT (FX Frontend) is a tool that can convert a PyTorch model through ``torch.fx`` to an
+TensorRT engine optimized targeting running on Nvidia GPUs. TensorRT is the inference engine
+developed by NVIDIA which composed of various kinds of optimization including kernel fusion,
+graph optimization, low precision, etc.. This tool is developed in Python environment which allows this
+workflow to be very accessible to researchers and engineers. There are a few stages that a
+user want to use this tool and we will introduce them here.
 
-
-Installation
-------------
-Torch-TensorRT (FX Path) is in ``Beta`` phase and always recommended to work with PyTorch nightly.  
-
-
-* Method 1. Follow the instrucions for Torch-TensorRT
-* Method 2. To install FX path only (Python path) and avoid the C++ build for torchscript path
+> Torch-TensorRT (FX Frontend) is in ``Beta`` and currently it is recommended to work with PyTorch nightly.
 
 .. code-block:: shell
 
-    $ conda create --name python_env python=3.8
-    $ conda activate python_env
-
-    # Recommend to install PyTorch 1.12 and later
-    $ conda install pytorch torchvision torchtext cudatoolkit=11.3 -c pytorch-nightly
-
-    # Install TensorRT python package
-    $ pip3 install nvidia-pyindex
-    $ pip3 install nvidia-tensorrt==8.2.4.2
-    $ git clone https://github.com/pytorch/TensorRT.git
-    $ cd TensorRT/py && python setup.py install --fx-only && cd ..
-
-    $ pyton -c "import torch_tensorrt.fx"
     # Test an example by
     $ python py/torch_tensorrt/fx/example/lower_example.py
 
 
 Converting a PyTorch Model to TensorRT Engine
 ---------------------------------------------
-In general, users are welcome to use the ``compile()`` to finish the conversion from a model to tensorRT engine. It is a wrapper API that consists of the major steps needed to finish this converison. Please refer to ``lower_example.py`` file in ``examples/fx``.
+In general, users are welcome to use the ``compile()`` to finish the conversion from a model to tensorRT engine. It is a
+wrapper API that consists of the major steps needed to finish this converison. Please refer to ``lower_example.py`` file in ``examples/fx``.
 
-In this section, we will go through an example to illustrate the major steps that FX path uses. Users can refer to ``fx2trt_example.py`` file in ``examples/fx``.
+In this section, we will go through an example to illustrate the major steps that fx path uses.
+Users can refer to ``fx2trt_example.py`` file in ``examples/fx``.
 
 * **Step 1: Trace the model with acc_tracer**
 Acc_tracer is a tracer inheritated from FX tracer. It comes with args normalizer to convert all args to kwargs and pass to TRT converters.
@@ -276,7 +263,7 @@ In the custom mapper function, we construct an acc op node and return it. The no
 
 The last step would be *adding unit test* for the new acc op or mapper function we added. The place to add the unit test is here `test_acc_tracer.py <https://github.com/pytorch/TensorRT/blob/master/py/torch_tensorrt/fx/test/tracer/test_acc_tracer.py>`_.
 
-* **Step 2. Add a new fx2trt converter**
+* **Step 2. Add a new converter**
 
 All the developed converters for acc ops are all in `acc_op_converter.py <https://github.com/pytorch/TensorRT/blob/master/py/torch_tensorrt/fx/converters/acc_ops_converters.py>`_. It could give you a good example of how the converter is added.
 
