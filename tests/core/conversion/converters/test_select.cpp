@@ -865,7 +865,7 @@ TEST(Converters, ScatterValueConvertsCorrectly) {
           %5 : NoneType = prim::Constant()
           %6 : bool = prim::Constant[value=0]()
           %7 : int = prim::Constant[value=4]()
-          %index : Tensor = aten::to(%index.1, %7, %6, %6, %5) 
+          %index : Tensor = aten::to(%index.1, %7, %6, %6, %5)
           %10 : Tensor = aten::scatter(%data, %dim, %index, %value)
           return (%10))IR";
 
@@ -900,7 +900,7 @@ TEST(Converters, ScatterSrcConvertsCorrectly) {
           %5 : NoneType = prim::Constant()
           %6 : bool = prim::Constant[value=0]()
           %7 : int = prim::Constant[value=4]()
-          %index : Tensor = aten::to(%index.1, %7, %6, %6, %5) 
+          %index : Tensor = aten::to(%index.1, %7, %6, %6, %5)
           %10 : Tensor = aten::scatter(%data, %dim, %index, %src)
           return (%10))IR";
 
