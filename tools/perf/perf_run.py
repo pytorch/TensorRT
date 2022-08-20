@@ -15,7 +15,7 @@ import pandas as pd
 # Importing supported Backends
 import torch
 import torch_tensorrt as torchtrt
-from torch_tensorrt.fx.lower import lower_to_trt
+from torch_tensorrt.fx.lower import compile
 from torch_tensorrt.fx.utils import LowerPrecision
 
 import tensorrt as trt
@@ -89,7 +89,7 @@ def run_torch_tensorrt(model, input_tensors, params, precision, truncate_long_an
     if precision == "int8":
         compile_settings.update({"calib": params.get("calibration_cache")})
 
-    with torchtrt.logging.errors():
+    with torchtrt.logging.debug():
         model = torchtrt.compile(model, **compile_settings)
 
     iters = params.get("iterations", 20)
@@ -123,7 +123,7 @@ def run_fx2trt(model, input_tensors, params, precision, batch_size):
         model.half()
         input_tensors = [tensor.half() for tensor in input_tensors]
     # Run lowering eager mode benchmark
-    model = lower_to_trt(
+    model = compile(
         model,
         input_tensors,
         max_batch_size=batch_size,
@@ -430,7 +430,8 @@ if __name__ == "__main__":
     print("Model Summary: ", model_name)
     summary = pd.DataFrame(results)
     print(summary)
-    with open(args.report, "w") as file:
-        file.write("Model Summary: " + model_name + "\n")
-        file.write(summary.to_string())
-    file.close()
+    if args.report:
+        with open(args.report, "w") as file:
+            file.write("Model Summary: " + model_name + "\n")
+            file.write(summary.to_string())
+        file.close()
