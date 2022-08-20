@@ -11,6 +11,7 @@
 
 #include "torch/csrc/jit/frontend/function_schema_parser.h"
 #include "torch/csrc/jit/ir/ir.h"
+#include "torch/csrc/jit/ir/constants.h"
 #include "torch/csrc/jit/ir/ir_views.h"
 #include "torch/csrc/jit/passes/graph_fuser.h"
 #include "torch/csrc/jit/passes/loop_unrolling.h"
@@ -27,6 +28,22 @@
 
 namespace torch_tensorrt {
 namespace core {
+
+void RewriteInputsWithParams(std::shared_ptr<torch::jit::Graph> g, std::vector<torch::jit::IValue> params) {
+  auto input_size = g->inputs().size();
+  auto param_it = params.rbegin();
+  for (int i = input_size - 1; i >= 0; --i) {
+    if (g->inputs()[i]->type() != c10::TensorType::get() && g->inputs()[i]->type()->kind() != torch::jit::TypeKind::TupleType &&
+        g->inputs()[i]->type()->kind() != torch::jit::TypeKind::ListType && param_it != params.rend()) {
+      auto new_constant = torch::jit::tryInsertConstant(*g, *param_it);
+      ++param_it;
+      if (new_constant) {
+        g->inputs()[i]->replaceAllUsesWith(*new_constant);
+        g->eraseInput(i);
+      }
+    }
+  }
+}
 
 void AddEngineToGraph(
     torch::jit::script::Module mod,
@@ -434,6 +451,9 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
           (!(cfg.lower_info.forced_fallback_modules.size() == 0 &&
              cfg.partition_info.forced_fallback_operators.size() == 0 && isBlockConvertible) ||
            outputIsCollection)) {
+        if (!static_params.empty()) {
+          RewriteInputsWithParams(g, params);
+        }
         std::unordered_map<torch::jit::Node*, int> fallback_nodes;
         auto collection_input_ivalues_map =
             partitioning::generateRandomInputs(cfg.convert_info.collection_input_spec_map, first_use_types);
