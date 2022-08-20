@@ -105,7 +105,9 @@ class TestGetitemConverter(AccTestCase):
                 shape_ranges=[((1, 256, 256), (3, 256, 256), (5, 256, 256))],
             ),
         ]
-        self.run_test_with_dynamic_shape(Getitem(idx), input_specs, expected_ops={acc_ops.getitem})
+        self.run_test_with_dynamic_shape(
+            Getitem(idx), input_specs, expected_ops={acc_ops.getitem}
+        )
 
     @parameterized.expand(
         [
@@ -142,7 +144,9 @@ class TestGetitemConverter(AccTestCase):
                 shape_ranges=[((1, 128, 256), (3, 192, 256), (5, 256, 256))],
             ),
         ]
-        self.run_test_with_dynamic_shape(Getitem(idx), input_specs, expected_ops={acc_ops.getitem})
+        self.run_test_with_dynamic_shape(
+            Getitem(idx), input_specs, expected_ops={acc_ops.getitem}
+        )
 
     # Testing with following parameters results into Error:
     # AssertionError: We don't support slicing tensor on dynamic shape.
@@ -185,7 +189,9 @@ class TestGetitemConverter(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(Getitem(idx), input_specs, expected_ops={acc_ops.getitem})
+        self.run_test_with_dynamic_shape(
+            Getitem(idx), input_specs, expected_ops={acc_ops.getitem}
+        )
 
 
 if __name__ == "__main__":

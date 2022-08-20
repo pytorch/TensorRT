@@ -141,4 +141,6 @@ reload_model_output = reload_trt_mod(*inputs)
 
 # Make sure the results match
 regular_model_output = model(*inputs)
-torch.testing.assert_close(reload_model_output, regular_model_output, atol=3e-3, rtol=1e-2)
+torch.testing.assert_close(
+    reload_model_output, regular_model_output, atol=3e-3, rtol=1e-2
+)

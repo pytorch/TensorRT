@@ -26,7 +26,9 @@ class TestReLUConverter(AccTestCase):
                 shape_ranges=[((1, 1, 1), (1, 2, 3), (3, 3, 3))],
             ),
         ]
-        self.run_test_with_dynamic_shape(TestModule(), input_specs, expected_ops={acc_ops.relu})
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.relu}
+        )
 
     def test_relu_with_dynamic_shape_four_dimensions(self):
         class TestModule(nn.Module):
@@ -41,7 +43,9 @@ class TestReLUConverter(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(TestModule(), input_specs, expected_ops={acc_ops.relu})
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.relu}
+        )
 
 
 if __name__ == "__main__":

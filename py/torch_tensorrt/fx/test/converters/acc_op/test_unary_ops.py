@@ -64,7 +64,9 @@ class TestUnaryOpConvertersWithDynamicShapeFourDimensions(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(TestModule(orig_op), input_specs, expected_ops={expected_op})
+        self.run_test_with_dynamic_shape(
+            TestModule(orig_op), input_specs, expected_ops={expected_op}
+        )
 
 
 class TestUnaryOpNotConverters(AccTestCase):
@@ -87,7 +89,9 @@ class TestUnaryOpNotConverters(AccTestCase):
 
         m = TestModule(orig_op)
         inputs = [torch.randn(2, 2, 3).to(input_dtype)]
-        self.run_test(m, inputs, expected_ops={expected_op}, test_implicit_batch_dim=False)
+        self.run_test(
+            m, inputs, expected_ops={expected_op}, test_implicit_batch_dim=False
+        )
 
 
 class TestUnaryOpNotConvertersWithDynamicShapeFourDimensions(AccTestCase):
@@ -116,7 +120,9 @@ class TestUnaryOpNotConvertersWithDynamicShapeFourDimensions(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(TestModule(orig_op), input_specs, expected_ops={expected_op})
+        self.run_test_with_dynamic_shape(
+            TestModule(orig_op), input_specs, expected_ops={expected_op}
+        )
 
 
 class TestUnaryRSQRTConverters(AccTestCase):
@@ -144,7 +150,9 @@ class TestUnaryRSQRTConvertersWithDynamicShapeFourDimensions(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(TestModule(), input_specs, expected_ops={acc_ops.sqrt, acc_ops.reciprocal})
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.sqrt, acc_ops.reciprocal}
+        )
 
 
 if __name__ == "__main__":

@@ -23,7 +23,9 @@ class TestFusePermuteMatmul(AccTestCase):
     @parameterized.expand(
         [
             ("transpose_lhs_bmm", (3, 3, 2), (3, 3, 4), tranpose_last_two_dims),
-            param("transpose_rhs_bmm", (3, 2, 3), (3, 4, 3), rhs_op=tranpose_last_two_dims),
+            param(
+                "transpose_rhs_bmm", (3, 2, 3), (3, 4, 3), rhs_op=tranpose_last_two_dims
+            ),
             ("permute_lhs_bmm", (3, 3, 2), (3, 3, 4), permute021),
             param("permute_rhs_bmm", (3, 2, 3), (3, 4, 3), rhs_op=permute021),
             ("permute_both_bmm", (3, 3, 2), (3, 4, 3), permute021, permute021),

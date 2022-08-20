@@ -81,7 +81,9 @@ class DataLoaderCalibrator(object):
         if not isinstance(dataloader, torch.utils.data.DataLoader):
             log(
                 Level.Error,
-                "Dataloader : {} is not a valid instance of torch.utils.data.DataLoader".format(dataloader),
+                "Dataloader : {} is not a valid instance of torch.utils.data.DataLoader".format(
+                    dataloader
+                ),
             )
 
         if not cache_file:
@@ -116,13 +118,21 @@ class DataLoaderCalibrator(object):
 
         # Using type metaclass to construct calibrator class based on algorithm type
         if algo_type == CalibrationAlgo.ENTROPY_CALIBRATION:
-            return type("DataLoaderCalibrator", (_C.IInt8EntropyCalibrator,), attribute_mapping)()
+            return type(
+                "DataLoaderCalibrator", (_C.IInt8EntropyCalibrator,), attribute_mapping
+            )()
         elif algo_type == CalibrationAlgo.ENTROPY_CALIBRATION_2:
-            return type("DataLoaderCalibrator", (_C.IInt8MinMaxCalibrator,), attribute_mapping)()
+            return type(
+                "DataLoaderCalibrator", (_C.IInt8MinMaxCalibrator,), attribute_mapping
+            )()
         elif algo_type == CalibrationAlgo.LEGACY_CALIBRATION:
-            return type("DataLoaderCalibrator", (_C.IInt8LegacyCalibrator,), attribute_mapping)()
+            return type(
+                "DataLoaderCalibrator", (_C.IInt8LegacyCalibrator,), attribute_mapping
+            )()
         elif algo_type == CalibrationAlgo.MINMAX_CALIBRATION:
-            return type("DataLoaderCalibrator", (_C.IInt8MinMaxCalibrator,), attribute_mapping)()
+            return type(
+                "DataLoaderCalibrator", (_C.IInt8MinMaxCalibrator,), attribute_mapping
+            )()
         else:
             log(
                 Level.Error,
@@ -164,13 +174,21 @@ class CacheCalibrator(object):
         }
         # Using type metaclass to construct calibrator class based on algorithm type
         if algo_type == CalibrationAlgo.ENTROPY_CALIBRATION:
-            return type("DataLoaderCalibrator", (_C.IInt8EntropyCalibrator,), attribute_mapping)()
+            return type(
+                "DataLoaderCalibrator", (_C.IInt8EntropyCalibrator,), attribute_mapping
+            )()
         elif algo_type == CalibrationAlgo.ENTROPY_CALIBRATION_2:
-            return type("DataLoaderCalibrator", (_C.IInt8MinMaxCalibrator,), attribute_mapping)()
+            return type(
+                "DataLoaderCalibrator", (_C.IInt8MinMaxCalibrator,), attribute_mapping
+            )()
         elif algo_type == CalibrationAlgo.LEGACY_CALIBRATION:
-            return type("DataLoaderCalibrator", (_C.IInt8LegacyCalibrator,), attribute_mapping)()
+            return type(
+                "DataLoaderCalibrator", (_C.IInt8LegacyCalibrator,), attribute_mapping
+            )()
         elif algo_type == CalibrationAlgo.MINMAX_CALIBRATION:
-            return type("DataLoaderCalibrator", (_C.IInt8MinMaxCalibrator,), attribute_mapping)()
+            return type(
+                "DataLoaderCalibrator", (_C.IInt8MinMaxCalibrator,), attribute_mapping
+            )()
         else:
             log(
                 Level.Error,

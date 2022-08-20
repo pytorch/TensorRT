@@ -38,7 +38,9 @@ class TestLtConverter(AccTestCase):
             input,
             other,
         ]
-        self.run_test(Lt(), inputs, expected_ops={acc_ops.lt}, test_implicit_batch_dim=False)
+        self.run_test(
+            Lt(), inputs, expected_ops={acc_ops.lt}, test_implicit_batch_dim=False
+        )
 
 
 class TestLtMethodConverter(AccTestCase):
@@ -74,7 +76,9 @@ class TestLtMethodConverter(AccTestCase):
             input,
             other,
         ]
-        self.run_test(Lt(), inputs, expected_ops={acc_ops.lt}, test_implicit_batch_dim=False)
+        self.run_test(
+            Lt(), inputs, expected_ops={acc_ops.lt}, test_implicit_batch_dim=False
+        )
 
 
 class TestLtOperatorConverter(AccTestCase):
@@ -110,7 +114,9 @@ class TestLtOperatorConverter(AccTestCase):
             input,
             other,
         ]
-        self.run_test(Lt(), inputs, expected_ops={acc_ops.lt}, test_implicit_batch_dim=False)
+        self.run_test(
+            Lt(), inputs, expected_ops={acc_ops.lt}, test_implicit_batch_dim=False
+        )
 
 
 class TestEqOperatorSimpleConverter(AccTestCase):
@@ -158,7 +164,9 @@ class TestEqOperatorSimpleConverter(AccTestCase):
             input,
             other,
         ]
-        self.run_test(Eq(), inputs, expected_ops={acc_ops.lt}, test_implicit_batch_dim=False)
+        self.run_test(
+            Eq(), inputs, expected_ops={acc_ops.lt}, test_implicit_batch_dim=False
+        )
 
 
 class TestEqOperatorSimpleConverterWithDynamicShape(AccTestCase):
@@ -219,7 +227,9 @@ class TestEqOperatorConstantConverter(AccTestCase):
         inputs = [
             input,
         ]
-        self.run_test(Eq(), inputs, expected_ops={acc_ops.lt}, test_implicit_batch_dim=False)
+        self.run_test(
+            Eq(), inputs, expected_ops={acc_ops.lt}, test_implicit_batch_dim=False
+        )
 
 
 class TestConstInputConverter(AccTestCase):
@@ -235,7 +245,9 @@ class TestConstInputConverter(AccTestCase):
         inputs = [
             input,
         ]
-        self.run_test(Lt(), inputs, expected_ops={acc_ops.lt}, test_implicit_batch_dim=False)
+        self.run_test(
+            Lt(), inputs, expected_ops={acc_ops.lt}, test_implicit_batch_dim=False
+        )
 
 
 class TestConstInputConverterWithDynamicShape(AccTestCase):

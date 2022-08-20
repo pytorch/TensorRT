@@ -31,7 +31,9 @@ def fetch_attr(mod, target):
     attr_itr = mod
     for i, atom in enumerate(target_atoms):
         if not hasattr(attr_itr, atom):
-            raise RuntimeError(f"Node referenced nonexistent target {'.'.join(target_atoms[:i])}")
+            raise RuntimeError(
+                f"Node referenced nonexistent target {'.'.join(target_atoms[:i])}"
+            )
         attr_itr = getattr(attr_itr, atom)
     return attr_itr
 
@@ -82,7 +84,9 @@ class TRTTestCase(TestCase):
             outputs = trt_mod(*cuda_inputs)
             end_event.record()
             torch.cuda.synchronize()
-            _LOGGER.info(f"TRT run time(s)= {(start_event.elapsed_time(end_event) * 1.0e-3)}")
+            _LOGGER.info(
+                f"TRT run time(s)= {(start_event.elapsed_time(end_event) * 1.0e-3)}"
+            )
 
             if isinstance(outputs, torch.Tensor):
                 ref_outputs = [ref_outputs]
@@ -124,7 +128,9 @@ class TRTTestCase(TestCase):
                 self.assert_has_op(mod, expected_ops)
 
             interpreter_result = interpreter.run(
-                lower_precision=LowerPrecision.FP16 if fp16_mode else LowerPrecision.FP32
+                lower_precision=LowerPrecision.FP16
+                if fp16_mode
+                else LowerPrecision.FP32
             )
             trt_mod = TRTModule(
                 interpreter_result.engine,
@@ -135,7 +141,9 @@ class TRTTestCase(TestCase):
             res_cpu = mod(*inputs)
             assert len(res_trt) == len(res_cpu)
             assert len(res_cpu) == len(comparators)
-            for output_trt, output_cpu, comparator in zip(res_trt, res_cpu, comparators):
+            for output_trt, output_cpu, comparator in zip(
+                res_trt, res_cpu, comparators
+            ):
                 comp_func = comparator[0]
                 args = comparator[1]
                 self.assertTrue(comp_func(output_trt, output_cpu, *args))
@@ -159,7 +167,9 @@ class TRTTestCase(TestCase):
             elif node.op in {"call_function", "call_method"}:
                 ops_in_mod.add(node.target)
 
-        self.assertTrue(ops_in_mod >= ops, f"expected ops {ops}, actuall ops {ops_in_mod}")
+        self.assertTrue(
+            ops_in_mod >= ops, f"expected ops {ops}, actuall ops {ops_in_mod}"
+        )
 
     def assert_unexpected_op(self, mod, ops):
         for node in mod.graph.nodes:
@@ -196,7 +206,9 @@ class VanillaTestCase(TRTTestCase):
         shape_prop.ShapeProp(mod).propagate(*inputs)
         mod = NormalizeArgs(mod).transform()
         interp = TRTInterpreter(mod, InputTensorSpec.from_tensors(inputs))
-        super().run_test_custom_compare_results(mod, inputs, expected_ops, interp, comparators, fp16_mode=fp16_mode)
+        super().run_test_custom_compare_results(
+            mod, inputs, expected_ops, interp, comparators, fp16_mode=fp16_mode
+        )
 
 
 class AccTestCase(TRTTestCase):
@@ -223,11 +235,17 @@ class AccTestCase(TRTTestCase):
 
         if test_implicit_batch_dim:
             interp = TRTInterpreter(mod, InputTensorSpec.from_tensors(inputs))
-            super().run_test(mod, inputs, expected_ops, unexpected_ops, interp, rtol, atol, precision)
+            super().run_test(
+                mod, inputs, expected_ops, unexpected_ops, interp, rtol, atol, precision
+            )
 
         if test_explicit_batch_dim:
-            interp = TRTInterpreter(mod, InputTensorSpec.from_tensors(inputs), explicit_batch_dimension=True)
-            super().run_test(mod, inputs, expected_ops, unexpected_ops, interp, rtol, atol, precision)
+            interp = TRTInterpreter(
+                mod, InputTensorSpec.from_tensors(inputs), explicit_batch_dimension=True
+            )
+            super().run_test(
+                mod, inputs, expected_ops, unexpected_ops, interp, rtol, atol, precision
+            )
 
         if test_explicit_precision:
             interp = TRTInterpreter(
@@ -235,7 +253,9 @@ class AccTestCase(TRTTestCase):
                 InputTensorSpec.from_tensors(inputs),
                 explicit_precision=test_explicit_precision,
             )
-            super().run_test(mod, inputs, expected_ops, unexpected_ops, interp, rtol, atol)
+            super().run_test(
+                mod, inputs, expected_ops, unexpected_ops, interp, rtol, atol
+            )
 
             interp = TRTInterpreter(
                 mod,
@@ -243,7 +263,9 @@ class AccTestCase(TRTTestCase):
                 explicit_batch_dimension=True,
                 explicit_precision=test_explicit_precision,
             )
-            super().run_test(mod, inputs, expected_ops, unexpected_ops, interp, rtol, atol, precision)
+            super().run_test(
+                mod, inputs, expected_ops, unexpected_ops, interp, rtol, atol, precision
+            )
 
     def run_test_with_assert_error(
         self,
@@ -261,7 +283,9 @@ class AccTestCase(TRTTestCase):
             super().run_test_with_error(mod, inputs, interp, expect_error)
 
         if test_explicit_batch_dim:
-            interp = TRTInterpreter(mod, InputTensorSpec.from_tensors(inputs), explicit_batch_dimension=True)
+            interp = TRTInterpreter(
+                mod, InputTensorSpec.from_tensors(inputs), explicit_batch_dimension=True
+            )
             super().run_test_with_error(mod, inputs, interp, expect_error)
 
     def run_test_with_dynamic_shape(

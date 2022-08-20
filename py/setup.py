@@ -35,7 +35,11 @@ __tensorrt_version__ = "8.4"
 
 
 def get_git_revision_short_hash() -> str:
-    return subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).decode("ascii").strip()
+    return (
+        subprocess.check_output(["git", "rev-parse", "--short", "HEAD"])
+        .decode("ascii")
+        .strip()
+    )
 
 
 if "--fx-only" in sys.argv:
@@ -68,10 +72,18 @@ if platform.uname().processor == "aarch64":
         elif version == "4.6":
             JETPACK_VERSION = "4.6"
         elif version == "5.0":
-            JETPACK_VERSION = "4.6"
+            JETPACK_VERSION = "5.0"
+
     if not JETPACK_VERSION:
-        warnings.warn("Assuming jetpack version to be 4.6 or greater, if not use the --jetpack-version option")
-        JETPACK_VERSION = "4.6"
+        warnings.warn(
+            "Assuming jetpack version to be 5.0, if not use the --jetpack-version option"
+        )
+        JETPACK_VERSION = "5.0"
+
+    if not CXX11_ABI:
+        warnings.warn(
+            "Jetson platform detected but did not see --use-cxx11-abi option, if using a pytorch distribution provided by NVIDIA include this flag"
+        )
 
 
 def which(program):
@@ -122,7 +134,10 @@ def build_libtorchtrt_pre_cxx11_abi(develop=True, use_dist_dir=True, cxx11_abi=F
         print("Jetpack version: 4.5")
     elif JETPACK_VERSION == "4.6":
         cmd.append("--platforms=//toolchains:jetpack_4.6")
-        print("Jetpack version: >=4.6")
+        print("Jetpack version: 4.6")
+    elif JETPACK_VERSION == "5.0":
+        cmd.append("--platforms=//toolchains:jetpack_5.0")
+        print("Jetpack version: 5.0")
 
     if CI_RELEASE:
         cmd.append("--platforms=//toolchains:ci_rhel_x86_64_linux")
@@ -158,7 +173,11 @@ def copy_libtorchtrt(multilinux=False):
             dir_path + "/trtorch/lib/libtrtorch.so",
         )
     else:
-        os.system("tar -xzf ../bazel-bin/libtorchtrt.tar.gz --strip-components=2 -C " + dir_path + "/torch_tensorrt")
+        os.system(
+            "tar -xzf ../bazel-bin/libtorchtrt.tar.gz --strip-components=2 -C "
+            + dir_path
+            + "/torch_tensorrt"
+        )
 
 
 class DevelopCommand(develop):
@@ -299,7 +318,11 @@ ext_modules = [
             "-Wno-deprecated",
             "-Wno-deprecated-declarations",
         ]
-        + (["-D_GLIBCXX_USE_CXX11_ABI=1"] if CXX11_ABI else ["-D_GLIBCXX_USE_CXX11_ABI=0"]),
+        + (
+            ["-D_GLIBCXX_USE_CXX11_ABI=1"]
+            if CXX11_ABI
+            else ["-D_GLIBCXX_USE_CXX11_ABI=0"]
+        ),
         extra_link_args=[
             "-Wno-deprecated",
             "-Wno-deprecated-declarations",
@@ -314,7 +337,11 @@ ext_modules = [
             "-Xlinker",
             "-export-dynamic",
         ]
-        + (["-D_GLIBCXX_USE_CXX11_ABI=1"] if CXX11_ABI else ["-D_GLIBCXX_USE_CXX11_ABI=0"]),
+        + (
+            ["-D_GLIBCXX_USE_CXX11_ABI=1"]
+            if CXX11_ABI
+            else ["-D_GLIBCXX_USE_CXX11_ABI=0"]
+        ),
         undef_macros=["NDEBUG"],
     )
 ]

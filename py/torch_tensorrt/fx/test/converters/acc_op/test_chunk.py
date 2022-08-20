@@ -45,7 +45,9 @@ class TestChunkConverter(AccTestCase):
                 shape_ranges=[((1, 10, 20), (5, 10, 20), (10, 10, 20))],
             ),
         ]
-        self.run_test_with_dynamic_shape(Chunk(), input_specs, expected_ops={acc_ops.chunk})
+        self.run_test_with_dynamic_shape(
+            Chunk(), input_specs, expected_ops={acc_ops.chunk}
+        )
 
     # Testing with (-1, -1, -1, -1) results in Error: AssertionError: Can't chunk on dynamic shape dimension!
     @parameterized.expand(
@@ -68,7 +70,9 @@ class TestChunkConverter(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(Chunk(), input_specs, expected_ops={acc_ops.chunk})
+        self.run_test_with_dynamic_shape(
+            Chunk(), input_specs, expected_ops={acc_ops.chunk}
+        )
 
 
 if __name__ == "__main__":

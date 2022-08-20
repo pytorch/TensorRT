@@ -18,20 +18,12 @@ We use the PyTorch Slack for communication about core development, integration w
 
 - We generally follow the coding guidelines used in PyTorch
 
-    - Use the built in linting tools to ensure that your code matches the style guidelines
-      ```sh
-      # C++ Linting (After installing clang-format [Version 9.0.0])
-      # Print non-conforming sections of code
-      bazel run //tools/linter:cpplint_diff -- //...
-      # Modify code to conform with style guidelines
-      bazel run //tools/linter:cpplint -- //...
+    - Linting your code is essential to ensure code matches the style guidelines.
+      To begin with, please install the following dependencies
+      * `pip install -r requirements-dev.txt`
+      * Install Bazel buildifier https://github.com/bazelbuild/buildtools/blob/master/buildifier/README.md#setup
 
-      # Python Linting
-      # Print non-conforming sections of code
-      bazel run //tools/linter:pylint_diff -- //...
-      # Modify code to conform with style guidelines
-      bazel run //tools/linter:pylint -- //...
-      ```
+      Once the above dependencies are installed, `git commit` command will perform linting before committing your code.
 
 - Avoid introducing unnecessary complexity into existing code so that maintainability and readability are preserved
 

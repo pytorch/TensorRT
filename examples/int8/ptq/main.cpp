@@ -50,6 +50,7 @@ torch::jit::Module compile_int8_model(const std::string& data_dir, torch::jit::M
   compile_spec.enabled_precisions.insert(torch::kI8);
   /// Use the TensorRT Entropy Calibrator
   compile_spec.ptq_calibrator = calibrator;
+  compile_spec.truncate_long_and_double = true;
 
 #ifdef SAVE_ENGINE
   std::cout << "Compiling graph to save as TRT engine (/tmp/engine_converted_from_jit.trt)" << std::endl;

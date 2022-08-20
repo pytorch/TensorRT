@@ -103,7 +103,9 @@ class TestMinConverterWithDynamicShape(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(MinDimReduce(), input_specs, expected_ops={acc_ops.min_dim_reduce})
+        self.run_test_with_dynamic_shape(
+            MinDimReduce(), input_specs, expected_ops={acc_ops.min_dim_reduce}
+        )
 
     def test_min_full_reduce(
         self,
@@ -123,7 +125,9 @@ class TestMinConverterWithDynamicShape(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(MinFullReduce(), input_specs, expected_ops={acc_ops.min_full_reduce})
+        self.run_test_with_dynamic_shape(
+            MinFullReduce(), input_specs, expected_ops={acc_ops.min_full_reduce}
+        )
 
     def test_min_method(self):
         class MinMethod(torch.nn.Module):
@@ -146,7 +150,9 @@ class TestMinConverterWithDynamicShape(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(MinMethod(), input_specs, expected_ops={acc_ops.minimum})
+        self.run_test_with_dynamic_shape(
+            MinMethod(), input_specs, expected_ops={acc_ops.minimum}
+        )
 
 
 if __name__ == "__main__":

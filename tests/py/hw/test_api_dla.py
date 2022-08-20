@@ -61,7 +61,9 @@ class TestCompile(ModelTestCaseOnDLA):
 
 def test_suite():
     suite = unittest.TestSuite()
-    suite.addTest(TestCompile.parametrize(TestCompile, model=models.resnet18(pretrained=True)))
+    suite.addTest(
+        TestCompile.parametrize(TestCompile, model=models.resnet18(pretrained=True))
+    )
 
     return suite
 

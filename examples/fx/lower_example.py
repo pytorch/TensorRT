@@ -4,7 +4,7 @@ from dataclasses import dataclass, field, replace
 
 import torch
 import torchvision
-from torch_tensorrt.fx.lower import lower_to_trt
+from torch_tensorrt.fx.lower import compile
 from torch_tensorrt.fx.utils import LowerPrecision
 
 
@@ -125,7 +125,10 @@ def benchmark(
         ),
     ]
 
-    results = [run_configuration_benchmark(deepcopy(model), inputs, conf_) for conf_ in configurations]
+    results = [
+        run_configuration_benchmark(deepcopy(model), inputs, conf_)
+        for conf_ in configurations
+    ]
 
     for res in results:
         print(res.format())
@@ -180,7 +183,7 @@ def run_configuration_benchmark(
         time = benchmark_torch_function(conf.batch_iter, lambda: module(*input))
     elif not conf.jit:
         # Run lowering eager mode benchmark
-        lowered_module = lower_to_trt(
+        lowered_module = compile(
             module,
             input,
             max_batch_size=conf.batch_size,

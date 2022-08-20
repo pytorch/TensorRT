@@ -8,7 +8,10 @@ from .utils import get_dynamic_dims
 
 def generate_input_specs(inputs, lower_setting, additional_inputs=None):
     # dynamic_batch is TRT only flag.
-    if not lower_setting.explicit_batch_dimension or lower_setting.dynamic_batch is False:
+    if (
+        not lower_setting.explicit_batch_dimension
+        or lower_setting.dynamic_batch is False
+    ):
         return InputTensorSpec.from_tensors(inputs)
 
     # If we don't have additional inputs, we assume the first dimension
@@ -32,12 +35,16 @@ def generate_input_specs(inputs, lower_setting, additional_inputs=None):
 
             for idx, values in enumerate(zip(i.shape, j.shape)):
                 if values[0] != values[1]:
-                    assert found_batch_dim is False, f"We've already found a batch dim, {i.shape}, {j.shape}."
+                    assert (
+                        found_batch_dim is False
+                    ), f"We've already found a batch dim, {i.shape}, {j.shape}."
                     batch_dims.append(idx)
                     found_batch_dim = True
 
             if not found_batch_dim:
-                raise RuntimeError(f"Failed to find batch dimension because shapes are the same, {i.shape}")
+                raise RuntimeError(
+                    f"Failed to find batch dimension because shapes are the same, {i.shape}"
+                )
 
         return InputTensorSpec.from_tensors_with_dynamic_batch_size(
             inputs,
@@ -152,10 +159,10 @@ class InputTensorSpec(NamedTuple):
             ), f"The {i}th tensor (shape: {tensor.shape}) doesn't have the correct batch size: {batch_size}."
             shape = list(tensor.shape)
             shape[batch_dim] = -1
-            shape_ranges: List[ShapeRange] = [
-                tuple(tuple(shape[0:batch_dim] + [bs] + shape[batch_dim + 1 :]) for bs in batch_size_range)
-            ] * opt_profile_replica  # type: ignore[list-item]
-            input_specs.append(cls(tuple(shape), tensor.dtype, tensor.device, shape_ranges))
+            shape_ranges: List[ShapeRange] = [tuple(tuple(shape[0:batch_dim] + [bs] + shape[batch_dim + 1 :]) for bs in batch_size_range)] * opt_profile_replica  # type: ignore[list-item]
+            input_specs.append(
+                cls(tuple(shape), tensor.dtype, tensor.device, shape_ranges)
+            )
 
         return input_specs
 

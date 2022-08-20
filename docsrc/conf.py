@@ -99,7 +99,9 @@ exhale_args = {
 }
 
 html_show_sourcelink = True
-html_sidebars = {"**": ["logo-text.html", "globaltoc.html", "localtoc.html", "searchbox.html"]}
+html_sidebars = {
+    "**": ["logo-text.html", "globaltoc.html", "localtoc.html", "searchbox.html"]
+}
 
 # extensions.append("sphinx_material")
 html_theme_path = [pytorch_sphinx_theme.get_html_theme_path()]
@@ -183,7 +185,15 @@ def patched_make_field(self, types, domain, items, **kw):
                 typename = typename.replace("long", "python:long")
                 typename = typename.replace("float", "python:float")
                 typename = typename.replace("type", "python:type")
-                par.extend(self.make_xrefs(self.typerolename, domain, typename, addnodes.literal_emphasis, **kw))
+                par.extend(
+                    self.make_xrefs(
+                        self.typerolename,
+                        domain,
+                        typename,
+                        addnodes.literal_emphasis,
+                        **kw
+                    )
+                )
             else:
                 par += fieldtype
             par += nodes.Text(")")

@@ -25,27 +25,6 @@ nvinfer1::ITensor* clamp_util(
   return clamp_layer_out;
 }
 
-nvinfer1::ITensor* scalar_to_tensor(ConversionCtx* ctx, at::Scalar s) {
-  nvinfer1::ITensor* out;
-  if (s.isIntegral(false)) {
-    auto s_int = s.to<int64_t>();
-    auto s_t = torch::tensor({s_int}).to(at::kInt);
-    out = tensor_to_const(ctx, s_t);
-  } else if (s.isBoolean()) {
-    auto s_bool = s.to<bool>();
-    auto s_t = torch::tensor({s_bool}).to(at::kBool);
-    out = tensor_to_const(ctx, s_t);
-  } else if (s.isFloatingPoint()) {
-    auto other_float = s.to<float>();
-    auto s_t = torch::tensor({other_float});
-    out = tensor_to_const(ctx, s_t);
-  } else {
-    out = nullptr;
-    TORCHTRT_THROW_ERROR("Unsupported data type for scalar. Found: (" << s.type() << ")");
-  }
-  return out;
-}
-
 auto element_wise_registrations TORCHTRT_UNUSED =
     RegisterNodeConversionPatterns()
         .pattern(
@@ -408,6 +387,18 @@ auto element_wise_registrations TORCHTRT_UNUSED =
 
                div->setName(util::node_info(n).c_str());
                auto out = ctx->AssociateValueAndTensor(n->outputs()[0], div->getOutput(0));
+               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+               return true;
+             }})
+        .pattern(
+            {"aten::square(Tensor self) -> Tensor",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               auto self = args[0].ITensorOrFreeze(ctx);
+               auto mul = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPROD, self, self, util::node_info(n));
+               TORCHTRT_CHECK(mul, "Unable to create mul layer from node: " << *n);
+
+               mul->setName(util::node_info(n).c_str());
+               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], mul->getOutput(0));
                LOG_DEBUG("Output tensor shape: " << out->getDimensions());
                return true;
              }})

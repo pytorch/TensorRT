@@ -32,7 +32,9 @@ class TestSqueeze(AccTestCase):
                 shape_ranges=[((1, 1, 2), (1, 2, 2), (1, 3, 2))],
             ),
         ]
-        self.run_test_with_dynamic_shape(Squeeze(), input_specs, expected_ops={acc_ops.squeeze})
+        self.run_test_with_dynamic_shape(
+            Squeeze(), input_specs, expected_ops={acc_ops.squeeze}
+        )
 
 
 if __name__ == "__main__":

@@ -4,12 +4,20 @@ import os
 import sys
 
 # Use system installed Python packages
-PYT_PATH = "/opt/conda/lib/python3.8/site-packages" if not "PYT_PATH" in os.environ else os.environ["PYT_PATH"]
+PYT_PATH = (
+    "/opt/conda/lib/python3.8/site-packages"
+    if not "PYT_PATH" in os.environ
+    else os.environ["PYT_PATH"]
+)
 print(f"Using python path {PYT_PATH}")
 
 # Set the root directory to the directory of the noxfile unless the user wants to
 # TOP_DIR
-TOP_DIR = os.path.dirname(os.path.realpath(__file__)) if not "TOP_DIR" in os.environ else os.environ["TOP_DIR"]
+TOP_DIR = (
+    os.path.dirname(os.path.realpath(__file__))
+    if not "TOP_DIR" in os.environ
+    else os.environ["TOP_DIR"]
+)
 print(f"Test root directory {TOP_DIR}")
 
 # Set the USE_CXX11=1 to use cxx11_abi
@@ -24,7 +32,9 @@ if USE_HOST_DEPS:
 
 SUPPORTED_PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10"]
 
-nox.options.sessions = ["l0_api_tests-" + "{}.{}".format(sys.version_info.major, sys.version_info.minor)]
+nox.options.sessions = [
+    "l0_api_tests-" + "{}.{}".format(sys.version_info.major, sys.version_info.minor)
+]
 
 
 def install_deps(session):
@@ -54,11 +64,21 @@ def install_torch_trt(session):
 
 
 def download_datasets(session):
-    print("Downloading dataset to path", os.path.join(TOP_DIR, "examples/int8/training/vgg16"))
+    print(
+        "Downloading dataset to path",
+        os.path.join(TOP_DIR, "examples/int8/training/vgg16"),
+    )
     session.chdir(os.path.join(TOP_DIR, "examples/int8/training/vgg16"))
-    session.run_always("wget", "https://www.cs.toronto.edu/~kriz/cifar-10-binary.tar.gz", external=True)
+    session.run_always(
+        "wget", "https://www.cs.toronto.edu/~kriz/cifar-10-binary.tar.gz", external=True
+    )
     session.run_always("tar", "-xvzf", "cifar-10-binary.tar.gz", external=True)
-    session.run_always("mkdir", "-p", os.path.join(TOP_DIR, "tests/accuracy/datasets/data"), external=True)
+    session.run_always(
+        "mkdir",
+        "-p",
+        os.path.join(TOP_DIR, "tests/accuracy/datasets/data"),
+        external=True,
+    )
     session.run_always(
         "cp",
         "-rpf",
@@ -91,7 +111,12 @@ def train_model(session):
             env={"PYTHONPATH": PYT_PATH},
         )
 
-        session.run_always("python", "export_ckpt.py", "vgg16_ckpts/ckpt_epoch25.pth", env={"PYTHONPATH": PYT_PATH})
+        session.run_always(
+            "python",
+            "export_ckpt.py",
+            "vgg16_ckpts/ckpt_epoch25.pth",
+            env={"PYTHONPATH": PYT_PATH},
+        )
     else:
         session.run_always(
             "python",
@@ -113,7 +138,9 @@ def train_model(session):
 
 def finetune_model(session):
     # Install pytorch-quantization dependency
-    session.install("pytorch-quantization", "--extra-index-url", "https://pypi.ngc.nvidia.com")
+    session.install(
+        "pytorch-quantization", "--extra-index-url", "https://pypi.ngc.nvidia.com"
+    )
     session.chdir(os.path.join(TOP_DIR, "examples/int8/training/vgg16"))
 
     if USE_HOST_DEPS:
@@ -136,7 +163,12 @@ def finetune_model(session):
         )
 
         # Export model
-        session.run_always("python", "export_qat.py", "vgg16_ckpts/ckpt_epoch26.pth", env={"PYTHONPATH": PYT_PATH})
+        session.run_always(
+            "python",
+            "export_qat.py",
+            "vgg16_ckpts/ckpt_epoch26.pth",
+            env={"PYTHONPATH": PYT_PATH},
+        )
     else:
         session.run_always(
             "python",
@@ -202,7 +234,9 @@ def copy_model(session):
     model_files = ["trained_vgg16.jit.pt", "trained_vgg16_qat.jit.pt"]
 
     for file_name in model_files:
-        src_file = os.path.join(TOP_DIR, str("examples/int8/training/vgg16/") + file_name)
+        src_file = os.path.join(
+            TOP_DIR, str("examples/int8/training/vgg16/") + file_name
+        )
         if os.path.exists(src_file):
             session.run_always(
                 "cp",

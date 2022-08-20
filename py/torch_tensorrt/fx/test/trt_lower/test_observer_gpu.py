@@ -33,7 +33,9 @@ class ObserverGPUTests(TestCase):
 
         with execution_verifier() as verify_execution:
 
-            lowerer = lower.Lowerer.create(lower_setting=LowerSetting(min_acc_module_size=0))
+            lowerer = lower.Lowerer.create(
+                lower_setting=LowerSetting(min_acc_module_size=0)
+            )
 
             @verify_execution
             def observe_fuse_permute_linear_post(ctx: ob.ObserveContext):
@@ -45,5 +47,7 @@ class ObserverGPUTests(TestCase):
                 assert ctx.callable is fuse_permute_linear.orig_func
 
             # Register the observer callback and do the lowering
-            with fuse_permute_linear.observers.post.add(observe_fuse_permute_linear_post):
+            with fuse_permute_linear.observers.post.add(
+                observe_fuse_permute_linear_post
+            ):
                 lowerer(mod, inp)

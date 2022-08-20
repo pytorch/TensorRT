@@ -66,7 +66,9 @@ class TestTransposeConvolutionConverter(AccTestCase):
                 shape_ranges=[((1, 3, 1, 1), (1, 3, 4, 4), (32, 3, 128, 128))],
             ),
         ]
-        self.run_test_with_dynamic_shape(TestModule(), input_specs, expected_ops={acc_ops.conv_transpose2d})
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.conv_transpose2d}
+        )
 
     @parameterized.expand(
         [
@@ -126,7 +128,9 @@ class TestTransposeConvolutionConverter(AccTestCase):
                 shape_ranges=[((1, 3, 1, 1, 1), (1, 3, 4, 4, 4), (8, 3, 32, 32, 32))],
             ),
         ]
-        self.run_test_with_dynamic_shape(TestModule(), input_specs, expected_ops={acc_ops.conv_transpose3d})
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.conv_transpose3d}
+        )
 
 
 if __name__ == "__main__":

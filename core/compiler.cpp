@@ -426,7 +426,8 @@ torch::jit::Module CompileGraph(const torch::jit::Module& mod, CompileSpec cfg) 
       auto outputIsCollection = conversion::OutputIsCollection(g->block());
       if (cfg.partition_info.enabled &&
           (cfg.lower_info.forced_fallback_modules.size() == 0 &&
-           cfg.partition_info.forced_fallback_operators.size() == 0 && isBlockConvertible)) {
+           cfg.partition_info.forced_fallback_operators.size() == 0 && isBlockConvertible) &&
+          !outputIsCollection) {
         LOG_INFO("Skipping partitioning since model is fully supported");
       }
 

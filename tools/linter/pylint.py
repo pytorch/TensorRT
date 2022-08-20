@@ -28,7 +28,9 @@ if __name__ == "__main__":
     USER = pwd.getpwuid(os.getuid())[0]
     projects = utils.CHECK_PROJECTS(sys.argv[1:])
     if "//..." in projects:
-        projects = [p.replace(BAZEL_ROOT, "/")[:-1] for p in glob.glob(BAZEL_ROOT + "/*/")]
+        projects = [
+            p.replace(BAZEL_ROOT, "/")[:-1] for p in glob.glob(BAZEL_ROOT + "/*/")
+        ]
         projects = [p for p in projects if p not in utils.BLACKLISTED_BAZEL_TARGETS]
 
     for p in projects:

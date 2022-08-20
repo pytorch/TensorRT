@@ -192,7 +192,9 @@ def run_tensorrt(
 
         print("Converting method to TensorRT engine...")
         with torch.no_grad(), torchtrt.logging.errors():
-            model = torchtrt.ts.convert_method_to_trt_engine(model, "forward", **compile_settings)
+            model = torchtrt.ts.convert_method_to_trt_engine(
+                model, "forward", **compile_settings
+            )
 
     # Deserialize the TensorRT engine
     with trt.Logger() as logger, trt.Runtime(logger) as runtime:
@@ -241,10 +243,16 @@ def run(
     for backend in backends:
         if precision == "int8":
             if backend == "all" or backend == "torch":
-                print("int8 precision is not supported for torch runtime in this script yet")
+                print(
+                    "int8 precision is not supported for torch runtime in this script yet"
+                )
                 return False
 
-            if backend == "all" or backend == "torch_tensorrt" or params.get("calibration_cache", None) == None:
+            if (
+                backend == "all"
+                or backend == "torch_tensorrt"
+                or params.get("calibration_cache", None) == None
+            ):
                 print("int8 precision expects calibration cache file for inference")
                 return False
 
@@ -313,7 +321,9 @@ def load_model(params):
 
 
 if __name__ == "__main__":
-    arg_parser = argparse.ArgumentParser(description="Run inference on a model with random input values")
+    arg_parser = argparse.ArgumentParser(
+        description="Run inference on a model with random input values"
+    )
     arg_parser.add_argument(
         "--config",
         type=str,
