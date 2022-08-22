@@ -778,7 +778,9 @@ try:
 
     assert callable(stochastic_depth)
 except Exception as e:
-    warnings.warn(f"Unable to import torchvision related libraries.: {e}")
+    warnings.warn(
+        f"Unable to import torchvision related libraries.: {e}. Please install torchvision lib in order to lower stochastic_depth"
+    )
 else:
 
     @register_custom_acc_mapper_fn(
