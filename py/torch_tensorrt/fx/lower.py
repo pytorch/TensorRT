@@ -53,7 +53,7 @@ def compile(
         timing_cache_prefix: Timing cache file name for timing cache used by fx2trt.
         save_timing_cache: Update timing cache with current timing cache data if set to True.
         cuda_graph_batch_size: Cuda graph batch size, default to be -1.
-
+        dynamic_batch: batch dimension (dim=0) is dynamic.
     Returns:
         A torch.nn.Module lowered by TensorRT.
     """
