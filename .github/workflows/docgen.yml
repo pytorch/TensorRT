@@ -28,16 +28,10 @@ jobs:
           apt update
           DEBIAN_FRONTEND=noninteractive apt install -y software-properties-common gcc git curl wget make zlib1g-dev bzip2 libbz2-dev lzma lzma-dev libreadline-dev libsqlite3-dev libssl-dev libffi-dev doxygen pandoc
           git config --global --add safe.directory '*'
-      - name: Install Python
-        run: |
-          mkdir -p /opt/circleci
-          git clone https://github.com/pyenv/pyenv.git /opt/circleci/.pyenv
-          export PYENV_ROOT="/opt/circleci/.pyenv"
-          export PATH="$PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH"
-          pyenv install 3.9.4
-          pyenv global 3.9.4
-          python3 -m pip install --upgrade pip
-          python3 -m pip install wheel
+      - name: Set up Python 3.9.4
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9.4 
       - uses: actions/checkout@v2
         with:
           ref: ${{github.head_ref}}
@@ -70,25 +64,19 @@ jobs:
           apt-get install -y libnvinfer8 libnvinfer-plugin8 libnvinfer-dev libnvinfer-plugin-dev
       - name: Install Torch
         run: |
-          export PYENV_ROOT="/opt/circleci/.pyenv"
-          export PATH="$PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH"
-          pyenv global 3.9.4
           python3 -m pip install -r py/requirements.txt
       - name: Build Python Package
         run: |
           cp toolchains/ci_workspaces/WORKSPACE.x86_64 WORKSPACE
           cd py
-          export PYENV_ROOT="/opt/circleci/.pyenv"
-          export PATH="$PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH"
-          pyenv global 3.9.4
+          echo $(which python3)
+          mkdir -p /opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/
+          ln -s /usr/local/lib/python3.8/site-packages /opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/site-packages
           python3 setup.py install
           cd ..
       - name: Generate New Docs
         run: |
           cd docsrc
-          export PYENV_ROOT="/opt/circleci/.pyenv"
-          export PATH="$PYENV_ROOT/shims:$PYENV_ROOT/bin:$PATH"
-          pyenv global 3.9.4
           python3 -m pip install -r requirements.txt
           python3 -c "import torch_tensorrt; print(torch_tensorrt.__version__)"
           make html
