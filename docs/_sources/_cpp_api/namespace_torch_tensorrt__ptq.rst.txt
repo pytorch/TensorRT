@@ -26,6 +26,6 @@ Functions
 ---------
 
 
-- :ref:`exhale_function_ptq_8h_1a9835f6e605dce1abf442a55b64d6dffa`
+- :ref:`exhale_function_ptq_8h_1a226e3c83379d1012cde8578c1c86b16c`
 
-- :ref:`exhale_function_ptq_8h_1a83ff2be7e0b80bc7434de415861dc039`
+- :ref:`exhale_function_ptq_8h_1a6186e305f47c1d94b6130ef6c7f7e178`

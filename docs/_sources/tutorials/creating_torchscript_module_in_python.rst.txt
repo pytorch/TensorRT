@@ -17,6 +17,7 @@ For example, we can define a LeNet module like this:
     import torch.nn as nn
     import torch.nn.functional as F
 
+
     class LeNetFeatExtractor(nn.Module):
         def __init__(self):
             super(LeNetFeatExtractor, self).__init__()
@@ -28,6 +29,7 @@ For example, we can define a LeNet module like this:
             x = F.max_pool2d(F.relu(self.conv2(x)), 2)
             return x
 
+
     class LeNetClassifier(nn.Module):
         def __init__(self):
             super(LeNetClassifier, self).__init__()
@@ -36,11 +38,12 @@ For example, we can define a LeNet module like this:
             self.fc3 = nn.Linear(84, 10)
 
         def forward(self, x):
-            x = torch.flatten(x,1)
+            x = torch.flatten(x, 1)
             x = F.relu(self.fc1(x))
             x = F.relu(self.fc2(x))
             x = self.fc3(x)
             return x
+
 
     class LeNet(nn.Module):
         def __init__(self):
@@ -67,7 +70,7 @@ To trace an instance of our LeNet module, we can call ``torch.jit.trace`` with a
     import torch
 
     model = LeNet()
-    input_data = torch.empty([1,1,32,32])
+    input_data = torch.empty([1, 1, 32, 32])
     traced_model = torch.jit.trace(model, input_data)
 
 Scripting actually inspects your code with a compiler and generates an equivalent TorchScript program. The difference is that since tracing
