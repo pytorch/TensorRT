@@ -70,9 +70,9 @@ jobs:
           cp toolchains/ci_workspaces/WORKSPACE.x86_64 WORKSPACE
           cd py
           echo $(which python3)
-          ls $(which python3)/..
+          echo $(python3 -c 'import site; print(site.getsitepackages())')
           mkdir -p /opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/
-          ln -s /__t/Python/3.9.4/x64/lib/python3.9/site-packages /opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/site-packages
+          ln -s $(python3 -c 'import site; print(site.getsitepackages())') /opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/site-packages
           python3 setup.py install
           cd ..
       - name: Generate New Docs
