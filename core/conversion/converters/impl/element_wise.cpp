@@ -391,6 +391,18 @@ auto element_wise_registrations TORCHTRT_UNUSED =
                return true;
              }})
         .pattern(
+            {"aten::square(Tensor self) -> Tensor",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               auto self = args[0].ITensorOrFreeze(ctx);
+               auto mul = add_elementwise(ctx, nvinfer1::ElementWiseOperation::kPROD, self, self, util::node_info(n));
+               TORCHTRT_CHECK(mul, "Unable to create mul layer from node: " << *n);
+
+               mul->setName(util::node_info(n).c_str());
+               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], mul->getOutput(0));
+               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+               return true;
+             }})
+        .pattern(
             {"aten::mul.Tensor(Tensor self, Tensor other) -> Tensor",
              [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
                // Should implement self * other

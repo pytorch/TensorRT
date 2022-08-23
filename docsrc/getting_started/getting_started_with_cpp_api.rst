@@ -1,7 +1,7 @@
-.. _getting_started:
+.. _getting_started_cpp:
 
-Getting Started with C++
-========================
+Using Torch-TensorRT in  C++
+==============================
 
 If you haven't already, acquire a tarball of the library by following the instructions in :ref:`Installation`
 

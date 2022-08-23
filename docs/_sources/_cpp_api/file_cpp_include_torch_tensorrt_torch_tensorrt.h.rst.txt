@@ -39,6 +39,8 @@ Includes
 
 - ``string``
 
+- ``torch/custom_class.h``
+
 - ``torch_tensorrt/macros.h`` (:ref:`file_cpp_include_torch_tensorrt_macros.h`)
 
 - ``vector``
@@ -62,6 +64,8 @@ Classes
 
 
 - :ref:`exhale_struct_structtorch__tensorrt_1_1Device`
+
+- :ref:`exhale_struct_structtorch__tensorrt_1_1GraphInputs`
 
 - :ref:`exhale_struct_structtorch__tensorrt_1_1Input`
 

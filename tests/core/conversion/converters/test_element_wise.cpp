@@ -145,6 +145,14 @@ TEST(Converters, ATenMulConvertsCorrectly) {
   pointwise_test_helper(graph, false, true, {5}, {5}, false, at::kInt, at::kFloat);
 }
 
+TEST(Converters, ATenSquareConvertsCorrectly) {
+  const auto graph = R"IR(
+      graph(%0 : Tensor):
+        %1 : Tensor = aten::square(%0)
+        return (%1))IR";
+  pointwise_test_helper(graph, true);
+}
+
 TEST(Converters, ATenMulWithScalarConvertsCorrectly) {
   const auto graph = R"IR(
       graph(%0 : Tensor):
