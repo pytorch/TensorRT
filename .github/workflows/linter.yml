@@ -36,7 +36,7 @@ jobs:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Install dependencies
         run: |
-          pip3 install -r $GITHUB_WORKSPACE/.github/scripts/requirements.txt"
+          pip3 install -r $GITHUB_WORKSPACE/.github/scripts/requirements.txt
           pip3 install -r $GITHUB_WORKSPACE/requirements-dev.txt
       - name: Lint C++
         run: | 
@@ -82,7 +82,7 @@ jobs:
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Install dependencies
         run: |
-          pip3 install -r $GITHUB_WORKSPACE/.github/scripts/requirements.txt"
+          pip3 install -r $GITHUB_WORKSPACE/.github/scripts/requirements.txt
           pip3 install -r $GITHUB_WORKSPACE/requirements-dev.txt
       - name: Lint Python
         run: |
