@@ -203,7 +203,7 @@ def _parse_input_signature(input_signature: Any):
 
 def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
     # TODO: Remove deep copy once collections does not need partial compilation
-    compile_spec = deepcopy(compile_spec_)
+    compile_spec = compile_spec_ #deepcopy(compile_spec_)
     info = _ts_C.CompileSpec()
 
     if len(compile_spec["inputs"]) > 0:
@@ -254,7 +254,7 @@ def _parse_compile_spec(compile_spec_: Dict[str, Any]) -> _ts_C.CompileSpec:
     if "enabled_precisions" in compile_spec:
         info.enabled_precisions = _parse_enabled_precisions(compile_spec["enabled_precisions"])
 
-    if "calibrator" in compile_spec:
+    if "calibrator" in compile_spec and compile_spec["calibrator"]:
         info.ptq_calibrator = compile_spec["calibrator"]
 
     if "sparse_weights" in compile_spec:

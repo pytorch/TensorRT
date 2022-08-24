@@ -18,8 +18,8 @@ bool almostEqual(const at::Tensor& computed_tensor, const at::Tensor& gt_tensor,
   auto result = diff.abs().max().item<float>();
   auto threshold = atol + (rtol * gt_tensor.abs().max().item<float>());
 
-  LOG_GRAPH(std::string("Max Difference: ") + std::to_string(result));
-  LOG_GRAPH(std::string("Acceptable Threshold: ") + std::to_string(threshold));
+  LOG_DEBUG(std::string("Max Difference: ") + std::to_string(result));
+  LOG_DEBUG(std::string("Acceptable Threshold: ") + std::to_string(threshold));
 
   return result <= threshold;
 }
