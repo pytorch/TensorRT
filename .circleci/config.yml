@@ -917,7 +917,7 @@ jobs:
 
   build-x86_64-pyt-ngc:
     machine:
-      image: << pipeline.parameters.torch-ngc-base-container >>
+      image: << pipeline.parameters.torch-ngc-base-image >>
     resource_class: xlarge
     steps:
       - checkout
@@ -945,7 +945,7 @@ jobs:
         type: boolean
         default: false
     machine:
-      image: << pipeline.parameters.torch-ngc-base-container >>
+      image: << pipeline.parameters.torch-ngc-base-image >>
     resource_class: xlarge
     steps:
       - when:
