@@ -301,7 +301,10 @@ commands:
               -DCMAKE_BUILD_TYPE=Debug
             cmake --build build -j4
             mkdir -p /tmp/dist/builds
-            cp -r build /tmp/dist/builds
+            cp -r build/bin /tmp/dist/builds
+            cp -r build/lib /tmp/dist/builds
+            cp -r build/cpp/include /tmp/dist/builds
+
 
   dump-test-env:
     description: "Dump the test env to console"
