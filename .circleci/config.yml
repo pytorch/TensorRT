@@ -916,14 +916,14 @@ jobs:
           destination: x86_64-cmake
 
   build-x86_64-pyt-ngc:
-    machine:
-      image: << pipeline.parameters.torch-ngc-base-image >>
+    docker:
+      - image: << pipeline.parameters.torch-ngc-base-image >>
     resource_class: xlarge
     steps:
       - checkout
       - install-bazel:
-          version: << pipeline.parameters.bazel-version >>
-          platform: "x86_64"
+          bazel-version: << pipeline.parameters.bazel-version >>
+          bazel-platform: "x86_64"
       - build-py-ngc:
           release: false
       - run:
@@ -944,8 +944,8 @@ jobs:
       enabled:
         type: boolean
         default: false
-    machine:
-      image: << pipeline.parameters.torch-ngc-base-image >>
+    docker:
+      - image: << pipeline.parameters.torch-ngc-base-image >>
     resource_class: xlarge
     steps:
       - when:
@@ -953,8 +953,8 @@ jobs:
           steps:
             - checkout
             - install-bazel:
-                version: << pipeline.parameters.bazel-version >>
-                platform: "x86_64"
+                bazel-version: << pipeline.parameters.bazel-version >>
+                bazel-platform: "x86_64"
             - build-py-ngc:
                 release: true
             - run:
