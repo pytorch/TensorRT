@@ -283,12 +283,9 @@ auto expand_registrations TORCHTRT_UNUSED =
 
                LOG_DEBUG("Repeat layer output tensor shape: " << out->getDimensions());
                return true;
-             }});
-
-auto repeatinterleave TORCHTRT_UNUSED =
-    RegisterNodeConversionPatterns()
-        .pattern({
-  "aten::repeat_interleave.self_int(Tensor self, int repeats, int? dim=None, *, int? output_size=None) -> (Tensor)",
+             }})
+        .pattern(
+            {"aten::repeat_interleave.self_int(Tensor self, int repeats, int? dim=None, *, int? output_size=None) -> (Tensor)",
             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
               auto self = args[0].ITensorOrFreeze(ctx);
               auto repeats = args[1].unwrapToScalar().to<int>();
@@ -318,6 +315,20 @@ auto repeatinterleave TORCHTRT_UNUSED =
               }
               else {
                 dim = args[2].unwrapToScalar().to<int>();
+              }
+
+              if (ctx->input_is_dynamic) {
+                int dynamic_dims = 0;
+                for (int idx = 0; idx < input_shape.nbDims; idx++) {
+                  if (input_shape.d[idx] == -1) {
+                    dynamic_dims++;
+                  }
+                }
+
+                if (dynamic_dims > 1) {
+                  TORCHTRT_THROW_ERROR(
+                      "Repeat_interleave is currently not supported when target shape contains more than one dynamic dimension");
+                }
               }
 
               // Insert singleton dimension after desired repeat dimension
