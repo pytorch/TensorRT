@@ -299,7 +299,7 @@ commands:
               -DTorch_DIR=/opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/site-packages/torch/share/cmake/Torch \
               -DTensorRT_ROOT=/usr \
               -DCMAKE_BUILD_TYPE=Debug
-            cmake --build build -j4
+            cmake --build build -- -j12
             mkdir -p /tmp/dist/builds
             cp -r build/bin /tmp/dist/builds
             cp -r build/lib /tmp/dist/builds
@@ -853,7 +853,7 @@ jobs:
         type: string
     machine:
       image: ubuntu-2004-cuda-11.4:202110-01
-    resource_class: gpu.nvidia.small
+    resource_class: xlarge
     steps:
       - checkout
       - create-env:
