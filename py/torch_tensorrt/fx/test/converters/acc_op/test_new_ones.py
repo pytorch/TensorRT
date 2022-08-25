@@ -60,7 +60,9 @@ class TestNewOnesConverterWithDynamicShape(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(TestModule(), input_specs, expected_ops={acc_ops.new_ones})
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.new_ones}
+        )
 
     def test_newone_no_dtype(self):
         class TestModule(nn.Module):
@@ -75,7 +77,9 @@ class TestNewOnesConverterWithDynamicShape(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(TestModule(), input_specs, expected_ops={acc_ops.new_ones})
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.new_ones}
+        )
 
     def test_newone_device(self):
         class TestModule(nn.Module):
@@ -90,7 +94,9 @@ class TestNewOnesConverterWithDynamicShape(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(TestModule(), input_specs, expected_ops={acc_ops.new_ones})
+        self.run_test_with_dynamic_shape(
+            TestModule(), input_specs, expected_ops={acc_ops.new_ones}
+        )
 
 
 if __name__ == "__main__":

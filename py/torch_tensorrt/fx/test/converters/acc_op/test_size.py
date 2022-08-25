@@ -44,7 +44,9 @@ class TestSizeConverter(AccTestCase):
                 shape_ranges=[((1, 12, 32), (3, 12, 32), (100, 12, 32))],
             ),
         ]
-        self.run_test_with_dynamic_shape(Size(), input_specs, expected_ops={acc_ops.size})
+        self.run_test_with_dynamic_shape(
+            Size(), input_specs, expected_ops={acc_ops.size}
+        )
 
     def test_size_dynamic_shape_four_dimensions(self):
         class Size(nn.Module):
@@ -60,7 +62,9 @@ class TestSizeConverter(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(Size(), input_specs, expected_ops={acc_ops.size})
+        self.run_test_with_dynamic_shape(
+            Size(), input_specs, expected_ops={acc_ops.size}
+        )
 
 
 if __name__ == "__main__":

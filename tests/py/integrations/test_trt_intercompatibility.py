@@ -22,7 +22,9 @@ class TestPyTorchToTRTEngine(unittest.TestCase):
             },
         }
 
-        trt_engine = torchtrt.ts.convert_method_to_trt_engine(self.ts_model, "forward", **compile_spec)
+        trt_engine = torchtrt.ts.convert_method_to_trt_engine(
+            self.ts_model, "forward", **compile_spec
+        )
 
         TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
         with trt.Runtime(TRT_LOGGER) as rt:
@@ -36,7 +38,9 @@ class TestPyTorchToTRTEngine(unittest.TestCase):
                 ctx.execute_async(
                     batch_size=1,
                     bindings=bindings,
-                    stream_handle=torch.cuda.current_stream(device="cuda:0").cuda_stream,
+                    stream_handle=torch.cuda.current_stream(
+                        device="cuda:0"
+                    ).cuda_stream,
                 )
                 same = (out - self.ts_model(self.input)).abs().max()
                 self.assertTrue(same < 2e-3)

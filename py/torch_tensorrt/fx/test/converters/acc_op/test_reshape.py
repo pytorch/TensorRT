@@ -46,7 +46,9 @@ class TestReshapeConverter(AccTestCase):
                 shape_ranges=[((1, 1, 1), (1, 2, 3), (3, 3, 3))],
             ),
         ]
-        self.run_test_with_dynamic_shape(TestModule(target_shape), input_specs, expected_ops={acc_ops.reshape})
+        self.run_test_with_dynamic_shape(
+            TestModule(target_shape), input_specs, expected_ops={acc_ops.reshape}
+        )
 
     @parameterized.expand(
         [
@@ -71,7 +73,9 @@ class TestReshapeConverter(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(TestModule(target_shape), input_specs, expected_ops={acc_ops.reshape})
+        self.run_test_with_dynamic_shape(
+            TestModule(target_shape), input_specs, expected_ops={acc_ops.reshape}
+        )
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ from dataclasses import dataclass, field, replace
 import torch
 import torchdynamo
 import torchvision
-from torch_tensorrt.fx.lower import lower_to_trt
+from torch_tensorrt.fx.lower import compile
 from torch_tensorrt.fx.utils import LowerPrecision
 from torchdynamo.optimizations import backends
 
@@ -142,7 +142,10 @@ def benchmark(
         ),
     ]
 
-    results = [run_configuration_benchmark(deepcopy(model), inputs, conf_) for conf_ in configurations]
+    results = [
+        run_configuration_benchmark(deepcopy(model), inputs, conf_)
+        for conf_ in configurations
+    ]
 
     for res in results:
         print(res.format())
@@ -194,7 +197,7 @@ def run_configuration_benchmark(
 
     if conf.trt:
         # Run lowering eager mode benchmark
-        lowered_module = lower_to_trt(
+        lowered_module = compile(
             module,
             input,
             max_batch_size=conf.batch_size,

@@ -10,6 +10,7 @@ from unittest import TestCase
 
 import torch_tensorrt.fx.diagnostics as diag
 
+
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
@@ -72,7 +73,9 @@ class Fx2trtDiagnosticsTest(TestCase):
         diag.set_current_collector(collector)
 
         with diag.collect_when(
-            diag.CollectionConditions.when_called_by_function(self.test_condition_func_name.__name__)
+            diag.CollectionConditions.when_called_by_function(
+                self.test_condition_func_name.__name__
+            )
         ):
             diag.write("aaa", "hello")
 
@@ -95,7 +98,9 @@ class Fx2trtDiagnosticsTest(TestCase):
     def test_conditions(self):
 
         _test_cond(
-            diag.CollectionConditions.when_called_by_function(self.test_conditions.__name__),
+            diag.CollectionConditions.when_called_by_function(
+                self.test_conditions.__name__
+            ),
             should_collect=True,
         )
 

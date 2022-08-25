@@ -10,9 +10,9 @@ on:
 
 jobs:
   build-docs:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     container:
-      image: docker.pkg.github.com/pytorch/tensorrt/docgen:latest
+      image: ghcr.io/pytorch/tensorrt/docgen:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -22,23 +22,66 @@ jobs:
           rm -rf /usr/share/dotnet
           rm -rf /opt/ghc
           rm -rf "/usr/local/share/boost"
+          rm -rf /usr/local/cuda/cuda-*
+      - name: Install base deps
+        run: |
+          apt update
+          DEBIAN_FRONTEND=noninteractive apt install -y software-properties-common gcc git curl wget make zlib1g-dev bzip2 libbz2-dev lzma lzma-dev libreadline-dev libsqlite3-dev libssl-dev libffi-dev doxygen pandoc
+          git config --global --add safe.directory '*'
+      - name: Set up Python 3.9.4
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9.4 
       - uses: actions/checkout@v2
         with:
           ref: ${{github.head_ref}}
       - name: Get HEAD SHA
         id: vars
         run: echo "::set-output name=sha::$(git rev-parse --short HEAD)"
+      - name: Get Bazel version
+        id: bazel_info
+        run: echo "::set-output name=version::$(cat .bazelversion)"
+      - name: Install Bazel
+        run: |
+          wget -q https://github.com/bazelbuild/bazel/releases/download/${{ steps.bazel_info.outputs.version }}/bazel-${{ steps.bazel_info.outputs.version }}-linux-x86_64 -O /usr/bin/bazel
+          chmod a+x /usr/bin/bazel
+      - name: Install cudnn + tensorrt
+        run: |
+          apt-get update
+          wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin
+          mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600
+          apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub
+          apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 536F8F1DE80F6A35
+          apt-key adv --keyserver keyserver.ubuntu.com --recv-keys A4B469963BF863CC
+          add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
+          apt-get update
+          apt-get install -y libcudnn8 libcudnn8-dev
+
+          apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/3bf863cc.pub
+          add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /"
+          apt-get update
+
+          apt-get install -y libnvinfer8 libnvinfer-plugin8 libnvinfer-dev libnvinfer-plugin-dev
+      - name: Install Torch
+        run: |
+          python3 -m pip install -r py/requirements.txt
       - name: Build Python Package
         run: |
-          cp docker/WORKSPACE.docker WORKSPACE
+          cp toolchains/ci_workspaces/WORKSPACE.x86_64 WORKSPACE
           cd py
+          echo $(which python3)
+          echo $(python3 -c 'import site; print(site.getsitepackages()[0])')
+          mkdir -p /opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/
+          ln -s $(python3 -c 'import site; print(site.getsitepackages()[0])') /opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/site-packages
           python3 setup.py install
+          cd ..
       - name: Generate New Docs
         run: |
           cd docsrc
-          pip3 install -r requirements.txt
+          python3 -m pip install -r requirements.txt
           python3 -c "import torch_tensorrt; print(torch_tensorrt.__version__)"
           make html
+          cd ..
       - uses: stefanzweifel/git-auto-commit-action@v4
         with:
         # Required

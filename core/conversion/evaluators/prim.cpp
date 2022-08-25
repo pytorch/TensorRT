@@ -100,7 +100,12 @@ auto prim_registrations =
                      auto ival = c10::IValue(std::move(c10::make_intrusive<TensorContainer>(tensor_holder)));
                      list.emplace_back(std::move(ival));
                    } else {
-                     list.emplace_back(std::move(args.at(in).unwrapToTensor()));
+                     if (args.at(in).IValue()->isNone()) {
+                       auto ival = torch::jit::IValue();
+                       list.emplace_back(std::move(ival));
+                     } else {
+                       list.emplace_back(std::move(args.at(in).unwrapToTensor()));
+                     }
                    }
                  }
                  return c10::optional<torch::jit::IValue>(std::move(torch::jit::IValue(list)));

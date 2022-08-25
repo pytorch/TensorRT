@@ -65,7 +65,9 @@ class NormalizationInfo(NamedTuple):
     # (tensor_meta_field_name, orginal_field_name)
     # when move_to_qparams is True, we'll move the field to qparams
     # dictionary, otherwise it will stay in TensorMeta itself
-    kwargs_to_move_to_acc_out_ty: Optional[List[Union[Tuple[str, str, bool], Tuple[str, str]]]]
+    kwargs_to_move_to_acc_out_ty: Optional[
+        List[Union[Tuple[str, str, bool], Tuple[str, str]]]
+    ]
     needs_shapes_for_normalization: bool
 
 
@@ -81,7 +83,9 @@ def _insert_fun(
     arg_replacement_tuples: List[Tuple],
     new_fn_target: Optional[Callable] = None,
     custom_mapping_fn: Optional[Callable] = None,
-    kwargs_to_move_to_acc_out_ty: Optional[List[Union[Tuple[str, str, bool], Tuple[str, str]]]] = None,
+    kwargs_to_move_to_acc_out_ty: Optional[
+        List[Union[Tuple[str, str, bool], Tuple[str, str]]]
+    ] = None,
     needs_shapes_for_normalization=False,
     allow_normalize_from_torch_package=False,
 ):
@@ -114,7 +118,9 @@ def _insert_fun(
         for k in orig_kwarg:
             if k in ALIAS_MAP:
                 orig_kwarg_set.update(ALIAS_MAP[k])
-        final_arg_replacement_tuples.append((tuple(orig_kwarg_set), new_kwarg, is_optional))
+        final_arg_replacement_tuples.append(
+            (tuple(orig_kwarg_set), new_kwarg, is_optional)
+        )
 
     assert op_and_target not in _normalization_dict.keys()
     norm_info = NormalizationInfo(
@@ -167,7 +173,9 @@ def register_acc_op_mapping(
             ]
         ]
     ] = None,
-    kwargs_to_move_to_acc_out_ty: Optional[List[Union[Tuple[str, str, bool], Tuple[str, str]]]] = None,
+    kwargs_to_move_to_acc_out_ty: Optional[
+        List[Union[Tuple[str, str, bool], Tuple[str, str]]]
+    ] = None,
 ):
     """
     Use this decorator to map a non-acc operator to an acc operator.
@@ -242,7 +250,9 @@ def move_kwargs_to_acc_out_ty(
     if normalization_info.kwargs_to_move_to_acc_out_ty is None:
         return
 
-    assert acc_utils.is_acc_op_with_kwarg(normalization_info.new_fn_target, "acc_out_ty")
+    assert acc_utils.is_acc_op_with_kwarg(
+        normalization_info.new_fn_target, "acc_out_ty"
+    )
 
     # Build a dict representing the new TensorMetadata to use for acc_out_ty,
     # and then remove the kwarg from the new_kwargs since it's passed in via
@@ -270,7 +280,9 @@ def move_kwargs_to_acc_out_ty(
     new_kwargs["acc_out_ty"] = acc_utils.build_raw_tensor_meta(**tmd_dict)
 
 
-def get_normalized_kwargs(node: torch.fx.Node, arg_replacement_tuples: ArgReplacementTuplesType):
+def get_normalized_kwargs(
+    node: torch.fx.Node, arg_replacement_tuples: ArgReplacementTuplesType
+):
     new_kwargs = {}
     final_arg_is_varg = False
     for i, replacement_tuple in enumerate(arg_replacement_tuples):
@@ -298,7 +310,9 @@ def get_normalized_kwargs(node: torch.fx.Node, arg_replacement_tuples: ArgReplac
                 new_kwargs[new_kwarg_name] = node.args[i]
             else:
                 # Verify the arg we're trying to normalize was optional.
-                assert is_optional, f"Cannot normalize {orig_kwargs_names} to {new_kwarg_name} for {node.name}"
+                assert (
+                    is_optional
+                ), f"Cannot normalize {orig_kwargs_names} to {new_kwarg_name} for {node.name}"
         else:
             new_kwargs[new_kwarg_name] = node.kwargs[orig_kwargs_name]
 
@@ -401,7 +415,9 @@ def normalize(mod: torch.fx.GraphModule, expect_nodes_have_shapes: bool = False)
         else:
             normalized_args = ()
             try:
-                normalized_kwargs = get_normalized_kwargs(node, normalization_info.arg_replacement_tuples)
+                normalized_kwargs = get_normalized_kwargs(
+                    node, normalization_info.arg_replacement_tuples
+                )
             except Exception:
                 _LOGGER.error(
                     f"Error during kwarg normalization for: {node.format_node()}; "
@@ -409,7 +425,10 @@ def normalize(mod: torch.fx.GraphModule, expect_nodes_have_shapes: bool = False)
                 )
                 raise
 
-        if normalization_info.needs_shapes_for_normalization and not expect_nodes_have_shapes:
+        if (
+            normalization_info.needs_shapes_for_normalization
+            and not expect_nodes_have_shapes
+        ):
             # All nodes needing shapes for normalization should be custom mapped.
             assert normalization_info.custom_mapping_fn is not None
             # For custom mapping, the normalized_kwargs are used for the original op,
@@ -420,7 +439,9 @@ def normalize(mod: torch.fx.GraphModule, expect_nodes_have_shapes: bool = False)
             continue
 
         try:
-            normalize_to_acc_op(node, normalization_info, normalized_args, normalized_kwargs)
+            normalize_to_acc_op(
+                node, normalization_info, normalized_args, normalized_kwargs
+            )
         except Exception:
             _LOGGER.error(f"Error during normalization for node: {node.format_node()}")
             raise

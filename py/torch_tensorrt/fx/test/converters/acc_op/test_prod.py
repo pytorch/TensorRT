@@ -72,7 +72,9 @@ class TestProdConverter(AccTestCase):
             test_implicit_batch_dim=(dim != 0),
         )
 
-    @parameterized.expand([(f"{acc_ops.prod.__name__}_no_dim_no_keepdim", torch.prod, acc_ops.prod)])
+    @parameterized.expand(
+        [(f"{acc_ops.prod.__name__}_no_dim_no_keepdim", torch.prod, acc_ops.prod)]
+    )
     def test_prod_all_dims(
         self,
         test_name,
@@ -107,7 +109,9 @@ class TestProdConverter(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(Prod(), input_specs, expected_ops={acc_ops.prod})
+        self.run_test_with_dynamic_shape(
+            Prod(), input_specs, expected_ops={acc_ops.prod}
+        )
 
 
 if __name__ == "__main__":

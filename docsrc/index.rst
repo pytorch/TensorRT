@@ -22,46 +22,43 @@ More Information / System Architecture:
 Getting Started
 ----------------
 * :ref:`installation`
-* :ref:`getting_started`
-* :ref:`ptq`
-* :ref:`torchtrtc`
-* :ref:`use_from_pytorch`
-* :ref:`runtime`
-* :ref:`using_dla`
-* :ref:`serving_torch_tensorrt_with_triton`
-* :ref:`user_guide`
+* :ref:`getting_started_with_python_api`
+* :ref:`getting_started_cpp`
 
 .. toctree::
    :caption: Getting Started
    :maxdepth: 1
    :hidden:
 
-   tutorials/installation
-   tutorials/getting_started_with_cpp_api
-   tutorials/getting_started_with_python_api
-   tutorials/creating_torchscript_module_in_python
-   tutorials/ptq
-   tutorials/torchtrtc
-   tutorials/use_from_pytorch
-   tutorials/runtime
-   tutorials/using_dla
-   tutorials/serving_torch_tensorrt_with_triton
-   tutorials/getting_started_with_fx_path
+   getting_started/installation
+   getting_started/getting_started_with_python_api
+   getting_started/getting_started_with_cpp_api
+
+
+Tutorials
+------------
+* :ref:`creating_a_ts_mod`
+* :ref:`getting_started_with_fx`
+* :ref:`ptq`
+* :ref:`runtime`
+* :ref:`serving_torch_tensorrt_with_triton`
+* :ref:`use_from_pytorch`
+* :ref:`using_dla`
+* :ref:`notebooks`
 
 .. toctree::
-   :caption: Notebooks
+   :caption: Tutorials
    :maxdepth: 1
    :hidden:
 
-   _notebooks/CitriNet-example
-   _notebooks/dynamic-shapes
-   _notebooks/EfficientNet-example
-   _notebooks/Hugging-Face-BERT
-   _notebooks/lenet-getting-started
-   _notebooks/Resnet50-example
-   _notebooks/ssd-object-detection-demo
-   _notebooks/vgg-qat
-
+   tutorials/creating_torchscript_module_in_python
+   tutorials/getting_started_with_fx_path
+   tutorials/ptq
+   tutorials/runtime
+   tutorials/serving_torch_tensorrt_with_triton
+   tutorials/use_from_pytorch
+   tutorials/using_dla
+   tutorials/notebooks
 
 Python API Documenation
 ------------------------
@@ -69,6 +66,7 @@ Python API Documenation
 * :ref:`torch_tensorrt_logging_py`
 * :ref:`torch_tensorrt_ptq_py`
 * :ref:`torch_tensorrt_ts_py`
+* :ref:`torch_tensorrt_fx_py`
 
 .. toctree::
    :caption: Python API Documenation
@@ -79,6 +77,7 @@ Python API Documenation
    py_api/logging
    py_api/ptq
    py_api/ts
+   py_api/fx
 
 C++ API Documenation
 ----------------------
@@ -98,6 +97,18 @@ C++ API Documenation
    _cpp_api/namespace_torch_tensorrt__logging
    _cpp_api/namespace_torch_tensorrt__torchscript
    _cpp_api/namespace_torch_tensorrt__ptq
+
+CLI Documentation
+---------------------
+* :ref:`torchtrtc`
+
+.. toctree::
+   :caption: CLI Documenation
+   :maxdepth: 0
+   :hidden:
+
+   cli/torchtrtc
+
 
 Contributor Documentation
 --------------------------------

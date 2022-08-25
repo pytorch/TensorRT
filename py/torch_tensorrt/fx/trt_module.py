@@ -8,7 +8,9 @@ from .utils import torch_dtype_from_trt
 
 
 class TRTModule(torch.nn.Module):
-    def __init__(self, engine=None, input_names=None, output_names=None, cuda_graph_batch_size=-1):
+    def __init__(
+        self, engine=None, input_names=None, output_names=None, cuda_graph_batch_size=-1
+    ):
         super(TRTModule, self).__init__()
         self._register_state_dict_hook(TRTModule._on_state_dict)
         self.engine = engine
@@ -37,26 +39,35 @@ class TRTModule(torch.nn.Module):
         primary_input_outputs.update(self.output_binding_indices_in_order)
         self.hidden_output_binding_indices_in_order: Sequence[int] = []
         self.hidden_output_names: Sequence[str] = []
-        for i in range(self.engine.num_bindings // self.engine.num_optimization_profiles):
+        for i in range(
+            self.engine.num_bindings // self.engine.num_optimization_profiles
+        ):
             if i not in primary_input_outputs:
                 self.hidden_output_binding_indices_in_order.append(i)
                 self.hidden_output_names.append(self.engine.get_binding_name(i))
 
         assert (self.engine.num_bindings // self.engine.num_optimization_profiles) == (
-            len(self.input_names) + len(self.output_names) + len(self.hidden_output_names)
+            len(self.input_names)
+            + len(self.output_names)
+            + len(self.hidden_output_names)
         )
 
         self.input_dtypes: Sequence[torch.dtype] = [
-            torch_dtype_from_trt(self.engine.get_binding_dtype(idx)) for idx in self.input_binding_indices_in_order
+            torch_dtype_from_trt(self.engine.get_binding_dtype(idx))
+            for idx in self.input_binding_indices_in_order
         ]
         self.input_shapes: Sequence[Sequence[int]] = [
-            tuple(self.engine.get_binding_shape(idx)) for idx in self.input_binding_indices_in_order
+            tuple(self.engine.get_binding_shape(idx))
+            for idx in self.input_binding_indices_in_order
         ]
         self.output_dtypes: Sequence[torch.dtype] = [
-            torch_dtype_from_trt(self.engine.get_binding_dtype(idx)) for idx in self.output_binding_indices_in_order
+            torch_dtype_from_trt(self.engine.get_binding_dtype(idx))
+            for idx in self.output_binding_indices_in_order
         ]
         self.output_shapes = [
-            tuple(self.engine.get_binding_shape(idx)) if self.engine.has_implicit_batch_dimension else tuple()
+            tuple(self.engine.get_binding_shape(idx))
+            if self.engine.has_implicit_batch_dimension
+            else tuple()
             for idx in self.output_binding_indices_in_order
         ]
         self.hidden_output_dtypes: Sequence[torch.dtype] = [
@@ -64,7 +75,9 @@ class TRTModule(torch.nn.Module):
             for idx in self.hidden_output_binding_indices_in_order
         ]
         self.hidden_output_shapes = [
-            tuple(self.engine.get_binding_shape(idx)) if self.engine.has_implicit_batch_dimension else tuple()
+            tuple(self.engine.get_binding_shape(idx))
+            if self.engine.has_implicit_batch_dimension
+            else tuple()
             for idx in self.hidden_output_binding_indices_in_order
         ]
 
@@ -126,11 +139,15 @@ class TRTModule(torch.nn.Module):
                 batch_size = inputs[0].shape[0]
                 contiguous_inputs: List[torch.Tensor] = [i.contiguous() for i in inputs]
                 bindings: List[Any] = [None] * (
-                    len(self.input_names) + len(self.output_names) + len(self.hidden_output_names)
+                    len(self.input_names)
+                    + len(self.output_names)
+                    + len(self.hidden_output_names)
                 )
 
                 for i, input_name in enumerate(self.input_names):
-                    assert inputs[i].is_cuda, f"{i}th input({input_name}) is not on cuda device."
+                    assert inputs[
+                        i
+                    ].is_cuda, f"{i}th input({input_name}) is not on cuda device."
                     assert (
                         inputs[i].dtype == self.input_dtypes[i]
                     ), f"Dtype mismatch for {i}th input({input_name}). Expect {self.input_dtypes[i]}, got {inputs[i].dtype}."
@@ -139,7 +156,9 @@ class TRTModule(torch.nn.Module):
                     bindings[idx] = contiguous_inputs[i].data_ptr()
 
                     if not self.engine.has_implicit_batch_dimension:
-                        self.context.set_binding_shape(idx, tuple(contiguous_inputs[i].shape))
+                        self.context.set_binding_shape(
+                            idx, tuple(contiguous_inputs[i].shape)
+                        )
                     else:
                         assert inputs[i].size()[1:] == self.input_shapes[i], (
                             f"Shape mismatch for {i}th input({input_name}). "
@@ -179,9 +198,13 @@ class TRTModule(torch.nn.Module):
 
             with torch.autograd.profiler.record_function("TRTModule:TensorRTRuntime"):
                 if self.engine.has_implicit_batch_dimension:
-                    self.context.execute_async(batch_size, bindings, torch.cuda.current_stream().cuda_stream)
+                    self.context.execute_async(
+                        batch_size, bindings, torch.cuda.current_stream().cuda_stream
+                    )
                 else:
-                    self.context.execute_async_v2(bindings, torch.cuda.current_stream().cuda_stream)
+                    self.context.execute_async_v2(
+                        bindings, torch.cuda.current_stream().cuda_stream
+                    )
 
             if len(outputs) == 1:
                 return outputs[0]

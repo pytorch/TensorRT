@@ -28,3 +28,12 @@ repos:
         args:
           - --warnings=all
     -   id: buildifier-lint
+  - repo: local
+    hooks:
+    -   id: dont-commit-upstream
+        name: NVIDIA-INTERNAL check
+        entry: "!NVIDIA-INTERNAL"
+        exclude: "^.pre-commit-config.yaml"
+        language: pygrep
+        types: [text]
+

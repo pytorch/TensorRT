@@ -71,7 +71,9 @@ testing_dataset = datasets.CIFAR10(
     ),
 )
 
-testing_dataloader = torch.utils.data.DataLoader(testing_dataset, batch_size=32, shuffle=False, num_workers=2)
+testing_dataloader = torch.utils.data.DataLoader(
+    testing_dataset, batch_size=32, shuffle=False, num_workers=2
+)
 
 crit = torch.nn.CrossEntropyLoss()
 
@@ -94,6 +96,8 @@ compile_settings = {
 }
 new_mod = torch.jit.load("trained_vgg16_qat.jit.pt")
 trt_ts_module = torchtrt.compile(new_mod, **compile_settings)
-testing_dataloader = torch.utils.data.DataLoader(testing_dataset, batch_size=1, shuffle=False, num_workers=2)
+testing_dataloader = torch.utils.data.DataLoader(
+    testing_dataset, batch_size=1, shuffle=False, num_workers=2
+)
 test_loss, test_acc = test(trt_ts_module, testing_dataloader, crit)
 print("[TRTorch] Test Loss: {:.5f} Test Acc: {:.2f}%".format(test_loss, 100 * test_acc))

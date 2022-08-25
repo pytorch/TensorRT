@@ -23,7 +23,11 @@ class TestCompileHalf(unittest.TestCase):
         }
 
         trt_mod = torchtrt.ts.compile(self.scripted_model, **compile_spec)
-        same = (trt_mod(self.input.half()) - self.scripted_model(self.input.half())).abs().max()
+        same = (
+            (trt_mod(self.input.half()) - self.scripted_model(self.input.half()))
+            .abs()
+            .max()
+        )
         torchtrt.logging.log(torchtrt.logging.Level.Debug, "Max diff: " + str(same))
         self.assertTrue(same < 3e-2)
 
@@ -43,7 +47,11 @@ class TestCompileHalf(unittest.TestCase):
         }
 
         trt_mod = torchtrt.ts.compile(self.scripted_model, **compile_spec)
-        same = (trt_mod(self.input.half()) - self.scripted_model(self.input.half())).abs().max()
+        same = (
+            (trt_mod(self.input.half()) - self.scripted_model(self.input.half()))
+            .abs()
+            .max()
+        )
         torchtrt.logging.log(torchtrt.logging.Level.Debug, "Max diff: " + str(same))
         self.assertTrue(same < 3e-2)
 
@@ -159,7 +167,9 @@ class TestInputTypeDefaultsFP16Model(unittest.TestCase):
         half_mod = torch.jit.script(self.model)
         half_mod.half()
 
-        trt_mod = torchtrt.ts.compile(half_mod, inputs=[torchtrt.Input(self.input.shape)])
+        trt_mod = torchtrt.ts.compile(
+            half_mod, inputs=[torchtrt.Input(self.input.shape)]
+        )
         trt_mod(self.input.half())
 
     def test_input_respect_user_setting_fp16_weights_fp32_in(self):

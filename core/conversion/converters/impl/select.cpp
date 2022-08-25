@@ -136,7 +136,8 @@ auto select_registrations TORCHTRT_UNUSED =
                  // IShuffleLayer removes redundant dimensions
                  auto shuffle_layer = ctx->net->addShuffle(*out);
                  TORCHTRT_CHECK(shuffle_layer, "Unable to create shuffle layer from node: " << *n);
-                 shuffle_layer->setReshapeDimensions(util::squeezeDims(out->getDimensions(), dim));
+                 shuffle_layer->setReshapeDimensions(
+                     util::squeezeDims(out->getDimensions(), dim, !ctx->input_is_dynamic));
                  shuffle_layer->setName(util::node_info(n).c_str());
                  out = shuffle_layer->getOutput(0);
                }
@@ -249,21 +250,19 @@ auto select_registrations TORCHTRT_UNUSED =
                auto dims = args[2].unwrapToIntList().vec();
 
                TORCHTRT_CHECK(dims.size() == shifts.size(), "dims.size() should be equal to shifts.size()");
-               if (ctx->input_is_dynamic) {
-                 TORCHTRT_THROW_ERROR("aten::roll is currently not support in dynamic input shape compilation");
-               } else {
-                 auto in_shape = util::toVec(in->getDimensions());
-                 for (size_t i = 0; i < dims.size(); i++) {
-                   auto dim = dims[i] < 0 ? (in_shape.size() + dims[i]) : dims[i];
-                   TORCHTRT_CHECK(dim < in_shape.size(), "Dimension out of range");
-                   in = roll(ctx, in, shifts[i], dim, in_shape);
-                 }
-                 auto out = ctx->AssociateValueAndTensor(n->outputs()[0], in);
-
-                 LOG_DEBUG("Output tensor shape: " << out->getDimensions());
-
-                 return true;
+               auto in_shape = util::toVec(in->getDimensions());
+               for (size_t i = 0; i < dims.size(); i++) {
+                 auto dim = dims[i] < 0 ? (in_shape.size() + dims[i]) : dims[i];
+                 TORCHTRT_CHECK(dim < in_shape.size(), "Dimension out of range");
+                 TORCHTRT_CHECK(
+                     in_shape[dim] != -1, "aten::roll is not supported when the targeted dimension is dynamic");
+                 in = roll(ctx, in, shifts[i], dim, in_shape);
                }
+               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], in);
+
+               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+
+               return true;
              }})
         .pattern(
             {"aten::index.Tensor(Tensor self, Tensor?[] indices) -> (Tensor)",
@@ -272,37 +271,229 @@ auto select_registrations TORCHTRT_UNUSED =
                auto ts = args[1].IValue()->toListRef();
 
                std::vector<nvinfer1::ITensor*> tensors;
-               for (auto t : ts) {
+               std::vector<int32_t> adv_idx_indices;
+               for (auto i = 0; i < ts.size(); i++) {
+                 auto t = ts[i];
                  if (t.isTensor()) {
-                   auto torch_tensor = t.toTensor();
+                   auto torch_tensor = t.toTensor().to(torch::kInt32);
                    tensors.push_back(tensor_to_const(ctx, torch_tensor));
+                   adv_idx_indices.push_back(i);
                  } else {
-                   auto cont = t.toCustomClass<TensorContainer>();
-                   tensors.push_back(cont->tensor());
+                   // IValue
+                   if (!t.isNone()) {
+                     adv_idx_indices.push_back(i);
+                     auto cont = t.toCustomClass<TensorContainer>();
+                     // Set datatype for indices tensor to INT32
+                     auto identity = ctx->net->addIdentity(*cont->tensor());
+                     identity->setOutputType(0, nvinfer1::DataType::kINT32);
+                     tensors.push_back(identity->getOutput(0));
+                   }
                  }
                }
 
-               // In TorchScript, aten::index.Tensor indexes the self tensor along its each dimension by several
-               // indexes. In this version of Torch-TensorRT, it can only receive one index tensor which means it only
-               // indexes the self tensor along dimension 0.
-               TORCHTRT_CHECK(
-                   tensors.size() == 1,
-                   "In this version of Torch-TensorRT, aten::index.Tensor can only receive one index tensor which means it only indexes the self tensor along dimension 0.");
-               auto indicesTensor = tensors[0];
-               // Set datatype for indices tensor to INT32
-               auto identity = ctx->net->addIdentity(*indicesTensor);
-               identity->setOutputType(0, nvinfer1::DataType::kINT32);
-               indicesTensor = identity->getOutput(0);
+               if (tensors.size() == 0) {
+                 auto identity_out = ctx->net->addIdentity(*in)->getOutput(0);
+                 auto out = ctx->AssociateValueAndTensor(n->outputs()[0], identity_out);
+                 LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+               } else if (tensors.size() == 1) {
+                 auto indicesTensor = tensors[0];
+                 // Set datatype for indices tensor to INT32
+                 auto identity = ctx->net->addIdentity(*indicesTensor);
+                 identity->setOutputType(0, nvinfer1::DataType::kINT32);
+                 indicesTensor = identity->getOutput(0);
 
-               // IGatherLayer takes in input tensor, the indices, and the axis of input tensor to take indices
-               // from
-               auto gather_layer = ctx->net->addGather(*in, *indicesTensor, 0);
-               TORCHTRT_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
-               auto gather_out = gather_layer->getOutput(0);
+                 // IGatherLayer takes in input tensor, the indices, and the axis of input tensor to take indices
+                 // from
+                 auto gather_layer = ctx->net->addGather(*in, *indicesTensor, 0);
+                 TORCHTRT_CHECK(gather_layer, "Unable to create gather layer from node: " << *n);
+                 auto gather_out = gather_layer->getOutput(0);
 
-               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], gather_out);
+                 auto out = ctx->AssociateValueAndTensor(n->outputs()[0], gather_out);
+                 LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+               } else {
+                 auto inDims = in->getDimensions();
+                 int rank = inDims.nbDims;
+                 LOG_WARNING("If indices include negative values, the exported graph will produce incorrect results.");
+                 int adv_idx_count = adv_idx_indices.size();
+                 auto in_shape_itensor = ctx->net->addShape(*in)->getOutput(0);
 
-               LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+                 std::vector<nvinfer1::ITensor*> dim_tensor_list;
+                 for (int i = 0; i < rank; i++) {
+                   auto dim_tensor =
+                       ctx->net
+                           ->addGather(*in_shape_itensor, *tensor_to_const(ctx, torch::tensor({i}, torch::kInt32)), 0)
+                           ->getOutput(0);
+                   dim_tensor_list.push_back(dim_tensor);
+                 }
+
+                 // t: [x_1, y_1, y_2, ..., x_m, ..., y_n] -> t: [x_1, x_2, ..., x_m, y_1, y_2, ..., y_n],
+                 // where t is a tensor of rank m+n, {x_i} are axes where tensor index is provided, and {y_i} are axes
+                 // for ":".
+                 auto in_transpose_layer = ctx->net->addShuffle(*in);
+                 TORCHTRT_CHECK(in_transpose_layer, "Unable to create shuffle layer from node: " << *n);
+                 nvinfer1::Permutation permute;
+                 std::vector<int32_t> new_order;
+                 for (int i = 0; i < adv_idx_count; i++) {
+                   new_order.push_back(adv_idx_indices[i]);
+                 }
+                 for (int i = 0; i < rank; i++) {
+                   if (std::find(adv_idx_indices.begin(), adv_idx_indices.end(), i) == adv_idx_indices.end()) {
+                     new_order.push_back(i);
+                   }
+                 }
+                 std::copy(new_order.begin(), new_order.end(), permute.order);
+                 in_transpose_layer->setSecondTranspose(permute);
+                 auto shuffle_out = in_transpose_layer->getOutput(0);
+
+                 //  t: [x_1, x_2, ..., x_m, y_1, y_2, ..., y_n] -> t: [x_1*x_2* ...*x_m, y_1*y_2* ...*y_n]
+                 nvinfer1::ITensor* flatten_tensor = NULL;
+                 {
+                   auto shuffle_shape_tensor = ctx->net->addShape(*shuffle_out)->getOutput(0);
+                   auto d0 = tensor_to_const(ctx, torch::tensor({1}, torch::kInt32));
+                   for (int i = 0; i < adv_idx_count; i++) {
+                     auto dim_tensor =
+                         ctx->net
+                             ->addGather(
+                                 *shuffle_shape_tensor, *tensor_to_const(ctx, torch::tensor({i}, torch::kInt32)), 0)
+                             ->getOutput(0);
+                     d0 = add_elementwise(
+                              ctx,
+                              nvinfer1::ElementWiseOperation::kPROD,
+                              d0,
+                              dim_tensor,
+                              std::string("compute_dim0_") + std::to_string(i))
+                              ->getOutput(0);
+                   }
+
+                   auto d1 = tensor_to_const(ctx, torch::tensor({1}, torch::kInt32));
+                   for (int i = adv_idx_count; i < rank; i++) {
+                     auto dim_tensor =
+                         ctx->net
+                             ->addGather(
+                                 *shuffle_shape_tensor, *tensor_to_const(ctx, torch::tensor({i}, torch::kInt32)), 0)
+                             ->getOutput(0);
+                     d1 = add_elementwise(
+                              ctx,
+                              nvinfer1::ElementWiseOperation::kPROD,
+                              d1,
+                              dim_tensor,
+                              std::string("compute_dim1_") + std::to_string(i))
+                              ->getOutput(0);
+                   }
+
+                   std::vector<nvinfer1::ITensor*> concat_tensors;
+                   concat_tensors.push_back(d0);
+                   concat_tensors.push_back(d1);
+                   auto concat_layer = ctx->net->addConcatenation(concat_tensors.data(), concat_tensors.size());
+
+                   auto shuffle = ctx->net->addShuffle(*shuffle_out);
+                   shuffle->setInput(1, *concat_layer->getOutput(0));
+                   flatten_tensor = shuffle->getOutput(0);
+                   LOG_DEBUG(flatten_tensor->getDimensions());
+                 }
+
+                 // tensor index = \sum_{i=1}^m (ind_i * \prod_{j=i+1}^m (x_j)),  ind_i is input indices[i], x_j is the
+                 // j dimension of input x.
+                 nvinfer1::ITensor* multiplier = dim_tensor_list[adv_idx_indices[adv_idx_count - 1]];
+                 nvinfer1::ITensor* cum_adv_index = tensors[adv_idx_count - 1];
+                 for (int i = adv_idx_count - 2; i >= 0; i--) {
+                   nvinfer1::ITensor* adv_index = add_elementwise(
+                                                      ctx,
+                                                      nvinfer1::ElementWiseOperation::kPROD,
+                                                      tensors[i],
+                                                      multiplier,
+                                                      std::string("adv_index_") + std::to_string(i))
+                                                      ->getOutput(0);
+                   cum_adv_index = add_elementwise(
+                                       ctx,
+                                       nvinfer1::ElementWiseOperation::kSUM,
+                                       cum_adv_index,
+                                       adv_index,
+                                       std::string("cum_adv_index_") + std::to_string(i))
+                                       ->getOutput(0);
+                   multiplier = add_elementwise(
+                                    ctx,
+                                    nvinfer1::ElementWiseOperation::kPROD,
+                                    multiplier,
+                                    dim_tensor_list[adv_idx_indices[i]],
+                                    std::string("multiplier_") + std::to_string(i))
+                                    ->getOutput(0);
+                 }
+
+                 // perform gather
+                 auto gather_out = ctx->net->addGather(*flatten_tensor, *cum_adv_index, 0)->getOutput(0);
+
+                 nvinfer1::ITensor* reshape_output = NULL;
+                 {
+                   auto cum_adv_index_shape_tensor = ctx->net->addShape(*cum_adv_index)->getOutput(0);
+                   // check if all advanced indices are consecutive.
+                   if (adv_idx_count == (adv_idx_indices[adv_idx_count - 1] - adv_idx_indices[0] + 1)) {
+                     // unfold regular index axes
+                     std::vector<nvinfer1::ITensor*> concat_tensors;
+                     concat_tensors.push_back(tensor_to_const(ctx, torch::tensor({-1}, torch::kInt32)));
+                     for (int i = 0; i < rank; i++) {
+                       if (std::find(adv_idx_indices.begin(), adv_idx_indices.end(), i) == adv_idx_indices.end()) {
+                         nvinfer1::ITensor* current_dim = dim_tensor_list[i];
+                         concat_tensors.push_back(current_dim);
+                       }
+                     }
+                     auto concat_layer = ctx->net->addConcatenation(concat_tensors.data(), concat_tensors.size());
+                     auto regular_index_shuffle_layer = ctx->net->addShuffle(*gather_out);
+                     regular_index_shuffle_layer->setInput(1, *concat_layer->getOutput(0));
+                     auto unfold_tensor = regular_index_shuffle_layer->getOutput(0);
+
+                     // Transpose folded advanced indexed axis to its original location.
+                     auto transpose_advanced_shuffle_layer = ctx->net->addShuffle(*unfold_tensor);
+                     nvinfer1::Permutation permute;
+                     std::vector<int32_t> new_order;
+                     for (int i = 1; i < adv_idx_indices[0] + 1; i++) {
+                       new_order.push_back(i);
+                     }
+                     new_order.push_back(0);
+                     for (int i = adv_idx_indices[0] + 1; i < rank - adv_idx_count + 1; i++) {
+                       new_order.push_back(i);
+                     }
+                     std::copy(new_order.begin(), new_order.end(), permute.order);
+                     transpose_advanced_shuffle_layer->setSecondTranspose(permute);
+                     auto shuffle_out = transpose_advanced_shuffle_layer->getOutput(0);
+
+                     // unfold advanced index axes
+                     std::vector<nvinfer1::ITensor*> concat_final_tensors;
+                     for (int i = 0; i < adv_idx_indices[0]; i++) {
+                       nvinfer1::ITensor* current_dim = dim_tensor_list[i];
+                       concat_final_tensors.push_back(current_dim);
+                     }
+                     concat_final_tensors.push_back(cum_adv_index_shape_tensor);
+                     for (int i = adv_idx_indices[0]; i < rank; i++) {
+                       if (std::find(adv_idx_indices.begin(), adv_idx_indices.end(), i) == adv_idx_indices.end()) {
+                         nvinfer1::ITensor* current_dim = dim_tensor_list[i];
+                         concat_final_tensors.push_back(current_dim);
+                       }
+                     }
+                     auto concat_final_shape_layer =
+                         ctx->net->addConcatenation(concat_tensors.data(), concat_tensors.size());
+                     auto unfold_advanced_shuffle_layer = ctx->net->addShuffle(*shuffle_out);
+                     unfold_advanced_shuffle_layer->setInput(1, *concat_final_shape_layer->getOutput(0));
+                     reshape_output = unfold_advanced_shuffle_layer->getOutput(0);
+                   } else {
+                     std::vector<nvinfer1::ITensor*> concat_tensors;
+                     concat_tensors.push_back(cum_adv_index_shape_tensor);
+                     for (int i = 0; i < rank; i++) {
+                       if (std::find(adv_idx_indices.begin(), adv_idx_indices.end(), i) == adv_idx_indices.end()) {
+                         nvinfer1::ITensor* current_dim = dim_tensor_list[i];
+                         concat_tensors.push_back(current_dim);
+                       }
+                     }
+                     auto concat_layer = ctx->net->addConcatenation(concat_tensors.data(), concat_tensors.size());
+                     auto shuffle_layer = ctx->net->addShuffle(*gather_out);
+                     shuffle_layer->setInput(1, *concat_layer->getOutput(0));
+                     reshape_output = shuffle_layer->getOutput(0);
+                   }
+                 }
+
+                 auto out = ctx->AssociateValueAndTensor(n->outputs()[0], reshape_output);
+                 LOG_DEBUG("Output tensor shape: " << out->getDimensions());
+               }
                return true;
              }})
         .pattern(
@@ -360,9 +551,15 @@ auto select_registrations TORCHTRT_UNUSED =
                    stride_.d[i] = 1;
                  }
                }
-               auto slice_layer = ctx->net->addSlice(*in, start_, size_, stride_);
-
-               if (dynamic_shape) { // dynamic shape
+               if (!dynamic_shape) {
+                 auto slice_layer = ctx->net->addSlice(*in, start_, size_, stride_);
+                 LOG_DEBUG("start_:" << start_);
+                 LOG_DEBUG("size_:" << size_);
+                 LOG_DEBUG("stride_:" << stride_);
+                 auto slice_out = slice_layer->getOutput(0);
+                 auto out = ctx->AssociateValueAndTensor(n->outputs()[0], slice_out);
+                 LOG_DEBUG("Slice layer output shape: " << out->getDimensions());
+               } else { // dynamic shape
                  LOG_DEBUG("Using dynamic version of slice");
                  // start tensor
                  at::Tensor start_tensor = torch::zeros({nbdims}).to(torch::kI32);
@@ -398,13 +595,13 @@ auto select_registrations TORCHTRT_UNUSED =
                  auto size_itensor = get_slice_size(ctx, out_start, out_end, stride_itensor, nbdims, node_name);
 
                  // update slice layer
+                 auto slice_layer = ctx->net->addSlice(*in, start_, size_, stride_);
                  slice_layer->setInput(1, *out_start); // start
                  slice_layer->setInput(2, *size_itensor); // size, must be set if input is dynamic
+                 auto slice_out = slice_layer->getOutput(0);
+                 auto out = ctx->AssociateValueAndTensor(n->outputs()[0], slice_out);
+                 LOG_DEBUG("Slice layer output shape: " << out->getDimensions());
                }
-               auto slice_out = slice_layer->getOutput(0);
-
-               auto out = ctx->AssociateValueAndTensor(n->outputs()[0], slice_out);
-               LOG_DEBUG("Slice layer output shape: " << out->getDimensions());
 
                return true;
              }})
@@ -462,6 +659,53 @@ auto select_registrations TORCHTRT_UNUSED =
                new_layer->setName(util::node_info(n).c_str());
 
                auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], new_layer->getOutput(0));
+               LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+               return true;
+             }})
+        .pattern(
+            {"aten::scatter.value(Tensor self, int dim, Tensor index, Scalar value) -> (Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               auto self = args[0].ITensorOrFreeze(ctx);
+               int dim = args[1].unwrapToInt();
+               auto index = args[2].ITensorOrFreeze(ctx);
+               auto index_dim = index->getDimensions();
+               std::vector<int64_t> dim_vec;
+               for (int i = 0; i < index_dim.nbDims; i++) {
+                 dim_vec.push_back(index_dim.d[i]);
+               }
+               auto value = args[3].unwrapToScalar() * torch::ones(dim_vec);
+               auto value_tensor = tensor_to_const(ctx, value, "");
+               if (self->getType() != value_tensor->getType()) {
+                 value_tensor = castITensor(ctx, value_tensor, self->getType());
+               }
+
+               auto layer = ctx->net->addScatter(*self, *index, *value_tensor, nvinfer1::ScatterMode::kELEMENT);
+               layer->setAxis(dim);
+
+               TORCHTRT_CHECK(layer, "Unable to create layer for aten::scatter.value");
+
+               layer->setName(util::node_info(n).c_str());
+
+               auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], layer->getOutput(0));
+               LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
+               return true;
+             }})
+        .pattern(
+            {"aten::scatter.src(Tensor self, int dim, Tensor index, Tensor src) -> (Tensor)",
+             [](ConversionCtx* ctx, const torch::jit::Node* n, args& args) -> bool {
+               auto self = args[0].ITensorOrFreeze(ctx);
+               int dim = args[1].unwrapToInt();
+               auto index = args[2].ITensorOrFreeze(ctx);
+               auto src = args[3].ITensorOrFreeze(ctx);
+
+               auto layer = ctx->net->addScatter(*self, *index, *src, nvinfer1::ScatterMode::kELEMENT);
+               layer->setAxis(dim);
+
+               TORCHTRT_CHECK(layer, "Unable to create layer for aten::scatter.src");
+
+               layer->setName(util::node_info(n).c_str());
+
+               auto out_tensor = ctx->AssociateValueAndTensor(n->outputs()[0], layer->getOutput(0));
                LOG_DEBUG("Output shape: " << out_tensor->getDimensions());
                return true;
              }});

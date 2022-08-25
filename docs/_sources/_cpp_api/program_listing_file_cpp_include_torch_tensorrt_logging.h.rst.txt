@@ -18,10 +18,10 @@ Program Listing for File logging.h
     * LICENSE file in the root directory of this source tree.
     */
    #pragma once
-
+   
    #include <string>
    #include "torch_tensorrt/macros.h"
-
+   
    namespace torch_tensorrt {
    namespace logging {
    enum Level {
@@ -32,19 +32,19 @@ Program Listing for File logging.h
      kDEBUG,
      kGRAPH,
    };
-
+   
    // Are these ones necessary for the user?
    TORCHTRT_API std::string get_logging_prefix();
    TORCHTRT_API void set_logging_prefix(std::string prefix);
-
+   
    TORCHTRT_API void set_reportable_log_level(Level lvl);
-
+   
    TORCHTRT_API void set_is_colored_output_on(bool colored_output_on);
-
+   
    TORCHTRT_API Level get_reportable_log_level();
-
+   
    TORCHTRT_API bool get_is_colored_output_on();
-
+   
    // Dont know if we want this?
    TORCHTRT_API void log(Level lvl, std::string msg);
    } // namespace logging

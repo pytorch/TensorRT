@@ -53,7 +53,9 @@ class TestToConverter(AccTestCase):
         inputs = [
             input,
         ]
-        self.run_test(To(), inputs, expected_ops={acc_ops.to_dtype}, test_implicit_batch_dim=False)
+        self.run_test(
+            To(), inputs, expected_ops={acc_ops.to_dtype}, test_implicit_batch_dim=False
+        )
 
     def test_cuda_fp16(self):
         class To(torch.nn.Module):
@@ -106,7 +108,9 @@ class TestToConverter(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(To(), input_specs, expected_ops={acc_ops.to_dtype, acc_ops.add})
+        self.run_test_with_dynamic_shape(
+            To(), input_specs, expected_ops={acc_ops.to_dtype, acc_ops.add}
+        )
 
     def test_device(self):
         class To(torch.nn.Module):
@@ -150,7 +154,9 @@ class TestToConverter(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(To(), input_specs, expected_ops={acc_ops.to_dtype, acc_ops.add})
+        self.run_test_with_dynamic_shape(
+            To(), input_specs, expected_ops={acc_ops.to_dtype, acc_ops.add}
+        )
 
     def test_device_fp16(self):
         class To(torch.nn.Module):
@@ -240,7 +246,9 @@ class TestToConverter(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(To(), input_specs, expected_ops={acc_ops.to_dtype})
+        self.run_test_with_dynamic_shape(
+            To(), input_specs, expected_ops={acc_ops.to_dtype}
+        )
 
     # Half is not suitable for dynamic shape
     # Error: assert engine
@@ -301,7 +309,9 @@ class TestToConverter(AccTestCase):
             ),
         ]
 
-        self.run_test_with_dynamic_shape(To(), input_specs, expected_ops={acc_ops.to_dtype})
+        self.run_test_with_dynamic_shape(
+            To(), input_specs, expected_ops={acc_ops.to_dtype}
+        )
 
 
 if __name__ == "__main__":
