@@ -19,6 +19,81 @@ commands:
             sudo wget -q https://github.com/bazelbuild/bazel/releases/download/<< parameters.version >>/bazel-<< parameters.version >>-linux-<< parameters.platform >> -O /usr/bin/bazel
             sudo chmod a+x /usr/bin/bazel
 
+  install-cmake:
+    description: Install CMake.
+    parameters:
+        cache:
+            default: true
+            description: Whether or not to cache the installation.
+            type: boolean
+        cache-key:
+            default: v1
+            description: String to use in cache key. Typically overridden when needed to bust cache.
+            type: string
+        install-dir:
+            default: $HOME/cmake
+            description: The path to install CMake to.
+            type: string
+        version:
+            default: 3.18.2
+            description: The version of CMake to install.
+            type: string
+    steps:
+        - when:
+            condition:
+                equal:
+                    - << parameters.cache >>
+                    - true
+            steps:
+                - run:
+                    command: mkdir -pv << parameters.install-dir >>
+                    name: Prep cache restore
+                - restore_cache:
+                    keys:
+                        - cmake-<< parameters.cache-key >>-<< parameters.version >>
+        - run:
+            command: |
+                echo 'export PATH="<< parameters.install-dir >>/bin:$PATH"' >> $BASH_ENV
+            name: Add CMake to PATH
+        - run:
+            command: |
+                if which cmake; then
+                  if cmake --version | grep "<< parameters.version >>"; then
+                    echo "CMake is already installed."
+                    exit 0
+                  else
+                    echo "CMake is already installed but it is the wrong version."
+                  fi
+                fi
+
+                rm -rf << parameters.install-dir >>/*
+                echo "Installing the requested version of CMake."
+                baseUrl="https://github.com/Kitware/CMake/releases/download/"
+                url="${baseUrl}/v<< parameters.version >>/cmake-<< parameters.version >>-Linux-x86_64.tar.gz"
+                curl -sSL -o /tmp/cmake.tar.gz $url
+                tar -C << parameters.install-dir >> --strip-components 1 -zxf /tmp/cmake.tar.gz
+            name: Install CMake
+        - run:
+            command: rm -rf << parameters.install-dir >>/{doc,man}
+            name: Remove unnecessary files
+        - run:
+            command: |
+                ls -l << parameters.install-dir >>/bin
+                echo $PATH
+                cmake --version
+            name: Verify CMake installation
+        - when:
+            condition:
+                equal:
+                    - << parameters.cache >>
+                    - true
+            steps:
+                - save_cache:
+                    key: cmake-<< parameters.cache-key >>-<< parameters.version >>
+                    paths:
+                        - << parameters.install-dir >>
+
+
   install-cuda:
     description: "Install CUDA"
     parameters:
@@ -206,6 +281,26 @@ commands:
             python3 setup.py install --fx-only
             mkdir -p /tmp/dist/builds
             cp dist/* /tmp/dist/builds
+
+  build-cmake:
+    description: "Build the torch-tensorrt using CMake"
+    parameters:
+      platform:
+        type: string
+        default: "x86_64"
+    steps:
+      - run:
+          name: Build torch-tensorrt library with CMake
+          command: |
+            mkdir build
+            cmake -S. -Bbuild \
+              -DCMAKE_MODULE_PATH=cmake/Module \
+              -DTorch_DIR=/opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/site-packages/torch/share/cmake/Torch \
+              -DTensorRT_ROOT=/usr \
+              -DCMAKE_BUILD_TYPE=Debug
+            cmake --build build
+            mkdir -p /tmp/dist/builds
+            cp -r build /tmp/dist/builds
 
   dump-test-env:
     description: "Dump the test env to console"
@@ -632,7 +727,7 @@ jobs:
                 platform: "x86_64"
                 cudnn-version: << pipeline.parameters.cudnn-release-version >>
                 trt-version-short:  << pipeline.parameters.trt-release-version-short >>
-                bazel-version: "5.1.1"
+                bazel-version: << pipeline.parameters.bazel-version >>
                 bazel-platform: "x86_64"
             - run:
                 name: Build cxx11-abi tarball
@@ -703,7 +798,7 @@ jobs:
           platform: "sbsa"
           cudnn-version: << pipeline.parameters.cudnn-jetson-version >>
           trt-version-short:  << pipeline.parameters.trt-jetson-version-short >>
-          bazel-version: "5.1.1"
+          bazel-version: << pipeline.parameters.bazel-version >>
           bazel-platform: "arm64"
       - run:
           name: Set python version
@@ -742,6 +837,45 @@ jobs:
           path: /tmp/dist/jetson
           destination: aarch64-release-pkgs
 
+  build-x86_64-cmake:
+    parameters:
+      cudnn-version:
+        type: string
+      trt-version-short:
+        type: string
+      torch-build:
+        type: string
+      torch-build-index:
+        type: string
+    machine:
+      image: ubuntu-2004-cuda-11.4:202110-01
+    resource_class: xlarge
+    steps:
+      - checkout
+      - create-env:
+          os: "ubuntu2004"
+          platform: "x86_64"
+          cudnn-version: << parameters.cudnn-version >>
+          trt-version-short:  << parameters.trt-version-short >>
+          bazel-platform: "x86_64"
+      - install-cmake:
+          version: 3.24.1
+      - install-torch-from-index:
+          torch-build:  << parameters.torch-build >>
+          torch-build-index: << parameters.torch-build-index >>
+      - build-cmake
+      - run:
+          name: Move to cmake build dir
+          command: |
+            mkdir -p /tmp/dist/cmake
+            cp -r /tmp/dist/builds/* /tmp/dist/cmake
+      - persist_to_workspace:
+          root: /tmp/dist
+          paths:
+            - cmake
+      - store_artifacts:
+          path: /tmp/dist/cmake
+          destination: x86_64-cmake
 
 parameters:
   bazel-version:
@@ -821,7 +955,6 @@ workflows:
           jetpack-version: << pipeline.parameters.jetpack-version >>
           python-version: 3.8.10
 
-
       - build-x86_64-pyt-release:
           torch-build: << pipeline.parameters.torch-release-build >>
           torch-build-index: << pipeline.parameters.torch-release-build-index >>
@@ -854,7 +987,6 @@ workflows:
           trt-version-long: << pipeline.parameters.trt-release-version-long >>
           requires:
             - build-x86_64-pyt-release
-
 
       - build-x86_64-pyt-nightly:
           torch-build: << pipeline.parameters.torch-nightly-build >>
@@ -900,7 +1032,6 @@ workflows:
       - build-x86_64-pyt-release:
           torch-build: << pipeline.parameters.torch-release-build >>
           torch-build-index: << pipeline.parameters.torch-release-build-index >>
-
 
       - test-core-cpp-x86_64:
           name: test-core-cpp-x86_64-pyt-release
@@ -958,7 +1089,6 @@ workflows:
           jetpack-version: << pipeline.parameters.jetpack-version >>
           python-version: 3.8.10
 
-
       - build-x86_64-pyt-release:
           torch-build: << pipeline.parameters.torch-release-build >>
           torch-build-index: << pipeline.parameters.torch-release-build-index >>
@@ -1025,3 +1155,17 @@ workflows:
           trt-version-long: << pipeline.parameters.trt-nightly-version-long >>
           requires:
             - build-x86_64-pyt-nightly
+
+      - build-x86_64-cmake:
+          name: build-x86_64-cmake-pyt-nightly
+          torch-build: << pipeline.parameters.torch-nightly-build >>
+          torch-build-index: << pipeline.parameters.torch-nightly-build-index >>
+          trt-version-short: << pipeline.parameters.trt-nightly-version-short >>
+          cudnn-version: << pipeline.parameters.cudnn-nightly-version >>
+
+      - build-x86_64-cmake:
+          name: build-x86_64-cmake-pyt-release
+          torch-build: << pipeline.parameters.torch-release-build >>
+          torch-build-index: << pipeline.parameters.torch-release-build-index >>
+          trt-version-short: << pipeline.parameters.trt-release-version-short >>
+          cudnn-version: << pipeline.parameters.cudnn-release-version >>
