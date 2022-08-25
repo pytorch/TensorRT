@@ -299,7 +299,7 @@ commands:
       - run:
           name: Pull image
           command: |
-            docker pull << parameters.torch-base-img >>
+            docker pull << parameters.torch-base-image >>
       - run:
           name: Create container
           command: |
