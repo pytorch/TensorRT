@@ -199,7 +199,7 @@
               
               
                 <div class="version">
-                  master (1.2.0a0+c83e09e)
+                  master (1.2.0a0+d43606b)
                 </div>
               
             
@@ -476,12 +476,18 @@ OPTIONS:
 <div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>torchtrtc tests/modules/ssd_traced.jit.pt ssd_trt.ts <span class="s2">&quot;[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@f16%contiguous&quot;</span> -p f16
 </pre></div>
 </div>
-<p>To run with custom torch operators
-.. code-block:: shell
-torchtrtc tests/modules/ssd_traced.jit.pt ssd_trt.ts –custom-torch-ops=&lt;path to custom library&gt; “[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]&#64;fp16%contiguous” -p f16</p>
-<p>To run with custom converters
-.. code-block:: shell
-torchtrtc tests/modules/ssd_traced.jit.pt ssd_trt.ts –custom-converters=&lt;path to custom library&gt; “[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]&#64;fp16%contiguous” -p f16</p>
+<ul class="simple">
+<li><p>To include a set of custom operators</p></li>
+</ul>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>torchtrtc tests/modules/ssd_traced.jit.pt ssd_trt.ts --custom-torch-ops<span class="o">=</span>&lt;path to custom library .so file&gt; <span class="s2">&quot;[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@fp16%contiguous&quot;</span> -p f16
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>To include a set of custom converters</p></li>
+</ul>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span>torchtrtc tests/modules/ssd_traced.jit.pt ssd_trt.ts --custom-converters<span class="o">=</span>&lt;path to custom library .so file&gt; <span class="s2">&quot;[(1,3,300,300); (1,3,512,512); (1, 3, 1024, 1024)]@fp16%contiguous&quot;</span> -p f16
+</pre></div>
+</div>
 </section>
 
 
