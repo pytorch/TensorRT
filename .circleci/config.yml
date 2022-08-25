@@ -1196,10 +1196,10 @@ workflows:
           python-version: 3.8.10
 
       - build-x86_64-pyt-ngc:
-          torch-base-img: << pipeline.parameters.torch-ngc-base-image >>
+          torch-base-image: << pipeline.parameters.torch-ngc-base-image >>
 
       - package-x86_64-ngc:
-          torch-base-img: << pipeline.parameters.torch-ngc-base-image >>
+          torch-base-image: << pipeline.parameters.torch-ngc-base-image >>
           enabled: << pipeline.parameters.enable-ngc-packaging >>
           requires:
             - build-x86_64-pyt-ngc
