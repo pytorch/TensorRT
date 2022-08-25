@@ -298,7 +298,7 @@ commands:
               -DTorch_DIR=/opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/site-packages/torch/share/cmake/Torch \
               -DTensorRT_ROOT=/usr \
               -DCMAKE_BUILD_TYPE=Debug \
-              -DCMAKE_CUDA_ARCHITECTURES="60 61 62 70 72 75 86"
+              -DCMAKE_CUDA_ARCHITECTURES="60;61;62;70;72;75;80;86"
             cmake --build build
             mkdir -p /tmp/dist/builds
             cp -r build /tmp/dist/builds
