@@ -288,28 +288,42 @@ commands:
       release:
         type: boolean
         default: false
+      torch-base-img:
+        type: string
+        default: nvcr.io/nvidia/pytorch:latest
     steps:
       - run:
-          name: Build torch-tensorrt python release (pre-cxx11-abi)
+          name: Log into docker
           command: |
-            mv toolchains/docker/WORKSPACE.ngc WORKSPACE
-            cd py
-            python3 -m pip install wheel setuptools
-            python3 -m pip install pybind11==2.6.2
+            docker login --username "$oauthtoken" --password $NGC_TOKEN
+      - run:
+          name: Pull image
+          command: |
+            docker pull << parameters.torch-base-img >>
+      - run:
+          name: Create container
+          command: |
+              docker run -it -d --name ngc_build_container -v /home/circleci/project:/workspace  -w /workspace  << parameters.torch-base-img >>
+      - run:
+          name: Install build deps
+          command: |
+            docker exec ngc_build_container bash -c "wget -q https://github.com/bazelbuild/bazel/releases/download/$(cat /workspace/.bazelversion)/bazel-$(cat /workspace/.bazelversion)-linux-x86_64 -O /usr/bin/bazel && chmod a+x /usr/bin/bazel"
+            docker exec ngc_build_container bash -c "mv /workspace/toolchains/docker/WORKSPACE.ngc /workspace/WORKSPACE"
+            docker exec ngc_build_container bash -c "cd /workspace/py && pip install wheel setuptools pybind11==2.6.2"
       - when:
           condition: << parameters.release >>
           steps:
             - run:
                 name: Build torch-tensorrt debug build for NGC
                 command: |
-                  python3 setup.py bdist_wheel --use-cxx11-abi
+                  docker exec ngc_build_container bash -c "cd /workspace/py && python3 setup.py bdist_wheel --use-cxx11-abi"
       - unless:
           condition: << parameters.release >>
           steps:
             - run:
                 name: Build torch-tensorrt release build for NGC
                 command: |
-                  python3 setup.py bdist_wheel --use-cxx11-abi --release
+                  docker exec ngc_build_container bash -c "cd /workspace/py && python3 setup.py bdist_wheel --use-cxx11-abi --release"
       - run:
           name: Collect builds
           command: |
@@ -916,19 +930,17 @@ jobs:
           destination: x86_64-cmake
 
   build-x86_64-pyt-ngc:
-    docker:
-      - image: << pipeline.parameters.torch-ngc-base-image >>
-        auth:
-          username: '$oauthtoken'
-          password: $NGC_TOKEN
+    parameters:
+      torch-base-image:
+        type: string
+    machine:
+      image: ubuntu-2004-cuda-11.4:202110-01
     resource_class: xlarge
     steps:
       - checkout
-      - install-bazel:
-          version: << pipeline.parameters.bazel-version >>
-          platform: "x86_64"
       - build-py-ngc:
           release: false
+          torch-base-image: << parameters.torch-base-image >>
       - run:
           name: Move to NGC dir
           command: |
@@ -947,22 +959,19 @@ jobs:
       enabled:
         type: boolean
         default: false
-    docker:
-      - image: << pipeline.parameters.torch-ngc-base-image >>
-        auth:
-          username: '$oauthtoken'
-          password: $NGC_TOKEN
+      torch-base-image:
+        type: string
+    machine:
+      image: ubuntu-2004-cuda-11.4:202110-01
     resource_class: xlarge
     steps:
       - when:
           condition: << parameters.enabled >>
           steps:
             - checkout
-            - install-bazel:
-                version: << pipeline.parameters.bazel-version >>
-                platform: "x86_64"
             - build-py-ngc:
                 release: true
+                torch-base-image: << parameters.torch-base-image >>
             - run:
                 name: Collect packages
                 command: |
@@ -1186,15 +1195,18 @@ workflows:
           jetpack-version: << pipeline.parameters.jetpack-version >>
           python-version: 3.8.10
 
-      - build-x86_64-pyt-ngc
+      - build-x86_64-pyt-ngc:
+          torch-base-img: << pipeline.parameters.torch-ngc-base-image >>
 
       - package-x86_64-ngc:
+          torch-base-img: << pipeline.parameters.torch-ngc-base-image >>
+          enabled: << pipeline.parameters.enable-ngc-packaging >>
           requires:
             - build-x86_64-pyt-ngc
 
       - package-jetson:
           name: package-release-aarch64-jetson
-          enabled: << pipeline.parameters.enable-packaging >>
+          enabled: << pipeline.parameters.enable-ngc-packaging >>
           torch-build: << pipeline.parameters.torch-jetson-build >>
           jetpack-version: << pipeline.parameters.jetpack-version >>
           python-version: 3.8.10
