@@ -303,7 +303,7 @@ commands:
             mkdir -p /tmp/dist/builds
             cp -r build/bin /tmp/dist/builds
             cp -r build/lib /tmp/dist/builds
-            cp -r build/cpp/include /tmp/dist/builds
+            cp -r cpp/include /tmp/dist/builds
 
 
   dump-test-env:
