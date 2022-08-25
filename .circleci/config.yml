@@ -293,13 +293,13 @@ commands:
           name: Build torch-tensorrt library with CMake
           command: |
             mkdir build
-            cmake -S. -Bbuild \
+            export PATH=$PATH:/usr/local/cuda
+            ~/cmake/bin/cmake -S. -Bbuild \
               -DCMAKE_MODULE_PATH=cmake/Module \
               -DTorch_DIR=/opt/circleci/.pyenv/versions/3.9.4/lib/python3.9/site-packages/torch/share/cmake/Torch \
               -DTensorRT_ROOT=/usr \
-              -DCMAKE_BUILD_TYPE=Debug \
-              -DCMAKE_CUDA_ARCHITECTURES="60;61;62;70;72;75;80;86"
-            cmake --build build
+              -DCMAKE_BUILD_TYPE=Debug
+            cmake --build build -j4
             mkdir -p /tmp/dist/builds
             cp -r build /tmp/dist/builds
 
