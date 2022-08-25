@@ -916,8 +916,8 @@ jobs:
           destination: x86_64-cmake
 
   build-x86_64-pyt-ngc:
-    machine:
-      image: << pipeline.parameters.torch-ngc-base-image >>
+    docker:
+      - image: << pipeline.parameters.torch-ngc-base-image >>
     resource_class: xlarge
     steps:
       - checkout
@@ -944,8 +944,8 @@ jobs:
       enabled:
         type: boolean
         default: false
-    machine:
-      image: << pipeline.parameters.torch-ngc-base-image >>
+    docker:
+      - image: << pipeline.parameters.torch-ngc-base-image >>
     resource_class: xlarge
     steps:
       - when:
