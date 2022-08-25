@@ -922,8 +922,8 @@ jobs:
     steps:
       - checkout
       - install-bazel:
-          bazel-version: << pipeline.parameters.bazel-version >>
-          bazel-platform: "x86_64"
+          version: << pipeline.parameters.bazel-version >>
+          platform: "x86_64"
       - build-py-ngc:
           release: false
       - run:
@@ -953,8 +953,8 @@ jobs:
           steps:
             - checkout
             - install-bazel:
-                bazel-version: << pipeline.parameters.bazel-version >>
-                bazel-platform: "x86_64"
+                version: << pipeline.parameters.bazel-version >>
+                platform: "x86_64"
             - build-py-ngc:
                 release: true
             - run:
