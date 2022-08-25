@@ -919,7 +919,7 @@ jobs:
     docker:
       - image: << pipeline.parameters.torch-ngc-base-image >>
         auth:
-          username: $NGC_TOKEN
+          username: '$oauthtoken'
           password: $NGC_TOKEN
     resource_class: xlarge
     steps:
@@ -950,7 +950,7 @@ jobs:
     docker:
       - image: << pipeline.parameters.torch-ngc-base-image >>
         auth:
-          username: $NGC_TOKEN
+          username: '$oauthtoken'
           password: $NGC_TOKEN
     resource_class: xlarge
     steps:
