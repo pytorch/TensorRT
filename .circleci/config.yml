@@ -288,7 +288,7 @@ commands:
       release:
         type: boolean
         default: false
-      torch-base-img:
+      torch-base-image:
         type: string
         default: nvcr.io/nvidia/pytorch:latest
     steps:
@@ -303,7 +303,7 @@ commands:
       - run:
           name: Create container
           command: |
-              docker run -it -d --name ngc_build_container -v /home/circleci/project:/workspace  -w /workspace  << parameters.torch-base-img >>
+              docker run -it -d --name ngc_build_container -v /home/circleci/project:/workspace  -w /workspace  << parameters.torch-base-image >>
       - run:
           name: Install build deps
           command: |
