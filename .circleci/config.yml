@@ -286,7 +286,7 @@ commands:
     description: "Build the torch-tensorrt python release for NGC PyTorch (cxx11-abi)"
     parameters:
       release:
-        type: bool
+        type: boolean
         default: false
     steps:
       - run:
