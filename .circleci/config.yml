@@ -918,6 +918,9 @@ jobs:
   build-x86_64-pyt-ngc:
     docker:
       - image: << pipeline.parameters.torch-ngc-base-image >>
+        auth:
+          username: $oauthtoken
+          password: $NGC_TOKEN
     resource_class: xlarge
     steps:
       - checkout
@@ -946,6 +949,9 @@ jobs:
         default: false
     docker:
       - image: << pipeline.parameters.torch-ngc-base-image >>
+        auth:
+          username: $oauthtoken
+          password: $NGC_TOKEN
     resource_class: xlarge
     steps:
       - when:
