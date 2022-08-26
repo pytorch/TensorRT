@@ -307,6 +307,7 @@ commands:
       - run:
           name: Install build deps
           command: |
+            export BAZEL_VERSION="$(cat /home/circleci/project/.bazelversion)"
             docker exec ngc_build_container bash -c "wget https://github.com/bazelbuild/bazel/releases/download/$BAZEL_VERSION/bazel-$BAZEL_VERSION-linux-x86_64 -O /usr/bin/bazel && chmod a+x /usr/bin/bazel"
             docker exec ngc_build_container bash -c "mv /workspace/docker/WORKSPACE.ngc /workspace/WORKSPACE"
             docker exec ngc_build_container bash -c "cd /workspace/py && pip install wheel setuptools pybind11==2.6.2"
