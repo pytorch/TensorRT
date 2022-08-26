@@ -22,7 +22,7 @@ CXX11_ABI = False
 
 JETPACK_VERSION = None
 
-__version__ = '1.2.0a0'
+__version__ = '1.2.0a0.nv22.07'
 FX_ONLY = False
 
 def get_git_revision_short_hash() -> str:
@@ -296,7 +296,7 @@ setup(
     long_description=long_description,
     ext_modules=ext_modules,
     install_requires=[
-        'torch>=1.11.0+cu113<1.12.0',
+        'torch>=1.13.0+cu113,<1.14.0',
     ],
     setup_requires=[],
     cmdclass={
