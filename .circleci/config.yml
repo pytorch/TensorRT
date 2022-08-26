@@ -295,7 +295,7 @@ commands:
       - run:
           name: Log into docker
           command: |
-            docker login --username "$oauthtoken" --password $NGC_TOKEN
+            docker login --username="\$oauthtoken" --password=$NGC_TOKEN nvcr.io
       - run:
           name: Pull image
           command: |
